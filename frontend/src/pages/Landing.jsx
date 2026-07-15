@@ -208,7 +208,9 @@ export default function Landing() {
   const navigate = useNavigate();
   const { isDark, toggleTheme } = useTheme();
   const { availableLanguages, language, setLanguage, t } = useTranslation();
-  const copy = LANDING_COPY[language] || LANDING_COPY.ru;
+  // Map unified language codes to legacy LANDING_COPY keys ('uz-Latn' → 'uz')
+  const landingCopyKey = language?.startsWith('uz') ? 'uz' : language?.split('-')[0];
+  const copy = LANDING_COPY[landingCopyKey] || LANDING_COPY.ru;
   const cardStyle = useMemo(() => buildGlassStyle(isDark), [isDark]);
   const heroCardStyle = useMemo(() => buildGlassStyle(isDark, 'hero'), [isDark]);
   const accentCardStyle = useMemo(() => buildGlassStyle(isDark, 'accent'), [isDark]);
@@ -307,7 +309,7 @@ export default function Landing() {
   // Теперь 2 цели: «Войти в систему» (→ /login) и «Связаться с продажами» (→ telegram).
   // Кнопка «Связаться с продажами» открывает Telegram-чат с поддержкой.
   const handleSalesContact = () => {
-    const telegramUrl = toTelegramUrl(t('telegram'));
+    const telegramUrl = toTelegramUrl(t('legacy.telegram'));
     if (telegramUrl) {
       window.open(telegramUrl, '_blank', 'noopener,noreferrer');
     } else {
@@ -330,7 +332,7 @@ export default function Landing() {
               <Stethoscope size={18} />
             </div>
             <div>
-              <strong>{t('title')}</strong>
+              <strong>{t('legacy.title')}</strong>
               <span>{copy.liveStatus}</span>
             </div>
           </a>
@@ -349,8 +351,8 @@ export default function Landing() {
               size="sm"
               onClick={toggleTheme}
               className="landing-toolbar-button"
-              aria-label={isDark ? t('lightTheme') : t('darkTheme')}
-              title={isDark ? t('lightTheme') : t('darkTheme')}
+              aria-label={isDark ? t('legacy.lightTheme') : t('legacy.darkTheme')}
+              title={isDark ? t('legacy.lightTheme') : t('legacy.darkTheme')}
             >
               {isDark ? <Sun size={16} /> : <Moon size={16} />}
             </Button>
@@ -758,14 +760,14 @@ export default function Landing() {
               </Button>
 
               <div className="landing-contact-list">
-                <ContactRow icon={MapPin} label={copy.contactLabels.address} value={t('address')} />
-                <ContactRow icon={Phone} label={copy.contactLabels.phone} value={t('phone')} href={toTelUrl(t('phone'))} />
-                <ContactRow icon={Clock} label={copy.contactLabels.schedule} value={t('schedule')} />
+                <ContactRow icon={MapPin} label={copy.contactLabels.address} value={t('legacy.address')} />
+                <ContactRow icon={Phone} label={copy.contactLabels.phone} value={t('legacy.phone')} href={toTelUrl(t('legacy.phone'))} />
+                <ContactRow icon={Clock} label={copy.contactLabels.schedule} value={t('legacy.schedule')} />
                 <ContactRow
                   icon={MessageSquare}
                   label={copy.contactLabels.support}
-                  value={t('telegram')}
-                  href={toTelegramUrl(t('telegram'))}
+                  value={t('legacy.telegram')}
+                  href={toTelegramUrl(t('legacy.telegram'))}
                 />
               </div>
             </div>
@@ -778,7 +780,7 @@ export default function Landing() {
               <Stethoscope size={18} />
             </div>
             <div>
-              <strong>{t('title')}</strong>
+              <strong>{t('legacy.title')}</strong>
               <span>{copy.footer.tagline}</span>
             </div>
           </div>

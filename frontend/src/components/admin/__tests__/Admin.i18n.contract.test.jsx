@@ -14,7 +14,7 @@ const files = {
 };
 
 const translationsSource = fs.readFileSync(
-  path.join(ROOT, 'components/laboratory/utils/labTranslations.js'), 'utf8'
+  path.join(ROOT, 'i18n/locales/ru.js'), 'utf8'
 );
 
 describe('Admin components STRAT#36 — i18n migration', () => {

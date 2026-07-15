@@ -20,11 +20,17 @@ const ROOT = path.resolve(process.cwd());
 
 describe('P0-19: i18n extraction pattern', () => {
   it('useTranslation hook has at least 3 new keys added (demonstrating extraction)', () => {
-    const useTranslation = path.join(ROOT, 'src/hooks/useTranslation.jsx');
-    const src = fs.readFileSync(useTranslation, 'utf-8');
-    // We look for PR-44 marker keys that demonstrate the extraction pattern
-    // These are new keys added to the translations object
+    // After i18n unification, the unified locale file holds all keys.
+    // We verify the legacy namespace still contains the PR-44 marker keys
+    // (verificationTitle, verificationCode, sendCode) that were the original
+    // extraction demonstration.
+    const ruLocale = path.join(ROOT, 'src/i18n/locales/ru.js');
+    const src = fs.readFileSync(ruLocale, 'utf-8');
+    // PR-44 marker comment preserved in ru.js header
     expect(src).toMatch(/PR-44/);
+    expect(src).toMatch(/verificationTitle/);
+    expect(src).toMatch(/verificationCode/);
+    expect(src).toMatch(/sendCode/);
   });
 
   it('at least one production component imports and uses useTranslation for a previously-hardcoded string', () => {

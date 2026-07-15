@@ -6,7 +6,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT = path.resolve(__dirname, '../..');
 const source = fs.readFileSync(path.join(ROOT, 'pages/DoctorPanel.jsx'), 'utf8');
-const translationsSource = fs.readFileSync(path.join(ROOT, 'components/laboratory/utils/labTranslations.js'), 'utf8');
+const translationsSource = fs.readFileSync(path.join(ROOT, 'i18n/locales/ru.js'), 'utf8');
 
 describe('DoctorPanel STRAT#35 — i18n migration', () => {
   it('imports t from i18n adapter', () => {
