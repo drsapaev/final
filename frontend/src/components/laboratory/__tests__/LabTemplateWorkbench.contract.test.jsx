@@ -63,12 +63,41 @@ describe('LabTemplateWorkbench template version command contract', () => {
     const onClickBody = source.slice(onClickStart, onClickEnd);
 
     expect(onClickBody).toContain('await confirm(');
-    expect(onClickBody).toContain("'Сброс черновика'");
+    // STRAT#10: строка мигрирована на t('confirm.reset_draft_title')
+    expect(onClickBody).toContain("t('confirm.reset_draft_title')");
     expect(onClickBody).toContain("intent: 'warning'");
     expect(onClickBody).toContain('if (!ok) return;');
     // Не должно быть мгновенного setDraftVersion без confirm
     const setDraftIdx = onClickBody.indexOf('setDraftVersion(hydrateVersion(');
     const confirmIdx = onClickBody.indexOf('await confirm(');
     expect(setDraftIdx).toBeGreaterThan(confirmIdx);
+  });
+
+  it('STRAT#10: both confirm dialogs (archive + reset) use t() from labTranslations', () => {
+    // STRAT#10: archive и reset dialogs мигрированы на t()
+    expect(source).toContain("from './utils/labTranslations'");
+    expect(source).toContain('import { t }');
+
+    // Archive dialog
+    expect(source).toContain("t('confirm.archive_title')");
+    expect(source).toContain("t('confirm.archive_message')");
+    expect(source).toContain("t('confirm.archive_description')");
+    expect(source).toContain("t('confirm.archive_confirm')");
+
+    // Reset dialog
+    expect(source).toContain("t('confirm.reset_draft_title')");
+    expect(source).toContain("t('confirm.reset_draft_message')");
+    expect(source).toContain("t('confirm.reset_draft_description')");
+    expect(source).toContain("t('confirm.reset_confirm')");
+
+    // Общий cancel label
+    expect(source).toContain("t('confirm.cancel')");
+
+    // Больше нет хардкоженных русских строк в confirm() calls
+    expect(source).not.toContain("title: 'Архивирование версии шаблона'");
+    expect(source).not.toContain("title: 'Сброс черновика'");
+    expect(source).not.toContain("confirmLabel: 'Архивировать'");
+    expect(source).not.toContain("confirmLabel: 'Сбросить'");
+    expect(source).not.toContain("cancelLabel: 'Отмена'");
   });
 });
