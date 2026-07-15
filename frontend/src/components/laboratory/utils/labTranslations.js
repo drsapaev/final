@@ -786,6 +786,83 @@ const TRANSLATIONS = {
     no_data: 'Нет данных',
     search_placeholder: 'Поиск...',
   },
+  // ─── Final remaining (STRAT#46) ──────────────────────────────────────────
+  final: {
+    // PaymentSuccess
+    link_copied: 'Ссылка скопирована в буфер обмена',
+    // TelegramMiniAppPatientShell
+    patient_form_title: 'Анкета перед визитом',
+    // ForgotPassword
+    password_recovery_title: 'Восстановление пароля',
+    password_recovery_subtitle: 'Выберите способ восстановления пароля',
+    // TwoFactorSetupWizard
+    twofactor_step1_title: 'Выбор метода',
+    twofactor_step1_desc: 'Выберите способ двухфакторной аутентификации',
+    twofactor_step2_title: 'Настройка',
+    twofactor_step2_desc: 'Настройте выбранный метод',
+    twofactor_step3_title: 'Подтверждение',
+    twofactor_step3_desc: 'Подтвердите настройку',
+    twofactor_step4_title: 'Резервные коды',
+    twofactor_step4_desc: 'Сохраните резервные коды',
+    twofactor_step5_title: 'Завершение',
+    twofactor_step5_desc: 'Настройка завершена',
+    // AI
+    copied_to_clipboard: 'Скопировано в буфер обмена',
+    icd_added_to_form: 'Код МКБ-10 добавлен в форму',
+    // PhotoUploader
+    photo_select_patient: 'Для загрузки фото выберите пациента или визит',
+    photo_upload_failed: 'Не удалось загрузить фото. Проверьте соединение и попробуйте снова.',
+    photo_read_failed: 'Не удалось прочитать файл.',
+    photo_deleted: 'Фото удалено',
+    photo_delete_failed: 'Не удалось удалить фото. Проверьте соединение и попробуйте снова.',
+    // PriceOverrideManager
+    price_override_fields_required: 'Заполните цену и причину изменения',
+    price_override_invalid: 'Введите корректную цену',
+    price_override_sent: 'Изменение цены отправлено на одобрение',
+    // EmailSMSManager
+    col_template: 'Шаблон',
+    col_variables: 'Переменные',
+    // ECGViewer
+    ecg_saved: 'ЭКГ сохранена в истории пациента',
+    ecg_not_saved: 'ЭКГ загружена, но не сохранена в истории. Проверьте соединение.',
+    ecg_parse_warning: 'Не удалось разобрать файл ЭКГ. Параметры не извлечены — показан только просмотр.',
+    ecg_download_failed: 'Не удалось скачать файл. Проверьте соединение и попробуйте позже.',
+    ecg_delete_failed: 'Не удалось удалить файл. Проверьте соединение и попробуйте позже.',
+    // Mobile
+    check_connection: 'Проверьте подключение к интернету и попробуйте снова',
+    notifications_not_supported: 'Уведомления не поддерживаются в этом браузере',
+    // Modal
+    modal_confirm_title: 'Подтверждение',
+    modal_notification_title: 'Уведомление',
+    // ComponentTest
+    col_name: 'Имя',
+    col_role: 'Роль',
+    test_modal_title: 'Тестовое модальное окно',
+    form_submitted: 'Форма отправлена',
+    validation_passed: 'Валидация прошла',
+    validation_error: 'Ошибка валидации',
+    // VoiceRecorder
+    mic_permission_required: 'Разрешите доступ к микрофону в настройках браузера',
+    // NotificationPrompt
+    notifications_blocked: 'Уведомления заблокированы. Разрешите их в настройках браузера.',
+    notifications_enable_failed: 'Не удалось включить уведомления. Проверьте настройки браузера.',
+    // VisitTimeline
+    timeline_appointment_created: 'Запись создана',
+    timeline_payment: 'Оплата',
+    timeline_doctor_visit: 'Прием у врача',
+    timeline_emr: 'ЭМК',
+    timeline_prescription: 'Рецепт',
+    // AppointmentFlow
+    flow_payment: 'Оплата',
+    flow_start_visit: 'Начать прием',
+    flow_emr: 'ЭМК',
+    flow_prescription: 'Рецепт',
+    // AppointmentContextMenu
+    emergency_actions_title: 'Экстренные действия со всеми записями врача: перенос на другой день или отмена с возвратом',
+    // useTranslation (legacy)
+    app_subtitle_ru: 'Система управления медицинской клиникой',
+    app_subtitle_uz: 'Медициналық клиниканы басқару жүйесі',
+  },
 };
 
 /**

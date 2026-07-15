@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 // Тестовый компонент для проверки работоспособности всех созданных компонентов
 import React, { useState } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -36,9 +37,9 @@ function ComponentTestInner() {
   ]);
 
   const tableColumns = [
-    { key: 'name', title: 'Имя', sortable: true },
+    { key: 'name', title: t('final.col_name'), sortable: true },
     { key: 'email', title: 'Email', sortable: true },
-    { key: 'role', title: 'Роль', sortable: true }
+    { key: 'role', title: t('final.col_role'), sortable: true }
   ];
 
   const containerStyle = {
@@ -92,7 +93,7 @@ function ComponentTestInner() {
 
   const handleTestModal = () => {
     openModal({
-      title: 'Тестовое модальное окно',
+      title: t('final.test_modal_title'),
       content: (
         <div>
           <p>Это тестовое модальное окно для проверки работоспособности.</p>
@@ -116,7 +117,7 @@ function ComponentTestInner() {
     logger.log('Form submitted:', values);
     addToast({
       type: 'success',
-      title: 'Форма отправлена',
+      title: t('final.form_submitted'),
       message: `Данные: ${JSON.stringify(values)}`
     });
   };
@@ -133,13 +134,13 @@ function ComponentTestInner() {
     if (isValid) {
       addToast({
         type: 'success',
-        title: 'Валидация прошла',
+        title: t('final.validation_passed'),
         message: 'Все поля корректны'
       });
     } else {
       addToast({
         type: 'error',
-        title: 'Ошибка валидации',
+        title: t('final.validation_error'),
         message: 'Проверьте заполнение полей'
       });
     }

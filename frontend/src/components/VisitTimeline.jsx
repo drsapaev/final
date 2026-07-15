@@ -1,3 +1,4 @@
+import { t } from '../i18n/adapter';
 import { CheckCircle, Clock, AlertCircle, CreditCard, User, FileText, Pill } from 'lucide-react';
 import PropTypes from 'prop-types';
 import { Card, Badge } from './ui/macos';
@@ -12,7 +13,7 @@ const VisitTimeline = ({ appointment, emr, prescription }) => {
   const timelineSteps = [
     {
       id: 'appointment',
-      title: 'Запись создана',
+      title: t('final.timeline_appointment_created'),
       description: 'Пациент записан на прием',
       icon: Clock,
       status: 'completed',
@@ -20,7 +21,7 @@ const VisitTimeline = ({ appointment, emr, prescription }) => {
     },
     {
       id: 'payment',
-      title: 'Оплата',
+      title: t('final.timeline_payment'),
       description: 'Ожидание оплаты записи',
       icon: CreditCard,
       status: appointment?.status === APPOINTMENT_STATUS.PENDING ? 'current' : 
@@ -31,7 +32,7 @@ const VisitTimeline = ({ appointment, emr, prescription }) => {
     },
     {
       id: 'visit',
-      title: 'Прием у врача',
+      title: t('final.timeline_doctor_visit'),
       description: 'Начало приема',
       icon: User,
       status: appointment?.status === APPOINTMENT_STATUS.IN_VISIT ? 'current' :
@@ -40,7 +41,7 @@ const VisitTimeline = ({ appointment, emr, prescription }) => {
     },
     {
       id: 'emr',
-      title: 'ЭМК',
+      title: t('final.timeline_emr'),
       description: 'Электронная медицинская карта',
       icon: FileText,
       status: emr && !emr.isDraft ? 'completed' :
@@ -49,7 +50,7 @@ const VisitTimeline = ({ appointment, emr, prescription }) => {
     },
     {
       id: 'prescription',
-      title: 'Рецепт',
+      title: t('final.timeline_prescription'),
       description: 'Назначение препаратов',
       icon: Pill,
       status: prescription && !prescription.isDraft ? 'completed' :

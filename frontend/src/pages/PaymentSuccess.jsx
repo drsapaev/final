@@ -1,3 +1,4 @@
+import { t } from '../i18n/adapter';
 import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
@@ -240,7 +241,7 @@ const PaymentSuccess = () => {
     } else {
       // Fallback - копируем в буфер обмена
       navigator.clipboard.writeText(window.location.href);
-      notify.info('Ссылка скопирована в буфер обмена');
+      notify.info(t('final.link_copied'));
     }
   };
 

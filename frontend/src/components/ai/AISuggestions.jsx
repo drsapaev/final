@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 import { useState } from 'react';
 import {
   Card, CardContent, Typography, Alert, Badge, Button,
@@ -23,7 +24,7 @@ const AISuggestions = ({
   const handleCopy = (text, id) => {
     navigator.clipboard.writeText(text);
     setCopiedId(id);
-    notify.info('Скопировано в буфер обмена');
+    notify.info(t('final.copied_to_clipboard'));
     setTimeout(() => setCopiedId(null), 2000);
   };
   const handleActivationKeyDown = (event, onActivate) => {

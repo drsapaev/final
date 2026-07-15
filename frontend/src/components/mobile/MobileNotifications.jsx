@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 import { api } from '../../api/client';
 import { useState, useEffect, useCallback } from 'react';
 import { Bell, BellOff, Settings, Check } from 'lucide-react';
@@ -63,7 +64,7 @@ const MobileNotifications = () => {
 
   const requestNotificationPermission = async () => {
     if (!('Notification' in window)) {
-      notify.warning('Уведомления не поддерживаются в этом браузере');
+      notify.warning(t('final.notifications_not_supported'));
       return;
     }
 

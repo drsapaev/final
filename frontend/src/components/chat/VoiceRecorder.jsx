@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 /**
  * Компонент записи голосовых сообщений
  */
@@ -74,7 +75,7 @@ const VoiceRecorder = ({ onSend, onCancel }) => {
 
         } catch (error) {
             logger.error('Microphone access denied:', error);
-            notify.warning('Разрешите доступ к микрофону в настройках браузера');
+            notify.warning(t('final.mic_permission_required'));
         }
     };
 

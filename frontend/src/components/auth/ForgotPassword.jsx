@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 /**
  * ForgotPassword — password recovery component.
  *
@@ -54,8 +55,8 @@ function getPasswordStrength(password) {
 // ============================================================================
 const translations = {
   RU: {
-    title: 'Восстановление пароля',
-    subtitle: 'Выберите способ восстановления пароля',
+    title: t('final.password_recovery_title'),
+    subtitle: t('final.password_recovery_subtitle'),
     methodPhone: 'По номеру телефона',
     methodEmail: 'По электронной почте',
     phoneLabel: 'Номер телефона',
