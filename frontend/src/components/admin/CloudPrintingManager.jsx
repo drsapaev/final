@@ -26,7 +26,6 @@ import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/adapter';
 
 const PROVIDER_LABELS = {
-  const { t } = useTranslation();
   mock: 'Mock (Тестовый)',
   microsoft: 'Microsoft Universal Print',
   google: 'Google Cloud Print',
