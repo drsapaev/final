@@ -125,4 +125,38 @@ describe('LabTemplateWorkbench template version command contract', () => {
     expect(source).not.toContain('>Архивировать<');
     expect(source).not.toContain('{tab.label}');
   });
+
+  it('STRAT#17: notify() calls use t() for all hardcoded Russian messages', () => {
+    // STRAT#17: все notify() с hardcoded русскими строками мигрированы на t()
+    expect(source).toContain("from './utils/labTranslations'");
+    expect(source).toContain('import { t }');
+
+    // Success messages
+    expect(source).toContain("t('success.template_created')");
+    expect(source).toContain("t('success.template_draft_saved')");
+    expect(source).toContain("t('success.template_published')");
+    expect(source).toContain("t('success.template_archived')");
+    expect(source).toContain("t('success.template_cloned')");
+    expect(source).toContain("t('success.norm_loaded_from_catalog')");
+
+    // Error messages
+    expect(source).toContain("t('errors.catalog_load_failed')");
+    expect(source).toContain("t('errors.template_code_name_required')");
+    expect(source).toContain("t('errors.select_template_first')");
+    expect(source).toContain("t('errors.select_template')");
+    expect(source).toContain("t('errors.select_version_for_archive')");
+    expect(source).toContain("t('errors.select_template_for_copy')");
+    expect(source).toContain("t('errors.validation_errors')");
+    expect(source).toContain("t('errors.no_norm_in_catalog')");
+    expect(source).toContain("t('errors.catalog_load_error')");
+
+    // Больше нет хардкоженных русских строк в notify() calls
+    expect(source).not.toContain("'Не удалось загрузить лабораторный каталог.'");
+    expect(source).not.toContain("'Укажите код и название шаблона.'");
+    expect(source).not.toContain("'Шаблон создан.'");
+    expect(source).not.toContain("'Черновик шаблона сохранён.'");
+    expect(source).not.toContain("'Версия шаблона опубликована.'");
+    expect(source).not.toContain("'Версия шаблона архивирована.'");
+    expect(source).not.toContain("'Копия шаблона создана.'");
+  });
 });
