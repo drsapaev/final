@@ -155,7 +155,7 @@ export function LabResultsSection({ patientId, visitId, disabled = false }) {
 
   const renderContent = () => {
     if (loading) {
-      return <div style={{ padding: '12px', color: 'var(--mac-text-secondary)' }}>Загрузка результатов анализов…</div>;
+      return <div style={{ padding: '12px', color: 'var(--mac-text-secondary)' }}>{t('empty.loading_results')}</div>;
     }
 
     if (error) {
@@ -165,7 +165,7 @@ export function LabResultsSection({ patientId, visitId, disabled = false }) {
     if (instances.length === 0) {
       return (
         <div style={{ padding: '12px', color: 'var(--mac-text-secondary)', fontSize: '14px' }}>
-          Нет готовых результатов анализов для этого пациента.
+          {t('empty.no_lab_results')}
         </div>
       );
     }
@@ -246,10 +246,10 @@ export function LabResultsSection({ patientId, visitId, disabled = false }) {
           <DialogContent>
             <div style={{ paddingTop: '8px', display: 'grid', gap: '8px' }}>
               {templatesLoading ? (
-                <div style={{ color: 'var(--mac-text-secondary)' }}>Загрузка шаблонов…</div>
+                <div style={{ color: 'var(--mac-text-secondary)' }}>{t('empty.loading_templates')}</div>
               ) : templates.length === 0 ? (
                 <div style={{ color: 'var(--mac-text-secondary)' }}>
-                  Нет опубликованных шаблонов анализов.
+                  {t('empty.no_templates')}
                 </div>
               ) : (
                 templates.map((template) => (

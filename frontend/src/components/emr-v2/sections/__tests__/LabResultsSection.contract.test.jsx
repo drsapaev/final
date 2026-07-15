@@ -104,4 +104,18 @@ describe('LabResultsSection UX-AUDIT-FIX6 — migrate lucide-react to macos Icon
     expect(source).not.toContain("confirmLabel: 'Заказать'");
     expect(source).not.toContain("cancelLabel: 'Отмена'");
   });
+
+  it('STRAT#20: empty-state strings use t() from labTranslations', () => {
+    // STRAT#20: empty-state strings мигрированы на t('empty.*')
+    expect(source).toContain("t('empty.loading_results')");
+    expect(source).toContain("t('empty.no_lab_results')");
+    expect(source).toContain("t('empty.loading_templates')");
+    expect(source).toContain("t('empty.no_templates')");
+
+    // Больше нет хардкоженных русских строк для empty states
+    expect(source).not.toContain('Загрузка результатов анализов…');
+    expect(source).not.toContain('Нет готовых результатов анализов для этого пациента.');
+    expect(source).not.toContain('Загрузка шаблонов…');
+    expect(source).not.toContain('Нет опубликованных шаблонов анализов.');
+  });
 });
