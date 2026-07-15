@@ -1,3 +1,4 @@
+from app.services.authorization.staff import staff_authorization_service
 """
 API endpoints для интеграции панелей врачей с системой
 Основа: passport.md стр. 1141-2063
@@ -166,7 +167,7 @@ def _doctor_queue_action_flags(entry: OnlineQueueEntry) -> dict[str, bool]:
 
 
 def _ensure_visit_doctor_access(visit: Visit, current_user: User) -> None:
-    if current_user.role == "Admin":
+    if staff_authorization_service.has_permission(current_user, "users:manage"):
         return
 
     doctor = visit.doctor
@@ -185,7 +186,7 @@ def _ensure_legacy_complete_doctor_access(
     record_doctor_id: int | None,
     current_user: User,
 ) -> None:
-    if current_user.role == "Admin":
+    if staff_authorization_service.has_permission(current_user, "users:manage"):
         return
 
     if record_doctor_id is None:
@@ -222,7 +223,7 @@ def _visit_filter_doctor_id(db: Session, current_user: User) -> int:
     )
     if doctor:
         return doctor.id
-    if current_user.role == "Admin":
+    if staff_authorization_service.has_permission(current_user, "users:manage"):
         return current_user.id
     return -1
 
@@ -268,7 +269,7 @@ def _ensure_schedule_next_patient_access(
     doctor: Doctor | None,
     current_user: User,
 ) -> None:
-    if current_user.role == "Admin":
+    if staff_authorization_service.has_permission(current_user, "users:manage"):
         return
     if (current_user.role or "").strip().lower() not in DOCTOR_SCHEDULE_NEXT_ROLES:
         return

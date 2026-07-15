@@ -100,9 +100,13 @@ def _ensure_visit_payment_access(db: Session, visit_id: int, current_user) -> Vi
 
 
 def _ensure_payment_read_access(db: Session, payment_id: int, current_user) -> None:
-    if getattr(current_user, "role", None) not in {"Patient", "Doctor"}:
-        return
+    # M5.2: centralized authorization — only Patient and Doctor need ownership check
+    from app.services.authorization.staff import staff_authorization_service
+    role = staff_authorization_service._get_permissions(current_user)
+    if staff_authorization_service.has_permission(current_user, "payments:manage"):
+        return  # Admin/Cashier — broad access, no ownership check
 
+    # Patient and Doctor: check ownership via visit
     payment = db.query(Payment).filter(Payment.id == payment_id).first()
     if not payment:
         raise HTTPException(status_code=404, detail="Payment not found")

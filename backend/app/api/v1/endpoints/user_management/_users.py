@@ -172,7 +172,8 @@ async def get_user_profile(
     their own profile. Раньше любой Nurse/Receptionist мог читать
     salary, address, DOB любого пользователя.
     """
-    if current_user.id != user_id and current_user.role != "Admin":
+    from app.services.authorization.staff import staff_authorization_service
+    if not staff_authorization_service.can_manage_users(current_user, target_user_id=user_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Нет доступа к профилю другого пользователя",
@@ -246,7 +247,8 @@ async def update_user_profile(
     """Обновить профиль пользователя"""
     try:
         # Проверяем права доступа
-        if current_user.id != user_id and current_user.role != "Admin":
+        from app.services.authorization.staff import staff_authorization_service
+        if not staff_authorization_service.can_manage_users(current_user, target_user_id=user_id):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Недостаточно прав для обновления профиля",
@@ -325,7 +327,8 @@ async def get_user_preferences(
     """Получить настройки пользователя"""
     try:
         # Проверяем права доступа
-        if current_user.id != user_id and current_user.role != "Admin":
+        from app.services.authorization.staff import staff_authorization_service
+        if not staff_authorization_service.can_manage_users(current_user, target_user_id=user_id):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Недостаточно прав для просмотра настроек",
@@ -386,7 +389,8 @@ async def update_user_preferences(
     """Обновить настройки пользователя"""
     try:
         # Проверяем права доступа
-        if current_user.id != user_id and current_user.role != "Admin":
+        from app.services.authorization.staff import staff_authorization_service
+        if not staff_authorization_service.can_manage_users(current_user, target_user_id=user_id):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Недостаточно прав для обновления настроек",
@@ -456,7 +460,8 @@ async def get_user_notification_settings(
     """Получить настройки уведомлений пользователя"""
     try:
         # Проверяем права доступа
-        if current_user.id != user_id and current_user.role != "Admin":
+        from app.services.authorization.staff import staff_authorization_service
+        if not staff_authorization_service.can_manage_users(current_user, target_user_id=user_id):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Недостаточно прав для просмотра настроек уведомлений",
@@ -522,7 +527,8 @@ async def update_user_notification_settings(
     """Обновить настройки уведомлений пользователя"""
     try:
         # Проверяем права доступа
-        if current_user.id != user_id and current_user.role != "Admin":
+        from app.services.authorization.staff import staff_authorization_service
+        if not staff_authorization_service.can_manage_users(current_user, target_user_id=user_id):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Недостаточно прав для обновления настроек уведомлений",
@@ -594,7 +600,8 @@ async def get_user_activity(
     """Получить активность пользователя"""
     try:
         # Проверяем права доступа
-        if current_user.id != user_id and current_user.role != "Admin":
+        from app.services.authorization.staff import staff_authorization_service
+        if not staff_authorization_service.can_manage_users(current_user, target_user_id=user_id):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Недостаточно прав для просмотра активности",
@@ -814,7 +821,8 @@ async def get_user(
     ADM-AUDIT-28 P0-2: ownership check — non-Admin staff can only see
     their own user record.
     """
-    if current_user.id != user_id and current_user.role != "Admin":
+    from app.services.authorization.staff import staff_authorization_service
+    if not staff_authorization_service.can_manage_users(current_user, target_user_id=user_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Нет доступа к данным другого пользователя",

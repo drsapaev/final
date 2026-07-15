@@ -110,10 +110,15 @@ def ensure_emr_visit_access(db: Session, visit_id: int, current_user: User) -> N
     EMR-AUDIT-28 P0-1: ранее non-doctor roles (Lab) bypassed ownership check
     (early return без проверки). Теперь все non-Admin роли без Doctor profile
     получают 403.
+    M5.2: centralized authorization — uses StaffAuthorizationService.
     """
-    if current_user.role == "Admin" or current_user.is_superuser:
-        return
+    from app.services.authorization.staff import staff_authorization_service
 
+    if staff_authorization_service.has_permission(current_user, "emr:read"):
+        if staff_authorization_service.has_permission(current_user, "emr:delete") or current_user.is_superuser:
+            return  # Admin/superuser — full access
+
+    # Non-admin: must be a doctor with ownership
     doctor = get_current_active_doctor(db, current_user)
     if not doctor:
         raise HTTPException(status_code=403, detail="Access denied")
@@ -130,8 +135,12 @@ def filter_patient_emrs_for_access(
     emrs: list,
     current_user: User,
 ) -> list:
-    if current_user.role == "Admin" or current_user.is_superuser:
-        return emrs
+    from app.services.authorization.staff import staff_authorization_service
+
+    if staff_authorization_service.has_permission(current_user, "emr:read") and (
+        staff_authorization_service.has_permission(current_user, "emr:delete") or current_user.is_superuser
+    ):
+        return emrs  # Admin/superuser — full access
 
     doctor = get_current_active_doctor(db, current_user)
     if not doctor:
@@ -231,13 +240,30 @@ async def get_emr(
     if not emr:
         raise HTTPException(status_code=404, detail="EMR not found")
 
-    # Log view action
+    # Log view action — existing EMRAuditLog
     emr_v2_service.log_view(
         db,
         emr=emr,
         user_id=current_user.id,
         user_role=current_user.role if hasattr(current_user, 'role') else "Doctor",
         ip_address=get_client_ip(request),
+    )
+
+    # M5.1: Also log to unified AuditLog
+    from app.services.audit_service import log_audit_event
+    from app.services.reason_codes import ReasonCode
+    log_audit_event(
+        db=db,
+        event_type="DOCTOR_OPEN_EMR",
+        actor_user_id=current_user.id,
+        actor_role=getattr(current_user, "role", "doctor"),
+        subject_patient_id=getattr(emr, "patient_id", None),
+        resource_type="emr",
+        resource_id=str(emr.id),
+        action="view",
+        outcome="success",
+        reason_code=ReasonCode.visit(visit_id).to_dict(),
+        request=request,
     )
 
     return emr

@@ -138,7 +138,8 @@ async def analyze_complaint(
     """Анализ жалоб пациента и создание плана обследования"""
     try:
         # Проверяем права доступа
-        if current_user.role not in ["doctor", "admin"]:
+        from app.services.authorization.staff import staff_authorization_service
+        if not staff_authorization_service.can_access_ai(current_user):
             raise HTTPException(status_code=403, detail="Недостаточно прав")
 
         patient_info = {}
@@ -198,7 +199,8 @@ async def suggest_icd10_codes(
     """Получить подсказки кодов МКБ-10"""
     try:
         # Проверяем права доступа
-        if current_user.role not in ["doctor", "admin"]:
+        from app.services.authorization.staff import staff_authorization_service
+        if not staff_authorization_service.can_access_ai(current_user):
             raise HTTPException(status_code=403, detail="Недостаточно прав")
 
         result = await ai_manager.suggest_icd10(
@@ -221,7 +223,8 @@ async def interpret_lab_results(
     """Интерпретация результатов лабораторных анализов"""
     try:
         # Проверяем права доступа
-        if current_user.role not in ["doctor", "lab", "admin"]:
+        from app.services.authorization.staff import staff_authorization_service
+        if not (staff_authorization_service.can_access_ai(current_user) or staff_authorization_service.can_read_lab(current_user)):
             raise HTTPException(status_code=403, detail="Недостаточно прав")
 
         patient_info = {}
@@ -253,7 +256,8 @@ async def analyze_skin(
     """Анализ состояния кожи по фото"""
     try:
         # Проверяем права доступа
-        if current_user.role not in ["doctor", "admin"]:
+        from app.services.authorization.staff import staff_authorization_service
+        if not staff_authorization_service.can_access_ai(current_user):
             raise HTTPException(status_code=403, detail="Недостаточно прав")
 
         # Проверяем тип файла
@@ -289,7 +293,8 @@ async def interpret_ecg(
     """Интерпретация данных ЭКГ"""
     try:
         # Проверяем права доступа
-        if current_user.role not in ["doctor", "admin"]:
+        from app.services.authorization.staff import staff_authorization_service
+        if not staff_authorization_service.can_access_ai(current_user):
             raise HTTPException(status_code=403, detail="Недостаточно прав")
 
         patient_info = {}
