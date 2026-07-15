@@ -206,21 +206,24 @@ class AuthorizationService:
                     actor_type=actor_type.value,
                 )
 
-            if int(scope.patient_id) != int(subject_patient_id):
-                # Patient trying to access another patient's PHI
-                # Future: check guardian/heir relationships (M4-P1-3)
+            if int(scope.patient_id) == int(subject_patient_id):
+                # Direct self-access — always allowed
                 return AuthorizationResult(
-                    decision=AuthorizationDecision.DENY,
-                    reason="patient_scope_mismatch",
+                    decision=AuthorizationDecision.ALLOW,
+                    reason="self_access",
                     actor_type=actor_type.value,
                 )
 
-            # Self-access is always allowed
-            return AuthorizationResult(
-                decision=AuthorizationDecision.ALLOW,
-                reason="self_access",
-                actor_type=actor_type.value,
+            # M4-P1-3: Check guardian/heir/caregiver relationships
+            # Patient trying to access another patient's PHI — check if
+            # they have an active relationship (guardian, heir, caregiver)
+            rel_result = self._check_relationship_access(
+                actor_patient_id=int(scope.patient_id),
+                subject_patient_id=int(subject_patient_id),
+                resource_type=resource_type,
+                action=action,
             )
+            return rel_result
 
         # ─── STAFF access (doctor/admin/etc accessing patient PHI) ────────
         if actor_type == ActorType.STAFF:
@@ -296,6 +299,87 @@ class AuthorizationService:
             raise AuthorizationError(result.reason)
 
         return scope
+
+    def _check_relationship_access(
+        self,
+        *,
+        actor_patient_id: int,
+        subject_patient_id: int,
+        resource_type: str,
+        action: str,
+    ) -> AuthorizationResult:
+        """M4-P1-3: Check if actor has a guardian/heir/caregiver relationship
+        that grants access to subject's PHI.
+
+        Queries PatientRelationship table for active, valid relationships
+        where actor_patient_id → subject_patient_id.
+
+        Args:
+            actor_patient_id: Patient requesting access (guardian/heir)
+            subject_patient_id: Patient whose PHI is requested (child/ward)
+            resource_type: Resource being accessed
+            action: Action being performed
+
+        Returns:
+            AuthorizationResult with decision + reason + actor_type
+        """
+        try:
+            from app.db.session import SessionLocal
+            from app.models.patient_relationship import PatientRelationship
+            from sqlalchemy.orm import Session
+
+            db: Session = SessionLocal()
+
+            # Find active relationships where actor can access subject's PHI
+            relationships = (
+                db.query(PatientRelationship)
+                .filter(
+                    PatientRelationship.actor_patient_id == actor_patient_id,
+                    PatientRelationship.subject_patient_id == subject_patient_id,
+                    PatientRelationship.active == True,
+                )
+                .all()
+            )
+
+            db.close()
+
+            if not relationships:
+                return AuthorizationResult(
+                    decision=AuthorizationDecision.DENY,
+                    reason="patient_scope_mismatch",
+                    actor_type=ActorType.SELF.value,
+                )
+
+            # Check each relationship for validity + permissions
+            for rel in relationships:
+                if not rel.is_valid_now():
+                    continue
+
+                if rel.has_permission(resource_type, action):
+                    return AuthorizationResult(
+                        decision=AuthorizationDecision.ALLOW,
+                        reason=f"relationship_access:{rel.relationship_type}",
+                        actor_type=rel.relationship_type,
+                    )
+
+            # Relationship exists but doesn't grant this specific permission
+            return AuthorizationResult(
+                decision=AuthorizationDecision.DENY,
+                reason="relationship_permission_denied",
+                actor_type=ActorType.SELF.value,
+            )
+
+        except Exception as e:
+            logger.error(
+                "Error checking patient relationship access: %s",
+                e,
+            )
+            # Fail closed: deny on error
+            return AuthorizationResult(
+                decision=AuthorizationDecision.DENY,
+                reason="relationship_check_error",
+                actor_type=ActorType.SELF.value,
+            )
 
 
 # Singleton instance
