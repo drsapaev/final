@@ -4,6 +4,8 @@ import TwoFactorManager from '../components/security/TwoFactorManager';
 import TwoFactorSetupWizard from '../components/security/TwoFactorSetupWizard';
 import SMSEmail2FA from '../components/security/SMSEmail2FA';
 import {
+export default SecurityPage;import { useTranslation } from '../i18n/adapter';
+
   Shield,
 
   Key,
@@ -252,4 +254,3 @@ const SecurityPage = () => {void
 
 };
 
-export default SecurityPage;

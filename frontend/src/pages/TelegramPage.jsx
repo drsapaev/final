@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import TelegramManager from '../components/telegram/TelegramManager';
 import {
-import { useTranslation } from '../i18n/adapter';
   MessageSquare,
   Bot,
   Settings,
