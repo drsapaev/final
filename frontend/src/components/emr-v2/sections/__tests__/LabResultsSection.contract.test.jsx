@@ -20,12 +20,12 @@ const iconSource = fs.readFileSync(
 
 describe('LabResultsSection UX-AUDIT-FIX6 — migrate lucide-react to macos Icon', () => {
   it('does not import from lucide-react anymore', () => {
-    expect(source).not.toContain("from 'lucide-react'");
+    expect(source).not.toContain('from \'lucide-react\'');
     expect(source).not.toContain('FileText, Download, TestTube, Plus');
   });
 
   it('imports Icon from macos UI library', () => {
-    expect(source).toContain("from '../../ui/macos'");
+    expect(source).toContain('from \'../../ui/macos\'');
     expect(source).toContain('Icon');
   });
 
@@ -43,7 +43,7 @@ describe('LabResultsSection UX-AUDIT-FIX6 — migrate lucide-react to macos Icon
   it('registers square.and.arrow.down in macos Icon.jsx (previously missing)', () => {
     // Ранее 'square.and.arrow.down' отсутствовал в Icon.jsx — fallback на
     // 'questionmark'. Теперь SVG-path определён.
-    expect(iconSource).toContain("'square.and.arrow.down'");
+    expect(iconSource).toContain('\'square.and.arrow.down\'');
     expect(iconSource).toContain('UX-AUDIT-FIX6');
   });
 
@@ -51,7 +51,7 @@ describe('LabResultsSection UX-AUDIT-FIX6 — migrate lucide-react to macos Icon
     // FIX9: handleOrder ранее мгновенно создавал заказ через
     // labReportingApi.createOrder без подтверждения. Теперь обёрнут в
     // useConfirm() — соответствует Nielsen Heuristic #5 (Error Prevention).
-    expect(source).toContain("from '../../common/ConfirmDialog'");
+    expect(source).toContain('from \'../../common/ConfirmDialog\'');
     expect(source).toContain('useConfirm');
 
     // Ищем функцию handleOrder
@@ -62,7 +62,7 @@ describe('LabResultsSection UX-AUDIT-FIX6 — migrate lucide-react to macos Icon
 
     expect(fnBody).toContain('await confirm(');
     // STRAT#12: строка мигрирована на t('confirm.order_title')
-    expect(fnBody).toContain("t('confirm.order_title')");
+    expect(fnBody).toContain('t(\'confirm.order_title\')');
     expect(fnBody).toContain('if (!ok) return;');
     // createOrder должен вызываться ПОСЛЕ confirm
     const confirmIdx = fnBody.indexOf('await confirm(');
@@ -74,7 +74,7 @@ describe('LabResultsSection UX-AUDIT-FIX6 — migrate lucide-react to macos Icon
     // FIX10: локальные STATUS_LABELS / STATUS_VARIANTS удалены.
     // LabResultsSection импортирует formatLabStatus / getLabStatusVariant
     // из labUiLabels.js — единый источник истины.
-    expect(source).toContain("from '../../laboratory/labUiLabels'");
+    expect(source).toContain('from \'../../laboratory/labUiLabels\'');
     expect(source).toContain('formatLabStatus');
     expect(source).toContain('getLabStatusVariant');
 
@@ -89,28 +89,28 @@ describe('LabResultsSection UX-AUDIT-FIX6 — migrate lucide-react to macos Icon
 
   it('STRAT#12: order confirm dialog uses t() and tInterpolate() from labTranslations', () => {
     // STRAT#12: order confirm dialog мигрирован на t()
-    expect(source).toContain("from '../../laboratory/utils/labTranslations'");
+    expect(source).toContain('from \'../../laboratory/utils/labTranslations\'');
     expect(source).toContain('import { t, tInterpolate }');
 
     // Order dialog
-    expect(source).toContain("t('confirm.order_title')");
-    expect(source).toContain("tInterpolate('confirm.order_message', { name: templateName })");
-    expect(source).toContain("t('confirm.order_description')");
-    expect(source).toContain("t('confirm.order_confirm')");
-    expect(source).toContain("t('confirm.cancel')");
+    expect(source).toContain('t(\'confirm.order_title\')');
+    expect(source).toContain('tInterpolate(\'confirm.order_message\', { name: templateName })');
+    expect(source).toContain('t(\'confirm.order_description\')');
+    expect(source).toContain('t(\'confirm.order_confirm\')');
+    expect(source).toContain('t(\'confirm.cancel\')');
 
     // Больше нет хардкоженных русских строк в confirm() calls
-    expect(source).not.toContain("title: 'Заказать анализы?'");
-    expect(source).not.toContain("confirmLabel: 'Заказать'");
-    expect(source).not.toContain("cancelLabel: 'Отмена'");
+    expect(source).not.toContain('title: \'Заказать анализы?\'');
+    expect(source).not.toContain('confirmLabel: \'Заказать\'');
+    expect(source).not.toContain('cancelLabel: \'Отмена\'');
   });
 
   it('STRAT#20: empty-state strings use t() from labTranslations', () => {
     // STRAT#20: empty-state strings мигрированы на t('empty.*')
-    expect(source).toContain("t('empty.loading_results')");
-    expect(source).toContain("t('empty.no_lab_results')");
-    expect(source).toContain("t('empty.loading_templates')");
-    expect(source).toContain("t('empty.no_templates')");
+    expect(source).toContain('t(\'empty.loading_results\')');
+    expect(source).toContain('t(\'empty.no_lab_results\')');
+    expect(source).toContain('t(\'empty.loading_templates\')');
+    expect(source).toContain('t(\'empty.no_templates\')');
 
     // Больше нет хардкоженных русских строк для empty states
     expect(source).not.toContain('Загрузка результатов анализов…');

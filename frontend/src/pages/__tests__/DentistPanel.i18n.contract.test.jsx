@@ -10,17 +10,17 @@ const translationsSource = fs.readFileSync(path.join(ROOT, 'components/laborator
 
 describe('DentistPanel STRAT#34 — i18n migration', () => {
   it('imports useTranslation from i18n adapter', () => {
-    expect(source).toContain("from '../i18n/adapter'");
+    expect(source).toContain('from \'../i18n/adapter\'');
     expect(source).toContain('useTranslation');
   });
   it('uses tI18n() for notify messages', () => {
-    expect(source).toContain("tI18n('dental.session_expired')");
-    expect(source).toContain("tI18n('dental.visit_completed')");
-    expect(source).toContain("tI18n('dental.icd_added_from_ai')");
+    expect(source).toContain('tI18n(\'dental.session_expired\')');
+    expect(source).toContain('tI18n(\'dental.visit_completed\')');
+    expect(source).toContain('tI18n(\'dental.icd_added_from_ai\')');
   });
   it('does not contain hardcoded Russian notify strings', () => {
-    expect(source).not.toContain("notify.error('Сессия истекла");
-    expect(source).not.toContain("notify.success('Приём завершён успешно')");
+    expect(source).not.toContain('notify.error(\'Сессия истекла');
+    expect(source).not.toContain('notify.success(\'Приём завершён успешно\')');
   });
   it('labTranslations has dental.* namespace', () => {
     expect(translationsSource).toContain('dental: {');

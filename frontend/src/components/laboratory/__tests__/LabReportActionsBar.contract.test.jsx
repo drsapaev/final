@@ -20,39 +20,39 @@ const translationsSource = fs.readFileSync(
 
 describe('LabReportActionsBar STRAT#5 — i18n migration', () => {
   it('imports t from labTranslations', () => {
-    expect(source).toContain("from './utils/labTranslations'");
+    expect(source).toContain('from \'./utils/labTranslations\'');
     expect(source).toContain('import { t }');
   });
 
   it('uses t() for all button labels (no hardcoded Russian strings)', () => {
     // Все 5 button label pairs должны использовать t()
-    expect(source).toContain("t('actions.saving')");
-    expect(source).toContain("t('actions.save_draft')");
-    expect(source).toContain("t('actions.finalizing')");
-    expect(source).toContain("t('actions.finalize')");
-    expect(source).toContain("t('actions.revising')");
-    expect(source).toContain("t('actions.revise')");
-    expect(source).toContain("t('actions.printing')");
-    expect(source).toContain("t('actions.print')");
-    expect(source).toContain("t('actions.notifying')");
-    expect(source).toContain("t('actions.notify_patient')");
+    expect(source).toContain('t(\'actions.saving\')');
+    expect(source).toContain('t(\'actions.save_draft\')');
+    expect(source).toContain('t(\'actions.finalizing\')');
+    expect(source).toContain('t(\'actions.finalize\')');
+    expect(source).toContain('t(\'actions.revising\')');
+    expect(source).toContain('t(\'actions.revise\')');
+    expect(source).toContain('t(\'actions.printing\')');
+    expect(source).toContain('t(\'actions.print\')');
+    expect(source).toContain('t(\'actions.notifying\')');
+    expect(source).toContain('t(\'actions.notify_patient\')');
   });
 
   it('uses t() for title attribute on Revise button', () => {
-    expect(source).toContain("title={t('actions.revise_title')}");
+    expect(source).toContain('title={t(\'actions.revise_title\')}');
   });
 
   it('does not contain hardcoded Russian button labels anymore', () => {
     // Ранее эти строки были захардкожены в JSX
-    expect(source).not.toContain("'Сохраняю...'");
-    expect(source).not.toContain("'Сохранить черновик'");
-    expect(source).not.toContain("'Утверждаю...'");
-    expect(source).not.toContain("'Утвердить'");
-    expect(source).not.toContain("'Создаю...'");
-    expect(source).not.toContain("'Исправленная версия'");
-    expect(source).not.toContain("'Отправляю...'");
-    expect(source).not.toContain("'Печать результата'");
-    expect(source).not.toContain("'Отправить пациенту'");
+    expect(source).not.toContain('\'Сохраняю...\'');
+    expect(source).not.toContain('\'Сохранить черновик\'');
+    expect(source).not.toContain('\'Утверждаю...\'');
+    expect(source).not.toContain('\'Утвердить\'');
+    expect(source).not.toContain('\'Создаю...\'');
+    expect(source).not.toContain('\'Исправленная версия\'');
+    expect(source).not.toContain('\'Отправляю...\'');
+    expect(source).not.toContain('\'Печать результата\'');
+    expect(source).not.toContain('\'Отправить пациенту\'');
     expect(source).not.toContain('title="Создать исправленную версию отчёта"');
   });
 

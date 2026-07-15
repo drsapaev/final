@@ -20,48 +20,48 @@ const translationsSource = fs.readFileSync(
 
 describe('CashierPanel STRAT#31 — i18n migration', () => {
   it('imports useTranslation from i18n adapter', () => {
-    expect(source).toContain("from '../i18n/adapter'");
+    expect(source).toContain('from \'../i18n/adapter\'');
     expect(source).toContain('useTranslation');
   });
 
   it('instantiates tI18n via useTranslation()', () => {
-    expect(source).toContain("const { t: tI18n } = useTranslation()");
+    expect(source).toContain('const { t: tI18n } = useTranslation()');
   });
 
   it('uses tI18n() for confirm dialog', () => {
-    expect(source).toContain("tI18n('cashier.confirm_payment_title')");
-    expect(source).toContain("tI18n('cashier.confirm_payment_message')");
-    expect(source).toContain("tI18n('cashier.confirm_payment_description')");
-    expect(source).toContain("tI18n('cashier.confirm_payment_confirm')");
-    expect(source).toContain("tI18n('cashier.cancel')");
+    expect(source).toContain('tI18n(\'cashier.confirm_payment_title\')');
+    expect(source).toContain('tI18n(\'cashier.confirm_payment_message\')');
+    expect(source).toContain('tI18n(\'cashier.confirm_payment_description\')');
+    expect(source).toContain('tI18n(\'cashier.confirm_payment_confirm\')');
+    expect(source).toContain('tI18n(\'cashier.cancel\')');
   });
 
   it('uses tI18n() for all notify messages', () => {
-    expect(source).toContain("tI18n('cashier.session_expired')");
-    expect(source).toContain("tI18n('cashier.cancel_reason_required')");
-    expect(source).toContain("tI18n('cashier.payment_cancelled')");
-    expect(source).toContain("tI18n('cashier.refund_fields_required')");
-    expect(source).toContain("tI18n('cashier.no_payment_for_receipt')");
-    expect(source).toContain("tI18n('cashier.print_dialog_opened')");
-    expect(source).toContain("tI18n('cashier.print_dialog_failed')");
-    expect(source).toContain("tI18n('cashier.session_extending')");
+    expect(source).toContain('tI18n(\'cashier.session_expired\')');
+    expect(source).toContain('tI18n(\'cashier.cancel_reason_required\')');
+    expect(source).toContain('tI18n(\'cashier.payment_cancelled\')');
+    expect(source).toContain('tI18n(\'cashier.refund_fields_required\')');
+    expect(source).toContain('tI18n(\'cashier.no_payment_for_receipt\')');
+    expect(source).toContain('tI18n(\'cashier.print_dialog_opened\')');
+    expect(source).toContain('tI18n(\'cashier.print_dialog_failed\')');
+    expect(source).toContain('tI18n(\'cashier.session_extending\')');
   });
 
   it('does not contain hardcoded Russian strings in confirm() calls anymore', () => {
-    expect(source).not.toContain("title: 'Подтверждение платежа'");
-    expect(source).not.toContain("confirmLabel: 'Принять'");
-    expect(source).not.toContain("cancelLabel: 'Отмена'");
+    expect(source).not.toContain('title: \'Подтверждение платежа\'');
+    expect(source).not.toContain('confirmLabel: \'Принять\'');
+    expect(source).not.toContain('cancelLabel: \'Отмена\'');
   });
 
   it('does not contain hardcoded Russian strings in notify() calls anymore', () => {
-    expect(source).not.toContain("notify.error('Сессия истекла");
-    expect(source).not.toContain("notify.warning('Укажите причину отмены");
-    expect(source).not.toContain("notify.info('Платёж отменён')");
-    expect(source).not.toContain("notify.warning('Укажите сумму возврата");
-    expect(source).not.toContain("notify.error('Не удалось определить платеж");
-    expect(source).not.toContain("notify.success('Открыт диалог печати");
-    expect(source).not.toContain("notify.warning('Диалог печати не открылся");
-    expect(source).not.toContain("notify.info('Продлеваем сессию...')");
+    expect(source).not.toContain('notify.error(\'Сессия истекла');
+    expect(source).not.toContain('notify.warning(\'Укажите причину отмены');
+    expect(source).not.toContain('notify.info(\'Платёж отменён\')');
+    expect(source).not.toContain('notify.warning(\'Укажите сумму возврата');
+    expect(source).not.toContain('notify.error(\'Не удалось определить платеж');
+    expect(source).not.toContain('notify.success(\'Открыт диалог печати');
+    expect(source).not.toContain('notify.warning(\'Диалог печати не открылся');
+    expect(source).not.toContain('notify.info(\'Продлеваем сессию...\')');
   });
 
   it('labTranslations has cashier.* namespace with all keys', () => {

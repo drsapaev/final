@@ -15,17 +15,17 @@ const source = fs.readFileSync(
 
 describe('VirtualizedQueueList STRAT#27 — @tanstack/react-virtual', () => {
   it('imports useVirtualizer from @tanstack/react-virtual', () => {
-    expect(source).toContain("from '@tanstack/react-virtual'");
+    expect(source).toContain('from \'@tanstack/react-virtual\'');
     expect(source).toContain('useVirtualizer');
   });
 
   it('imports QueueCard for per-item rendering', () => {
-    expect(source).toContain("from './QueueCard'");
+    expect(source).toContain('from \'./QueueCard\'');
     expect(source).toContain('QueueCard');
   });
 
   it('imports t from labTranslations for load-more labels', () => {
-    expect(source).toContain("from './utils/labTranslations'");
+    expect(source).toContain('from \'./utils/labTranslations\'');
     expect(source).toContain('import { t }');
   });
 
@@ -38,7 +38,7 @@ describe('VirtualizedQueueList STRAT#27 — @tanstack/react-virtual', () => {
 
   it('renders virtual items with absolute positioning', () => {
     expect(source).toContain('getVirtualItems()');
-    expect(source).toContain("'absolute'");
+    expect(source).toContain('\'absolute\'');
     expect(source).toContain('translateY');
   });
 
@@ -52,9 +52,9 @@ describe('VirtualizedQueueList STRAT#27 — @tanstack/react-virtual', () => {
     expect(source).toContain('hasMore && onLoadMore');
     expect(source).toContain('onClick={onLoadMore}');
     expect(source).toContain('disabled={loadingMore}');
-    expect(source).toContain("t('queue.load_more_aria')");
-    expect(source).toContain("t('queue.loading')");
-    expect(source).toContain("t('queue.show_more')");
+    expect(source).toContain('t(\'queue.load_more_aria\')');
+    expect(source).toContain('t(\'queue.loading\')');
+    expect(source).toContain('t(\'queue.show_more\')');
   });
 
   it('accepts all expected props', () => {

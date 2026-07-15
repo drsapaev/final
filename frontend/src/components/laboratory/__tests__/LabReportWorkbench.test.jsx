@@ -276,12 +276,12 @@ describe('LabReportWorkbench', () => {
 
     expect(fnBody).toContain('await confirm(');
     // STRAT#9: строка мигрирована на t('confirm.notify_title')
-    expect(fnBody).toContain("t('confirm.notify_title')");
-    expect(fnBody).toContain("intent: 'warning'");
+    expect(fnBody).toContain('t(\'confirm.notify_title\')');
+    expect(fnBody).toContain('intent: \'warning\'');
     // Действие не должно выполняться без подтверждения
     expect(fnBody).toContain('if (!ok) return;');
     // Не должен быть POST до confirm
-    const postIndex = fnBody.indexOf("api.post('/telegram/send-lab-results'");
+    const postIndex = fnBody.indexOf('api.post(\'/telegram/send-lab-results\'');
     const confirmIndex = fnBody.indexOf('await confirm(');
     expect(postIndex).toBeGreaterThan(confirmIndex);
   });
@@ -298,7 +298,7 @@ describe('LabReportWorkbench', () => {
     // Подсказка "только для чтения" когда не editable
     expect(source).toContain('только для чтения — отчёт утверждён');
     // Все 4 signer поля внутри details
-    expect(source).toContain("'lab_technician_label', 'lab_technician_name', 'approver_label', 'approver_name'");
+    expect(source).toContain('\'lab_technician_label\', \'lab_technician_name\', \'approver_label\', \'approver_name\'');
   });
 
   it('STRAT#9: all 3 confirm dialogs use t() from labTranslations', () => {
@@ -306,38 +306,38 @@ describe('LabReportWorkbench', () => {
     const source = fs.readFileSync(workbenchPath, 'utf8');
 
     // Import
-    expect(source).toContain("from './utils/labTranslations'");
+    expect(source).toContain('from \'./utils/labTranslations\'');
     expect(source).toContain('import { t }');
 
     // Finalize dialog
-    expect(source).toContain("t('confirm.finalize_title')");
-    expect(source).toContain("t('confirm.finalize_message')");
-    expect(source).toContain("t('confirm.finalize_description')");
-    expect(source).toContain("t('confirm.finalize_confirm')");
+    expect(source).toContain('t(\'confirm.finalize_title\')');
+    expect(source).toContain('t(\'confirm.finalize_message\')');
+    expect(source).toContain('t(\'confirm.finalize_description\')');
+    expect(source).toContain('t(\'confirm.finalize_confirm\')');
 
     // Revise dialog
-    expect(source).toContain("t('confirm.revise_title')");
-    expect(source).toContain("t('confirm.revise_message')");
-    expect(source).toContain("t('confirm.revise_description')");
-    expect(source).toContain("t('confirm.revise_confirm')");
+    expect(source).toContain('t(\'confirm.revise_title\')');
+    expect(source).toContain('t(\'confirm.revise_message\')');
+    expect(source).toContain('t(\'confirm.revise_description\')');
+    expect(source).toContain('t(\'confirm.revise_confirm\')');
 
     // Notify dialog
-    expect(source).toContain("t('confirm.notify_title')");
-    expect(source).toContain("t('confirm.notify_message')");
-    expect(source).toContain("t('confirm.notify_description')");
-    expect(source).toContain("t('confirm.notify_confirm')");
+    expect(source).toContain('t(\'confirm.notify_title\')');
+    expect(source).toContain('t(\'confirm.notify_message\')');
+    expect(source).toContain('t(\'confirm.notify_description\')');
+    expect(source).toContain('t(\'confirm.notify_confirm\')');
 
     // Все dialogs используют общий cancel label
-    expect(source).toContain("t('confirm.cancel')");
+    expect(source).toContain('t(\'confirm.cancel\')');
 
     // Больше нет хардкоженных русских строк в confirm() calls
-    expect(source).not.toContain("title: 'Утверждение отчёта'");
-    expect(source).not.toContain("title: 'Создание исправленной версии'");
-    expect(source).not.toContain("title: 'Отправка результатов пациенту'");
-    expect(source).not.toContain("confirmLabel: 'Утвердить'");
-    expect(source).not.toContain("confirmLabel: 'Создать версию'");
-    expect(source).not.toContain("confirmLabel: 'Отправить'");
-    expect(source).not.toContain("cancelLabel: 'Отмена'");
+    expect(source).not.toContain('title: \'Утверждение отчёта\'');
+    expect(source).not.toContain('title: \'Создание исправленной версии\'');
+    expect(source).not.toContain('title: \'Отправка результатов пациенту\'');
+    expect(source).not.toContain('confirmLabel: \'Утвердить\'');
+    expect(source).not.toContain('confirmLabel: \'Создать версию\'');
+    expect(source).not.toContain('confirmLabel: \'Отправить\'');
+    expect(source).not.toContain('cancelLabel: \'Отмена\'');
   });
 
   it('STRAT#13: notify() calls use t() for all hardcoded Russian messages', () => {
@@ -345,25 +345,25 @@ describe('LabReportWorkbench', () => {
     const source = fs.readFileSync(workbenchPath, 'utf8');
 
     // Success messages
-    expect(source).toContain("t('success.report_created')");
-    expect(source).toContain("t('success.draft_saved')");
-    expect(source).toContain("t('success.draft_saved_in_progress')");
-    expect(source).toContain("t('success.finalized')");
-    expect(source).toContain("t('success.revised')");
-    expect(source).toContain("t('success.notified')");
+    expect(source).toContain('t(\'success.report_created\')');
+    expect(source).toContain('t(\'success.draft_saved\')');
+    expect(source).toContain('t(\'success.draft_saved_in_progress\')');
+    expect(source).toContain('t(\'success.finalized\')');
+    expect(source).toContain('t(\'success.revised\')');
+    expect(source).toContain('t(\'success.notified\')');
 
     // Error messages
-    expect(source).toContain("t('errors.select_patient_template')");
-    expect(source).toContain("t('errors.no_template_for_services')");
-    expect(source).toContain("t('errors.open_or_create_first')");
-    expect(source).toContain("t('errors.print_failed')");
-    expect(source).toContain("t('errors.notify_failed')");
+    expect(source).toContain('t(\'errors.select_patient_template\')');
+    expect(source).toContain('t(\'errors.no_template_for_services\')');
+    expect(source).toContain('t(\'errors.open_or_create_first\')');
+    expect(source).toContain('t(\'errors.print_failed\')');
+    expect(source).toContain('t(\'errors.notify_failed\')');
 
     // Больше нет хардкоженных русских строк в notify() calls
-    expect(source).not.toContain("notify('error', 'Выберите запись и шаблон.')");
-    expect(source).not.toContain("notify('success', 'Черновик сохранён.')");
-    expect(source).not.toContain("notify('success', 'Отчёт утверждён.')");
-    expect(source).not.toContain("notify('success', 'Результаты отправлены пациенту через Telegram.')");
+    expect(source).not.toContain('notify(\'error\', \'Выберите запись и шаблон.\')');
+    expect(source).not.toContain('notify(\'success\', \'Черновик сохранён.\')');
+    expect(source).not.toContain('notify(\'success\', \'Отчёт утверждён.\')');
+    expect(source).not.toContain('notify(\'success\', \'Результаты отправлены пациенту через Telegram.\')');
   });
 
   it('STRAT#19: JSX labels (print feedback, editor header, template resolution) use t()', () => {
@@ -371,33 +371,33 @@ describe('LabReportWorkbench', () => {
     const source = fs.readFileSync(workbenchPath, 'utf8');
 
     // Print feedback
-    expect(source).toContain("t('workbench.print_sending')");
-    expect(source).toContain("t('workbench.print_sent')");
-    expect(source).toContain("t('workbench.print_pdf_failed')");
-    expect(source).toContain("t('workbench.print_pdf_invalid')");
-    expect(source).toContain("t('workbench.print_pdf_opened')");
-    expect(source).toContain("t('workbench.print_pdf_blocked')");
+    expect(source).toContain('t(\'workbench.print_sending\')');
+    expect(source).toContain('t(\'workbench.print_sent\')');
+    expect(source).toContain('t(\'workbench.print_pdf_failed\')');
+    expect(source).toContain('t(\'workbench.print_pdf_invalid\')');
+    expect(source).toContain('t(\'workbench.print_pdf_opened\')');
+    expect(source).toContain('t(\'workbench.print_pdf_blocked\')');
 
     // Editor header
-    expect(source).toContain("t('workbench.title')");
-    expect(source).toContain("t('workbench.select_patient_prompt')");
-    expect(source).toContain("t('workbench.select_patient_short')");
-    expect(source).toContain("t('workbench.patient_label')");
-    expect(source).toContain("t('workbench.visit_services')");
+    expect(source).toContain('t(\'workbench.title\')');
+    expect(source).toContain('t(\'workbench.select_patient_prompt\')');
+    expect(source).toContain('t(\'workbench.select_patient_short\')');
+    expect(source).toContain('t(\'workbench.patient_label\')');
+    expect(source).toContain('t(\'workbench.visit_services\')');
 
     // Template resolution
-    expect(source).toContain("t('workbench.resolving_templates')");
-    expect(source).toContain("t('workbench.recommended_report')");
-    expect(source).toContain("t('workbench.unmapped_services')");
-    expect(source).toContain("t('workbench.no_template_found')");
-    expect(source).toContain("t('workbench.no_template_hint')");
-    expect(source).toContain("t('workbench.show_all_templates')");
-    expect(source).toContain("t('workbench.create_report')");
-    expect(source).toContain("t('workbench.creating_report')");
+    expect(source).toContain('t(\'workbench.resolving_templates\')');
+    expect(source).toContain('t(\'workbench.recommended_report\')');
+    expect(source).toContain('t(\'workbench.unmapped_services\')');
+    expect(source).toContain('t(\'workbench.no_template_found\')');
+    expect(source).toContain('t(\'workbench.no_template_hint\')');
+    expect(source).toContain('t(\'workbench.show_all_templates\')');
+    expect(source).toContain('t(\'workbench.create_report\')');
+    expect(source).toContain('t(\'workbench.creating_report\')');
 
     // Больше нет хардкоженных русских строк в print feedback
-    expect(source).not.toContain("'Отправляю лабораторный отчёт на печать...'");
-    expect(source).not.toContain("'Не удалось сформировать PDF. Проверьте соединение и попробуйте снова.'");
-    expect(source).not.toContain("'PDF сформирован некорректно. Обратитесь к администратору.'");
+    expect(source).not.toContain('\'Отправляю лабораторный отчёт на печать...\'');
+    expect(source).not.toContain('\'Не удалось сформировать PDF. Проверьте соединение и попробуйте снова.\'');
+    expect(source).not.toContain('\'PDF сформирован некорректно. Обратитесь к администратору.\'');
   });
 });

@@ -36,7 +36,7 @@ describe('LabQueueWorkbench UX-AUDIT-FIX11 — MaskedPhone affordance', () => {
   it('adds read-only variant when canReveal=false', () => {
     expect(source).toContain('lqw-masked-phone-readonly');
     // STRAT#18: title migrated to t('pii.phone_restricted')
-    expect(source).toContain("t('pii.phone_restricted')");
+    expect(source).toContain('t(\'pii.phone_restricted\')');
   });
 
   it('registers hover/focus styles in lab.css', () => {
@@ -89,35 +89,35 @@ describe('LabQueueWorkbench UX-AUDIT-FIX11 — MaskedPhone affordance', () => {
 
   it('STRAT#14: queue filter/sort/title labels use t() from labTranslations', () => {
     // STRAT#14: filter/sort/title/badge labels мигрированы на t()
-    expect(source).toContain("from './utils/labTranslations'");
+    expect(source).toContain('from \'./utils/labTranslations\'');
     expect(source).toContain('import { t }');
 
     // Title + badges
-    expect(source).toContain("t('queue.title')");
-    expect(source).toContain("t('queue.total')");
-    expect(source).toContain("t('queue.in_progress')");
-    expect(source).toContain("t('common.refresh')");
+    expect(source).toContain('t(\'queue.title\')');
+    expect(source).toContain('t(\'queue.total\')');
+    expect(source).toContain('t(\'queue.in_progress\')');
+    expect(source).toContain('t(\'common.refresh\')');
 
     // Search
-    expect(source).toContain("t('queue.search_placeholder')");
-    expect(source).toContain("t('queue.search_aria')");
-    expect(source).toContain("t('queue.search_clear')");
+    expect(source).toContain('t(\'queue.search_placeholder\')');
+    expect(source).toContain('t(\'queue.search_aria\')');
+    expect(source).toContain('t(\'queue.search_clear\')');
 
     // Filter buttons
-    expect(source).toContain("t('queue.filter_all')");
-    expect(source).toContain("t('queue.filter_active')");
-    expect(source).toContain("t('queue.filter_completed')");
-    expect(source).toContain("t('queue.filter_group_aria')");
+    expect(source).toContain('t(\'queue.filter_all\')');
+    expect(source).toContain('t(\'queue.filter_active\')');
+    expect(source).toContain('t(\'queue.filter_completed\')');
+    expect(source).toContain('t(\'queue.filter_group_aria\')');
 
     // Sort
-    expect(source).toContain("t('queue.sort_label')");
-    expect(source).toContain("t('queue.sort_aria')");
-    expect(source).toContain("t('queue.sort_default')");
-    expect(source).toContain("t('queue.sort_name')");
-    expect(source).toContain("t('queue.sort_time')");
+    expect(source).toContain('t(\'queue.sort_label\')');
+    expect(source).toContain('t(\'queue.sort_aria\')');
+    expect(source).toContain('t(\'queue.sort_default\')');
+    expect(source).toContain('t(\'queue.sort_name\')');
+    expect(source).toContain('t(\'queue.sort_time\')');
 
     // Filter count
-    expect(source).toContain("t('queue.filter_count')");
+    expect(source).toContain('t(\'queue.filter_count\')');
   });
 
   it('STRAT#18: card strings (patient info, PII, history) use t()', () => {
@@ -130,30 +130,30 @@ describe('LabQueueWorkbench UX-AUDIT-FIX11 — MaskedPhone affordance', () => {
     );
 
     // Strings now in QueueCard.jsx
-    expect(queueCardSource).toContain("t('pii.phone_not_set')");
-    expect(queueCardSource).toContain("t('pii.no_services')");
-    expect(queueCardSource).toContain("t('queue.patient_no_name')");
-    expect(queueCardSource).toContain("t('queue.visit')");
-    expect(queueCardSource).toContain("t('queue.visit_not_linked')");
-    expect(queueCardSource).toContain("t('queue.phone')");
-    expect(queueCardSource).toContain("t('queue.services')");
-    expect(queueCardSource).toContain("t('queue.payment')");
-    expect(queueCardSource).toContain("t('queue.patient_id_aria')");
-    expect(queueCardSource).toContain("t('queue.patient_id_label')");
-    expect(queueCardSource).toContain("t('queue.report_exists')");
-    expect(queueCardSource).toContain("t('queue.report_new')");
+    expect(queueCardSource).toContain('t(\'pii.phone_not_set\')');
+    expect(queueCardSource).toContain('t(\'pii.no_services\')');
+    expect(queueCardSource).toContain('t(\'queue.patient_no_name\')');
+    expect(queueCardSource).toContain('t(\'queue.visit\')');
+    expect(queueCardSource).toContain('t(\'queue.visit_not_linked\')');
+    expect(queueCardSource).toContain('t(\'queue.phone\')');
+    expect(queueCardSource).toContain('t(\'queue.services\')');
+    expect(queueCardSource).toContain('t(\'queue.payment\')');
+    expect(queueCardSource).toContain('t(\'queue.patient_id_aria\')');
+    expect(queueCardSource).toContain('t(\'queue.patient_id_label\')');
+    expect(queueCardSource).toContain('t(\'queue.report_exists\')');
+    expect(queueCardSource).toContain('t(\'queue.report_new\')');
 
     // Empty states still in LabQueueWorkbench
-    expect(source).toContain("t('queue.no_entries')");
-    expect(source).toContain("t('queue.no_matches')");
+    expect(source).toContain('t(\'queue.no_entries\')');
+    expect(source).toContain('t(\'queue.no_matches\')');
 
     // History panel strings still in LabQueueWorkbench
-    expect(source).toContain("t('queue.history_title')");
-    expect(source).toContain("t('queue.history_empty')");
-    expect(source).toContain("t('queue.history_report_number')");
-    expect(source).toContain("t('queue.history_created')");
-    expect(source).toContain("t('queue.history_status')");
-    expect(source).toContain("t('queue.history_flags')");
-    expect(source).toContain("t('queue.history_critical')");
+    expect(source).toContain('t(\'queue.history_title\')');
+    expect(source).toContain('t(\'queue.history_empty\')');
+    expect(source).toContain('t(\'queue.history_report_number\')');
+    expect(source).toContain('t(\'queue.history_created\')');
+    expect(source).toContain('t(\'queue.history_status\')');
+    expect(source).toContain('t(\'queue.history_flags\')');
+    expect(source).toContain('t(\'queue.history_critical\')');
   });
 });

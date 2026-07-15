@@ -15,18 +15,18 @@ const source = fs.readFileSync(
 
 describe('LabReportHistoryPanel STRAT#21 — i18n migration', () => {
   it('imports t from labTranslations', () => {
-    expect(source).toContain("from './utils/labTranslations'");
+    expect(source).toContain('from \'./utils/labTranslations\'');
     expect(source).toContain('import { t }');
   });
 
   it('uses t() for panel titles', () => {
-    expect(source).toContain("t('queue.history_recent_title')");
-    expect(source).toContain("t('queue.history_patient_title')");
+    expect(source).toContain('t(\'queue.history_recent_title\')');
+    expect(source).toContain('t(\'queue.history_patient_title\')');
   });
 
   it('uses t() for empty-state messages', () => {
-    expect(source).toContain("t('queue.history_no_saved')");
-    expect(source).toContain("t('queue.history_no_matches')");
+    expect(source).toContain('t(\'queue.history_no_saved\')');
+    expect(source).toContain('t(\'queue.history_no_matches\')');
   });
 
   it('uses t() for severity filter labels via key map', () => {
@@ -38,24 +38,24 @@ describe('LabReportHistoryPanel STRAT#21 — i18n migration', () => {
   });
 
   it('uses t() for card labels (patient, report, visit, flags, critical)', () => {
-    expect(source).toContain("t('queue.history_patient_number')");
-    expect(source).toContain("t('queue.history_report_number')");
-    expect(source).toContain("t('queue.history_visit')");
-    expect(source).toContain("t('queue.history_no_visit')");
-    expect(source).toContain("t('queue.history_flags')");
-    expect(source).toContain("t('queue.history_critical')");
+    expect(source).toContain('t(\'queue.history_patient_number\')');
+    expect(source).toContain('t(\'queue.history_report_number\')');
+    expect(source).toContain('t(\'queue.history_visit\')');
+    expect(source).toContain('t(\'queue.history_no_visit\')');
+    expect(source).toContain('t(\'queue.history_flags\')');
+    expect(source).toContain('t(\'queue.history_critical\')');
   });
 
   it('does not contain hardcoded Russian strings anymore', () => {
-    expect(source).not.toContain("'Недавние лабораторные отчёты'");
-    expect(source).not.toContain("'Доступные отчёты пациента'");
-    expect(source).not.toContain("'Все'");
-    expect(source).not.toContain("'Без флагов'");
-    expect(source).not.toContain("'С флагами'");
-    expect(source).not.toContain("'Критические'");
-    expect(source).not.toContain("'Пациент #'");
-    expect(source).not.toContain("'без визита'");
-    expect(source).not.toContain("'флагов'");
-    expect(source).not.toContain("'критич.'");
+    expect(source).not.toContain('\'Недавние лабораторные отчёты\'');
+    expect(source).not.toContain('\'Доступные отчёты пациента\'');
+    expect(source).not.toContain('\'Все\'');
+    expect(source).not.toContain('\'Без флагов\'');
+    expect(source).not.toContain('\'С флагами\'');
+    expect(source).not.toContain('\'Критические\'');
+    expect(source).not.toContain('\'Пациент #\'');
+    expect(source).not.toContain('\'без визита\'');
+    expect(source).not.toContain('\'флагов\'');
+    expect(source).not.toContain('\'критич.\'');
   });
 });

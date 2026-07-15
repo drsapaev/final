@@ -311,6 +311,7 @@ const PhotoArchive = ({
                 <button
             onClick={() => handleFileDelete(file.id)}
             aria-label={`Удалить файл ${file.name}`}
+            title="Удалить"
             className="flex-1 px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200">
             
                   <Trash2 className="h-3 w-3 mx-auto" />

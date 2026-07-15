@@ -19,12 +19,12 @@ describe('useLabReportState hook (STRAT#1)', () => {
   });
 
   it('imports hasLabReportAction from labReportActions utils', () => {
-    expect(source).toContain("from '../utils/labReportActions'");
+    expect(source).toContain('from \'../utils/labReportActions\'');
     expect(source).toContain('hasLabReportAction');
   });
 
   it('imports normalize helpers from labReportNormalize utils', () => {
-    expect(source).toContain("from '../utils/labReportNormalize'");
+    expect(source).toContain('from \'../utils/labReportNormalize\'');
     expect(source).toContain('extractFieldValue');
     expect(source).toContain('getServiceContextItems');
   });
@@ -63,11 +63,11 @@ describe('useLabReportState hook (STRAT#1)', () => {
   });
 
   it('contains all action availability flags', () => {
-    expect(source).toContain("hasLabReportAction(activeInstance, 'edit')");
-    expect(source).toContain("hasLabReportAction(activeInstance, 'save_draft')");
-    expect(source).toContain("hasLabReportAction(activeInstance, 'finalize')");
-    expect(source).toContain("hasLabReportAction(activeInstance, 'revise')");
-    expect(source).toContain("hasLabReportAction(activeInstance, 'print')");
+    expect(source).toContain('hasLabReportAction(activeInstance, \'edit\')');
+    expect(source).toContain('hasLabReportAction(activeInstance, \'save_draft\')');
+    expect(source).toContain('hasLabReportAction(activeInstance, \'finalize\')');
+    expect(source).toContain('hasLabReportAction(activeInstance, \'revise\')');
+    expect(source).toContain('hasLabReportAction(activeInstance, \'print\')');
   });
 
   it('contains init-instance effect that loads values from activeInstance', () => {

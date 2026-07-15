@@ -64,6 +64,6 @@ describe('LabPanel Phase 1 safety contract (H-1, H-2, H-3)', () => {
     // STRAT#24: field rendering moved to ReportEditor component.
     // Check there for the localized aria-label pattern.
     const reportEditorSource = readSource('components/laboratory/ReportEditor.jsx');
-    expect(reportEditorSource).toContain("t('workbench.result_label')");
+    expect(reportEditorSource).toContain('t(\'workbench.result_label\')');
   });
 });

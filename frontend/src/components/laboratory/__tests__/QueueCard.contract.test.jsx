@@ -32,15 +32,15 @@ describe('QueueCard STRAT#28 — React.memo wrapped card component', () => {
   });
 
   it('uses t() for all i18n strings', () => {
-    expect(source).toContain("t('queue.patient_no_name')");
-    expect(source).toContain("t('queue.visit')");
-    expect(source).toContain("t('queue.services')");
-    expect(source).toContain("t('queue.report_exists')");
-    expect(source).toContain("t('queue.report_new')");
+    expect(source).toContain('t(\'queue.patient_no_name\')');
+    expect(source).toContain('t(\'queue.visit\')');
+    expect(source).toContain('t(\'queue.services\')');
+    expect(source).toContain('t(\'queue.report_exists\')');
+    expect(source).toContain('t(\'queue.report_new\')');
   });
 
   it('imports formatters from labUiLabels', () => {
-    expect(source).toContain("from './labUiLabels'");
+    expect(source).toContain('from \'./labUiLabels\'');
     expect(source).toContain('formatLabStatus');
     expect(source).toContain('getLabStatusVariant');
     expect(source).toContain('formatPaymentStatus');
