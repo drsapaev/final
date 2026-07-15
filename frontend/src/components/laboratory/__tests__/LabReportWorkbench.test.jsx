@@ -82,7 +82,9 @@ describe('LabReportWorkbench', () => {
     );
 
     expect(
-      screen.getByText('Выберите пациента из очереди или откройте уже существующий лабораторный отчёт из списка ниже.')
+      screen.getByText((content) =>
+        content.includes('Выберите пациента из очереди или откройте уже существующий лабораторный отчёт')
+      )
     ).toBeInTheDocument();
     expect(screen.getByText('Недавние лабораторные отчёты')).toBeInTheDocument();
     expect(screen.getByText(/Тестовый Пациент Регистратура/i)).toBeInTheDocument();
@@ -362,5 +364,40 @@ describe('LabReportWorkbench', () => {
     expect(source).not.toContain("notify('success', 'Черновик сохранён.')");
     expect(source).not.toContain("notify('success', 'Отчёт утверждён.')");
     expect(source).not.toContain("notify('success', 'Результаты отправлены пациенту через Telegram.')");
+  });
+
+  it('STRAT#19: JSX labels (print feedback, editor header, template resolution) use t()', () => {
+    // STRAT#19: JSX strings мигрированы на t()
+    const source = fs.readFileSync(workbenchPath, 'utf8');
+
+    // Print feedback
+    expect(source).toContain("t('workbench.print_sending')");
+    expect(source).toContain("t('workbench.print_sent')");
+    expect(source).toContain("t('workbench.print_pdf_failed')");
+    expect(source).toContain("t('workbench.print_pdf_invalid')");
+    expect(source).toContain("t('workbench.print_pdf_opened')");
+    expect(source).toContain("t('workbench.print_pdf_blocked')");
+
+    // Editor header
+    expect(source).toContain("t('workbench.title')");
+    expect(source).toContain("t('workbench.select_patient_prompt')");
+    expect(source).toContain("t('workbench.select_patient_short')");
+    expect(source).toContain("t('workbench.patient_label')");
+    expect(source).toContain("t('workbench.visit_services')");
+
+    // Template resolution
+    expect(source).toContain("t('workbench.resolving_templates')");
+    expect(source).toContain("t('workbench.recommended_report')");
+    expect(source).toContain("t('workbench.unmapped_services')");
+    expect(source).toContain("t('workbench.no_template_found')");
+    expect(source).toContain("t('workbench.no_template_hint')");
+    expect(source).toContain("t('workbench.show_all_templates')");
+    expect(source).toContain("t('workbench.create_report')");
+    expect(source).toContain("t('workbench.creating_report')");
+
+    // Больше нет хардкоженных русских строк в print feedback
+    expect(source).not.toContain("'Отправляю лабораторный отчёт на печать...'");
+    expect(source).not.toContain("'Не удалось сформировать PDF. Проверьте соединение и попробуйте снова.'");
+    expect(source).not.toContain("'PDF сформирован некорректно. Обратитесь к администратору.'");
   });
 });
