@@ -68,4 +68,21 @@ describe('LabResultsSection UX-AUDIT-FIX6 — migrate lucide-react to macos Icon
     const createIdx = fnBody.indexOf('labReportingApi.createOrder(');
     expect(createIdx).toBeGreaterThan(confirmIdx);
   });
+
+  it('UX-AUDIT-FIX10: uses labUiLabels SSOT instead of local STATUS_LABELS', () => {
+    // FIX10: локальные STATUS_LABELS / STATUS_VARIANTS удалены.
+    // LabResultsSection импортирует formatLabStatus / getLabStatusVariant
+    // из labUiLabels.js — единый источник истины.
+    expect(source).toContain("from '../../laboratory/labUiLabels'");
+    expect(source).toContain('formatLabStatus');
+    expect(source).toContain('getLabStatusVariant');
+
+    // Локальные константы удалены
+    expect(source).not.toContain('const STATUS_LABELS = {');
+    expect(source).not.toContain('const STATUS_VARIANTS = {');
+
+    // Использование в render: formatLabStatus(instance.status)
+    expect(source).toContain('formatLabStatus(instance.status)');
+    expect(source).toContain('getLabStatusVariant(instance.status)');
+  });
 });

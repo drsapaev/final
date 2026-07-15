@@ -23,24 +23,17 @@ import EMRSection from './EMRSection';
 import { labReportingApi } from '../../../api/labReporting';
 import { Badge, Button, Dialog, DialogTitle, DialogContent, DialogActions, Icon } from '../../ui/macos';
 import { useConfirm } from '../../common/ConfirmDialog';
+// UX-AUDIT-FIX10: ранее STATUS_LABELS / STATUS_VARIANTS дублировались локально.
+// Комментарий "PR-58: unified with labUiLabels.js" обещал SSOT, но реально
+// был вынесен только один лейбл. При добавлении нового статуса (например,
+// CANCELLED) забыли бы обновить LabResultsSection — пациенту показалось бы
+// 'Unknown'. Теперь используется единый источник истины.
+import { formatLabStatus, getLabStatusVariant } from '../../laboratory/labUiLabels';
 import logger from '../../../utils/logger';
 import notify from '../../../services/notify';
 
-const STATUS_LABELS = {
-  DRAFT: 'Черновик',
-  IN_PROGRESS: 'В работе',
-  FINALIZED: 'Утверждён',  // PR-58: unified with labUiLabels.js (was 'Готов')
-  PRINTED: 'Напечатан',
-  ARCHIVED: 'Архив',
-};
-
-const STATUS_VARIANTS = {
-  DRAFT: 'default',
-  IN_PROGRESS: 'warning',
-  FINALIZED: 'success',
-  PRINTED: 'info',
-  ARCHIVED: 'default',
-};
+// UX-AUDIT-FIX10: STATUS_LABELS и STATUS_VARIANTS удалены —
+// используются formatLabStatus() и getLabStatusVariant() из labUiLabels.js.
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -208,8 +201,8 @@ export function LabResultsSection({ patientId, visitId, disabled = false }) {
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-              <Badge variant={STATUS_VARIANTS[instance.status] || 'default'} size="small">
-                {STATUS_LABELS[instance.status] || instance.status}
+              <Badge variant={getLabStatusVariant(instance.status) || 'default'} size="small">
+                {formatLabStatus(instance.status) || instance.status}
               </Badge>
               {!disabled && (
                 <Button
