@@ -56,6 +56,8 @@ import tokenManager from '../utils/tokenManager';
 import { getRegistrarTimestampDisplay } from '../utils/dateUtils';
 // UX Audit Doctor H-30: import DoctorQueuePanel instead of inline queue rendering.
 import DoctorQueuePanel from '../components/doctor/DoctorQueuePanel';
+// STRAT#35: useTranslation adapter for i18n.
+import { t } from '../i18n/adapter';
 
 const hasBackendQueueAction = (entry, action, flagName) => {
   if (!entry) return false;
@@ -206,7 +208,7 @@ const DoctorPanel = () => {
     const now = new Date();
     const diffMs = now - start;
     const diffMins = Math.floor(diffMs / 60000);
-    if (diffMins < 1) return 'только что';
+    if (diffMins < 1) return t('doctor.just_now');
     if (diffMins < 60) return `${diffMins}m`;
     const hours = Math.floor(diffMins / 60);
     const mins = diffMins % 60;
@@ -267,16 +269,16 @@ const DoctorPanel = () => {
     const nextAppointment = {
       id: result?.visit_id || Date.now(),
       patientId: normalizedPatientId,
-      patientName: confirmation.patient_name || selectedPatient?.name || 'Новый пациент',
+      patientName: confirmation.patient_name || selectedPatient?.name || t('doctor.new_patient'),
       time: visitTime,
       type:
         submittedFormData?.discount_mode === 'repeat'
-          ? 'Повторный прием'
+          ? t('doctor.repeat_visit')
           : submittedFormData?.discount_mode === 'benefit'
-            ? 'Льготный визит'
-            : 'Следующий визит',
+            ? t('doctor.benefit_visit')
+            : t('doctor.next_visit'),
       status: 'scheduled',
-      notes: result?.message || (visitDate ? `Ожидает подтверждения на ${visitDate}` : 'Ожидает подтверждения'),
+      notes: result?.message || (visitDate ? `Ожидает подтверждения на ${visitDate}` : t('doctor.awaiting_confirmation')),
       appointmentDate: visitDate,
       confirmationToken: confirmation.token || null,
       confirmationChannel: confirmation.channel || submittedFormData?.confirmation_channel || 'telegram',
@@ -483,21 +485,21 @@ const DoctorPanel = () => {
 
   const getStatusText = (status) => {
     const statusMap = {
-      'active': 'Активен',
-      'recovery': 'Выздоравливает',
-      'critical': 'Критический',
-      'scheduled': 'Запланирован',
-      'in_progress': 'В процессе',
-      'completed': 'Завершен',
-      'cancelled': 'Отменен',
+      'active': t('doctor.status_active'),
+      'recovery': t('doctor.status_recovery'),
+      'critical': t('doctor.status_critical'),
+      'scheduled': t('doctor.status_scheduled'),
+      'in_progress': t('doctor.status_in_progress'),
+      'completed': t('doctor.status_completed'),
+      'cancelled': t('doctor.status_cancelled'),
       // Статусы очереди
-      'waiting': 'Ожидает',
-      'called': 'Вызван',
-      'in_service': 'На приёме',
-      'diagnostics': 'На обследовании',
-      'served': 'Обслужен',
-      'incomplete': 'Не завершён',
-      'no_show': 'Не явился'
+      'waiting': t('doctor.status_waiting'),
+      'called': t('doctor.status_called'),
+      'in_service': t('doctor.status_in_service'),
+      'diagnostics': t('doctor.status_diagnostics'),
+      'served': t('doctor.status_served'),
+      'incomplete': t('doctor.status_incomplete'),
+      'no_show': t('doctor.status_no_show')
     };
     return statusMap[status] || status;
   };
@@ -523,9 +525,9 @@ const DoctorPanel = () => {
 
   const getCurrentVisitMeta = (entry) => {
     const statusMap = {
-      called: { label: 'Текущий прием', variant: 'primary' },
-      in_service: { label: 'На приеме', variant: 'info' },
-      diagnostics: { label: 'На диагностике', variant: 'info' }
+      called: { label: t('doctor.queue_called'), variant: 'primary' },
+      in_service: { label: t('doctor.queue_in_service'), variant: 'info' },
+      diagnostics: { label: t('doctor.queue_diagnostics'), variant: 'info' }
     };
 
     return statusMap[entry?.status] || null;
@@ -841,7 +843,7 @@ const DoctorPanel = () => {
               loadError ?
               renderEmptyState({
                 icon: AlertCircle,
-                title: 'Данные врача не загружены',
+                title: t('doctor.doctor_data_not_loaded'),
                 description: loadError,
                 tone: 'error',
                 action: <Button variant="ghost" onClick={loadData}>Повторить</Button>
@@ -849,10 +851,10 @@ const DoctorPanel = () => {
               filteredPatients.length === 0 ?
               renderEmptyState({
                 icon: Users,
-                title: 'Пациенты не найдены',
+                title: t('doctor.patients_not_found'),
                 description: searchQuery || filterStatus !== 'all'
-                  ? 'По текущему поиску или фильтру нет пациентов.'
-                  : 'Нет пациентов для отображения. Откройте пациента через вкладку «Очередь» или найдите по ID/телефону в форме поиска выше.'
+                  ? t('doctor.no_patients_filtered')
+                  : t('doctor.no_patients_empty')
               }) :
 
               <div className="admin-table-wrapper">
@@ -878,11 +880,11 @@ const DoctorPanel = () => {
                           <td className="doctor-td" aria-label={getPatientA11yContext(patient)}>
                             <div className="doctor-patient-cell">
                               <div className="doctor-avatar-sm" style={{ '--doctor-gradient-from': primaryColor, '--doctor-gradient-to': getColor('primary', 600) }}>
-                                {String(patient.name || 'Пациент').split(' ').map((n) => n[0]).join('')}
+                                {String(patient.name || t('doctor.patient_default')).split(' ').map((n) => n[0]).join('')}
                               </div>
                               <div>
                                 <div className="doctor-patient-name">
-                                  {patient.name || 'Пациент'}
+                                  {patient.name || t('doctor.patient_default')}
                                 </div>
                                 <div className="doctor-patient-meta">
                                   {patient.gender}
@@ -993,7 +995,7 @@ const DoctorPanel = () => {
               loadError ?
               renderEmptyState({
                 icon: AlertCircle,
-                title: 'Записи врача не загружены',
+                title: t('doctor.appointments_not_loaded'),
                 description: loadError,
                 tone: 'error',
                 action: <Button variant="ghost" onClick={loadData}>Повторить</Button>
@@ -1001,9 +1003,9 @@ const DoctorPanel = () => {
               filteredAppointments.length === 0 ?
               renderEmptyState({
                 icon: Calendar,
-                title: 'Записи не найдены',
+                title: t('doctor.appointments_not_found'),
                 description: searchQuery || filterStatus !== 'all'
-                  ? 'По текущему поиску или фильтру нет записей.'
+                  ? t('doctor.no_appointments_filtered')
                   : 'Нет реальных записей для отображения. Создайте визит через регистратуру, очередь или кнопку назначения следующего визита.'
               }) :
 
@@ -1030,7 +1032,7 @@ const DoctorPanel = () => {
                               {appointment.time}
                             </div>
                           </td>
-                          <td className="doctor-td">{appointment.patientName || 'Пациент'}</td>
+                          <td className="doctor-td">{appointment.patientName || t('doctor.patient_default')}</td>
                           <td className="doctor-td">{appointment.type || '—'}</td>
                           <td className="doctor-td">
                             <Badge variant={getStatusVariant(appointment.status)} size="md">
@@ -1183,14 +1185,14 @@ const DoctorPanel = () => {
             <div className="doctor-modal-body">
               <div className="doctor-flex-gap-12">
                 <div className="doctor-text-sm doctor-modal-avatar">
-                  {patientModal.selectedItem.name?.charAt(0) || 'П'}
+                  {patientModal.selectedItem.name?.charAt(0) || t('doctor.patient_initial')}
                 </div>
                 <div>
                   <h4 className="doctor-modal-patient-name">
-                    {patientModal.selectedItem.name || 'Неизвестно'}
+                    {patientModal.selectedItem.name || t('doctor.unknown')}
                   </h4>
                   <p className="doctor-modal-patient-meta">
-                    {patientModal.selectedItem.phone || 'Телефон не указан'}
+                    {patientModal.selectedItem.phone || t('doctor.phone_not_set')}
                   </p>
                 </div>
               </div>
@@ -1201,7 +1203,7 @@ const DoctorPanel = () => {
                     Возраст
                   </p>
                   <p className="doctor-modal-info-value">
-                    {patientModal.selectedItem.age || 'Не указан'}
+                    {patientModal.selectedItem.age || t('doctor.age_not_set')}
                   </p>
                 </div>
                 <div>
@@ -1209,9 +1211,9 @@ const DoctorPanel = () => {
                     Статус
                   </p>
                   <p className="doctor-modal-info-value">
-                    {patientModal.selectedItem.status === 'active' ? 'Активный' :
-                  patientModal.selectedItem.status === 'waiting' ? 'Ожидает' :
-                  patientModal.selectedItem.status || 'Неизвестно'}
+                    {patientModal.selectedItem.status === 'active' : t('doctor.status_active_label') :
+                  patientModal.selectedItem.status === 'waiting' : t('doctor.status_waiting_label') :
+                  patientModal.selectedItem.status || t('doctor.unknown')}
                   </p>
                 </div>
               </div>
