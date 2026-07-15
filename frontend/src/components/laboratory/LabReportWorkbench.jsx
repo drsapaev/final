@@ -396,7 +396,7 @@ export default function LabReportWorkbench({
     // print attempt, producing stacked toasts alongside the inline Alert.
     setPrintFeedback({
       severity: 'info',
-      text: 'Отправляю лабораторный отчёт на печать...'
+      text: t('workbench.print_sending')
     });
     try {
       const printResult = await printService.printLabResults(
@@ -411,7 +411,7 @@ export default function LabReportWorkbench({
         await onQueueChanged?.();
         setPrintFeedback({
           severity: 'success',
-          text: `Лабораторный отчёт отправлен на печать${printResult.data?.printer ? ` (${printResult.data.printer})` : ''}.`
+          text: `${t('workbench.print_sent')}${printResult.data?.printer ? ` (${printResult.data.printer})` : ''}.`
         });
         // PR-59: auto-dismiss success feedback after 5 seconds
         setTimeout(() => setPrintFeedback(null), 5000);
@@ -433,7 +433,7 @@ export default function LabReportWorkbench({
         logger.error('[LabReportWorkbench] PDF download failed', downloadError);
         setPrintFeedback({
           severity: 'error',
-          text: 'Не удалось сформировать PDF. Проверьте соединение и попробуйте снова.'
+          text: t('workbench.print_pdf_failed')
         });
         notify('error', downloadError.message || t('errors.print_failed'));
         return;
@@ -442,7 +442,7 @@ export default function LabReportWorkbench({
         // L-M-9 fix: если blob пустой или не Blob — не открываем window.open('undefined')
         setPrintFeedback({
           severity: 'error',
-          text: 'PDF сформирован некорректно. Обратитесь к администратору.'
+          text: t('workbench.print_pdf_invalid')
         });
         return;
       }
@@ -457,14 +457,12 @@ export default function LabReportWorkbench({
         await onQueueChanged?.();
         setPrintFeedback({
           severity: 'success',
-          text: 'PDF открыт в новой вкладке. Статус печати обновлён.'
+          text: t('workbench.print_pdf_opened')
         });
       } else {
         setPrintFeedback({
           severity: 'warning',
-          text: 'PDF сформирован, но новая вкладка заблокирована. ' +
-            'Разрешите pop-up для этого сайта и нажмите «Печать» снова, ' +
-            'чтобы обновить статус отчёта.'
+          text: t('workbench.print_pdf_blocked')
         });
       }
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
@@ -523,25 +521,25 @@ export default function LabReportWorkbench({
         <CardHeader style={{ background: 'var(--mac-bg-tertiary)', borderBottom: '1px solid var(--mac-border)', padding: 'var(--mac-spacing-4)' }}>
           <CardTitle style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
             <Icon name="doc.text" size={20} />
-            Редактор лабораторного отчёта
+            {t('workbench.title')}
           </CardTitle>
         </CardHeader>
         <CardContent style={{ padding: 'var(--mac-spacing-4)', background: 'var(--mac-bg-secondary)', display: 'grid', gap: 'var(--mac-spacing-4)' }}>
           {!selectedAppointment && !activeInstance ? (
             <Alert severity="info">
               {recentReports.length > 0
-                ? 'Выберите пациента из очереди или откройте уже существующий лабораторный отчёт из списка ниже.'
-                : 'Выберите пациента из очереди или откройте уже существующий лабораторный отчёт.'}
+                ? t('workbench.select_patient_prompt')
+                : t('workbench.select_patient_short')}
             </Alert>
           ) : !activeInstance ? (
             <div style={{ display: 'grid', gap: 'var(--mac-spacing-3)' }}>
               <div style={{ color: 'var(--mac-text-secondary)' }}>
-                Пациент: <strong style={{ color: 'var(--mac-text-primary)' }}>{selectedAppointment?.patient_fio}</strong>
+                {t('workbench.patient_label')}: <strong style={{ color: 'var(--mac-text-primary)' }}>{selectedAppointment?.patient_fio}</strong>
               </div>
               {serviceContextItems.length > 0 && (
                 <div style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
                   <div style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-base)' }}>
-                    Услуги визита
+                    {t('workbench.visit_services')}
                   </div>
                   <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)', flexWrap: 'wrap' }}>
                     {serviceContextItems.map((item) => (
@@ -554,30 +552,30 @@ export default function LabReportWorkbench({
                 </div>
               )}
               {templateResolutionLoading && (
-                <Alert severity="info">Подбираю доступные отчёты для выбранного визита...</Alert>
+                <Alert severity="info">{t('workbench.resolving_templates')}</Alert>
               )}
               {!templateResolutionLoading && templateResolution?.default_template && (
                 <Alert severity="info">
-                  Рекомендуемый отчёт: <strong>{templateResolution.default_template.name}</strong>
+                  {t('workbench.recommended_report')}: <strong>{templateResolution.default_template.name}</strong>
                 </Alert>
               )}
               {!templateResolutionLoading && templateResolution?.unmapped_service_codes?.length > 0 && (
                 <Alert severity={resolvedTemplates.length > 0 ? 'warning' : 'error'}>
-                  Ненастроенные услуги визита: {templateResolution.unmapped_service_codes.join(', ')}
+                  {t('workbench.unmapped_services')}: {templateResolution.unmapped_service_codes.join(', ')}
                 </Alert>
               )}
               {!templateResolutionLoading && resolutionHasBlockingGap && (
                 <Alert severity="error">
-                  Для выбранного визита не найдено ни одного допустимого отчёта.
-                  Настройте mapping услуги к шаблону (требуется роль Admin)
-                  или создайте отчёт без привязки к услугам.
+                  {t('workbench.no_template_found')}
+                  <br />
+                  {t('workbench.no_template_hint')} {t('workbench.no_template_escape')}
                   <div style={{ marginTop: 'var(--mac-spacing-2)' }}>
                     <Button
                       size="small"
                       variant="outline"
                       onClick={() => setEscapeHatchActive(true)}
                     >
-                      Показать все шаблоны (без привязки к услугам)
+                      {t('workbench.show_all_templates')}
                     </Button>
                   </div>
                 </Alert>
@@ -591,7 +589,7 @@ export default function LabReportWorkbench({
               )}
               {!templateResolutionLoading && singleAllowedTemplate && !resolutionHasBlockingGap && (
                 <Alert severity="info">
-                  Единственный допустимый отчёт найден: <strong>{singleAllowedTemplate.name}</strong>. Нажмите «Создать отчёт», чтобы открыть его для заполнения.
+                  {t('workbench.single_template_found')} <strong>{singleAllowedTemplate.name}</strong>. {t('workbench.click_create_to_open')}
                 </Alert>
               )}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 'var(--mac-spacing-3)', alignItems: 'end' }}>
@@ -617,7 +615,7 @@ export default function LabReportWorkbench({
                   disabled={saving || templateResolutionLoading || (resolutionHasBlockingGap && !escapeHatchActive) || !selectedTemplateId}
                 >
                   <Icon name="plus.rectangle.on.folder" size={16} />
-                  {busyAction === 'create' ? 'Создаю...' : 'Создать отчёт'}
+                  {busyAction === 'create' ? t('workbench.creating_report') : t('workbench.create_report')}
                 </Button>
               </div>
             </div>
