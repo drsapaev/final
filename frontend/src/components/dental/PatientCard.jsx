@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 import { useState, useEffect } from 'react';
 import logger from '../../utils/logger';
 import {
@@ -164,7 +165,7 @@ const PatientCard = ({
       setIsEditing(false);
     } catch (error) {
       logger.error('Ошибка сохранения:', error);
-      notify.error('Не удалось сохранить данные пациента. Проверьте соединение и попробуйте снова.');
+      notify.error(t('dental2.patient_save_failed'));
     } finally {
       setLoading(false);
     }

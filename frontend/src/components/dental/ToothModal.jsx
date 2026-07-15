@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 /**
  * Tooth Modal Component
  * Модальное окно для работы с зубом
@@ -351,7 +352,7 @@ const ToothModal = ({
       
     } catch (error) {
       logger.error('Ошибка сохранения данных зуба:', error);
-      notify.error('Не удалось сохранить данные зуба. Проверьте соединение и попробуйте снова.');
+      notify.error(t('dental2.tooth_save_failed'));
     } finally {
       setLoading(false);
     }
