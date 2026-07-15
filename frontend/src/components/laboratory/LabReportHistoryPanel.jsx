@@ -9,6 +9,8 @@ import {
   getLabStatusVariant,
 } from './labUiLabels';
 import { historySeverityState, matchesHistoryFilter } from './utils/labReportNormalize';
+// STRAT#21: t() для i18n — history panel strings мигрированы.
+import { t } from './utils/labTranslations';
 
 /**
  * P-04 fix: LabReportHistoryPanel выделен из LabReportWorkbench.
@@ -20,12 +22,13 @@ import { historySeverityState, matchesHistoryFilter } from './utils/labReportNor
  * Включает фильтр по severity (Все / Без флагов / С флагами / Критические)
  * и кнопки-карточки для открытия бланка.
  */
-const SEVERITY_FILTERS = [
-  { id: 'all',      label: 'Все' },
-  { id: 'clean',    label: 'Без флагов' },
-  { id: 'flagged',  label: 'С флагами' },
-  { id: 'critical', label: 'Критические' },
-];
+const SEVERITY_FILTER_IDS = ['all', 'clean', 'flagged', 'critical'];
+const SEVERITY_FILTER_KEY_MAP = {
+  all: 'queue.history_severity_all',
+  clean: 'queue.history_severity_clean',
+  flagged: 'queue.history_severity_flagged',
+  critical: 'queue.history_severity_critical',
+};
 
 function sortHistoryItems(items) {
   return [...items].sort((left, right) => {
@@ -53,12 +56,12 @@ export default function LabReportHistoryPanel({
   );
 
   const title = showRecentReportsBrowser
-    ? 'Недавние лабораторные отчёты'
-    : 'Доступные отчёты пациента';
+    ? t('queue.history_recent_title')
+    : t('queue.history_patient_title');
 
   const emptyText = showRecentReportsBrowser
-    ? 'В лаборатории пока нет сохранённых отчётов для повторного открытия.'
-    : 'Для выбранного фильтра нет лабораторных отчётов.';
+    ? t('queue.history_no_saved')
+    : t('queue.history_no_matches');
 
   // L-L-5 fix: keyboard-навигация между карточками (ArrowUp/Down).
   // Список карточек хранится в ref — при ArrowDown/Up перемещаем фокус.
@@ -92,13 +95,13 @@ export default function LabReportHistoryPanel({
       <CardContent style={{ padding: 'var(--mac-spacing-4)', background: 'var(--mac-bg-secondary)', display: 'grid', gap: 'var(--mac-spacing-3)' }}>
         {/* Фильтр по severity */}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--mac-spacing-2)' }}>
-          {SEVERITY_FILTERS.map((filter) => (
+          {SEVERITY_FILTER_IDS.map((filterId) => (
             <Button
-              key={filter.id}
-              variant={historySeverityFilter === filter.id ? 'primary' : 'outline'}
-              onClick={() => onSeverityFilterChange(filter.id)}
+              key={filterId}
+              variant={historySeverityFilter === filterId ? 'primary' : 'outline'}
+              onClick={() => onSeverityFilterChange(filterId)}
             >
-              {filter.label}
+              {t(SEVERITY_FILTER_KEY_MAP[filterId])}
             </Button>
           ))}
         </div>
@@ -108,7 +111,7 @@ export default function LabReportHistoryPanel({
         ) : (
           filteredItems.map((item, index) => {
             const severity = historySeverityState(item);
-            const patientLabel = item.patient_snapshot?.full_name || `Пациент #${item.patient_id}`;
+            const patientLabel = item.patient_snapshot?.full_name || `${t('queue.history_patient_number')} #${item.patient_id}`;
             return (
               <button
                 key={item.id}
@@ -117,7 +120,7 @@ export default function LabReportHistoryPanel({
                 onClick={() => onOpenInstance(item.id)}
                 // L-L-5 fix: ArrowUp/Down/Home/End для навигации между карточками.
                 onKeyDown={(e) => handleCardKeyDown(e, index)}
-                aria-label={`Отчёт ${item.template?.name || `#${item.id}`}, ${patientLabel}, ${formatLabStatus(item.status)}`}
+                aria-label={`${t('queue.history_report_number')} ${item.template?.name || `#${item.id}`}, ${patientLabel}, ${formatLabStatus(item.status)}`}
                 style={{
                   border: '1px solid var(--mac-border)',
                   borderRadius: '14px',
@@ -134,7 +137,7 @@ export default function LabReportHistoryPanel({
               >
                 <div style={{ display: 'grid', gap: 'var(--mac-spacing-1)', textAlign: 'left' }}>
                   <div style={{ fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>
-                    {item.template?.name || `Отчёт #${item.id}`}
+                    {item.template?.name || `${t('queue.history_report_number')} #${item.id}`}
                   </div>
                   <div style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-sm)' }}>
                     {showRecentReportsBrowser
@@ -143,7 +146,7 @@ export default function LabReportHistoryPanel({
                   </div>
                   {showRecentReportsBrowser && (
                     <div style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-xs)' }}>
-                      Визит: {item.visit_id || 'без визита'}
+                      {t('queue.history_visit')}: {item.visit_id || t('queue.history_no_visit')}
                     </div>
                   )}
                 </div>
@@ -161,10 +164,10 @@ export default function LabReportHistoryPanel({
                     {formatSeverityLabel(severity.label)}
                   </Badge>
                   {item.flagged_findings_count > 0 && (
-                    <Badge variant="info">{item.flagged_findings_count} флагов</Badge>
+                    <Badge variant="info">{item.flagged_findings_count} {t('queue.history_flags')}</Badge>
                   )}
                   {item.critical_findings_count > 0 && (
-                    <Badge variant="danger">{item.critical_findings_count} критич.</Badge>
+                    <Badge variant="danger">{item.critical_findings_count} {t('queue.history_critical')}</Badge>
                   )}
                 </div>
               </button>
