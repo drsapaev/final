@@ -23,6 +23,7 @@ function todayStr() {
  * Для минимальных перезаписей реализуем только чтение и поиск.
  */
 export default function Appointments() {
+  const { t } = useTranslation();
   const [date, setDate] = useState(todayStr());
   const [rows, setRows] = useState([]);
   const [q, setQ] = useState('');

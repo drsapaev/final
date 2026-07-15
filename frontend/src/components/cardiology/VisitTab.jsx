@@ -26,6 +26,7 @@ export function VisitTab({
   getColor,
   getFontSize,
 }) {
+  const { t } = useTranslation();
   // Empty state: no patient selected
   if (!selectedPatient) {
     return (

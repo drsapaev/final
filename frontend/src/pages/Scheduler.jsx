@@ -17,6 +17,7 @@ function todayStr() {
  * Совместимо с GET /schedule?date=YYYY-MM-DD&limit=...
  */
 export default function Scheduler() {
+  const { t } = useTranslation();
   const [date, setDate] = useState(todayStr());
   const [rows, setRows] = useState([]);
   const [q, setQ] = useState('');
