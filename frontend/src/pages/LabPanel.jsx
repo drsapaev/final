@@ -28,6 +28,11 @@ const tabs = [
 const LAB_PANEL_TITLE_ID = 'lab-panel-title';
 const LAB_PANEL_TABLIST_ID = 'lab-panel-tabs';
 
+// STRAT#7: размер страницы для server-side pagination очереди.
+// 50 записей — баланс между network overhead и UX (минимум прокруток).
+// Backend maximum — 500 (Query(ge=1, le=500)).
+const LAB_QUEUE_PAGE_SIZE = 50;
+
 function getLabPanelTabId(tabId) {
   return `lab-panel-tab-${tabId}`;
 }
@@ -83,6 +88,14 @@ export default function LabPanel() {
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'queue');
   const [appointments, setAppointments] = useState([]);
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
+  // STRAT#7: server-side pagination state для очереди.
+  // queueTotal — общее количество записей на сервере (из payload.total).
+  // queueOffset — текущий offset для следующей страницы.
+  // hasMoreQueue — флаг, есть ли ещё записи для load-more.
+  const [queueTotal, setQueueTotal] = useState(0);
+  const [queueOffset, setQueueOffset] = useState(0);
+  const [hasMoreQueue, setHasMoreQueue] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [templates, setTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [selectedAppointment, setSelectedAppointment] = useState(null);
@@ -215,9 +228,22 @@ export default function LabPanel() {
       // fetch к registrar endpoint. Façade имеет собственный контракт,
       // собственную RBAC и нормализует ответ в плоский формат — это убирает
       // жёсткую связку с registrar module и промежуточную нормализацию.
-      const payload = await labReportingApi.listQueueToday();
+      //
+      // STRAT#7: передаём { limit: LAB_QUEUE_PAGE_SIZE, offset: 0 } для
+      // server-side pagination. Backend уже поддерживает limit/offset
+      // (STRAT#4), но frontend ранее грузил все записи сразу. Теперь
+      // initial load получает первые LAB_QUEUE_PAGE_SIZE=50 записей;
+      // loadMoreAppointments() догружает следующие.
+      const payload = await labReportingApi.listQueueToday(null, {
+        limit: LAB_QUEUE_PAGE_SIZE,
+        offset: 0,
+      });
       const queueEntries = normalizeListPayload(payload?.entries ?? []);
       setAppointments(queueEntries);
+      setQueueTotal(payload?.total ?? queueEntries.length);
+      setQueueOffset(queueEntries.length);
+      // STRAT#7: помечаем, есть ли ещё записи для load-more
+      setHasMoreQueue((payload?.total ?? 0) > queueEntries.length);
       setSelectedAppointment((current) => {
         if (!current) {
           return current;
@@ -242,6 +268,31 @@ export default function LabPanel() {
       setAppointmentsLoading(false);
     }
   }, [notify]);
+
+  // STRAT#7: loadMoreAppointments — incremental server-side pagination.
+  // Догружает следующую страницу (offset = queueOffset) и аппендит к
+  // существующему списку. Используется кнопкой «Показать ещё» в
+  // LabQueueWorkbench (заменит client-side load-more из FIX#13).
+  const loadMoreAppointments = useCallback(async () => {
+    if (loadingMore || !hasMoreQueue) return;
+    setLoadingMore(true);
+    try {
+      const payload = await labReportingApi.listQueueToday(null, {
+        limit: LAB_QUEUE_PAGE_SIZE,
+        offset: queueOffset,
+      });
+      const newEntries = normalizeListPayload(payload?.entries ?? []);
+      setAppointments((current) => [...current, ...newEntries]);
+      setQueueOffset((current) => current + newEntries.length);
+      setHasMoreQueue((payload?.total ?? 0) > queueOffset + newEntries.length);
+      logger.info('[LabPanel] loaded more lab queue entries', newEntries.length);
+    } catch (error) {
+      logger.error('[LabPanel] loadMoreAppointments failed', error);
+      notify('error', getErrorMessage(error, 'Не удалось загрузить дополнительные записи очереди.'));
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loadingMore, hasMoreQueue, queueOffset, notify]);
 
   // H-2 fix: keyboard shortcuts for tab switching, refresh, clear selection.
   useLabHotkeys({
@@ -575,6 +626,11 @@ export default function LabPanel() {
           appointments={appointments}
           loading={appointmentsLoading}
           onRefresh={loadLabAppointments}
+          // STRAT#7: server-side pagination props
+          onLoadMore={loadMoreAppointments}
+          hasMore={hasMoreQueue}
+          loadingMore={loadingMore}
+          queueTotal={queueTotal}
           onOpenAppointment={(appointment) => {
             setSelectedAppointment(appointment);
             setTemplateResolution(null);
