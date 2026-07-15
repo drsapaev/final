@@ -15,10 +15,13 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import PropTypes from 'prop-types';
-import { FileText, Download, TestTube, Plus } from 'lucide-react';
+// UX-AUDIT-FIX6: lucide-react заменён на macos Icon для консистентности со
+// всеми остальными lab-компонентами. Смешивание двух библиотек иконок
+// (lucide + macos SF-Symbol-style) нарушало Nielsen Heuristic #4
+// (Consistency & Standards) — разные stroke-width, optical size, padding.
 import EMRSection from './EMRSection';
 import { labReportingApi } from '../../../api/labReporting';
-import { Badge, Button, Dialog, DialogTitle, DialogContent, DialogActions } from '../../ui/macos';
+import { Badge, Button, Dialog, DialogTitle, DialogContent, DialogActions, Icon } from '../../ui/macos';
 import logger from '../../../utils/logger';
 import notify from '../../../services/notify';
 
@@ -168,7 +171,7 @@ export function LabResultsSection({ patientId, visitId, disabled = false }) {
               background: 'var(--mac-bg-secondary)',
             }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
-              <TestTube size={16} style={{ color: 'var(--mac-text-secondary)', flexShrink: 0 }} aria-hidden="true" />
+              <Icon name="testtube.2" size={16} color="secondary" aria-hidden="true" />
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontWeight: 500, fontSize: '14px', color: 'var(--mac-text-primary)' }}>
                   {instance.template_name || instance.template_code || 'Лабораторный отчёт'}
@@ -193,7 +196,7 @@ export function LabResultsSection({ patientId, visitId, disabled = false }) {
                   size="small"
                   onClick={() => handleDownload(instance.id)}
                   aria-label={`Скачать PDF: ${instance.template_name || 'лабораторный отчёт'}`}>
-                  <Download size={14} style={{ marginRight: 4 }} />
+                  <Icon name="square.and.arrow.down" size={14} style={{ marginRight: 4 }} aria-hidden="true" />
                   PDF
                 </Button>
               )}
@@ -208,12 +211,12 @@ export function LabResultsSection({ patientId, visitId, disabled = false }) {
     <>
       <EMRSection
         title="Результаты анализов"
-        icon={<FileText size={16} aria-hidden="true" />}
+        icon={<Icon name="doc.text" size={16} aria-hidden="true" />}
         disabled={disabled}
         defaultOpen={instances.length > 0}
         headerAction={!disabled && patientId ? (
           <Button variant="outline" size="small" onClick={handleOpenOrderModal}>
-            <Plus size={14} style={{ marginRight: 4 }} />
+            <Icon name="plus" size={14} style={{ marginRight: 4 }} aria-hidden="true" />
             Заказать анализы
           </Button>
         ) : null}
@@ -260,7 +263,7 @@ export function LabResultsSection({ patientId, visitId, disabled = false }) {
                         {template.code} • {template.family}
                       </div>
                     </div>
-                    <TestTube size={20} style={{ color: 'var(--mac-text-secondary)' }} />
+                    <Icon name="testtube.2" size={20} color="secondary" aria-hidden="true" />
                   </button>
                 ))
               )}

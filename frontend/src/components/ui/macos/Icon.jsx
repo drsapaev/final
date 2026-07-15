@@ -273,6 +273,18 @@ const ICONS = {
   'square.and.arrow.up':
   <path d="M7 13.5l2.5-2.5m0 0L10.5 9m-1 2V16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-5.5M7 13.5V11a2 2 0 0 1 2-2h.5" />,
 
+  // UX-AUDIT-FIX6: 'square.and.arrow.down' ранее отсутствовал — fallback на
+  // 'questionmark' при использовании в LabReportActionsBar, LabTemplateWorkbench,
+  // ContentTab. Теперь SVG-path корректный (download icon).
+  'square.and.arrow.down':
+  <path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />,
+
+  'square.and.arrow.down.on.square':
+  <path d="M12 3v8m0 0l-3-3m3 3l3-3M4 14v4a2 2 0 002 2h8a2 2 0 002-2v-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />,
+
+  'square.and.arrow.down.on.square.fill':
+  <path d="M12 3v8m0 0l-3-3m3 3l3-3M4 14v4a2 2 0 002 2h8a2 2 0 002-2v-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />,
+
   'trash':
   <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />,
 
