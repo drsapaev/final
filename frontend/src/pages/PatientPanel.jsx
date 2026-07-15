@@ -20,7 +20,7 @@ import PatientBookingPanel from '../components/patient/PatientBookingPanel';
 import PatientCabinetSummary from '../components/patient/PatientCabinetSummary';
 import PatientFormsPreview from '../components/patient/PatientFormsPreview';
 import './patient.css';
-import { useTranslation } from '../i18n/adapter';
+import { useTranslation } from '../i18n/useTranslation';
 
 /**
  * PatientPanel — корневой контейнер для patient-facing веб-панели.

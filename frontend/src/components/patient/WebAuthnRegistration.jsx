@@ -4,7 +4,7 @@ import {
   Card, CardContent, CardHeader, CardTitle, Badge, Button, Icon, Alert, Input,
 } from '../ui/macos';
 import { useWebAuthn } from '../../hooks/useWebAuthn';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 /**
  * WebAuthn Registration UI — P5 frontend integration.

@@ -24,7 +24,7 @@ import QueuePositionCard from '../components/mobile/QueuePositionCard';
 
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
-import { useTranslation } from '../i18n/adapter';
+import { useTranslation } from '../i18n/useTranslation';
 
 /**
  * Мобильная панель пациента для PWA

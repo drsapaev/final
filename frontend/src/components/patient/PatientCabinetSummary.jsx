@@ -9,7 +9,7 @@ import {
   describePatientError,
 } from './patientUtils';
 import PanelEmptyState from './PanelEmptyState';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 /**
  * L-H-4 fix: PatientCabinetSummary выделен в отдельный файл (~200 строк).
