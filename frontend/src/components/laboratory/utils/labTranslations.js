@@ -175,6 +175,7 @@ const TRANSLATIONS = {
     show_more: 'Показать ещё',
     remaining: 'осталось',
     loading: 'Загрузка…',
+    load_more_aria: 'Загрузить ещё записи с сервера',
     no_entries: 'На сегодня не найдено лабораторных записей.',
     no_matches: 'Ничего не найдено. Измените поисковый запрос или фильтр.',
     filter_all: 'Все',
@@ -192,6 +193,25 @@ const TRANSLATIONS = {
     filter_count: 'Показано',
     filter_count_search: 'поиск',
     filter_count_filter: 'фильтр',
+    // Card strings (STRAT#18)
+    patient_no_name: 'Пациент без имени',
+    visit: 'Визит',
+    visit_not_linked: 'не привязан',
+    phone: 'Телефон',
+    services: 'Услуги',
+    payment: 'Оплата',
+    patient_id_aria: 'Показать внутренний ID пациента',
+    patient_id_label: 'ID пациента',
+    report_exists: 'Отчёт существует',
+    report_new: 'Новый отчёт',
+    // History panel (STRAT#18)
+    history_title: 'История отчётов пациента',
+    history_empty: 'Для выбранного пациента ещё нет лабораторных отчётов.',
+    history_report_number: 'Отчёт',
+    history_created: 'Создан',
+    history_status: 'Статус',
+    history_flags: 'флагов',
+    history_critical: 'критич.',
   },
 
   // ─── Error messages ──────────────────────────────────────────────────────
@@ -250,8 +270,11 @@ const TRANSLATIONS = {
     show_patient_id: 'ID пациента',
     show_phone: 'Показать номер (доступ ограничен)',
     hide_phone: 'Скрыть номер',
+    show_phone_aria: 'Показать номер телефона',
+    hide_phone_aria: 'Скрыть номер телефона',
     phone_restricted: 'Доступ к номеру ограничен ролью',
     phone_not_set: 'не указан',
+    no_services: 'Нет данных об услугах',
   },
 };
 

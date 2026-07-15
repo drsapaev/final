@@ -35,7 +35,8 @@ describe('LabQueueWorkbench UX-AUDIT-FIX11 — MaskedPhone affordance', () => {
 
   it('adds read-only variant when canReveal=false', () => {
     expect(source).toContain('lqw-masked-phone-readonly');
-    expect(source).toContain('title="Доступ к номеру ограничен ролью"');
+    // STRAT#18: title migrated to t('pii.phone_restricted')
+    expect(source).toContain("t('pii.phone_restricted')");
   });
 
   it('registers hover/focus styles in lab.css', () => {
@@ -88,7 +89,8 @@ describe('LabQueueWorkbench UX-AUDIT-FIX11 — MaskedPhone affordance', () => {
     expect(source).toContain('disabled={loadingMore}');
     // Loading indicator
     expect(source).toContain("loadingMore ? 'arrow.clockwise' : 'arrow.down'");
-    expect(source).toContain("'Загрузка…'");
+    // STRAT#18: 'Загрузка…' migrated to t('queue.loading')
+    expect(source).toContain("t('queue.loading')");
     // Counter показывает server-side total
     expect(source).toContain('queueTotal - appointments.length');
     // Client-side fallback остаётся
@@ -126,5 +128,47 @@ describe('LabQueueWorkbench UX-AUDIT-FIX11 — MaskedPhone affordance', () => {
 
     // Filter count
     expect(source).toContain("t('queue.filter_count')");
+  });
+
+  it('STRAT#18: card strings (patient info, PII, history) use t()', () => {
+    // STRAT#18: card content strings мигрированы на t()
+    expect(source).toContain("t('pii.phone_not_set')");
+    expect(source).toContain("t('pii.phone_restricted')");
+    expect(source).toContain("t('pii.hide_phone')");
+    expect(source).toContain("t('pii.show_phone')");
+    expect(source).toContain("t('pii.no_services')");
+
+    // Card fields
+    expect(source).toContain("t('queue.patient_no_name')");
+    expect(source).toContain("t('queue.visit')");
+    expect(source).toContain("t('queue.visit_not_linked')");
+    expect(source).toContain("t('queue.phone')");
+    expect(source).toContain("t('queue.services')");
+    expect(source).toContain("t('queue.payment')");
+    expect(source).toContain("t('queue.patient_id_aria')");
+    expect(source).toContain("t('queue.patient_id_label')");
+    expect(source).toContain("t('queue.report_exists')");
+    expect(source).toContain("t('queue.report_new')");
+
+    // Empty states
+    expect(source).toContain("t('queue.no_entries')");
+    expect(source).toContain("t('queue.no_matches')");
+
+    // History panel
+    expect(source).toContain("t('queue.history_title')");
+    expect(source).toContain("t('queue.history_empty')");
+    expect(source).toContain("t('queue.history_report_number')");
+    expect(source).toContain("t('queue.history_created')");
+    expect(source).toContain("t('queue.history_status')");
+    expect(source).toContain("t('queue.history_flags')");
+    expect(source).toContain("t('queue.history_critical')");
+
+    // Больше нет хардкоженных русских строк в card content
+    expect(source).not.toContain("'Пациент без имени'");
+    expect(source).not.toContain("'Отчёт существует'");
+    expect(source).not.toContain("'Новый отчёт'");
+    expect(source).not.toContain('>История отчётов пациента<');
+    expect(source).not.toContain("'флагов'");
+    expect(source).not.toContain("'критич.'");
   });
 });

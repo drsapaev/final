@@ -46,10 +46,10 @@ function maskPhone(phone) {
 // Соответствует Nielsen Heuristic #6 (Recognition rather than Recall).
 function MaskedPhone({ phone, canReveal = true }) {
   const [revealed, setRevealed] = useState(false);
-  if (!phone) return <span className="lqw-masked-phone-empty">не указан</span>;
+  if (!phone) return <span className="lqw-masked-phone-empty">{t('pii.phone_not_set')}</span>;
   if (!canReveal) {
     return (
-      <span className="lqw-masked-phone-readonly" title="Доступ к номеру ограничен ролью">
+      <span className="lqw-masked-phone-readonly" title={t('pii.phone_restricted')}>
         <Icon name="eye.slash" size={12} aria-hidden="true" />
         <span className="lqw-masked-phone-text">{maskPhone(phone)}</span>
       </span>
@@ -62,8 +62,8 @@ function MaskedPhone({ phone, canReveal = true }) {
         e.stopPropagation();
         setRevealed((v) => !v);
       }}
-      title={revealed ? 'Скрыть номер' : 'Показать номер (доступ ограничен)'}
-      aria-label={revealed ? 'Скрыть номер телефона' : 'Показать номер телефона'}
+      title={revealed ? t('pii.hide_phone') : t('pii.show_phone')}
+      aria-label={revealed ? t('pii.hide_phone_aria') : t('pii.show_phone_aria')}
       aria-pressed={revealed}
       className={`lqw-masked-phone ${revealed ? 'lqw-masked-phone-revealed' : ''}`}
     >
@@ -98,7 +98,7 @@ function formatServices(appointment) {
     ? appointment.all_patient_services
     : appointment?.services || [];
   if (!services.length) {
-    return 'Нет данных об услугах';
+    return t('pii.no_services');
   }
   return services.join(', ');
 }
@@ -302,8 +302,8 @@ export default function LabQueueWorkbench({
           ) : filteredAppointments.length === 0 ? (
             <Alert severity="info">
               {appointments.length === 0
-                ? 'На сегодня не найдено лабораторных записей.'
-                : 'Ничего не найдено. Измените поисковый запрос или фильтр.'}
+                ? t('queue.no_entries')
+                : t('queue.no_matches')}
             </Alert>
           ) : (
             <div className="lqw-card-grid">
@@ -329,10 +329,10 @@ export default function LabQueueWorkbench({
                     <div className="lqw-card-top">
                       <div className="lqw-card-info">
                         <div className="lqw-card-name">
-                          {appointment.patient_fio || 'Пациент без имени'}
+                          {appointment.patient_fio || t('queue.patient_no_name')}
                         </div>
                         <div className="lqw-card-meta">
-                          Визит: {appointment.visit_id || 'не привязан'} | Телефон:{' '}
+                          {t('queue.visit')}: {appointment.visit_id || t('queue.visit_not_linked')} | {t('queue.phone')}:{' '}
                           {/* P-05 fix: маскирование номера телефона в публичном
                               пространстве лаборатории. Раскрытие — по клику. */}
                           <MaskedPhone phone={appointment.patient_phone} />
@@ -344,12 +344,12 @@ export default function LabQueueWorkbench({
                     </div>
 
                     <div className="lqw-card-services">
-                      <strong>Услуги:</strong> {formatServices(appointment)}
+                      <strong>{t('queue.services')}:</strong> {formatServices(appointment)}
                     </div>
 
                     <div className="lqw-meta-row">
                       <Badge variant="primary">{formatSpecialtyLabel(appointment.specialty)}</Badge>
-                      {appointment.payment_status && <Badge variant="info">Оплата: {formatPaymentStatus(appointment.payment_status)}</Badge>}
+                      {appointment.payment_status && <Badge variant="info">{t('queue.payment')}: {formatPaymentStatus(appointment.payment_status)}</Badge>}
                       {/* PR-60 / Medium-13: was variant="success" (green implies positive status, but time is not a status) */}
                       {appointment.appointment_time && <Badge variant="default">{appointment.appointment_time}</Badge>}
                       {appointment.report_template_name && <Badge variant="info">{appointment.report_template_name}</Badge>}
@@ -365,9 +365,9 @@ export default function LabQueueWorkbench({
                         <details className="lqw-pii-details">
                           <summary
                             className="lqw-pii-summary"
-                            aria-label="Показать внутренний ID пациента"
+                            aria-label={t('queue.patient_id_aria')}
                           >
-                            ID пациента ▸
+                            {t('queue.patient_id_label')} ▸
                           </summary>
                           <span className="lqw-pii-value">
                             {appointment.patient_id}
@@ -379,7 +379,7 @@ export default function LabQueueWorkbench({
                           и создавала a11y anti-pattern (click bubbles to parent). */}
                       <Badge variant={appointment.report_instance_id ? 'success' : 'info'}>
                         <Icon name="doc.text" size={12} />
-                        {appointment.report_instance_id ? 'Отчёт существует' : 'Новый отчёт'}
+                        {appointment.report_instance_id ? t('queue.report_exists') : t('queue.report_new')}
                       </Badge>
                     </div>
                   </div>
@@ -399,12 +399,12 @@ export default function LabQueueWorkbench({
                         variant="outline"
                         onClick={onLoadMore}
                         disabled={loadingMore}
-                        aria-label="Загрузить ещё записи с сервера"
+                        aria-label={t('queue.load_more_aria')}
                       >
                         <Icon name={loadingMore ? 'arrow.clockwise' : 'arrow.down'} size={14} />
                         {loadingMore
-                          ? 'Загрузка…'
-                          : `Показать ещё (${queueTotal - appointments.length} осталось)`}
+                          ? t('queue.loading')
+                          : `${t('queue.show_more')} (${queueTotal - appointments.length} ${t('queue.remaining')})`}
                       </Button>
                     </div>
                   );
@@ -436,22 +436,22 @@ export default function LabQueueWorkbench({
           <CardHeader className="lqw-card-header">
             <CardTitle className="lqw-card-title">
               <Icon name="clock.arrow.circlepath" size={20} />
-              История отчётов пациента
+              {t('queue.history_title')}
             </CardTitle>
           </CardHeader>
           <CardContent className="lqw-card-content">
             {reportHistory.length === 0 ? (
-              <Alert severity="info">Для выбранного пациента ещё нет лабораторных отчётов.</Alert>
+              <Alert severity="info">{t('queue.history_empty')}</Alert>
             ) : (
               <div className="lqw-card-grid">
                 {reportHistory.map((item) => (
                   <div key={item.id} className="lqw-history-card">
                     <div className="lqw-history-info">
                       <div className="lqw-history-title">
-                        {item.template?.name || `Отчёт #${item.id}`}
+                        {item.template?.name || `${t('queue.history_report_number')} #${item.id}`}
                       </div>
                       <div className="lqw-history-meta">
-                        Создан: {new Date(item.created_at).toLocaleString()} | Статус: {formatLabStatus(item.status)}
+                        {t('queue.history_created')}: {new Date(item.created_at).toLocaleString()} | {t('queue.history_status')}: {formatLabStatus(item.status)}
                       </div>
                     </div>
                     <div className="lqw-history-badges">
@@ -461,8 +461,8 @@ export default function LabQueueWorkbench({
                       <Badge variant={historySeverityBadge(item).variant}>
                         {formatSeverityLabel(historySeverityBadge(item).label)}
                       </Badge>
-                      {item.flagged_findings_count > 0 && <Badge variant="info">{item.flagged_findings_count} флагов</Badge>}
-                      {item.critical_findings_count > 0 && <Badge variant="danger">{item.critical_findings_count} критич.</Badge>}
+                      {item.flagged_findings_count > 0 && <Badge variant="info">{item.flagged_findings_count} {t('queue.history_flags')}</Badge>}
+                      {item.critical_findings_count > 0 && <Badge variant="danger">{item.critical_findings_count} {t('queue.history_critical')}</Badge>}
                     </div>
                   </div>
                 ))}
