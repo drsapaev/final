@@ -1211,8 +1211,8 @@ const DoctorPanel = () => {
                     Статус
                   </p>
                   <p className="doctor-modal-info-value">
-                    {patientModal.selectedItem.status === 'active' : t('doctor.status_active_label') :
-                  patientModal.selectedItem.status === 'waiting' : t('doctor.status_waiting_label') :
+                    {patientModal.selectedItem.status === 'active' ? t('doctor.status_active_label') :
+                  patientModal.selectedItem.status === 'waiting' ? t('doctor.status_waiting_label') :
                   patientModal.selectedItem.status || t('doctor.unknown')}
                   </p>
                 </div>
