@@ -5,6 +5,8 @@ import {
   Icon, Typography,
 } from '../ui/macos';
 import { AIButton, AIAssistant } from '../ai';
+// STRAT#22: t() для i18n — AI analysis strings мигрированы.
+import { t } from './utils/labTranslations';
 
 /**
  * P-01 fix: AI-анализ лабораторного бланка перенесён из LabResultsManager
@@ -69,20 +71,18 @@ export default function LabReportAIAnalysis({ activeInstance, notify }) {
       return;
     }
     if (!hasResults) {
-      setAiBlockedReason('AI-анализ недоступен: нет заполненных показателей в отчёте.');
+      setAiBlockedReason(t('ai.blocked_no_results'));
       return;
     }
     if (resolvedPatientAge == null) {
       setAiBlockedReason(
-        'AI-анализ недоступен: в snapshot пациента не указан возраст. ' +
-        'Проверьте, что у пациента заполнена дата рождения.'
+        t('ai.blocked_no_age')
       );
       return;
     }
     if (!resolvedPatientGender) {
       setAiBlockedReason(
-        'AI-анализ недоступен: в snapshot пациента не указан пол. ' +
-        'Референсные интервалы зависят от пола — интерпретация невозможна.'
+        t('ai.blocked_no_gender')
       );
       return;
     }
@@ -92,11 +92,11 @@ export default function LabReportAIAnalysis({ activeInstance, notify }) {
   const handleOpenAIAnalysis = () => {
     if (!activeInstance) return;
     if (!hasResults) {
-      notify('error', 'Сначала заполните хотя бы один показатель в отчёте.');
+      notify('error', t('ai.fill_fields_first'));
       return;
     }
     if (resolvedPatientAge == null || !resolvedPatientGender) {
-      notify('error', aiBlockedReason || 'AI-анализ недоступен: проверьте данные пациента');
+      notify('error', aiBlockedReason || t('ai.blocked_generic'));
       return;
     }
     setShowAIAnalysis(true);
@@ -107,15 +107,15 @@ export default function LabReportAIAnalysis({ activeInstance, notify }) {
   return (
     <>
       <AIButton
-        text="AI Интерпретация"
+        text={t('ai.button_label')}
         size="small"
         onClick={handleOpenAIAnalysis}
         disabled={!hasResults || Boolean(aiBlockedReason)}
         tooltip={
           aiBlockedReason
           || (hasResults
-              ? 'AI интерпретация результатов с учётом возраста и пола пациента'
-              : 'Заполните показатели в отчёте для активации AI')
+              ? t('ai.button_tooltip')
+              : t('ai.button_disabled'))
         }
       />
 
@@ -129,13 +129,13 @@ export default function LabReportAIAnalysis({ activeInstance, notify }) {
           <DialogTitle>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <Typography variant="h6">
-                AI Интерпретация результатов отчёта #{activeInstance.id}
+                {t('ai.dialog_title')} #{activeInstance.id}
               </Typography>
               <Button
                 type="button"
                 size="small"
-                title="Закрыть AI-анализ"
-                aria-label="Закрыть AI-анализ"
+                title={t('ai.dialog_close_aria')}
+                aria-label={t('ai.dialog_close_aria')}
                 onClick={() => setShowAIAnalysis(false)}
               >
                 {/* L-M-8 fix: emoji ✕ заменён на lucide-icon X для консистентности
@@ -151,22 +151,22 @@ export default function LabReportAIAnalysis({ activeInstance, notify }) {
                 (backend уже вычислил age_years), без отдельного запроса. */}
             <Alert severity="info" sx={{ mb: 2 }}>
               <Typography variant="caption" component="div">
-                <strong>Пациент:</strong>{' '}
+                <strong>{t('ai.patient_label')}:</strong>{' '}
                 {patientSnapshot.full_name || `#${patientSnapshot.patient_id || '?'}`}
                 {' · '}
-                <strong>Возраст:</strong>{' '}
-                {resolvedPatientAge != null ? `${resolvedPatientAge} лет` : 'неизвестен'}
+                <strong>{t('ai.age_label')}:</strong>{' '}
+                {resolvedPatientAge != null ? `${resolvedPatientAge} ${t('ai.age_years')}` : t('ai.age_unknown')}
                 {' · '}
-                <strong>Пол:</strong>{' '}
+                <strong>{t('ai.gender_label')}:</strong>{' '}
                 {resolvedPatientGender
-                  ? ({ male: 'мужской', female: 'женский', other: 'другой' }[resolvedPatientGender] || resolvedPatientGender)
-                  : 'не указан'}
+                  ? ({ male: t('ai.gender_male'), female: t('ai.gender_female'), other: t('ai.gender_other') }[resolvedPatientGender] || resolvedPatientGender)
+                  : t('ai.gender_not_set')}
                 {' · '}
-                <strong>Показателей:</strong> {results.length}
+                <strong>{t('ai.fields_count')}:</strong> {results.length}
               </Typography>
               {(resolvedPatientAge == null || !resolvedPatientGender) && (
                 <Typography variant="caption" color="error" component="div" sx={{ mt: 0.5 }}>
-                  AI-интерпретация невозможна без возраста и пола пациента.
+                  {t('ai.missing_age_gender')}
                 </Typography>
               )}
             </Alert>
@@ -192,7 +192,7 @@ export default function LabReportAIAnalysis({ activeInstance, notify }) {
 
           <DialogActions>
             <Button onClick={() => setShowAIAnalysis(false)}>
-              Закрыть
+              {t('ai.dialog_close')}
             </Button>
           </DialogActions>
         </Dialog>
