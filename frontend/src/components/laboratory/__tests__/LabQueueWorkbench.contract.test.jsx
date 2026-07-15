@@ -67,4 +67,31 @@ describe('LabQueueWorkbench UX-AUDIT-FIX11 — MaskedPhone affordance', () => {
     expect(cssSource).toContain('.lqw-load-more');
     expect(cssSource).toContain('UX-AUDIT-FIX13');
   });
+
+  it('STRAT#8: accepts server-side pagination props (onLoadMore, hasMore, loadingMore, queueTotal)', () => {
+    // STRAT#8: новые props от LabPanel для server-side pagination
+    expect(source).toContain('onLoadMore,');
+    expect(source).toContain('hasMore = false,');
+    expect(source).toContain('loadingMore = false,');
+    expect(source).toContain('queueTotal = 0,');
+    // PropTypes добавлены
+    expect(source).toContain('onLoadMore: PropTypes.func');
+    expect(source).toContain('hasMore: PropTypes.bool');
+    expect(source).toContain('loadingMore: PropTypes.bool');
+    expect(source).toContain('queueTotal: PropTypes.number');
+  });
+
+  it('STRAT#8: uses server-side onLoadMore when hasMore=true, falls back to client-side otherwise', () => {
+    // Server-side path: приоритетный
+    expect(source).toContain('if (hasMore && onLoadMore)');
+    expect(source).toContain('onClick={onLoadMore}');
+    expect(source).toContain('disabled={loadingMore}');
+    // Loading indicator
+    expect(source).toContain("loadingMore ? 'arrow.clockwise' : 'arrow.down'");
+    expect(source).toContain("'Загрузка…'");
+    // Counter показывает server-side total
+    expect(source).toContain('queueTotal - appointments.length');
+    // Client-side fallback остаётся
+    expect(source).toContain('if (sortedAppointments.length > visibleCount)');
+  });
 });

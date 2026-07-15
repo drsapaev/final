@@ -120,7 +120,14 @@ export default function LabQueueWorkbench({
   onRefresh,
   onOpenAppointment,
   selectedAppointment = null,
-  reportHistory = []
+  reportHistory = [],
+  // STRAT#8: server-side pagination props (от LabPanel, добавлены в STRAT#7).
+  // Когда hasMore=true, кнопка «Показать ещё» вызывает onLoadMore (server-side).
+  // Когда hasMore=false, fallback на client-side visibleCount (FIX#13).
+  onLoadMore,
+  hasMore = false,
+  loadingMore = false,
+  queueTotal = 0,
 }) {
   // QW-8 fix: локальный state поиска и фильтра статусов.
   const [searchQuery, setSearchQuery] = useState('');
@@ -376,21 +383,47 @@ export default function LabQueueWorkbench({
                   </div>
                 );
               })}
-              {/* UX-AUDIT-FIX13: кнопка «Показать ещё» — увеличивает
-                  visibleCount на PAGE_SIZE. Показывается только если
-                  есть ещё записи для отображения. */}
-              {sortedAppointments.length > visibleCount && (
-                <div className="lqw-load-more">
-                  <Button
-                    variant="outline"
-                    onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
-                    aria-label={`Показать ещё ${Math.min(PAGE_SIZE, sortedAppointments.length - visibleCount)} записей`}
-                  >
-                    <Icon name="arrow.down" size={14} />
-                    Показать ещё ({sortedAppointments.length - visibleCount} осталось)
-                  </Button>
-                </div>
-              )}
+              {/* UX-AUDIT-FIX13 / STRAT#8: кнопка «Показать ещё».
+                  STRAT#8: когда hasMore=true (server-side pagination активна),
+                  вызываем onLoadMore для догрузки следующей страницы с сервера.
+                  Когда hasMore=false — fallback на client-side visibleCount
+                  (FIX#13 pattern, для случаев когда server-side не настроен). */}
+              {(() => {
+                // Server-side load-more: приоритетный путь
+                if (hasMore && onLoadMore) {
+                  return (
+                    <div className="lqw-load-more">
+                      <Button
+                        variant="outline"
+                        onClick={onLoadMore}
+                        disabled={loadingMore}
+                        aria-label="Загрузить ещё записи с сервера"
+                      >
+                        <Icon name={loadingMore ? 'arrow.clockwise' : 'arrow.down'} size={14} />
+                        {loadingMore
+                          ? 'Загрузка…'
+                          : `Показать ещё (${queueTotal - appointments.length} осталось)`}
+                      </Button>
+                    </div>
+                  );
+                }
+                // Client-side load-more: fallback (FIX#13)
+                if (sortedAppointments.length > visibleCount) {
+                  return (
+                    <div className="lqw-load-more">
+                      <Button
+                        variant="outline"
+                        onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+                        aria-label={`Показать ещё ${Math.min(PAGE_SIZE, sortedAppointments.length - visibleCount)} записей`}
+                      >
+                        <Icon name="arrow.down" size={14} />
+                        Показать ещё ({sortedAppointments.length - visibleCount} осталось)
+                      </Button>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
             </div>
           )}
         </CardContent>
@@ -446,5 +479,10 @@ LabQueueWorkbench.propTypes = {
   onRefresh: PropTypes.func.isRequired,
   onOpenAppointment: PropTypes.func.isRequired,
   selectedAppointment: PropTypes.object,
-  reportHistory: PropTypes.array
+  reportHistory: PropTypes.array,
+  // STRAT#8: server-side pagination props
+  onLoadMore: PropTypes.func,
+  hasMore: PropTypes.bool,
+  loadingMore: PropTypes.bool,
+  queueTotal: PropTypes.number,
 };
