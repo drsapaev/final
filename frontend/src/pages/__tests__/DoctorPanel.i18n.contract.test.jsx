@@ -9,9 +9,10 @@ const source = fs.readFileSync(path.join(ROOT, 'pages/DoctorPanel.jsx'), 'utf8')
 const translationsSource = fs.readFileSync(path.join(ROOT, 'i18n/locales/ru.js'), 'utf8');
 
 describe('DoctorPanel STRAT#35 — i18n migration', () => {
-  it('imports t from i18n adapter', () => {
-    expect(source).toContain("from '../i18n/adapter'");
-    expect(source).toContain('import { t }');
+  it('imports useTranslation from unified i18n', () => {
+    // i18n-unification: now imports useTranslation from unified, not adapter
+    expect(source).toContain("from '../i18n/useTranslation'");
+    expect(source).toContain('useTranslation');
   });
   it('uses t() for status labels', () => {
     expect(source).toContain("t('doctor.status_active')");

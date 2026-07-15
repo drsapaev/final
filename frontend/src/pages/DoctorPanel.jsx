@@ -56,8 +56,8 @@ import tokenManager from '../utils/tokenManager';
 import { getRegistrarTimestampDisplay } from '../utils/dateUtils';
 // UX Audit Doctor H-30: import DoctorQueuePanel instead of inline queue rendering.
 import DoctorQueuePanel from '../components/doctor/DoctorQueuePanel';
-// STRAT#35: useTranslation adapter for i18n.
-import { t } from '../i18n/adapter';
+// i18n-unification: useTranslation hook from unified i18n (replaces adapter shim)
+import { useTranslation } from '../i18n/useTranslation';
 
 const hasBackendQueueAction = (entry, action, flagName) => {
   if (!entry) return false;
@@ -76,6 +76,7 @@ const DoctorPanel = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { isMobile, isTablet } = useBreakpoint();
+  const { t } = useTranslation();
   const isTouchDevice = useTouchDevice();
   // UX Audit Doctor L-43: isTouchDevice used for disabling hover on touch.
   void isTouchDevice;
@@ -278,7 +279,7 @@ const DoctorPanel = () => {
             ? t('doctor.benefit_visit')
             : t('doctor.next_visit'),
       status: 'scheduled',
-      notes: result?.message || (visitDate ? `Ожидает подтверждения на ${visitDate}` : t('doctor.awaiting_confirmation')),
+      notes: result?.message || (visitDate ? t('doctor.awaiting_confirmation_on_date', { date: visitDate }) : t('doctor.awaiting_confirmation')),
       appointmentDate: visitDate,
       confirmationToken: confirmation.token || null,
       confirmationChannel: confirmation.channel || submittedFormData?.confirmation_channel || 'telegram',
@@ -606,48 +607,48 @@ const DoctorPanel = () => {
         {/* Вкладки */}
         <div style={tabsStyle}>
           <button
-            aria-label="Открыть вкладку «Обзор»"
+            aria-label={t("doctor.aria_open_tab", { name: t("doctor.tab_dashboard") })}
             style={activeTab === 'dashboard' ? activeTabStyle : tabStyle}
             onClick={() => setDoctorTab('dashboard')}
             onMouseEnter={(e) => handleInactiveTabHover(e, activeTab === 'dashboard', true)}
             onMouseLeave={(e) => handleInactiveTabHover(e, activeTab === 'dashboard', false)}>
 
             <Activity size={isMobile ? 16 : 20} />
-            {!isMobile && <span>Обзор</span>}
+            {!isMobile && <span>{t("doctor.tab_dashboard")}</span>}
           </button>
 
           <button
-            aria-label="Открыть вкладку «Пациенты»"
+            aria-label={t("doctor.aria_open_tab", { name: t("doctor.tab_patients") })}
             style={activeTab === 'patients' ? activeTabStyle : tabStyle}
             onClick={() => setDoctorTab('patients')}
             onMouseEnter={(e) => handleInactiveTabHover(e, activeTab === 'patients', true)}
             onMouseLeave={(e) => handleInactiveTabHover(e, activeTab === 'patients', false)}>
 
             <User size={isMobile ? 16 : 20} />
-            {!isMobile && <span>Пациенты</span>}
+            {!isMobile && <span>{t("doctor.tab_patients")}</span>}
           </button>
 
           <button
-            aria-label="Открыть вкладку «Записи»"
+            aria-label={t("doctor.aria_open_tab", { name: t("doctor.tab_appointments") })}
             style={activeTab === 'appointments' ? activeTabStyle : tabStyle}
             onClick={() => setDoctorTab('appointments')}
             onMouseEnter={(e) => handleInactiveTabHover(e, activeTab === 'appointments', true)}
             onMouseLeave={(e) => handleInactiveTabHover(e, activeTab === 'appointments', false)}>
 
             <Calendar size={isMobile ? 16 : 20} />
-            {!isMobile && <span>Записи</span>}
+            {!isMobile && <span>{t("doctor.tab_appointments")}</span>}
           </button>
 
           {/* ✅ НОВОЕ: Таб очереди */}
           <button
-            aria-label="Открыть вкладку «Очередь»"
+            aria-label={t("doctor.aria_open_tab", { name: t("doctor.tab_queue") })}
             style={activeTab === 'queue' ? activeTabStyle : tabStyle}
             onClick={() => setDoctorTab('queue')}
             onMouseEnter={(e) => handleInactiveTabHover(e, activeTab === 'queue', true)}
             onMouseLeave={(e) => handleInactiveTabHover(e, activeTab === 'queue', false)}>
 
             <Users size={isMobile ? 16 : 20} />
-            {!isMobile && <span>Очередь</span>}
+            {!isMobile && <span>{t("doctor.tab_queue")}</span>}
             {queueStats.waiting > 0 &&
             <Badge variant="warning" className="doctor-badge-ml">
                 {queueStats.waiting}
@@ -656,7 +657,7 @@ const DoctorPanel = () => {
           </button>
 
           <button
-            aria-label="Открыть вкладку «AI-помощник»"
+            aria-label={t("doctor.aria_open_tab", { name: t("doctor.tab_ai") })}
             style={activeTab === 'ai' ? activeTabStyle : tabStyle}
             onClick={() => setDoctorTab('ai')}
             onMouseEnter={(e) => handleInactiveTabHover(e, activeTab === 'ai', true)}
@@ -667,14 +668,14 @@ const DoctorPanel = () => {
           </button>
 
           <button
-            aria-label="Открыть вкладку «Отчёты»"
+            aria-label={t("doctor.aria_open_tab", { name: t("doctor.tab_reports") })}
             style={activeTab === 'reports' ? activeTabStyle : tabStyle}
             onClick={() => setDoctorTab('reports')}
             onMouseEnter={(e) => handleInactiveTabHover(e, activeTab === 'reports', true)}
             onMouseLeave={(e) => handleInactiveTabHover(e, activeTab === 'reports', false)}>
 
             <FileText size={isMobile ? 16 : 20} />
-            {!isMobile && <span>Отчеты</span>}
+            {!isMobile && <span>{t("doctor.tab_reports")}</span>}
           </button>
         </div>
 
@@ -808,9 +809,9 @@ const DoctorPanel = () => {
                     <div className="doctor-search-wrap">
                       <Search size={20} className="doctor-search-icon" />
                       <Input
-                      aria-label="Поиск пациентов"
+                      aria-label={t("doctor.aria_search_patients")}
                       type="text"
-                      placeholder="Поиск пациентов..."
+                      placeholder={t("doctor.search_patients_placeholder")}
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className={`doctor-search-input ${isMobile ? 'doctor-search-w-mobile' : 'doctor-search-w-desktop'}`} />
@@ -821,18 +822,18 @@ const DoctorPanel = () => {
                     onChange={(e) => setFilterStatus(e.target.value)}
                     className="doctor-filter-select">
 
-                      <option value="all">Все статусы</option>
-                      <option value="active">Активные</option>
-                      <option value="recovery">Выздоравливающие</option>
-                      <option value="critical">Критические</option>
+                      <option value="all">{t("doctor.filter_all_statuses")}</option>
+                      <option value="active">{t("doctor.filter_active")}</option>
+                      <option value="recovery">{t("doctor.filter_recovery")}</option>
+                      <option value="critical">{t("doctor.filter_critical")}</option>
                     </select>
                     <Button
                       type="button"
                       variant="primary"
                       title="Add patient"
-                      aria-label="Добавить пациента">
+                      aria-label={t("doctor.aria_add_patient")}>
                       <Plus aria-hidden="true" size={16} />
-                      {!isMobile && <span>Добавить</span>}
+                      {!isMobile && <span>{t("doctor.btn_add")}</span>}
                     </Button>
                   </div>
                 </div>
@@ -846,7 +847,7 @@ const DoctorPanel = () => {
                 title: t('doctor.doctor_data_not_loaded'),
                 description: loadError,
                 tone: 'error',
-                action: <Button variant="ghost" onClick={loadData}>Повторить</Button>
+                action: <Button variant="ghost" onClick={loadData}>{t("doctor.btn_retry")}</Button>
               }) :
               filteredPatients.length === 0 ?
               renderEmptyState({
@@ -861,12 +862,12 @@ const DoctorPanel = () => {
 <table style={tableStyle}>
                     <thead>
                       <tr>
-                        <th className="doctor-th">Пациент</th>
-                        <th className="doctor-th">Возраст</th>
-                        <th className="doctor-th">Телефон</th>
-                        <th className="doctor-th">Диагноз</th>
-                        <th className="doctor-th">Статус</th>
-                        <th className="doctor-th">Действия</th>
+                        <th className="doctor-th">{t("doctor.col_patient")}</th>
+                        <th className="doctor-th">{t("doctor.col_age")}</th>
+                        <th className="doctor-th">{t("doctor.col_phone")}</th>
+                        <th className="doctor-th">{t("doctor.col_diagnosis")}</th>
+                        <th className="doctor-th">{t("doctor.col_status")}</th>
+                        <th className="doctor-th">{t("doctor.col_actions")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -892,7 +893,7 @@ const DoctorPanel = () => {
                               </div>
                             </div>
                           </td>
-                          <td className="doctor-td">{patient.age ? `${patient.age} лет` : '—'}</td>
+                          <td className="doctor-td">{patient.age ? t('doctor.age_years', { count: patient.age }) : '—'}</td>
                           <td className="doctor-td">{patient.phone || '—'}</td>
                           <td className="doctor-td">{patient.diagnosis || '—'}</td>
                           <td className="doctor-td" aria-label={`${getPatientA11yContext(patient)} status`}>
@@ -928,7 +929,7 @@ const DoctorPanel = () => {
                         aria-label={`Delete ${getPatientA11yContext(patient)}`}
                         className="doctor-action-btn doctor-action-btn-danger"
                         disabled
-                        title="Функция в разработке"
+                        title={t("doctor.feature_in_development")}
                         onClick={(e) => e.stopPropagation()}>
 
                               <Trash2 size={16} />
@@ -957,9 +958,9 @@ const DoctorPanel = () => {
                     <div className="doctor-search-wrap">
                       <Search size={20} className="doctor-search-icon" />
                       <Input
-                      aria-label="Поиск записей"
+                      aria-label={t("doctor.aria_search_appointments")}
                       type="text"
-                      placeholder="Поиск записей..."
+                      placeholder={t("doctor.search_appointments_placeholder")}
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className={`doctor-search-input ${isMobile ? 'doctor-search-w-mobile' : 'doctor-search-w-desktop'}`} />
@@ -970,11 +971,11 @@ const DoctorPanel = () => {
                     onChange={(e) => setFilterStatus(e.target.value)}
                     className="doctor-filter-select">
 
-                      <option value="all">Все статусы</option>
-                      <option value="scheduled">Запланированы</option>
-                      <option value="in_progress">В процессе</option>
-                      <option value="completed">Завершены</option>
-                      <option value="cancelled">Отменены</option>
+                      <option value="all">{t("doctor.filter_all_statuses")}</option>
+                      <option value="scheduled">{t("doctor.filter_scheduled")}</option>
+                      <option value="in_progress">{t("doctor.filter_in_progress")}</option>
+                      <option value="completed">{t("doctor.filter_completed")}</option>
+                      <option value="cancelled">{t("doctor.filter_cancelled")}</option>
                     </select>
                     <Button
                     type="button"
@@ -984,7 +985,7 @@ const DoctorPanel = () => {
                     onClick={() => setScheduleNextModal({ open: true, patient: null })}>
 
                       <Plus aria-hidden="true" size={16} />
-                      {!isMobile && <span>Назначить следующий визит</span>}
+                      {!isMobile && <span>{t("doctor.btn_next_visit")}</span>}
                     </Button>
                   </div>
                 </div>
@@ -998,7 +999,7 @@ const DoctorPanel = () => {
                 title: t('doctor.appointments_not_loaded'),
                 description: loadError,
                 tone: 'error',
-                action: <Button variant="ghost" onClick={loadData}>Повторить</Button>
+                action: <Button variant="ghost" onClick={loadData}>{t("doctor.btn_retry")}</Button>
               }) :
               filteredAppointments.length === 0 ?
               renderEmptyState({
@@ -1012,12 +1013,12 @@ const DoctorPanel = () => {
               <table style={tableStyle}>
                     <thead>
                       <tr>
-                        <th className="doctor-th">Время</th>
-                        <th className="doctor-th">Пациент</th>
-                        <th className="doctor-th">Тип</th>
-                        <th className="doctor-th">Статус</th>
-                        <th className="doctor-th">Примечания</th>
-                        <th className="doctor-th">Действия</th>
+                        <th className="doctor-th">{t("doctor.col_time")}</th>
+                        <th className="doctor-th">{t("doctor.col_patient")}</th>
+                        <th className="doctor-th">{t("doctor.col_type")}</th>
+                        <th className="doctor-th">{t("doctor.col_status")}</th>
+                        <th className="doctor-th">{t("doctor.col_notes")}</th>
+                        <th className="doctor-th">{t("doctor.col_actions")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1057,7 +1058,7 @@ const DoctorPanel = () => {
                         aria-label={`Complete ${getAppointmentA11yContext(appointment)}`}
                         className="doctor-action-btn doctor-action-btn-success"
                         disabled
-                        title="Функция в разработке"
+                        title={t("doctor.feature_in_development")}
                         onClick={(e) => e.stopPropagation()}>
 
                               <CheckCircle size={16} />
@@ -1066,7 +1067,7 @@ const DoctorPanel = () => {
                         aria-label={`Cancel ${getAppointmentA11yContext(appointment)}`}
                         className="doctor-action-btn doctor-action-btn-danger"
                         disabled
-                        title="Функция в разработке"
+                        title={t("doctor.feature_in_development")}
                         onClick={(e) => e.stopPropagation()}>
 
                               <XCircle size={16} />
@@ -1125,27 +1126,27 @@ const DoctorPanel = () => {
               </CardHeader>
               <CardContent>
                 <div className={`doctor-reports-grid doctor-reports-grid-${isMobile ? '1' : isTablet ? '2' : '3'}`}>
-                  <Button variant="primary" fullWidth disabled title="Функция в разработке">
+                  <Button variant="primary" fullWidth disabled title={t("doctor.feature_in_development")}>
                     <FileText size={20} />
                     Отчет по пациентам
                   </Button>
-                  <Button variant="secondary" fullWidth disabled title="Функция в разработке">
+                  <Button variant="secondary" fullWidth disabled title={t("doctor.feature_in_development")}>
                     <Calendar size={20} />
                     Отчет по записям
                   </Button>
-                  <Button variant="success" fullWidth disabled title="Функция в разработке">
+                  <Button variant="success" fullWidth disabled title={t("doctor.feature_in_development")}>
                     <Activity size={20} />
                     Статистика работы
                   </Button>
-                  <Button variant="warning" fullWidth disabled title="Функция в разработке">
+                  <Button variant="warning" fullWidth disabled title={t("doctor.feature_in_development")}>
                     <Pill size={20} />
                     Отчет по лекарствам
                   </Button>
-                  <Button variant="info" fullWidth disabled title="Функция в разработке">
+                  <Button variant="info" fullWidth disabled title={t("doctor.feature_in_development")}>
                     <Heart size={20} />
                     Медицинская статистика
                   </Button>
-                  <Button variant="ghost" fullWidth disabled title="Функция в разработке">
+                  <Button variant="ghost" fullWidth disabled title={t("doctor.feature_in_development")}>
                     <Download size={20} />
                     Экспорт всех данных
                   </Button>
@@ -1163,7 +1164,7 @@ const DoctorPanel = () => {
         className="doctor-modal-overlay"
         role="dialog"
         aria-modal="true"
-        aria-label="Информация о пациенте"
+        aria-label={t("doctor.aria_patient_info")}
         onClick={(e) => { if (e.target === e.currentTarget) patientModal.closeModal(); }}
         onKeyDown={(e) => { if (e.key === 'Escape') patientModal.closeModal(); }}
         tabIndex={-1}>
@@ -1173,7 +1174,7 @@ const DoctorPanel = () => {
                 Информация о пациенте
               </h3>
               <button
-              aria-label="Закрыть окно информации о пациенте"
+              aria-label={t("doctor.aria_close_patient_info")}
               onClick={patientModal.closeModal}
               className="doctor-modal-close">
 
@@ -1229,7 +1230,7 @@ const DoctorPanel = () => {
               <button
               className="doctor-text-sm doctor-modal-btn-accent"
               disabled
-              title="Функция в разработке">
+              title={t("doctor.feature_in_development")}>
 
                 Редактировать
               </button>

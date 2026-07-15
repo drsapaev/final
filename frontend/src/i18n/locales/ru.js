@@ -740,6 +740,50 @@ const ru = {
     age_not_set: 'Не указан',
     status_active_label: 'Активный',
     status_waiting_label: 'Ожидает',
+    // Sprint 3: tab labels
+    tab_dashboard: 'Обзор',
+    tab_patients: 'Пациенты',
+    tab_appointments: 'Записи',
+    tab_queue: 'Очередь',
+    tab_ai: 'AI-помощник',
+    tab_reports: 'Отчёты',
+    // Sprint 3: aria labels
+    aria_open_tab: 'Открыть вкладку «{name}»',
+    aria_search_patients: 'Поиск пациентов',
+    aria_search_appointments: 'Поиск записей',
+    aria_add_patient: 'Добавить пациента',
+    aria_patient_info: 'Информация о пациенте',
+    aria_close_patient_info: 'Закрыть окно информации о пациенте',
+    // Sprint 3: search placeholders
+    search_patients_placeholder: 'Поиск пациентов...',
+    search_appointments_placeholder: 'Поиск записей...',
+    // Sprint 3: status filter options
+    filter_all_statuses: 'Все статусы',
+    filter_active: 'Активные',
+    filter_recovery: 'Выздоравливающие',
+    filter_critical: 'Критические',
+    filter_scheduled: 'Запланированы',
+    filter_in_progress: 'В процессе',
+    filter_completed: 'Завершены',
+    filter_cancelled: 'Отменены',
+    // Sprint 3: table headers
+    col_patient: 'Пациент',
+    col_age: 'Возраст',
+    col_phone: 'Телефон',
+    col_diagnosis: 'Диагноз',
+    col_status: 'Статус',
+    col_actions: 'Действия',
+    col_time: 'Время',
+    col_type: 'Тип',
+    col_notes: 'Примечания',
+    // Sprint 3: actions
+    btn_add: 'Добавить',
+    btn_retry: 'Повторить',
+    btn_next_visit: 'Назначить следующий визит',
+    // Sprint 3: misc
+    age_years: '{count} лет',
+    feature_in_development: 'Функция в разработке',
+    awaiting_confirmation_on_date: 'Ожидает подтверждения на {date}',
   },
 
   // ─── Admin (confirm/notify) ──────────────────────────────────────────────
