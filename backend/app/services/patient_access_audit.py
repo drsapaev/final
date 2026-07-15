@@ -159,14 +159,15 @@ def log_patient_access(
     except Exception as exc:
         # Non-blocking: audit-log failure must NOT break the request.
         # Rollback to avoid polluting the session, then log warning.
+        # Note: do NOT log subject_patient_id or other PHI here —
+        # CodeQL flags this as clear-text logging of sensitive information.
         try:
             db.rollback()
         except Exception:
             pass
         logger.warning(
             "Failed to write patient access audit log "
-            "(subject_patient_id=%s, resource_type=%s, action=%s): %s",
-            subject_patient_id,
+            "(resource_type=%s, action=%s): %s",
             resource_type,
             action,
             exc,
