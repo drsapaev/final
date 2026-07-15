@@ -238,6 +238,18 @@ const TRANSLATIONS = {
     history_status: 'Статус',
     history_flags: 'флагов',
     history_critical: 'критич.',
+    // History panel — LabReportHistoryPanel (STRAT#21)
+    history_recent_title: 'Недавние лабораторные отчёты',
+    history_patient_title: 'Доступные отчёты пациента',
+    history_no_saved: 'В лаборатории пока нет сохранённых отчётов для повторного открытия.',
+    history_no_matches: 'Для выбранного фильтра нет лабораторных отчётов.',
+    history_visit: 'Визит',
+    history_no_visit: 'без визита',
+    history_patient_number: 'Пациент',
+    history_severity_all: 'Все',
+    history_severity_clean: 'Без флагов',
+    history_severity_flagged: 'С флагами',
+    history_severity_critical: 'Критические',
   },
 
   // ─── Error messages ──────────────────────────────────────────────────────
