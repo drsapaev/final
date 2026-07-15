@@ -146,6 +146,7 @@ from app.api.v1.endpoints.security_management import (
     router as security_management_router,
 )
 from app.api.v1.endpoints.visit_confirmation import router as visit_confirmation_router
+from app.api.v1.endpoints.webauthn import router as webauthn_router  # M4-P1-4
 from app.ws import cashier_ws
 
 try:
@@ -181,6 +182,9 @@ api_router.include_router(visit_payments_ep.router, tags=["visit-payments"])
 
 # Эндпоинты подтверждения визитов (публичные, без авторизации)
 api_router.include_router(visit_confirmation_router, tags=["visit-confirmation"])
+
+# M4-P1-4: WebAuthn/Passkey endpoints (alternative patient auth)
+api_router.include_router(webauthn_router, tags=["webauthn"])
 
 # Эндпоинты утренней сборки (админ/регистратор)
 api_router.include_router(morning_assignment_router, tags=["morning-assignment"])

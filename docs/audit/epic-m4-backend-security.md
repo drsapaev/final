@@ -229,9 +229,10 @@ POST /telegram/mini-app/auth/exchange { initData }
 
 ---
 
-### M4-P1-4 — WebAuthn / Passkeys (альтернативный вход)
+### M4-P1-4 — WebAuthn / Passkeys (альтернативный вход) ✅ DONE
 
 **Серьёзность:** P1 (resilience)
+**Статус:** ✅ Реализовано (PR pending)
 **Файлы:** новый functionality
 
 **Текущее состояние:**
@@ -253,7 +254,7 @@ POST /telegram/mini-app/auth/exchange { initData }
 
 ## P2 — Compliance & Recovery
 
-### M4-P2-1 — Emergency Recovery Flow
+### M4-P2-1 — Emergency Recovery Flow ✅ DONE
 
 **Серьёзность:** P2 (resilience)
 **Файлы:** новый functionality
@@ -273,7 +274,7 @@ POST /telegram/mini-app/auth/exchange { initData }
 
 ---
 
-### M4-P2-2 — Управление сессиями (patient-facing)
+### M4-P2-2 — Управление сессиями (patient-facing) ✅ DONE (в M4-P0-3)
 
 **Серьёзность:** P2 (UX + security)
 **Файлы:** новый functionality (зависит от M4-P0-2, M4-P0-3)
@@ -290,7 +291,7 @@ POST /telegram/mini-app/auth/exchange { initData }
 
 ---
 
-### M4-P2-3 — Security integration tests
+### M4-P2-3 — Security integration tests ✅ DONE
 
 **Серьёзность:** P2 (verification)
 **Файлы:** новый test suite
