@@ -23,6 +23,8 @@ import {
 } from './templateEditor/config';
 import NewTemplateDialog from './templateEditor/NewTemplateDialog';
 import ContentTab from './templateEditor/ContentTab';
+// STRAT#10: t() для i18n — confirm dialogs мигрированы на translation keys.
+import { t } from './utils/labTranslations';
 import DesignTab from './templateEditor/DesignTab';
 import SignersTab from './templateEditor/SignersTab';
 import PreviewTab from './templateEditor/PreviewTab';
@@ -271,13 +273,11 @@ export default function LabTemplateWorkbench({
       return;
     }
     const ok = await confirm({
-      title: 'Архивирование версии шаблона',
-      message: 'Версия станет недоступна для создания новых отчётов.',
-      description: 'Существующие отчёты, созданные по этой версии, ' +
-        'сохранят доступ к данным. Восстановить архивированную версию нельзя — ' +
-        'потребуется создать новый черновик на основе существующей.',
-      confirmLabel: 'Архивировать',
-      cancelLabel: 'Отмена',
+      title: t('confirm.archive_title'),
+      message: t('confirm.archive_message'),
+      description: t('confirm.archive_description'),
+      confirmLabel: t('confirm.archive_confirm'),
+      cancelLabel: t('confirm.cancel'),
       intent: 'warning',
     });
     if (!ok) return;
@@ -564,14 +564,11 @@ export default function LabTemplateWorkbench({
                     // Nielsen Heuristic #5 (Error Prevention) и эвристике #4
                     // (Consistency & Standards).
                     const ok = await confirm({
-                      title: 'Сброс черновика',
-                      message: 'Все несохранённые изменения будут потеряны.',
-                      description:
-                        'Восстановится последняя версия с сервера. ' +
-                        'Действие нельзя отменить. Если нужно сохранить ' +
-                        'текущее состояние — нажмите «Отмена» и «Сохранить черновик».',
-                      confirmLabel: 'Сбросить',
-                      cancelLabel: 'Отмена',
+                      title: t('confirm.reset_draft_title'),
+                      message: t('confirm.reset_draft_message'),
+                      description: t('confirm.reset_draft_description'),
+                      confirmLabel: t('confirm.reset_confirm'),
+                      cancelLabel: t('confirm.cancel'),
                       intent: 'warning',
                     });
                     if (!ok) return;
