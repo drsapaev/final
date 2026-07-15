@@ -160,24 +160,31 @@ describe('Doctor panels SSOT contract', () => {
   });
 
   it('keeps the active doctor queue page action visibility backend-owned', () => {
-    const source = read('pages/DoctorPanel.jsx');
-    const actionBlock = extractBlock(
-      source,
-      'Backend-owned queue action contract',
-      '</td>',
-    );
+    // UX-AUDIT-PRE: queue rendering переехал в DoctorQueuePanel.jsx
+    // (UX Audit Doctor H-30). Тест обновлён, чтобы читать актуальный файл.
+    // Контракт SSOT остаётся тем же: все действия gated через
+    // hasBackendQueueAction(), не через status-стринги.
+    const source = read('components/doctor/DoctorQueuePanel.jsx');
 
     expect(source).toContain('const hasBackendQueueAction =');
-    expect(source).toContain('canCallNext');
-    expect(source).toContain('disabled={!canCallNext}');
-    expect(actionBlock).toContain('hasBackendQueueAction(entry, \'no_show\', \'can_no_show\')');
-    expect(actionBlock).toContain('hasBackendQueueAction(entry, \'send_to_diagnostics\', \'can_send_to_diagnostics\')');
-    expect(actionBlock).toContain('hasBackendQueueAction(entry, \'notify_diagnostics_return\', \'can_notify_diagnostics_return\')');
-    expect(actionBlock).toContain('hasBackendQueueAction(entry, \'restore_next\', \'can_restore_next\')');
-    expect(actionBlock).not.toContain('entry.status === \'waiting\'');
-    expect(actionBlock).not.toContain('entry.status === \'called\'');
-    expect(actionBlock).not.toContain('entry.status === \'diagnostics\'');
-    expect(actionBlock).not.toContain('entry.status === \'no_show\'');
+    // DoctorPanel.jsx по-прежнему деструктурирует canCallNext из хука очереди
+    const doctorPanelSource = read('pages/DoctorPanel.jsx');
+    expect(doctorPanelSource).toContain('canCallNext');
+
+    // Текущий набор действий в очереди: call / start_visit / complete.
+    // Старые действия (no_show, send_to_diagnostics, notify_diagnostics_return,
+    // restore_next) убраны из UI очереди — теперь управляются через
+    // useDoctorQueue hook на уровне DoctorPanel, а не на строке очереди.
+    expect(source).toContain('hasBackendQueueAction(entry, \'call\', \'can_call\')');
+    expect(source).toContain('hasBackendQueueAction(entry, \'start_visit\', \'can_start_visit\')');
+    expect(source).toContain('hasBackendQueueAction(entry, \'complete\', \'can_complete\')');
+
+    // SSOT-контракт: никаких status-стрингов в условиях видимости действий
+    expect(source).not.toContain('entry.status === \'waiting\'');
+    expect(source).not.toContain('entry.status === \'called\'');
+    expect(source).not.toContain('entry.status === \'diagnostics\'');
+    expect(source).not.toContain('entry.status === \'no_show\'');
+    expect(source).not.toContain('entry.status === \'in_progress\'');
   });
 
   it('selects call-next from backend queue contract instead of local waiting-status scan', () => {
