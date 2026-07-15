@@ -487,6 +487,29 @@ const TRANSLATIONS = {
     settings_saved: 'Настройки сохранены',
     session_extending: 'Продлеваем сессию...',
   },
+  // ─── Dermatologist (STRAT#33) ────────────────────────────────────────────
+  derma: {
+    complete_visit_title: 'Завершить приём?',
+    complete_visit_message: 'Приём будет сохранён. Убедитесь, что диагноз и план лечения заполнены.',
+    complete_visit_confirm: 'Завершить приём',
+    cancel: 'Отмена',
+    session_expired: 'Сессия истекла. Пожалуйста, войдите снова.',
+    no_queue_id_for_visit: 'Невозможно начать приём без ID записи в очереди',
+    patient_load_failed: 'Не удалось загрузить пациента',
+    no_entry_for_prescription: 'Не удалось определить запись для сохранения рецепта',
+    prescription_saved: 'Рецепт сохранен успешно!',
+    prescription_save_failed: 'Ошибка при сохранении рецепта',
+    icd_added_from_ai: 'Код МКБ-10 добавлен из AI предложения',
+    diagnosis_added_from_ai: 'Диагноз добавлен из AI предложения',
+    no_patient_for_complete: 'Не выбран пациент для завершения приема',
+    visit_completed: 'Прием завершен успешно',
+    skin_exam_saved: 'Осмотр кожи сохранен успешно',
+    skin_exam_save_failed: 'Ошибка сохранения осмотра кожи',
+    procedure_saved: 'Косметическая процедура сохранена успешно',
+    procedure_save_failed: 'Ошибка сохранения косметической процедуры',
+    price_change_unavailable: 'Изменение цены недоступно — используйте каталог услуг',
+    session_extending: 'Продлеваем сессию...',
+  },
 };
 
 /**
