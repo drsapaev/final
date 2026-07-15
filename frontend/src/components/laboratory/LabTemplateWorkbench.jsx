@@ -547,11 +547,28 @@ export default function LabTemplateWorkbench({
                 </Button>
                 <Button
                   variant="outline"
-                  onClick={() => {
-                    if (activeVersion) {
-                      setDraftVersion(hydrateVersion(activeVersion));
-                      notify('info', 'Изменения отменены. Восстановлена версия с сервера.');
-                    }
+                  onClick={async () => {
+                    if (!activeVersion) return;
+                    // UX-AUDIT-QW2: Reset — необратимая потеря черновика.
+                    // Ранее выполнялся мгновенно через notify('info', ...),
+                    // что диссонировало с ConfirmDialog на Archive/Publish.
+                    // Теперь обёрнут в useConfirm() — соответствует
+                    // Nielsen Heuristic #5 (Error Prevention) и эвристике #4
+                    // (Consistency & Standards).
+                    const ok = await confirm({
+                      title: 'Сброс черновика',
+                      message: 'Все несохранённые изменения будут потеряны.',
+                      description:
+                        'Восстановится последняя версия с сервера. ' +
+                        'Действие нельзя отменить. Если нужно сохранить ' +
+                        'текущее состояние — нажмите «Отмена» и «Сохранить черновик».',
+                      confirmLabel: 'Сбросить',
+                      cancelLabel: 'Отмена',
+                      intent: 'warning',
+                    });
+                    if (!ok) return;
+                    setDraftVersion(hydrateVersion(activeVersion));
+                    notify('success', 'Черновик восстановлен из серверной версии.');
                   }}
                   disabled={saving || !activeVersion}
                   title="Отменить изменения и восстановить версию с сервера"
