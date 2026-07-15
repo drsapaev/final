@@ -27,7 +27,6 @@ import { Input } from '../ui/macos';
 import { useTranslation } from '../../i18n/adapter';
 
 const groupReactions = (reactions) => {
-  const { t } = useTranslation();
   if (!reactions) return {};
   const groups = {};
   reactions.forEach((r) => {

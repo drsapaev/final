@@ -86,7 +86,6 @@ const TIMEZONES = [
 // UX Audit Stage 2 (Setup issue 2.1): индикатор силы пароля.
 // Возвращает { score: 0-4, label, color, percent }.
 function getPasswordStrength(password) {
-  const { t } = useTranslation();
   if (!password) {
     return { score: 0, label: '', color: 'transparent', percent: 0 };
   }

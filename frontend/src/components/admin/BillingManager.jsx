@@ -62,7 +62,6 @@ const PAYMENT_METHOD_LABELS = Object.fromEntries(
 );
 
 const toNullableInteger = (value) => {
-  const { t } = useTranslation();
   if (value === '' || value === null || value === undefined) {
     return null;
   }

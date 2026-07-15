@@ -59,7 +59,6 @@ const FIELD_ORDER = [
  * Get human-readable field label
  */
 function getFieldLabel(field) {
-  const { t } = useTranslation();
     return FIELD_LABELS[field] || field;
 }
 

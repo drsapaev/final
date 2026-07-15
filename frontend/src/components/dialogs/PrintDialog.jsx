@@ -13,7 +13,6 @@ import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/adapter';
 
 const formatPrintServiceLabel = (service) => {
-  const { t } = useTranslation();
   if (service == null) return '';
 
   if (

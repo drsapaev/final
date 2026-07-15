@@ -25,7 +25,6 @@ import { useTranslation } from '../../i18n/adapter';
  *   - есть заполненные поля (не только пустые values)
  */
 function normalizeSexForAI(sex) {
-  const { t } = useTranslation();
   if (!sex) return null;
   const s = String(sex).trim().toUpperCase();
   if (s === 'M' || s === 'MALE') return 'male';

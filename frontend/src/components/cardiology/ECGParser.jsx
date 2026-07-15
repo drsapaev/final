@@ -110,7 +110,6 @@ export const parseXMLFile = async (file) => {
 
 // Вспомогательная функция для извлечения значений из XML
 function extractXMLValue(xmlDoc, tagName, attribute) {
-  const { t } = useTranslation();
   const element = xmlDoc.querySelector(tagName);
   if (element) {
     if (attribute) {

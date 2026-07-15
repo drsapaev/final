@@ -23,7 +23,6 @@ import { useTranslation } from '../../i18n/adapter';
 // пациенты и сотрудники. Раскрытие — по клику, с обратной маской.
 // Маска сохраняет последние 2 цифры (для опознания пациента) и страну.
 function maskPhone(phone) {
-  const { t } = useTranslation();
   if (!phone || typeof phone !== 'string') return '';
   const trimmed = phone.trim();
   if (!trimmed) return '';

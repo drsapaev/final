@@ -31,7 +31,6 @@ const ALL_FREE_ACTION_CAN_FIELD = {
 };
 
 const hasBackendAllFreeAction = (request, action) => {
-  const { t } = useTranslation();
   const normalizedAction = String(action || '').trim().toLowerCase();
   if (!normalizedAction) {
     return false;

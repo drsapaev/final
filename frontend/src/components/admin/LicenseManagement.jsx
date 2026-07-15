@@ -43,7 +43,6 @@ const emptyLicenseStats = {
 };
 
 const deriveLicenseStats = (licenseList) => {
-  const { t } = useTranslation();
   const nextLicenses = Array.isArray(licenseList) ? licenseList : [];
   return {
     total_licenses: nextLicenses.length,

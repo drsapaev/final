@@ -18,7 +18,6 @@ import StateWrapper from '../common/StateWrapper.jsx';
 import { useTranslation } from '../../i18n/adapter';
 
 const stripPasswordFields = (formData) => {
-  const { t } = useTranslation();
   const persistedSettings = { ...(formData || {}) };
   delete persistedSettings.currentPassword;
   delete persistedSettings.newPassword;

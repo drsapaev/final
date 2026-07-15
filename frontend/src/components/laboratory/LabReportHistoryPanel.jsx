@@ -32,7 +32,6 @@ const SEVERITY_FILTER_KEY_MAP = {
 };
 
 function sortHistoryItems(items) {
-  const { t } = useTranslation();
   return [...items].sort((left, right) => {
     const leftSeverity = historySeverityState(left);
     const rightSeverity = historySeverityState(right);

@@ -13,7 +13,6 @@ import { useTranslation } from '../../../i18n/adapter';
  * Format confidence as percentage
  */
 function formatConfidence(confidence) {
-  const { t } = useTranslation();
   if (typeof confidence !== 'number') return '';
   return `${Math.round(confidence * 100)}%`;
 }

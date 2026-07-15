@@ -31,7 +31,6 @@ const CATEGORY_META = {
  * Merge strategy: APPEND_WITH_SEPARATOR
  */
 const mergeWithSeparator = (existing, templateBody) => {
-  const { t } = useTranslation();
     if (!existing || !existing.trim()) {
         return templateBody;
     }

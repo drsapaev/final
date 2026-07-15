@@ -72,7 +72,6 @@ const ACTION_ALIASES = {
 };
 
 const getBackendActionAvailability = (row, action, flagName) => {
-  const { t } = useTranslation();
   if (row && flagName && Object.prototype.hasOwnProperty.call(row, flagName)) {
     return Boolean(row[flagName]);
   }

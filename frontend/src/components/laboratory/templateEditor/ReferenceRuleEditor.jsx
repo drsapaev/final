@@ -42,7 +42,6 @@ const RULE_OP_OPTIONS = [
 ];
 
 function parseRuleText(text) {
-  const { t } = useTranslation();
   if (!text?.trim()) return null;
   try {
     return JSON.parse(text);

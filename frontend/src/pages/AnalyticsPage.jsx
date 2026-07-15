@@ -49,7 +49,6 @@ const DEPARTMENT_OPTIONS = [
 { value: 'Dentistry', label: 'Стоматология' }];
 
 function buildRelativeDateRange(days) {
-  const { t } = useTranslation();
   const end = new Date();
   const start = new Date(Date.now() - (days - 1) * DAY_MS);
   return {

@@ -19,7 +19,6 @@ const loadingSizes = {
 const getLoadingSize = (size) => loadingSizes[size] || loadingSizes.md;
 
 const normalizeIcon = (icon) => {
-  const { t } = useTranslation();
   if (!React.isValidElement(icon)) {
     return icon;
   }

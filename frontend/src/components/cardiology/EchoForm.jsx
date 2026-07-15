@@ -81,7 +81,6 @@ const DEFAULT_ECHO_DATA = {
 };
 
 function deepMerge(base, incoming) {
-  const { t } = useTranslation();
   if (!incoming || typeof incoming !== 'object' || Array.isArray(incoming)) {
     return base;
   }

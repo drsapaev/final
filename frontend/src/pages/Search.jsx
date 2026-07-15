@@ -13,7 +13,6 @@ const registrarHomeRoute = getRoleHomeRoute('registrar');
 
 // Modern Search Page with Full Functionality
 export default function Search() {
-  const { t } = useTranslation();
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [patients, setPatients] = useState([]);

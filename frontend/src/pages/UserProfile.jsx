@@ -77,7 +77,6 @@ const timezoneOptions = [
 ];
 
 function formatDateTime(value) {
-  const { t } = useTranslation();
   if (!value) {
     return 'Не указано';
   }

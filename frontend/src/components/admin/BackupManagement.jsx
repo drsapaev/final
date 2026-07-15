@@ -36,7 +36,6 @@ const emptyBackupStats = {
 };
 
 const deriveBackupStats = (backupList) => {
-  const { t } = useTranslation();
   const nextBackups = Array.isArray(backupList) ? backupList : [];
   return {
     total_backups: nextBackups.length,

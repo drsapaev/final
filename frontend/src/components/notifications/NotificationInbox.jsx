@@ -22,7 +22,6 @@ const STATUS_FILTER_OPTIONS = [
 ];
 
 function formatDate(value) {
-  const { t } = useTranslation();
   if (!value) return '';
   try {
     return new Date(value).toLocaleString('ru-RU');

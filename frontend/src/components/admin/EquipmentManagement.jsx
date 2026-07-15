@@ -41,7 +41,6 @@ const emptyEquipmentStats = {
 };
 
 const deriveEquipmentStats = (equipmentList) => {
-  const { t } = useTranslation();
   const nextEquipment = Array.isArray(equipmentList) ? equipmentList : [];
   return {
     total_equipment: nextEquipment.length,

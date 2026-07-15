@@ -33,7 +33,6 @@ import { useTranslation } from '../../i18n/adapter';
 const sanitizePayload = (form) =>
   Object.fromEntries(
     Object.entries(form).filter(([, value]) => {
-  const { t } = useTranslation();
       if (value === '' || value === null || typeof value === 'undefined') {
         return false;
       }

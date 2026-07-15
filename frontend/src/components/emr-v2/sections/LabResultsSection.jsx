@@ -39,7 +39,6 @@ import { useTranslation } from '../../../i18n/adapter';
 // используются formatLabStatus() и getLabStatusVariant() из labUiLabels.js.
 
 function formatDate(dateStr) {
-  const { t } = useTranslation();
   if (!dateStr) return '—';
   try {
     return new Date(dateStr).toLocaleDateString('ru-RU', {

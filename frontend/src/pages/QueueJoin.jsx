@@ -24,7 +24,6 @@ import {
 import { useTranslation } from '../i18n/adapter';
 
 const formatSpecialistLabel = (specialist) => {
-  const { t } = useTranslation();
   const doctorName =
     specialist?.doctor_name ||
     specialist?.full_name ||

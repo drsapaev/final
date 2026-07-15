@@ -7,7 +7,6 @@ import { useTranslation } from '../../../i18n/adapter';
 // (type + title + description + action + dismissible).
 
 const variantStyle = (severity) => {
-  const { t } = useTranslation();
   switch (severity) {
     case 'success':
       return { borderColor: 'rgba(52,199,89,0.35)', background: 'rgba(52,199,89,0.08)', color: 'var(--mac-text-primary)' };

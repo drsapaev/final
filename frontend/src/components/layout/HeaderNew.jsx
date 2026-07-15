@@ -22,7 +22,6 @@ const profileRoute = getCanonicalRouteById('clinical-profile')?.path || '/clinic
 const registrarHomeRoute = getRoleHomeRoute('registrar');
 
 export function isThemeMenuInteraction(event, themeMenuRoot) {
-  const { t } = useTranslation();
   const path = event.composedPath ? event.composedPath() : [];
   const inRef = Boolean(
     themeMenuRoot &&

@@ -31,7 +31,6 @@ const PRICE_OVERRIDE_ACTION_CAN_FIELD = {
 };
 
 const hasBackendPriceOverrideAction = (override, action) => {
-  const { t } = useTranslation();
   const normalizedAction = String(action || '').trim().toLowerCase();
   if (!normalizedAction) {
     return false;

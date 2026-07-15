@@ -62,7 +62,6 @@ const QUICK_ACTIONS = [
 ];
 
 function loadRecent() {
-  const { t } = useTranslation();
   try {
     const raw = localStorage.getItem(RECENT_KEY);
     return raw ? JSON.parse(raw) : [];

@@ -24,7 +24,6 @@ import { useTranslation } from '../../i18n/adapter';
  * Format date for display
  */
 function formatDate(dateStr) {
-  const { t } = useTranslation();
     if (!dateStr) return '—';
     const date = new Date(dateStr);
     return date.toLocaleDateString('ru-RU', {

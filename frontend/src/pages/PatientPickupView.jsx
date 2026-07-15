@@ -18,7 +18,6 @@ import { useTranslation } from '../i18n/adapter';
 
 // Get user role for role-based UI
 const getUserRole = () => {
-  const { t } = useTranslation();
   const st = auth.getState();
   const profile = st.profile || st.user || {};
   return String(profile?.role || profile?.role_name || '').toLowerCase();

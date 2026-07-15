@@ -35,7 +35,6 @@ const PROVIDER_LABELS = {
 const getProviderLabel = (provider) => PROVIDER_LABELS[provider] || provider;
 
 const getStatusText = (status) => {
-  const { t } = useTranslation();
   switch (status) {
     case 'online': return 'В сети';
     case 'busy': return 'Занят';

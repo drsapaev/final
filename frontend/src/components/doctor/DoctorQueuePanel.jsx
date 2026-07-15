@@ -38,7 +38,6 @@ const QUEUE_ACTION_ALIASES = {
 };
 
 const hasBackendQueueAction = (entry, action, flagName) => {
-  const { t } = useTranslation();
   if (flagName && entry?.[flagName] === true) {
     return true;
   }

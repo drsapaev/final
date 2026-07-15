@@ -35,7 +35,6 @@ const LAB_PANEL_TABLIST_ID = 'lab-panel-tabs';
 const LAB_QUEUE_PAGE_SIZE = 50;
 
 function getLabPanelTabId(tabId) {
-  const { t } = useTranslation();
   return `lab-panel-tab-${tabId}`;
 }
 

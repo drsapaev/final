@@ -86,7 +86,6 @@ const PHRASE_DATABASE = {
  * Find matching phrases based on input
  */
 function findMatchingPhrases(text, fieldName, maxResults = 5) {
-  const { t } = useTranslation();
     if (!text || text.length < 3) return [];
 
     const fieldPhrases = PHRASE_DATABASE[fieldName] || {};

@@ -37,7 +37,6 @@ const emptyBranchStats = {
 };
 
 const deriveBranchStats = (branchList) => {
-  const { t } = useTranslation();
   const nextBranches = Array.isArray(branchList) ? branchList : [];
   return {
     total_branches: nextBranches.length,

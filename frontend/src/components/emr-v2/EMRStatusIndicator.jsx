@@ -22,7 +22,6 @@ import { useTranslation } from '../../i18n/adapter';
  * Format relative time (e.g., "2 мин назад")
  */
 function formatRelativeTime(date) {
-  const { t } = useTranslation();
     if (!date) return null;
 
     const now = Date.now();
