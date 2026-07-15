@@ -6,8 +6,9 @@ import { toast } from 'react-toastify';
  * Ранее в lab-модуле было 3 канала нотификаций:
  *   1. `notify(severity, message)` callback prop (42 calls) — основной канал
  *      для success/error/info от операций (save, finalize, notify patient).
- *   2. `toast` из react-toastify (3 calls в LabReportWorkbench) — для
- *      numeric validation с расширенными опциями (autoClose, onClick undo).
+ *   2. `toast` из react-toastify (3 calls в LabReportWorkbench, теперь в
+ *      ReportEditor) — для numeric validation с расширенными опциями
+ *      (autoClose, onClick undo).
  *   3. `notifyService` из services/notify (2 calls в LabPanel) — для
  *      session-expiry (отдельный домен, не затрагивается).
  *
@@ -21,6 +22,19 @@ import { toast } from 'react-toastify';
  *   - Для interactive toasts (с onClick, custom autoClose) использует
  *     `toast` напрямую — это legitimate use case, который не покрывается
  *     простым notify.
+ *
+ * STRAT#26: notifyService (services/notify) намеренно сохранён для
+ * session-expiry сообщений в LabPanel.jsx. Причина:
+ *   - notificationGuardrails.test.js запрещает прямой импорт react-toastify
+ *     в page-level panels (LabPanel, RegistrarPanel, DoctorPanel, etc.)
+ *   - notifyService — это санкционированный wrapper вокруг toast, который
+ *     не нарушает guardrail
+ *   - session-expiry — это auth-domain concern, не lab-domain concern
+ *   - Смешивание auth и lab notification channels нарушило бы separation
+ *     of concerns
+ * Таким образом, lab-модуль использует 2 канала (notify callback + toast
+ * через useLabToast), а session-expiry использует 3-й канал (notifyService)
+ * по архитектурным причинам.
  *
  * Соответствует Nielsen Heuristic #4 (Consistency & Standards).
  *
