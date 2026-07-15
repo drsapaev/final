@@ -510,6 +510,21 @@ const TRANSLATIONS = {
     price_change_unavailable: 'Изменение цены недоступно — используйте каталог услуг',
     session_extending: 'Продлеваем сессию...',
   },
+  // ─── Dentist (STRAT#34) ──────────────────────────────────────────────────
+  dental: {
+    session_expired: 'Сессия истекла. Пожалуйста, войдите снова.',
+    no_queue_id_for_visit: 'Cannot start visit without a queue entry id',
+    no_active_visit: 'У пациента нет активного визита. Откройте вкладку «Пациенты» для поиска.',
+    no_patient_for_complete: 'Не выбран пациент для завершения приёма',
+    no_queue_id_for_complete: 'Невозможно завершить приём без ID записи в очереди',
+    visit_completed: 'Приём завершён успешно',
+    protocol_needs_visit_id: 'Для протокола визита нужен канонический visit_id. Откройте пациента из вкладки «Записи».',
+    protocol_not_found: 'Не удалось открыть протокол визита: данные не найдены.',
+    treatment_plan_needs_visit_id: 'План лечения требует канонический visit_id. Откройте пациента из вкладки «Записи».',
+    templates_future: 'Шаблоны будут реализованы в следующей версии',
+    icd_added_from_ai: 'Код МКБ-10 добавлен из AI предложения',
+    session_extending: 'Продлеваем сессию...',
+  },
 };
 
 /**
