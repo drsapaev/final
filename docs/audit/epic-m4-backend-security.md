@@ -148,9 +148,10 @@ POST /telegram/mini-app/auth/exchange { initData }
 
 ## P1 — Architecture (после P0)
 
-### M4-P1-1 — Единый ABAC / Policy Layer
+### M4-P1-1 — Единый ABAC / Policy Layer ✅ DONE
 
 **Серьёзность:** P1 (architecture)
+**Статус:** ✅ Реализовано (PR pending)
 **Файлы:**
 - `backend/app/api/v1/endpoints/telegram_webhook/_clinic_bot.py:1211-1219` — локальная ABAC-проверка `LabReportInstance.patient_id == scope.patient_id` (только для report-download)
 - `backend/app/api/v1/endpoints/telegram_webhook/_clinic_bot.py:1152-1154` — локальная проверка для cabinet-summary
@@ -177,9 +178,10 @@ POST /telegram/mini-app/auth/exchange { initData }
 
 ---
 
-### M4-P1-2 — Replay protection (временная мера до полного отказа от initData)
+### M4-P1-2 — Replay protection (временная мера до полного отказа от initData) ✅ DONE
 
 **Серьёзность:** P1 (если M4-P0-2 отложен)
+**Статус:** ✅ Реализовано в M4-P0-2 (PR #2331)
 **Файлы:**
 - `backend/app/services/telegram_mini_app_init_data.py:556-601` — `validate_telegram_mini_app_init_data`
 
