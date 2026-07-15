@@ -289,6 +289,7 @@ response_model=dict[str, Any],
 )
 def preview_mini_app_appointment_booking(
     request_body: TelegramMiniAppAppointmentPreviewRequest,
+    request: Request,
     db: Session = Depends(get_db),
 ):
     """Return a trusted Mini App appointment preview without creating it."""
@@ -297,6 +298,7 @@ def preview_mini_app_appointment_booking(
         request_body,
         db,
         allow_entry_token=True,
+        request=request,  # M4-P0-1: pass request for audit logging
     )
     return preview.to_response_payload()
 
@@ -308,6 +310,7 @@ response_model=dict[str, Any],
 )
 def submit_mini_app_patient_form(
     request_body: TelegramMiniAppPatientFormSubmissionRequest,
+    request: Request,
     db: Session = Depends(get_db),
 ):
     """Create or update one protected Mini App patient form submission."""
@@ -315,6 +318,7 @@ def submit_mini_app_patient_form(
     result = _save_mini_app_patient_form_submission_from_request(
         request_body,
         db,
+        request=request,  # M4-P0-1: pass request for audit logging
     )
     return result.to_response_payload()
 
@@ -326,6 +330,7 @@ response_model=dict[str, Any],
 )
 def preview_mini_app_patient_cabinet_summary(
     request_body: TelegramMiniAppPatientCabinetSummaryRequest,
+    request: Request,
     db: Session = Depends(get_db),
 ):
     """Return protected patient cabinet summary without exposing Telegram ids."""
@@ -333,6 +338,7 @@ def preview_mini_app_patient_cabinet_summary(
     return _build_mini_app_patient_cabinet_summary_from_request(
         request_body,
         db,
+        request=request,  # M4-P0-1: pass request for audit logging
     )
 
 
@@ -343,11 +349,16 @@ response_model=dict[str, Any],
 )
 def download_mini_app_patient_report(
     request_body: TelegramMiniAppPatientReportDownloadRequest,
+    request: Request,
     db: Session = Depends(get_db),
 ):
     """Return one protected ready PDF report for the linked Mini App patient."""
 
-    return _build_mini_app_patient_report_download_response(request_body, db)
+    return _build_mini_app_patient_report_download_response(
+        request_body,
+        db,
+        request=request,  # M4-P0-1: pass request for audit logging
+    )
 
 
 @router.post(
@@ -357,11 +368,16 @@ response_model=dict[str, Any],
 )
 def preview_mini_app_patient_manifest(
     request_body: TelegramMiniAppPatientManifestRequest,
+    request: Request,
     db: Session = Depends(get_db),
 ):
     """Return safe Mini App capability manifest for a linked patient."""
 
-    return _build_mini_app_patient_manifest_from_request(request_body, db)
+    return _build_mini_app_patient_manifest_from_request(
+        request_body,
+        db,
+        request=request,  # M4-P0-1: pass request for audit logging
+    )
 
 
 @router.post(
@@ -371,6 +387,7 @@ response_model=dict[str, Any],
 )
 def preview_mini_app_patient_forms(
     request_body: TelegramMiniAppPatientFormsPreviewRequest,
+    request: Request,
     db: Session = Depends(get_db),
 ):
     """Return trusted Mini App patient form metadata without storing data."""
@@ -378,6 +395,7 @@ def preview_mini_app_patient_forms(
     preview = _build_mini_app_patient_forms_preview_from_request(
         request_body,
         db,
+        request=request,  # M4-P0-1: pass request for audit logging
     )
     return preview.to_response_payload()
 
@@ -390,6 +408,7 @@ response_model=dict[str, Any],
 )
 def create_mini_app_appointment_booking(
     request_body: TelegramMiniAppAppointmentPreviewRequest,
+    request: Request,
     db: Session = Depends(get_db),
 ):
     """Create one trusted Mini App appointment for a linked patient."""
@@ -398,6 +417,7 @@ def create_mini_app_appointment_booking(
         request_body,
         db,
         allow_entry_token=True,
+        request=request,  # M4-P0-1: pass request for audit logging
     )
     draft_payload = preview.draft.to_appointment_create_payload()
 
@@ -418,6 +438,24 @@ def create_mini_app_appointment_booking(
     appointment_create_payload.pop("department", None)
     appointment_in = appointment_schemas.AppointmentCreate(**appointment_create_payload)
     appointment = appointment_crud.create(db=db, obj_in=appointment_in)
+
+    # M4-P0-1: PHI audit trail — log appointment creation
+    from app.services.patient_access_audit import log_patient_access
+    log_patient_access(
+        db=db,
+        scope=preview.scope,
+        resource_type="appointment",
+        resource_id=str(appointment.id),
+        action="create",
+        outcome="success",
+        request=request,
+        extra_data={
+            "appointment_date": str(preview.draft.appointment_date),
+            "appointment_time": preview.draft.appointment_time,
+            "department": preview.draft.department,
+        },
+    )
+
     return {
         "created": True,
         "appointment_id": int(appointment.id),

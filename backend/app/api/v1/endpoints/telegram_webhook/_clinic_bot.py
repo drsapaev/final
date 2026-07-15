@@ -626,7 +626,10 @@ def _build_mini_app_appointment_booking_preview_from_request(
     db: Session,
     *,
     allow_entry_token: bool = False,
+    request: "Request | None" = None,  # M4-P0-1: for audit logging
 ):
+    from app.services.patient_access_audit import log_patient_access
+
     try:
         if allow_entry_token:
             scope, _auth_source = _resolve_mini_app_patient_scope_from_auth(
@@ -654,15 +657,51 @@ def _build_mini_app_appointment_booking_preview_from_request(
             services=request_body.services,
         )
     except TelegramMiniAppInitDataError as exc:
+        # M4-P0-1: Log auth failure
+        log_patient_access(
+            db=db,
+            subject_patient_id=request_body.patient_id,
+            resource_type="appointment",
+            action="preview",
+            outcome="denied",
+            request=request,
+            extra_data={"reason": exc.reason},
+        )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={"reason": exc.reason},
         ) from exc
     except TelegramMiniAppSessionScopeError as exc:
+        # M4-P0-1: Log scope failure
+        log_patient_access(
+            db=db,
+            subject_patient_id=request_body.patient_id,
+            resource_type="appointment",
+            action="preview",
+            outcome="denied",
+            request=request,
+            extra_data={"reason": exc.reason},
+        )
         raise HTTPException(
             status_code=_mini_app_booking_scope_status_code(exc.reason),
             detail={"reason": exc.reason},
         ) from exc
+
+    # M4-P0-1: Log successful appointment preview access
+    # (audit for actual creation happens in _routes.py create_mini_app_appointment_booking)
+    log_patient_access(
+        db=db,
+        scope=scope,
+        resource_type="appointment",
+        action="preview",
+        outcome="success",
+        request=request,
+        extra_data={
+            "appointment_date": str(preview.draft.appointment_date),
+            "appointment_time": preview.draft.appointment_time,
+            "department": preview.draft.department,
+        },
+    )
 
     return preview
 
@@ -993,13 +1032,26 @@ def _mini_app_patient_onboarding_manifest_payload(
 def _build_mini_app_patient_manifest_from_request(
     request_body: TelegramMiniAppPatientManifestRequest,
     db: Session,
+    *,
+    request: "Request | None" = None,  # M4-P0-1: for audit logging
 ) -> dict[str, Any]:
+    from app.services.patient_access_audit import log_patient_access
+
     try:
         scope, auth_source = _resolve_mini_app_patient_scope_from_auth(
             db,
             init_data_payload=request_body.init_data,
             entry_token=request_body.entry_token,
             expected_section=request_body.section,
+        )
+        # M4-P0-1: Log successful manifest access
+        log_patient_access(
+            db=db,
+            scope=scope,
+            resource_type="manifest",
+            action="view",
+            outcome="success",
+            request=request,
         )
         return _mini_app_patient_manifest_payload(db, scope, auth_source=auth_source)
     except (TelegramMiniAppInitDataError, TelegramMiniAppSessionScopeError):
@@ -1013,11 +1065,29 @@ def _build_mini_app_patient_manifest_from_request(
                 )
             )
         except TelegramMiniAppInitDataError as exc:
+            # M4-P0-1: Log auth failure
+            log_patient_access(
+                db=db,
+                resource_type="manifest",
+                action="view",
+                outcome="denied",
+                request=request,
+                extra_data={"reason": exc.reason},
+            )
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail={"reason": exc.reason},
             ) from exc
         except TelegramMiniAppSessionScopeError as exc:
+            # M4-P0-1: Log scope failure
+            log_patient_access(
+                db=db,
+                resource_type="manifest",
+                action="view",
+                outcome="denied",
+                request=request,
+                extra_data={"reason": exc.reason},
+            )
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail={"reason": exc.reason},
@@ -1141,7 +1211,11 @@ def _mini_app_patient_cabinet_summary_payload(
 def _build_mini_app_patient_cabinet_summary_from_request(
     request_body: TelegramMiniAppPatientCabinetSummaryRequest,
     db: Session,
+    *,
+    request: "Request | None" = None,  # M4-P0-1: for audit logging
 ) -> dict[str, Any]:
+    from app.services.patient_access_audit import log_patient_access
+
     try:
         scope, _auth_source = _resolve_mini_app_patient_scope_from_auth(
             db,
@@ -1151,17 +1225,58 @@ def _build_mini_app_patient_cabinet_summary_from_request(
         )
         if request_body.patient_id is not None:
             if int(scope.patient_id) != int(request_body.patient_id):
+                # M4-P0-1: Log denied access attempt
+                log_patient_access(
+                    db=db,
+                    scope=scope,
+                    subject_patient_id=request_body.patient_id,
+                    resource_type="cabinet_summary",
+                    action="view",
+                    outcome="denied",
+                    request=request,
+                    extra_data={"reason": "patient_scope_mismatch"},
+                )
                 raise TelegramMiniAppSessionScopeError("patient_scope_mismatch")
     except TelegramMiniAppInitDataError as exc:
+        # M4-P0-1: Log auth failure (cannot identify subject, but log attempt)
+        log_patient_access(
+            db=db,
+            subject_patient_id=request_body.patient_id,
+            resource_type="cabinet_summary",
+            action="view",
+            outcome="denied",
+            request=request,
+            extra_data={"reason": exc.reason},
+        )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={"reason": exc.reason},
         ) from exc
     except TelegramMiniAppSessionScopeError as exc:
+        # M4-P0-1: Log scope failure
+        log_patient_access(
+            db=db,
+            subject_patient_id=request_body.patient_id,
+            resource_type="cabinet_summary",
+            action="view",
+            outcome="denied",
+            request=request,
+            extra_data={"reason": exc.reason},
+        )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={"reason": exc.reason},
         ) from exc
+
+    # M4-P0-1: Log successful cabinet summary access
+    log_patient_access(
+        db=db,
+        scope=scope,
+        resource_type="cabinet_summary",
+        action="view",
+        outcome="success",
+        request=request,
+    )
 
     return _mini_app_patient_cabinet_summary_payload(db, scope)
 
@@ -1188,7 +1303,11 @@ def _resolve_mini_app_patient_scope_for_optional_patient(
 def _build_mini_app_patient_report_download_response(
     request_body: TelegramMiniAppPatientReportDownloadRequest,
     db: Session,
+    *,
+    request: "Request | None" = None,  # M4-P0-1: for audit logging
 ) -> Response:
+    from app.services.patient_access_audit import log_patient_access
+
     try:
         scope = _resolve_mini_app_patient_scope_for_optional_patient(
             db,
@@ -1198,11 +1317,33 @@ def _build_mini_app_patient_report_download_response(
             expected_section=request_body.section or "results",
         )
     except TelegramMiniAppInitDataError as exc:
+        # M4-P0-1: Log auth failure
+        log_patient_access(
+            db=db,
+            subject_patient_id=request_body.patient_id,
+            resource_type="lab_report",
+            resource_id=str(request_body.report_id),
+            action="download",
+            outcome="denied",
+            request=request,
+            extra_data={"reason": exc.reason},
+        )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={"reason": exc.reason},
         ) from exc
     except TelegramMiniAppSessionScopeError as exc:
+        # M4-P0-1: Log scope failure
+        log_patient_access(
+            db=db,
+            subject_patient_id=request_body.patient_id,
+            resource_type="lab_report",
+            resource_id=str(request_body.report_id),
+            action="download",
+            outcome="denied",
+            request=request,
+            extra_data={"reason": exc.reason},
+        )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={"reason": exc.reason},
@@ -1218,6 +1359,17 @@ def _build_mini_app_patient_report_download_response(
         .first()
     )
     if report is None:
+        # M4-P0-1: Log not-found / not-ready attempt (denied)
+        log_patient_access(
+            db=db,
+            scope=scope,
+            resource_type="lab_report",
+            resource_id=str(request_body.report_id),
+            action="download",
+            outcome="denied",
+            request=request,
+            extra_data={"reason": "report_not_ready_or_not_found"},
+        )
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={"reason": "report_not_ready_or_not_found"},
@@ -1228,11 +1380,34 @@ def _build_mini_app_patient_report_download_response(
 
         filename, pdf_bytes, _caption = telegram_webhook._build_lab_report_pdf(db, report)
     except Exception as exc:
+        # M4-P0-1: Log generation error
+        log_patient_access(
+            db=db,
+            scope=scope,
+            resource_type="lab_report",
+            resource_id=str(request_body.report_id),
+            action="download",
+            outcome="error",
+            request=request,
+            extra_data={"reason": "pdf_generation_failed"},
+        )
         _raise_telegram_webhook_internal_error(
             "mini_app_patient_report_download",
             "Protected report could not be generated",
             exc,
         )
+
+    # M4-P0-1: Log successful report download
+    log_patient_access(
+        db=db,
+        scope=scope,
+        resource_type="lab_report",
+        resource_id=str(report.id),
+        action="download",
+        outcome="success",
+        request=request,
+        extra_data={"report_status": report.status, "filename": filename},
+    )
 
     return Response(
         content=pdf_bytes,
@@ -1244,7 +1419,11 @@ def _build_mini_app_patient_report_download_response(
 def _build_mini_app_patient_forms_preview_from_request(
     request_body: TelegramMiniAppPatientFormsPreviewRequest,
     db: Session,
+    *,
+    request: "Request | None" = None,  # M4-P0-1: for audit logging
 ):
+    from app.services.patient_access_audit import log_patient_access
+
     try:
         scope, _auth_source = _resolve_mini_app_patient_scope_from_auth(
             db,
@@ -1258,15 +1437,46 @@ def _build_mini_app_patient_forms_preview_from_request(
             patient_id=request_body.patient_id,
         )
     except TelegramMiniAppInitDataError as exc:
+        # M4-P0-1: Log auth failure
+        log_patient_access(
+            db=db,
+            subject_patient_id=request_body.patient_id,
+            resource_type="forms_preview",
+            action="view",
+            outcome="denied",
+            request=request,
+            extra_data={"reason": exc.reason},
+        )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={"reason": exc.reason},
         ) from exc
     except TelegramMiniAppSessionScopeError as exc:
+        # M4-P0-1: Log scope failure
+        log_patient_access(
+            db=db,
+            subject_patient_id=request_body.patient_id,
+            resource_type="forms_preview",
+            action="view",
+            outcome="denied",
+            request=request,
+            extra_data={"reason": exc.reason},
+        )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={"reason": exc.reason},
         ) from exc
+
+    # M4-P0-1: Log successful forms preview access
+    log_patient_access(
+        db=db,
+        scope=scope,
+        resource_type="forms_preview",
+        action="view",
+        outcome="success",
+        request=request,
+        extra_data={"forms_count": len(preview.forms)},
+    )
 
     return preview
 
@@ -1274,7 +1484,11 @@ def _build_mini_app_patient_forms_preview_from_request(
 def _save_mini_app_patient_form_submission_from_request(
     request_body: TelegramMiniAppPatientFormSubmissionRequest,
     db: Session,
+    *,
+    request: "Request | None" = None,  # M4-P0-1: for audit logging
 ):
+    from app.services.patient_access_audit import log_patient_access
+
     try:
         scope, _auth_source = _resolve_mini_app_patient_scope_from_auth(
             db,
@@ -1291,15 +1505,52 @@ def _save_mini_app_patient_form_submission_from_request(
             status=request_body.status,
         )
     except TelegramMiniAppInitDataError as exc:
+        # M4-P0-1: Log auth failure
+        log_patient_access(
+            db=db,
+            subject_patient_id=request_body.patient_id,
+            resource_type="form_submission",
+            resource_id=str(request_body.form_id),
+            action="submit",
+            outcome="denied",
+            request=request,
+            extra_data={"reason": exc.reason},
+        )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={"reason": exc.reason},
         ) from exc
     except TelegramMiniAppSessionScopeError as exc:
+        # M4-P0-1: Log scope failure
+        log_patient_access(
+            db=db,
+            subject_patient_id=request_body.patient_id,
+            resource_type="form_submission",
+            resource_id=str(request_body.form_id),
+            action="submit",
+            outcome="denied",
+            request=request,
+            extra_data={"reason": exc.reason},
+        )
         raise HTTPException(
             status_code=_mini_app_forms_scope_status_code(exc.reason),
             detail={"reason": exc.reason},
         ) from exc
+
+    # M4-P0-1: Log successful form submission
+    log_patient_access(
+        db=db,
+        scope=scope,
+        resource_type="form_submission",
+        resource_id=str(request_body.form_id),
+        action="submit",
+        outcome="success",
+        request=request,
+        extra_data={
+            "form_status": request_body.status,
+            "submission_id": result.submission.id if result.submission else None,
+        },
+    )
 
     return result
 

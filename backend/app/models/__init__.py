@@ -97,6 +97,7 @@ from .emr_v2 import (
 from .emr_version import EMRVersion
 from .family_relation import FamilyRelation, RelationType
 from .feature_flags import FeatureFlag, FeatureFlagHistory
+from .patient_access_audit import PatientAccessAuditLog  # M4-P0-1: PHI audit trail
 from .file_system import (
     File,
     FileAccessLog,
@@ -195,6 +196,7 @@ from .visit import Visit, VisitService
 __all__ = [
     "User",
     "Patient",
+    "PatientAccessAuditLog",  # M4-P0-1: PHI access audit trail
     "Visit",
     "VisitService",
     "Service",
