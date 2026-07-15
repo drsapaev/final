@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 import { useState, useEffect } from 'react';
 import {
   Users,
@@ -163,11 +164,11 @@ const UserExportManager = () => {
   const handleDeleteFile = async (filename) => {
     // P-013 fix: replaced native confirm() with shared useConfirm hook.
     const ok = await confirm({
-      title: 'Удаление файла',
+      title: t('admin2.delete_file_title'),
       message: `Удалить файл ${filename}?`,
       description: 'Это действие необратимо.',
-      confirmLabel: 'Удалить',
-      cancelLabel: 'Отмена',
+      confirmLabel: t('admin2.delete_confirm'),
+      cancelLabel: t('admin2.cancel'),
       intent: 'danger',
     });
     if (!ok) return;

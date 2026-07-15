@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 import { useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import {
@@ -328,11 +329,11 @@ const DynamicPricingManager = () => {
   const handleDeleteRule = async (ruleId) => {
     // P-013 fix: replaced native confirm() with shared useConfirm hook.
     const ok = await confirm({
-      title: 'Удаление правила',
+      title: t('admin2.delete_rule_title'),
       message: 'Удалить это правило?',
       description: 'Это действие необратимо.',
-      confirmLabel: 'Удалить',
-      cancelLabel: 'Отмена',
+      confirmLabel: t('admin2.delete_confirm'),
+      cancelLabel: t('admin2.cancel'),
       intent: 'danger',
     });
     if (!ok) return;
@@ -350,11 +351,11 @@ const DynamicPricingManager = () => {
   const handleDeletePackage = async (packageId) => {
     // P-013 fix: replaced native confirm() with shared useConfirm hook.
     const ok = await confirm({
-      title: 'Удаление пакета',
+      title: t('admin2.delete_package_title'),
       message: 'Удалить этот пакет?',
       description: 'Это действие необратимо.',
-      confirmLabel: 'Удалить',
-      cancelLabel: 'Отмена',
+      confirmLabel: t('admin2.delete_confirm'),
+      cancelLabel: t('admin2.cancel'),
       intent: 'danger',
     });
     if (!ok) return;

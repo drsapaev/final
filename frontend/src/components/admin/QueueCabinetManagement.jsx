@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Building2,
@@ -439,15 +440,15 @@ const QueueCabinetManagement = () => {
           ) : (
             <Table
               columns={[
-                { key: 'day', title: 'Дата', sortable: false },
-                { key: 'specialist_name', title: 'Специалист', sortable: false },
-                { key: 'queue_tag', title: 'Тег', sortable: false },
-                { key: 'cabinet_number', title: 'Кабинет', sortable: false },
-                { key: 'cabinet_floor', title: 'Этаж', sortable: false },
-                { key: 'cabinet_building', title: 'Корпус', sortable: false },
-                { key: 'entries_count', title: 'Записи', sortable: false },
-                { key: 'active', title: 'Статус', sortable: false },
-                { key: 'sync_state', title: 'Синхронизация', sortable: false },
+                { key: 'day', title: t('admin2.col_day'), sortable: false },
+                { key: 'specialist_name', title: t('admin2.col_specialist'), sortable: false },
+                { key: 'queue_tag', title: t('admin2.col_tag'), sortable: false },
+                { key: 'cabinet_number', title: t('admin2.col_cabinet'), sortable: false },
+                { key: 'cabinet_floor', title: t('admin2.col_floor'), sortable: false },
+                { key: 'cabinet_building', title: t('admin2.col_building'), sortable: false },
+                { key: 'entries_count', title: t('admin2.col_entries'), sortable: false },
+                { key: 'active', title: t('admin2.col_active'), sortable: false },
+                { key: 'sync_state', title: t('admin2.col_sync'), sortable: false },
               ]}
               data={tableRows}
               loading={loading}

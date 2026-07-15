@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 import { useCallback, useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import {
@@ -129,11 +130,11 @@ const ActivationSystem = () => {
   const revokeActivation = async (activationKey) => {
     // P-013 fix: replaced native confirm() with shared useConfirm hook.
     const ok = await confirm({
-      title: 'Отзыв активации',
+      title: t('admin2.revoke_activation_title'),
       message: 'Отозвать активацию?',
       description: 'Устройство будет заблокировано.',
-      confirmLabel: 'Отозвать',
-      cancelLabel: 'Отмена',
+      confirmLabel: t('admin2.revoke_confirm'),
+      cancelLabel: t('admin2.cancel'),
       intent: 'warning',
     });
     if (!ok) return;
@@ -365,7 +366,7 @@ const ActivationSystem = () => {
             columns={[
             {
               key: 'key',
-              title: 'Ключ активации',
+              title: t('admin2.col_activation_key'),
               render: (activation) =>
               <div className="flex items-center justify-center">
                     <Key className="admin-icon-16-mr-8-blue" />
@@ -387,7 +388,7 @@ const ActivationSystem = () => {
             },
             {
               key: 'device',
-              title: 'Устройство',
+              title: t('admin2.col_device'),
               render: (activation) =>
               <div className="flex items-center justify-center">
                     <Smartphone className="admin-icon-16-mr-8-tertiary" />
@@ -404,7 +405,7 @@ const ActivationSystem = () => {
             },
             {
               key: 'status',
-              title: 'Статус',
+              title: t('admin2.col_active'),
               render: (activation) => {
                 const row = activation || {};
                 const status = statusLabels[row.status] || { label: row.status, color: 'secondary' };
@@ -413,7 +414,7 @@ const ActivationSystem = () => {
             },
             {
               key: 'expiry',
-              title: 'Срок действия',
+              title: t('admin2.col_expiry'),
               render: (activation) => {
                 const row = activation || {};
                 const isExpired = row.expiry_date ? new Date(row.expiry_date) < new Date() : false;
@@ -433,7 +434,7 @@ const ActivationSystem = () => {
             },
             {
               key: 'created',
-              title: 'Создан',
+              title: t('admin2.col_created'),
               render: (activation) =>
               <div className="admin-created-date">
                     {(activation || {}).created_at ? new Date((activation || {}).created_at).toLocaleDateString('ru-RU') : '—'}
@@ -442,7 +443,7 @@ const ActivationSystem = () => {
             },
             {
               key: 'actions',
-              title: 'Действия',
+              title: t('admin2.col_actions'),
               render: (_actionValue, activation) =>
               <div className="admin-form-row-gap-8">
                     <Button

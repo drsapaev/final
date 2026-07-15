@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 import { useState, useEffect } from 'react';
 import {
   FileText,
@@ -195,11 +196,11 @@ const ReportsManager = () => {
   const cleanupOldReports = async () => {
     // P-013 fix: replaced window.confirm() with shared useConfirm hook.
     const ok = await confirm({
-      title: 'Очистка старых отчётов',
+      title: t('admin2.clean_reports_title'),
       message: 'Удалить старые файлы отчётов (старше 30 дней)?',
       description: 'Это действие необратимо. Файлы будут удалены навсегда.',
-      confirmLabel: 'Удалить',
-      cancelLabel: 'Отмена',
+      confirmLabel: t('admin2.delete_confirm'),
+      cancelLabel: t('admin2.cancel'),
       intent: 'danger',
     });
     if (!ok) {

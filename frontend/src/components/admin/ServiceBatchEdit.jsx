@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 import { useState } from 'react';
 import PropTypes from 'prop-types';
 import { api } from '../../api/client';
@@ -59,7 +60,7 @@ const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }
 
   const handleSubmit = async () => {
     if (Object.keys(updates).length === 0) {
-      notify.warning('Выберите хотя бы одно поле для изменения');
+      notify.warning(t('admin2.select_field_warning'));
       return;
     }
 
@@ -80,7 +81,7 @@ const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }
       }
     } catch (error) {
       logger.error('Ошибка batch обновления:', error);
-      notify.error('Ошибка при массовом обновлении услуг');
+      notify.error(t('admin2.batch_update_error'));
     } finally {
       setLoading(false);
     }

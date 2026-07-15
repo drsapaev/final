@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import {
@@ -466,7 +467,7 @@ const ProviderForm = ({ provider, providerConfigs, onSave, onCancel }) => {
     e.preventDefault();
 
     if (!formData.name || !formData.display_name) {
-      notify.warning('Заполните обязательные поля');
+      notify.warning(t('admin2.ai_settings_required'));
       return;
     }
 

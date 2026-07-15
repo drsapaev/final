@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 import { useState, useEffect } from 'react';
 import {
   MacOSCard, Button, Input, Checkbox, SegmentedControl,

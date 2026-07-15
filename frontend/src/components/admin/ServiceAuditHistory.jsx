@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { servicesService } from '../../api/services';

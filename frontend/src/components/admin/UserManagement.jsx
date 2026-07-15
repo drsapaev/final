@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 import { useState, useEffect, useRef } from 'react';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
@@ -388,7 +389,7 @@ const UserManagement = () => {
   const columns = [
   {
     key: 'user',
-    title: 'Пользователь',
+    title: t('admin2.col_user'),
     render: (_, user) =>
     <Box display="flex" alignItems="center" gap="12px">
           {/* Placeholder Avatar - can be replaced with MacOSAvatar if available */}
@@ -408,7 +409,7 @@ const UserManagement = () => {
   },
   {
     key: 'role',
-    title: 'Роль',
+    title: t('admin2.col_role'),
     render: (role) =>
     <Badge variant={getRoleBadgeVariant(role)}>
           {getRoleLabel(role)}
@@ -422,12 +423,12 @@ const UserManagement = () => {
   },
   {
     key: 'phone',
-    title: 'Телефон',
+    title: t('admin2.col_phone'),
     render: (phone) => <span className="admin-fs-13">{phone || '-'}</span>
   },
   {
     key: 'status',
-    title: 'Статус',
+    title: t('admin2.col_active'),
     render: (_, user) =>
     <Badge variant={user.is_active ? 'success' : 'default'} outline>
           {user.is_active ? 'Активен' : 'Неактивен'}
@@ -436,7 +437,7 @@ const UserManagement = () => {
   },
   {
     key: 'last_login',
-    title: 'Последний вход',
+    title: t('admin2.col_last_login'),
     render: (last_login) =>
     <span className="admin-fs-13-secondary">
           {last_login ? new Date(last_login).toLocaleDateString() : '-'}
