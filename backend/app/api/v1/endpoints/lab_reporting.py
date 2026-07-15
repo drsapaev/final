@@ -86,8 +86,7 @@ def _ensure_doctor_can_read_lab_instance(db: Session, instance, current_user) ->
     """
     if getattr(current_user, "is_superuser", False):
         return
-    from app.services.authorization.staff import staff_authorization_service
-    if staff_authorization_service.has_permission(current_user, "lab:write"):
+    if getattr(current_user, "role", None) == "Admin":
         return
     # All other roles (including Lab) must go through Doctor ownership check
     if not instance.visit_id:
@@ -555,8 +554,7 @@ def list_lab_report_instances(
 ):
     service = LabReportingService(db)
     scoped_visit_ids = visit_ids
-    from app.services.authorization.staff import staff_authorization_service
-    if not staff_authorization_service.has_permission(user, "lab:write") and not getattr(
+    if getattr(user, "role", None) == "Doctor" and not getattr(
         user, "is_superuser", False
     ):
         scoped_visit_ids = _doctor_allowed_visit_ids(
@@ -782,8 +780,7 @@ def create_lab_order(
         if not template:
             raise HTTPException(status_code=404, detail="Шаблон не найден")
 
-        from app.services.authorization.staff import staff_authorization_service
-        if not (staff_authorization_service.has_permission(user, "lab:write")) and payload.visit_id:
+        if user.role not in ("Admin", "Lab") and payload.visit_id:
             visit = db.query(Visit).filter(Visit.id == payload.visit_id).first()
             if not visit:
                 raise HTTPException(status_code=404, detail="Визит не найден")
