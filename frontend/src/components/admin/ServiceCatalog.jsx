@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { api } from '../../api/client';
@@ -282,11 +283,11 @@ const ServiceCatalog = () => {
   const handleDeleteService = async (serviceId) => {
     // P-013 fix: replaced native confirm() with shared useConfirm hook.
     const ok = await confirm({
-      title: 'Удаление услуги',
+      title: t('admin2.delete_service_title'),
       message: 'Удалить услугу?',
       description: 'Услуга будет деактивирована. При необходимости её можно восстановить через администратора.',
-      confirmLabel: 'Удалить',
-      cancelLabel: 'Отмена',
+      confirmLabel: t('admin2.delete_confirm'),
+      cancelLabel: t('admin2.cancel'),
       intent: 'danger',
     });
     if (!ok) return;
@@ -560,13 +561,13 @@ const ServiceCatalog = () => {
             ),
             width: '40px'
           },
-          { key: 'service', title: 'Услуга', width: '23%' },
-          { key: 'category', title: 'Категория', width: '14%' },
-          { key: 'price', title: 'Цена', width: '13%' },
-          { key: 'duration', title: 'Длительность', width: '10%' },
-          { key: 'doctor', title: 'Врач', width: '12%' },
-          { key: 'status', title: 'Статус', width: '10%' },
-          { key: 'actions', title: 'Действия', width: '12%' }]
+          { key: 'service', title: t('admin2.col_service'), width: '23%' },
+          { key: 'category', title: t('admin2.col_category'), width: '14%' },
+          { key: 'price', title: t('admin2.col_price'), width: '13%' },
+          { key: 'duration', title: t('admin2.col_duration'), width: '10%' },
+          { key: 'doctor', title: t('admin2.col_doctor'), width: '12%' },
+          { key: 'status', title: t('admin2.col_active'), width: '10%' },
+          { key: 'actions', title: t('admin2.col_actions'), width: '12%' }]
           }
           data={filteredServices.map((service) => {
               const specialty = getCategorySpecialty(service.category_id);
@@ -840,7 +841,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
     e.preventDefault();
 
     if (!formData.name.trim()) {
-      notify.warning('Введите название услуги');
+      notify.warning(t('admin2.service_name_required'));
       return;
     }
 

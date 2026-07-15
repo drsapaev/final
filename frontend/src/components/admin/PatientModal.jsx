@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 import { useState, useEffect } from 'react';
 import { Save, User, Mail, Phone, MapPin, Calendar, IdCard, AlertCircle } from 'lucide-react';
 import logger from '../../utils/logger';
@@ -187,11 +188,11 @@ const PatientModal = ({
     if (isDirty) {
       // P-013 fix: replaced window.confirm() with shared useConfirm hook.
       const ok = await confirm({
-        title: 'Несохранённые изменения',
+        title: t('admin2.unsaved_changes_title'),
         message: 'У вас есть несохранённые изменения. Закрыть окно?',
         description: 'Изменения будут потеряны.',
-        confirmLabel: 'Закрыть без сохранения',
-        cancelLabel: 'Отмена',
+        confirmLabel: t('admin2.close_without_saving'),
+        cancelLabel: t('admin2.cancel'),
         intent: 'warning',
       });
       if (ok) {

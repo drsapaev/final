@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 /**
  * QueueProfilesManager - Admin component for managing queue tabs
  * 
@@ -190,11 +191,11 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
     const handleDelete = async (profileKey) => {
         // P-013 fix: replaced window.confirm() with shared useConfirm hook.
         const ok = await confirm({
-            title: 'Удаление вкладки очереди',
+            title: t('admin2.delete_queue_tab_title'),
             message: `Удалить вкладку «${profileKey}»?`,
             description: 'Это действие необратимо.',
-            confirmLabel: 'Удалить',
-            cancelLabel: 'Отмена',
+            confirmLabel: t('admin2.delete_confirm'),
+            cancelLabel: t('admin2.cancel'),
             intent: 'danger',
         });
         if (!ok) {
@@ -243,11 +244,11 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
 
         // P-013 fix: replaced window.confirm() with shared useConfirm hook.
         const ok = await confirm({
-            title: 'Массовое удаление вкладок',
+            title: t('admin2.bulk_delete_queue_tabs_title'),
             message: `Удалить ${selectedProfiles.length} вкладок?`,
             description: 'Это действие нельзя отменить.',
-            confirmLabel: 'Удалить все',
-            cancelLabel: 'Отмена',
+            confirmLabel: t('admin2.delete_all_confirm'),
+            cancelLabel: t('admin2.cancel'),
             intent: 'destructive',
         });
         if (!ok) {

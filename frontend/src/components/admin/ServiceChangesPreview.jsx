@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 import PropTypes from 'prop-types';
 import { AlertCircle, ArrowRight, Check, X } from 'lucide-react';
 import {

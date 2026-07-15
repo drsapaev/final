@@ -598,6 +598,76 @@ const TRANSLATIONS = {
     transaction_delete_error: 'Ошибка при удалении финансовой транзакции',
     patient_delete_error: 'Ошибка при удалении пациента',
   },
+  // ─── Admin remaining (STRAT#37) ──────────────────────────────────────────
+  admin2: {
+    // Common
+    delete_confirm: 'Удалить',
+    delete_all_confirm: 'Удалить все',
+    cancel: 'Отмена',
+    // AdminDashboard stat cards
+    stat_appointments_today: 'Записи сегодня',
+    stat_awaiting_confirmation: 'Ожидают подтверждения',
+    stat_income_month: 'Доход (за месяц)',
+    stat_total_users: 'Всего пользователей',
+    stat_doctors: 'Врачи',
+    stat_patients: 'Пациенты',
+    // UserExportManager
+    delete_file_title: 'Удаление файла',
+    // UserManagement table headers
+    col_user: 'Пользователь',
+    col_role: 'Роль',
+    col_phone: 'Телефон',
+    col_status: 'Статус',
+    col_last_login: 'Последний вход',
+    // ServiceBatchEdit
+    select_field_warning: 'Выберите хотя бы одно поле для изменения',
+    batch_update_error: 'Ошибка при массовом обновлении услуг',
+    // ServiceCatalog
+    delete_service_title: 'Удаление услуги',
+    col_service: 'Услуга',
+    col_category: 'Категория',
+    col_price: 'Цена',
+    col_duration: 'Длительность',
+    col_doctor: 'Врач',
+    col_actions: 'Действия',
+    service_name_required: 'Введите название услуги',
+    service_update_error: 'Ошибка при обновлении услуги',
+    // QueueCabinetManagement
+    col_day: 'Дата',
+    col_specialist: 'Специалист',
+    col_tag: 'Тег',
+    col_cabinet: 'Кабинет',
+    col_floor: 'Этаж',
+    col_building: 'Корпус',
+    col_entries: 'Записи',
+    col_active: 'Статус',
+    col_sync: 'Синхронизация',
+    // QueueProfilesManager
+    delete_queue_tab_title: 'Удаление вкладки очереди',
+    bulk_delete_queue_tabs_title: 'Массовое удаление вкладок',
+    // DepartmentManagement
+    delete_department_title: 'Удаление отделения',
+    bulk_delete_departments_title: 'Массовое удаление отделений',
+    // DynamicPricingManager
+    delete_rule_title: 'Удаление правила',
+    delete_package_title: 'Удаление пакета',
+    // ReportsManager
+    clean_reports_title: 'Очистка старых отчётов',
+    // WebhookManager
+    delete_webhook_title: 'Удаление webhook',
+    // SystemManagement
+    delete_backup_title: 'Удаление бэкапа',
+    // ActivationSystem
+    revoke_activation_title: 'Отзыв активации',
+    revoke_confirm: 'Отозвать',
+    col_activation_key: 'Ключ активации',
+    col_device: 'Устройство',
+    col_expiry: 'Срок действия',
+    col_created: 'Создан',
+    ai_settings_required: 'Заполните обязательные поля',
+    unsaved_changes_title: 'Несохранённые изменения',
+    close_without_saving: 'Закрыть без сохранения',
+  },
 };
 
 /**

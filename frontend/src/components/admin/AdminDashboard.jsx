@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 import React from 'react';
 import {
   Activity,
@@ -197,21 +198,21 @@ const AdminDashboard = () => {
     // Операционные — показывают текущую нагрузку.
     {
       key: 'appointments-today',
-      title: 'Записи сегодня',
+      title: t('admin2.stat_appointments_today'),
       value: stats.appointmentsToday || 0,
       icon: Calendar,
       color: 'orange',
     },
     {
       key: 'pending-approvals',
-      title: 'Ожидают подтверждения',
+      title: t('admin2.stat_awaiting_confirmation'),
       value: stats.pendingApprovals || 0,
       icon: Clock,
       color: 'red',
     },
     {
       key: 'revenue',
-      title: 'Доход (за месяц)',
+      title: t('admin2.stat_income_month'),
       value: formatCurrency(stats.totalRevenue || 0),
       icon: TrendingUp,
       color: 'green',
@@ -219,21 +220,21 @@ const AdminDashboard = () => {
     // Кумулятивные — общее количество.
     {
       key: 'users',
-      title: 'Всего пользователей',
+      title: t('admin2.stat_total_users'),
       value: stats.totalUsers || 0,
       icon: Users,
       color: 'blue',
     },
     {
       key: 'doctors',
-      title: 'Врачи',
+      title: t('admin2.stat_doctors'),
       value: stats.totalDoctors || 0,
       icon: Stethoscope,
       color: 'green',
     },
     {
       key: 'patients',
-      title: 'Пациенты',
+      title: t('admin2.stat_patients'),
       value: stats.totalPatients || 0,
       icon: Users,
       color: 'purple',

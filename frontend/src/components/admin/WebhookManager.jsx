@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 import { useState, useEffect, useCallback } from 'react';
 import {
   Plus,
@@ -147,11 +148,11 @@ const WebhookManager = () => {
   const handleDeleteWebhook = async (webhookId) => {
     // P-013 fix: replaced native confirm() with shared useConfirm hook.
     const ok = await confirm({
-      title: 'Удаление webhook',
+      title: t('admin2.delete_webhook_title'),
       message: 'Удалить этот webhook?',
       description: 'Это действие необратимо. Связанные вызовы останутся в журнале.',
-      confirmLabel: 'Удалить',
-      cancelLabel: 'Отмена',
+      confirmLabel: t('admin2.delete_confirm'),
+      cancelLabel: t('admin2.cancel'),
       intent: 'danger',
     });
     if (!ok) {

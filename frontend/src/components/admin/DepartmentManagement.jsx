@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 /**
  * DepartmentManagement Component
  * Управление отделениями, вкладками и интеграциями очередей/услуг
@@ -358,11 +359,11 @@ const DepartmentManagement = () => {
   const handleDeleteDepartment = async (id) => {
     // P-013 fix: replaced window.confirm() with shared useConfirm hook.
     const ok = await confirm({
-      title: 'Удаление отделения',
+      title: t('admin2.delete_department_title'),
       message: 'Удалить отделение?',
       description: 'Это действие необратимо. Все связанные сервисы будут отвязаны.',
-      confirmLabel: 'Удалить',
-      cancelLabel: 'Отмена',
+      confirmLabel: t('admin2.delete_confirm'),
+      cancelLabel: t('admin2.cancel'),
       intent: 'danger',
     });
     if (!ok) return;
@@ -610,11 +611,11 @@ const DepartmentManagement = () => {
 
     // P-013 fix: replaced window.confirm() with shared useConfirm hook.
     const confirmed = await confirm({
-      title: 'Массовое удаление отделений',
+      title: t('admin2.bulk_delete_departments_title'),
       message: `Удалить ${selectedDepartments.length} отделений?`,
       description: 'Это действие нельзя отменить. Все связанные сервисы будут отвязаны.',
-      confirmLabel: 'Удалить все',
-      cancelLabel: 'Отмена',
+      confirmLabel: t('admin2.delete_all_confirm'),
+      cancelLabel: t('admin2.cancel'),
       intent: 'destructive',
     });
 

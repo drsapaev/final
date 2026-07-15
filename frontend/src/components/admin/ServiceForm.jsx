@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 /**
  * ServiceForm — extracted from ServiceCatalog.jsx (UX Audit Admin #4.1).
  *
@@ -148,7 +149,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
     e.preventDefault();
 
     if (!formData.name.trim()) {
-      notify.warning('Введите название услуги');
+      notify.warning(t('admin2.service_name_required'));
       return;
     }
 

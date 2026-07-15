@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeftRight, LayoutDashboard, LineChart } from 'lucide-react';
 import { getCanonicalRouteById, getEffectiveRouteByPath } from '../../routing/routeSelectors.js';

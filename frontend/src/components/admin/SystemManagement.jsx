@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 import { useState, useEffect } from 'react';
 import {
   Server,
@@ -159,11 +160,11 @@ const SystemManagement = () => {
   const deleteBackup = async (backupName) => {
     // P-013 fix: replaced window.confirm() with shared useConfirm hook.
     const ok = await confirm({
-      title: 'Удаление бэкапа',
+      title: t('admin2.delete_backup_title'),
       message: `Удалить бэкап ${backupName}?`,
       description: 'Это действие необратимо.',
-      confirmLabel: 'Удалить',
-      cancelLabel: 'Отмена',
+      confirmLabel: t('admin2.delete_confirm'),
+      cancelLabel: t('admin2.cancel'),
       intent: 'danger',
     });
     if (!ok) {
