@@ -125,14 +125,14 @@ const MedicalEquipmentManager = () => {
       const response = await api.post(`/medical-equipment/devices/${deviceId}/connect`);
       const data = response.data;
       if (data.success) {
-        toast.success('Устройство подключено');
+        toast.success(t('admin2.equip_toast_connected'));
         loadDevices();
       } else {
-        toast.error(data.message || 'Ошибка подключения');
+        toast.error(data.message || t('admin2.equip_toast_connect_failed'));
       }
     } catch (error) {
       logger.error('Ошибка подключения устройства:', error);
-      toast.error('Ошибка подключения устройства');
+      toast.error(t('admin2.equip_toast_connect_failed_full'));
     }
   };
 
@@ -141,26 +141,26 @@ const MedicalEquipmentManager = () => {
       const response = await api.post(`/medical-equipment/devices/${deviceId}/disconnect`);
       const data = response.data;
       if (data.success) {
-        toast.success('Устройство отключено');
+        toast.success(t('admin2.equip_toast_disconnected'));
         loadDevices();
       } else {
-        toast.error(data.message || 'Ошибка отключения');
+        toast.error(data.message || t('admin2.equip_toast_disconnect_failed'));
       }
     } catch (error) {
       logger.error('Ошибка отключения устройства:', error);
-      toast.error('Ошибка отключения устройства');
+      toast.error(t('admin2.equip_toast_disconnect_failed_full'));
     }
   };
 
   const takeMeasurement = async () => {
     if (!measurementForm.device_id) {
-      toast.error('Выберите устройство');
+      toast.error(t('admin2.equip_toast_select_device'));
       return;
     }
 
     try {void (
       await api.post('/medical-equipment/measurements', measurementForm));
-      toast.success('Измерение выполнено');
+      toast.success(t('admin2.equip_toast_measurement_done'));
       setMeasurementForm({ device_id: '', patient_id: '' });
       if (activeTab === 'measurements') {
         loadMeasurements();
@@ -168,9 +168,9 @@ const MedicalEquipmentManager = () => {
     } catch (error) {
       logger.error('Ошибка измерения:', error);
       if (error.response && error.response.data) {
-        toast.error(error.response.data.detail || 'Ошибка измерения');
+        toast.error(error.response.data.detail || t('admin2.equip_toast_measurement_failed'));
       } else {
-        toast.error('Ошибка измерения');
+        toast.error(t('admin2.equip_toast_measurement_failed'));
       }
     }
   };
@@ -180,14 +180,14 @@ const MedicalEquipmentManager = () => {
       const response = await api.post(`/medical-equipment/devices/${deviceId}/calibrate`);
       const data = response.data;
       if (data.success) {
-        toast.success('Калибровка завершена');
+        toast.success(t('admin2.equip_toast_calibrate_done'));
         loadDevices();
       } else {
-        toast.error(data.message || 'Ошибка калибровки');
+        toast.error(data.message || t('admin2.equip_toast_calibrate_failed'));
       }
     } catch (error) {
       logger.error('Ошибка калибровки:', error);
-      toast.error('Ошибка калибровки');
+      toast.error(t('admin2.equip_toast_calibrate_failed'));
     }
   };
 
@@ -196,10 +196,10 @@ const MedicalEquipmentManager = () => {
       const response = await api.post(`/medical-equipment/devices/${deviceId}/diagnostics`);
       const data = response.data;
       setSelectedDevice({ ...selectedDevice, diagnostics: data });
-      toast.success('Диагностика завершена');
+      toast.success(t('admin2.equip_toast_diagnostics_done'));
     } catch (error) {
       logger.error('Ошибка диагностики:', error);
-      toast.error('Ошибка диагностики');
+      toast.error(t('admin2.equip_toast_diagnostics_failed'));
     }
   };
 
@@ -217,12 +217,12 @@ const MedicalEquipmentManager = () => {
 
   const getStatusText = (status) => {
     switch (status) {
-      case 'online':return 'В сети';
-      case 'busy':return 'Занято';
-      case 'offline':return 'Не в сети';
-      case 'error':return 'Ошибка';
-      case 'maintenance':return 'Обслуживание';
-      case 'calibrating':return 'Калибровка';
+      case 'online':return t('admin2.equip_status_online');
+      case 'busy':return t('admin2.equip_status_busy');
+      case 'offline':return t('admin2.equip_status_offline');
+      case 'error':return t('admin2.equip_status_error');
+      case 'maintenance':return t('admin2.equip_status_maintenance');
+      case 'calibrating':return t('admin2.equip_status_calibrating');
       default:return status;
     }
   };
@@ -241,17 +241,17 @@ const MedicalEquipmentManager = () => {
 
   const getDeviceTypeName = (deviceType) => {
     switch (deviceType) {
-      case 'blood_pressure':return 'Тонометр';
-      case 'pulse_oximeter':return 'Пульсоксиметр';
-      case 'glucometer':return 'Глюкометр';
-      case 'thermometer':return 'Термометр';
-      case 'scale':return 'Весы';
-      case 'ecg':return 'ЭКГ';
-      case 'ultrasound':return 'УЗИ';
-      case 'xray':return 'Рентген';
-      case 'analyzer':return 'Анализатор';
-      case 'spirometer':return 'Спирометр';
-      case 'height_meter':return 'Ростомер';
+      case 'blood_pressure':return t('admin2.equip_type_blood_pressure');
+      case 'pulse_oximeter':return t('admin2.equip_type_pulse_oximeter');
+      case 'glucometer':return t('admin2.equip_type_glucometer');
+      case 'thermometer':return t('admin2.equip_type_thermometer');
+      case 'scale':return t('admin2.equip_type_scale');
+      case 'ecg':return t('admin2.equip_type_ecg');
+      case 'ultrasound':return t('admin2.equip_type_ultrasound');
+      case 'xray':return t('admin2.equip_type_xray');
+      case 'analyzer':return t('admin2.equip_type_analyzer');
+      case 'spirometer':return t('admin2.equip_type_spirometer');
+      case 'height_meter':return t('admin2.equip_type_height_meter');
       default:return deviceType;
     }
   };
@@ -263,16 +263,16 @@ const MedicalEquipmentManager = () => {
     return true;
   });
   const hasDeviceFilters = Boolean(filters.device_type || filters.status || filters.location.trim());
-  const devicesEmptyTitle = hasDeviceFilters ? 'Устройства по фильтрам не найдены' : 'Устройства ещё не добавлены';
+  const devicesEmptyTitle = hasDeviceFilters ? t('admin2.equip_empty_filtered_title') : t('admin2.equip_empty_title');
   const devicesEmptyDescription = hasDeviceFilters ?
-  'Измените тип, статус или расположение, чтобы увидеть другие устройства.' :
-  'Добавьте первое медицинское устройство, чтобы отслеживать его статус и измерения.';
+  t('admin2.equip_empty_filtered_desc') :
+  t('admin2.equip_empty_desc');
 
   const renderOverviewTab = () =>
   <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <h3 className="admin-section-h3-m0">
-          Обзор оборудования
+          {t('admin2.equip_overview_title')}
         </h3>
         <Button
         onClick={() => {loadDevices();loadOverview();}}
@@ -280,7 +280,7 @@ const MedicalEquipmentManager = () => {
         className="flex items-center justify-center gap-2">
         
           <RefreshCw size={16} />
-          {loading ? 'Загрузка...' : 'Обновить'}
+          {loading ? t('admin2.equip_loading') : t('admin2.equip_refresh')}
         </Button>
       </div>
 
@@ -291,7 +291,7 @@ const MedicalEquipmentManager = () => {
               {overview.total_devices}
             </div>
             <div className="admin-text-sm-secondary">
-              Всего устройств
+              {t('admin2.equip_stat_total_devices')}
             </div>
           </MacOSCard>
           <MacOSCard className="p-0">
@@ -299,7 +299,7 @@ const MedicalEquipmentManager = () => {
               {overview.online_devices}
             </div>
             <div className="admin-text-sm-secondary">
-              В сети
+              {t('admin2.equip_stat_online')}
             </div>
           </MacOSCard>
           <MacOSCard className="p-0">
@@ -307,7 +307,7 @@ const MedicalEquipmentManager = () => {
               {overview.offline_devices}
             </div>
             <div className="admin-text-sm-secondary">
-              Не в сети
+              {t('admin2.equip_stat_offline')}
             </div>
           </MacOSCard>
           <MacOSCard className="p-0">
@@ -315,7 +315,7 @@ const MedicalEquipmentManager = () => {
               {overview.total_measurements}
             </div>
             <div className="admin-text-sm-secondary">
-              Всего измерений
+              {t('admin2.equip_stat_total_measurements')}
             </div>
           </MacOSCard>
         </div> :
@@ -326,7 +326,7 @@ const MedicalEquipmentManager = () => {
       <div className="admin-grid-auto-300-24">
         <MacOSCard className="p-0">
           <h4 className="admin-rule-header mb-4">
-            Статистика по типам устройств
+            {t('admin2.equip_stat_by_type')}
           </h4>
           {overview?.device_types ?
         Object.entries(overview.device_types).map(([type, stats]) =>
@@ -347,7 +347,7 @@ const MedicalEquipmentManager = () => {
 
         <MacOSCard className="p-0">
           <h4 className="admin-rule-header mb-4">
-            Быстрые действия
+            {t('admin2.equip_quick_actions')}
           </h4>
           <div className="flex flex-col gap-3">
             <Button
@@ -356,7 +356,7 @@ const MedicalEquipmentManager = () => {
             className="admin-btn-justify-start">
             
               <Settings size={16} className="mr-2" />
-              Управление устройствами
+              {t('admin2.equip_quick_manage_devices')}
             </Button>
             <Button
             onClick={() => setActiveTab('measurements')}
@@ -364,7 +364,7 @@ const MedicalEquipmentManager = () => {
             className="admin-btn-justify-start">
             
               <BarChart3 size={16} className="mr-2" />
-              Просмотр измерений
+              {t('admin2.equip_quick_view_measurements')}
             </Button>
             <Button
             onClick={() => setActiveTab('measurement')}
@@ -372,7 +372,7 @@ const MedicalEquipmentManager = () => {
             className="admin-btn-justify-start">
             
               <Activity size={16} className="mr-2" />
-              Выполнить измерение
+              {t('admin2.equip_take_measurement')}
             </Button>
           </div>
         </MacOSCard>
@@ -383,10 +383,10 @@ const MedicalEquipmentManager = () => {
   const renderDevicesTab = () =>
   <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
-        <h3 className="admin-section-h3-m0">Устройства</h3>
+        <h3 className="admin-section-h3-m0">{t('admin2.equip_devices_title')}</h3>
         <Button onClick={loadDevices} disabled={loading}>
           <RefreshCw size={16} className="mr-2" />
-          {loading ? 'Загрузка...' : 'Обновить'}
+          {loading ? t('admin2.equip_loading') : t('admin2.equip_refresh')}
         </Button>
       </div>
 
@@ -394,19 +394,19 @@ const MedicalEquipmentManager = () => {
       <MacOSCard className="p-0">
         <div className="admin-grid-auto-200">
           <div>
-            <label htmlFor="device-type-filter" className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">Тип устройства</label>
+            <label htmlFor="device-type-filter" className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">{t('admin2.equip_filter_device_type')}</label>
             <Select
             id="device-type-filter"
             value={filters.device_type}
             onChange={(value) => setFilters({ ...filters, device_type: value })}
             options={[
-            { value: '', label: 'Все типы' },
-            { value: 'blood_pressure', label: 'Тонометр' },
-            { value: 'pulse_oximeter', label: 'Пульсоксиметр' },
-            { value: 'glucometer', label: 'Глюкометр' },
-            { value: 'thermometer', label: 'Термометр' },
-            { value: 'scale', label: 'Весы' },
-            { value: 'ecg', label: 'ЭКГ' }]
+            { value: '', label: t('admin2.equip_filter_all_types') },
+            { value: 'blood_pressure', label: t('admin2.equip_type_blood_pressure') },
+            { value: 'pulse_oximeter', label: t('admin2.equip_type_pulse_oximeter') },
+            { value: 'glucometer', label: t('admin2.equip_type_glucometer') },
+            { value: 'thermometer', label: t('admin2.equip_type_thermometer') },
+            { value: 'scale', label: t('admin2.equip_type_scale') },
+            { value: 'ecg', label: t('admin2.equip_type_ecg') }]
             }
             size="large" />
           
@@ -418,22 +418,22 @@ const MedicalEquipmentManager = () => {
             value={filters.status}
             onChange={(value) => setFilters({ ...filters, status: value })}
             options={[
-            { value: '', label: 'Все статусы' },
-            { value: 'online', label: 'В сети' },
-            { value: 'offline', label: 'Не в сети' },
-            { value: 'error', label: 'Ошибка' },
-            { value: 'busy', label: 'Занято' }]
+            { value: '', label: t('admin2.equip_filter_all_statuses') },
+            { value: 'online', label: t('admin2.equip_status_online') },
+            { value: 'offline', label: t('admin2.equip_status_offline') },
+            { value: 'error', label: t('admin2.equip_status_error') },
+            { value: 'busy', label: t('admin2.equip_status_busy') }]
             }
             size="large" />
           
           </div>
           <div>
-            <label htmlFor="location-filter" className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">Местоположение</label>
+            <label htmlFor="location-filter" className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">{t('admin2.equip_filter_location')}</label>
             <Input
             id="location-filter"
             value={filters.location}
             onChange={(e) => setFilters({ ...filters, location: e.target.value })}
-            placeholder="Поиск по местоположению" />
+            placeholder={t('admin2.equip_filter_location_ph')} />
           
           </div>
         </div>
@@ -459,10 +459,10 @@ const MedicalEquipmentManager = () => {
               </div>
 
               <div className="admin-flex-col-8-sm mb-4">
-                <div><strong>Производитель:</strong> {device.manufacturer}</div>
-                <div><strong>Модель:</strong> {device.model}</div>
-                <div><strong>Местоположение:</strong> {device.location || 'Не указано'}</div>
-                <div><strong>Серийный номер:</strong> {device.serial_number}</div>
+                <div><strong>{t('admin2.equip_field_manufacturer')}</strong> {device.manufacturer}</div>
+                <div><strong>{t('admin2.equip_field_model')}</strong> {device.model}</div>
+                <div><strong>{t('admin2.equip_field_location')}</strong> {device.location || t('admin2.equip_not_specified')}</div>
+                <div><strong>{t('admin2.equip_field_serial')}</strong> {device.serial_number}</div>
               </div>
 
               <div className="admin-flex-wrap-8">
@@ -473,7 +473,7 @@ const MedicalEquipmentManager = () => {
                 className="flex items-center justify-center">
                 
                     <Wifi size={16} className="mr-1" />
-                    Подключить
+                    {t('admin2.equip_action_connect')}
                   </Button> :
 
               <Button
@@ -483,7 +483,7 @@ const MedicalEquipmentManager = () => {
                 className="flex items-center justify-center">
                 
                     <WifiOff size={16} className="mr-1" />
-                    Отключить
+                    {t('admin2.equip_action_disconnect')}
                   </Button>
               }
 
@@ -494,7 +494,7 @@ const MedicalEquipmentManager = () => {
                 disabled={device.status !== 'online'}>
                 
                   <Wrench size={16} className="mr-1" />
-                  Калибровка
+                  {t('admin2.equip_action_calibrate')}
                 </Button>
 
                 <Button
@@ -503,7 +503,7 @@ const MedicalEquipmentManager = () => {
                 onClick={() => setSelectedDevice(device)}>
                 
                   <Settings size={16} className="mr-1" />
-                  Подробнее
+                  {t('admin2.equip_action_details')}
                 </Button>
               </div>
             </MacOSCard>);
@@ -523,19 +523,19 @@ const MedicalEquipmentManager = () => {
 
   const renderMeasurementTab = () =>
   <div className="flex flex-col gap-6">
-      <h3 className="admin-section-h3-m0">Выполнить измерение</h3>
+      <h3 className="admin-section-h3-m0">{t('admin2.equip_take_measurement')}</h3>
 
       <MacOSCard className="p-6">
         <div className="admin-grid-auto-300-24">
           <div className="flex flex-col gap-4">
             <div>
-              <label htmlFor="measurement-device" className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">Устройство</label>
+              <label htmlFor="measurement-device" className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">{t('admin2.equip_field_device')}</label>
               <Select
               id="measurement-device"
               value={measurementForm.device_id}
               onChange={(value) => setMeasurementForm({ ...measurementForm, device_id: value })}
               options={[
-              { value: '', label: 'Выберите устройство' },
+              { value: '', label: t('admin2.equip_select_device') },
               ...devices.
               filter((d) => d.status === 'online').
               map((device) => ({
@@ -548,12 +548,12 @@ const MedicalEquipmentManager = () => {
             </div>
 
             <div>
-              <label htmlFor="measurement-patient" className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">ID пациента (опционально)</label>
+              <label htmlFor="measurement-patient" className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">{t('admin2.equip_patient_id_label')}</label>
               <Input
               id="measurement-patient"
               value={measurementForm.patient_id}
               onChange={(e) => setMeasurementForm({ ...measurementForm, patient_id: e.target.value })}
-              placeholder="Введите ID пациента" />
+              placeholder={t('admin2.equip_patient_id_ph')} />
             
             </div>
 
@@ -563,12 +563,12 @@ const MedicalEquipmentManager = () => {
             className="w-full">
             
               <Activity size={16} className="mr-2" />
-              Выполнить измерение
+              {t('admin2.equip_take_measurement')}
             </Button>
           </div>
 
           <div className="flex flex-col gap-4">
-            <h4 className="admin-device-h4-base-med">Доступные устройства</h4>
+            <h4 className="admin-device-h4-base-med">{t('admin2.equip_available_devices')}</h4>
             <div className="flex flex-col gap-2">
               {devices.
             filter((d) => d.status === 'online').
@@ -580,7 +580,7 @@ const MedicalEquipmentManager = () => {
                         <DeviceIcon size={16} className="admin-icon-blue" />
                         <span className="admin-text-sm-primary">{device.name}</span>
                       </div>
-                      <Badge variant="success">Готов</Badge>
+                      <Badge variant="success">{t('admin2.equip_status_ready')}</Badge>
                     </div>);
 
             })}
@@ -589,8 +589,8 @@ const MedicalEquipmentManager = () => {
             {devices.filter((d) => d.status === 'online').length === 0 &&
           <MacOSEmptyState
             icon={WifiOff}
-            title="Нет доступных устройств"
-            description="Все устройства находятся в офлайн режиме" />
+            title={t('admin2.equip_no_available_devices_title')}
+            description={t('admin2.equip_no_available_devices_desc')} />
 
           }
           </div>
@@ -603,15 +603,15 @@ const MedicalEquipmentManager = () => {
     return (
       <div className="flex flex-col gap-6">
         <div className="flex items-center justify-between">
-          <h3 className="admin-section-h3-m0">История измерений</h3>
+          <h3 className="admin-section-h3-m0">{t('admin2.equip_history_title')}</h3>
           <div className="admin-flex-gap-8">
             <Button onClick={loadMeasurements} disabled={loading}>
               <RefreshCw size={16} className="mr-2" />
-              Обновить
+              {t('admin2.equip_refresh')}
             </Button>
             <Button variant="outline">
               <Download size={16} className="mr-2" />
-              Экспорт
+              {t('admin2.equip_export_btn')}
             </Button>
           </div>
         </div>
@@ -620,25 +620,25 @@ const MedicalEquipmentManager = () => {
         <MacOSCard className="p-0">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label htmlFor="measurements-device-type" className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">Тип устройства</label>
+              <label htmlFor="measurements-device-type" className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">{t('admin2.equip_filter_device_type')}</label>
               <Select
                 id="measurements-device-type"
                 value={filters.device_type}
                 onChange={(value) => setFilters({ ...filters, device_type: value })}
                 options={[
-                { value: '', label: 'Все типы' },
-                { value: 'blood_pressure', label: 'Тонометр' },
-                { value: 'pulse_oximeter', label: 'Пульсоксиметр' },
-                { value: 'glucometer', label: 'Глюкометр' },
-                { value: 'thermometer', label: 'Термометр' },
-                { value: 'scale', label: 'Весы' }]
+                { value: '', label: t('admin2.equip_filter_all_types') },
+                { value: 'blood_pressure', label: t('admin2.equip_type_blood_pressure') },
+                { value: 'pulse_oximeter', label: t('admin2.equip_type_pulse_oximeter') },
+                { value: 'glucometer', label: t('admin2.equip_type_glucometer') },
+                { value: 'thermometer', label: t('admin2.equip_type_thermometer') },
+                { value: 'scale', label: t('admin2.equip_type_scale') }]
                 }
                 size="large" />
               
             </div>
             <div className="admin-flex admin-flex-start-end">
               <Button onClick={loadMeasurements}>
-                Применить фильтры
+                {t('admin2.equip_apply_filters')}
               </Button>
             </div>
           </div>
@@ -657,22 +657,22 @@ const MedicalEquipmentManager = () => {
                     </span>
                     {measurement.quality_score &&
                   <Badge variant={measurement.quality_score > 0.8 ? 'success' : 'warning'}>
-                        Качество: {Math.round(measurement.quality_score * 100)}%
+                        {t('admin2.equip_quality', { score: Math.round(measurement.quality_score * 100) })}
                       </Badge>
                   }
                   </div>
 
                   <div className="admin-grid-auto-200">
                     <div>
-                      <strong>Устройство:</strong> {measurement.device_id}
+                      <strong>{t('admin2.equip_field_device')}</strong> {measurement.device_id}
                     </div>
                     {measurement.patient_id &&
                   <div>
-                        <strong>Пациент:</strong> {measurement.patient_id}
+                        <strong>{t('admin2.equip_field_patient')}</strong> {measurement.patient_id}
                       </div>
                   }
                     <div>
-                      <strong>Данные:</strong>
+                      <strong>{t('admin2.equip_field_data')}</strong>
                       <div className="text-sm admin-mt-4">
                         {measurement.measurements && Object.entries(measurement.measurements).map(([key, value]) =>
                       <div key={key}>
@@ -681,7 +681,7 @@ const MedicalEquipmentManager = () => {
                       )}
                         {!measurement.measurements &&
                       <div className="admin-italic-secondary">
-                            Данные недоступны
+                            {t('admin2.equip_no_data')}
                           </div>
                       }
                       </div>
@@ -695,7 +695,7 @@ const MedicalEquipmentManager = () => {
 
         {measurements.length === 0 && !loading &&
         <div className="text-center py-8 text-gray-500">
-            Измерения не найдены
+            {t('admin2.equip_measurements_empty')}
           </div>
         }
       </div>);
@@ -708,17 +708,17 @@ const MedicalEquipmentManager = () => {
         <Stethoscope size={24} color="var(--mac-accent)" />
         <div>
           <h2 className="admin-page-title">
-            Медицинское оборудование
+            {t('admin2.equip_page_title')}
           </h2>
           <p className="admin-page-subtitle">
-            Управление медицинскими устройствами и измерениями
+            {t('admin2.equip_page_subtitle')}
           </p>
         </div>
       </div>
 
       <div className="admin-tabs-scroll">
         <SegmentedControl
-          aria-label="Разделы медицинского оборудования"
+          aria-label={t('admin2.equip_tabs_aria')}
           value={activeTab}
           onChange={setActiveTab}
           options={[
@@ -727,7 +727,7 @@ const MedicalEquipmentManager = () => {
               label: (
                 <span className="admin-inline-flex-center-8">
                   <BarChart3 size={14} aria-hidden="true" />
-                  Обзор
+                  {t('admin2.equip_tab_overview')}
                 </span>
               )
             },
@@ -736,7 +736,7 @@ const MedicalEquipmentManager = () => {
               label: (
                 <span className="admin-inline-flex-center-8">
                   <Stethoscope size={14} aria-hidden="true" />
-                  Устройства
+                  {t('admin2.equip_tab_devices')}
                 </span>
               )
             },
@@ -745,7 +745,7 @@ const MedicalEquipmentManager = () => {
               label: (
                 <span className="admin-inline-flex-center-8">
                   <Activity size={14} aria-hidden="true" />
-                  Измерение
+                  {t('admin2.equip_tab_measurement')}
                 </span>
               )
             },
@@ -754,7 +754,7 @@ const MedicalEquipmentManager = () => {
               label: (
                 <span className="admin-inline-flex-center-8">
                   <History size={14} aria-hidden="true" />
-                  История
+                  {t('admin2.equip_tab_history')}
                 </span>
               )
             }
@@ -772,45 +772,45 @@ const MedicalEquipmentManager = () => {
       {selectedDevice &&
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
-            <h3 className="text-lg font-semibold mb-4">Подробности устройства</h3>
+            <h3 className="text-lg font-semibold mb-4">{t('admin2.equip_modal_title')}</h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
               <div className="space-y-3">
-                <div><strong>Название:</strong> {selectedDevice.name}</div>
-                <div><strong>Тип:</strong> {getDeviceTypeName(selectedDevice.device_type)}</div>
-                <div><strong>Производитель:</strong> {selectedDevice.manufacturer}</div>
-                <div><strong>Модель:</strong> {selectedDevice.model}</div>
-                <div><strong>Серийный номер:</strong> {selectedDevice.serial_number}</div>
-                <div><strong>Версия ПО:</strong> {selectedDevice.firmware_version}</div>
+                <div><strong>{t('admin2.equip_field_name')}</strong> {selectedDevice.name}</div>
+                <div><strong>{t('admin2.equip_field_type')}</strong> {getDeviceTypeName(selectedDevice.device_type)}</div>
+                <div><strong>{t('admin2.equip_field_manufacturer')}</strong> {selectedDevice.manufacturer}</div>
+                <div><strong>{t('admin2.equip_field_model')}</strong> {selectedDevice.model}</div>
+                <div><strong>{t('admin2.equip_field_serial')}</strong> {selectedDevice.serial_number}</div>
+                <div><strong>{t('admin2.equip_field_firmware')}</strong> {selectedDevice.firmware_version}</div>
               </div>
 
               <div className="flex flex-col gap-3">
                 <div className="flex items-center justify-center">
-                  <strong>Статус:</strong>
+                  <strong>{t('admin2.equip_field_status')}</strong>
                   <Badge variant={getStatusBadgeVariant(selectedDevice.status)} className="admin-ml-8">
                     {getStatusText(selectedDevice.status)}
                   </Badge>
                 </div>
-                <div><strong>Местоположение:</strong> {selectedDevice.location || 'Не указано'}</div>
-                <div><strong>Тип подключения:</strong> {selectedDevice.connection_type}</div>
+                <div><strong>{t('admin2.equip_field_location')}</strong> {selectedDevice.location || t('admin2.equip_not_specified')}</div>
+                <div><strong>{t('admin2.equip_field_connection_type')}</strong> {selectedDevice.connection_type}</div>
                 {selectedDevice.last_seen &&
-              <div><strong>Последняя активность:</strong> {new Date(selectedDevice.last_seen).toLocaleString()}</div>
+              <div><strong>{t('admin2.equip_field_last_seen')}</strong> {new Date(selectedDevice.last_seen).toLocaleString()}</div>
               }
                 {selectedDevice.calibration_date &&
-              <div><strong>Калибровка:</strong> {new Date(selectedDevice.calibration_date).toLocaleString()}</div>
+              <div><strong>{t('admin2.equip_field_calibration_date')}</strong> {new Date(selectedDevice.calibration_date).toLocaleString()}</div>
               }
               </div>
             </div>
 
             {selectedDevice.diagnostics &&
           <div className="mb-6">
-                <h4 className="font-medium mb-2">Результаты диагностики</h4>
+                <h4 className="font-medium mb-2">{t('admin2.equip_diagnostics_results')}</h4>
                 <div className="space-y-2">
                   {Object.entries(selectedDevice.diagnostics.tests).map(([test, result]) =>
               <div key={test} className="flex justify-between items-center p-2 bg-gray-50 rounded">
                       <span>{test}</span>
                       <Badge variant={result.passed ? 'success' : 'destructive'}>
-                        {result.passed ? 'Пройден' : 'Ошибка'}
+                        {result.passed ? t('admin2.equip_test_passed') : t('admin2.equip_test_failed')}
                       </Badge>
                     </div>
               )}
@@ -824,7 +824,7 @@ const MedicalEquipmentManager = () => {
               disabled={selectedDevice.status !== 'online'}>
               
                 <AlertTriangle size={16} className="mr-2" />
-                Диагностика
+                {t('admin2.equip_action_diagnostics')}
               </Button>
               <Button
               onClick={() => calibrateDevice(selectedDevice.id)}
@@ -832,13 +832,13 @@ const MedicalEquipmentManager = () => {
               variant="outline">
               
                 <Wrench size={16} className="mr-2" />
-                Калибровка
+                {t('admin2.equip_action_calibrate')}
               </Button>
               <Button
               variant="outline"
               onClick={() => setSelectedDevice(null)}>
               
-                Закрыть
+                {t('admin2.equip_action_close')}
               </Button>
             </div>
           </div>
