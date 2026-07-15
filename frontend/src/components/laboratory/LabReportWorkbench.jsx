@@ -36,6 +36,8 @@ import LabReportActionsBar from './LabReportActionsBar';
 import LabReportHistoryPanel from './LabReportHistoryPanel';
 // P-01 fix: AI-анализ перенесён из LabResultsManager в LabReportWorkbench.
 import LabReportAIAnalysis from './LabReportAIAnalysis';
+// STRAT#24: sections/fields editor extracted to ReportEditor component.
+import ReportEditor from './ReportEditor';
 // STRAT#1: state-логика вынесена в useLabReportState hook.
 // Компонент теперь содержит только handlers + JSX. Это уменьшает
 // god-компонент на ~200 строк и изолирует state для тестирования.
@@ -825,219 +827,24 @@ export default function LabReportWorkbench({
                 </Alert>
               )}
 
-              <div style={{ display: 'grid', gap: 'var(--mac-spacing-4)' }}>
-                {activeInstance.sections.map((section) => {
-                  const isCollapsed = collapsedSections.has(section.key);
-                  return (
-                  <div key={section.key} style={{ border: '1px solid var(--mac-border)', borderRadius: 'var(--mac-radius-xl)', overflow: 'hidden', background: 'var(--mac-bg-primary)' }}>
-                    {/* PR-64 / Medium-16: collapsible section header */}
-                    <div
-                      style={{ padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', background: 'var(--mac-bg-tertiary)', fontWeight: 'var(--mac-font-weight-semibold)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', userSelect: 'none' }}
-                      onClick={() => {
-                        setCollapsedSections((prev) => {
-                          const next = new Set(prev);
-                          if (next.has(section.key)) next.delete(section.key);
-                          else next.add(section.key);
-                          return next;
-                        });
-                      }}
-                      role="button"
-                      tabIndex={0}
-                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click(); } }}
-                      aria-expanded={!isCollapsed}
-                    >
-                      {section.title || section.key}
-                      {/* L-M-11 fix: заменены ▶/▼ (CJK punctuation) на lucide chevron icons
-                          для консистентности с LabTemplateWorkbench (там уже chevron.down/right). */}
-                      <Icon name={isCollapsed ? 'chevron.right' : 'chevron.down'} size={14} />
-                    </div>
-                    {!isCollapsed && (
-                    <div style={{ padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', display: 'grid', gap: '10px' }}>
-                      {section.fields.map((field) => {
-                        const choiceOptions = field.choice_options || [];
-                        const currentValue = draftValues[field.field_key] ?? '';
-                        // PR-65 / Medium-15: per-field comment
-                        const commentKey = `${field.field_key}__comment`;
-                        const currentComment = draftValues[commentKey] ?? '';
-
-                        return (
-                          <div
-                            key={field.field_key}
-                            className="lrw-field-row"
-                          >
-                            <div className="lrw-field-label">
-                              <strong className="lrw-field-label-name">{field.label}</strong>
-                              <div className="lrw-field-meta">
-                                <span>Норма: {field.reference_text || 'не задана'}</span>
-                                {field.resolved_flag_meta?.matched_threshold && (
-                                  <span>
-                                    Порог: {formatThreshold(field.resolved_flag_meta)}
-                                    {field.resolved_flag_source ? ` • ${field.resolved_flag_source}` : ''}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                            {/* PR-67 / High-9: previous-result trending — show last value from reportHistory */}
-                            {reportHistory.length > 1 && (() => {
-                              const prevReport = reportHistory[1]; // [0] = current, [1] = previous
-                              if (!prevReport?.sections) return null;
-                              let prevValue = null;
-                              for (const sec of prevReport.sections) {
-                                for (const f of (sec.fields || [])) {
-                                  if (f.field_key === field.field_key && f.value_text) {
-                                    prevValue = f.value_text;
-                                    break;
-                                  }
-                                }
-                                if (prevValue) break;
-                              }
-                              if (!prevValue) return null;
-                              const prevDate = prevReport.created_at ? new Date(prevReport.created_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) : '';
-                              return (
-                                <span style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)', whiteSpace: 'nowrap' }}>
-                                  ↗ {prevValue} {prevDate && `(${prevDate})`}
-                                </span>
-                              );
-                            })()}
-                            {field.value_type === 'choice' && choiceOptions.length > 0 ? (
-                              <select
-                                className="macos-input"
-                                value={currentValue}
-                                onChange={(event) => updateField(field.field_key, event.target.value)}
-                                disabled={!canEditActiveInstance}
-                              >
-                                <option value="">Выберите значение</option>
-                                {currentValue && !choiceOptions.includes(currentValue) && (
-                                  <option value={currentValue}>{currentValue}</option>
-                                )}
-                                {choiceOptions.map((option) => (
-                                  <option key={option} value={option}>
-                                    {option}
-                                  </option>
-                                ))}
-                              </select>
-                            ) : field.value_type === 'multiline' ? (
-                              <textarea
-                                className="macos-input"
-                                aria-label={`Результат: ${field.label}`}
-                                rows={3}
-                                value={currentValue}
-                                onChange={(event) => updateField(field.field_key, event.target.value)}
-                                disabled={!canEditActiveInstance}
-                              />
-                            ) : (
-                              <Input
-                                className="macos-input"
-                                aria-label={`Результат: ${field.label}`}
-                                value={currentValue}
-                                onChange={(event) => updateField(field.field_key, event.target.value)}
-                                disabled={!canEditActiveInstance}
-                                // PR-55: numeric input safety — type=number + inputMode=decimal + validation
-                                type={field.value_type === 'numeric' ? 'number' : 'text'}
-                                inputMode={field.value_type === 'numeric' ? 'decimal' : undefined}
-                                step={field.value_type === 'numeric' ? 'any' : undefined}
-                                onBlur={(event) => {
-                                  if (field.value_type !== 'numeric') return;
-                                  const val = event.target.value;
-                                  if (val === '' || val === null || val === undefined) return;
-                                  const parsed = parseFloat(val);
-                                  if (isNaN(parsed)) {
-                                    // L-M-1 fix: undo вместо безвозвратной потери данных.
-                                    // Раньше при некорректном numeric-вводе (например, "abc")
-                                    // onBlur сбрасывал поле в '' — данные терялись безвозвратно.
-                                    // Теперь показываем toast с кнопкой undo, которая
-                                    // восстанавливает предыдущее валидное значение.
-                                    const previousValue = draftValues[field.field_key] || '';
-                                    // STRAT#2: используем labToast.interactiveError вместо
-                                    // прямого toast.error — единая точка для future migration.
-                                    labToast.interactiveError(
-                                      `Некорректное числовое значение: "${val}". Поле возвращено к предыдущему значению.`,
-                                      {
-                                        autoClose: 6000,
-                                        onClick: () => {
-                                          updateField(field.field_key, previousValue);
-                                        },
-                                      }
-                                    );
-                                    updateField(field.field_key, previousValue);
-                                    return;
-                                  }
-                                  // PR-56: out-of-range confirmation
-                                  // Check if value exceeds matched_threshold (critical value)
-                                  const threshold = field.resolved_flag_meta?.matched_threshold;
-                                  if (threshold && threshold.value) {
-                                    const thresholdVal = parseFloat(threshold.value);
-                                    if (!isNaN(thresholdVal)) {
-                                      const op = threshold.operator;
-                                      let isCritical = false;
-                                      if (op === 'gt' && parsed > thresholdVal) isCritical = true;
-                                      else if (op === 'gte' && parsed >= thresholdVal) isCritical = true;
-                                      else if (op === 'lt' && parsed < thresholdVal) isCritical = true;
-                                      else if (op === 'lte' && parsed <= thresholdVal) isCritical = true;
-                                      if (isCritical) {
-                                        // STRAT#2: labToast.interactiveWarning для critical value
-                                        labToast.interactiveWarning(
-                                          `⚠ Критическое значение: ${field.label} = ${parsed} ${field.unit || ''} ` +
-                                          `(порог: ${op} ${thresholdVal}). Проверьте правильность ввода.`,
-                                          { autoClose: 8000 }
-                                        );
-                                      }
-                                    }
-                                  }
-                                  // Check if value is outside reference_text range (e.g., "120-160")
-                                  const refText = field.reference_text || '';
-                                  const rangeMatch = refText.match(/(\d+\.?\d*)\s*[-–]\s*(\d+\.?\d*)/);
-                                  if (rangeMatch) {
-                                    const low = parseFloat(rangeMatch[1]);
-                                    const high = parseFloat(rangeMatch[2]);
-                                    if (!isNaN(low) && !isNaN(high) && (parsed < low || parsed > high)) {
-                                      // STRAT#2: labToast.interactiveInfo для out-of-range
-                                      labToast.interactiveInfo(
-                                        `Значение ${parsed} вне референсного диапазона (${low}–${high}) для «${field.label}».`,
-                                        { autoClose: 5000 }
-                                      );
-                                    }
-                                  }
-                                }}
-                              />
-                            )}
-                            <div style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-sm)' }}>
-                              {field.unit || '—'}
-                            </div>
-                            <Badge variant={flagVariant(field.resolved_flag, field.resolved_flag_severity)}>
-                              {formatFlagLabel(field)}
-                            </Badge>
-                            {/* PR-60 / Low-32: was <span /> placeholder, now aria-hidden empty cell */}
-                            {field.required ? <Badge variant="warning">обязательное</Badge> : <span aria-hidden="true" />}
-                            {/* PR-65 / Medium-15: per-field comment input
-                                L-M-10 fix: убрана emoji 💬 из placeholder.
-                                На macOS emoji рендерится как цветной glyph,
-                                что ломает визуальную иерархию input'а. */}
-                            <input
-                              type="text"
-                              className="macos-input"
-                              placeholder="комментарий…"
-                              value={currentComment}
-                              onChange={(e) => updateField(commentKey, e.target.value)}
-                              disabled={!canEditActiveInstance}
-                              aria-label={`Комментарий к полю: ${field.label}`}
-                              style={{
-                                fontSize: 'var(--mac-font-size-xs)',
-                                padding: '4px 8px',
-                                minWidth: '100px',
-                                color: 'var(--mac-text-secondary)',
-                                fontStyle: currentComment ? 'normal' : 'italic',
-                              }}
-                            />
-                          </div>
-                        );
-                      })}
-                    </div>
-                    )}
-                  </div>
-                  );
-                })}
-              </div>
+              {/* STRAT#24: sections/fields editor extracted to ReportEditor component */}
+              <ReportEditor
+                activeInstance={activeInstance}
+                draftValues={draftValues}
+                collapsedSections={collapsedSections}
+                onToggleSection={(sectionKey) => {
+                  setCollapsedSections((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(sectionKey)) next.delete(sectionKey);
+                    else next.add(sectionKey);
+                    return next;
+                  });
+                }}
+                onUpdateField={updateField}
+                canEditActiveInstance={canEditActiveInstance}
+                reportHistory={reportHistory}
+                notify={notify}
+              />
             </div>
           )}
         </CardContent>

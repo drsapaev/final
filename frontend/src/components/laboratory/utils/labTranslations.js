@@ -113,6 +113,18 @@ const TRANSLATIONS = {
     // Critical findings (STRAT#19)
     critical_findings: 'Критические показатели',
     critical_findings_hint: 'Проверьте правильность ввода. Критические значения требуют внимания врача.',
+    // ReportEditor field-level (STRAT#24)
+    norm_label: 'Норма',
+    norm_not_set: 'не задана',
+    threshold_label: 'Порог',
+    select_value: 'Выберите значение',
+    result_label: 'Результат',
+    comment_placeholder: 'комментарий…',
+    comment_label: 'Комментарий к полю',
+    critical_value: 'Критическое значение',
+    check_input: 'Проверьте правильность ввода',
+    value: 'Значение',
+    out_of_range: 'вне референсного диапазона',
   },
 
   // ─── Actions bar ─────────────────────────────────────────────────────────
