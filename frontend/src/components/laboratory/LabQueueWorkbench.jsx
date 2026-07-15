@@ -10,6 +10,8 @@ import {
   formatSpecialtyLabel,
   getLabStatusVariant
 } from './labUiLabels';
+// STRAT#14: t() для i18n — filter/sort/title/badge labels мигрированы.
+import { t } from './utils/labTranslations';
 
 // P-05 fix: маскирование PII (номера телефона) в карточках очереди.
 // Лабораторное помещение — публичное пространство, экран видят другие
@@ -187,16 +189,16 @@ export default function LabQueueWorkbench({
         <CardHeader className="lqw-card-header">
           <CardTitle className="lqw-card-title">
             <Icon name="testtube.2" size={20} />
-            Очередь лаборатории
+            {t('queue.title')}
           </CardTitle>
           <div className="lqw-meta-row">
-            <Badge variant="info">Всего: {appointments.length}</Badge>
+            <Badge variant="info">{t('queue.total')}: {appointments.length}</Badge>
             <Badge variant="warning">
-              В работе: {appointments.filter((item) => activeQueueStatuses.has(item.status)).length}
+              {t('queue.in_progress')}: {appointments.filter((item) => activeQueueStatuses.has(item.status)).length}
             </Badge>
             <Button variant="outline" onClick={onRefresh} disabled={loading}>
               <Icon name="arrow.clockwise" size={16} />
-              Обновить
+              {t('common.refresh')}
             </Button>
           </div>
           {/* QW-8 fix: панель поиска и фильтра статусов. L-H-4: CSS-классы. */}
@@ -211,15 +213,15 @@ export default function LabQueueWorkbench({
                 type="search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Поиск по ФИО, телефону, ID…"
-                aria-label="Поиск по очереди лаборатории"
+                placeholder={t('queue.search_placeholder')}
+                aria-label={t('queue.search_aria')}
                 className="lqw-search-input"
               />
               {searchQuery && (
                 <button
                   type="button"
                   onClick={() => setSearchQuery('')}
-                  aria-label="Очистить поиск"
+                  aria-label={t('queue.search_clear')}
                   className="lqw-search-clear"
                 >
                   ×
@@ -228,13 +230,13 @@ export default function LabQueueWorkbench({
             </div>
             <div
               role="group"
-              aria-label="Фильтр по статусу"
+              aria-label={t('queue.filter_group_aria')}
               className="lqw-status-filter-group"
             >
               {[
-                { key: 'all',        label: 'Все' },
-                { key: 'active',     label: 'В работе' },
-                { key: 'completed',  label: 'Завершены' },
+                { key: 'all',        label: t('queue.filter_all') },
+                { key: 'active',     label: t('queue.filter_active') },
+                { key: 'completed',  label: t('queue.filter_completed') },
               ].map((opt) => (
                 <button
                   key={opt.key}
@@ -250,25 +252,25 @@ export default function LabQueueWorkbench({
           </div>
           {/* PR-64 / Medium-14: sort controls */}
           <div className="lqw-sort-row">
-            <span className="lqw-sort-label">Сортировать:</span>
+            <span className="lqw-sort-label">{t('queue.sort_label')}</span>
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              aria-label="Сортировка очереди"
+              aria-label={t('queue.sort_aria')}
               className="macos-input lqw-sort-select"
             >
-              <option value="default">По умолчанию</option>
-              <option value="name">По имени</option>
-              <option value="time">По времени</option>
+              <option value="default">{t('queue.sort_default')}</option>
+              <option value="name">{t('queue.sort_name')}</option>
+              <option value="time">{t('queue.sort_time')}</option>
             </select>
           </div>
           {/* QW-8 fix: индикатор количества отфильтрованных записей. */}
           {(searchQuery || statusFilter !== 'all') && (
             <div className="lqw-filter-count">
-              Показано: {filteredAppointments.length} из {appointments.length}
-              {searchQuery && ` · поиск: «${searchQuery}»`}
-              {statusFilter !== 'all' && ` · фильтр: ${
-                { active: 'в работе', completed: 'завершены' }[statusFilter]
+              {t('queue.filter_count')}: {filteredAppointments.length} / {appointments.length}
+              {searchQuery && ` · ${t('queue.filter_count_search')}: «${searchQuery}»`}
+              {statusFilter !== 'all' && ` · ${t('queue.filter_count_filter')}: ${
+                { active: t('queue.filter_active').toLowerCase(), completed: t('queue.filter_completed').toLowerCase() }[statusFilter]
               }`}
             </div>
           )}

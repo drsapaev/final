@@ -173,6 +173,7 @@ const TRANSLATIONS = {
     in_progress: 'В работе',
     show_more: 'Показать ещё',
     remaining: 'осталось',
+    loading: 'Загрузка…',
     no_entries: 'На сегодня не найдено лабораторных записей.',
     no_matches: 'Ничего не найдено. Измените поисковый запрос или фильтр.',
     filter_all: 'Все',
@@ -181,6 +182,15 @@ const TRANSLATIONS = {
     sort_default: 'По умолчанию',
     sort_name: 'По имени',
     sort_time: 'По времени',
+    sort_label: 'Сортировать:',
+    sort_aria: 'Сортировка очереди',
+    search_placeholder: 'Поиск по ФИО, телефону, ID…',
+    search_aria: 'Поиск по очереди лаборатории',
+    search_clear: 'Очистить поиск',
+    filter_group_aria: 'Фильтр по статусу',
+    filter_count: 'Показано',
+    filter_count_search: 'поиск',
+    filter_count_filter: 'фильтр',
   },
 
   // ─── Error messages ──────────────────────────────────────────────────────
