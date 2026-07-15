@@ -458,6 +458,35 @@ const TRANSLATIONS = {
     print_dialog_failed: 'Диалог печати не открылся, поэтому был загружен PDF-чек.',
     session_extending: 'Продлеваем сессию...',
   },
+
+  // ─── Cardiologist (STRAT#32) ─────────────────────────────────────────────
+  cardio: {
+    cancel_appointment_title: 'Отменить запись?',
+    cancel_appointment_message: 'Отменить запись пациента {name}?',
+    cancel_appointment_confirm: 'Отменить запись',
+    cancel_appointment_cancel: 'Не отменять',
+    session_expired: 'Сессия истекла. Пожалуйста, войдите снова.',
+    session_expired_short: 'Сессия истекла. Войдите в систему снова.',
+    select_patient_first: 'Сначала выберите пациента или визит кардиолога',
+    patient_card_load_failed: 'Не удалось загрузить карточку пациента, показаны данные из очереди',
+    no_visit_id: 'Не удалось определить канонический visit_id для пациента',
+    appointment_cancelled: 'Запись отменена',
+    emr_no_visit_id: 'Не удалось открыть EMR без канонического visit_id',
+    no_queue_id_for_visit: 'Невозможно начать приём без ID записи в очереди',
+    no_visit_id_for_complete: 'Не удалось завершить приём без канонического visit_id',
+    icd_added_from_ai: 'Код МКБ-10 добавлен из AI предложения',
+    diagnosis_added_from_ai: 'Диагноз добавлен из AI предложения',
+    visit_completed: 'Прием завершен успешно',
+    emr_v2_no_visit_id: 'Не указан visit_id для EMR v2',
+    emr_no_permission: 'Сессия истекла или нет прав на просмотр EMR. Войдите в систему снова.',
+    server_unavailable: 'Сервер недоступен. Попробуйте позже.',
+    blood_test_no_patient: 'Нельзя сохранить анализ без выбранного пациента',
+    blood_test_saved: 'Анализ крови сохранен успешно',
+    ecg_added: 'Запись ЭКГ добавлена в историю пациента',
+    ecg_save_failed: 'Не удалось сохранить запись ЭКГ. Проверьте соединение.',
+    settings_saved: 'Настройки сохранены',
+    session_extending: 'Продлеваем сессию...',
+  },
 };
 
 /**

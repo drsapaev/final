@@ -38,6 +38,8 @@ import { resolveCanonicalVisitId } from '../utils/canonicalVisit';
 import { getErrorMessage } from '../utils/errorHandler';
 import logger from '../utils/logger';
 import notify from '../services/notify';
+// STRAT#32: useTranslation adapter for confirm/notify i18n.
+import { useTranslation } from '../i18n/adapter';
 // QW-10 (UX audit): shared ConfirmDialog hook used before completing a visit.
 import { useConfirm } from '../components/common/ConfirmDialog';
 import RoleNotificationCenter from '../components/notifications/RoleNotificationCenter';
@@ -101,6 +103,8 @@ const MacOSCardiologistPanelUnified = () => {
   // QW-10 (UX audit): confirm hook used before completing a visit (prevents
   // accidental completion with empty diagnosis/treatment).
   const [confirm, confirmDialog] = useConfirm();
+  // STRAT#32: useTranslation adapter for confirm/notify i18n.
+  const { t: tI18n } = useTranslation();
   const [scheduleNextModal, setScheduleNextModal] = useState({ open: false, patient: null });
   const [editPatientModal, setEditPatientModal] = useState({ open: false, patient: null, loading: false });
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -128,7 +132,7 @@ const MacOSCardiologistPanelUnified = () => {
     onWarning: (expiresAt) => setSessionWarning({ expiresAt }),
     onExpired: () => {
       setSessionWarning(null);
-      notify.error('Сессия истекла. Пожалуйста, войдите снова.');
+      notify.error(tI18n('cardio.session_expired'));
       // Force a reload so the auth guard redirects to /login.
       if (typeof window !== 'undefined') {
         window.location.href = '/login';
@@ -320,7 +324,7 @@ const MacOSCardiologistPanelUnified = () => {
   const openBloodTestForm = () => {
     const { patientId } = getSelectedPatientContext();
     if (!patientId) {
-      notify.error('Сначала выберите пациента или визит кардиолога');
+      notify.error(tI18n('cardio.select_patient_first'));
       return;
     }
 
@@ -856,7 +860,7 @@ const MacOSCardiologistPanelUnified = () => {
         // Если не удалось загрузить, используем данные из row (частичные)
         const partialPatient = createPartialPatientFromRow(row);
         setEditPatientModal({ open: true, patient: partialPatient, loading: false });
-        notify.warning('Не удалось загрузить карточку пациента, показаны данные из очереди');
+        notify.warning(tI18n('cardio.patient_card_load_failed'));
         return;
       }
 
@@ -878,7 +882,7 @@ const MacOSCardiologistPanelUnified = () => {
       const appointmentId = row.appointment_id || null;
       const visitId = await ensureCanonicalVisitId(row);
       if (!visitId) {
-        notify.error('Не удалось определить канонический visit_id для пациента');
+        notify.error(tI18n('cardio.no_visit_id'));
         return;
       }
 
@@ -917,11 +921,11 @@ const MacOSCardiologistPanelUnified = () => {
   // but did nothing, leaving the doctor with no feedback.
   const handleCancelAppointment = async (row) => {
     const ok = await confirm({
-      title: 'Отменить запись?',
-      message: `Отменить запись пациента ${row?.patient_fio || row?.patient_name || ''}?`.trim(),
+      title: tI18n('cardio.cancel_appointment_title'),
+      message: tI18n('cardio.cancel_appointment_message', { name: (row?.patient_fio || row?.patient_name || '').trim() }),
       description: 'Запись будет помечена как отменённая. Пациент получит уведомление, если включено.',
-      confirmLabel: 'Отменить запись',
-      cancelLabel: 'Не отменять',
+      confirmLabel: tI18n('cardio.cancel_appointment_confirm'),
+      cancelLabel: tI18n('cardio.cancel_appointment_cancel'),
       intent: 'warning',
     });
     if (!ok) {
@@ -944,7 +948,7 @@ const MacOSCardiologistPanelUnified = () => {
         throw new Error(errorData?.detail || `HTTP ${response.status}`);
       }
 
-      notify.success('Запись отменена');
+      notify.success(tI18n('cardio.appointment_cancelled'));
       loadMacOSCardiologyAppointments(true);
     } catch (error) {
       logger.error('[Cardiology] Ошибка отмены записи:', error);
@@ -966,7 +970,7 @@ const MacOSCardiologistPanelUnified = () => {
           const appointmentId = row.appointment_id || null;
           const visitId = await ensureCanonicalVisitId(row);
           if (!visitId) {
-            notify.error('Не удалось открыть EMR без канонического visit_id');
+            notify.error(tI18n('cardio.emr_no_visit_id'));
             break;
           }
 
@@ -1002,7 +1006,7 @@ const MacOSCardiologistPanelUnified = () => {
           const queueEntryId = resolveDoctorQueueEntryId(row);
           if (queueEntryId === null) {
             logger.warn('[Cardiology] Cannot start visit without OnlineQueueEntry id', row);
-            notify.error('Невозможно начать приём без ID записи в очереди');
+            notify.error(tI18n('cardio.no_queue_id_for_visit'));
             break;
           }
           const token = tokenManager.getAccessToken();
@@ -1046,7 +1050,7 @@ const MacOSCardiologistPanelUnified = () => {
           try {
             const visitId = await ensureCanonicalVisitId(row);
             if (!visitId) {
-              notify.error('Не удалось завершить приём без канонического visit_id');
+              notify.error(tI18n('cardio.no_visit_id_for_complete'));
               break;
             }
             // Переходим на вкладку визита для завершения
@@ -1124,7 +1128,7 @@ const MacOSCardiologistPanelUnified = () => {
   const handleAISuggestion = (type, suggestion) => {
     if (type === 'icd10') {
       setVisitData({ ...visitData, icd10: suggestion });
-      notify.success('Код МКБ-10 добавлен из AI предложения');
+      notify.success(tI18n('cardio.icd_added_from_ai'));
       // P-020 (UX audit): immediately warn if the AI-suggested ICD-10 code
       // is a critical diagnosis, so the doctor can double-check before
       // completing the visit.
@@ -1137,7 +1141,7 @@ const MacOSCardiologistPanelUnified = () => {
       }
     } else if (type === 'diagnosis') {
       setVisitData({ ...visitData, diagnosis: suggestion });
-      notify.success('Диагноз добавлен из AI предложения');
+      notify.success(tI18n('cardio.diagnosis_added_from_ai'));
     }
   };
 
@@ -1215,7 +1219,7 @@ const MacOSCardiologistPanelUnified = () => {
       setLoading(true);
       const queueEntryId = resolveDoctorQueueEntryId(selectedPatient);
       if (queueEntryId === null) {
-        notify.error('Невозможно завершить приём без ID записи в очереди');
+        notify.error(tI18n('cardio.no_queue_id_for_visit'));
         return;
       }
 
@@ -1254,7 +1258,7 @@ const MacOSCardiologistPanelUnified = () => {
         notes: emrPayload.notes
       };
       await queueService.completeVisit(queueEntryId, visitPayload);
-      notify.success('Прием завершен успешно');
+      notify.success(tI18n('cardio.visit_completed'));
 
       // Очищаем форму и возвращаемся в очередь
       setSelectedPatient(null);
@@ -1301,14 +1305,14 @@ const MacOSCardiologistPanelUnified = () => {
   //   - Other → generic fallback via getErrorMessage
   const loadEMR = async (visitId) => {
     if (!visitId) {
-      notify.error('Не указан visit_id для EMR v2');
+      notify.error(tI18n('cardio.emr_v2_no_visit_id'));
       return null;
     }
 
     const token = tokenManager.getAccessToken();
     if (!token) {
       logger.warn('[Cardiology] loadEMR: no auth token, skipping EMR load', { visitId });
-      notify.error('Сессия истекла. Войдите в систему снова.');
+      notify.error(tI18n('cardio.session_expired_short'));
       return null;
     }
 
@@ -1335,14 +1339,14 @@ const MacOSCardiologistPanelUnified = () => {
 
       if (response.status === 401 || response.status === 403) {
         logger.warn('[Cardiology] loadEMR: auth denied', { visitId, status: response.status });
-        notify.error('Сессия истекла или нет прав на просмотр EMR. Войдите в систему снова.');
+        notify.error(tI18n('cardio.emr_no_permission'));
         setEmr(null);
         return null;
       }
 
       if (response.status >= 500) {
         logger.error('[Cardiology] loadEMR: server error', { visitId, status: response.status });
-        notify.error('Сервер недоступен. Попробуйте позже.');
+        notify.error(tI18n('cardio.server_unavailable'));
         setEmr(null);
         return null;
       }
@@ -1481,7 +1485,7 @@ const MacOSCardiologistPanelUnified = () => {
     const { patientId, visitId } = getSelectedPatientContext();
 
     if (!patientId) {
-      notify.error('Нельзя сохранить анализ без выбранного пациента');
+      notify.error(tI18n('cardio.blood_test_no_patient'));
       return;
     }
 
@@ -1513,7 +1517,7 @@ const MacOSCardiologistPanelUnified = () => {
         setShowForm({ open: false, type: 'blood' });
         setBloodTestForm(getEmptyBloodTestForm());
         await loadPatientData();
-        notify.success('Анализ крови сохранен успешно');
+        notify.success(tI18n('cardio.blood_test_saved'));
         return;
       }
 
@@ -1799,12 +1803,12 @@ const MacOSCardiologistPanelUnified = () => {
                     }),
                   }).then((response) => {
                     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                    notify.success('Запись ЭКГ добавлена в историю пациента');
+                    notify.success(tI18n('cardio.ecg_added'));
                     setShowForm({ open: false });
                     loadPatientData();
                   }).catch((err) => {
                     logger.error('[Cardiology] Ошибка сохранения ЭКГ:', err);
-                    notify.error('Не удалось сохранить запись ЭКГ. Проверьте соединение.');
+                    notify.error(tI18n('cardio.ecg_save_failed'));
                   });
                 }}
                 getEmptyBloodTestForm={getEmptyBloodTestForm}
@@ -1932,7 +1936,7 @@ const MacOSCardiologistPanelUnified = () => {
                     // Trigger a token refresh by making any API call —
                     // the api/client.js interceptor will refresh if needed.
                     // A simple page reload also works but is more disruptive.
-                    notify.info('Продлеваем сессию...');
+                    notify.info(tI18n('cardio.session_extending'));
                     loadMacOSCardiologyAppointments?.();
                   }}
                 >
@@ -1980,7 +1984,7 @@ const MacOSCardiologistPanelUnified = () => {
                 // localStorage on every change via useLocalStorage. The
                 // "Save" button gives the doctor explicit feedback that
                 // the values are stored.
-                notify.success('Настройки сохранены');
+                notify.success(tI18n('cardio.settings_saved'));
                 setSettingsOpen(false);
               }}><Save size={16} className="cardio-icon-mr" />Сохранить</Button>
             </div>
