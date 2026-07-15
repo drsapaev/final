@@ -3,6 +3,21 @@ import tokenManager from '../utils/tokenManager';
 
 const API_V1_BASE = getApiBaseUrl();
 
+/**
+ * UX-AUDIT-FIX12: добавлена поддержка AbortSignal во все запросы.
+ *
+ * Ранее request() не принимал signal — вызовы не отменялись при unmount
+ * компонента или смене активной записи. LabPanel.jsx уже имел хелпер
+ * isAbortLikeError() для толерантности к abort-ошибкам, но никто не
+ * передавал signal. Теперь:
+ *   1) request() принимает options.signal и пробрасывает в fetch.
+ *   2) Каждый метод labReportingApi пробрасывает signal из options.
+ *   3) Вызывающий код (useEffect с cleanup) может создавать
+ *      AbortController и отменять запрос при unmount/смене dep.
+ *
+ * Соответствует Nielsen Heuristic #5 (Error Prevention) — предотвращает
+ * setState-after-unmark race conditions и уменьшает сетевой шум.
+ */
 async function request(path, options = {}) {
   const token = tokenManager.getAccessToken();
   const headers = {
@@ -13,7 +28,10 @@ async function request(path, options = {}) {
 
   const response = await fetch(`${API_V1_BASE}${path}`, {
     ...options,
-    headers
+    headers,
+    // UX-AUDIT-FIX12: пробрасываем signal в fetch, если передан.
+    // Если signal уже отменён — fetch выбросит AbortError сразу.
+    ...(options.signal ? { signal: options.signal } : {})
   });
 
   if (!response.ok) {
