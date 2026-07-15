@@ -1,3 +1,4 @@
+import { t } from '../i18n/adapter';
 import { useState, useEffect } from 'react';
 import { api } from '../api/client';
 import logger from '../utils/logger';
@@ -99,7 +100,7 @@ const TwoFactorSettings = () => {
       message: 'Перегенерировать backup-коды?',
       description: 'Старые коды станут недействительными.',
       confirmLabel: 'Перегенерировать',
-      cancelLabel: 'Отмена',
+      cancelLabel: t('misc.cancel'),
       intent: 'warning',
     });
     if (!ok) {
@@ -128,7 +129,7 @@ const TwoFactorSettings = () => {
       message: 'Отозвать доверие к этому устройству?',
       description: 'При следующем входе потребуется повторная 2FA-верификация.',
       confirmLabel: 'Отозвать',
-      cancelLabel: 'Отмена',
+      cancelLabel: t('misc.cancel'),
       intent: 'warning',
     });
     if (!ok) {

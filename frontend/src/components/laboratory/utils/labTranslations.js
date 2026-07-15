@@ -692,6 +692,100 @@ const TRANSLATIONS = {
     col_date: 'Дата',
     col_actions: 'Действия',
   },
+  // ─── Misc remaining (STRAT#40-45) ────────────────────────────────────────
+  misc: {
+    // Common patterns
+    delete: 'Удалить',
+    cancel: 'Отмена',
+    close: 'Закрыть',
+    save: 'Сохранить',
+    confirm: 'Подтвердить',
+    yes: 'Да',
+    no: 'Нет',
+    // FileManager
+    file_delete_title: 'Удаление файла',
+    file_delete_message: 'Удалить файл?',
+    file_rename_title: 'Переименование файла',
+    file_move_title: 'Перемещение файла',
+    file_create_folder_title: 'Создание папки',
+    file_upload_error: 'Ошибка загрузки файла',
+    file_delete_error: 'Ошибка удаления файла',
+    file_rename_error: 'Ошибка переименования файла',
+    // ModernQueueManager
+    queue_delete_title: 'Удаление очереди',
+    queue_delete_message: 'Удалить очередь?',
+    queue_create_title: 'Создание очереди',
+    queue_edit_title: 'Редактирование очереди',
+    queue_reset_title: 'Сброс очереди',
+    queue_reset_message: 'Сбросить очередь?',
+    // TwoFactor
+    twofactor_disable_title: 'Отключение 2FA',
+    twofactor_disable_message: 'Вы уверены, что хотите отключить двухфакторную аутентификацию?',
+    twofactor_enable_title: 'Включение 2FA',
+    twofactor_verify_title: 'Проверка кода',
+    twofactor_backup_title: 'Резервные коды',
+    twofactor_regenerate_title: 'Регенерация кодов',
+    // Settings
+    settings_save_title: 'Сохранение настроек',
+    settings_reset_title: 'Сброс настроек',
+    settings_reset_message: 'Сбросить все настройки?',
+    settings_export_title: 'Экспорт настроек',
+    // ECGViewer
+    ecg_load_error: 'Ошибка загрузки ЭКГ',
+    ecg_parse_error: 'Ошибка парсинга ЭКГ',
+    ecg_save_error: 'Ошибка сохранения ЭКГ',
+    ecg_delete_error: 'Ошибка удаления ЭКГ',
+    ecg_print_error: 'Ошибка печати ЭКГ',
+    // PhotoUploader
+    photo_upload_error: 'Ошибка загрузки фото',
+    photo_delete_error: 'Ошибка удаления фото',
+    photo_resize_error: 'Ошибка изменения размера',
+    photo_format_error: 'Неподдерживаемый формат',
+    photo_size_error: 'Размер файла превышает лимит',
+    // PriceOverrideManager
+    price_override_title: 'Изменение цены',
+    price_override_message: 'Изменить цену услуги?',
+    price_override_error: 'Ошибка изменения цены',
+    // AI
+    ai_send_error: 'Ошибка отправки запроса',
+    ai_response_error: 'Ошибка получения ответа',
+    ai_cancel_title: 'Отмена запроса',
+    // EmailSMSManager
+    email_send_title: 'Отправка email',
+    sms_send_title: 'Отправка SMS',
+    email_send_error: 'Ошибка отправки email',
+    // EMR
+    emr_discard_title: 'Отмена изменений',
+    emr_discard_message: 'Отменить несохранённые изменения?',
+    emr_template_delete_title: 'Удаление шаблона',
+    // VisitTimeline
+    visit_delete_title: 'Удаление визита',
+    visit_edit_title: 'Редактирование визита',
+    visit_complete_title: 'Завершение визита',
+    visit_cancel_title: 'Отмена визита',
+    visit_reschedule_title: 'Перенос визита',
+    // AppointmentFlow
+    appointment_cancel_title: 'Отмена записи',
+    appointment_create_title: 'Создание записи',
+    appointment_edit_title: 'Редактирование записи',
+    appointment_delete_title: 'Удаление записи',
+    // WelcomeView
+    welcome_start_work: 'Начать работу',
+    // PaymentSuccess
+    payment_success_message: 'Платёж успешно завершён',
+    // Misc
+    unsaved_changes: 'Несохранённые изменения',
+    close_without_saving: 'Закрыть без сохранения',
+    confirm_delete: 'Вы уверены?',
+    operation_error: 'Ошибка операции',
+    connection_error: 'Ошибка соединения',
+    data_saved: 'Данные сохранены',
+    data_deleted: 'Данные удалены',
+    data_updated: 'Данные обновлены',
+    loading: 'Загрузка...',
+    no_data: 'Нет данных',
+    search_placeholder: 'Поиск...',
+  },
 };
 
 /**

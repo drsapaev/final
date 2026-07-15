@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import ModernDialog from '../dialogs/ModernDialog';
@@ -229,7 +230,7 @@ const ModernQueueManager = ({
         'После открытия приёма онлайн-запись через QR будет закрыта — ' +
         'новые пациенты не смогут записаться онлайн.',
       confirmLabel: 'Открыть приём',
-      cancelLabel: 'Отмена',
+      cancelLabel: t('misc.cancel'),
       intent: 'warning',
     });
     if (!confirmed) {
@@ -272,7 +273,7 @@ const ModernQueueManager = ({
       description:
         'Онлайн-запись через QR будет открыта — новые пациенты смогут записаться онлайн.',
       confirmLabel: 'Закрыть приём',
-      cancelLabel: 'Отмена',
+      cancelLabel: t('misc.cancel'),
       intent: 'primary',
     });
     if (!confirmed) {

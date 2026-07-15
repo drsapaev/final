@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import {
@@ -90,7 +91,7 @@ function PatientFormsPreview({ status, preview, error, initData }) {
         message: 'После отправки изменения будут заблокированы.',
         description: 'Для редактирования отправленной анкеты потребуется обратиться в клинику. Действие нельзя отменить.',
         confirmLabel: 'Отправить',
-        cancelLabel: 'Отмена',
+        cancelLabel: t('misc.cancel'),
         intent: 'primary',
       });
       if (!ok) return;

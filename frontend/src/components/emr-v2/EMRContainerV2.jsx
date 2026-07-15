@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 /**
  * EMRContainerV2 - Modular EMR container using v2 sections
  * 
@@ -418,7 +419,7 @@ export function EMRContainerV2({ visitId, patientId, specialty, ICD10Component }
             message: 'Подписать ЭМК?',
             description: 'После подписания редактирование возможно только через поправку.',
             confirmLabel: 'Подписать',
-            cancelLabel: 'Отмена',
+            cancelLabel: t('misc.cancel'),
             intent: 'primary',
         });
         if (!ok) {

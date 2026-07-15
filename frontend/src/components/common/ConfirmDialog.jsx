@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 /**
  * Shared ConfirmDialog component + useConfirm hook.
  *
@@ -24,8 +25,8 @@
  *   const ok = await confirm({
  *     title: 'Удаление пациента',
  *     message: `Удалить пациента ${name}? Действие необратимо.`,
- *     confirmLabel: 'Удалить',
- *     cancelLabel: 'Отмена',
+ *     confirmLabel: t('misc.delete'),
+ *     cancelLabel: t('misc.cancel'),
  *     intent: 'danger',  // 'danger' | 'warning' | 'primary'
  *   });
  *   if (ok) await deletePatient(id);
@@ -233,7 +234,7 @@ export function ConfirmDialog({
  *       title: 'Удалить пациента?',
  *       message: 'Действие необратимо.',
  *       intent: 'danger',
- *       confirmLabel: 'Удалить',
+ *       confirmLabel: t('misc.delete'),
  *     });
  *     if (ok) await api.delete(`/patients/${id}`);
  *   }

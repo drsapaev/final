@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 import { api } from '../../api/client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -355,8 +356,8 @@ const FileManager = () => {
       title: 'Удаление файла',
       message: 'Удалить этот файл?',
       description: 'Это действие необратимо.',
-      confirmLabel: 'Удалить',
-      cancelLabel: 'Отмена',
+      confirmLabel: t('misc.delete'),
+      cancelLabel: t('misc.cancel'),
       intent: 'danger',
     });
     if (!ok) return;
