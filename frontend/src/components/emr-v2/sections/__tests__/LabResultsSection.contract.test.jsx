@@ -46,4 +46,26 @@ describe('LabResultsSection UX-AUDIT-FIX6 — migrate lucide-react to macos Icon
     expect(iconSource).toContain("'square.and.arrow.down'");
     expect(iconSource).toContain('UX-AUDIT-FIX6');
   });
+
+  it('UX-AUDIT-FIX9: requires confirm dialog before creating lab order', () => {
+    // FIX9: handleOrder ранее мгновенно создавал заказ через
+    // labReportingApi.createOrder без подтверждения. Теперь обёрнут в
+    // useConfirm() — соответствует Nielsen Heuristic #5 (Error Prevention).
+    expect(source).toContain("from '../../common/ConfirmDialog'");
+    expect(source).toContain('useConfirm');
+
+    // Ищем функцию handleOrder
+    const fnStart = source.indexOf('const handleOrder = async (templateId, templateName) => {');
+    expect(fnStart).toBeGreaterThan(-1);
+    const fnEnd = source.indexOf('\n  };', fnStart);
+    const fnBody = source.slice(fnStart, fnEnd);
+
+    expect(fnBody).toContain('await confirm(');
+    expect(fnBody).toContain("'Заказать анализы?'");
+    expect(fnBody).toContain('if (!ok) return;');
+    // createOrder должен вызываться ПОСЛЕ confirm
+    const confirmIdx = fnBody.indexOf('await confirm(');
+    const createIdx = fnBody.indexOf('labReportingApi.createOrder(');
+    expect(createIdx).toBeGreaterThan(confirmIdx);
+  });
 });
