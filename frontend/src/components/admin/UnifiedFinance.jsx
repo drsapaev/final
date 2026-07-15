@@ -7,9 +7,11 @@ import DiscountBenefitsManager from './DiscountBenefitsManager';
 import AdminFinanceOverview from './AdminFinanceOverview';
 import ErrorBoundary from '../common/ErrorBoundary';
 import { MacOSTab } from '../ui/macos';
+import { useTranslation } from '../../i18n/adapter';
 
 
 const UnifiedFinance = ({ renderFinance }) => {
+  const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const section = searchParams.get('section') || 'finance';
 

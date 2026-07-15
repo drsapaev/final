@@ -5,8 +5,10 @@ import {
   AppEmpty, AppError, AppLoading, Button,
 } from '../components/ui/macos';
 import auth from '../stores/auth.js';
+import { useTranslation } from '../i18n/adapter';
 
 export default function Health() {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [health, setHealth] = useState(null);
   const [act, setAct] = useState(null);

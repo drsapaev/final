@@ -9,6 +9,7 @@
 import { memo } from 'react';
 import PropTypes from 'prop-types';
 import { Icon } from '../../components/ui/macos';
+import { useTranslation } from '../../i18n/adapter';
 
 const DataSourceIndicator = memo(({ dataSource, count, paginationInfo, onRetry }) => {
   // QW-03 fix: 'demo' state replaced with 'error' state — no more fake data.

@@ -7,8 +7,10 @@ import {
 import { api } from '../api/client.js';
 import { getActivationStatus } from '../api';
 import { useTheme } from '../contexts/ThemeContext';
+import { useTranslation } from '../i18n/adapter';
 
 export default function Activation() {void
+  const { t } = useTranslation();
   useTheme();
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState(null);
@@ -99,7 +101,7 @@ export default function Activation() {void
         }
 
         <section className="mb-6">
-          <h2 className="text-lg font-medium mb-2">Статус</h2>
+          <h2 className="text-lg font-medium mb-2">{t('common.status')}</h2>
           {loading ?
           <AppLoading
             size="sm"
@@ -133,7 +135,7 @@ export default function Activation() {void
                     <tr>
                       <th className="text-left px-3 py-2 border-b">ID</th>
                       <th className="text-left px-3 py-2 border-b">Имя</th>
-                      <th className="text-left px-3 py-2 border-b">Статус</th>
+                      <th className="text-left px-3 py-2 border-b">{t('common.status')}</th>
                       <th className="text-left px-3 py-2 border-b">Обновлён</th>
                     </tr>
                   </thead>

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import TelegramManager from '../components/telegram/TelegramManager';
 import {
+import { useTranslation } from '../i18n/adapter';
   MessageSquare,
   Bot,
   Settings,
@@ -21,6 +22,7 @@ import {
  * Централизованное управление ботом и уведомлениями
  */
 const TelegramPage = () => {void
+  const { t } = useTranslation();
   useTheme();
   const [activeTab, setActiveTab] = useState('overview');
 

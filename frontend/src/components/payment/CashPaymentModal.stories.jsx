@@ -5,6 +5,7 @@
  * Shows states: default (cash method), with change due, insufficient funds.
  */
 import CashPaymentModal from './CashPaymentModal';
+import { useTranslation } from '../../i18n/adapter';
 
 export default {
   title: 'Payment/CashPaymentModal',

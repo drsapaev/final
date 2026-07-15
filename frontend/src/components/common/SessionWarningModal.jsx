@@ -1,4 +1,5 @@
 import { Button } from '../ui/macos';
+import { useTranslation } from '../../i18n/adapter';
 
 /**
  * SessionWarningModal — shared session expiry warning (Sprint 10).
@@ -8,6 +9,7 @@ import { Button } from '../ui/macos';
  * consistent styling and dark mode support.
  */
 const SessionWarningModal = ({ visible, onDismiss, onExtend }) => {
+  const { t } = useTranslation();
   if (!visible) return null;
 
   return (

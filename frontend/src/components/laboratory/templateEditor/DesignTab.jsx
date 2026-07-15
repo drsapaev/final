@@ -1,11 +1,13 @@
 import PropTypes from 'prop-types';
 import { layoutOptions, brandingFieldLabels } from './config';
+import { useTranslation } from '../../../i18n/adapter';
 
 /**
  * L-H-6 fix: DesignTab выделен в отдельный файл (~50 строк).
  * Вкладка «Оформление» — макет печати, подвал, брендирование.
  */
 function DesignTab({ draftVersion, onUpdateLayout, onUpdateFooter, onUpdateBranding }) {
+  const { t } = useTranslation();
   return (
     <div className="ltw-grid-18">
       <div className="ltw-grid-2-minmax">

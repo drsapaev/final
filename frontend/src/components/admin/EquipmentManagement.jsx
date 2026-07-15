@@ -31,6 +31,7 @@ import {
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
+import { useTranslation } from '../../i18n/adapter';
 
 const emptyEquipmentStats = {
   total_equipment: 0,
@@ -40,6 +41,7 @@ const emptyEquipmentStats = {
 };
 
 const deriveEquipmentStats = (equipmentList) => {
+  const { t } = useTranslation();
   const nextEquipment = Array.isArray(equipmentList) ? equipmentList : [];
   return {
     total_equipment: nextEquipment.length,

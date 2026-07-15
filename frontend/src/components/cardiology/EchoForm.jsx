@@ -25,6 +25,7 @@ import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
+import { useTranslation } from '../../i18n/adapter';
 
 const DEFAULT_ECHO_DATA = {
   // Левый желудочек
@@ -80,6 +81,7 @@ const DEFAULT_ECHO_DATA = {
 };
 
 function deepMerge(base, incoming) {
+  const { t } = useTranslation();
   if (!incoming || typeof incoming !== 'object' || Array.isArray(incoming)) {
     return base;
   }

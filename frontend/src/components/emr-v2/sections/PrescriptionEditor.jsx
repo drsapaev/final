@@ -13,6 +13,7 @@ import PropTypes from 'prop-types';
 import { Plus, Trash2, Pill } from 'lucide-react';
 import './PrescriptionEditor.css';
 import { Input } from '../../ui/macos';
+import { useTranslation } from '../../../i18n/adapter';
 
 // Mock DB препаратов
 const MOCK_DRUGS = [

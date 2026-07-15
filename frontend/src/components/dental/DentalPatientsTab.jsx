@@ -7,6 +7,7 @@ import { Card, Button } from '../ui/macos';
 import { Scissors, FileText, Eye } from 'lucide-react';
 // P0 fix: 'Tooth' is not exported by lucide-react. Use Stethoscope as alias (matches DentistPanelUnified.jsx:42).
 import { Stethoscope as Tooth } from 'lucide-react';
+import { useTranslation } from '../../i18n/adapter';
 
 export function DentalPatientsTab({
   patients = [],

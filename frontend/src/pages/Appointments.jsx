@@ -8,7 +8,9 @@ import {
 import { api } from '../api/client.js';
 
 import logger from '../utils/logger';
+import { useTranslation } from '../i18n/adapter';
 function todayStr() {
+  const { t } = useTranslation();
   const d = new Date();
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -149,10 +151,10 @@ export default function Appointments() {
               <thead>
                 <tr>
                   <th>ID</th>
-                  <th>Пациент</th>
-                  <th>Врач</th>
-                  <th>Время</th>
-                  <th>Статус</th>
+                  <th>{t('common.patient')}</th>
+                  <th>{t('common.doctor')}</th>
+                  <th>{t('common.time')}</th>
+                  <th>{t('common.status')}</th>
                 </tr>
               </thead>
               <tbody>

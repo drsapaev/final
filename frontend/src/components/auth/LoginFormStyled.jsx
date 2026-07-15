@@ -7,7 +7,6 @@ import { setProfile } from '../../stores/auth';
 import { getRouteForProfile } from '../../constants/routes';
 import { getCanonicalRouteById, getEffectiveRouteByPath } from '../../routing/routeSelectors.js';
 import { useSetupStatus } from '../../hooks/useSetupStatus.js';
-import { useTranslation } from '../../hooks/useTranslation.jsx';
 import { colors } from '../../theme/tokens';
 import { BRAND } from '../../config/brand';
 import TwoFactorVerify from '../TwoFactorVerify.jsx';
@@ -17,6 +16,7 @@ import {
   Button, Card, CardHeader, CardTitle, CardContent, Input, Checkbox, Alert,
 } from '../ui/macos';
 import logger from '../../utils/logger';
+import { useTranslation } from '../../i18n/adapter';
 
 const landingRoute = getCanonicalRouteById('landing')?.path || '/';
 const loginRoute = getCanonicalRouteById('login')?.path || '/login';
@@ -32,6 +32,7 @@ const setupRoute = getCanonicalRouteById('setup')?.path || '/setup';
 // `void useTheme();` заменён на нормальный вызов — мы подписываемся
 // на смену темы, чтобы карточка логина перерисовывалась.
 const LoginFormStyled = () => {
+  const { t } = useTranslation();
   // UX Audit: useTheme — используем isDark для conditional styles.
   const { isDark } = useTheme();
   const navigate = useNavigate();

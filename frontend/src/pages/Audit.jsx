@@ -4,12 +4,14 @@ import { api } from '../api/client.js';
 import {
   AppEmpty, AppError, AppLoading, Button, Card, CardContent, CardHeader, Input,
 } from '../components/ui/macos';
+import { useTranslation } from '../i18n/adapter';
 
 /**
  * Аудит: список последних действий пользователей.
  * Совместимо с GET /audit?limit=...&offset=...
  */
 export default function Audit() {
+  const { t } = useTranslation();
   const [rows, setRows] = useState([]);
   const [limit, setLimit] = useState(100);
   const [q, setQ] = useState('');
@@ -160,7 +162,7 @@ export default function Audit() {
               <caption id={tableCaptionId} style={visuallyHiddenStyle}>Журнал аудита</caption>
               <thead>
                 <tr>
-                  <th>Время</th>
+                  <th>{t('common.time')}</th>
                   <th>Пользователь</th>
                   <th>Действие</th>
                   <th>Сущность</th>

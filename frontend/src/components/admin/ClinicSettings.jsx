@@ -31,8 +31,10 @@ import {
   Textarea,
   Checkbox,
 } from '../ui/macos';
+import { useTranslation } from '../../i18n/adapter';
 
 const ClinicSettings = () => {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState({

@@ -43,7 +43,9 @@ import {
 
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
+import { useTranslation } from '../../i18n/adapter';
 const ProcedureTemplates = ({ onSelectProcedure }) => {
+  const { t } = useTranslation();
   const [templates, setTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -485,7 +487,7 @@ const ProcedureTemplates = ({ onSelectProcedure }) => {
             </Grid>
             
             <Grid item xs={12}>
-              <div style={{ fontSize: 12, color: 'var(--mac-text-secondary)', marginBottom: 6 }}>Описание</div>
+              <div style={{ fontSize: 12, color: 'var(--mac-text-secondary)', marginBottom: 6 }}>{t('common.description')}</div>
               <Textarea
                 value={templateForm.description}
                 onChange={(e) => setTemplateForm({ ...templateForm, description: e.target.value })}

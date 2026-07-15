@@ -29,6 +29,7 @@ import {
   formatRegistrarTime,
   getRegistrarTimestampDisplay,
 } from '../../utils/dateUtils';
+import { useTranslation } from '../../i18n/adapter';
 
 const QUEUE_ACTION_ALIASES = {
   call: ['call'],
@@ -37,6 +38,7 @@ const QUEUE_ACTION_ALIASES = {
 };
 
 const hasBackendQueueAction = (entry, action, flagName) => {
+  const { t } = useTranslation();
   if (flagName && entry?.[flagName] === true) {
     return true;
   }

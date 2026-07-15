@@ -26,6 +26,7 @@ import {
   Button,
   Input,
 } from '../ui/macos';
+import { useTranslation } from '../../i18n/adapter';
 
 const accentGradients = {
   info: 'linear-gradient(135deg, var(--mac-accent), color-mix(in srgb, var(--mac-accent), white 18%))',
@@ -58,6 +59,7 @@ const toneChipStyles = {
 };
 
 function MetricCard({ accent, icon: Icon, label, value }) {
+  const { t } = useTranslation();
   return (
     <div
       className="theme-soft-surface"

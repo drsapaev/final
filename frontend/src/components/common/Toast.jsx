@@ -2,6 +2,7 @@
 import PropTypes from 'prop-types';
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useTranslation } from '../../i18n/adapter';
 
 
 // Контекст для уведомлений
@@ -12,6 +13,7 @@ let addToastExternal = null;
  * Провайдер контекста уведомлений
  */
 export function ToastProvider({ children }) {
+  const { t } = useTranslation();
   const [toasts, setToasts] = useState([]);
   const theme = useTheme();
 

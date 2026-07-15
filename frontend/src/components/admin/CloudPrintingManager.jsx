@@ -23,6 +23,7 @@ import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
+import { useTranslation } from '../../i18n/adapter';
 
 const PROVIDER_LABELS = {
   mock: 'Mock (Тестовый)',
@@ -34,6 +35,7 @@ const PROVIDER_LABELS = {
 const getProviderLabel = (provider) => PROVIDER_LABELS[provider] || provider;
 
 const getStatusText = (status) => {
+  const { t } = useTranslation();
   switch (status) {
     case 'online': return 'В сети';
     case 'busy': return 'Занят';
@@ -561,7 +563,7 @@ const CloudPrintingManager = () => {
                 placeholder="Возраст" />
               </div>
               <div>
-                <label htmlFor="patient-phone" className="admin-label-block-sm-med-primary-mb-8">Телефон</label>
+                <label htmlFor="patient-phone" className="admin-label-block-sm-med-primary-mb-8">{t('common.phone')}</label>
                 <Input
                 id="patient-phone"
                 value={medicalForm.patient_data.phone}
@@ -605,7 +607,7 @@ const CloudPrintingManager = () => {
                 rows={4} />
                 </div>
                 <div>
-                  <label htmlFor="doctor" className="admin-label-block-sm-med-primary-mb-8">Врач</label>
+                  <label htmlFor="doctor" className="admin-label-block-sm-med-primary-mb-8">{t('common.doctor')}</label>
                   <Input
                 id="doctor"
                 value={medicalForm.template_data.doctor_name}
@@ -632,7 +634,7 @@ const CloudPrintingManager = () => {
                 placeholder="A001" />
                 </div>
                 <div>
-                  <label htmlFor="ticket-doctor" className="admin-label-block-sm-med-primary-mb-8">Врач</label>
+                  <label htmlFor="ticket-doctor" className="admin-label-block-sm-med-primary-mb-8">{t('common.doctor')}</label>
                   <Input
                 id="ticket-doctor"
                 value={medicalForm.template_data.doctor_name}
@@ -643,7 +645,7 @@ const CloudPrintingManager = () => {
                 placeholder="ФИО врача" />
                 </div>
                 <div>
-                  <label htmlFor="cabinet" className="admin-label-block-sm-med-primary-mb-8">Кабинет</label>
+                  <label htmlFor="cabinet" className="admin-label-block-sm-med-primary-mb-8">{t('common.cabinet')}</label>
                   <Input
                 id="cabinet"
                 value={medicalForm.template_data.cabinet}
@@ -683,7 +685,7 @@ const CloudPrintingManager = () => {
                 rows={3} />
                 </div>
                 <div>
-                  <label htmlFor="report-doctor" className="admin-label-block-sm-med-primary-mb-8">Врач</label>
+                  <label htmlFor="report-doctor" className="admin-label-block-sm-med-primary-mb-8">{t('common.doctor')}</label>
                   <Input
                 id="report-doctor"
                 value={medicalForm.template_data.doctor_name}

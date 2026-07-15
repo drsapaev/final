@@ -11,6 +11,7 @@ import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { Check, AlertCircle } from 'lucide-react';
 import './ExaminationMatrix.css';
+import { useTranslation } from '../../../i18n/adapter';
 
 // Конфигурация матриц для разных специальностей
 const MATRICES = {

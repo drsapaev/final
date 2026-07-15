@@ -28,6 +28,7 @@ import { t } from './utils/labTranslations';
 import DesignTab from './templateEditor/DesignTab';
 import SignersTab from './templateEditor/SignersTab';
 import PreviewTab from './templateEditor/PreviewTab';
+import { useTranslation } from '../../i18n/adapter';
 
 export default function LabTemplateWorkbench({
   templates,

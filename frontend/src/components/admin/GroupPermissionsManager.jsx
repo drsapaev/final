@@ -27,8 +27,10 @@ import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
+import { useTranslation } from '../../i18n/adapter';
 
 const toArray = (value, fallbackKeys = []) => {
+  const { t } = useTranslation();
   if (Array.isArray(value)) return value;
 
   for (const key of fallbackKeys) {

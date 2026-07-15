@@ -11,6 +11,7 @@ import {
   Select,
 } from '../ui/macos';
 import PropTypes from 'prop-types';
+import { useTranslation } from '../../i18n/adapter';
 
 const DoctorModal = ({
   isOpen,
@@ -199,7 +200,7 @@ const DoctorModal = ({
             <Input value={selectedUser?.email || ''} readOnly icon={Mail} />
           </div>
           <div>
-            <Label className="admin-label-block-mb-8">Телефон</Label>
+            <Label className="admin-label-block-mb-8">{t('common.phone')}</Label>
             <Input value={selectedUser?.phone || ''} readOnly icon={Phone} />
           </div>
           <div>
@@ -248,7 +249,7 @@ const DoctorModal = ({
           </div>
 
           <div>
-            <Label className="admin-label-block-mb-8">Кабинет</Label>
+            <Label className="admin-label-block-mb-8">{t('common.cabinet')}</Label>
             <Input
               value={formData.cabinet}
               onChange={(event) => handleChange('cabinet', event.target.value)}

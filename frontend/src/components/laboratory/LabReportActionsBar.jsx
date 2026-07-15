@@ -1,6 +1,7 @@
 import PropTypes from 'prop-types';
 import { Button, Icon } from '../ui/macos';
 import { t } from './utils/labTranslations';
+import { useTranslation } from '../../i18n/adapter';
 
 /**
  * P-04 fix: LabReportActionsBar выделен из LabReportWorkbench.

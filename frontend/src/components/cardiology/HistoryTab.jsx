@@ -15,6 +15,7 @@ import PropTypes from 'prop-types';
 import { Calendar, Eye, Download, FileText } from 'lucide-react';
 import { Button, Badge, MacOSCard, MacOSEmptyState } from '../ui/macos';
 import { formatRegistrarDate } from '../../utils/dateUtils';
+import { useTranslation } from '../../i18n/adapter';
 
 /**
  * @param {Object} props

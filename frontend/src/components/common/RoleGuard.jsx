@@ -2,6 +2,7 @@
 import PropTypes from 'prop-types';
 import { useTheme } from '../../contexts/ThemeContext';
 import { getProfileRoles, hasRouteAccess as hasRouteAccessByRole, normalizeRole } from '../../routing/routeSelectors.js';
+import { useTranslation } from '../../i18n/adapter';
 
 /**
  * Компонент для проверки ролевого доступа

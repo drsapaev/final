@@ -15,7 +15,7 @@ import { toast } from 'react-toastify';
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
 import { useSafeInput } from '../../hooks/useSafeInput';  // PR-39 / P0-5: sanitizer wired to form
-import { useTranslation } from '../../hooks/useTranslation';  // PR-44 / P0-19: i18n extraction
+import { useTranslation } from '../../i18n/adapter';
 const PhoneVerification = ({
   phone,
   purpose = 'verification',

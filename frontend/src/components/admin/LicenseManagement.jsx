@@ -33,6 +33,7 @@ import {
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
+import { useTranslation } from '../../i18n/adapter';
 
 const emptyLicenseStats = {
   total_licenses: 0,
@@ -42,6 +43,7 @@ const emptyLicenseStats = {
 };
 
 const deriveLicenseStats = (licenseList) => {
+  const { t } = useTranslation();
   const nextLicenses = Array.isArray(licenseList) ? licenseList : [];
   return {
     total_licenses: nextLicenses.length,

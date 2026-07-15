@@ -20,6 +20,7 @@ import { MCP_PROVIDERS } from '../../../../constants/ai';
 import logger from '../../../../utils/logger';
 import './DermatologySection.css';
 import { Checkbox } from '../../../ui/macos';
+import { useTranslation } from '../../../../i18n/adapter';
 
 /**
  * DermatologySection Component

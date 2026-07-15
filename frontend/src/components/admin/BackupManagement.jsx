@@ -26,6 +26,7 @@ import {
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
+import { useTranslation } from '../../i18n/adapter';
 
 const emptyBackupStats = {
   total_backups: 0,
@@ -35,6 +36,7 @@ const emptyBackupStats = {
 };
 
 const deriveBackupStats = (backupList) => {
+  const { t } = useTranslation();
   const nextBackups = Array.isArray(backupList) ? backupList : [];
   return {
     total_backups: nextBackups.length,

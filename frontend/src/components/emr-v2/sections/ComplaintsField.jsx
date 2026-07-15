@@ -19,9 +19,11 @@ import { useState, useEffect, useRef, useCallback, useId } from 'react';
 import PropTypes from 'prop-types';
 import './ComplaintsField.css';
 import logger from '../../../utils/logger';
+import { useTranslation } from '../../../i18n/adapter';
 
 // Debounce hook
 const useDebounce = (value, delay) => {
+  const { t } = useTranslation();
     const [debouncedValue, setDebouncedValue] = useState(value);
 
     useEffect(() => {

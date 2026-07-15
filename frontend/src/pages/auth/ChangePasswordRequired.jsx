@@ -9,12 +9,14 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { getErrorMessage } from '../../utils/errorHandler';
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
+import { useTranslation } from '../../i18n/adapter';
 
 /**
  * Компонент для обязательной смены пароля при первом входе
  * Показывается когда must_change_password = true
  */
 export default function ChangePasswordRequired({ currentPassword }) {
+  const { t } = useTranslation();
     const navigate = useNavigate();
     const { theme, getColor } = useTheme();
 

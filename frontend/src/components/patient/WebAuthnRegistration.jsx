@@ -4,6 +4,7 @@ import {
   Card, CardContent, CardHeader, CardTitle, Badge, Button, Icon, Alert, Input,
 } from '../ui/macos';
 import { useWebAuthn } from '../../hooks/useWebAuthn';
+import { useTranslation } from '../../i18n/adapter';
 
 /**
  * WebAuthn Registration UI — P5 frontend integration.
@@ -12,6 +13,7 @@ import { useWebAuthn } from '../../hooks/useWebAuthn';
  * an alternative to Telegram Mini App authentication.
  */
 export default function WebAuthnRegistration({ patientId }) {
+  const { t } = useTranslation();
   const { isSupported, isRegistering, error, register, listCredentials, deactivateCredential } = useWebAuthn();
   const [credentials, setCredentials] = useState([]);
   const [credentialName, setCredentialName] = useState('');

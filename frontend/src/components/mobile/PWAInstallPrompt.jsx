@@ -2,10 +2,12 @@ import { useState, useEffect } from 'react';
 import { Download, X, Smartphone, Monitor } from 'lucide-react';
 import { Button, Card } from '../ui/macos';
 import logger from '../../utils/logger';
+import { useTranslation } from '../../i18n/adapter';
 /**
  * Компонент для предложения установки PWA
  */
 const PWAInstallPrompt = () => {
+  const { t } = useTranslation();
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [showInstallPrompt, setShowInstallPrompt] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);

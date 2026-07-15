@@ -16,6 +16,7 @@ import {
 import { useTheme } from '../../contexts/ThemeContext';
 import './ModernInput.css';
 import { Input } from '../ui/macos';
+import { useTranslation } from '../../i18n/adapter';
 
 const ModernInput = ({
   type = 'text',

@@ -16,12 +16,14 @@ import { t } from './utils/labTranslations';
 import QueueCard from './QueueCard';
 // STRAT#27: VirtualizedQueueList for 1000+ entries via @tanstack/react-virtual.
 import VirtualizedQueueList from './VirtualizedQueueList';
+import { useTranslation } from '../../i18n/adapter';
 
 // P-05 fix: маскирование PII (номера телефона) в карточках очереди.
 // Лабораторное помещение — публичное пространство, экран видят другие
 // пациенты и сотрудники. Раскрытие — по клику, с обратной маской.
 // Маска сохраняет последние 2 цифры (для опознания пациента) и страну.
 function maskPhone(phone) {
+  const { t } = useTranslation();
   if (!phone || typeof phone !== 'string') return '';
   const trimmed = phone.trim();
   if (!trimmed) return '';

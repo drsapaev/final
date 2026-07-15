@@ -19,6 +19,7 @@ import PropTypes from 'prop-types';
 import { apiClient } from '../../api/client';
 import logger from '../../utils/logger';
 import './EMRDiffViewer.css';
+import { useTranslation } from '../../i18n/adapter';
 
 /**
  * Human-readable field labels (Russian)
@@ -58,6 +59,7 @@ const FIELD_ORDER = [
  * Get human-readable field label
  */
 function getFieldLabel(field) {
+  const { t } = useTranslation();
     return FIELD_LABELS[field] || field;
 }
 

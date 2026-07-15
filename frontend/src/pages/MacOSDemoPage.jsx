@@ -1,4 +1,5 @@
 import { Suspense, lazy } from 'react';
+import { useTranslation } from '../i18n/adapter';
 // Динамический импорт для уменьшения размера основного бандла
 const MacOSDemo = lazy(() => import('../components/examples/MacOSDemo'));
 
@@ -7,6 +8,7 @@ const MacOSDemo = lazy(() => import('../components/examples/MacOSDemo'));
  * Dedicated route for showcasing macOS components
  */
 const MacOSDemoPage = () => {
+  const { t } = useTranslation();
   return (
     <Suspense fallback={<div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontSize: 'var(--mac-font-size-xl)' }}>Загрузка macOS компонентов...</div>}>
       <MacOSDemo />

@@ -14,9 +14,11 @@ import {
   AppEmpty, AppError, AppLoading, Button,
 } from '../components/ui/macos';
 import { notify } from '../services/notify.js';
+import { useTranslation } from '../i18n/adapter';
 
 // Get user role for role-based UI
 const getUserRole = () => {
+  const { t } = useTranslation();
   const st = auth.getState();
   const profile = st.profile || st.user || {};
   return String(profile?.role || profile?.role_name || '').toLowerCase();
@@ -201,9 +203,9 @@ export default function PatientPickupView() {
           <table>
             <thead>
               <tr>
-                <th>Дата</th>
-                <th>Врач</th>
-                <th>Статус</th>
+                <th>{t('common.date')}</th>
+                <th>{t('common.doctor')}</th>
+                <th>{t('common.status')}</th>
               </tr>
             </thead>
             <tbody>${visitsHtml}</tbody>
@@ -215,7 +217,7 @@ export default function PatientPickupView() {
               <tr>
                 <th>Исследование</th>
                 <th>Результат</th>
-                <th>Статус</th>
+                <th>{t('common.status')}</th>
               </tr>
             </thead>
             <tbody>${labHtml}</tbody>
@@ -457,7 +459,7 @@ export default function PatientPickupView() {
                         <span style={styles.infoValue}>{formatDate(patient?.birth_date)}</span>
                     </div>
                     <div style={styles.infoItem}>
-                        <span style={styles.infoLabel}>Телефон</span>
+                        <span style={styles.infoLabel}>{t('common.phone')}</span>
                         <span style={styles.infoValue}>{patient?.phone || '—'}</span>
                     </div>
                     <div style={styles.infoItem}>
@@ -572,11 +574,11 @@ export default function PatientPickupView() {
                 background: 'var(--mac-bg-tertiary, #f1f5f9)',
                 borderBottom: '2px solid var(--mac-separator, #e2e8f0)'
               }}>
-                                        <th style={{ padding: 'var(--mac-spacing-3)', textAlign: 'left', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-secondary)' }}>Дата</th>
+                                        <th style={{ padding: 'var(--mac-spacing-3)', textAlign: 'left', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-secondary)' }}>{t('common.date')}</th>
                                         <th style={{ padding: 'var(--mac-spacing-3)', textAlign: 'left', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-secondary)' }}>№ Визита</th>
                                         <th style={{ padding: 'var(--mac-spacing-3)', textAlign: 'left', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-secondary)' }}>Услуги</th>
                                         <th style={{ padding: 'var(--mac-spacing-3)', textAlign: 'right', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-secondary)' }}>Сумма</th>
-                                        <th style={{ padding: 'var(--mac-spacing-3)', textAlign: 'center', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-secondary)' }}>Статус</th>
+                                        <th style={{ padding: 'var(--mac-spacing-3)', textAlign: 'center', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-secondary)' }}>{t('common.status')}</th>
                                     </tr>
                                 </thead>
                                 <tbody>

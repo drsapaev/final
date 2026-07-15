@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import { useState, useMemo, useCallback } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Input } from '../ui/macos';
+import { useTranslation } from '../../i18n/adapter';
 
 /**
  * Компонент таблицы

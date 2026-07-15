@@ -24,6 +24,7 @@ import { SmartAssistButton } from '../ai/SmartAssistButton';
 import { AISuggestionPopover } from '../ai/AISuggestionPopover';
 import './EMRSmartFieldV2.css';
 import { Input } from '../../ui/macos';
+import { useTranslation } from '../../../i18n/adapter';
 
 /**
  * EMRSmartFieldV2 Component

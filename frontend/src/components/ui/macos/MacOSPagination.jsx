@@ -1,5 +1,6 @@
 import { MoreHorizontal } from 'lucide-react';
 import PropTypes from 'prop-types';
+import { useTranslation } from '../../../i18n/adapter';
 
 const MacOSPagination = ({
   currentPage = 1,

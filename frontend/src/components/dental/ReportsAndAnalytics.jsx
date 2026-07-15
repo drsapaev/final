@@ -44,6 +44,7 @@ import {
   X } from
 'lucide-react';
 import PropTypes from 'prop-types';
+import { useTranslation } from '../../i18n/adapter';
 
 /**
  * Отчеты и аналитика для стоматологической ЭМК

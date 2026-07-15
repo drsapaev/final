@@ -27,6 +27,7 @@ import {
   ArrowUpRight,
   Clock3 } from
 'lucide-react';
+import { useTranslation } from '../i18n/adapter';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -48,6 +49,7 @@ const DEPARTMENT_OPTIONS = [
 { value: 'Dentistry', label: 'Стоматология' }];
 
 function buildRelativeDateRange(days) {
+  const { t } = useTranslation();
   const end = new Date();
   const start = new Date(Date.now() - (days - 1) * DAY_MS);
   return {

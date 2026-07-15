@@ -23,8 +23,10 @@ import { toast } from 'react-toastify';
 
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
+import { useTranslation } from '../../i18n/adapter';
 
 const GraphQLExplorer = () => {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState('explorer');
   const [query, setQuery] = useState('');
   const [variables, setVariables] = useState('{}');

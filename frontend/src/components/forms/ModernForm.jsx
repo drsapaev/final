@@ -4,6 +4,7 @@ import { AlertCircle, CheckCircle, Loader } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import logger from '../../utils/logger';
 import './ModernForm.css';
+import { useTranslation } from '../../i18n/adapter';
 
 const ModernForm = ({
   children,

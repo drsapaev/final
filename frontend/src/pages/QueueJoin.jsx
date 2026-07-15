@@ -18,10 +18,13 @@ import {
   completeQueueJoinSession,
 } from '../api/queue';
 import { formatRegistrarTime } from '../utils/dateUtils';
-import { Input,
+import {
+  Input,
   Checkbox } from '../components/ui/macos';
+import { useTranslation } from '../i18n/adapter';
 
 const formatSpecialistLabel = (specialist) => {
+  const { t } = useTranslation();
   const doctorName =
     specialist?.doctor_name ||
     specialist?.full_name ||
@@ -608,7 +611,7 @@ const QueueJoin = () => {
             color: 'var(--mac-error)',
             margin: '0 auto 16px'
           }} aria-hidden="true" />
-          <h2 id="queue-join-error-title" className="qj-title">Ошибка</h2>
+          <h2 id="queue-join-error-title" className="qj-title">{t('common.error')}</h2>
           <p className="qj-body-text-mb6" id="queue-join-error-message" role="alert" aria-live="assertive">{error}</p>
           <div className="qj-action-stack">
             <button

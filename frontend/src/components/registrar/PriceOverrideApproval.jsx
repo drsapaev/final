@@ -23,6 +23,7 @@ import {
   approvePriceOverride,
 } from '../../api/registrar';
 import logger from '../../utils/logger';
+import { useTranslation } from '../../i18n/adapter';
 
 const PRICE_OVERRIDE_ACTION_CAN_FIELD = {
   approve: 'can_approve',
@@ -30,6 +31,7 @@ const PRICE_OVERRIDE_ACTION_CAN_FIELD = {
 };
 
 const hasBackendPriceOverrideAction = (override, action) => {
+  const { t } = useTranslation();
   const normalizedAction = String(action || '').trim().toLowerCase();
   if (!normalizedAction) {
     return false;

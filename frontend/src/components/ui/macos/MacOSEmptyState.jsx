@@ -1,5 +1,6 @@
 import { useId } from 'react';
 import PropTypes from 'prop-types';
+import { useTranslation } from '../../../i18n/adapter';
 const MacOSEmptyState = ({
   icon: Icon,
   title = 'Нет данных',

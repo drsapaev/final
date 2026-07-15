@@ -1,5 +1,6 @@
 import { useTheme } from '../../contexts/ThemeContext';
 import PropTypes from 'prop-types';
+import { useTranslation } from '../../i18n/adapter';
 
 /**
  * Базовая медицинская карточка в стиле MediLab

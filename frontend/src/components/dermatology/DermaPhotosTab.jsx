@@ -9,6 +9,7 @@ import { Camera } from 'lucide-react';
 import PhotoUploader from './PhotoUploader';
 import SkinAnalysis from './SkinAnalysis';
 import PhotoComparison from './PhotoComparison';
+import { useTranslation } from '../../i18n/adapter';
 
 export function DermaPhotosTab({
   hasPatient,

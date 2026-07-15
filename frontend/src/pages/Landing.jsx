@@ -1,7 +1,6 @@
 import React, { startTransition, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
-import { useTranslation } from '../hooks/useTranslation';
 import {
   Button, MacOSCard,
 } from '../components/ui/macos';
@@ -30,6 +29,7 @@ import { LANDING_COPY, buildGlassStyle } from './landingContent';
 import { BRAND } from '../config/brand';
 import './Landing.css';
 import PropTypes from 'prop-types';
+import { useTranslation } from '../i18n/adapter';
 
 const FEATURE_VISUALS = [
   { icon: FileText, accent: 'var(--mac-accent-blue)' },
@@ -46,6 +46,7 @@ const SECURITY_VISUALS = [Shield, Users, Key, Activity];
 const INTEGRATION_VISUALS = [MessageSquare, CreditCard, CreditCard, CreditCard, Activity, FileText];
 
 function SurfaceLabel({ children }) {
+  const { t } = useTranslation();
   return <span className="landing-surface-label">{children}</span>;
 }
 

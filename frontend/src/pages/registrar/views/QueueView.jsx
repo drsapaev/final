@@ -24,6 +24,7 @@ import ModernQueueManager from '../../../components/queue/ModernQueueManager';
 import { getLocalDateString } from '../../../utils/dateUtils';
 import { getRegistrarTranslator } from '../../registrarTranslations';
 import logger from '../../../utils/logger';
+import { useTranslation } from '../../../i18n/adapter';
 
 const QueueView = React.memo(({
   searchParams,

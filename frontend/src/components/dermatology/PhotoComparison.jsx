@@ -21,8 +21,10 @@ import {
   Layout } from
 'lucide-react';
 import PropTypes from 'prop-types';
+import { useTranslation } from '../../i18n/adapter';
 
 const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
+  const { t } = useTranslation();
   const [sliderPosition, setSliderPosition] = useState(50);
   const [viewMode, setViewMode] = useState('slider'); // slider, side-by-side, overlay
   const [zoom, setZoom] = useState(1);

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { createPortal } from 'react-dom';
+import { useTranslation } from '../../../i18n/adapter';
 
 const Select = React.forwardRef(({ 
   options = [],

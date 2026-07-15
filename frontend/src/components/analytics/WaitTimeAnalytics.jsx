@@ -30,7 +30,9 @@ import { api } from '../../api/client';
 import './WaitTimeAnalytics.css';
 
 import logger from '../../utils/logger';
+import { useTranslation } from '../../i18n/adapter';
 const WaitTimeAnalytics = () => {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(false);
   const [dateRange, setDateRange] = useState({

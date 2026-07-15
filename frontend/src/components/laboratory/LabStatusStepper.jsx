@@ -5,6 +5,7 @@ import {
   getLabReportStepIndex,
 } from './utils/labStatusConfig';
 import { t } from './utils/labTranslations';
+import { useTranslation } from '../../i18n/adapter';
 
 /**
  * P-04 fix: LabStatusStepper выделен в отдельный файл.
@@ -41,6 +42,7 @@ const VISIBLE_STEPPER_STEPS = LAB_REPORT_STATUS_CONFIG.filter(
 );
 
 export default function LabStatusStepper({ status }) {
+  const { t } = useTranslation();
   // Индекс считаем по полной конфигурации, чтобы READY (если пришёл с бэкенда)
   // корректно отображался как текущий шаг.
   const fullIndex = getLabReportStepIndex(status);

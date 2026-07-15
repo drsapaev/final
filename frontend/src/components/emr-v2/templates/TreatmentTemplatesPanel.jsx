@@ -15,6 +15,7 @@ import PropTypes from 'prop-types';
 import treatmentTemplatesData from '../../../data/treatmentTemplates.json';
 import './TreatmentTemplatesPanel.css';
 import { Input } from '../../ui/macos';
+import { useTranslation } from '../../../i18n/adapter';
 
 /**
  * Category metadata
@@ -30,6 +31,7 @@ const CATEGORY_META = {
  * Merge strategy: APPEND_WITH_SEPARATOR
  */
 const mergeWithSeparator = (existing, templateBody) => {
+  const { t } = useTranslation();
     if (!existing || !existing.trim()) {
         return templateBody;
     }

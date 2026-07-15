@@ -6,8 +6,10 @@ import { roleToRoute } from '../constants/routes';
 import {
   AppEmpty, AppError, AppLoading, Button, Card, CardContent, CardHeader,
 } from '../components/ui/macos';
+import { useTranslation } from '../i18n/adapter';
 
 export default function UserSelect() {
+  const { t } = useTranslation();
   const [items, setItems] = useState([]);
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(false);

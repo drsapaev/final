@@ -7,11 +7,13 @@ import {
   AppEmpty, AppError, Button,
   Input } from '../components/ui/macos';
 import { getRoleHomeRoute } from '../routing/routeSelectors.js';
+import { useTranslation } from '../i18n/adapter';
 
 const registrarHomeRoute = getRoleHomeRoute('registrar');
 
 // Modern Search Page with Full Functionality
 export default function Search() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [patients, setPatients] = useState([]);

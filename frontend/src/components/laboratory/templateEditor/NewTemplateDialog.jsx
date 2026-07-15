@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import {
   Alert, Button, Dialog, DialogTitle, DialogContent, DialogActions, Input, Label, Textarea, Icon,
 } from '../../ui/macos';
+import { useTranslation } from '../../../i18n/adapter';
 
 /**
  * L-H-6 fix: NewTemplateDialog выделен в отдельный файл (~110 строк).
@@ -16,6 +17,7 @@ import {
  * уже существует в переданном списке templates.
  */
 function NewTemplateDialog({ open, onClose, onCreate, saving, existingTemplates = [] }) {
+  const { t } = useTranslation();
   const [form, setForm] = useState({
     code: '',
     name: '',
@@ -73,7 +75,7 @@ function NewTemplateDialog({ open, onClose, onCreate, saving, existingTemplates 
             )}
           </div>
           <div>
-            <Label htmlFor="new-template-name" className="ltw-label">Название</Label>
+            <Label htmlFor="new-template-name" className="ltw-label">{t('common.name')}</Label>
             <Input
               id="new-template-name"
               aria-label="Название шаблона"
@@ -104,7 +106,7 @@ function NewTemplateDialog({ open, onClose, onCreate, saving, existingTemplates 
             </select>
           </div>
           <div>
-            <Label htmlFor="new-template-description" className="ltw-label">Описание</Label>
+            <Label htmlFor="new-template-description" className="ltw-label">{t('common.description')}</Label>
             <Textarea
               id="new-template-description"
               aria-label="Описание шаблона"
@@ -118,7 +120,7 @@ function NewTemplateDialog({ open, onClose, onCreate, saving, existingTemplates 
         </form>
       </DialogContent>
       <DialogActions>
-        <Button variant="outline" onClick={onClose}>Отмена</Button>
+        <Button variant="outline" onClick={onClose}>{t('common.cancel')}</Button>
         <Button
           variant="primary"
           type="submit"

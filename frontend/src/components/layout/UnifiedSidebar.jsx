@@ -7,12 +7,14 @@ import '../../styles/sidebar-buttons.css';
 import '../../styles/cursor-effects.css';
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
+import { useTranslation } from '../../i18n/adapter';
 
 /**
  * Унифицированный сайдбар в стиле MediLab
  * Используется во всех панелях для единообразия
  */
 const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
+  const { t } = useTranslation();
   const asideRef = useRef(null);
   const location = useLocation();
   const { isDark, toggleTheme } = useTheme();

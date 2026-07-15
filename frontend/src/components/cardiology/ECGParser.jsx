@@ -4,6 +4,7 @@
  * Phase 3: stale MASTER_TODO_LIST reference removed.
  */
 import logger from '../../utils/logger';
+import { useTranslation } from '../../i18n/adapter';
 // Парсер для SCP формата
 // C-1 fix: previously this returned hardcoded fake parameters (heartRate: 75,
 // prInterval: 160, etc.) regardless of file contents. Those fake values were
@@ -109,6 +110,7 @@ export const parseXMLFile = async (file) => {
 
 // Вспомогательная функция для извлечения значений из XML
 function extractXMLValue(xmlDoc, tagName, attribute) {
+  const { t } = useTranslation();
   const element = xmlDoc.querySelector(tagName);
   if (element) {
     if (attribute) {

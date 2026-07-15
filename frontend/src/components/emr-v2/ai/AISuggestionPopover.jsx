@@ -18,11 +18,13 @@ import PropTypes from 'prop-types';
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import './AISuggestionPopover.css';
+import { useTranslation } from '../../../i18n/adapter';
 
 /**
  * Format confidence as percentage with color
  */
 function getConfidenceInfo(confidence) {
+  const { t } = useTranslation();
     if (typeof confidence !== 'number') return { text: '', className: '' };
 
     const percent = Math.round(confidence * 100);

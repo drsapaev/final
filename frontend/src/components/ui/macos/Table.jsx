@@ -2,6 +2,7 @@ import React from 'react';
 import { useState } from 'react';
 import PropTypes from 'prop-types';
 import { ChevronUp, ChevronDown } from 'lucide-react';
+import { useTranslation } from '../../../i18n/adapter';
 
 const Table = ({
   columns = [],

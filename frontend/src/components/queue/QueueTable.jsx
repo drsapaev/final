@@ -5,6 +5,7 @@ import PropTypes from 'prop-types';
 import { formatRegistrarTime } from '../../utils/dateUtils';
 // UX Audit Registrar #3: все inline-стили перенесены в QueueTable.css.
 import './QueueTable.css';
+import { useTranslation } from '../../i18n/adapter';
 
 /**
  * QueueTable Component

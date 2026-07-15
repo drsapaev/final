@@ -1,5 +1,6 @@
 import PropTypes from 'prop-types';
 import { Button, Icon } from '../../ui/macos';
+import { useTranslation } from '../../../i18n/adapter';
 
 /**
  * L-H-6 fix: ReferenceRuleEditor выделен в отдельный файл (~290 строк).
@@ -41,6 +42,7 @@ const RULE_OP_OPTIONS = [
 ];
 
 function parseRuleText(text) {
+  const { t } = useTranslation();
   if (!text?.trim()) return null;
   try {
     return JSON.parse(text);

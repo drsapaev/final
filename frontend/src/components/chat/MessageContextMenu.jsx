@@ -3,8 +3,10 @@ import { useEffect, useRef } from 'react';
 import { Copy, Reply, Trash } from 'lucide-react';
 import './MessageContextMenu.css';
 import PropTypes from 'prop-types';
+import { useTranslation } from '../../i18n/adapter';
 
 const MessageContextMenu = ({ x, y, message, onBlur, onAction, isOwn }) => {
+  const { t } = useTranslation();
     const menuRef = useRef(null);
 
     useEffect(() => {
@@ -43,7 +45,7 @@ const MessageContextMenu = ({ x, y, message, onBlur, onAction, isOwn }) => {
             {/* PR-69 / H-4: removed forward stub */}
             {isOwn && (
                 <button role="menuitem" className="delete" onClick={() => handleAction('delete')}>
-                    <Trash size={14} /> <span>Удалить</span>
+                    <Trash size={14} /> <span>{t('common.delete')}</span>
                 </button>
             )}
         </div>

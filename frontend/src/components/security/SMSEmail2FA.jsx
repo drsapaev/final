@@ -17,6 +17,7 @@ import {
 'lucide-react';
 import { tokenManager } from '../../utils/tokenManager';
 import PropTypes from 'prop-types';
+import { useTranslation } from '../../i18n/adapter';
 
 /**
  * Компонент для SMS/Email двухфакторной аутентификации

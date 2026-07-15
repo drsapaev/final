@@ -4,9 +4,11 @@ import FCMManager from './FCMManager';
 import RegistrarNotificationManager from './RegistrarNotificationManager';
 import ErrorBoundary from '../common/ErrorBoundary';
 import { MacOSTab } from '../ui/macos';
+import { useTranslation } from '../../i18n/adapter';
 
 
 const UnifiedNotifications = () => {
+  const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const section = searchParams.get('section') || 'fcm';
 

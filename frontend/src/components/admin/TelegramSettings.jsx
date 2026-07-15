@@ -24,6 +24,7 @@ import {
 
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
+import { useTranslation } from '../../i18n/adapter';
 
 const DEFAULT_LANGUAGE_OPTIONS = [
   { value: 'ru', label: '\u0420\u0443\u0441\u0441\u043a\u0438\u0439' },
@@ -32,6 +33,7 @@ const DEFAULT_LANGUAGE_OPTIONS = [
 ];
 
 const TelegramSettings = () => {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState({

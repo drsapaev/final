@@ -7,6 +7,7 @@ import {
 import { AIButton, AIAssistant } from '../ai';
 // STRAT#22: t() для i18n — AI analysis strings мигрированы.
 import { t } from './utils/labTranslations';
+import { useTranslation } from '../../i18n/adapter';
 
 /**
  * P-01 fix: AI-анализ лабораторного бланка перенесён из LabResultsManager
@@ -24,6 +25,7 @@ import { t } from './utils/labTranslations';
  *   - есть заполненные поля (не только пустые values)
  */
 function normalizeSexForAI(sex) {
+  const { t } = useTranslation();
   if (!sex) return null;
   const s = String(sex).trim().toUpperCase();
   if (s === 'M' || s === 'MALE') return 'male';

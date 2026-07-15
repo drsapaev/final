@@ -8,6 +8,7 @@ import {
   getLabStatusVariant,
 } from './labUiLabels';
 import { t } from './utils/labTranslations';
+import { useTranslation } from '../../i18n/adapter';
 
 /**
  * STRAT#28: QueueCard — extracted from LabQueueWorkbench, wrapped in React.memo.
@@ -21,6 +22,7 @@ import { t } from './utils/labTranslations';
  * вызывает re-render только отфильтрованных карточек, а не всех.
  */
 function QueueCard({ appointment, isSelected, onOpenAppointment }) {
+  const { t } = useTranslation();
   return (
     <div
       role="button"

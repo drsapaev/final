@@ -13,8 +13,10 @@ import '../styles/cursor-effects.css';
 import '../styles/animations.css';
 import '../styles/responsive.css';
 import { Input } from '../components/ui/macos';
+import { useTranslation } from '../i18n/adapter';
 
 const resolveTabFromPath = (path) => {
+  const { t } = useTranslation();
   if (path.includes('/patients')) return 'patients';
   if (path.includes('/appointments')) return 'appointments';
   if (path.includes('/staff-schedule')) return 'staff-schedule';

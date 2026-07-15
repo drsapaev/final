@@ -22,6 +22,7 @@ import {
 } from '../../api/registrar';
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
+import { useTranslation } from '../../i18n/adapter';
 /**
  * Интегрированный селектор врачей для регистратуры
  * Использует данные врачей и расписаний из админ панели

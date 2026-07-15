@@ -7,6 +7,7 @@ import { COLOR_SCHEMES } from '../../theme/colorScheme.js';
 import {
   MacOSCard, Select,
 } from '../ui/macos';
+import { useTranslation } from '../../i18n/adapter';
 
 const ICONS = {
   light: Sun,
@@ -36,6 +37,7 @@ const ACCENT_LABELS = {
 };
 
 function ThemePreviewCard({ scheme, isActive, onSelect }) {
+  const { t } = useTranslation();
   const Icon = ICONS[scheme.id] || Sun;
   const preview = scheme.preview;
   const buttonLabel = isActive

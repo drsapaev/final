@@ -4,6 +4,7 @@ import TwoFactorManager from '../components/security/TwoFactorManager';
 import TwoFactorSetupWizard from '../components/security/TwoFactorSetupWizard';
 import SMSEmail2FA from '../components/security/SMSEmail2FA';
 import {
+import { useTranslation } from '../i18n/adapter';
   Shield,
 
   Key,
@@ -20,6 +21,7 @@ import {
  * Централизованное управление всеми аспектами безопасности
  */
 const SecurityPage = () => {void
+  const { t } = useTranslation();
   useTheme();
   const [activeTab, setActiveTab] = useState('overview');
   const [showSetupWizard, setShowSetupWizard] = useState(false);

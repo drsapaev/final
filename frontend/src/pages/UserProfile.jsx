@@ -33,6 +33,7 @@ import TwoFactorManager from '../components/security/TwoFactorManager';
 import { getState as getAuthState, setProfile as setAuthProfile } from '../stores/auth';
 import { getErrorMessage } from '../utils/errorHandler';
 import logger from '../utils/logger';
+import { useTranslation } from '../i18n/adapter';
 
 const SELF_PROFILE_CACHE_MS = 30_000;
 let selfProfileCache = null;
@@ -76,6 +77,7 @@ const timezoneOptions = [
 ];
 
 function formatDateTime(value) {
+  const { t } = useTranslation();
   if (!value) {
     return 'Не указано';
   }

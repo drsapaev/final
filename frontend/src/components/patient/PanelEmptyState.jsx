@@ -1,5 +1,6 @@
 import PropTypes from 'prop-types';
 import { Icon } from '../ui/macos';
+import { useTranslation } from '../../i18n/adapter';
 
 /**
  * L-H-4 fix: PanelEmptyState выделен в отдельный файл.
@@ -16,6 +17,7 @@ import { Icon } from '../ui/macos';
  * 'loading' добавляет aria-busy + skeleton-подобный shimmer.
  */
 function PanelEmptyState({ icon, title, description, variant = 'empty' }) {
+  const { t } = useTranslation();
   const iconSize = 24;
   return (
     <div

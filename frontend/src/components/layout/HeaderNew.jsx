@@ -12,9 +12,9 @@ import GlobalSearchBar from '../search/GlobalSearchBar';
 import ChatButton from '../chat/ChatButton';
 import { COLOR_SCHEMES } from '../../theme/colorScheme.js';
 import { getCanonicalRouteById, getEffectiveRouteByPath, getRoleHomeRoute } from '../../routing/routeSelectors.js';
-import { useTranslation } from '../../hooks/useTranslation.jsx';  // PR-50: i18n
 
 import logger from '../../utils/logger';
+import { useTranslation } from '../../i18n/adapter';
 
 const landingRoute = getCanonicalRouteById('landing')?.path || '/';
 const loginRoute = getCanonicalRouteById('login')?.path || '/login';
@@ -22,6 +22,7 @@ const profileRoute = getCanonicalRouteById('clinical-profile')?.path || '/clinic
 const registrarHomeRoute = getRoleHomeRoute('registrar');
 
 export function isThemeMenuInteraction(event, themeMenuRoot) {
+  const { t } = useTranslation();
   const path = event.composedPath ? event.composedPath() : [];
   const inRef = Boolean(
     themeMenuRoot &&

@@ -1,6 +1,7 @@
 // Minimal macOS-style Dialog components to replace MUI Dialog API used in CashierPanel
 // Props compatibility: open, onClose, maxWidth, fullWidth, children
 import PropTypes from 'prop-types';
+import { useTranslation } from '../../../i18n/adapter';
 
 const overlayStyleBase = {
   position: 'fixed',
@@ -32,6 +33,7 @@ const sizeMap = {
 };
 
 const Dialog = ({ open, onClose, maxWidth = 'md', fullWidth = true, children, style = {}, overlayStyle = {}, ...props }) => {
+  const { t } = useTranslation();
   if (!open) return null;
   const maxW = typeof maxWidth === 'string' ? (sizeMap[maxWidth] || sizeMap.md) : maxWidth;
   const backdropStyle = {

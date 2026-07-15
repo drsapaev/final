@@ -28,10 +28,12 @@ import { toast } from 'react-toastify';
 
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
+import { useTranslation } from '../../i18n/adapter';
 
 const sanitizePayload = (form) =>
   Object.fromEntries(
     Object.entries(form).filter(([, value]) => {
+  const { t } = useTranslation();
       if (value === '' || value === null || typeof value === 'undefined') {
         return false;
       }
@@ -337,7 +339,7 @@ const DiscountBenefitsManager = () => {
         </div>
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Описание</label>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('common.description')}</label>
         <Textarea
         value={discountForm.description}
         onChange={(e) => setDiscountForm({ ...discountForm, description: e.target.value })}
@@ -454,7 +456,7 @@ const DiscountBenefitsManager = () => {
         </div>
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Описание</label>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('common.description')}</label>
         <Textarea
         value={benefitForm.description}
         onChange={(e) => setBenefitForm({ ...benefitForm, description: e.target.value })}
@@ -578,7 +580,7 @@ const DiscountBenefitsManager = () => {
         </div>
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Описание</label>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('common.description')}</label>
         <Textarea
         value={loyaltyForm.description}
         onChange={(e) => setLoyaltyForm({ ...loyaltyForm, description: e.target.value })}

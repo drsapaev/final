@@ -23,6 +23,7 @@ import {
 'lucide-react';
 import PropTypes from 'prop-types';
 import { Input } from '../ui/macos';
+import { useTranslation } from '../../i18n/adapter';
 
 /**
  * Шаблоны протоколов для стоматологической ЭМК

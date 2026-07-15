@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useTheme } from '../../../contexts/ThemeContext';
 import PropTypes from 'prop-types';
+import { useTranslation } from '../../../i18n/adapter';
 
 /**
  * macOS-style Tooltip Component

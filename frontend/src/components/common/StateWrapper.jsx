@@ -15,7 +15,7 @@
  *     isEmpty={!loading && !error && (!data || data.length === 0)}
  *     emptyTitle="Настроек пока нет"
  *     emptyMessage="Создайте первую настройку, чтобы увидеть её здесь."
- *     emptyAction={<Button onClick={handleCreate}>Создать</Button>}
+ *     emptyAction={<Button onClick={handleCreate}>{t('common.create')}</Button>}
  *   >
  *     {children}
  *   </StateWrapper>
@@ -27,6 +27,7 @@ import { AlertCircle, RefreshCw } from 'lucide-react';
 import { MacOSEmptyState } from '../ui/macos';
 import { Skeleton } from '../ui/macos';
 import { Button } from '../ui/macos';
+import { useTranslation } from '../../i18n/adapter';
 
 const DEFAULT_SKELETON_ROWS = 4;
 

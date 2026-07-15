@@ -4,6 +4,7 @@ import {
   Card, CardContent, CardHeader, CardTitle, Badge, Button, Icon, Alert, Input,
 } from '../ui/macos';
 import { api } from '../../api/client';
+import { useTranslation } from '../../i18n/adapter';
 
 /**
  * Admin Security Dashboard — M5.6 frontend integration.
@@ -12,6 +13,7 @@ import { api } from '../../api/client';
  * Also shows: compliance report, secrets rotation status, backup status.
  */
 export default function AdminSecurityDashboard() {
+  const { t } = useTranslation();
   const [dashboard, setDashboard] = useState(null);
   const [compliance, setCompliance] = useState(null);
   const [secrets, setSecrets] = useState(null);
