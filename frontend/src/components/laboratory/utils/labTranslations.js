@@ -87,10 +87,13 @@ const TRANSLATIONS = {
 
   // ─── Actions bar ─────────────────────────────────────────────────────────
   actions: {
+    save_draft: 'Сохранить черновик',
+    saving: 'Сохраняю…',
     finalize: 'Утвердить',
     finalizing: 'Утверждаю…',
     revise: 'Исправленная версия',
     revising: 'Создаю…',
+    revise_title: 'Создать исправленную версию отчёта',
     print: 'Печать результата',
     printing: 'Отправляю…',
     notify_patient: 'Отправить пациенту',
