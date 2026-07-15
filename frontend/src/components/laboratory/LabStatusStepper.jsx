@@ -18,13 +18,37 @@ import {
  * L-H-3 fix: вместо локального LAB_REPORT_STEPS используется единый
  * источник истины — utils/labStatusConfig.js. Маппинг статусов больше
  * не дублируется между этим файлом и labUiLabels.js.
+ *
+ * UX-AUDIT-QW3: шаг READY скрыт из степпера. Кнопка «Mark Ready» была
+ * убрана в WF-round5 (была функционально пустой — backend разрешал
+ * одинаковые действия для DRAFT/IN_PROGRESS/READY). Пользователь видел
+ * шаг, к которому не мог прийти вручную — это вызывало когнитивный
+ * диссонанс. Если backend явно вернёт status='READY' (через mark_ready),
+ * индекс вычисляется по полной конфигурации, поэтому READY всё равно
+ * корректно отрисуется как current step. Скрытие влияет только на
+ * будущее/прошлое отображение шага, когда текущий статус — другой.
  */
+const HIDDEN_STEPPER_STATUSES = new Set(['READY']);
+
+// Видимые шаги степпера. READY исключён: нет ручного действия для перехода.
+const VISIBLE_STEPPER_STEPS = LAB_REPORT_STATUS_CONFIG.filter(
+  (step) => !HIDDEN_STEPPER_STATUSES.has(step.key)
+);
+
 export default function LabStatusStepper({ status }) {
-  const currentIndex = getLabReportStepIndex(status);
-  if (currentIndex < 0) {
+  // Индекс считаем по полной конфигурации, чтобы READY (если пришёл с бэкенда)
+  // корректно отображался как текущий шаг.
+  const fullIndex = getLabReportStepIndex(status);
+  if (fullIndex < 0) {
     // Неизвестный статус — fallback на Badge в родительском компоненте
     return null;
   }
+
+  // Маппинг полного индекса на видимый индекс: если текущий статус — READY,
+  // показываем его на месте IN_PROGRESS (как «почти готов»).
+  const currentIndex = HIDDEN_STEPPER_STATUSES.has(status)
+    ? VISIBLE_STEPPER_STEPS.findIndex((s) => s.key === 'IN_PROGRESS')
+    : VISIBLE_STEPPER_STEPS.findIndex((s) => s.key === status);
 
   return (
     <div
@@ -38,11 +62,11 @@ export default function LabStatusStepper({ status }) {
         marginTop: 'var(--mac-spacing-2)',
       }}
     >
-      {LAB_REPORT_STATUS_CONFIG.map((step, index) => {
+      {VISIBLE_STEPPER_STEPS.map((step, index) => {
         const isCompleted = index < currentIndex;
         const isCurrent = index === currentIndex;
         const isFuture = index > currentIndex;
-        const isLast = index === LAB_REPORT_STATUS_CONFIG.length - 1;
+        const isLast = index === VISIBLE_STEPPER_STEPS.length - 1;
 
         return (
           <div
