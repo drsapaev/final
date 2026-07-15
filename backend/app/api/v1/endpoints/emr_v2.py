@@ -423,24 +423,6 @@ async def save_emr(
             request=request,
             description=f"Сохранен EMR ID={emr.id} для визита {visit_id}",
         )
-
-        # M5.1: Unified audit log for EMR create/edit
-        from app.services.audit_service import log_audit_event
-        from app.services.reason_codes import ReasonCode
-        log_audit_event(
-            db=db,
-            event_type="DOCTOR_EDIT_DIAGNOSIS" if existing_emr else "DOCTOR_CREATE_EMR",
-            actor_user_id=current_user.id,
-            actor_role=getattr(current_user, "role", "doctor"),
-            subject_patient_id=getattr(emr, "patient_id", None),
-            resource_type="emr",
-            resource_id=str(emr.id),
-            action="create" if existing_emr is None else "edit",
-            outcome="success",
-            reason_code=ReasonCode.visit(visit_id).to_dict(),
-            request=request,
-        )
-
         db.commit()
         return emr
     except ConcurrencyError as e:
@@ -511,23 +493,6 @@ async def sign_emr(
         except Exception as learn_error:
             # Don't fail signing if learning fails
             logger.warning(f"Failed to learn templates from EMR: {learn_error}")
-
-        # M5.1: Unified audit log for EMR sign (sensitive action)
-        from app.services.audit_service import log_audit_event
-        from app.services.reason_codes import ReasonCode
-        log_audit_event(
-            db=db,
-            event_type="DOCTOR_SIGN_EMR",
-            actor_user_id=current_user.id,
-            actor_role=getattr(current_user, "role", "doctor"),
-            subject_patient_id=getattr(emr, "patient_id", None),
-            resource_type="emr",
-            resource_id=str(emr.id),
-            action="sign",
-            outcome="success",
-            reason_code=ReasonCode.visit(visit_id).to_dict(),
-            request=request,
-        )
 
         return emr
     except EMRNotFoundException:
