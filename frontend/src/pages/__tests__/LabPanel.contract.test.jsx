@@ -79,6 +79,41 @@ describe('LabPanel queue/report status contract', () => {
     expect(source).toContain('queueTotal={queueTotal}');
   });
 
+  it('STRAT#16: AbortController in loadLabAppointments and loadMoreAppointments', () => {
+    const source = readLabPanelSource();
+
+    // Refs for AbortControllers
+    expect(source).toContain('queueAbortControllerRef = useRef(null)');
+    expect(source).toContain('loadMoreAbortControllerRef = useRef(null)');
+
+    // loadLabAppointments: abort previous + create new + pass signal
+    const loadBlock = extractBlock(
+      source,
+      'const loadLabAppointments = useCallback(async () => {',
+      'const loadMoreAppointments = useCallback(async () => {',
+    );
+    expect(loadBlock).toContain('queueAbortControllerRef.current.abort()');
+    expect(loadBlock).toContain('new AbortController()');
+    expect(loadBlock).toContain('signal: controller.signal');
+    // Abort error tolerance
+    expect(loadBlock).toContain('isAbortLikeError(error)');
+
+    // loadMoreAppointments: same pattern
+    const loadMoreBlock = extractBlock(
+      source,
+      'const loadMoreAppointments = useCallback(async () => {',
+      '// H-2 fix: keyboard shortcuts',
+    );
+    expect(loadMoreBlock).toContain('loadMoreAbortControllerRef.current.abort()');
+    expect(loadMoreBlock).toContain('signal: controller.signal');
+    expect(loadMoreBlock).toContain('isAbortLikeError(error)');
+
+    // Cleanup effect on unmount
+    expect(source).toContain('STRAT#16: cleanup');
+    expect(source).toContain('queueAbortControllerRef.current.abort()');
+    expect(source).toContain('loadMoreAbortControllerRef.current.abort()');
+  });
+
   it('relies on backend-provided lab report summary fields without re-inventing status', () => {
     // P-03 fix: backend /lab/queue/today уже возвращает latest_lab_report
     // и связанные поля (lab_report_status, report_instance_id, etc.).
