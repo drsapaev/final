@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 import {
   Calendar,
   CreditCard,
@@ -133,11 +134,11 @@ const AdminFinanceOverview = () => {
   const handleDeleteTransaction = async (transaction) => {
     // P-013 fix: replaced window.confirm() with shared useConfirm hook.
     const ok = await confirm({
-      title: 'Удаление транзакции',
+      title: t('admin.delete_transaction_title'),
       message: `Удалить транзакцию «${transaction.description}»?`,
       description: 'Это действие необратимо.',
-      confirmLabel: 'Удалить',
-      cancelLabel: 'Отмена',
+      confirmLabel: t('admin.delete_confirm'),
+      cancelLabel: t('admin.cancel'),
       intent: 'danger',
     });
     if (!ok) {
@@ -148,7 +149,7 @@ const AdminFinanceOverview = () => {
       await deleteTransaction(transaction.id);
     } catch (error) {
       logger.error('Ошибка удаления финансовой транзакции:', error);
-      notify.error('Ошибка при удалении финансовой транзакции');
+      notify.error(t('admin.transaction_delete_error'));
     }
   };
 

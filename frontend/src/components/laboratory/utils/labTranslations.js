@@ -579,6 +579,25 @@ const TRANSLATIONS = {
     status_active_label: 'Активный',
     status_waiting_label: 'Ожидает',
   },
+  // ─── Admin (STRAT#36) ────────────────────────────────────────────────────
+  admin: {
+    // Confirm dialogs
+    delete_appointment_title: 'Удаление записи',
+    delete_appointment_message: 'Удалить запись «{name}»?',
+    delete_confirm: 'Удалить',
+    cancel: 'Отмена',
+    deactivate_doctor_title: 'Деактивация врача',
+    deactivate_doctor_message: 'Деактивировать врача «{name}»?',
+    deactivate_confirm: 'Деактивировать',
+    delete_transaction_title: 'Удаление транзакции',
+    delete_transaction_message: 'Удалить транзакцию «{name}»?',
+    delete_patient_title: 'Удаление пациента',
+    delete_patient_message: 'Удалить пациента «{name}»?',
+    // Notify messages
+    appointment_delete_error: 'Ошибка при удалении записи',
+    transaction_delete_error: 'Ошибка при удалении финансовой транзакции',
+    patient_delete_error: 'Ошибка при удалении пациента',
+  },
 };
 
 /**
