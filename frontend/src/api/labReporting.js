@@ -57,10 +57,24 @@ export const labReportingApi = {
   // Теперь использует этот метод — собственный контракт, собственная RBAC,
   // нормализация в lab-специфичный формат на backend.
   // Возвращает { entries: [...], total, date, timezone }.
-  listQueueToday(targetDate = null) {
+  //
+  // STRAT#4: добавлена поддержка server-side pagination через limit/offset.
+  // Backend уже принимает эти query params (default limit=100, offset=0).
+  // Frontend ранее не передавал их — загружал все записи сразу. Теперь
+  // callers могут передать { limit, offset } для chunked loading, что
+  // критично для крупных клиник с 1000+ анализов в день.
+  // Backward compat: если params не передан, поведение не меняется.
+  listQueueToday(targetDate = null, params = {}) {
     const search = new URLSearchParams();
     if (targetDate) {
       search.set('target_date', targetDate);
+    }
+    // STRAT#4: server-side pagination params
+    if (params.limit !== undefined && params.limit !== null) {
+      search.set('limit', String(params.limit));
+    }
+    if (params.offset !== undefined && params.offset !== null) {
+      search.set('offset', String(params.offset));
     }
     const suffix = search.size ? `?${search.toString()}` : '';
     return request(`/lab/queue/today${suffix}`);
