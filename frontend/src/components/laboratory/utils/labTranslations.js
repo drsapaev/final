@@ -407,6 +407,38 @@ const TRANSLATIONS = {
     btn_later: 'Позже',
     btn_extend: 'Продлить сессию',
   },
+
+  // ─── Registrar (STRAT#30) ────────────────────────────────────────────────
+  registrar: {
+    // Confirm dialogs
+    send_to_cabinet_title: 'Отправить в кабинет',
+    send_to_cabinet_message: 'Отправить пациента «{name}» в кабинет?',
+    send_to_cabinet_confirm: 'Отправить',
+    complete_visit_title: 'Завершение приёма',
+    complete_visit_message: 'Завершить приём пациента «{name}»?',
+    complete_visit_confirm: 'Завершить',
+    postpone_tomorrow_title: 'Перенос на завтра',
+    postpone_tomorrow_message: 'Перенести запись пациента на завтра?',
+    postpone_tomorrow_description: 'Запись будет перемещена на завтрашний день. Пациенту потребуется новая запись на сегодня, если он придёт.',
+    postpone_tomorrow_confirm: 'Перенести',
+    postpone_date_title: 'Перенос на другую дату',
+    postpone_date_confirm: 'Перенести',
+    cancel: 'Отмена',
+    // Notify messages
+    sent_to_cabinet: 'Пациент отправлен в кабинет',
+    visit_completed: 'Приём завершён',
+    appointment_created: 'Запись создана! Обновите страницу для отображения изменений.',
+    visit_postponed: 'Визит успешно перенесён на завтра',
+    visit_postponed_date: 'Визит успешно перенесён',
+    no_visit_for_postpone: 'Не удалось определить визит для переноса',
+    select_postpone_date: 'Выберите дату переноса',
+    invalid_date_format: 'Неверный формат даты. Используйте YYYY-MM-DD',
+    invalid_time_format: 'Неверный формат времени. Используйте HH:MM',
+    cannot_postpone_past: 'Нельзя перенести запись на прошедшую дату',
+    backend_unavailable: 'Backend недоступен. Проверьте подключение и повторите попытку.',
+    unknown_patient: 'Неизвестный пациент',
+    incorrect_server_data: 'Некорректные данные от сервера',
+  },
 };
 
 /**
