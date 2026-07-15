@@ -79,19 +79,19 @@ describe('CardiologistPanel Phase 1 safety contract (C-1 through C-7 + H-1)', ()
   it('C-6: ECGViewer downloadFile catch has notify.error', () => {
     const source = readSource('components/cardiology/ECGViewer.jsx');
 
-    expect(source).toContain('Не удалось скачать файл');
+    expect(source).toContain("t('final.ecg_download_failed')");
   });
 
   it('C-7: ECGViewer deleteFile catch has notify.error', () => {
     const source = readSource('components/cardiology/ECGViewer.jsx');
 
-    expect(source).toContain('Не удалось удалить файл');
+    expect(source).toContain("t('final.ecg_delete_failed')");
   });
 
   it('H-1: ECGViewer parseECGFileData catch has notify.warning', () => {
     const source = readSource('components/cardiology/ECGViewer.jsx');
 
-    expect(source).toContain('показан только просмотр');
+    expect(source).toContain("t('final.ecg_parse_warning')");
   });
 
   it('ECGViewer imports notify + getErrorMessage', () => {
