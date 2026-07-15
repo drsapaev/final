@@ -1,5 +1,6 @@
 import PropTypes from 'prop-types';
 import { Button, Icon } from '../ui/macos';
+import { t } from './utils/labTranslations';
 
 /**
  * P-04 fix: LabReportActionsBar выделен из LabReportWorkbench.
@@ -13,6 +14,11 @@ import { Button, Icon } from '../ui/macos';
  *
  * Терминология (Вариант B): «Финализировать» → «Утвердить»,
  * «Создать ревизию» → «Создать исправленную версию».
+ *
+ * STRAT#5: все русские строки мигрированы на t() из labTranslations.
+ * Первый компонент в lab-модуле, полностью использующий i18n-инфраструктуру.
+ * Когда будет подключён react-i18next, t() будет заменён на useTranslation().t
+ * без изменения call sites.
  */
 export default function LabReportActionsBar({
   saving = false,
@@ -41,31 +47,31 @@ export default function LabReportActionsBar({
         <>
           <Button variant="outline" onClick={onSaveDraft} disabled={saving || !canSaveDraft}>
             <Icon name="square.and.arrow.down" size={16} />
-            {busyAction === 'save' ? 'Сохраняю...' : 'Сохранить черновик'}
+            {busyAction === 'save' ? t('actions.saving') : t('actions.save_draft')}
           </Button>
           <Button variant="primary" onClick={onFinalize} disabled={saving || !canFinalize}>
             <Icon name="lock.circle" size={16} />
-            {busyAction === 'finalize' ? 'Утверждаю...' : 'Утвердить'}
+            {busyAction === 'finalize' ? t('actions.finalizing') : t('actions.finalize')}
           </Button>
         </>
       )}
       {showSecondaryGroup && (
         <>
-          <Button variant="outline" onClick={onRevise} disabled={saving || !canRevise} title="Создать исправленную версию отчёта">
+          <Button variant="outline" onClick={onRevise} disabled={saving || !canRevise} title={t('actions.revise_title')}>
             <Icon name="arrow.triangle.branch" size={16} />
             {/* L-L-2 fix: сокращён текст кнопки для tablet-friendly layout.
                 Полное название доступно в title-атрибуте. */}
-            {busyAction === 'revise' ? 'Создаю...' : 'Исправленная версия'}
+            {busyAction === 'revise' ? t('actions.revising') : t('actions.revise')}
           </Button>
           <Button variant="outline" onClick={onPrint} disabled={saving || !canPrint}>
             <Icon name="printer" size={16} />
-            {busyAction === 'print' ? 'Отправляю...' : 'Печать результата'}
+            {busyAction === 'print' ? t('actions.printing') : t('actions.print')}
           </Button>
           {/* P1 fix: Notify patient via Telegram — only for finalized/printed reports */}
           {canNotify && (
             <Button variant="success" onClick={onNotify} disabled={saving || busyAction === 'notify'}>
               <Icon name="paperplane" size={16} />
-              {busyAction === 'notify' ? 'Отправляю...' : 'Отправить пациенту'}
+              {busyAction === 'notify' ? t('actions.notifying') : t('actions.notify_patient')}
             </Button>
           )}
         </>
