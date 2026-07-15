@@ -116,7 +116,7 @@ def log_audit_event(
             ip_address=_get_client_ip(request),
             user_agent=_get_user_agent(request),
             session_id=session_id,
-            extra_data=extra_data,
+            payload=extra_data,  # M5.1: map extra_data to existing payload field
         )
         db.add(entry)
         db.commit()

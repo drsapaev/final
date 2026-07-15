@@ -59,7 +59,7 @@ class TestLogAuditEvent:
         assert entry.reason_code == {"context": "consultation", "id": 5832}
 
     def test_captures_extra_data(self):
-        """Extra data is stored."""
+        """Extra data is stored in payload field."""
         db = MagicMock()
         log_audit_event(
             db=db,
@@ -68,7 +68,7 @@ class TestLogAuditEvent:
             extra_data={"format": "csv", "rows": 1500},
         )
         entry = db.add.call_args[0][0]
-        assert entry.extra_data == {"format": "csv", "rows": 1500}
+        assert entry.payload == {"format": "csv", "rows": 1500}
 
     def test_patient_actor(self):
         """Patient actor fields are set correctly."""
