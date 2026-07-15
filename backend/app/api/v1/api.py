@@ -147,6 +147,7 @@ from app.api.v1.endpoints.security_management import (
 )
 from app.api.v1.endpoints.visit_confirmation import router as visit_confirmation_router
 from app.api.v1.endpoints.webauthn import router as webauthn_router  # M4-P1-4
+from app.api.v1.endpoints.admin_security import router as admin_security_router  # M5.6/M5.8/M5.9/M5.10
 from app.ws import cashier_ws
 
 try:
@@ -185,6 +186,9 @@ api_router.include_router(visit_confirmation_router, tags=["visit-confirmation"]
 
 # M4-P1-4: WebAuthn/Passkey endpoints (alternative patient auth)
 api_router.include_router(webauthn_router, tags=["webauthn"])
+
+# M5.6/M5.8/M5.9/M5.10: Admin security endpoints (dashboard, compliance, secrets, backup)
+api_router.include_router(admin_security_router, tags=["admin-security"])
 
 # Эндпоинты утренней сборки (админ/регистратор)
 api_router.include_router(morning_assignment_router, tags=["morning-assignment"])

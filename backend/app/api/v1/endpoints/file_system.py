@@ -127,8 +127,10 @@ async def upload_file(
         if tags:
             tags_list = [tag.strip() for tag in tags.split(',') if tag.strip()]
 
-        # #43: Scan for malware before saving\n        is_clean, threat = scan_for_malware(file_content)\n        if not is_clean:\n            raise HTTPException(status_code=400, detail=f"File rejected: malware detected ({threat})")\n\n        # FILES-AUDIT-28 P1: validate patient_id ownership
-        if patient_id is not None and current_user.role not in ("Admin", "Registrar"):
+        # FILES-AUDIT-28 P1: validate patient_id ownership
+        # M5.2: centralized authorization
+        from app.services.authorization.staff import staff_authorization_service
+        if patient_id is not None and not staff_authorization_service.has_permission(current_user, "patient:write"):
             from app.models.patient import Patient
             patient = db.query(Patient).filter(Patient.id == patient_id).first()
             if not patient:
@@ -346,10 +348,11 @@ async def get_files(
     try:
         from app.crud.file_system import file
 
-        # Определяем владельца файлов
+        # Определяем владельца файлов — M5.2: centralized authorization
+        from app.services.authorization.staff import staff_authorization_service
         owner_id = current_user.id
-        if current_user.role == "Admin":
-            owner_id = None  # Админ видит все файлы
+        if staff_authorization_service.can_manage_files(current_user):
+            owner_id = None  # Admin sees all files
 
         files = file.get_multi(
             db=db,

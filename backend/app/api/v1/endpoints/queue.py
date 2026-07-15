@@ -143,8 +143,9 @@ def generate_qr_token(
     try:
         queue_api_service = QueueApiService(db)
 
-        # Проверка прав доступа
-        if current_user.role not in ["Admin", "Registrar"]:
+        # Проверка прав доступа — M5.2: centralized authorization
+        from app.services.authorization.staff import staff_authorization_service
+        if not staff_authorization_service.can_manage_queue(current_user):
             raise HTTPException(status_code=403, detail="Недостаточно прав")
 
         specialist = queue_api_service.get_doctor_user(specialist_id)
@@ -388,8 +389,9 @@ def open_queue(
     try:
         queue_api_service = QueueApiService(db)
 
-        # Проверка прав доступа
-        if current_user.role not in ["Admin", "Registrar"]:
+        # Проверка прав доступа — M5.2: centralized authorization
+        from app.services.authorization.staff import staff_authorization_service
+        if not staff_authorization_service.can_manage_queue(current_user):
             raise HTTPException(status_code=403, detail="Недостаточно прав")
 
         # Получение или создание очереди
@@ -542,8 +544,9 @@ def call_patient(
 
     См. документацию: docs/QUEUE_ENDPOINTS_MIGRATION_GUIDE.md
     """
-    # Проверка прав доступа
-    if current_user.role not in ["Admin", "Registrar", "Doctor"]:
+    # Проверка прав доступа — M5.2: centralized authorization
+    from app.services.authorization.staff import staff_authorization_service
+    if not staff_authorization_service.can_read_queue(current_user):
         raise HTTPException(status_code=403, detail="Недостаточно прав")
 
     queue_api_service = QueueApiService(db)
