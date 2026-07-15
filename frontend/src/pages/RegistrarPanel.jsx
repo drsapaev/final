@@ -25,6 +25,8 @@ import RoleNotificationCenter from '../components/notifications/RoleNotification
 import { useConfirm } from '../components/common/ConfirmDialog';
 // QW-06 fix: translations extracted to separate file (was 50+ inline keys).
 import { getRegistrarTranslator } from './registrarTranslations';
+// STRAT#30: useTranslation adapter for confirm/notify i18n (react-i18next compatible).
+import { useTranslation } from '../i18n/adapter';
 // Decomp 2: hotkeys extracted to useRegistrarHotkeys hook
 import { useRegistrarHotkeys } from './registrar/useRegistrarHotkeys';
 // Decomp 3: reschedule helpers extracted to useRegistrarReschedule hook
@@ -264,6 +266,12 @@ const RegistrarPanel = () => {
   // Full migration to locales/{ru,uz,en}.js deferred until useTranslation.jsx
   // is refactored to use centralized locale files (see audit §8, Direction 3).
   const t = useMemo(() => getRegistrarTranslator(language), [language]);
+  // STRAT#30: useTranslation adapter for confirm/notify i18n.
+  // 't' from getRegistrarTranslator handles UI labels (tabs, statuses).
+  // 'tI18n' from useTranslation handles confirm dialogs and notify messages
+  // via the centralized labTranslations dictionary's registrar.* namespace.
+  // When react-i18next is adopted, both will merge into a single t().
+  const { t: tI18n } = useTranslation();
   const currentWorklistLabel = t(REGISTRAR_TAB_LABEL_KEYS[activeTab] || 'tabs_appointments');
   const statusFilterLabel = statusFilter ? t(REGISTRAR_STATUS_LABEL_KEYS[statusFilter] || statusFilter) : null;
   const { theme, getSpacing, getFontSize, getColor } = useTheme();
@@ -544,7 +552,7 @@ const RegistrarPanel = () => {
         });
         // Показываем уведомление пользователю только при первой загрузке
         if (appointmentsCount === 0) {
-          notify.error('Backend недоступен. Проверьте подключение и повторите попытку.');
+          notify.error(tI18n('registrar.backend_unavailable'));
         }
       }
     } finally {
@@ -1307,15 +1315,15 @@ const RegistrarPanel = () => {
         // confirm. Это нарушение Nielsen #4 (consistency) + #5 (error prevention).
         const inCabinetName = row.patient_fio || row.patient_name || '';
         const inCabinetOk = await confirm({
-          title: 'Отправить в кабинет',
-          message: `Отправить пациента «${inCabinetName}» в кабинет?`,
-          confirmLabel: 'Отправить',
-          cancelLabel: 'Отмена',
+          title: tI18n('registrar.send_to_cabinet_title'),
+          message: tI18n('registrar.send_to_cabinet_message', { name: inCabinetName }),
+          confirmLabel: tI18n('registrar.send_to_cabinet_confirm'),
+          cancelLabel: tI18n('registrar.cancel'),
           intent: 'primary',
         });
         if (!inCabinetOk) break;
         await updateAppointmentStatus(row.id, 'in_cabinet', '', row);
-        notify.success('Пациент отправлен в кабинет');
+        notify.success(tI18n('registrar.sent_to_cabinet'));
         break;
       }
       case 'call':
@@ -1325,15 +1333,15 @@ const RegistrarPanel = () => {
         // UX Audit R-1.2: confirm для завершения приёма в context menu.
         const completeName = row.patient_fio || row.patient_name || '';
         const completeOk = await confirm({
-          title: 'Завершение приёма',
-          message: `Завершить приём пациента «${completeName}»?`,
-          confirmLabel: 'Завершить',
-          cancelLabel: 'Отмена',
+          title: tI18n('registrar.complete_visit_title'),
+          message: tI18n('registrar.complete_visit_message', { name: completeName }),
+          confirmLabel: tI18n('registrar.complete_visit_confirm'),
+          cancelLabel: tI18n('registrar.cancel'),
           intent: 'primary',
         });
         if (!completeOk) break;
         await updateAppointmentStatus(row.id, 'done', '', row);
-        notify.success('Приём завершён');
+        notify.success(tI18n('registrar.visit_completed'));
         break;
       }
       case 'payment':
@@ -1654,10 +1662,10 @@ const RegistrarPanel = () => {
                     // Теперь: macOS-style ConfirmDialog через useConfirm.
                     const inCabinetName = row.patient_fio || row.patient_name || '';
                     const inCabinetOk = await confirm({
-                      title: 'Отправить в кабинет',
-                      message: `Отправить пациента «${inCabinetName}» в кабинет?`,
-                      confirmLabel: 'Отправить',
-                      cancelLabel: 'Отмена',
+                      title: tI18n('registrar.send_to_cabinet_title'),
+                      message: tI18n('registrar.send_to_cabinet_message', { name: inCabinetName }),
+                      confirmLabel: tI18n('registrar.send_to_cabinet_confirm'),
+                      cancelLabel: tI18n('registrar.cancel'),
                       intent: 'primary',
                     });
                     if (!inCabinetOk) break;
@@ -1673,10 +1681,10 @@ const RegistrarPanel = () => {
                     // UX Audit Registrar #2: window.confirm() → useConfirm hook.
                     const completeName = row.patient_fio || row.patient_name || '';
                     const completeOk = await confirm({
-                      title: 'Завершение приёма',
-                      message: `Завершить приём пациента «${completeName}»?`,
-                      confirmLabel: 'Завершить',
-                      cancelLabel: 'Отмена',
+                      title: tI18n('registrar.complete_visit_title'),
+                      message: tI18n('registrar.complete_visit_message', { name: completeName }),
+                      confirmLabel: tI18n('registrar.complete_visit_confirm'),
+                      cancelLabel: tI18n('registrar.cancel'),
                       intent: 'primary',
                     });
                     if (!completeOk) break;
@@ -1968,7 +1976,7 @@ const RegistrarPanel = () => {
             logger.error('Error refreshing data after wizard completion:', error);
             // Не показываем ошибку пользователю, так как запись уже создана
             setShowWizard(false);
-            notify.success('Запись создана! Обновите страницу для отображения изменений.');
+            notify.success(tI18n('registrar.appointment_created'));
           }
         }} />
 
@@ -1996,12 +2004,11 @@ const RegistrarPanel = () => {
               // R-43 fix: confirmation dialog для destructive action.
               // Перенос записи — необратимое действие (запись меняет день).
               const ok = await confirm({
-                title: 'Перенос на завтра',
-                message: 'Перенести запись пациента на завтра?',
-                description: 'Запись будет перемещена на завтрашний день. ' +
-                  'Текущее время слота может измениться.',
-                confirmLabel: 'Перенести',
-                cancelLabel: 'Отмена',
+                title: tI18n('registrar.postpone_tomorrow_title'),
+                message: tI18n('registrar.postpone_tomorrow_message'),
+                description: tI18n('registrar.postpone_tomorrow_description'),
+                confirmLabel: tI18n('registrar.postpone_tomorrow_confirm'),
+                cancelLabel: tI18n('registrar.cancel'),
                 intent: 'primary',
               });
               if (!ok) return;
@@ -2010,12 +2017,12 @@ const RegistrarPanel = () => {
                 setShowSlotsModal(false);
                 const targetVisitId = resolveRescheduleVisitId(rescheduleData);
                 if (!targetVisitId) {
-                  notify.error('Не удалось определить визит для переноса');
+                  notify.error(tI18n('registrar.no_visit_for_postpone'));
                   return;
                 }
                 logger.info(`Перенос визита ${targetVisitId} на завтра`);
                 await rescheduleTomorrow(targetVisitId);
-                notify.success('Визит успешно перенесён на завтра');
+                notify.success(tI18n('registrar.visit_postponed'));
                 removeRescheduledAppointmentFromView(rescheduleData, targetVisitId);
                 setRescheduleData(null);
                 setCustomRescheduleDate('');
@@ -2043,36 +2050,36 @@ const RegistrarPanel = () => {
               const timeStr = (customRescheduleTime || '').trim();
 
               if (!dateStr) {
-                notify.error('Выберите дату переноса');
+                notify.error(tI18n('registrar.select_postpone_date'));
                 return;
               }
 
               if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-                notify.error('Неверный формат даты. Используйте YYYY-MM-DD');
+                notify.error(tI18n('registrar.invalid_date_format'));
                 return;
               }
 
               // R-27 fix: validate optional time (HH:MM)
               if (timeStr && !/^\d{2}:\d{2}$/.test(timeStr)) {
-                notify.error('Неверный формат времени. Используйте HH:MM');
+                notify.error(tI18n('registrar.invalid_time_format'));
                 return;
               }
 
               // Optional guard: prevent rescheduling to a past date
               const today = getLocalDateString();
               if (dateStr < today) {
-                notify.error('Нельзя перенести запись на прошедшую дату');
+                notify.error(tI18n('registrar.cannot_postpone_past'));
                 return;
               }
 
               // R-43 fix: confirmation dialog для destructive action.
               const ok = await confirm({
-                title: 'Перенос на другую дату',
+                title: tI18n('registrar.postpone_date_title'),
                 message: timeStr
                   ? `Перенести запись пациента на ${dateStr} в ${timeStr}?`
                   : `Перенести запись пациента на ${dateStr}?`,
-                confirmLabel: 'Перенести',
-                cancelLabel: 'Отмена',
+                confirmLabel: tI18n('registrar.postpone_date_confirm'),
+                cancelLabel: tI18n('registrar.cancel'),
                 intent: 'primary',
               });
               if (!ok) return;
@@ -2081,12 +2088,12 @@ const RegistrarPanel = () => {
                 setShowSlotsModal(false);
                 const targetVisitId = resolveRescheduleVisitId(rescheduleData);
                 if (!targetVisitId) {
-                  notify.error('Не удалось определить визит для переноса');
+                  notify.error(tI18n('registrar.no_visit_for_postpone'));
                   return;
                 }
                 logger.info(`Перенос визита ${targetVisitId} на ${dateStr}${timeStr ? ' ' + timeStr : ''}`);
                 await rescheduleVisit(targetVisitId, dateStr, timeStr || undefined);
-                notify.success(`Визит перенесён на ${dateStr}${timeStr ? ' ' + timeStr : ''}`);
+                notify.success(tI18n('registrar.visit_postponed_date') + ` ${dateStr}${timeStr ? ' ' + timeStr : ''}`);
                 removeRescheduledAppointmentFromView(rescheduleData, targetVisitId);
                 setRescheduleData(null);
                 setCustomRescheduleDate('');
