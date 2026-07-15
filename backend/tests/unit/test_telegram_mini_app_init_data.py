@@ -54,6 +54,7 @@ def _validated_init_data(telegram_id: int, *, now: datetime):
         init_data,
         bot_token=BOT_TOKEN,
         now=now,
+        replay_check=False,  # M4-P0-2: disable replay protection in unit tests
     )
 
 

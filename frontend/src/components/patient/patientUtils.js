@@ -87,6 +87,7 @@ const SHARED_ERROR_MESSAGES = {
   hash_mismatch: 'Откройте Mini App из Telegram заново.',
   telegram_link_required: 'Привяжите Telegram к профилю пациента перед выполнением.',
   bot_token_required: 'Telegram Mini App ещё не настроен.',
+  init_data_replayed: 'Этот сеанс уже использован. Откройте Mini App из Telegram заново.',
 };
 
 const BOOKING_ERROR_MESSAGES = {

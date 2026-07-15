@@ -459,3 +459,21 @@ def admin_auth_headers(client, admin_user, admin_password):
     assert response.status_code == 200
     token = response.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
+
+
+# M4-P0-2: Clear replay-protection cache before each test to prevent
+# cross-test contamination from init_data replay protection.
+@pytest.fixture(autouse=True)
+def _clear_replay_cache():
+    """Auto-fixture: clear cache_manager before each test."""
+    try:
+        from app.core.cache import cache_manager
+        cache_manager.clear()
+    except Exception:
+        pass
+    yield
+    try:
+        from app.core.cache import cache_manager
+        cache_manager.clear()
+    except Exception:
+        pass
