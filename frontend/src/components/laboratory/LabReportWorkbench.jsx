@@ -35,6 +35,10 @@ import LabReportActionsBar from './LabReportActionsBar';
 import LabReportHistoryPanel from './LabReportHistoryPanel';
 // P-01 fix: AI-анализ перенесён из LabResultsManager в LabReportWorkbench.
 import LabReportAIAnalysis from './LabReportAIAnalysis';
+// STRAT#1: state-логика вынесена в useLabReportState hook.
+// Компонент теперь содержит только handlers + JSX. Это уменьшает
+// god-компонент на ~200 строк и изолирует state для тестирования.
+import { useLabReportState } from './hooks/useLabReportState';
 
 export default function LabReportWorkbench({
   selectedAppointment = null,
@@ -56,40 +60,58 @@ export default function LabReportWorkbench({
   // новый instance. Оба действия необратимы без объяснения последствий.
   const [confirm, confirmDialog] = useConfirm();
 
-  const [selectedTemplateId, setSelectedTemplateId] = useState('');
-  const [draftValues, setDraftValues] = useState({});
-  const [signerSnapshot, setSignerSnapshot] = useState({});
-  // PR-64 / Medium-16: collapsible sections in report editor
-  const [collapsedSections, setCollapsedSections] = useState(new Set());
-  const [saving, setSaving] = useState(false);
-  const [busyAction, setBusyAction] = useState('');
-  const [printFeedback, setPrintFeedback] = useState(null);
-  const [historySeverityFilter, setHistorySeverityFilter] = useState('all');
-  // WF-11 fix: escape hatch для template resolution blocking gap.
-  // Если услуги есть, но ни один template не смаплен — лаборант застревал.
-  // Теперь можно нажать "Показать все шаблоны" и создать бланк без привязки.
-  const [escapeHatchActive, setEscapeHatchActive] = useState(false);
-
-  // Dirty state tracking: храним snapshot значений при загрузке instance,
-  // сравниваем с текущими draftValues для определения несохранённых изменений.
-  const initialValuesRef = useRef({ values: {}, signer: {} });
-
-  const isDirty = useMemo(() => {
-    if (!activeInstance) return false;
-    // Сравниваем draftValues с initialValues
-    const initial = initialValuesRef.current.values;
-    const draftKeys = new Set([...Object.keys(draftValues), ...Object.keys(initial)]);
-    for (const key of draftKeys) {
-      if ((draftValues[key] || '') !== (initial[key] || '')) return true;
-    }
-    // Сравниваем signerSnapshot
-    const initialSigner = initialValuesRef.current.signer;
-    const signerKeys = ['lab_technician_label', 'lab_technician_name', 'approver_label', 'approver_name'];
-    for (const key of signerKeys) {
-      if ((signerSnapshot?.[key] || '') !== (initialSigner?.[key] || '')) return true;
-    }
-    return false;
-  }, [activeInstance, draftValues, signerSnapshot]);
+  // STRAT#1: state declarations + derived memos + init effects
+  // теперь в useLabReportState hook (hooks/useLabReportState.js).
+  const {
+    selectedTemplateId,
+    setSelectedTemplateId,
+    draftValues,
+    setDraftValues,
+    signerSnapshot,
+    setSignerSnapshot,
+    collapsedSections,
+    setCollapsedSections,
+    saving,
+    setSaving,
+    busyAction,
+    setBusyAction,
+    printFeedback,
+    setPrintFeedback,
+    historySeverityFilter,
+    setHistorySeverityFilter,
+    escapeHatchActive,
+    setEscapeHatchActive,
+    lastAutoSave,
+    setLastAutoSave,
+    autoSaving,
+    setAutoSaving,
+    initialValuesRef,
+    autoSaveTimerRef,
+    handleSaveDraftRef,
+    isDirty,
+    publishedTemplates,
+    serviceContextItems,
+    resolvedTemplates,
+    serviceContextPresent,
+    templateOptions,
+    effectiveTemplateOptions,
+    resolutionHasBlockingGap,
+    singleAllowedTemplate,
+    showRecentReportsBrowser,
+    canEditActiveInstance,
+    canSaveDraft,
+    canFinalize,
+    canRevise,
+    canPrint,
+    missingRequiredFields,
+    hasMissingRequired,
+    canFinalizeWithValidation,
+  } = useLabReportState({
+    selectedAppointment,
+    templates,
+    templateResolution,
+    activeInstance,
+  });
 
   // Navigation guard: предотвращает потерю данных при refresh/close.
   // Используем beforeunload напрямую (без useNavigationGuard) —
@@ -106,58 +128,47 @@ export default function LabReportWorkbench({
     return () => window.removeEventListener('beforeunload', handler);
   }, [isDirty]);
 
-  const publishedTemplates = useMemo(
-    () => templates.filter((template) => template.published_version_id || template.draft_version_id),
-    [templates]
-  );
-  const serviceContextItems = useMemo(
-    () => getServiceContextItems(selectedAppointment),
-    [selectedAppointment]
-  );
-  const resolvedTemplates = templateResolution?.allowed_templates || [];
-  const serviceContextPresent = (templateResolution?.service_codes || []).length > 0;
-  // WF-11 fix: при escape hatch показываем все published templates,
-  // даже если service context есть, но resolution не нашёл шаблон.
-  const templateOptions = serviceContextPresent ? resolvedTemplates : publishedTemplates;
-  const effectiveTemplateOptions = escapeHatchActive
-    ? publishedTemplates
-    : templateOptions;
-  const resolutionHasBlockingGap = serviceContextPresent && resolvedTemplates.length === 0 && !escapeHatchActive;
-  const singleAllowedTemplate =
-    serviceContextPresent && effectiveTemplateOptions.length === 1 ? effectiveTemplateOptions[0] : null;
-
-  const showRecentReportsBrowser = !selectedAppointment && !activeInstance;
-  const canEditActiveInstance = hasLabReportAction(activeInstance, 'edit');
-  const canSaveDraft = hasLabReportAction(activeInstance, 'save_draft');
-  // WF-round5: Mark Ready убран — был функционально пустой операцией.
-  const canFinalize = hasLabReportAction(activeInstance, 'finalize'); // Утвердить
-  const canRevise = hasLabReportAction(activeInstance, 'revise');
-  const canPrint = hasLabReportAction(activeInstance, 'print');
-
-  // WF-10 fix: inline-валидация required fields. Раньше валидация происходила
-  // только на backend при finalize → late feedback (error toast со списком).
-  // Теперь вычисляем missing required fields на frontend и:
-  //   - disable кнопку Finalize пока есть незаполненные обязательные поля
-  //   - показываем tooltip со списком missing полей
-  const missingRequiredFields = useMemo(() => {
-    if (!activeInstance?.sections) return [];
-    const missing = [];
-    activeInstance.sections.forEach((section) => {
-      (section.fields || []).forEach((field) => {
-        if (field.required) {
-          const value = draftValues[field.field_key];
-          if (value === undefined || value === '' || value === null) {
-            missing.push(field.label || field.field_key);
-          }
+  // WF-22 fix: keyboard shortcuts для efficiency.
+  // Ctrl+S (Cmd+S на Mac) → save draft (preventDefault — браузер не показывает Save Dialog)
+  // Доступно только когда canSaveDraft (editable state).
+  useEffect(() => {
+    if (!canSaveDraft) return;
+    const handler = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        if (!saving && handleSaveDraftRef.current) {
+          handleSaveDraftRef.current();
         }
-      });
-    });
-    return missing;
-  }, [activeInstance, draftValues]);
-  const hasMissingRequired = missingRequiredFields.length > 0;
-  // Finalize disabled если есть missing required fields (даже если backend
-  // разрешает action — лучше предотвратить, чем получить 400 error).
-  const canFinalizeWithValidation = canFinalize && !hasMissingRequired;
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [canSaveDraft, saving]);
+
+  // PR-58: autosave — 30-second debounce when dirty + canSaveDraft
+  // L-L-6 fix: добавлен autoSaving state — отображается в индикаторе
+  // во время сохранения (а не только после успешного завершения).
+  useEffect(() => {
+    if (!isDirty || !canSaveDraft || saving) return;
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(async () => {
+      if (handleSaveDraftRef.current && !saving) {
+        try {
+          setAutoSaving(true);
+          await handleSaveDraftRef.current();
+          setLastAutoSave(new Date());
+        } catch (e) {
+          // Autosave failure is non-fatal — manual save is still available
+          logger.warn('Lab autosave failed:', e);
+        } finally {
+          setAutoSaving(false);
+        }
+      }
+    }, 30000); // 30 seconds
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+  }, [isDirty, canSaveDraft, saving, draftValues]);
 
   const handleCreateInstance = useCallback(async (templateIdOverride = null, options = {}) => {
     const templateId = templateIdOverride || selectedTemplateId;
@@ -210,105 +221,10 @@ export default function LabReportWorkbench({
     templateResolution
   ]);
 
-  useEffect(() => {
-    if (!activeInstance) {
-      setDraftValues({});
-      setSignerSnapshot({});
-      setPrintFeedback(null);
-      initialValuesRef.current = { values: {}, signer: {} };
-      // WF-11 fix: сбрасываем escape hatch при смене/закрытии instance
-      setEscapeHatchActive(false);
-      return;
-    }
-    // WF-12 fix: сбрасываем printFeedback при смене activeInstance,
-    // иначе лаборант видит stale success-сообщение от печати предыдущего
-    // бланка. useEffect зависит от activeInstance.id, не от объекта —
-    // поэтому сработает именно при смене instance, а не при любом re-render.
-    setPrintFeedback(null);
-    const values = {};
-    activeInstance.sections.forEach((section) => {
-      section.fields.forEach((field) => {
-        values[field.field_key] = extractFieldValue(field);
-      });
-    });
-    setDraftValues(values);
-    setSignerSnapshot(activeInstance.signer_snapshot || {});
-    setSelectedTemplateId(String(activeInstance.template_id));
-    // Dirty state: сохраняем snapshot загруженных значений как "чистых".
-    // isDirty будет true только если пользователь изменит что-то после этого.
-    initialValuesRef.current = {
-      values: { ...values },
-      signer: { ...(activeInstance.signer_snapshot || {}) },
-    };
-  }, [activeInstance]);
-
-  // WF-22 fix: keyboard shortcuts для efficiency.
-  // Ctrl+S (Cmd+S на Mac) → save draft (preventDefault — браузер не показывает Save Dialog)
-  // Доступно только когда canSaveDraft (editable state).
-  const handleSaveDraftRef = useRef(null);
-  useEffect(() => {
-    if (!canSaveDraft) return;
-    const handler = (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-        e.preventDefault();
-        if (!saving && handleSaveDraftRef.current) {
-          handleSaveDraftRef.current();
-        }
-      }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [canSaveDraft, saving]);
-
-  // PR-58: autosave — 30-second debounce when dirty + canSaveDraft
-  // L-L-6 fix: добавлен autoSaving state — отображается в индикаторе
-  // во время сохранения (а не только после успешного завершения).
-  const [lastAutoSave, setLastAutoSave] = useState(null);
-  const [autoSaving, setAutoSaving] = useState(false);
-  const autoSaveTimerRef = useRef(null);
-  useEffect(() => {
-    if (!isDirty || !canSaveDraft || saving) return;
-    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
-    autoSaveTimerRef.current = setTimeout(async () => {
-      if (handleSaveDraftRef.current && !saving) {
-        try {
-          setAutoSaving(true);
-          await handleSaveDraftRef.current();
-          setLastAutoSave(new Date());
-        } catch (e) {
-          // Autosave failure is non-fatal — manual save is still available
-          logger.warn('Lab autosave failed:', e);
-        } finally {
-          setAutoSaving(false);
-        }
-      }
-    }, 30000); // 30 seconds
-    return () => {
-      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
-    };
-  }, [isDirty, canSaveDraft, saving, draftValues]);
-
-  useEffect(() => {
-    if (activeInstance || !selectedAppointment) {
-      return;
-    }
-    const defaultTemplateId =
-      templateResolution?.default_template?.id
-      || (!serviceContextPresent ? effectiveTemplateOptions[0]?.id : '')
-      || '';
-    setSelectedTemplateId((current) => {
-      if (current && effectiveTemplateOptions.some((template) => String(template.id) === String(current))) {
-        return current;
-      }
-      return defaultTemplateId ? String(defaultTemplateId) : '';
-    });
-  }, [
-    activeInstance,
-    selectedAppointment,
-    serviceContextPresent,
-    effectiveTemplateOptions,
-    templateResolution?.default_template?.id
-  ]);
+  // STRAT#1: init-instance effect, default-template effect, keyboard-shortcut
+  // effect и autosave effect — все вынесены в useLabReportState hook.
+  // Здесь остались только handlers, которые зависят от notify/onInstanceChange
+  // (их нельзя изолировать в хук без прокидания через args).
 
   function updateField(fieldKey, value) {
     setDraftValues((prev) => ({ ...prev, [fieldKey]: value }));
