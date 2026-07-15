@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 import { api } from '../../api/client';
 import { useState } from 'react';
 import { Card, Button,
@@ -40,11 +41,11 @@ const TwoFactorSetupWizard = ({ onComplete }) => {
   const [showSecret, setShowSecret] = useState(false);
 
   const steps = [
-  { id: 1, title: 'Выбор метода', description: 'Выберите способ двухфакторной аутентификации' },
-  { id: 2, title: 'Настройка', description: 'Настройте выбранный метод' },
-  { id: 3, title: 'Подтверждение', description: 'Подтвердите настройку' },
-  { id: 4, title: 'Резервные коды', description: 'Сохраните резервные коды' },
-  { id: 5, title: 'Завершение', description: 'Настройка завершена' }];
+  { id: 1, title: t('final.twofactor_step1_title'), description: t('final.twofactor_step1_desc') },
+  { id: 2, title: t('final.twofactor_step2_title'), description: t('final.twofactor_step2_desc') },
+  { id: 3, title: t('final.twofactor_step3_title'), description: t('final.twofactor_step3_desc') },
+  { id: 4, title: t('final.twofactor_step4_title'), description: t('final.twofactor_step4_desc') },
+  { id: 5, title: t('final.twofactor_step5_title'), description: t('final.twofactor_step5_desc') }];
 
 
   const methods = [

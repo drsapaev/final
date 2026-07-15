@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 /**
  * ECG Viewer Component
  * Просмотр и анализ ЭКГ файлов
@@ -367,16 +368,16 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
               source: 'device',
               parameters: enrichedParams,
             });
-            notify.success('ЭКГ сохранена в истории пациента');
+            notify.success(t('final.ecg_saved'));
           } catch (persistError) {
             logger.error('Не удалось сохранить ЭКГ в истории пациента:', persistError);
-            notify.error('ЭКГ загружена, но не сохранена в истории. Проверьте соединение.');
+            notify.error(t('final.ecg_not_saved'));
           }
         }
       }
     } catch (error) {
       logger.error('Ошибка парсинга ЭКГ:', error);
-      notify.warning('Не удалось разобрать файл ЭКГ. Параметры не извлечены — показан только просмотр.');
+      notify.warning(t('final.ecg_parse_warning'));
     }
   };
 
@@ -404,7 +405,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
       window.URL.revokeObjectURL(blobUrl);
     } catch (error) {
       logger.error('Ошибка скачивания файла:', error);
-      notify.error('Не удалось скачать файл. Проверьте соединение и попробуйте позже.');
+      notify.error(t('final.ecg_download_failed'));
     }
   };
 
@@ -478,7 +479,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
       onDataUpdate && onDataUpdate();
     } catch (error) {
       logger.error('Ошибка удаления файла:', error);
-      notify.error('Не удалось удалить файл. Проверьте соединение и попробуйте позже.');
+      notify.error(t('final.ecg_delete_failed'));
     }
   };
 

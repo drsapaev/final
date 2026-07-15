@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 import { useState, useEffect } from 'react';
 import { Wifi, WifiOff, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
 import { Card, Button } from '../ui/macos';
@@ -124,7 +125,7 @@ const OfflineIndicator = () => {
       syncData();
     } else {
       // Показываем инструкции для восстановления подключения
-      notify.warning('Проверьте подключение к интернету и попробуйте снова');
+      notify.warning(t('final.check_connection'));
     }
   };
 

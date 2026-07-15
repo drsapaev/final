@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 import { useState, useEffect, useCallback } from 'react';
 import {
   DollarSign,
@@ -70,13 +71,13 @@ const PriceOverrideManager = ({
     e.preventDefault();
 
     if (!newPrice || !reason) {
-      notify.error('Заполните цену и причину изменения');
+      notify.error(t('final.price_override_fields_required'));
       return;
     }
 
     const priceNum = Number(newPrice.replace(/[^0-9.-]/g, ''));
     if (isNaN(priceNum) || priceNum <= 0) {
-      notify.error('Введите корректную цену');
+      notify.error(t('final.price_override_invalid'));
       return;
     }
 
@@ -92,7 +93,7 @@ const PriceOverrideManager = ({
 
       if (response.status >= 200 && response.status < 300) {
         const result = response.data;
-        notify.success('Изменение цены отправлено на одобрение');
+        notify.success(t('final.price_override_sent'));
 
         // Обновляем список изменений
         loadPriceOverrides();

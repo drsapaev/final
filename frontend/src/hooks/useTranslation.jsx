@@ -1,3 +1,4 @@
+import { t } from '../i18n/adapter';
 // Translation Context and Hook
 import { createContext, useContext, useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
@@ -137,7 +138,7 @@ export const TranslationProvider = ({ children }) => {
 
       // Landing page
       title: 'MediClinic Pro',
-      subtitle: 'Система управления медицинской клиникой',
+      subtitle: t('final.app_subtitle_ru'),
       loginButton: 'Войти в систему',
       activateButton: 'Активировать лицензию',
       contacts: 'Контактная информация',

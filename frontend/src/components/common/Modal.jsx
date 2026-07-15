@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 // Система модальных окон
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import PropTypes from 'prop-types';
@@ -440,7 +441,7 @@ export const modal = {
       return null;
     }
     return openModalExternal({
-      title: 'Подтверждение',
+      title: t('final.modal_confirm_title'),
       content: <p>{message}</p>,
       footer:
       <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)' }}>
@@ -456,7 +457,7 @@ export const modal = {
       return null;
     }
     return openModalExternal({
-      title: 'Уведомление',
+      title: t('final.modal_notification_title'),
       content: <p>{message}</p>,
       footer:
       <button onClick={onClose}>OK</button>

@@ -1,3 +1,4 @@
+import { t } from '../i18n/adapter';
 import PropTypes from 'prop-types';
 import { CreditCard, User, FileText, Pill, CheckCircle, AlertCircle } from 'lucide-react';
 import { Card, Badge } from './ui/macos';
@@ -61,22 +62,22 @@ const AppointmentFlow = ({ appointment }) => {
   const steps = [
   {
     id: 'payment',
-    title: 'Оплата',
+    title: t('final.flow_payment'),
     description: 'Ожидание оплаты записи',
   },
   {
     id: 'visit',
-    title: 'Начать прием',
+    title: t('final.flow_start_visit'),
     description: 'Отправить пациента к врачу',
   },
   {
     id: 'emr',
-    title: 'ЭМК',
+    title: t('final.flow_emr'),
     description: 'Электронная медицинская карта',
   },
   {
     id: 'prescription',
-    title: 'Рецепт',
+    title: t('final.flow_prescription'),
     description: 'Назначение препаратов',
   }];
 

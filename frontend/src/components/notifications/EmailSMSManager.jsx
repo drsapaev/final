@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 import { api } from '../../api/client';
 import { useEffect, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
@@ -771,7 +772,7 @@ const TemplateColumn = ({ title, icon: Icon, templates, tone }) => {
   const columns = [
     {
       key: 'title',
-      title: 'Шаблон',
+      title: t('final.col_template'),
       render: (_value, template) => (
         <div style={{ minWidth: '180px' }}>
           <strong>{template.title}</strong>
@@ -783,7 +784,7 @@ const TemplateColumn = ({ title, icon: Icon, templates, tone }) => {
     },
     {
       key: 'variables',
-      title: 'Переменные',
+      title: t('final.col_variables'),
       render: (_value, template) => (
         <div style={{ display: 'flex', gap: 'var(--mac-spacing-1)', flexWrap: 'wrap' }}>
           {(template.variables || []).map((variable) => (

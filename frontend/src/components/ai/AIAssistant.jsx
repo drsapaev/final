@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 import { useState } from 'react';
 import PropTypes from 'prop-types';
 import {
@@ -275,7 +276,7 @@ const AIAssistant = ({
 
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text);
-    notify.info('Скопировано в буфер обмена');
+    notify.info(t('final.copied_to_clipboard'));
   };
 
   const Pill = ({ children, color = 'default' }) => {
@@ -394,7 +395,7 @@ const AIAssistant = ({
                     {onSuggestionSelect && (
                     <Button variant="primary" onClick={() => {
                       onSuggestionSelect('icd10', item.code);
-                      notify.success('Код МКБ-10 добавлен в форму');
+                      notify.success(t('final.icd_added_to_form'));
                     }}>
                       <CheckCircle style={{ width: 14, height: 14, marginRight: 6 }} />Использовать
                     </Button>
@@ -430,7 +431,7 @@ const AIAssistant = ({
             {onSuggestionSelect && (
             <Button variant="primary" onClick={() => {
               onSuggestionSelect('icd10', item.code);
-              notify.success('Код МКБ-10 добавлен в форму');
+              notify.success(t('final.icd_added_to_form'));
             }}>
               <CheckCircle style={{ width: 14, height: 14, marginRight: 6 }} />Использовать
             </Button>

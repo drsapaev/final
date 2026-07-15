@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 import { useEffect, useState } from 'react';
 import { Bell, X } from 'lucide-react';
 import { pushNotifications } from '../../services/pushNotifications';
@@ -77,7 +78,7 @@ export function NotificationPrompt() {
         // If the user explicitly denied it (check current permission state)
         const permission = typeof Notification !== 'undefined' ? Notification.permission : 'denied';
         if (permission === 'denied') {
-          notify.warning('Уведомления заблокированы. Разрешите их в настройках браузера.');
+          notify.warning(t('final.notifications_blocked'));
         } else {
           // Just dismissed, or default
           logger.log('[NotificationPrompt] User dismissed the prompt');
@@ -89,7 +90,7 @@ export function NotificationPrompt() {
       settled = true;
       clearTimeout(safetyTimer);
       logger.error('[NotificationPrompt] Error:', error);
-      notify.error('Не удалось включить уведомления. Проверьте настройки браузера.');
+      notify.error(t('final.notifications_enable_failed'));
     } finally {
       settled = true;
       setIsLoading(false);

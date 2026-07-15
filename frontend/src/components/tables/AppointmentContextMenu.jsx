@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 import { useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import {
@@ -168,7 +169,7 @@ const AppointmentContextMenu = ({
     label: 'Форс-мажор',
     // UX Audit R-2.7: tooltip объясняет, что произойдёт при клике.
     // Без tooltip «Форс-мажор» — внутренний термин, неинтуитивный для регистратора.
-    title: 'Экстренные действия со всеми записями врача: перенос на другой день или отмена с возвратом',
+    title: t('final.emergency_actions_title'),
     icon: AlertTriangle,
     color: colors.warning,
     visible: !isDoctorView

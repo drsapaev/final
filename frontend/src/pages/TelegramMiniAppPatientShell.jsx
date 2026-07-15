@@ -1,3 +1,4 @@
+import { t } from '../i18n/adapter';
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -171,7 +172,7 @@ const MINI_APP_I18N = {
     },
     forms: {
       patient_intake: {
-        title: 'Анкета перед визитом',
+        title: t('final.patient_form_title'),
         description: 'Короткие данные для подготовки регистратуры и врача.',
         fields: {
           chief_complaint: 'Причина визита',

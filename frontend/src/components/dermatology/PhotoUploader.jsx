@@ -1,3 +1,4 @@
+import { t } from '../../i18n/adapter';
 /**
  * Photo Uploader Component
  * Загрузка фото до/после с поддержкой HEIC
@@ -90,7 +91,7 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
     // Previously this check was inside reader.onload (async callback),
     // causing an unhandled promise rejection that crashed silently.
     if (!patientId && !visitId) {
-      notify.error('Для загрузки фото выберите пациента или визит');
+      notify.error(t('final.photo_select_patient'));
       return;
     }
 
@@ -158,14 +159,14 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
             setUploadProgress(0);
           } catch (uploadError) {
             logger.error('Photo upload failed:', uploadError);
-            notify.error('Не удалось загрузить фото. Проверьте соединение и попробуйте снова.');
+            notify.error(t('final.photo_upload_failed'));
             setUploadProgress(0);
           }
         };
 
         reader.onerror = () => {
           logger.error('FileReader error');
-          notify.error('Не удалось прочитать файл.');
+          notify.error(t('final.photo_read_failed'));
           setUploadProgress(0);
         };
 
@@ -230,10 +231,10 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
         onDataUpdate && onDataUpdate(updated);
         return updated;
       });
-      notify.success('Фото удалено');
+      notify.success(t('final.photo_deleted'));
     } catch (error) {
       logger.error('Ошибка удаления фото:', error);
-      notify.error('Не удалось удалить фото. Проверьте соединение и попробуйте снова.');
+      notify.error(t('final.photo_delete_failed'));
     }
   };
 
