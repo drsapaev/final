@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/adapter';
 /**
  * QueueProfilesManager - Admin component for managing queue tabs
  * 
@@ -48,22 +48,22 @@ import {
 import { useConfirm } from '../common/ConfirmDialog';
 import { notify } from '../../services/notify.js';
 
-const STATUS_FILTER_OPTIONS = [
-    { value: 'all', label: '\u0412\u0441\u0435' },
-    { value: 'active', label: '\u0410\u043a\u0442\u0438\u0432\u043d\u044b\u0435' },
-    { value: 'inactive', label: '\u0421\u043a\u0440\u044b\u0442\u044b\u0435' },
+const getStatusFilterOptions = (t) => [
+    { value: 'all', label: t('admin2.qp_filter_all') },
+    { value: 'active', label: t('admin2.qp_filter_active') },
+    { value: 'inactive', label: t('admin2.qp_filter_hidden') },
 ];
 
 // Available icons for selection
-const AVAILABLE_ICONS = [
-    { name: 'Heart', component: Heart, label: 'Сердце' },
-    { name: 'Activity', component: Activity, label: 'ЭКГ' },
-    { name: 'Sparkles', component: Sparkles, label: 'Блеск' },
-    { name: 'Smile', component: Smile, label: 'Улыбка' },
-    { name: 'TestTube', component: TestTube, label: 'Пробирка' },
-    { name: 'Stethoscope', component: Stethoscope, label: 'Стетоскоп' },
-    { name: 'Users', component: Users, label: 'Люди' },
-    { name: 'Package', component: Package, label: 'Пакет' },
+const getAvailableIcons = (t) => [
+    { name: 'Heart', component: Heart, label: t('admin2.qp_icon_heart') },
+    { name: 'Activity', component: Activity, label: t('admin2.qp_icon_activity') },
+    { name: 'Sparkles', component: Sparkles, label: t('admin2.qp_icon_sparkles') },
+    { name: 'Smile', component: Smile, label: t('admin2.qp_icon_smile') },
+    { name: 'TestTube', component: TestTube, label: t('admin2.qp_icon_test_tube') },
+    { name: 'Stethoscope', component: Stethoscope, label: t('admin2.qp_icon_stethoscope') },
+    { name: 'Users', component: Users, label: t('admin2.qp_icon_users') },
+    { name: 'Package', component: Package, label: t('admin2.qp_icon_package') },
 ];
 
 // Predefined colors
@@ -79,6 +79,9 @@ const PRESET_COLORS = [
 ];
 
 const QueueProfilesManager = ({ theme = 'light' }) => {
+    const { t } = useTranslation();
+    const statusFilterOptions = getStatusFilterOptions(t);
+    const availableIcons = getAvailableIcons(t);
     // P-013 fix: shared ConfirmDialog hook (replaces 2 window.confirm() calls).
     const [confirm, confirmDialog] = useConfirm();
     const [profiles, setProfiles] = useState([]);
@@ -110,7 +113,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
             logger.info(`Loaded ${response.data.profiles?.length || 0} queue profiles`);
         } catch (err) {
             logger.error('Error loading queue profiles:', err);
-            setError('Ошибка загрузки профилей очередей');
+            setError(t('admin2.qp_load_failed'));
         } finally {
             setLoading(false);
         }
@@ -164,7 +167,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
             window.dispatchEvent(new CustomEvent('queue-profiles:updated'));
         } catch (err) {
             logger.error('Error creating profile:', err);
-            setError(err.response?.data?.detail || 'Ошибка создания профиля');
+            setError(err.response?.data?.detail || t('admin2.qp_create_error'));
         } finally {
             setSaving(false);
         }
@@ -181,7 +184,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
             window.dispatchEvent(new CustomEvent('queue-profiles:updated'));
         } catch (err) {
             logger.error('Error updating profile:', err);
-            setError(err.response?.data?.detail || 'Ошибка обновления профиля');
+            setError(err.response?.data?.detail || t('admin2.qp_update_error'));
         } finally {
             setSaving(false);
         }
@@ -192,8 +195,8 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
         // P-013 fix: replaced window.confirm() with shared useConfirm hook.
         const ok = await confirm({
             title: t('admin2.delete_queue_tab_title'),
-            message: `Удалить вкладку «${profileKey}»?`,
-            description: 'Это действие необратимо.',
+            message: t('admin2.qp_delete_confirm_msg', { key: profileKey }),
+            description: t('admin2.qp_delete_confirm_desc'),
             confirmLabel: t('admin2.delete_confirm'),
             cancelLabel: t('admin2.cancel'),
             intent: 'danger',
@@ -210,7 +213,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
             window.dispatchEvent(new CustomEvent('queue-profiles:updated'));
         } catch (err) {
             logger.error('Error deleting profile:', err);
-            setError(err.response?.data?.detail || 'Ошибка удаления профиля');
+            setError(err.response?.data?.detail || t('admin2.qp_delete_error'));
         } finally {
             setSaving(false);
         }
@@ -245,8 +248,8 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
         // P-013 fix: replaced window.confirm() with shared useConfirm hook.
         const ok = await confirm({
             title: t('admin2.bulk_delete_queue_tabs_title'),
-            message: `Удалить ${selectedProfiles.length} вкладок?`,
-            description: 'Это действие нельзя отменить.',
+            message: t('admin2.qp_bulk_delete_confirm_msg', { count: selectedProfiles.length }),
+            description: t('admin2.qp_bulk_delete_confirm_desc'),
             confirmLabel: t('admin2.delete_all_confirm'),
             cancelLabel: t('admin2.cancel'),
             intent: 'destructive',
@@ -267,7 +270,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
             window.dispatchEvent(new CustomEvent('queue-profiles:updated'));
         } catch (err) {
             logger.error('Error bulk deleting profiles:', err);
-            setError(err.response?.data?.detail || 'Ошибка массового удаления');
+            setError(err.response?.data?.detail || t('admin2.qp_bulk_delete_error'));
         } finally {
             setSaving(false);
         }
@@ -289,7 +292,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
             window.dispatchEvent(new CustomEvent('queue-profiles:updated'));
         } catch (err) {
             logger.error('Error bulk updating profiles:', err);
-            setError(err.response?.data?.detail || 'Ошибка массового обновления');
+            setError(err.response?.data?.detail || t('admin2.qp_bulk_update_error'));
         } finally {
             setSaving(false);
         }
@@ -322,7 +325,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
             logger.info('Exported queue profiles to CSV');
         } catch (err) {
             logger.error('Error exporting profiles:', err);
-            setError('Ошибка экспорта');
+            setError(t('admin2.qp_export_error'));
         }
     };
 
@@ -336,7 +339,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
             const lines = text.split('\n').filter(line => line.trim());
 
             if (lines.length < 2) {
-                setError('CSV файл должен содержать заголовки и данные');
+                setError(t('admin2.qp_import_csv_invalid'));
                 return;
             }
 
@@ -370,7 +373,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
             }
 
             if (importedProfiles.length === 0) {
-                setError('Нет валидных профилей для импорта');
+                setError(t('admin2.qp_import_no_valid'));
                 return;
             }
 
@@ -396,11 +399,11 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
             await loadProfiles();
             window.dispatchEvent(new CustomEvent('queue-profiles:updated'));
             setError(null);
-            notify.success(`Импорт завершён: ${imported} создано, ${updated} обновлено`);
+            notify.success(t('admin2.qp_import_success', { imported, updated }));
 
         } catch (err) {
             logger.error('Error importing profiles:', err);
-            setError('Ошибка импорта CSV');
+            setError(t('admin2.qp_import_error'));
         } finally {
             setSaving(false);
             event.target.value = '';
@@ -412,7 +415,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                 <div className="admin-p-24-radius-12-bd-1px-solid-var-mac-bo-ta-center-p-40-bgc-dyn" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' }}>
                     <RefreshCw size={24} className="admin-anim-spin-1s-linear-infin" />
                     <p className="admin-secondary-mt-12">
-                        Загрузка профилей...
+                        {t('admin2.qp_loading')}
                     </p>
                 </div>
             </div>
@@ -428,15 +431,15 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
             <div className="admin-qp-stats-grid">
                 <div className="admin-qp-stat-card" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' }}>
                     <div className="admin-qp-stat-value">{stats.total}</div>
-                    <div className="admin-qp-stat-label">Всего вкладок</div>
+                    <div className="admin-qp-stat-label">{t('admin2.qp_stat_total')}</div>
                 </div>
                 <div className="admin-p-16-radius-12-bd-1px-solid-var-mac-bo-ta-center-bgc-dyn" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' }}>
                     <div className="admin-fs-28-fw-bold-primary-mb-4-var-mac-success-10B9">{stats.active}</div>
-                    <div className="admin-qp-stat-label">Активных</div>
+                    <div className="admin-qp-stat-label">{t('admin2.qp_stat_active')}</div>
                 </div>
                 <div className="admin-qp-stat-card" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' }}>
                     <div className="admin-fs-28-fw-bold-primary-mb-4-var-mac-warning-F59E">{stats.inactive}</div>
-                    <div className="admin-qp-stat-label">Скрытых</div>
+                    <div className="admin-qp-stat-label">{t('admin2.qp_stat_hidden')}</div>
                 </div>
                 <div className="admin-qp-stat-card" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' }}>
                     <div className="admin-fs-28-fw-bold-primary-mb-4-var-mac-info-3B82F6">{stats.totalTags}</div>
@@ -448,15 +451,15 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
             <div className="admin-qp-main-card" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' }}>
                 {/* Header */}
                 <div className="admin-qp-header">
-                    <h2 className="admin-qp-title">Вкладки регистратуры</h2>
+                    <h2 className="admin-qp-title">{t('admin2.qp_page_title')}</h2>
                     <div className="admin-qp-toolbar">
                         {/* Search */}
                         <div className="admin-qp-search-wrapper">
                             <Search size={16} className="admin-qp-search-icon" />
                             <Input
                                 className="admin-qp-search-input" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-tertiary)' : 'var(--mac-bg-secondary)' }}
-                                aria-label="Поиск профилей очереди"
-                                placeholder="Поиск..."
+                                aria-label={t('admin2.qp_search_aria')}
+                                placeholder={t('admin2.qp_search_placeholder')}
                                 value={searchTerm}
                                 onChange={e => setSearchTerm(e.target.value)}
                             />
@@ -466,23 +469,23 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                         <Select
                             value={statusFilter}
                             onChange={setStatusFilter}
-                            options={STATUS_FILTER_OPTIONS}
+                            options={statusFilterOptions}
                             size="large"
                             className="admin-w-160"/>
 
                         {/* Export */}
                         <button className="admin-qp-button" onClick={handleExport} disabled={saving}>
                             <Download size={16} />
-                            Экспорт
+                            {t('admin2.qp_export_btn')}
                         </button>
 
                         {/* Import */}
                         <label className="admin-d-flex-ai-center-gap-6-p-8px-14px-bd-1px-solid-var-mac-bo-radius-8-bgc-transparent-primary-cur-pointer-fs-13-fw-500-cur-pointer">
                             <Upload size={16} />
-                            Импорт
+                            {t('admin2.qp_import_btn')}
                             <input
                                 type="file"
-                                aria-label="Импортировать профили очереди из CSV"
+                                aria-label={t('admin2.qp_import_aria')}
                                 accept=".csv"
                                 onChange={handleImport}
                                 className="admin-d-none"
@@ -495,7 +498,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                             className="admin-qp-button"
                             onClick={loadProfiles}
                             disabled={saving}
-                            aria-label="Обновить профили очереди"
+                            aria-label={t('admin2.qp_refresh_aria')}
                         >
                             <RefreshCw size={16} />
                         </button>
@@ -507,7 +510,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                             disabled={saving}
                         >
                             <Plus size={16} />
-                            Добавить
+                            {t('admin2.qp_add_btn')}
                         </button>
                     </div>
                 </div>
@@ -520,7 +523,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                         <button
                             className="admin-ml-auto-bg-none-bd-none-cur-pointer"
                             onClick={() => setError(null)}
-                            aria-label="Скрыть сообщение об ошибке"
+                            aria-label={t('admin2.qp_hide_error_aria')}
                         >
                             <X size={16} />
                         </button>
@@ -531,7 +534,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                 {selectedProfiles.length > 0 && (
                     <div className="admin-qp-bulk-actions">
                         <span className="admin-fs-14-primary">
-                            Выбрано: {selectedProfiles.length}
+                            {t('admin2.qp_selected_count', { count: selectedProfiles.length })}
                         </span>
                         <button
                             className="admin-d-flex-ai-center-gap-6-p-8px-14px-bd-1px-solid-var-mac-bo-radius-8-bgc-transparent-primary-cur-pointer-fs-13-fw-500-ml-auto"
@@ -539,7 +542,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                             disabled={saving}
                         >
                             <Eye size={16} />
-                            Активировать
+                            {t('admin2.qp_bulk_activate_btn')}
                         </button>
                         <button
                             className="admin-qp-button"
@@ -547,7 +550,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                             disabled={saving}
                         >
                             <EyeOff size={16} />
-                            Скрыть
+                            {t('admin2.qp_hide_btn')}
                         </button>
                         <button
                             className="admin-qp-danger-button"
@@ -555,7 +558,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                             disabled={saving}
                         >
                             <Trash2 size={16} />
-                            Удалить
+                            {t('admin2.qp_delete_btn')}
                         </button>
                     </div>
                 )}
@@ -580,19 +583,19 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                                 <button
                                     className="admin-qp-icon-button"
                                     onClick={() => handleSelectAll(!isAllSelected)}
-                                    aria-label={isAllSelected ? 'Снять выбор со всех вкладок очереди' : 'Выбрать все вкладки очереди'}
+                                    aria-label={isAllSelected ? t('admin2.qp_deselect_all_aria') : t('admin2.qp_select_all_aria')}
                                 >
                                     {isAllSelected ? <CheckSquare size={18} /> : <Square size={18} />}
                                 </button>
                             </th>
-                            <th className="admin-qp-th">Порядок</th>
-                            <th className="admin-qp-th">Ключ</th>
-                            <th className="admin-qp-th">Название</th>
+                            <th className="admin-qp-th">{t('admin2.qp_col_order')}</th>
+                            <th className="admin-qp-th">{t('admin2.qp_col_key')}</th>
+                            <th className="admin-qp-th">{t('admin2.qp_col_title')}</th>
                             <th className="admin-qp-th">Queue Tags</th>
-                            <th className="admin-qp-th">Иконка</th>
-                            <th className="admin-qp-th">Цвет</th>
-                            <th className="admin-qp-th">Статус</th>
-                            <th className="admin-qp-th">Действия</th>
+                            <th className="admin-qp-th">{t('admin2.qp_col_icon')}</th>
+                            <th className="admin-qp-th">{t('admin2.qp_col_color')}</th>
+                            <th className="admin-qp-th">{t('admin2.qp_col_status')}</th>
+                            <th className="admin-qp-th">{t('admin2.qp_col_actions')}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -605,7 +608,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                                             profile.key,
                                             !selectedProfiles.includes(profile.key)
                                         )}
-                                        aria-label={selectedProfiles.includes(profile.key) ? `Снять выбор вкладки ${profile.name}` : `Выбрать вкладку ${profile.name}`}
+                                        aria-label={selectedProfiles.includes(profile.key) ? t('admin2.qp_deselect_row_aria', { name: profile.name }) : t('admin2.qp_select_row_aria', { name: profile.name })}
                                     >
                                         {selectedProfiles.includes(profile.key)
                                             ? <CheckSquare size={18} className="admin-blue" />
@@ -645,14 +648,14 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                                 </td>
                                 <td className="admin-qp-td">
                                     {(() => {
-                                        const IconComponent = AVAILABLE_ICONS.find(i => i.name === profile.icon)?.component || Package;
+                                        const IconComponent = availableIcons.find(i => i.name === profile.icon)?.component || Package;
                                         return <IconComponent size={20} className="admin-col-dyn" style={{ '--admin-col0': profile.color || 'var(--mac-text-secondary)' }} />;
                                     })()}
                                 </td>
                                 <td className="admin-qp-td">
                                     <div
                                         role="img"
-                                        aria-label={`Цвет вкладки ${profile.name}: ${profile.color || 'не задан'}`}
+                                        aria-label={t('admin2.qp_color_aria', { name: profile.name, color: profile.color || t('admin2.qp_color_not_set') })}
                                         className="admin-w-16-h-16-radius-50pct-bd-2px-solid-var-mac-bo-bgc-dyn" style={{ '--admin-bgc0': profile.color || '#718096' }}
                                         title={profile.color}
                                     />
@@ -663,7 +666,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                                                 ? 'rgba(16, 185, 129, 0.1)'
                                                 : 'var(--mac-error-bg)', '--admin-col1': profile.is_active !== false ? 'var(--mac-success)' : 'var(--mac-error)' }}
                                     >
-                                        {profile.is_active !== false ? 'Активен' : 'Скрыт'}
+                                        {profile.is_active !== false ? t('admin2.qp_status_active') : t('admin2.qp_status_hidden')}
                                     </span>
                                 </td>
                                 <td className="admin-qp-td">
@@ -671,8 +674,8 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                                         <button
                                             className="admin-qp-icon-button"
                                             onClick={() => handleToggleActive(profile)}
-                                            aria-label={profile.is_active !== false ? `Скрыть вкладку ${profile.name}` : `Показать вкладку ${profile.name}`}
-                                            title={profile.is_active !== false ? 'Скрыть' : 'Показать'}
+                                            aria-label={profile.is_active !== false ? t('admin2.qp_hide_row_aria', { name: profile.name }) : t('admin2.qp_show_row_aria', { name: profile.name })}
+                                            title={profile.is_active !== false ? t('admin2.qp_hide_btn') : t('admin2.qp_show_btn')}
                                             disabled={saving}
                                         >
                                             {profile.is_active !== false ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -680,8 +683,8 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                                         <button
                                             className="admin-qp-icon-button"
                                             onClick={() => setEditingProfile(profile)}
-                                            aria-label={`Редактировать вкладку ${profile.name}`}
-                                            title="Редактировать"
+                                            aria-label={t('admin2.qp_edit_row_aria', { name: profile.name })}
+                                            title={t('admin2.qp_edit_btn')}
                                             disabled={saving}
                                         >
                                             <Edit2 size={16} />
@@ -689,8 +692,8 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                                         <button
                                             className="admin-p-6-bd-none-radius-6-bgc-transparent-cur-pointer-secondary-d-inline-flex-ai-center-jc-center-EF4444"
                                             onClick={() => handleDelete(profile.key)}
-                                            aria-label={`Удалить вкладку ${profile.name}`}
-                                            title="Удалить"
+                                            aria-label={t('admin2.qp_delete_row_aria', { name: profile.name })}
+                                            title={t('admin2.qp_delete_btn')}
                                             disabled={saving}
                                         >
                                             <Trash2 size={16} />
@@ -706,8 +709,8 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                 {filteredProfiles.length === 0 && (
                     <div className="admin-ta-center-p-40-secondary">
                         {profiles.length === 0
-                            ? 'Нет профилей. Нажмите "Добавить" для создания.'
-                            : 'Нет профилей, соответствующих фильтрам.'
+                            ? t('admin2.qp_empty_state')
+                            : t('admin2.qp_empty_filtered')
                         }
                     </div>
                 )}
@@ -732,6 +735,8 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
 };
 // Profile form component with show_on_qr_page support
 const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = false, departments = [] }) => {
+    const { t } = useTranslation();
+    const availableIcons = getAvailableIcons(t);
     const [formData, setFormData] = useState({
         key: profile?.key || '',
         title: profile?.title || '',
@@ -765,18 +770,18 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
             className="admin-qp-overlay"
             role="button"
             tabIndex={0}
-            aria-label="Закрыть форму вкладки очереди"
+            aria-label={t('admin2.qp_close_form_aria')}
             onClick={onCancel}
             onKeyDown={(event) => handleActivationKeyDown(event, onCancel)}>
             <div className="admin-qp-modal" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-primary)' : 'white' }} onClickCapture={e => e.stopPropagation()}>
                 <div className="admin-qp-modal-header">
                     <h3 className="admin-qp-modal-title">
-                        {isEdit ? 'Редактирование вкладки' : 'Новая вкладка'}
+                        {isEdit ? t('admin2.qp_edit_title') : t('admin2.qp_create_title')}
                     </h3>
                     <button
                         className="admin-qp-close-button"
                         onClick={onCancel}
-                        aria-label="Закрыть форму вкладки очереди"
+                        aria-label={t('admin2.qp_close_form_aria')}
                     >
                         <X size={20} />
                     </button>
@@ -786,27 +791,27 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                     {/* Key (only for create) */}
                     {!isEdit && (
                         <div className="admin-qp-field">
-                            <label className="admin-qp-label">Уникальный ключ *</label>
+                            <label className="admin-qp-label">{t('admin2.qp_key_label')}</label>
                             <Input
                                 className="admin-qp-input" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' }}
-                                aria-label="Уникальный ключ вкладки очереди"
+                                aria-label={t('admin2.qp_key_input_aria')}
                                 value={formData.key}
                                 onChange={e => setFormData({ ...formData, key: e.target.value })}
-                                placeholder="например: cardiology"
+                                placeholder={t('admin2.qp_key_ph')}
                                 required
                                 pattern="[a-z_]+"
                             />
-                            <div className="admin-qp-hint">Только латинские буквы и подчеркивания</div>
+                            <div className="admin-qp-hint">{t('admin2.qp_key_hint')}</div>
                         </div>
                     )}
 
                     {/* Titles */}
                     <div className="admin-qp-row">
                         <div className="admin-mb-16-flex-1-1">
-                            <label className="admin-qp-label">Название (EN) *</label>
+                            <label className="admin-qp-label">{t('admin2.qp_title_en_label')}</label>
                             <Input
                                 className="admin-qp-input" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' }}
-                                aria-label="Название вкладки очереди на английском"
+                                aria-label={t('admin2.qp_title_en_aria')}
                                 value={formData.title}
                                 onChange={e => setFormData({ ...formData, title: e.target.value })}
                                 placeholder="Cardiology"
@@ -814,13 +819,13 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                             />
                         </div>
                         <div className="admin-mb-16-flex-1">
-                            <label className="admin-qp-label">Название (RU)</label>
+                            <label className="admin-qp-label">{t('admin2.qp_title_ru_label')}</label>
                             <Input
                                 className="admin-qp-input" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' }}
-                                aria-label="Название вкладки очереди на русском"
+                                aria-label={t('admin2.qp_title_ru_aria')}
                                 value={formData.title_ru}
                                 onChange={e => setFormData({ ...formData, title_ru: e.target.value })}
-                                placeholder="Кардиология"
+                                placeholder={t('admin2.qp_title_ru_ph')}
                             />
                         </div>
                     </div>
@@ -835,33 +840,33 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                             onChange={e => setFormData({ ...formData, queue_tags: e.target.value })}
                             placeholder="cardio, cardiology, cardiology_common"
                         />
-                        <div className="admin-qp-hint">Разделяйте запятыми. Записи с этими тегами появятся на вкладке.</div>
+                        <div className="admin-qp-hint">{t('admin2.qp_tags_hint')}</div>
                     </div>
 
                     {/* PR-21: Department key Select */}
                     <div className="admin-qp-field">
-                        <label className="admin-qp-label">Отделение (необязательно)</label>
+                        <label className="admin-qp-label">{t('admin2.qp_department_label')}</label>
                         <select
                             className="admin-w-100pct-p-10px-12px-radius-8-bd-1px-solid-var-mac-bo-primary-fs-14-bsz-border-box-w-100-bgc-dyn"
                             style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' }}
                             value={formData.department_key}
                             onChange={e => setFormData({ ...formData, department_key: e.target.value })}
                         >
-                            <option value="">— Не привязано —</option>
+                            <option value="">{t('admin2.qp_department_none')}</option>
                             {departments.map(d => (
                                 <option key={d.key} value={d.key}>{d.name_ru || d.key}</option>
                             ))}
                         </select>
-                        <div className="admin-qp-hint">Привязка к отделению для синхронизации данных</div>
+                        <div className="admin-qp-hint">{t('admin2.qp_department_hint')}</div>
                     </div>
 
                     {/* Order */}
                     <div className="admin-qp-field">
-                        <label className="admin-qp-label">Порядок отображения</label>
+                        <label className="admin-qp-label">{t('admin2.qp_order_label')}</label>
                         <Input
                             className="admin-w-100pct-p-10px-12px-radius-8-bd-1px-solid-var-mac-bo-primary-fs-14-bsz-border-box-w-100-bgc-dyn" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' }}
                             type="number"
-                            aria-label="Порядок отображения вкладки очереди"
+                            aria-label={t('admin2.qp_order_aria')}
                             min="0"
                             value={formData.display_order}
                             onChange={e => setFormData({ ...formData, display_order: e.target.value })}
@@ -870,9 +875,9 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
 
                     {/* Icon */}
                     <div className="admin-qp-field">
-                        <label className="admin-qp-label">Иконка</label>
+                        <label className="admin-qp-label">{t('admin2.qp_icon_label')}</label>
                         <div className="admin-qp-icon-grid">
-                            {AVAILABLE_ICONS.map(icon => {
+                            {availableIcons.map(icon => {
                                 const IconComponent = icon.component;
                                 const isSelected = formData.icon === icon.name;
                                 return (
@@ -894,7 +899,7 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
 
                     {/* Color */}
                     <div className="admin-qp-field">
-                        <label className="admin-qp-label">Цвет</label>
+                        <label className="admin-qp-label">{t('admin2.qp_color_label')}</label>
                         <div className="admin-qp-color-grid">
                             {PRESET_COLORS.map(color => (
                                 <button
@@ -902,13 +907,13 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                                     type="button"
                                     className="admin-w-32-h-32-radius-50pct-bd-3px-solid-transparen-cur-pointer-tr-all-0-2s-bgc-dyn-bd-c-dyn-bsh-dyn" style={{ '--admin-bgc0': color, '--admin-bd-c1': formData.color === color ? 'white' : 'transparent', '--admin-bsh2': formData.color === color ? `0 0 0 2px ${color}` : 'none' }}
                                     onClick={() => setFormData({ ...formData, color })}
-                                    aria-label={`Выбрать цвет ${color}`}
+                                    aria-label={t('admin2.qp_color_pick_aria', { color })}
                                     title={color}
                                 />
                             ))}
                             <Input
                                 type="color"
-                                aria-label="Пользовательский цвет вкладки очереди"
+                                aria-label={t('admin2.qp_custom_color_aria')}
                                 value={formData.color}
                                 onChange={e => setFormData({ ...formData, color: e.target.value })}
                                 className="admin-w-32-h-32-bd-none-cur-pointer"
@@ -919,41 +924,41 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                     {/* Active */}
                     <div className="admin-qp-field">
                         <label className="admin-d-flex-ai-center-gap-8-cur-pointer">
-                            <Checkbox aria-label="Активная вкладка очереди" checked={formData.is_active} onChange={e => setFormData({ ...formData, is_active: e.target.checked })}
+                            <Checkbox aria-label={t('admin2.qp_active_checkbox_aria')} checked={formData.is_active} onChange={e => setFormData({ ...formData, is_active: e.target.checked })}
                             />
-                            <span className="admin-qp-label">Активная вкладка (видна пользователям)</span>
+                            <span className="admin-qp-label">{t('admin2.qp_active_label')}</span>
                         </label>
                     </div>
 
                     {/* ⭐ NEW: Show on QR Page */}
                     <div className="admin-qp-field">
                         <label className="admin-d-flex-ai-center-gap-8-cur-pointer">
-                            <Checkbox aria-label="Показывать вкладку на QR-странице" checked={formData.show_on_qr_page} onChange={e => setFormData({ ...formData, show_on_qr_page: e.target.checked })}
+                            <Checkbox aria-label={t('admin2.qp_qr_checkbox_aria')} checked={formData.show_on_qr_page} onChange={e => setFormData({ ...formData, show_on_qr_page: e.target.checked })}
                             />
-                            <span className="admin-qp-label">Показывать на QR-странице (самозапись пациентов)</span>
+                            <span className="admin-qp-label">{t('admin2.qp_qr_label')}</span>
                         </label>
                         <div className="admin-fs-12-secondary-mt-4-ml-24">
-                            Если включено, пациенты смогут выбрать эту специальность при сканировании QR-кода
+                            {t('admin2.qp_qr_hint')}
                         </div>
                     </div>
 
                     {/* Actions */}
                     <div className="admin-qp-actions">
                         <button type="button" className="admin-qp-cancel-button" onClick={onCancel}>
-                            Отмена
+                            {t('admin2.qp_cancel_btn')}
                         </button>
                         <button
                             type="submit"
                             className="admin-qp-submit-button"
                             disabled={saving}
-                            aria-label={isEdit ? 'Сохранить вкладку очереди' : 'Создать вкладку очереди'}
+                            aria-label={isEdit ? t('admin2.qp_save_aria') : t('admin2.qp_create_aria')}
                         >
                             {saving ? (
-                                <>Сохранение...</>
+                                <>{t('admin2.qp_saving')}</>
                             ) : (
                                 <>
                                     <Check size={16} />
-                                    {isEdit ? 'Сохранить' : 'Создать'}
+                                    {isEdit ? t('admin2.qp_save_btn') : t('admin2.qp_create_btn')}
                                 </>
                             )}
                         </button>
