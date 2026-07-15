@@ -508,6 +508,15 @@
   color: var(--mac-text-secondary);
 }
 
+/* UX-AUDIT-FIX13: load-more button container */
+.lqw-load-more {
+  display: flex;
+  justify-content: center;
+  padding: var(--mac-spacing-3);
+  margin-top: var(--mac-spacing-2);
+  border-top: 1px dashed var(--mac-border);
+}
+
 /* PII details summary (L-H-4 + L-M-5 fix) */
 .lqw-pii-details {
   display: inline;

@@ -47,4 +47,24 @@ describe('LabQueueWorkbench UX-AUDIT-FIX11 — MaskedPhone affordance', () => {
     // UX-AUDIT-FIX11 marker
     expect(cssSource).toContain('UX-AUDIT-FIX11');
   });
+
+  it('UX-AUDIT-FIX13: paginates queue rendering with PAGE_SIZE + load-more button', () => {
+    // FIX13: рендерим только visibleCount записей через .slice(0, visibleCount)
+    // вместо всего sortedAppointments. Кнопка «Показать ещё» увеличивает count.
+    expect(source).toContain('PAGE_SIZE = 20');
+    expect(source).toContain('visibleCount');
+    expect(source).toContain('setVisibleCount');
+    // .slice для ограничения рендера
+    expect(source).toContain('sortedAppointments.slice(0, visibleCount)');
+    // useEffect для сброса пагинации при смене фильтров
+    expect(source).toContain('useEffect(() => {');
+    expect(source).toContain('setVisibleCount(PAGE_SIZE)');
+    expect(source).toContain('[searchQuery, statusFilter, sortBy]');
+    // Кнопка «Показать ещё» в UI
+    expect(source).toContain('Показать ещё');
+    expect(source).toContain('lqw-load-more');
+    // CSS-класс для контейнера кнопки
+    expect(cssSource).toContain('.lqw-load-more');
+    expect(cssSource).toContain('UX-AUDIT-FIX13');
+  });
 });

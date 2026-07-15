@@ -1,5 +1,5 @@
 import PropTypes from 'prop-types';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Badge, Button, Card, CardContent, CardHeader, CardTitle, Icon, Alert,
   Input } from '../ui/macos';
@@ -127,6 +127,19 @@ export default function LabQueueWorkbench({
   const [statusFilter, setStatusFilter] = useState('all');
   // PR-64 / Medium-14: client-side sorting
   const [sortBy, setSortBy] = useState('default'); // default | name | time
+
+  // UX-AUDIT-FIX13: пагинация очереди. Ранее sortedAppointments.map(...)
+  // рендерил ВСЕ записи одновременно — при 100+ анализов в день это
+  // вызывало тормоза рендера и высокий memory footprint. Теперь
+  // показываем по PAGE_SIZE=20 записей, с кнопкой «Показать ещё».
+  // Сбрасываем visibleCount при изменении фильтра/поиска/sortBy.
+  const PAGE_SIZE = 20;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+
+  // Сбрасываем пагинацию при изменении любого фильтра.
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [searchQuery, statusFilter, sortBy]);
 
   const normalizedSearch = searchQuery.trim().toLowerCase();
   const filteredAppointments = appointments.filter((appointment) => {
@@ -285,7 +298,10 @@ export default function LabQueueWorkbench({
             </Alert>
           ) : (
             <div className="lqw-card-grid">
-              {sortedAppointments.map((appointment) => {
+              {/* UX-AUDIT-FIX13: рендерим только visibleCount записей
+                  вместо всего sortedAppointments. Кнопка «Показать ещё»
+                  внизу увеличивает visibleCount на PAGE_SIZE. */}
+              {sortedAppointments.slice(0, visibleCount).map((appointment) => {
                 const isSelected = selectedAppointment?.id === appointment.id;
                 return (
                   <div
@@ -360,6 +376,21 @@ export default function LabQueueWorkbench({
                   </div>
                 );
               })}
+              {/* UX-AUDIT-FIX13: кнопка «Показать ещё» — увеличивает
+                  visibleCount на PAGE_SIZE. Показывается только если
+                  есть ещё записи для отображения. */}
+              {sortedAppointments.length > visibleCount && (
+                <div className="lqw-load-more">
+                  <Button
+                    variant="outline"
+                    onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+                    aria-label={`Показать ещё ${Math.min(PAGE_SIZE, sortedAppointments.length - visibleCount)} записей`}
+                  >
+                    <Icon name="arrow.down" size={14} />
+                    Показать ещё ({sortedAppointments.length - visibleCount} осталось)
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </CardContent>
