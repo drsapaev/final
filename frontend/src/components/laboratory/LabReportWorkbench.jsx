@@ -529,7 +529,7 @@ export default function LabReportWorkbench({
             <Alert severity="info">
               {recentReports.length > 0
                 ? t('workbench.select_patient_prompt')
-                : t('workbench.select_patient_short')}}
+                : t('workbench.select_patient_short')}
             </Alert>
           ) : !activeInstance ? (
             <div style={{ display: 'grid', gap: 'var(--mac-spacing-3)' }}>
