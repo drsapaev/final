@@ -99,11 +99,28 @@ describe('LabReportWorkbench', () => {
 
     // P-04 fix: hasLabReportAction вынесена в utils/labReportActions.js.
     // Проверяем, что основной файл импортирует её оттуда и использует.
+    // STRAT#1: проверка canEdit/canFinalize/canRevise теперь делегирована
+    // в useLabReportState hook, поэтому ищем либо в основном файле, либо
+    // в хуке.
     expect(source).toContain('hasLabReportAction');
     expect(source).toContain('from \'./utils/labReportActions\'');
-    expect(source).toContain('const canEditActiveInstance = hasLabReportAction(activeInstance, \'edit\')');
-    expect(source).toContain('const canFinalize = hasLabReportAction(activeInstance, \'finalize\')');
-    expect(source).toContain('const canRevise = hasLabReportAction(activeInstance, \'revise\')');
+
+    const hookPath = path.resolve(__dirname, '../hooks/useLabReportState.js');
+    const hookSource = fs.readFileSync(hookPath, 'utf8');
+
+    // Action availability flags должны быть EITHER в workbench OR в hook
+    const actionFlags = [
+      'const canEditActiveInstance = hasLabReportAction(activeInstance, \'edit\')',
+      'const canFinalize = hasLabReportAction(activeInstance, \'finalize\')',
+      'const canRevise = hasLabReportAction(activeInstance, \'revise\')',
+    ];
+    for (const flag of actionFlags) {
+      const inWorkbench = source.includes(flag);
+      const inHook = hookSource.includes(flag);
+      expect(inWorkbench || inHook).toBe(true);
+    }
+
+    // SSOT-контракт: никаких status-стрингов в условиях видимости действий
     expect(source).not.toContain('activeInstance.status !== \'FINALIZED\' && activeInstance.status !== \'PRINTED\'');
     expect(source).not.toContain('activeInstance.status === \'FINALIZED\' || activeInstance.status === \'PRINTED\'');
   });
