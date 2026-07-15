@@ -50,7 +50,36 @@ const deriveEquipmentStats = (equipmentList) => {
   };
 };
 
+const EQUIPMENT_STATUS_KEYS = [
+  { value: 'active', labelKey: 'em_status_active', color: 'success' },
+  { value: 'maintenance', labelKey: 'em_status_maintenance', color: 'warning' },
+  { value: 'broken', labelKey: 'em_status_broken', color: 'error' },
+  { value: 'retired', labelKey: 'em_status_retired', color: 'gray' }
+];
+
+const EQUIPMENT_TYPE_KEYS = [
+  { value: 'medical', labelKey: 'em_type_medical' },
+  { value: 'diagnostic', labelKey: 'em_type_diagnostic' },
+  { value: 'surgical', labelKey: 'em_type_surgical' },
+  { value: 'laboratory', labelKey: 'em_type_laboratory' },
+  { value: 'imaging', labelKey: 'em_type_imaging' },
+  { value: 'monitoring', labelKey: 'em_type_monitoring' },
+  { value: 'other', labelKey: 'em_type_other' }
+];
+
+const getStatusOptions = (t) => EQUIPMENT_STATUS_KEYS.map((option) => ({
+  value: option.value,
+  label: t(`admin2.${option.labelKey}`),
+  color: option.color
+}));
+
+const getTypeOptions = (t) => EQUIPMENT_TYPE_KEYS.map((option) => ({
+  value: option.value,
+  label: t(`admin2.${option.labelKey}`)
+}));
+
 const EquipmentManagement = () => {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [equipment, setEquipment] = useState([]);
@@ -79,21 +108,8 @@ const EquipmentManagement = () => {
     description: ''
   });
 
-  const statusOptions = [
-  { value: 'active', label: 'Активное', color: 'success' },
-  { value: 'maintenance', label: 'Обслуживание', color: 'warning' },
-  { value: 'broken', label: 'Сломано', color: 'error' },
-  { value: 'retired', label: 'Списано', color: 'gray' }];
-
-
-  const typeOptions = [
-  { value: 'medical', label: 'Медицинское оборудование' },
-  { value: 'diagnostic', label: 'Диагностическое' },
-  { value: 'surgical', label: 'Хирургическое' },
-  { value: 'laboratory', label: 'Лабораторное' },
-  { value: 'imaging', label: 'Визуализация' },
-  { value: 'monitoring', label: 'Мониторинг' },
-  { value: 'other', label: 'Прочее' }];
+  const statusOptions = getStatusOptions(t);
+  const typeOptions = getTypeOptions(t);
 
 
   const loadEquipment = useCallback(async () => {
@@ -136,7 +152,7 @@ const EquipmentManagement = () => {
     e.preventDefault();
     const hasBranch = formData.branch_id !== null && formData.branch_id !== undefined && formData.branch_id !== '';
     if (!formData.name.trim() || !formData.type || !hasBranch) {
-      setMessage({ type: 'error', text: 'Заполните обязательные поля' });
+      setMessage({ type: 'error', text: t('admin2.em_required_fields') });
       return;
     }
 
@@ -145,10 +161,10 @@ const EquipmentManagement = () => {
 
       if (editingEquipment) {
         await api.put(`/clinic/equipment/${editingEquipment.id}`, formData);
-        setMessage({ type: 'success', text: 'Оборудование обновлено' });
+        setMessage({ type: 'success', text: t('admin2.em_update_success') });
       } else {
         await api.post('/clinic/equipment', formData);
-        setMessage({ type: 'success', text: 'Оборудование добавлено' });
+        setMessage({ type: 'success', text: t('admin2.em_add_success') });
       }
 
       setShowAddForm(false);
@@ -156,7 +172,7 @@ const EquipmentManagement = () => {
       resetForm();
       loadEquipment();
     } catch {
-      setMessage({ type: 'error', text: 'Ошибка сохранения оборудования' });
+      setMessage({ type: 'error', text: t('admin2.em_save_error') });
     } finally {
       setSaving(false);
     }
@@ -171,10 +187,10 @@ const EquipmentManagement = () => {
   const handleDelete = async (equipmentId) => {
     try {
       await api.delete(`/clinic/equipment/${equipmentId}`);
-      setMessage({ type: 'success', text: 'Оборудование удалено' });
+      setMessage({ type: 'success', text: t('admin2.em_delete_success') });
       loadEquipment();
     } catch {
-      setMessage({ type: 'error', text: 'Ошибка удаления оборудования' });
+      setMessage({ type: 'error', text: t('admin2.em_delete_error') });
     }
   };
 
@@ -195,7 +211,7 @@ const EquipmentManagement = () => {
   };
 
   const getStatusColor = (status) => {
-    const statusOption = statusOptions.find((s) => s.value === status);
+    const statusOption = EQUIPMENT_STATUS_KEYS.find((s) => s.value === status);
     return statusOption ? statusOption.color : 'gray';
   };
 
@@ -205,13 +221,13 @@ const EquipmentManagement = () => {
   };
 
   const getTypeLabel = (type) => {
-    const typeOption = typeOptions.find((t) => t.value === type);
+    const typeOption = typeOptions.find((opt) => opt.value === type);
     return typeOption ? typeOption.label : type;
   };
 
   const getBranchName = (branchId) => {
     const branch = branches.find((b) => b.id === branchId);
-    return branch ? branch.name : 'Неизвестно';
+    return branch ? branch.name : t('admin2.em_unknown_branch');
   };
 
   const filteredEquipment = equipment.filter((item) => {
@@ -224,10 +240,10 @@ const EquipmentManagement = () => {
     return matchesSearch && matchesStatus && matchesType && matchesBranch;
   });
   const hasEquipmentFilters = searchTerm.trim() !== '' || statusFilter !== 'all' || typeFilter !== 'all' || branchFilter !== 'all';
-  const equipmentEmptyTitle = hasEquipmentFilters ? 'Оборудование по фильтрам не найдено' : 'Оборудование ещё не добавлено';
+  const equipmentEmptyTitle = hasEquipmentFilters ? t('admin2.em_empty_filtered_title') : t('admin2.em_empty_title');
   const equipmentEmptyDescription = hasEquipmentFilters ?
-  'Измените поиск, статус, тип или филиал, чтобы увидеть другое оборудование.' :
-  'Добавьте первую единицу оборудования, чтобы вести учет техники по филиалам.';
+  t('admin2.em_empty_filtered_desc') :
+  t('admin2.em_empty_desc');
 
   return (
     <div className="admin-d-flex-fd-column-gap-24-ov-hidden">
@@ -235,10 +251,10 @@ const EquipmentManagement = () => {
       <div className="admin-d-flex-jc-between-ai-center-fw-wrap-gap-16">
         <div>
           <h2 className="admin-fs-2xl-fw-bold-primary-m-0-0-8px-0">
-            Управление оборудованием
+            {t('admin2.em_page_title')}
           </h2>
           <p className="admin-secondary-fs-sm-m-0">
-            Учет и управление медицинским оборудованием
+            {t('admin2.em_page_subtitle')}
           </p>
         </div>
         {stats &&
@@ -248,7 +264,7 @@ const EquipmentManagement = () => {
                 {stats.total_equipment}
               </div>
               <div className="text-sm text-[var(--mac-text-secondary)]">
-                Всего единиц
+                {t('admin2.em_stat_total')}
               </div>
             </div>
             <div className="text-center">
@@ -256,7 +272,7 @@ const EquipmentManagement = () => {
                 {stats.active_equipment}
               </div>
               <div className="text-sm text-[var(--mac-text-secondary)]">
-                Активных
+                {t('admin2.em_stat_active')}
               </div>
             </div>
           </div>
@@ -267,7 +283,7 @@ const EquipmentManagement = () => {
       {message.text &&
       <Alert
         type={message.type === 'success' ? 'success' : 'error'}
-        title={message.type === 'success' ? 'Успешно' : 'Ошибка'}
+        title={message.type === 'success' ? t('admin2.em_alert_success') : t('admin2.em_alert_error')}
         message={message.text} />
 
       }
@@ -278,8 +294,8 @@ const EquipmentManagement = () => {
           <div className="admin-flex-1-pos-relative">
             <Input
               type="text"
-              aria-label="Поиск оборудования по названию, модели или серийному номеру"
-              placeholder="Поиск по названию, модели или серийному номеру..."
+              aria-label={t('admin2.em_search_aria')}
+              placeholder={t('admin2.em_search_placeholder')}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="admin-pl-40" />
@@ -288,31 +304,31 @@ const EquipmentManagement = () => {
           </div>
           <div className="admin-d-flex-gap-12-fw-wrap">
             <Select
-              aria-label="Фильтр оборудования по статусу"
+              aria-label={t('admin2.em_filter_status_aria')}
               value={statusFilter}
               onChange={setStatusFilter}
               options={[
-                { value: 'all', label: 'Все статусы' },
+                { value: 'all', label: t('admin2.em_filter_status_all') },
                 ...statusOptions.map((option) => ({ value: option.value, label: option.label }))
               ]}
               size="large"
               className="admin-minw-150" />
             <Select
-              aria-label="Фильтр оборудования по типу"
+              aria-label={t('admin2.em_filter_type_aria')}
               value={typeFilter}
               onChange={setTypeFilter}
               options={[
-                { value: 'all', label: 'Все типы' },
+                { value: 'all', label: t('admin2.em_filter_type_all') },
                 ...typeOptions.map((option) => ({ value: option.value, label: option.label }))
               ]}
               size="large"
               className="admin-minw-150" />
             <Select
-              aria-label="Фильтр оборудования по филиалу"
+              aria-label={t('admin2.em_filter_branch_aria')}
               value={branchFilter}
               onChange={setBranchFilter}
               options={[
-                { value: 'all', label: 'Все филиалы' },
+                { value: 'all', label: t('admin2.em_filter_branch_all') },
                 ...branches.map((branch) => ({ value: String(branch.id), label: branch.name }))
               ]}
               size="large"
@@ -320,9 +336,9 @@ const EquipmentManagement = () => {
             <Button
               onClick={() => setShowAddForm(true)}
               className="admin-d-flex-ai-center-gap-8-bgc-blue-bd-none-p-8px-16px">
-              
+
               <Plus aria-hidden="true" className="w-4 h-4" />
-              <span>Добавить оборудование</span>
+              <span>{t('admin2.em_add_equipment_btn')}</span>
             </Button>
           </div>
         </div>
@@ -333,12 +349,12 @@ const EquipmentManagement = () => {
       <MacOSCard className="admin-p-24-ov-hidden">
           <div className="admin-d-flex-jc-between-ai-center-mb-16">
             <h3 className="admin-fs-lg-fw-semi-primary-m-0">
-              {editingEquipment ? 'Редактировать оборудование' : 'Добавить оборудование'}
+              {editingEquipment ? t('admin2.em_edit_title') : t('admin2.em_add_title')}
             </h3>
             <Button
             variant="outline"
             type="button"
-            aria-label={editingEquipment ? 'Закрыть форму редактирования оборудования' : 'Закрыть форму добавления оборудования'}
+            aria-label={editingEquipment ? t('admin2.em_close_edit_aria') : t('admin2.em_close_add_aria')}
             onClick={() => {
               setShowAddForm(false);
               setEditingEquipment(null);
@@ -354,72 +370,72 @@ const EquipmentManagement = () => {
             <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16">
               <div>
                 <label className="admin-d-block-fs-sm-fw-med-primary-mb-4-10">
-                  Название *
+                  {t('admin2.em_label_name')}
                 </label>
                 <Input
                 type="text"
                 required
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Введите название оборудования" />
-              
+                placeholder={t('admin2.em_name_ph')} />
+
               </div>
               <div>
                 <label className="admin-d-block-fs-sm-fw-med-primary-mb-4-9">
-                  Тип *
+                  {t('admin2.em_label_type')}
                 </label>
                 <Select
-                aria-label="Тип оборудования"
+                aria-label={t('admin2.em_type_aria')}
                 value={formData.type}
                 onChange={(value) => setFormData({ ...formData, type: value })}
                 options={[
-                  { value: '', label: 'Выберите тип' },
+                  { value: '', label: t('admin2.em_select_type') },
                   ...typeOptions.map((option) => ({ value: option.value, label: option.label }))
                 ]}
                 size="large" />
               </div>
               <div>
                 <label className="admin-d-block-fs-sm-fw-med-primary-mb-4-8">
-                  Модель
+                  {t('admin2.em_label_model')}
                 </label>
                 <Input
                 type="text"
                 value={formData.model}
                 onChange={(e) => setFormData({ ...formData, model: e.target.value })}
-                placeholder="Введите модель" />
-              
+                placeholder={t('admin2.em_model_ph')} />
+
               </div>
               <div>
                 <label className="admin-d-block-fs-sm-fw-med-primary-mb-4-7">
-                  Серийный номер
+                  {t('admin2.em_label_serial')}
                 </label>
                 <Input
                 type="text"
                 value={formData.serial_number}
                 onChange={(e) => setFormData({ ...formData, serial_number: e.target.value })}
-                placeholder="Введите серийный номер" />
-              
+                placeholder={t('admin2.em_serial_ph')} />
+
               </div>
               <div>
                 <label className="admin-d-block-fs-sm-fw-med-primary-mb-4-6">
-                  Филиал *
+                  {t('admin2.em_label_branch')}
                 </label>
                 <Select
-                aria-label="Филиал оборудования"
+                aria-label={t('admin2.em_branch_aria')}
                 value={formData.branch_id ? String(formData.branch_id) : ''}
                 onChange={(value) => setFormData({ ...formData, branch_id: value ? Number(value) : null })}
                 options={[
-                  { value: '', label: 'Выберите филиал' },
+                  { value: '', label: t('admin2.em_select_branch') },
                   ...branches.map((branch) => ({ value: String(branch.id), label: branch.name }))
                 ]}
                 size="large" />
               </div>
               <div>
                 <label className="admin-d-block-fs-sm-fw-med-primary-mb-4-5">
-                  Статус
+                  {t('admin2.em_label_status')}
                 </label>
                 <Select
-                aria-label="Статус оборудования"
+                aria-label={t('admin2.em_status_aria')}
                 value={formData.status}
                 onChange={(value) => setFormData({ ...formData, status: value })}
                 options={statusOptions.map((option) => ({ value: option.value, label: option.label }))}
@@ -427,57 +443,57 @@ const EquipmentManagement = () => {
               </div>
               <div>
                 <label className="admin-d-block-fs-sm-fw-med-primary-mb-4-4">
-                  Дата покупки
+                  {t('admin2.em_label_purchase_date')}
                 </label>
                 <Input
                 type="date"
                 value={formData.purchase_date}
                 onChange={(e) => setFormData({ ...formData, purchase_date: e.target.value })} />
-              
+
               </div>
               <div>
                 <label className="admin-d-block-fs-sm-fw-med-primary-mb-4-3">
-                  Окончание гарантии
+                  {t('admin2.em_label_warranty')}
                 </label>
                 <Input
                 type="date"
                 value={formData.warranty_expiry}
                 onChange={(e) => setFormData({ ...formData, warranty_expiry: e.target.value })} />
-              
+
               </div>
               <div>
                 <label className="admin-d-block-fs-sm-fw-med-primary-mb-4-2">
-                  Последнее обслуживание
+                  {t('admin2.em_label_maintenance_date')}
                 </label>
                 <Input
                 type="date"
                 value={formData.maintenance_date}
                 onChange={(e) => setFormData({ ...formData, maintenance_date: e.target.value })} />
-              
+
               </div>
               <div>
                 <label className="admin-d-block-fs-sm-fw-med-primary-mb-4-1">
-                  Стоимость (сум)
+                  {t('admin2.em_label_cost')}
                 </label>
                 <Input
                 type="number"
                 value={formData.cost}
                 onChange={(e) => setFormData({ ...formData, cost: parseFloat(e.target.value) })}
-                placeholder="Введите стоимость" />
-              
+                placeholder={t('admin2.em_cost_ph')} />
+
               </div>
             </div>
 
             <div>
               <label className="admin-d-block-fs-sm-fw-med-primary-mb-4">
-                Описание
+                {t('admin2.em_label_description')}
               </label>
               <Textarea
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="Введите описание оборудования"
+              placeholder={t('admin2.em_description_ph')}
               rows={3} />
-            
+
             </div>
 
             <div className="admin-d-flex-jc-end-gap-12">
@@ -490,8 +506,8 @@ const EquipmentManagement = () => {
                 resetForm();
               }}
               disabled={saving}>
-              
-                Отмена
+
+                {t('admin2.em_cancel_btn')}
               </Button>
               <Button
               type="submit"
@@ -502,12 +518,12 @@ const EquipmentManagement = () => {
                 {saving ?
               <>
                     <RefreshCw aria-hidden="true" className="admin-w-16-h-16-anim-spin-1s-linear-infin" />
-                    Сохранение...
+                    {t('admin2.em_saving')}
                   </> :
 
               <>
                     <Save aria-hidden="true" className="w-4 h-4" />
-                    {editingEquipment ? 'Обновить' : 'Добавить'}
+                    {editingEquipment ? t('admin2.em_update_btn') : t('admin2.em_add_btn')}
                   </>
               }
               </Button>
@@ -533,7 +549,7 @@ const EquipmentManagement = () => {
         action={
         <Button onClick={() => setShowAddForm(true)} variant="primary">
               <Plus aria-hidden="true" focusable="false" className="w-4 h-4 mr-2" />
-              Добавить оборудование
+              {t('admin2.em_add_equipment_btn')}
             </Button>
         } /> :
 
@@ -568,13 +584,13 @@ const EquipmentManagement = () => {
                 {item.cost > 0 &&
             <div className="admin-d-flex-ai-center-gap-8-fs-sm-secondary-1">
                     <DollarSign aria-hidden="true" className="w-4 h-4" />
-                    <span>{item.cost.toLocaleString()} сум</span>
+                    <span>{item.cost.toLocaleString()} {t('admin2.em_currency')}</span>
                   </div>
             }
                 {item.warranty_expiry &&
             <div className="admin-d-flex-ai-center-gap-8-fs-sm-secondary">
                     <Calendar aria-hidden="true" className="w-4 h-4" />
-                    <span>Гарантия до: {new Date(item.warranty_expiry).toLocaleDateString()}</span>
+                    <span>{t('admin2.em_warranty_until', { date: new Date(item.warranty_expiry).toLocaleDateString() })}</span>
                   </div>
             }
               </div>
@@ -591,7 +607,7 @@ const EquipmentManagement = () => {
                 <Button
               type="button"
               variant="outline"
-              aria-label={`Редактировать оборудование ${item.name}`}
+              aria-label={t('admin2.em_edit_aria', { name: item.name })}
               onClick={() => handleEdit(item)}
               className="admin-p-6px-12px">
               
@@ -600,7 +616,7 @@ const EquipmentManagement = () => {
                 <Button
               type="button"
               variant="outline"
-              aria-label={`Удалить оборудование ${item.name}`}
+              aria-label={t('admin2.em_delete_aria', { name: item.name })}
               onClick={() => handleDelete(item.id)}
               className="admin-p-6px-12px-error-bd-c-error">
               
