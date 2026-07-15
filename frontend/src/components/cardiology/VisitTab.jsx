@@ -17,6 +17,7 @@ import { formatRegistrarDate, formatRegistrarDateTime } from '../../utils/dateUt
 import { useTranslation } from '../../i18n/adapter';
 
 export function VisitTab({
+  const { t } = useTranslation();
   selectedPatient,
   emr,
   loading = false,
