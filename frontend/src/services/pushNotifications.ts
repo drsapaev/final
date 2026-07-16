@@ -1,12 +1,22 @@
 import { useEffect, useState, useCallback } from 'react';
 import logger from '../utils/logger';
 
+// Phase 1 — NotificationOptions in TS DOM lib doesn't include `renotify`,
+// `sticky`, etc. that some browsers support. Define a local extension.
+interface ExtendedNotificationOptions extends NotificationOptions {
+  renotify?: boolean;
+  sticky?: boolean;
+}
+
 /**
  * Push Notification Service
  * Handles browser push notifications for chat messages
  */
 
 class PushNotificationService {
+  permission: NotificationPermission = 'default';
+  isSupported: boolean = typeof window !== 'undefined' && 'Notification' in window;
+
   constructor() {
     this.permission = 'default';
     this.isSupported = typeof window !== 'undefined' && 'Notification' in window;
@@ -64,7 +74,7 @@ class PushNotificationService {
         return false;
       }
 
-      this.permission = permission;
+      this.permission = permission as NotificationPermission;
       return permission === 'granted';
     } catch (error) {
       logger.error('[PushNotification] Failed to request permission:', error);
@@ -94,7 +104,7 @@ class PushNotificationService {
     // }
 
     const title = `Новое сообщение от ${senderName || 'Пользователь'}`;
-    const options = {
+    const options: ExtendedNotificationOptions = {
       body: message.message_type === 'voice' ?
       '🎤 Голосовое сообщение' :
       message.content?.substring(0, 100) || 'Новое сообщение',
@@ -112,7 +122,7 @@ class PushNotificationService {
     };
 
     try {
-      const notification = new Notification(title, options);
+      const notification = new Notification(title, options as NotificationOptions);
 
       notification.onclick = () => {
         window.focus();
@@ -145,8 +155,8 @@ class PushNotificationService {
       {
         icon: '/favicon.ico',
         tag: 'unread-count',
-        renotify: false
-      }
+        renotify: false,
+      } as ExtendedNotificationOptions as NotificationOptions,
     );
 
     notification.onclick = () => {
