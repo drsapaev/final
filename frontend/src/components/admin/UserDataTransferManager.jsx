@@ -57,6 +57,7 @@ const normalizeStatistics = (payload) => ({
 });
 
 const UserDataTransferManager = () => {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState('transfer');
   const [sourceUser, setSourceUser] = useState(null);
   const [targetUser, setTargetUser] = useState(null);
@@ -81,7 +82,7 @@ const UserDataTransferManager = () => {
       setAvailableDataTypes(normalizeDataTypes(response.data));
     } catch (error) {
       logger.error('Ошибка загрузки типов данных:', error);
-      toast.error('Ошибка загрузки типов данных');
+      toast.error(t('admin2.udtm_err_load_data_types'));
     }
   };
 
@@ -97,7 +98,7 @@ const UserDataTransferManager = () => {
       setSearchResults(toArray(response.data, ['users', 'items', 'results']));
     } catch (error) {
       logger.error('Ошибка поиска пользователей:', error);
-      toast.error('Ошибка поиска пользователей');
+      toast.error(t('admin2.udtm_err_search_users'));
       setSearchResults([]);
     } finally {
       setIsSearching(false);
@@ -110,13 +111,13 @@ const UserDataTransferManager = () => {
       setUserDataSummary(normalizeDataSummary(response.data));
     } catch (error) {
       logger.error('Ошибка получения сводки данных:', error);
-      toast.error('Ошибка получения данных пользователя');
+      toast.error(t('admin2.udtm_err_user_data'));
     }
   };
 
   const validateTransfer = async () => {
     if (!sourceUser || !targetUser) {
-      toast.error('Выберите пользователей для передачи');
+      toast.error(t('admin2.udtm_err_select_users'));
       return false;
     }
 
@@ -132,7 +133,7 @@ const UserDataTransferManager = () => {
       return true;
     } catch (error) {
       logger.error('Ошибка валидации:', error);
-      toast.error('Ошибка валидации передачи');
+      toast.error(t('admin2.udtm_err_validation'));
       return false;
     }
   };
@@ -153,20 +154,20 @@ const UserDataTransferManager = () => {
       const transferResult = response.data || {};
 
       if (transferResult.success) {
-        toast.success('Данные успешно переданы!');
+        toast.success(t('admin2.udtm_success_transferred'));
 
         // Показываем результаты передачи
         const transferred = transferResult.transferred || {};
-        let message = 'Передано:\n';
+        let message = t('admin2.udtm_transferred_prefix');
 
         if (transferred.appointments?.success) {
-          message += `• Назначений: ${transferred.appointments.count}\n`;
+          message += t('admin2.udtm_transferred_appointments', { count: transferred.appointments.count });
         }
         if (transferred.visits?.success) {
-          message += `• Визитов: ${transferred.visits.count}\n`;
+          message += t('admin2.udtm_transferred_visits', { count: transferred.visits.count });
         }
         if (transferred.queue_entries?.success) {
-          message += `• Записей в очереди: ${transferred.queue_entries.count}\n`;
+          message += t('admin2.udtm_transferred_queue', { count: transferred.queue_entries.count });
         }
 
         toast.info(message);
@@ -181,11 +182,11 @@ const UserDataTransferManager = () => {
           loadTransferHistory();
         }
       } else {
-        toast.error('Ошибка передачи данных');
+        toast.error(t('admin2.udtm_err_transfer'));
       }
     } catch (error) {
       logger.error('Ошибка передачи:', error);
-      toast.error('Ошибка выполнения передачи');
+      toast.error(t('admin2.udtm_err_transfer_execution'));
     } finally {
       setIsTransferring(false);
     }
@@ -197,7 +198,7 @@ const UserDataTransferManager = () => {
       setTransferHistory(toArray(response.data, ['history', 'items', 'results']));
     } catch (error) {
       logger.error('Ошибка загрузки истории:', error);
-      toast.error('Ошибка загрузки истории');
+      toast.error(t('admin2.udtm_err_load_history'));
     }
   };
 
@@ -207,7 +208,7 @@ const UserDataTransferManager = () => {
       setStatistics(normalizeStatistics(response.data));
     } catch (error) {
       logger.error('Ошибка загрузки статистики:', error);
-      toast.error('Ошибка загрузки статистики');
+      toast.error(t('admin2.udtm_err_load_statistics'));
     }
   };
 
@@ -242,13 +243,13 @@ const UserDataTransferManager = () => {
       <MacOSCard className="admin-p-24">
         <h3 className="admin-lg-med-primary-m-0016px0-flex-ai-center-gap-8">
           <Search className="admin-icon-20" />
-          Поиск пользователей
+          {t('admin2.udtm_search_users_title')}
         </h3>
         
         <div className="admin-pos-relative">
           <Input
           type="text"
-          placeholder="Введите имя, телефон или email..."
+          placeholder={t('admin2.udtm_search_placeholder')}
           value={searchQuery}
           onChange={handleSearchChange}
           className="admin-w-full" />
@@ -281,7 +282,7 @@ const UserDataTransferManager = () => {
                   onClick={() => selectUser(user, 'source')}
                   disabled={targetUser?.id === user.id}>
                   
-                        Источник
+                        {t('admin2.udtm_btn_source')}
                       </Button>
                       <Button
                   size="sm"
@@ -289,7 +290,7 @@ const UserDataTransferManager = () => {
                   onClick={() => selectUser(user, 'target')}
                   disabled={sourceUser?.id === user.id}>
                   
-                        Получатель
+                        {t('admin2.udtm_btn_target')}
                       </Button>
                     </div>
                   </div>
@@ -304,7 +305,7 @@ const UserDataTransferManager = () => {
       <div className="admin-grid-gtc-rauto-fitcminmax300pxc1fr-gap-24">
         <MacOSCard className="admin-p-24">
           <h3 className="admin-lg-med-primary-m-0016px0">
-            Пользователь-источник
+            {t('admin2.udtm_source_user_title')}
           </h3>
           {sourceUser ?
         <div className="admin-flex-col-8">
@@ -326,19 +327,19 @@ const UserDataTransferManager = () => {
             }}
             className="admin-mt-8-alignself-0e92fc">
             
-                Очистить
+                {t('admin2.udtm_clear_btn')}
               </Button>
             </div> :
 
         <div className="admin-secondary-ta-center-p-32px0-sm">
-              Выберите пользователя-источника из результатов поиска
+              {t('admin2.udtm_source_user_hint')}
             </div>
         }
         </MacOSCard>
 
         <MacOSCard className="admin-p-24">
           <h3 className="admin-lg-med-primary-m-0016px0">
-            Пользователь-получатель
+            {t('admin2.udtm_target_user_title')}
           </h3>
           {targetUser ?
         <div className="admin-flex-col-8">
@@ -357,12 +358,12 @@ const UserDataTransferManager = () => {
             onClick={() => setTargetUser(null)}
             className="admin-mt-8-alignself-0e92fc">
             
-                Очистить
+                {t('admin2.udtm_clear_btn')}
               </Button>
             </div> :
 
         <div className="admin-secondary-ta-center-p-32px0-sm">
-              Выберите пользователя-получателя из результатов поиска
+              {t('admin2.udtm_target_user_hint')}
             </div>
         }
         </MacOSCard>
@@ -372,7 +373,7 @@ const UserDataTransferManager = () => {
       {userDataSummary &&
     <MacOSCard className="admin-p-24">
           <h3 className="admin-lg-med-primary-m-0016px0">
-            Данные для передачи
+            {t('admin2.udtm_data_to_transfer')}
           </h3>
           <div className="admin-grid-gtc-rauto-fitcminmax150pxc1fr-gap-16-mb-16">
             <div className="admin-text-center">
@@ -380,7 +381,7 @@ const UserDataTransferManager = () => {
                 {userDataSummary.data_counts.appointments}
               </div>
               <div className="admin-xs-secondary">
-                Назначений
+                {t('admin2.udtm_stat_appointments')}
               </div>
             </div>
             <div className="admin-text-center">
@@ -388,7 +389,7 @@ const UserDataTransferManager = () => {
                 {userDataSummary.data_counts.visits}
               </div>
               <div className="admin-xs-secondary">
-                Визитов
+                {t('admin2.udtm_stat_visits')}
               </div>
             </div>
             <div className="admin-text-center">
@@ -396,7 +397,7 @@ const UserDataTransferManager = () => {
                 {userDataSummary.data_counts.queue_entries}
               </div>
               <div className="admin-xs-secondary">
-                Записей в очереди
+                {t('admin2.udtm_stat_queue')}
               </div>
             </div>
           </div>
@@ -406,7 +407,7 @@ const UserDataTransferManager = () => {
       {/* Выбор типов данных */}
       <MacOSCard className="admin-p-24">
         <h3 className="admin-lg-med-primary-m-0016px0">
-          Типы данных для передачи
+          {t('admin2.udtm_data_types_title')}
         </h3>
         <div className="admin-flex-col-12">
           {availableDataTypes.map((dataType) =>
@@ -449,12 +450,12 @@ const UserDataTransferManager = () => {
           {isTransferring ?
         <>
               <div className="admin-w-16-h-16-bd-2solidwhite-bordertop-0dfa98-radius-50pct-anim-spin1slinearin-62066832"></div>
-              Передача данных...
+              {t('admin2.udtm_transferring')}
             </> :
 
         <>
               <ArrowRight className="admin-w-20-h-20-mr-8" />
-              Передать данные
+              {t('admin2.udtm_transfer_btn')}
             </>
         }
         </Button>
@@ -466,17 +467,17 @@ const UserDataTransferManager = () => {
   <MacOSCard className="admin-p-24">
       <div className="admin-flex-jc-between-ai-center-mb-16">
         <h3 className="admin-lg-med-primary-m-0">
-          История передач
+          {t('admin2.udtm_history_title')}
         </h3>
         <Button onClick={loadTransferHistory} variant="outline">
           <History className="admin-icon-16-mr-8" />
-          Обновить
+          {t('admin2.udtm_refresh_btn')}
         </Button>
       </div>
       
       {transferHistory.length === 0 ?
     <div className="admin-ta-center-p-32px0-secondary-sm">
-          История передач пуста
+          {t('admin2.udtm_history_empty')}
         </div> :
 
     <div className="admin-flex-col-16">
@@ -511,11 +512,11 @@ const UserDataTransferManager = () => {
   <MacOSCard className="admin-p-24">
       <div className="admin-flex-jc-between-ai-center-mb-16">
         <h3 className="admin-lg-med-primary-m-0">
-          Статистика передач
+          {t('admin2.udtm_statistics_title')}
         </h3>
         <Button onClick={loadStatistics} variant="outline">
           <BarChart3 className="admin-icon-16-mr-8" />
-          Обновить
+          {t('admin2.udtm_refresh_btn')}
         </Button>
       </div>
       
@@ -526,7 +527,7 @@ const UserDataTransferManager = () => {
               {statistics.total_transfers}
             </div>
             <div className="admin-xs-secondary">
-              Всего передач
+              {t('admin2.udtm_total_transfers')}
             </div>
           </div>
           <div className="admin-text-center">
@@ -534,7 +535,7 @@ const UserDataTransferManager = () => {
               {statistics.successful_transfers}
             </div>
             <div className="admin-xs-secondary">
-              Успешных
+              {t('admin2.udtm_successful')}
             </div>
           </div>
           <div className="admin-text-center">
@@ -542,13 +543,13 @@ const UserDataTransferManager = () => {
               {statistics.failed_transfers}
             </div>
             <div className="admin-xs-secondary">
-              Неудачных
+              {t('admin2.udtm_failed')}
             </div>
           </div>
         </div> :
 
     <div className="admin-ta-center-p-32px0-secondary-sm">
-          Нажмите «Обновить» для загрузки статистики
+          {t('admin2.udtm_statistics_hint')}
         </div>
     }
     </MacOSCard>;
@@ -559,17 +560,17 @@ const UserDataTransferManager = () => {
       <div className="admin-mb-24">
         <h1 className="admin-2xl-semi-primary-m-008px0-flex-ai-center-gap-12">
           <Users className="admin-w-28-h-28" />
-          Передача данных пользователей
+          {t('admin2.udtm_page_title')}
         </h1>
         <p className="admin-secondary-sm-m-0">
-          Управление передачей назначений, визитов и записей в очереди между пользователями
+          {t('admin2.udtm_page_subtitle')}
         </p>
       </div>
 
       {/* Навигация по вкладкам */}
       <div className="admin-maxw-100pct-overflowx-auto-pb-6-mb-24-scrollbarwidth-b2a750">
         <SegmentedControl
-          aria-label="Разделы передачи данных пользователей"
+          aria-label={t('admin2.udtm_tabs_aria')}
           value={activeTab}
           onChange={(value) => {
             setActiveTab(value);
@@ -586,7 +587,7 @@ const UserDataTransferManager = () => {
               label: (
                 <span className="admin-inline-flex-ai-center-gap-8">
                   <ArrowRight size={14} aria-hidden="true" />
-                  Передача данных
+                  {t('admin2.udtm_tab_transfer')}
                 </span>
               )
             },
@@ -595,7 +596,7 @@ const UserDataTransferManager = () => {
               label: (
                 <span className="admin-inline-flex-ai-center-gap-8">
                   <History size={14} aria-hidden="true" />
-                  История
+                  {t('admin2.udtm_tab_history')}
                 </span>
               )
             },
@@ -604,7 +605,7 @@ const UserDataTransferManager = () => {
               label: (
                 <span className="admin-inline-flex-ai-center-gap-8">
                   <BarChart3 size={14} aria-hidden="true" />
-                  Статистика
+                  {t('admin2.udtm_tab_statistics')}
                 </span>
               )
             }

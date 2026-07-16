@@ -5,21 +5,21 @@ import { getCanonicalRouteById, getEffectiveRouteByPath } from '../../routing/ro
 
 const SWITCHER_ROUTE_IDS = ['admin-dashboard', 'admin-analytics'];
 
-const ROUTE_PRESENTATION_BY_ID = {
+const getRoutePresentation = (t) => ({
   'admin-dashboard': {
-    description: 'Сводка по клинике и операционные карточки',
+    description: t('admin2.ars_desc_dashboard'),
     icon: LayoutDashboard,
   },
   'admin-analytics': {
-    description: 'Подробные разрезы, KPI и прогнозы',
+    description: t('admin2.ars_desc_analytics'),
     icon: LineChart,
   },
-};
+});
 
-const switcherRoutes = SWITCHER_ROUTE_IDS
+const buildSwitcherRoutes = (t) => SWITCHER_ROUTE_IDS
   .map((routeId) => {
     const route = getCanonicalRouteById(routeId);
-    const presentation = ROUTE_PRESENTATION_BY_ID[routeId];
+    const presentation = getRoutePresentation(t)[routeId];
 
     if (!route || !presentation) {
       return null;
@@ -116,16 +116,17 @@ export default function AdminRouteSwitcher() {
 
   const currentRoute = getEffectiveRouteByPath(location.pathname);
   const activeId = SWITCHER_ROUTE_IDS.includes(currentRoute?.id) ? currentRoute.id : 'admin-dashboard';
+  const switcherRoutes = buildSwitcherRoutes(t);
 
   return (
     <section
       style={switcherStyle}
-      aria-label="Навигация между разделами админки"
+      aria-label={t('admin2.ars_aria')}
     >
       <div style={switcherLabelStyle}>
         <ArrowLeftRight size={14} aria-hidden="true" />
         {/* UX Audit Admin #2.1: переименовано для соответствия фактическому функционалу (только 2 маршрута). */}
-        Сводка и аналитика
+        {t('admin2.ars_title')}
       </div>
       <div style={routeGridStyle}>
         {switcherRoutes.map((route) => {

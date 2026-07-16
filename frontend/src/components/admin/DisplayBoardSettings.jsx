@@ -116,7 +116,7 @@ const DisplayBoardSettings = () => {
         const result = response.data;
         setMessage({ type: 'success', text: result.message });
       } else {
-        throw new Error('Ошибка сохранения настроек табло');
+        throw new Error(t('admin2.db2_save_error'));
       }
     } catch (error) {
       logger.error('Ошибка сохранения:', error);
@@ -136,11 +136,11 @@ const DisplayBoardSettings = () => {
         test_type: testType,
         test_data: testType === 'call' ? {
           ticket_number: 'A007',
-          patient_name: 'Тестовый П.',
-          doctor_name: 'Доктор Тест',
+          patient_name: t('admin2.db2_test_patient_name'),
+          doctor_name: t('admin2.db2_test_doctor_name'),
           cabinet: '101'
         } : {
-          message: 'Тестовое объявление от админ панели'
+          message: t('admin2.db2_test_announcement')
         }
       };
 
@@ -158,7 +158,7 @@ const DisplayBoardSettings = () => {
         }));
         setMessage({ type: 'success', text: t('admin2.db_test_success', { type: testType }) });
       } else {
-        throw new Error('Ошибка тестирования');
+        throw new Error(t('admin2.db2_test_error'));
       }
     } catch (error) {
       logger.error('Ошибка тестирования:', error);

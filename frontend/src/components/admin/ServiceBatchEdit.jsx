@@ -30,14 +30,14 @@ const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }
   const [result, setResult] = useState(null);
 
   const availableFields = [
-    { key: 'price', label: 'Цена', type: 'number', icon: DollarSign },
-    { key: 'currency', label: 'Валюта', type: 'select', options: ['UZS', 'USD'], icon: Tag },
-    { key: 'duration_minutes', label: 'Длительность (мин)', type: 'number', icon: Clock },
-    { key: 'category_id', label: 'Категория', type: 'select', options: categories, icon: Tag },
-    { key: 'active', label: 'Активность', type: 'boolean', icon: Power },
-    { key: 'requires_doctor', label: 'Требует врача', type: 'boolean', icon: CheckSquare },
-    { key: 'is_consultation', label: 'Консультация', type: 'boolean', icon: CheckSquare },
-    { key: 'allow_doctor_price_override', label: 'Переопределение цены', type: 'boolean', icon: CheckSquare }
+    { key: 'price', label: t('admin2.sbe_field_price'), type: 'number', icon: DollarSign },
+    { key: 'currency', label: t('admin2.sbe_field_currency'), type: 'select', options: ['UZS', 'USD'], icon: Tag },
+    { key: 'duration_minutes', label: t('admin2.sbe_field_duration'), type: 'number', icon: Clock },
+    { key: 'category_id', label: t('admin2.sbe_field_category'), type: 'select', options: categories, icon: Tag },
+    { key: 'active', label: t('admin2.sbe_field_active'), type: 'boolean', icon: Power },
+    { key: 'requires_doctor', label: t('admin2.sbe_field_requires_doctor'), type: 'boolean', icon: CheckSquare },
+    { key: 'is_consultation', label: t('admin2.sbe_field_consultation'), type: 'boolean', icon: CheckSquare },
+    { key: 'allow_doctor_price_override', label: t('admin2.sbe_field_price_override'), type: 'boolean', icon: CheckSquare }
   ];
 
   const [selectedFields, setSelectedFields] = useState(new Set());
@@ -98,10 +98,10 @@ const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }
                 <CheckSquare size={32} className="admin-success" />
               </div>
               <h3 className="admin-fs-18-fw-600-primary-m-0-0-8px-0-2">
-                Успешно обновлено
+                {t('admin2.sbe_success_title')}
               </h3>
               <p className="admin-fs-14-secondary-m-0-0-20px-0-1">
-                Обновлено услуг: {result.updated_count}
+                {t('admin2.sbe_updated_count', { count: result.updated_count })}
               </p>
             </>
           ) : (
@@ -110,19 +110,19 @@ const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }
                 <AlertCircle size={32} className="admin-warning" />
               </div>
               <h3 className="admin-fs-18-fw-600-primary-m-0-0-8px-0-1">
-                Частично обновлено
+                {t('admin2.sbe_partial_title')}
               </h3>
               <p className="admin-fs-14-secondary-m-0-0-20px-0">
-                Успешно: {result.updated_count} | Ошибки: {result.failed_count}
+                {t('admin2.sbe_partial_summary', { success: result.updated_count, failed: result.failed_count })}
               </p>
               {result.failed_services.length > 0 && (
                 <div className="admin-ta-left-p-12-bgc-bg-secondary-radius-8-mb-20">
                   <h4 className="admin-fs-13-fw-600-mb-8">
-                    Ошибки:
+                    {t('admin2.sbe_errors_title')}
                   </h4>
                   {result.failed_services.map((fail, idx) => (
                     <div key={idx} className="admin-fs-12-error-mb-4">
-                      Услуга #{fail.service_id}: {fail.error}
+                      {t('admin2.sbe_error_line', { id: fail.service_id, error: fail.error })}
                     </div>
                   ))}
                 </div>
@@ -130,7 +130,7 @@ const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }
             </>
           )}
           <Button onClick={onComplete}>
-            Закрыть
+            {t('admin2.sbe_close')}
           </Button>
         </div>
       </MacOSCard>
@@ -141,17 +141,17 @@ const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }
     <MacOSCard variant="default" className="admin-p-0">
       <div className="admin-p-20px-24px-bd-b-1px-solid-var-mac-bo">
         <h3 className="admin-fs-18-fw-600-primary-m-0-0-8px-0">
-          Массовое редактирование
+          {t('admin2.sbe_title')}
         </h3>
         <p className="admin-fs-14-secondary-m-0">
-          Выбрано услуг: <strong>{selectedServices.length}</strong>
+          {t('admin2.sbe_selected_count', { count: selectedServices.length })}
         </p>
       </div>
 
       <div className="admin-p-24-maxh-500-ovy-auto">
         <div className="admin-mb-20">
           <label className="admin-d-block-fs-14-fw-600-primary-mb-12">
-            Выберите поля для изменения:
+            {t('admin2.sbe_select_fields')}
           </label>
           <div className="admin-d-grid-gtc-repeat-auto-fill-min-gap-8">
             {availableFields.map(field => {
@@ -177,7 +177,7 @@ const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }
         {selectedFields.size > 0 && (
           <div className="admin-p-16-bgc-bg-secondary-radius-8-mb-20">
             <h4 className="admin-fs-14-fw-600-primary-mb-16">
-              Новые значения:
+              {t('admin2.sbe_new_values')}
             </h4>
             <div className="admin-flex-col-12">
               {Array.from(selectedFields).map(fieldKey => {
@@ -194,7 +194,7 @@ const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }
                         type="number"
                         value={updates[fieldKey] || ''}
                         onChange={(e) => handleFieldChange(fieldKey, parseFloat(e.target.value) || 0)}
-                        placeholder={`Введите ${field.label.toLowerCase()}`}
+                        placeholder={t('admin2.sbe_input_placeholder', { label: field.label.toLowerCase() })}
                       />
                     </div>
                   );
@@ -214,7 +214,7 @@ const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }
                         value={updates[fieldKey] || ''}
                         onChange={(value) => handleFieldChange(fieldKey, value)}
                         options={[
-                          { value: '', label: `Выберите ${field.label.toLowerCase()}` },
+                          { value: '', label: t('admin2.sbe_select_placeholder', { label: field.label.toLowerCase() }) },
                           ...options
                         ]}
                         size="large"
@@ -243,13 +243,13 @@ const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }
 
         <div>
           <label className="admin-d-block-fs-13-fw-500-primary-mb-6">
-            Комментарий (опционально)
+            {t('admin2.sbe_comment_label')}
           </label>
           <Input
             type="text"
             value={comment}
             onChange={(e) => setComment(e.target.value)}
-            placeholder="Причина массового изменения..."
+            placeholder={t('admin2.sbe_comment_placeholder')}
           />
         </div>
       </div>
@@ -257,14 +257,14 @@ const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }
       <div className="admin-p-16px-24px-bd-t-1px-solid-var-mac-bo-d-flex-jc-end-gap-12">
         <Button variant="outline" onClick={onCancel} disabled={loading}>
           <X size={16} className="admin-mr-8" />
-          Отменить
+          {t('admin2.sbe_cancel')}
         </Button>
         <Button
           onClick={handleSubmit}
           disabled={loading || selectedFields.size === 0}
         >
           <Save size={16} className="admin-mr-8" />
-          {loading ? 'Сохранение...' : `Обновить ${selectedServices.length} услуг`}
+          {loading ? t('admin2.sbe_saving') : t('admin2.sbe_update_count', { count: selectedServices.length })}
         </Button>
       </div>
     </MacOSCard>

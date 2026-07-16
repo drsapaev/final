@@ -228,7 +228,7 @@ const GraphQLExplorer = () => {
 }`,
       variables: {
         'input': {
-          'fullName': 'Иванов Иван Иванович',
+          'fullName': t('admin2.gql2_example_full_name'),
           'phone': '+998901234567',
           'email': 'ivanov@example.com',
           'birthDate': '1990-01-01'
@@ -267,7 +267,7 @@ const GraphQLExplorer = () => {
           'doctorId': 1,
           'serviceId': 1,
           'appointmentDate': new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-          'notes': 'Первичная консультация'
+          'notes': t('admin2.gql2_example_notes')
         }
       }
     }

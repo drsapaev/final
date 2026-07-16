@@ -25,7 +25,7 @@ const UnifiedNotifications = () => {
 
   const tabs = [
   { id: 'fcm', label: 'Push (FCM)', icon: 'Bell' },
-  { id: 'registrar', label: 'Регистратор', icon: 'Users' }];
+  { id: 'registrar', label: t('admin2.un_tab_registrar'), icon: 'Users' }];
 
 
   const renderContent = () => {

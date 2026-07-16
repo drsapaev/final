@@ -18,11 +18,11 @@ const ICONS = {
   gradient: Sparkles,
 };
 
-const METRICS = [
-  { key: 'mood', label: 'Характер' },
-  { key: 'surfaces', label: 'Поверхности' },
-  { key: 'contrast', label: 'Контраст' },
-  { key: 'bestFor', label: 'Лучше всего для' },
+const getMetrics = (t) => [
+  { key: 'mood', label: t('admin2.css_metric_mood') },
+  { key: 'surfaces', label: t('admin2.css_metric_surfaces') },
+  { key: 'contrast', label: t('admin2.css_metric_contrast') },
+  { key: 'bestFor', label: t('admin2.css_metric_best_for') },
 ];
 
 const ACCENT_LABELS = {
@@ -41,8 +41,8 @@ function ThemePreviewCard({ scheme, isActive, onSelect }) {
   const Icon = ICONS[scheme.id] || Sun;
   const preview = scheme.preview;
   const buttonLabel = isActive
-    ? `Текущая цветовая схема: ${scheme.name}. ${scheme.mood}, контраст: ${scheme.contrast}`
-    : `Выбрать цветовую схему: ${scheme.name}. ${scheme.mood}, контраст: ${scheme.contrast}`;
+    ? t('admin2.css_aria_current_scheme', { name: scheme.name, mood: scheme.mood, contrast: scheme.contrast })
+    : t('admin2.css_aria_select_scheme', { name: scheme.name, mood: scheme.mood, contrast: scheme.contrast });
 
   return (
     <button
@@ -62,12 +62,12 @@ function ThemePreviewCard({ scheme, isActive, onSelect }) {
             </span>
           </div>
           <span className="admin-fontsize-6b9c17-opacity-0p84">
-            {scheme.mood} атмосфера
+            {t('admin2.css_mood_atmosphere', { mood: scheme.mood })}
           </span>
         </div>
         {isActive ?
           <span className="admin-fontsize-6b9c17-p-4px8-radius-999-background-c1d2e5">
-            Активна
+            {t('admin2.css_active')}
           </span> :
           null}
       </div>
@@ -116,6 +116,7 @@ ThemePreviewCard.propTypes = {
 };
 
 export default function ColorSchemeSelector() {
+  const { t } = useTranslation();
   const { colorScheme, setColorScheme } = useTheme();
   const { accent } = useMacOSTheme();
 
@@ -132,7 +133,8 @@ export default function ColorSchemeSelector() {
   const selectorDescriptionId = 'color-scheme-selector-description';
   const quickSelectId = 'color-scheme-selector-quick-select';
   const helpTextId = 'color-scheme-selector-help';
-  const currentPreviewLabel = `Текущая цветовая схема: ${currentScheme.name}. Accent: ${currentAccentLabel}`;
+  const currentPreviewLabel = t('admin2.css_current_preview_label', { name: currentScheme.name, accent: currentAccentLabel });
+  const metrics = getMetrics(t);
 
   return (
     <MacOSCard
@@ -146,21 +148,21 @@ export default function ColorSchemeSelector() {
           <Palette aria-hidden="true" focusable="false" className="admin-w-20-h-20-blue" />
           <div className="admin-grid-gap-4">
             <h3 id={selectorTitleId} className="admin-lg-semi-primary-m-0">
-              Цветовая схема интерфейса
+              {t('admin2.css_title')}
             </h3>
             <p id={selectorDescriptionId} className="admin-m-0-sm-secondary">
-              Тема управляет фоном, карточками, header и sidebar. Accent отдельно задаёт цвет интерактивных элементов.
+              {t('admin2.css_description')}
             </p>
           </div>
         </div>
 
         <div
           role="status"
-          aria-label={`Accent сейчас: ${currentAccentLabel}`}
+          aria-label={t('admin2.css_accent_noway_aria', { accent: currentAccentLabel })}
           className="admin-inline-flex-ai-center-gap-8-p-10px12-radius-14-bg-bg-secondary-bd-1solidva-9204ee03"
         >
           <SwatchBook aria-hidden="true" focusable="false" className="admin-w-14-h-14-blue" />
-          Accent сейчас: <strong className="admin-text-primary">{currentAccentLabel}</strong>
+          {t('admin2.css_accent_noway_prefix')} <strong className="admin-text-primary">{currentAccentLabel}</strong>
         </div>
       </div>
 
@@ -169,17 +171,17 @@ export default function ColorSchemeSelector() {
         className="admin-p-14px16-radius-16-background-41d8fc-bd-1solidvar-mac-border-grid-gap-8"
       >
         <div className="admin-fontsize-3044b6-bold-primary">
-          Что именно меняет настройка
+          {t('admin2.css_what_changes')}
         </div>
         <div className="admin-grid-gap-6-fontsize-6b9c17-secondary">
-          <div>Цветовая схема сохраняется в профиле пользователя и подтягивается после входа.</div>
-          <div>Accent color хранится локально в браузере и перекрашивает primary buttons, focus states и status chips.</div>
+          <div>{t('admin2.css_scheme_saved_profile')}</div>
+          <div>{t('admin2.css_accent_local_browser')}</div>
         </div>
       </div>
 
       <div className="admin-grid-gap-10">
         <label htmlFor={quickSelectId} className="admin-block-sm-med-primary">
-          Быстрый выбор схемы
+          {t('admin2.css_quick_select')}
         </label>
         <Select
           id={quickSelectId}
@@ -190,14 +192,14 @@ export default function ColorSchemeSelector() {
             value: scheme.id,
             label: scheme.name,
           }))}
-          placeholder="Выберите схему"
+          placeholder={t('admin2.css_select_scheme_placeholder')}
           size="large"
         />
       </div>
 
       <div
         role="group"
-        aria-label="Карточки выбора цветовой схемы"
+        aria-label={t('admin2.css_cards_aria')}
         className="admin-grid-gtc-rauto-fitcminmax220pxc1fr-gap-16"
       >
         {colorSchemes.map((scheme) => (
@@ -250,7 +252,7 @@ export default function ColorSchemeSelector() {
         <div className="admin-p-18-radius-18-bd-1solidvar-mac-border-background-9a770f-grid-gap-14-align-28f14aec">
           <div className="admin-grid-gap-6">
             <div className="admin-fontsize-6b9c17-secondary-texttransform-5f7abe-ls-008em">
-              Активная схема
+              {t('admin2.css_active_scheme')}
             </div>
             <div className="admin-fontsize-e5e6f8-bold-primary">
               {currentScheme.name}
@@ -258,7 +260,7 @@ export default function ColorSchemeSelector() {
           </div>
 
           <div className="admin-grid-gap-10">
-            {METRICS.map((metric) => (
+            {metrics.map((metric) => (
               <div
                 key={metric.key}
                 className="admin-grid-gap-6-p-12px14-radius-14-bg-bg-tertiary-bd-1solidvar-mac-border"
@@ -274,7 +276,7 @@ export default function ColorSchemeSelector() {
           </div>
 
           <div className="admin-p-12px14-radius-14-background-13d6cf-bd-1solidvar-mac-accent-border-primar-b92dd425">
-            Для полной смены характера интерфейса сначала выберите цветовую схему, затем при необходимости подстройте Accent ниже.
+            {t('admin2.css_full_change_hint')}
           </div>
         </div>
       </div>
