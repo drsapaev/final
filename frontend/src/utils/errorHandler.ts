@@ -9,6 +9,18 @@ import {
   DEFAULT_USER_FACING_NETWORK_ERROR,
   formatApiErrorMessage,
 } from './networkErrorMessages';
+
+// Phase 1 — typed accessor for error objects with axios-like shape.
+interface ErrorWithResponse {
+  response?: {
+    status?: number;
+    data?: { detail?: unknown; message?: string };
+    statusText?: string;
+  };
+  message?: string;
+  code?: string;
+  name?: string;
+}
 /**
  * Типы ошибок
  */
@@ -38,12 +50,12 @@ export const HTTP_STATUS = {
 /**
  * Определяет тип ошибки по HTTP статусу и содержимому
  */
-export function getErrorType(error) {
-  if (!error.response) {
+export function getErrorType(error: unknown): string {
+  if (!(error as ErrorWithResponse).response) {
     return ERROR_TYPES.NETWORK;
   }
 
-  const status = error.response.status;
+  const status = (error as ErrorWithResponse).response.status;
   
   switch (status) {
     case HTTP_STATUS.UNAUTHORIZED:
@@ -65,17 +77,17 @@ export function getErrorType(error) {
 /**
  * Извлекает сообщение об ошибке из ответа сервера
  */
-export function getErrorMessage(error, fallbackMessage = DEFAULT_USER_FACING_NETWORK_ERROR) {
+export function getErrorMessage(error: unknown, fallbackMessage: string = DEFAULT_USER_FACING_NETWORK_ERROR): string {
   const formatted = formatApiErrorMessage(error, fallbackMessage);
   if (formatted) {
     return formatted;
   }
 
-  if (!error?.response) {
+  if (!(error as ErrorWithResponse)?.response) {
     return fallbackMessage;
   }
 
-  const { status, data } = error.response;
+  const { status, data } = (error as ErrorWithResponse).response;
 
   // Сообщение от сервера
   if (data?.detail) {
@@ -85,7 +97,7 @@ export function getErrorMessage(error, fallbackMessage = DEFAULT_USER_FACING_NET
     
     // Обработка массива ошибок валидации
     if (Array.isArray(data.detail)) {
-      return data.detail.map(err => {
+      return (data.detail as Array<{ msg?: string; loc?: unknown[] }>).map(err => {
         if (err.msg && err.loc) {
           const field = err.loc[err.loc.length - 1];
           return `${field}: ${err.msg}`;
@@ -99,8 +111,8 @@ export function getErrorMessage(error, fallbackMessage = DEFAULT_USER_FACING_NET
     return data.message;
   }
 
-  if (data?.error) {
-    return data.error;
+  if ((data as { error?: string })?.error) {
+    return (data as { error?: string }).error as string;
   }
 
   // Стандартные сообщения по HTTP статусам
@@ -129,7 +141,7 @@ export function getErrorMessage(error, fallbackMessage = DEFAULT_USER_FACING_NET
 /**
  * Определяет, нужно ли показывать уведомление пользователю
  */
-export function shouldShowNotification(errorType, options = {}) {
+export function shouldShowNotification(errorType: string, options: { silentErrors?: string[]; silent?: boolean; showNetworkErrors?: boolean } = {}): boolean {
   const { silent = false, showNetworkErrors = true } = options;
 
   if (silent) return false;
@@ -152,7 +164,10 @@ export function shouldShowNotification(errorType, options = {}) {
 /**
  * Основная функция обработки ошибок
  */
-export function handleError(error, options = {}) {
+export function handleError(
+  error: unknown,
+  options: Record<string, unknown> = {},
+): { type: string; message: string; status?: number; originalError: unknown } {
   const {
     showToast = true,
     logError = true,
@@ -162,14 +177,16 @@ export function handleError(error, options = {}) {
   } = options;
 
   const errorType = getErrorType(error);
-  const errorMessage = customMessage || getErrorMessage(error);
+  const errorMessage: string = (typeof customMessage === 'string' && customMessage)
+    ? customMessage
+    : getErrorMessage(error);
 
   // Логирование
   if (logError) {
     logger.error(`[${context}] ${errorType.toUpperCase()} Error:`, {
       message: errorMessage,
-      status: error.response?.status,
-      data: error.response?.data,
+      status: (error as { response?: { status?: number } })?.response?.status,
+      data: (error as ErrorWithResponse).response?.data,
       originalError: error
     });
   }
@@ -178,16 +195,16 @@ export function handleError(error, options = {}) {
   if (showToast && shouldShowNotification(errorType, options)) {
     switch (errorType) {
       case ERROR_TYPES.VALIDATION:
-        toast.error(errorMessage, { duration: 6000 });
+        toast.error(errorMessage);
         break;
       case ERROR_TYPES.SERVER:
-        toast.error('Ошибка сервера. Попробуйте позже.', { duration: 4000 });
+        toast.error('Ошибка сервера. Попробуйте позже.');
         break;
       case ERROR_TYPES.NETWORK:
-        toast.error(errorMessage, { duration: 3000 });
+        toast.error(errorMessage);
         break;
       default:
-        toast.error(errorMessage, { duration: 4000 });
+        toast.error(errorMessage);
     }
   }
 
@@ -199,7 +216,7 @@ export function handleError(error, options = {}) {
   return {
     type: errorType,
     message: errorMessage,
-    status: error.response?.status,
+    status: (error as ErrorWithResponse).response?.status,
     originalError: error
   };
 }
@@ -207,7 +224,7 @@ export function handleError(error, options = {}) {
 /**
  * Хук для обработки ошибок в компонентах
  */
-export function useErrorHandler(context = 'Component') {
+export function useErrorHandler(context: string = 'Component'): (error: unknown, options?: Record<string, unknown>) => ReturnType<typeof handleError> {
   return (error, options = {}) => {
     return handleError(error, { ...options, context });
   };
@@ -216,7 +233,7 @@ export function useErrorHandler(context = 'Component') {
 /**
  * Обработчик ошибок для async/await
  */
-export function withErrorHandling(asyncFn, options = {}) {
+export function withErrorHandling<TArgs extends unknown[]>(asyncFn: (...args: TArgs) => Promise<unknown>, options: Record<string, unknown> = {}): (...args: TArgs) => Promise<unknown> {
   return async (...args) => {
     try {
       return await asyncFn(...args);
@@ -230,12 +247,20 @@ export function withErrorHandling(asyncFn, options = {}) {
 /**
  * Retry логика для сетевых запросов
  */
-export async function retryRequest(requestFn, options = {}) {
+export async function retryRequest<T>(
+  requestFn: () => Promise<T>,
+  options: {
+    maxRetries?: number;
+    delay?: number;
+    backoff?: number;
+    shouldRetry?: (error: unknown) => boolean;
+  } = {},
+): Promise<T> {
   const {
     maxRetries = 3,
     delay = 1000,
     backoff = 2,
-    shouldRetry = (error) => getErrorType(error) === ERROR_TYPES.NETWORK
+    shouldRetry = (error: unknown) => getErrorType(error) === ERROR_TYPES.NETWORK,
   } = options;
 
   let lastError;
@@ -323,25 +348,37 @@ export const validators = {
 };
 
 /**
- * Функция валидации формы
+ * Функция валидации формы.
+ *
+ * `rules` is a record of field → validator. Each validator is either:
+ *   - a direct function: (value, fieldName?) => string | null
+ *   - a curried function (e.g. validators.minLength(5)): (value, fieldName?) => string | null
+ *   - an array of either of the above
+ *
+ * The function collects the first error per field and returns
+ * `{ isValid, errors }`.
  */
-export function validateForm(data, rules) {
-  const errors = {};
-  
+export function validateForm(
+  data: Record<string, unknown>,
+  rules: Record<string, unknown>,
+): { isValid: boolean; errors: Record<string, string> } {
+  const errors: Record<string, string> = {};
+
   Object.entries(rules).forEach(([field, fieldRules]) => {
     const value = data[field];
-    
-    for (const rule of fieldRules) {
-      const error = rule(value, field);
-      if (error) {
+    const rulesArray: unknown[] = Array.isArray(fieldRules) ? fieldRules : [fieldRules];
+    for (const rule of rulesArray) {
+      if (typeof rule !== 'function') continue;
+      const error = (rule as (...args: unknown[]) => unknown)(value, field);
+      if (typeof error === 'string' && error) {
         errors[field] = error;
         break; // Первая ошибка для поля
       }
     }
   });
-  
+
   return {
     isValid: Object.keys(errors).length === 0,
-    errors
+    errors,
   };
 }

@@ -79,7 +79,7 @@ const AI_CONFIG = {
  * const clean = sanitizeHTML('<p>Диагноз: <script>alert("xss")</script>ОРВИ</p>');
  * // Результат: '<p>Диагноз: ОРВИ</p>'
  */
-export function sanitizeHTML(dirty, config = MEDICAL_CONFIG) {
+export function sanitizeHTML(dirty: string, config: Record<string, unknown> = MEDICAL_CONFIG): string {
   if (!dirty || typeof dirty !== 'string') {
     return '';
   }
@@ -109,8 +109,8 @@ export function sanitizeHTML(dirty, config = MEDICAL_CONFIG) {
  * const clean = sanitizeText('<p>Текст <script>alert("xss")</script>здесь</p>');
  * // Результат: 'Текст здесь'
  */
-export function sanitizeText(dirty) {
-  return sanitizeHTML(dirty, STRICT_CONFIG);
+export function sanitizeText(dirty: unknown): string {
+  return sanitizeHTML(String(dirty ?? ''), STRICT_CONFIG);
 }
 
 /**
@@ -123,7 +123,7 @@ export function sanitizeText(dirty) {
  * @example
  * const clean = sanitizeAIContent(aiGeneratedText);
  */
-export function sanitizeAIContent(aiContent) {
+export function sanitizeAIContent(aiContent: unknown): string {
   if (!aiContent || typeof aiContent !== 'string') {
     return '';
   }
@@ -160,7 +160,7 @@ export function sanitizeAIContent(aiContent) {
  * const safe = escapeHTML('<img alt="" src=x onerror="alert(1)">');
  * // Результат: '&lt;img src=x onerror=&quot;alert(1)&quot;&gt;'
  */
-export function escapeHTML(str) {
+export function escapeHTML(str: string): string {
   if (!str || typeof str !== 'string') {
     return '';
   }
@@ -191,7 +191,7 @@ export function escapeHTML(str) {
  * const ok = sanitizeURL('https://example.com');
  * // Результат: 'https://example.com'
  */
-export function sanitizeURL(url) {
+export function sanitizeURL(url: string): string {
   if (!url || typeof url !== 'string') {
     return null;
   }
@@ -232,7 +232,10 @@ export function sanitizeURL(url) {
  * @example
  * const clean = sanitizeInput('<script>alert("xss")</script>', { maxLength: 100 });
  */
-export function sanitizeInput(input, options = {}) {
+export function sanitizeInput(
+  input: string,
+  options: { maxLength?: number; trim?: boolean; lowercase?: boolean; allowNewlines?: boolean; allowedChars?: RegExp } = {},
+): string {
   const {
     maxLength = 10000,
     allowNewlines = true
@@ -279,7 +282,7 @@ export function sanitizeInput(input, options = {}) {
  * @example
  * <div {...createMarkup(userGeneratedHTML)} />
  */
-export function createMarkup(html, config = MEDICAL_CONFIG) {
+export function createMarkup(html: string, config: Record<string, unknown> = MEDICAL_CONFIG): { __html: string } {
   return {
     __html: sanitizeHTML(html, config)
   };
@@ -296,7 +299,7 @@ export function createMarkup(html, config = MEDICAL_CONFIG) {
  * isValidMedicalCode('J00.0') // true
  * isValidMedicalCode('<script>alert(1)</script>') // false
  */
-export function isValidMedicalCode(code) {
+export function isValidMedicalCode(code: string): boolean {
   if (!code || typeof code !== 'string') {
     return false;
   }
@@ -317,7 +320,7 @@ export function isValidMedicalCode(code) {
  * @example
  * sanitizePhone('+7 (999) 123-45-67<script>') // '+7 (999) 123-45-67'
  */
-export function sanitizePhone(phone) {
+export function sanitizePhone(phone: string): string {
   if (!phone || typeof phone !== 'string') {
     return '';
   }
@@ -336,7 +339,7 @@ export function sanitizePhone(phone) {
  * @example
  * sanitizeEmail('user@example.com<script>') // 'user@example.com'
  */
-export function sanitizeEmail(email) {
+export function sanitizeEmail(email: string): string {
   if (!email || typeof email !== 'string') {
     return null;
   }
