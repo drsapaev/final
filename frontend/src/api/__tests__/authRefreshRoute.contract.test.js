@@ -24,9 +24,7 @@ describe('auth refresh API contract', () => {
   });
 
   it('does not keep stale refresh route exceptions in interceptors', () => {
-    const interceptorsSource = readSource('interceptors.js');
-    // Note: interceptors.js is still .js — will be .ts after Phase 1 batch 4.
-    // Test will need updating then; for now, file is .js.
+    const interceptorsSource = readSource('interceptors.ts');
 
     expect(interceptorsSource).toContain('requestUrl.includes(\'/authentication/refresh\')');
     expect(interceptorsSource).not.toContain('requestUrl.includes(\'/auth/refresh\')');

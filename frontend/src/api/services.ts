@@ -52,7 +52,7 @@ function setNotificationQueryCacheEntry(key, data) {
   });
 }
 
-export function clearNotificationQueryCache() {
+export function clearNotificationQueryCache(): void {
   notificationQueryResultCache.clear();
   notificationQueryPromiseCache.clear();
   logger.info('[FIX:NOTIFICATIONS] notification query cache cleared');

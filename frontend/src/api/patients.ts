@@ -1,3 +1,18 @@
+// Phase 1 — typed wrapper for errors enriched with axios-like fields.
+interface WrappedApiError extends Error {
+  status?: number;
+  detail?: string;
+  response?: { status?: number; data?: { detail?: unknown } };
+}
+
+function createWrappedError(message: string, extras: { status?: number; detail?: string; response?: unknown }): WrappedApiError {
+  const err = new Error(message) as WrappedApiError;
+  err.status = extras.status;
+  err.detail = extras.detail;
+  err.response = extras.response as WrappedApiError['response'];
+  return err;
+}
+
 /**
  * Patients API client — centralized wrapper over `api` from api/client.js.
  *
@@ -29,7 +44,7 @@ import logger from '../utils/logger';
  * @returns {Promise<object>} Patient object
  * @throws {Error} Если пациент не найден или сеть недоступна
  */
-export async function getPatient(patientId) {
+export async function getPatient(patientId: string | number): Promise<Record<string, unknown>> {
   const response = await api.get(`/patients/${patientId}`);
   return response.data;
 }
@@ -40,26 +55,19 @@ export async function getPatient(patientId) {
  * @returns {Promise<object>} Created patient with id
  * @throws {Error} Если валидация не прошла (например, телефон уже существует)
  */
-export async function createPatient(patientData) {
+export async function createPatient(patientData: Record<string, unknown>) {
   try {
     const response = await api.post('/patients/', patientData);
     return response.data;
   } catch (error) {
     // 400 — типичная ошибка «пациент уже существует»
-    if (error?.response?.status === 400) {
-      const detail = error?.response?.data?.detail || 'Пациент с таким номером телефона уже существует';
-      const wrapped = new Error(detail);
-      wrapped.status = 400;
-      wrapped.detail = detail;
-      wrapped.response = error.response;
-      throw wrapped;
+    if ((error as WrappedApiError)?.response?.status === 400) {
+      const detail = (error as WrappedApiError)?.response?.data?.detail || 'Пациент с таким номером телефона уже существует';
+      throw createWrappedError(String(detail), { status: 400, detail: String(detail), response: (error as WrappedApiError)?.response });
     }
     // Другие ошибки — пробрасываем с нормализованным сообщением
-    const message = error?.response?.data?.detail || error?.message || 'Ошибка создания пациента';
-    const wrapped = new Error(message);
-    wrapped.status = error?.response?.status;
-    wrapped.response = error?.response;
-    throw wrapped;
+    const message = (error as WrappedApiError)?.response?.data?.detail || (error as { message?: string })?.message || 'Ошибка создания пациента';
+    throw createWrappedError(String(message), { status: (error as WrappedApiError)?.response?.status as number | undefined, response: (error as WrappedApiError)?.response });
   }
 }
 
@@ -69,18 +77,15 @@ export async function createPatient(patientData) {
  * @param {object} updateData - Частичные данные для обновления
  * @returns {Promise<object>} Updated patient
  */
-export async function updatePatient(patientId, updateData) {
+export async function updatePatient(patientId: string | number, updateData: Record<string, unknown>) {
   try {
     const response = await api.put(`/patients/${patientId}`, updateData);
     return response.data;
   } catch (error) {
-    const status = error?.response?.status;
-    const detail = error?.response?.data?.detail;
+    const status = (error as WrappedApiError)?.response?.status;
+    const detail = (error as WrappedApiError)?.response?.data?.detail;
     logger.error('[patients API] updatePatient failed', { patientId, status, detail });
-    const wrapped = new Error(detail || `Ошибка обновления пациента (${status || 'network'})`);
-    wrapped.status = status;
-    wrapped.response = error?.response;
-    throw wrapped;
+    throw createWrappedError(String(detail || `Ошибка обновления пациента (${status || 'network'})`), { status: status as number | undefined, response: (error as WrappedApiError)?.response });
   }
 }
 
@@ -89,7 +94,7 @@ export async function updatePatient(patientId, updateData) {
  * @param {string} phone - Телефон в любом формате (+998XXXXXXXXX, XXXXXXXXX)
  * @returns {Promise<Array<object>>} Массив найденных пациентов (может быть пустым)
  */
-export async function searchPatientsByPhone(phone) {
+export async function searchPatientsByPhone(phone: string): Promise<Record<string, unknown>[]> {
   if (!phone) return [];
   const response = await api.get('/patients/', {
     params: { phone },
@@ -102,7 +107,7 @@ export async function searchPatientsByPhone(phone) {
  * @param {string} query - Минимум 2 символа
  * @returns {Promise<Array<object>>} Массив найденных пациентов
  */
-export async function searchPatients(query) {
+export async function searchPatients(query: string): Promise<Record<string, unknown>[]> {
   if (!query || query.length < 2) return [];
   const response = await api.get('/patients/', {
     params: { q: query },
@@ -119,12 +124,12 @@ export async function searchPatients(query) {
  *
  * @returns {Promise<boolean>} true если авторизован
  */
-export async function checkAuthProbe() {
+export async function checkAuthProbe(): Promise<unknown> {
   try {
     await api.get('/patients/', { params: { _limit: 1 } });
     return true;
   } catch (error) {
-    const status = error?.response?.status;
+    const status = (error as WrappedApiError)?.response?.status;
     if (status === 401 || status === 403) {
       return false;
     }
@@ -144,18 +149,15 @@ export async function checkAuthProbe() {
  * @param {object} cartData - { patient_id, visits, discount_mode, payment_method, all_free, notes }
  * @returns {Promise<object>} Created cart result
  */
-export async function createRegistrarCart(cartData) {
+export async function createRegistrarCart(cartData: Record<string, unknown>): Promise<Record<string, unknown>> {
   try {
     const response = await api.post('/registrar/cart', cartData);
     return response.data;
   } catch (error) {
-    const status = error?.response?.status;
-    const detail = error?.response?.data?.detail;
+    const status = (error as WrappedApiError)?.response?.status;
+    const detail = (error as WrappedApiError)?.response?.data?.detail;
     logger.error('[patients API] createRegistrarCart failed', { status, detail });
-    const wrapped = new Error(detail || `Ошибка создания записи (${status || 'network'})`);
-    wrapped.status = status;
-    wrapped.response = error?.response;
-    throw wrapped;
+    throw createWrappedError(String(detail || `Ошибка создания записи (${status || 'network'})`), { status: status as number | undefined, response: (error as WrappedApiError)?.response });
   }
 }
 
@@ -179,7 +181,7 @@ export async function createRegistrarCart(cartData) {
  * @param {string} phone - Телефон в любом формате
  * @returns {Promise<object|null>} Найденный пациент или null
  */
-export async function findPatientByPhoneVariants(phone) {
+export async function findPatientByPhoneVariants(phone: string): Promise<Record<string, unknown> | null> {
   if (!phone) return null;
 
   // Очищенный телефон (только цифры, без + и пробелов)
@@ -187,13 +189,13 @@ export async function findPatientByPhoneVariants(phone) {
 
   // Попытка 1: Поиск по форматированному номеру
   let patients = await searchPatientsByPhone(phone);
-  let found = patients.find((p) => (p.phone || '').replace(/\D/g, '') === digits);
+  let found = patients.find((p) => String(p.phone || '').replace(/\D/g, '') === digits);
   if (found) return found;
 
   // Попытка 2: Поиск по очищенному номеру (если отличается от форматированного)
   if (digits.length >= 9 && digits !== phone) {
     patients = await searchPatientsByPhone(digits);
-    found = patients.find((p) => (p.phone || '').replace(/\D/g, '') === digits);
+    found = patients.find((p) => String(p.phone || '').replace(/\D/g, '') === digits);
     if (found) return found;
   }
 

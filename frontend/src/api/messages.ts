@@ -40,7 +40,7 @@ function getCachedUnreadCountResult(key) {
   return null;
 }
 
-export function clearMessageQueryCache() {
+export function clearMessageQueryCache(): void {
   conversationCache.clear();
   unreadCountCache.clear();
   conversationPromiseCache.clear();
