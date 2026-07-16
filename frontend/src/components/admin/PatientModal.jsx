@@ -100,36 +100,36 @@ const PatientModal = ({
     const newErrors = {};
 
     if (!formData.firstName.trim()) {
-      newErrors.firstName = 'Имя обязательно';
+      newErrors.firstName = t('admin2.pm_err_first_name_required');
     }
 
     if (!formData.lastName.trim()) {
-      newErrors.lastName = 'Фамилия обязательна';
+      newErrors.lastName = t('admin2.pm_err_last_name_required');
     }
 
     if (!formData.phone.trim()) {
-      newErrors.phone = 'Телефон обязателен';
+      newErrors.phone = t('admin2.pm_err_phone_required');
     } else if (!/^\+998\s?\d{2}\s?\d{3}\s?\d{2}\s?\d{2}$/.test(formData.phone.replace(/\s/g, ''))) {
-      newErrors.phone = 'Некорректный формат телефона';
+      newErrors.phone = t('admin2.pm_err_phone_format');
     }
 
     if (formData.email && !/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Некорректный email';
+      newErrors.email = t('admin2.pm_err_email_format');
     }
 
     if (!formData.birthDate) {
-      newErrors.birthDate = 'Дата рождения обязательна';
+      newErrors.birthDate = t('admin2.pm_err_birth_date_required');
     } else {
       const birthDate = new Date(formData.birthDate);
       const today = new Date();
       const age = today.getFullYear() - birthDate.getFullYear();
       if (age < 0 || age > 120) {
-        newErrors.birthDate = 'Некорректная дата рождения';
+        newErrors.birthDate = t('admin2.pm_err_birth_date_invalid');
       }
     }
 
     if (!formData.gender) {
-      newErrors.gender = 'Пол обязателен';
+      newErrors.gender = t('admin2.pm_err_gender_required');
     }
 
     // Passport is now optional for quick registration
@@ -171,7 +171,7 @@ const PatientModal = ({
       onClose();
     } catch (error) {
       logger.error('Ошибка сохранения пациента:', error);
-      setSubmitError(error?.response?.data?.detail || error?.message || 'Ошибка сохранения пациента');
+      setSubmitError(error?.response?.data?.detail || error?.message || t('admin2.pm_err_save'));
     } finally {
       setIsSubmitting(false);
     }
@@ -190,8 +190,8 @@ const PatientModal = ({
       // P-013 fix: replaced window.confirm() with shared useConfirm hook.
       const ok = await confirm({
         title: t('admin2.unsaved_changes_title'),
-        message: 'У вас есть несохранённые изменения. Закрыть окно?',
-        description: 'Изменения будут потеряны.',
+        message: t('admin2.pm_unsaved_msg'),
+        description: t('admin2.pm_unsaved_desc'),
         confirmLabel: t('admin2.close_without_saving'),
         cancelLabel: t('admin2.cancel'),
         intent: 'warning',
@@ -226,7 +226,7 @@ const PatientModal = ({
     <Modal
       isOpen={isOpen}
       onClose={handleClose}
-      title={patient ? 'Редактировать пациента' : 'Добавить пациента'}
+      title={patient ? t('admin2.pm_title_edit') : t('admin2.pm_title_create')}
       size="lg">
 
 
@@ -238,19 +238,19 @@ const PatientModal = ({
         {/* Личная информация */}
         <div className="space-y-4">
           <h3 className="text-lg font-medium admin-text-primary">
-            Личная информация
+            {t('admin2.pm_section_personal')}
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Фамилия */}
             <div>
               <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
-                Фамилия *
+                {t('admin2.pm_label_last_name')}
               </label>
               <Input
                 type="text"
                 value={formData.lastName}
                 onChange={(e) => handleChange('lastName', e.target.value)}
-                placeholder="Иванов"
+                placeholder={t('admin2.pm_ph_last_name')}
                 error={errors.lastName}
                 icon={User} />
 
@@ -265,13 +265,13 @@ const PatientModal = ({
             {/* Имя */}
             <div>
               <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
-                Имя *
+                {t('admin2.pm_label_first_name')}
               </label>
               <Input
                 type="text"
                 value={formData.firstName}
                 onChange={(e) => handleChange('firstName', e.target.value)}
-                placeholder="Иван"
+                placeholder={t('admin2.pm_ph_first_name')}
                 error={errors.firstName} />
 
               {errors.firstName &&
@@ -285,13 +285,13 @@ const PatientModal = ({
             {/* Отчество */}
             <div>
               <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
-                Отчество
+                {t('admin2.pm_label_middle_name')}
               </label>
               <Input
                 type="text"
                 value={formData.middleName}
                 onChange={(e) => handleChange('middleName', e.target.value)}
-                placeholder="Иванович" />
+                placeholder={t('admin2.pm_ph_middle_name')} />
 
             </div>
           </div>
@@ -300,7 +300,7 @@ const PatientModal = ({
             {/* Дата рождения */}
             <div>
               <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
-                Дата рождения *
+                {t('admin2.pm_label_birth_date')}
               </label>
               <Input
                 type="date"
@@ -311,7 +311,7 @@ const PatientModal = ({
 
               {formData.birthDate &&
               <p className="admin-fs-xs-secondary-mt-4-ml-2">
-                  Возраст: {new Date().getFullYear() - new Date(formData.birthDate).getFullYear()} лет
+                  {t('admin2.pm_age_text', { age: new Date().getFullYear() - new Date(formData.birthDate).getFullYear() })}
                 </p>
               }
               {errors.birthDate &&
@@ -325,15 +325,15 @@ const PatientModal = ({
             {/* Пол */}
             <div>
               <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
-                Пол *
+                {t('admin2.pm_label_gender')}
               </label>
               <Select
                 value={formData.gender}
                 onChange={(value) => handleChange('gender', value)}
                 options={[
-                { value: '', label: 'Выберите пол' },
-                { value: 'male', label: 'Мужской' },
-                { value: 'female', label: 'Женский' }]
+                { value: '', label: t('admin2.pm_gender_placeholder') },
+                { value: 'male', label: t('admin2.pm_gender_male') },
+                { value: 'female', label: t('admin2.pm_gender_female') }]
                 }
                 error={errors.gender}
                 size="large" />
@@ -351,13 +351,13 @@ const PatientModal = ({
         {/* Контактная информация */}
         <div className="space-y-4">
           <h3 className="text-lg font-medium admin-text-primary">
-            Контактная информация
+            {t('admin2.pm_section_contacts')}
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Телефон */}
             <div>
               <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
-                Телефон *
+                {t('admin2.pm_label_phone')}
               </label>
               <Input
                 type="tel"
@@ -400,13 +400,13 @@ const PatientModal = ({
           {/* Адрес */}
           <div>
             <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
-              Адрес
+              {t('admin2.pm_label_address')}
             </label>
             <Input
               type="text"
               value={formData.address}
               onChange={(e) => handleChange('address', e.target.value)}
-              placeholder="г. Ташкент, ул. Навои, д. 1"
+              placeholder={t('admin2.pm_ph_address')}
               icon={MapPin} />
 
           </div>
@@ -415,13 +415,13 @@ const PatientModal = ({
         {/* Документы */}
         <div className="space-y-4">
           <h3 className="text-lg font-medium admin-text-primary">
-            Документы
+            {t('admin2.pm_section_documents')}
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Паспорт */}
             <div>
               <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
-                Номер паспорта
+                {t('admin2.pm_label_passport')}
               </label>
               <Input
                 type="text"
@@ -439,7 +439,7 @@ const PatientModal = ({
               }
               {!errors.passport &&
               <p className="admin-fs-xs-secondary-mt-4">
-                  Если поле заполнено, документ будет сохранён как passport.
+                  {t('admin2.pm_passport_hint')}
                 </p>
               }
             </div>
@@ -447,7 +447,7 @@ const PatientModal = ({
             {/* Страховой номер */}
             <div>
               <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
-                Страховой номер
+                {t('admin2.pm_label_insurance')}
               </label>
               <Input
                 type="text"
@@ -462,23 +462,23 @@ const PatientModal = ({
         {/* Экстренный контакт */}
         <div className="space-y-4">
           <h3 className="text-lg font-medium admin-text-primary">
-            Экстренный контакт
+            {t('admin2.pm_section_emergency')}
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
-                Контактное лицо
+                {t('admin2.pm_label_emergency_contact')}
               </label>
               <Input
                 type="text"
                 value={formData.emergencyContact}
                 onChange={(e) => handleChange('emergencyContact', e.target.value)}
-                placeholder="Иванова Мария Ивановна" />
+                placeholder={t('admin2.pm_ph_emergency_contact')} />
 
             </div>
             <div>
               <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
-                Телефон экстренного контакта
+                {t('admin2.pm_label_emergency_phone')}
               </label>
               <Input
                 type="tel"
@@ -494,18 +494,18 @@ const PatientModal = ({
         {/* Медицинская информация */}
         <div className="space-y-4">
           <h3 className="text-lg font-medium admin-text-primary">
-            Медицинская информация
+            {t('admin2.pm_section_medical')}
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
-                Группа крови
+                {t('admin2.pm_label_blood_type')}
               </label>
               <Select
                 value={formData.bloodType}
                 onChange={(value) => handleChange('bloodType', value)}
                 options={[
-                { value: '', label: 'Не указано' },
+                { value: '', label: t('admin2.pm_blood_type_not_specified') },
                 { value: 'A+', label: 'A+' },
                 { value: 'A-', label: 'A-' },
                 { value: 'B+', label: 'B+' },
@@ -520,24 +520,24 @@ const PatientModal = ({
             </div>
             <div>
               <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
-                Аллергии
+                {t('admin2.pm_label_allergies')}
               </label>
               <Input
                 type="text"
                 value={formData.allergies}
                 onChange={(e) => handleChange('allergies', e.target.value)}
-                placeholder="Пенициллин, пыльца" />
+                placeholder={t('admin2.pm_ph_allergies')} />
 
             </div>
           </div>
           <div>
             <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
-              Хронические заболевания
+              {t('admin2.pm_label_chronic')}
             </label>
             <Textarea
               value={formData.chronicDiseases}
               onChange={(e) => handleChange('chronicDiseases', e.target.value)}
-              placeholder="Гипертония, диабет"
+              placeholder={t('admin2.pm_ph_chronic')}
               rows={3} />
 
           </div>
@@ -546,16 +546,16 @@ const PatientModal = ({
         {/* Дополнительная информация */}
         <div className="space-y-4">
           <h3 className="text-lg font-medium admin-text-primary">
-            Дополнительная информация
+            {t('admin2.pm_section_additional')}
           </h3>
           <div>
             <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
-              Заметки
+              {t('admin2.pm_label_notes')}
             </label>
             <Textarea
               value={formData.notes}
               onChange={(e) => handleChange('notes', e.target.value)}
-              placeholder="Дополнительная информация о пациенте..."
+              placeholder={t('admin2.pm_ph_notes')}
               rows={3} />
 
           </div>
@@ -572,12 +572,12 @@ const PatientModal = ({
             {isSubmitting ?
             <>
                 <div className="admin-w-16-h-16-bd-2px-solid-transparen-bd-t-2px-solid-currentCol-radius-50pct-anim-spin-1s-linear-infin-mr-8" />
-                Сохранение...
+                {t('admin2.pm_btn_saving')}
               </> :
 
             <>
                 <Save className="admin-icon-16-mr-8" />
-                {patient ? 'Сохранить изменения' : 'Добавить пациента'}
+                {patient ? t('admin2.pm_btn_save') : t('admin2.pm_btn_create')}
               </>
             }
           </Button>
@@ -589,7 +589,7 @@ const PatientModal = ({
             disabled={isSubmitting}
             className="admin-flex-1">
 
-            Отмена
+            {t('admin2.pm_btn_cancel')}
           </Button>
         </div>
       </form>
