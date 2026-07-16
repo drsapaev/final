@@ -49,14 +49,14 @@ const formatMessageTime = (dateStr) => {
 };
 
 // Форматирование разделителя даты
-const formatDateSeparator = (dateStr) => {
+const formatDateSeparator = (dateStr, t) => {
   const date = new Date(dateStr);
   const today = new Date();
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
 
-  if (date.toDateString() === today.toDateString()) return 'Сегодня';
-  if (date.toDateString() === yesterday.toDateString()) return 'Вчера';
+  if (date.toDateString() === today.toDateString()) return t('misc.cw_today');
+  if (date.toDateString() === yesterday.toDateString()) return t('misc.cw_yesterday');
   return date.toLocaleDateString('ru', { day: 'numeric', month: 'long' });
 };
 
@@ -155,12 +155,12 @@ const ChatWindow = ({ isOpen, onClose }) => {
 
   // PR-71: quick-reply templates for clinic workflow
   const quickReplies = [
-    'Пациент готов',
-    'Подойдите в регистратуру',
-    'Подойдите в кабинет 3',
-    'Вызовите следующего пациента',
-    'Перерыв на обед',
-    'Телефонный звонок от МЗ',
+    t('misc.cw_qr_patient_ready'),
+    t('misc.cw_qr_come_to_reception'),
+    t('misc.cw_qr_come_to_office_3'),
+    t('misc.cw_qr_call_next_patient'),
+    t('misc.cw_qr_lunch_break'),
+    t('misc.cw_qr_phone_call_mz'),
   ];
 
   // Список всех пользователей для отображения по дефолту
@@ -381,7 +381,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
       loadConversations();
     } catch (error) {
       logger.error('Voice send error:', error);
-      addToast({ type: 'error', message: 'Ошибка отправки голосового сообщения: ' + error.message });
+      addToast({ type: 'error', message: t('misc.cw_voice_send_error', { error: error.message }) });
     } finally {
       setIsSending(false);
     }
@@ -437,7 +437,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
       const ok = await confirm({
         title: t('chatDeleteTitle'),
         message: t('chatDeleteConfirm'),
-        description: 'Сообщение будет удалено только из вашего просмотра. Другие участники чата по-прежнему будут его видеть.',
+        description: t('misc.cw_delete_desc'),
         confirmLabel: t('chatDelete'),
         cancelLabel: t('chatCancel'),
         intent: 'danger',
@@ -715,17 +715,17 @@ const ChatWindow = ({ isOpen, onClose }) => {
 
                         <h3>
                             {showNewChat ?
-              'Новое сообщение' :
+              t('misc.cw_new_message') :
               activeUser ?
 
               <span className="chat-header-name">
                                             {activeUser.user_name}
                                             {onlineUsers[activeConversation] &&
-                <span className="user-online-dot" title="В сети" />
+                <span className="user-online-dot" title={t('misc.cw_online_title')} />
                 }
                                         </span> :
 
-              'Чаты'
+              t('misc.cw_chats')
               }
                         </h3>
                     </div>
@@ -788,7 +788,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
                 type="text"
                 className="user-search-input"
                 placeholder={t('common.search')}
-                aria-label="Поиск пользователя для нового чата"
+                aria-label={t('misc.cw_search_user_aria')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 autoFocus
@@ -836,13 +836,13 @@ const ChatWindow = ({ isOpen, onClose }) => {
               ) :
               searchQuery.length > 0 ?
               <div className="empty-state">
-                                        <p>Пользователи не найдены</p>
+                                        <p>{t('misc.cw_no_users_found')}</p>
                                     </div> :
 
               <div className="empty-state">
                                         <Search size={48} className="empty-state-icon" />
                                         <h4>{t('common.search')}</h4>
-                                        <p>Введите имя сотрудника</p>
+                                        <p>{t('misc.cw_enter_employee_name')}</p>
                                     </div>
               }
                             </div>
@@ -859,7 +859,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
                   value={convSearchQuery}
                   onChange={(e) => setConvSearchQuery(e.target.value)}
                   placeholder={t('common.search')}
-                  aria-label="Поиск чатов"
+                  aria-label={t('misc.cw_search_chats_aria')}
                   style={{
                     width: '100%',
                     padding: '6px 8px 6px 30px',
@@ -880,8 +880,8 @@ const ChatWindow = ({ isOpen, onClose }) => {
                   color: convFilter === 'unread' ? 'white' : 'var(--mac-text-secondary)',
                   cursor: 'pointer'
                 }}
-                title="Только непрочитанные"
-                aria-label={convFilter === 'unread' ? 'Показать все чаты' : 'Показать только непрочитанные чаты'}>
+                title={t('misc.cw_unread_only_title')}
+                aria-label={convFilter === 'unread' ? t('misc.cw_show_all_chats_aria') : t('misc.cw_show_unread_chats_aria')}>
                 
                                     <Filter size={16} />
                                 </button>
@@ -936,12 +936,12 @@ const ChatWindow = ({ isOpen, onClose }) => {
             /* Если нет бесед, показываем список всех доступных пользователей */
             <>
                                     <div className="section-header" style={{ padding: '12px 14px', fontSize: 'var(--mac-font-size-xs)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                        Сотрудники
+                                        {t('misc.cw_employees')}
                                     </div>
                                     {allUsers.length === 0 ?
               <div className="empty-state">
                                             <MessageCircle size={64} className="empty-state-icon" />
-                                            <h4>Загрузка...</h4>
+                                            <h4>{t('misc.cw_loading')}</h4>
                                         </div> :
 
               allUsers.map((u) =>
@@ -960,7 +960,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
                                                 <div className="conv-info">
                                                     <div className="conv-name">{u.name}</div>
                                                     <div className="conv-role" style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)' }}>
-                                                        {u.role || 'Сотрудник'}
+                                                        {u.role || t('misc.cw_employee_default')}
                                                     </div>
                                                 </div>
                                                 <div className="conv-action">
@@ -994,8 +994,8 @@ const ChatWindow = ({ isOpen, onClose }) => {
                                         <Input
                   value={msgSearchQuery}
                   onChange={(e) => setMsgSearchQuery(e.target.value)}
-                  placeholder="Поиск по сообщениям..."
-                  aria-label="Поиск по сообщениям"
+                  placeholder={t('misc.cw_search_messages_placeholder')}
+                  aria-label={t('misc.cw_search_messages_aria')}
                   autoFocus
                   style={{
                     width: '100%',
@@ -1023,8 +1023,8 @@ const ChatWindow = ({ isOpen, onClose }) => {
                                             {(activeUser?.user_name?.[0] || '?').toUpperCase()}
                                         </div>
                                         <h4>{activeUser?.user_name}</h4>
-                                        <p>{activeUser?.role || 'Сотрудник'}</p>
-                                        <p style={{ marginTop: 8, fontSize: 13, opacity: 0.6 }}>Напишите первое сообщение</p>
+                                        <p>{activeUser?.role || t('misc.cw_employee_default')}</p>
+                                        <p style={{ marginTop: 8, fontSize: 13, opacity: 0.6 }}>{t('misc.cw_write_first_message')}</p>
                                     </div> :
 
               <div
@@ -1052,7 +1052,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
                       
                                                     {item.type === 'date-separator' ?
                       <div className="date-separator">
-                                                            <span>{formatDateSeparator(item.date)}</span>
+                                                            <span>{formatDateSeparator(item.date, t)}</span>
                                                         </div> :
 
                       <div className={`message-row ${item.sender_id === user?.id ? 'sent' : 'received'}`}>
@@ -1095,7 +1095,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
                                   alt="Attached"
                                   role="button"
                                   tabIndex={0}
-                                  aria-label="Открыть изображение во вложении"
+                                  aria-label={t('misc.cw_open_image_aria')}
                                   onClick={() => window.open(item.content, '_blank')}
                                   onKeyDown={(event) => handleActivationKeyDown(event, () => window.open(item.content, '_blank'))}
                                   style={{ cursor: 'pointer', maxWidth: '100%', borderRadius: 8 }} />
@@ -1105,7 +1105,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
                               <div className="message-file">
                                                                                     <a href={item.content} target="_blank" rel="noopener noreferrer" className="file-link">
                                                                                         <Paperclip size={16} />
-                                                                                        <span>{item.content.split('name=')[1] || 'Файл'}</span>
+                                                                                        <span>{item.content.split('name=')[1] || t('misc.cw_file_default')}</span>
                                                                                     </a>
                                                                                 </div> :
 
@@ -1164,7 +1164,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
 
                                                                 <button
                             className="add-reaction-btn"
-                            aria-label="Добавить реакцию к сообщению"
+                            aria-label={t('misc.cw_add_reaction_aria')}
                             onClick={(e) => {
                               e.stopPropagation();
                               setReactionMenuMessageId(reactionMenuMessageId === item.id ? null : item.id);
@@ -1233,8 +1233,8 @@ const ChatWindow = ({ isOpen, onClose }) => {
               <button
                 className="scroll-to-bottom-btn"
                 onClick={scrollToBottom}
-                title="К последним сообщениям"
-                aria-label="Перейти к последним сообщениям">
+                title={t('misc.cw_scroll_to_bottom_title')}
+                aria-label={t('misc.cw_scroll_to_bottom_aria')}>
                 
                                         <ChevronDown size={20} />
                                     </button>
@@ -1296,11 +1296,11 @@ const ChatWindow = ({ isOpen, onClose }) => {
                     value={inputValue}
                     onChange={handleInputChange}
                     onKeyPress={handleKeyPress}
-                    placeholder="Сообщение... (Shift+Enter для новой строки)"
+                    placeholder={t('misc.cw_message_input_placeholder')}
                     rows={1}
                     disabled={isSending}
                     onMouseDown={(e) => e.stopPropagation()}
-                    aria-label="Введите сообщение" />
+                    aria-label={t('misc.cw_enter_message_aria')} />
                   
                                             {inputValue.length > 100 &&
                   <span className={`char-counter ${inputValue.length > MAX_MESSAGE_LENGTH * 0.9 ? 'warning' : ''}`}>

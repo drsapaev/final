@@ -35,8 +35,8 @@ function sanitizeAIResponse(obj) {
   return obj;
 }
 
-const AI_DRAFT_NOTICE = 'AI формирует только черновик. Финальное медицинское решение должен подтвердить врач или администратор.';
-const AI_PROVIDER_UNAVAILABLE_NOTICE = 'AI-провайдер не настроен или временно недоступен. Используйте ручной клинический workflow и повторите запрос после настройки провайдера.';
+const AI_DRAFT_NOTICE = 'misc.aia_draft_notice';
+const AI_PROVIDER_UNAVAILABLE_NOTICE = 'misc.aia_provider_unavailable_notice';
 
 function getAIResponseError(payload) {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
@@ -57,7 +57,7 @@ function getAIResponseError(payload) {
 function normalizeAIErrorMessage(message) {
   const rawMessage = String(message || '').trim();
   if (!rawMessage) {
-    return AI_PROVIDER_UNAVAILABLE_NOTICE;
+    return null;
   }
 
   const lower = rawMessage.toLowerCase();
@@ -67,7 +67,7 @@ function normalizeAIErrorMessage(message) {
     lower.includes('api key') ||
     lower.includes('not configured')
   ) {
-    return AI_PROVIDER_UNAVAILABLE_NOTICE;
+    return null;
   }
 
   return rawMessage;
@@ -98,7 +98,7 @@ const AIAssistant = ({
   analysisType,
   data,
   onResult,
-  title = 'AI Ассистент',
+  title = 'misc.aia_title',
   expanded = true,
   useMCP = true,
   providerOptions = ['deepseek', 'gemini', 'openai', 'default'],
@@ -107,6 +107,7 @@ const AIAssistant = ({
   specialty,
   onSuggestionSelect,
 }) => {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
@@ -247,7 +248,7 @@ const AIAssistant = ({
           break;
 
         default:
-          throw new Error('Неизвестный тип анализа');
+          throw new Error(t('misc.aia_unknown_type'));
       }
 
       // Санитизируем AI-generated контент перед отображением (XSS защита)
@@ -259,7 +260,7 @@ const AIAssistant = ({
       const sanitizedData = sanitizeAIResponse(response.data);
       setResult(sanitizedData);
       if (onResult) onResult(sanitizedData);
-      notify.success('AI анализ завершен');
+      notify.success(t('misc.aia_analysis_done'));
       logger.log('AI response sanitized and validated');
       setRetryCount(0);
     } catch (err) {
@@ -267,7 +268,7 @@ const AIAssistant = ({
         err.response?.data?.detail || err.response?.data?.error || err.message
       );
       setError(errorMsg);
-      notify.error(`Ошибка AI анализа: ${errorMsg}`);
+      notify.error(t('misc.aia_analysis_error', { message: errorMsg }));
       setRetryCount((prev) => prev + 1);
     } finally {
       setLoading(false);
@@ -308,7 +309,7 @@ const AIAssistant = ({
       <div>
         {result.preliminary_diagnosis &&
         <div style={{ marginBottom: 12 }}>
-            <Typography variant="subtitle2" gutterBottom>Предварительные диагнозы:</Typography>
+            <Typography variant="subtitle2" gutterBottom>{t('misc.aia_preliminary_dx')}</Typography>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {result.preliminary_diagnosis.map((diagnosis, idx) =>
             <Pill key={idx} color="primary">{diagnosis}</Pill>
@@ -318,7 +319,7 @@ const AIAssistant = ({
         }
         {result.examinations && result.examinations.length > 0 &&
         <div style={{ marginBottom: 12 }}>
-            <Typography variant="subtitle2" gutterBottom>План обследований:</Typography>
+            <Typography variant="subtitle2" gutterBottom>{t('misc.aia_exam_plan')}</Typography>
             <ul style={{ margin: 0, paddingLeft: 18 }}>
               {result.examinations.map((exam, idx) =>
             <li key={idx}>
@@ -333,7 +334,7 @@ const AIAssistant = ({
         }
         {result.lab_tests && result.lab_tests.length > 0 &&
         <div style={{ marginBottom: 12 }}>
-            <Typography variant="subtitle2" gutterBottom>Лабораторные анализы:</Typography>
+            <Typography variant="subtitle2" gutterBottom>{t('misc.aia_lab_tests')}</Typography>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {result.lab_tests.map((test, idx) =>
             <Pill key={idx}>{test}</Pill>
@@ -343,7 +344,7 @@ const AIAssistant = ({
         }
         {result.red_flags && result.red_flags.length > 0 &&
         <Alert severity="warning" style={{ marginTop: 8 }}>
-            <Typography variant="subtitle2" gutterBottom>Тревожные симптомы:</Typography>
+            <Typography variant="subtitle2" gutterBottom>{t('misc.aia_red_flags')}</Typography>
             <ul style={{ margin: 0, paddingLeft: 18 }}>
               {result.red_flags.map((flag, idx) => <li key={idx}>{flag}</li>)}
             </ul>
@@ -352,10 +353,10 @@ const AIAssistant = ({
         {result.urgency &&
         <div style={{ marginTop: 8 }}>
             <Pill color={
-          result.urgency === 'экстренно' ? 'error' :
-          result.urgency === 'неотложно' ? 'warning' : 'info'
+          result.urgency === t('misc.aia_urgency_emergency') ? 'error' :
+          result.urgency === t('misc.aia_urgency_urgent') ? 'warning' : 'info'
           }>
-              Срочность: {result.urgency}
+              {t('misc.aia_urgency_label')} {result.urgency}
             </Pill>
           </div>
         }
@@ -374,7 +375,7 @@ const AIAssistant = ({
           </Alert>
           {result.suggestions && result.suggestions.length > 0 &&
           <div>
-              <Typography variant="subtitle2" gutterBottom>Коды МКБ-10:</Typography>
+              <Typography variant="subtitle2" gutterBottom>{t('misc.aia_icd10_codes')}</Typography>
               <div>
                 {result.suggestions.map((item, idx) =>
               <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--mac-spacing-2) 0', borderBottom: '1px solid var(--mac-border)' }}>
@@ -382,7 +383,7 @@ const AIAssistant = ({
                       {`${item.code} - ${item.name || item.description}`}
                       {item.relevance &&
                   <span style={{ marginLeft: 8 }}>
-                          <Pill color={item.relevance === 'высокая' ? 'success' : item.relevance === 'средняя' ? 'warning' : 'default'}>
+                          <Pill color={item.relevance === t('misc.aia_relevance_high') ? 'success' : item.relevance === t('misc.aia_relevance_medium') ? 'warning' : 'default'}>
                             {item.relevance}
                           </Pill>
                         </span>
@@ -390,14 +391,14 @@ const AIAssistant = ({
                     </div>
                     <div style={{ display: 'flex', gap: 'var(--mac-spacing-1)' }}>
                     <Button variant="outline" onClick={() => copyToClipboard(`${item.code} - ${item.name || item.description}`)}>
-                      <Copy style={{ width: 14, height: 14, marginRight: 6 }} />Копировать
+                      <Copy style={{ width: 14, height: 14, marginRight: 6 }} />{t('misc.aia_copy')}
                     </Button>
                     {onSuggestionSelect && (
                     <Button variant="primary" onClick={() => {
                       onSuggestionSelect('icd10', item.code);
                       notify.success(t('final.icd_added_to_form'));
                     }}>
-                      <CheckCircle style={{ width: 14, height: 14, marginRight: 6 }} />Использовать
+                      <CheckCircle style={{ width: 14, height: 14, marginRight: 6 }} />{t('misc.aia_use')}
                     </Button>
                     )}
                     </div>
@@ -418,7 +419,7 @@ const AIAssistant = ({
               {`${item.code} - ${item.name || item.description}`}
               {item.relevance &&
             <span style={{ marginLeft: 8 }}>
-                  <Pill color={item.relevance === 'высокая' ? 'success' : item.relevance === 'средняя' ? 'warning' : 'default'}>
+                  <Pill color={item.relevance === t('misc.aia_relevance_high') ? 'success' : item.relevance === t('misc.aia_relevance_medium') ? 'warning' : 'default'}>
                     {item.relevance}
                   </Pill>
                 </span>
@@ -426,14 +427,14 @@ const AIAssistant = ({
             </div>
             <div style={{ display: 'flex', gap: 'var(--mac-spacing-1)' }}>
             <Button variant="outline" onClick={() => copyToClipboard(`${item.code} - ${item.name || item.description}`)}>
-              <Copy style={{ width: 14, height: 14, marginRight: 6 }} />Копировать
+              <Copy style={{ width: 14, height: 14, marginRight: 6 }} />{t('misc.aia_copy')}
             </Button>
             {onSuggestionSelect && (
             <Button variant="primary" onClick={() => {
               onSuggestionSelect('icd10', item.code);
               notify.success(t('final.icd_added_to_form'));
             }}>
-              <CheckCircle style={{ width: 14, height: 14, marginRight: 6 }} />Использовать
+              <CheckCircle style={{ width: 14, height: 14, marginRight: 6 }} />{t('misc.aia_use')}
             </Button>
             )}
             </div>
@@ -454,7 +455,7 @@ const AIAssistant = ({
         }
         {result.abnormal_values && result.abnormal_values.length > 0 &&
         <div style={{ marginBottom: 12 }}>
-            <Typography variant="subtitle2" gutterBottom>Отклонения от нормы:</Typography>
+            <Typography variant="subtitle2" gutterBottom>{t('misc.aia_abnormal_values')}</Typography>
             {result.abnormal_values.map((item, idx) =>
           <details key={idx} open={idx === 0} style={{
             border: '1px solid var(--mac-border)', borderRadius: 8, padding: 12, marginBottom: 8
@@ -463,8 +464,8 @@ const AIAssistant = ({
                   {item.parameter}: {item.value}
                 </summary>
                 <div style={{ marginTop: 8 }}>
-                  <Typography variant="body2" gutterBottom><strong>Интерпретация:</strong> {item.interpretation}</Typography>
-                  <Typography variant="body2"><strong>Клиническое значение:</strong> {item.clinical_significance}</Typography>
+                  <Typography variant="body2" gutterBottom><strong>{t('misc.aia_interpretation')}</strong> {item.interpretation}</Typography>
+                  <Typography variant="body2"><strong>{t('misc.aia_clinical_significance')}</strong> {item.clinical_significance}</Typography>
                 </div>
               </details>
           )}
@@ -472,7 +473,7 @@ const AIAssistant = ({
         }
         {result.possible_conditions && result.possible_conditions.length > 0 &&
         <div style={{ marginBottom: 12 }}>
-            <Typography variant="subtitle2" gutterBottom>Возможные состояния:</Typography>
+            <Typography variant="subtitle2" gutterBottom>{t('misc.aia_possible_conditions')}</Typography>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {result.possible_conditions.map((condition, idx) =>
             <Pill key={idx} color="warning">{condition}</Pill>
@@ -482,15 +483,15 @@ const AIAssistant = ({
         }
         {result.recommendations && result.recommendations.length > 0 &&
         <div style={{ marginBottom: 12 }}>
-            <Typography variant="subtitle2" gutterBottom>Рекомендации:</Typography>
+            <Typography variant="subtitle2" gutterBottom>{t('misc.aia_recommendations')}</Typography>
             <ul style={{ margin: 0, paddingLeft: 18 }}>
               {result.recommendations.map((rec, idx) => <li key={idx}>{rec}</li>)}
             </ul>
           </div>
         }
         {result.urgency &&
-        <Alert severity={result.urgency === 'да' ? 'warning' : 'info'} style={{ marginTop: 8 }}>
-            Срочная консультация: {result.urgency}
+        <Alert severity={result.urgency === t('misc.aia_yes') ? 'warning' : 'info'} style={{ marginTop: 8 }}>
+            {t('misc.aia_urgent_consultation')}: {result.urgency}
           </Alert>
         }
       </div>);
@@ -502,17 +503,17 @@ const AIAssistant = ({
     return (
       <div>
         <div style={{ border: '1px solid var(--mac-border)', borderRadius: 8, padding: 12, marginBottom: 12 }}>
-          <Typography variant="subtitle2" gutterBottom>Основные параметры:</Typography>
+          <Typography variant="subtitle2" gutterBottom>{t('misc.aia_main_params')}</Typography>
           <div style={{ display: 'grid', gap: 6 }}>
-            {result.rhythm && <Typography variant="body2"><strong>Ритм:</strong> {result.rhythm}</Typography>}
-            {result.rate && <Typography variant="body2"><strong>ЧСС:</strong> {result.rate}</Typography>}
-            {result.conduction && <Typography variant="body2"><strong>Проводимость:</strong> {result.conduction}</Typography>}
-            {result.axis && <Typography variant="body2"><strong>Электрическая ось:</strong> {result.axis}</Typography>}
+            {result.rhythm && <Typography variant="body2"><strong>{t('misc.aia_rhythm')}</strong> {result.rhythm}</Typography>}
+            {result.rate && <Typography variant="body2"><strong>{t('misc.aia_hr')}</strong> {result.rate}</Typography>}
+            {result.conduction && <Typography variant="body2"><strong>{t('misc.aia_conduction')}</strong> {result.conduction}</Typography>}
+            {result.axis && <Typography variant="body2"><strong>{t('misc.aia_axis')}</strong> {result.axis}</Typography>}
           </div>
         </div>
         {result.abnormalities && result.abnormalities.length > 0 &&
         <Alert severity="warning">
-            <Typography variant="subtitle2" gutterBottom>Выявленные отклонения:</Typography>
+            <Typography variant="subtitle2" gutterBottom>{t('misc.aia_abnormalities')}</Typography>
             <ul style={{ margin: 0, paddingLeft: 18 }}>
               {result.abnormalities.map((item, idx) => <li key={idx}>{item}</li>)}
             </ul>
@@ -520,21 +521,21 @@ const AIAssistant = ({
         }
         {result.interpretation &&
         <div style={{ border: '1px solid var(--mac-border)', borderRadius: 8, padding: 12, marginTop: 12 }}>
-            <Typography variant="subtitle2" gutterBottom>Заключение:</Typography>
+            <Typography variant="subtitle2" gutterBottom>{t('misc.aia_conclusion')}</Typography>
             <Typography variant="body2">{result.interpretation}</Typography>
           </div>
         }
         {result.recommendations && result.recommendations.length > 0 &&
         <div style={{ marginTop: 12 }}>
-            <Typography variant="subtitle2" gutterBottom>Рекомендации:</Typography>
+            <Typography variant="subtitle2" gutterBottom>{t('misc.aia_recommendations')}</Typography>
             <ul style={{ margin: 0, paddingLeft: 18 }}>
               {result.recommendations.map((rec, idx) => <li key={idx}>{rec}</li>)}
             </ul>
           </div>
         }
         {result.urgency &&
-        <Pill color={result.urgency === 'экстренно' ? 'error' : result.urgency === 'планово' ? 'info' : 'default'}>
-            Консультация кардиолога: {result.urgency}
+        <Pill color={result.urgency === t('misc.aia_urgency_emergency') ? 'error' : result.urgency === t('misc.aia_urgency_planned') ? 'info' : 'default'}>
+            {t('misc.aia_cardio_consultation')}: {result.urgency}
           </Pill>
         }
       </div>);
@@ -572,7 +573,7 @@ const AIAssistant = ({
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Brain style={{ color: 'var(--mac-accent-blue)' }} />
-            <Typography variant="h6">{title}</Typography>
+            <Typography variant="h6">{typeof title === 'string' && title.startsWith('misc.') ? t(title) : title}</Typography>
             {useMCP && <Badge variant="success">MCP</Badge>}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -585,7 +586,7 @@ const AIAssistant = ({
             </div>
             <Button size="small" variant="outline" onClick={() => analyzeData(true)} disabled={loading || !data}>
               <RefreshCw style={{ width: 14, height: 14, marginRight: 6 }} />
-              Обновить
+              {t('misc.aia_refresh')}
             </Button>
             <Button
               type="button"
@@ -603,19 +604,19 @@ const AIAssistant = ({
         {isOpen &&
         <div style={{ display: 'grid', gap: 8, marginBottom: 12 }}>
             <Alert severity="warning">
-              <Typography variant="body2">{AI_DRAFT_NOTICE}</Typography>
+              <Typography variant="body2">{t(AI_DRAFT_NOTICE)}</Typography>
             </Alert>
             {usesServerDefaultProvider && !usesFallbackProvider &&
             <Alert severity="info">
                 <Typography variant="body2">
-                  Используется серверный AI-провайдер по умолчанию. Если внешний провайдер не настроен, система покажет понятную ошибку и не создаст финальное медицинское решение.
+                  {t('misc.aia_default_provider_notice')}
                 </Typography>
               </Alert>
             }
             {usesFallbackProvider &&
             <Alert severity="info">
                 <Typography variant="body2">
-                  Ответ получен через резервный AI-провайдер {String(resultProvider).toUpperCase()}. Используйте его только как черновик и проверьте настройки внешнего AI перед клиническим применением.
+                  {t('misc.aia_fallback_provider_notice', { provider: String(resultProvider).toUpperCase() })}
                 </Typography>
               </Alert>
             }
@@ -626,7 +627,7 @@ const AIAssistant = ({
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 32 }}>
             <CircularProgress />
             <Typography variant="body2" color="textSecondary" style={{ marginTop: 8 }}>
-              Анализ через {provider.toUpperCase()} AI...
+              {t('misc.aia_analyzing_via', { provider: provider.toUpperCase() })}
             </Typography>
           </div> :
 
@@ -634,12 +635,12 @@ const AIAssistant = ({
         }
 
         {!result && !loading && !error &&
-        <Alert severity="info">Нажмите Обновить для запуска AI анализа</Alert>
+        <Alert severity="info">{t('misc.aia_click_refresh')}</Alert>
         }
 
         {error && retryCount > 0 &&
         <Alert severity="warning" style={{ marginTop: 8 }}>
-            <Typography variant="body2">Попытка {retryCount}. Попробуйте сменить AI провайдер или повторить запрос.</Typography>
+            <Typography variant="body2">{t('misc.aia_retry_attempt', { count: retryCount })}</Typography>
           </Alert>
         }
       </CardContent>

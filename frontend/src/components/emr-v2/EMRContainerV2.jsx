@@ -92,6 +92,7 @@ import {
 export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Component = null }) {
     // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
     const [confirm, confirmDialog] = useConfirm();
+    const { t } = useTranslation();
     const canonicalSpecialty = normalizeSpecialty(specialty);
     const {
         data,
@@ -352,7 +353,7 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                             ...prev,
                             [fieldName]: [{
                                 id: 'info-no-complaints',
-                                content: 'Для AI-подсказок сначала заполните поле «Жалобы»',
+                                content: t('misc.emr_ai_no_complaints'),
                                 source: 'info',
                                 confidence: 0,
                                 isInfo: true  // Marking as info, not a real suggestion
@@ -398,7 +399,7 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
             // QW-03 (UX audit): replaced native alert() with notify.warning to keep
             // the visual style consistent with the rest of the app and to avoid
             // blocking the main thread.
-            notify.warning('Ghost Mode недоступен в подписанной карте.');
+            notify.warning(t('misc.emr_ghost_unavailable'));
             return;
         }
         const newValue = !experimentalGhostMode;
@@ -415,10 +416,10 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
     const handleSign = useCallback(async () => {
         // P-013 fix: replaced window.confirm() with shared useConfirm hook.
         const ok = await confirm({
-            title: 'Подписание ЭМК',
-            message: 'Подписать ЭМК?',
-            description: 'После подписания редактирование возможно только через поправку.',
-            confirmLabel: 'Подписать',
+            title: t('misc.emr_sign_title'),
+            message: t('misc.emr_sign_message'),
+            description: t('misc.emr_sign_desc'),
+            confirmLabel: t('misc.emr_sign_confirm'),
             cancelLabel: t('misc.cancel'),
             intent: 'primary',
         });
@@ -446,7 +447,7 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
             <div className="emr-v2-container">
                 <div className="emr-v2-main">
                     <div className="emr-v2-actions">
-                        Ошибка контракта: для EMR v2 требуется `visitId`.
+                        {t('misc.emr_err_visit_id')}
                     </div>
                 </div>
             </div>
@@ -458,7 +459,7 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
             <div className="emr-v2-container">
                 <div className="emr-v2-main">
                     <div className="emr-v2-actions">
-                        Ошибка контракта: передана ненормализованная specialty.
+                        {t('misc.emr_err_specialty')}
                     </div>
                 </div>
             </div>
@@ -491,8 +492,8 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                 <header className="emr-v2-header">
                     <div className="emr-v2-header__left">
                         {/* UX Audit Doctor M-20: «ЭМК v2» → «Электронная медицинская карта». */}
-                        <h2>Электронная медицинская карта</h2>
-                        {patientId && <span className="emr-v2-patient-id">Пациент #{patientId}</span>}
+                        <h2>{t('misc.emr_title')}</h2>
+                        {patientId && <span className="emr-v2-patient-id">{t('misc.emr_patient', { id: patientId })}</span>}
                     </div>
 
                     <div className="emr-v2-header__right">
@@ -513,8 +514,8 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                             variant="ghost"
                             size="sm"
                             onClick={() => setShowHelp(true)}
-                            title="Справка и безопасность"
-                            aria-label="Справка и безопасность"
+                            title={t('misc.emr_help_title')}
+                            aria-label={t('misc.emr_help_title')}
                         >
                             <HelpCircle size={16} aria-hidden="true" />
                         </Button>
@@ -525,8 +526,8 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                             size="sm"
                             onClick={toggleGhostMode}
                             disabled={isSigned || isAmended}
-                            title={isSigned ? 'Недоступно в подписанной карте' : 'Расширенный режим ввода'}
-                            aria-label={isSigned ? 'Расширенный режим недоступен в подписанной карте' : 'Переключить расширенный режим ввода'}
+                            title={isSigned ? t('misc.emr_ghost_unavailable_title') : t('misc.emr_ghost_title')}
+                            aria-label={isSigned ? t('misc.emr_ghost_unavailable_aria') : t('misc.emr_ghost_aria')}
                             aria-pressed={experimentalGhostMode}
                         >
                             <PanelTopOpen size={16} aria-hidden="true" />
@@ -535,8 +536,8 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                             variant="ghost"
                             size="sm"
                             onClick={() => setShowHistory(!showHistory)}
-                            title="История изменений"
-                            aria-label="История изменений"
+                            title={t('misc.emr_history_title')}
+                            aria-label={t('misc.emr_history_title')}
                             aria-expanded={showHistory}
                         >
                             <History size={16} aria-hidden="true" />
@@ -546,14 +547,14 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
 
                 {/* Toolbar */}
                 <div className="emr-v2-toolbar">
-                    <Button variant="ghost" size="sm" onClick={undo} disabled={!canUndo} title="Отменить (Ctrl+Z)" aria-label="Отменить (Ctrl+Z)">
-                        <Undo2 size={14} aria-hidden="true" /> Отменить
+                    <Button variant="ghost" size="sm" onClick={undo} disabled={!canUndo} title={t('misc.emr_undo_title')} aria-label={t('misc.emr_undo_title')}>
+                        <Undo2 size={14} aria-hidden="true" /> {t('misc.emr_undo')}
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={redo} disabled={!canRedo} title="Повторить (Ctrl+Y)" aria-label="Повторить (Ctrl+Y)">
-                        <Redo2 size={14} aria-hidden="true" /> Повторить
+                    <Button variant="ghost" size="sm" onClick={redo} disabled={!canRedo} title={t('misc.emr_redo_title')} aria-label={t('misc.emr_redo_title')}>
+                        <Redo2 size={14} aria-hidden="true" /> {t('misc.emr_redo')}
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={loadEMR} title="Обновить" aria-label="Обновить EMR">
-                        <RefreshCw size={14} aria-hidden="true" /> Обновить
+                    <Button variant="ghost" size="sm" onClick={loadEMR} title={t('misc.emr_refresh_title')} aria-label={t('misc.emr_refresh_aria')}>
+                        <RefreshCw size={14} aria-hidden="true" /> {t('misc.emr_refresh')}
                     </Button>
                 </div>
 
@@ -562,24 +563,24 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                     {/* UX Audit Doctor M-48: progress indicator for EMR sections. */}
                     {(() => {
                         const sections = [
-                            { name: 'Жалобы', filled: !!(data?.complaints?.text || data?.complaints) },
-                            { name: 'Анамнез', filled: !!(data?.anamnesis_morbi?.text || data?.anamnesis_morbi) },
-                            { name: 'Осмотр', filled: !!(data?.examination?.text || data?.examination) },
-                            { name: 'Диагноз', filled: !!(data?.diagnosis?.text || data?.diagnosis) },
-                            { name: 'Лечение', filled: !!(data?.treatment?.text || data?.treatment) },
-                            { name: 'Рекомендации', filled: !!(data?.recommendations?.text || data?.recommendations) },
-                            { name: 'Заметки', filled: !!(data?.notes?.text || data?.notes) },
+                            { name: t('misc.emr_sec_complaints'), filled: !!(data?.complaints?.text || data?.complaints) },
+                            { name: t('misc.emr_sec_anamnesis'), filled: !!(data?.anamnesis_morbi?.text || data?.anamnesis_morbi) },
+                            { name: t('misc.emr_sec_examination'), filled: !!(data?.examination?.text || data?.examination) },
+                            { name: t('misc.emr_sec_diagnosis'), filled: !!(data?.diagnosis?.text || data?.diagnosis) },
+                            { name: t('misc.emr_sec_treatment'), filled: !!(data?.treatment?.text || data?.treatment) },
+                            { name: t('misc.emr_sec_recommendations'), filled: !!(data?.recommendations?.text || data?.recommendations) },
+                            { name: t('misc.emr_sec_notes'), filled: !!(data?.notes?.text || data?.notes) },
                         ];
                         const filledCount = sections.filter(s => s.filled).length;
                         return (
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', fontSize: '13px', color: 'var(--mac-text-secondary)' }}>
-                                <span>Заполнено: {filledCount} из {sections.length}</span>
+                                <span>{t('misc.emr_filled', { filled: filledCount, total: sections.length })}</span>
                                 <div style={{ flex: 1, maxWidth: '200px', height: '6px', borderRadius: '3px', background: 'var(--mac-bg-tertiary)' }}>
                                     <div style={{ width: `${(filledCount / sections.length) * 100}%`, height: '100%', borderRadius: '3px', background: 'var(--mac-success)', transition: 'width 0.3s ease' }} />
                                 </div>
                                 {sections.filter(s => !s.filled).length > 0 && (
                                     <span style={{ fontSize: '12px' }}>
-                                        Осталось: {sections.filter(s => !s.filled).map(s => s.name).join(', ')}
+                                        {t('misc.emr_remaining', { sections: sections.filter(s => !s.filled).map(s => s.name).join(', ') })}
                                     </span>
                                 )}
                             </div>
@@ -765,7 +766,7 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                 <div className="emr-v2-actions">
                     {accessDenied && (
                         <div className="emr-v2-signed-badge" style={{ marginBottom: 8 }} role="alert">
-                            <Ban size={14} aria-hidden="true" /> Нет прав на сохранение этой EMR
+                            <Ban size={14} aria-hidden="true" /> {t('misc.emr_no_access_save')}
                         </div>
                     )}
                     {!isSigned ? (
@@ -774,12 +775,12 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                                 className="emr-v2-btn emr-v2-btn--primary"
                                 onClick={() => saveEMR({ isDraft: false })}
                             disabled={isSaving || !isDirty || accessDenied}
-                            aria-label={isSaving ? 'Сохранение EMR' : 'Сохранить EMR'}
+                            aria-label={isSaving ? t('misc.emr_saving_aria') : t('misc.emr_save_aria')}
                         >
                             {isSaving ? (
-                                <><Save size={14} aria-hidden="true" /> Сохранение...</>
+                                <><Save size={14} aria-hidden="true" /> {t('misc.emr_saving')}</>
                             ) : (
-                                <><Save size={14} aria-hidden="true" /> Сохранить</>
+                                <><Save size={14} aria-hidden="true" /> {t('misc.emr_save')}</>
                             )}
                         </button>
                             {/* UX Audit Doctor M-13: комбинированная кнопка «Сохранить и подписать». */}
@@ -792,33 +793,33 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                                     handleSign();
                                 }}
                                 disabled={isSaving || accessDenied}
-                                title={accessDenied ? 'Нет прав на изменение EMR' : 'Сохранить и подписать в один шаг'}
-                                aria-label="Сохранить и подписать EMR"
+                                title={accessDenied ? t('misc.emr_no_access_save_title') : t('misc.emr_save_sign_title')}
+                                aria-label={t('misc.emr_save_sign_aria')}
                             >
-                                <CheckCircle2 size={14} aria-hidden="true" /> Сохранить и подписать
+                                <CheckCircle2 size={14} aria-hidden="true" /> {t('misc.emr_save_sign')}
                             </button>
                         </>
                     ) : (
                         <>
                             <div className="emr-v2-signed-badge">
-                                <CheckCircle2 size={14} aria-hidden="true" /> Подписана {isAmended && '(с поправками)'}
+                                <CheckCircle2 size={14} aria-hidden="true" /> {t('misc.emr_signed')} {isAmended && t('misc.emr_with_amendments')}
                             </div>
 
                             {!showAmendForm ? (
                                 <button
                                     className="emr-v2-btn emr-v2-btn--warning"
                                     onClick={() => setShowAmendForm(true)}
-                                    aria-label="Внести поправку в подписанную EMR"
+                                    aria-label={t('misc.emr_amend_aria')}
                                 >
-                                    <FilePenLine size={14} aria-hidden="true" /> Внести поправку
+                                    <FilePenLine size={14} aria-hidden="true" /> {t('misc.emr_amend')}
                                 </button>
                             ) : (
                                 <div className="emr-v2-amend-form">
                                     <textarea
-                                        aria-label="Причина поправки EMR"
+                                        aria-label={t('misc.emr_amend_reason_aria')}
                                         value={amendReason}
                                         onChange={(e) => setAmendReason(e.target.value)}
-                                        placeholder="Причина поправки (мин. 10 символов)..."
+                                        placeholder={t('misc.emr_amend_reason_ph')}
                                     />
                                     <div className="emr-v2-amend-actions">
                                         <button
@@ -826,13 +827,13 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                                             onClick={handleAmend}
                                             disabled={amendReason.trim().length < 10}
                                         >
-                                            Сохранить
+                                            {t('misc.emr_save')}
                                         </button>
                                         <button
                                             className="emr-v2-btn"
                                             onClick={() => setShowAmendForm(false)}
                                         >
-                                            Отмена
+                                            {t('misc.cancel')}
                                         </button>
                                     </div>
                                 </div>

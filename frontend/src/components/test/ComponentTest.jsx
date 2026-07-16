@@ -28,12 +28,13 @@ function ComponentTestInner() {
   const { openModal } = useModal();
   const { form, setValue, setError, validateForm } = useForm('test-form', { name: '', email: '' });
   const { profile, hasRole, isAdmin } = useRoleAccess();
+  const { t } = useTranslation();
 
   const [loading, setLoading] = useState(false);
   const [tableData, setTableData] = useState([
-    { id: 1, name: 'Иван Иванов', email: 'ivan@example.com', role: 'admin' },
-    { id: 2, name: 'Петр Петров', email: 'petr@example.com', role: 'doctor' },
-    { id: 3, name: 'Анна Сидорова', email: 'anna@example.com', role: 'patient' }
+    { id: 1, name: t('misc.ct_user_1'), email: 'ivan@example.com', role: 'admin' },
+    { id: 2, name: t('misc.ct_user_2'), email: 'petr@example.com', role: 'doctor' },
+    { id: 3, name: t('misc.ct_user_3'), email: 'anna@example.com', role: 'patient' }
   ]);
 
   const tableColumns = [
@@ -85,8 +86,8 @@ function ComponentTestInner() {
   const handleTestToast = (type) => {
     addToast({
       type,
-      title: `Тест ${type}`,
-      message: `Это тестовое уведомление типа ${type}`,
+      title: t('misc.ct_toast_title', { type }),
+      message: t('misc.ct_toast_message', { type }),
       duration: 3000
     });
   };
@@ -96,13 +97,13 @@ function ComponentTestInner() {
       title: t('final.test_modal_title'),
       content: (
         <div>
-          <p>Это тестовое модальное окно для проверки работоспособности.</p>
-          <p>Тема: {theme.isLight ? 'Светлая' : 'Темная'}</p>
+          <p>{t('misc.ct_modal_content')}</p>
+          <p>{t('misc.ct_theme_label')}: {theme.isLight ? t('misc.ct_theme_light') : t('misc.ct_theme_dark')}</p>
         </div>
       ),
       footer: (
         <button style={buttonStyle} onClick={() => { }}>
-          Закрыть
+          {t('misc.ct_close')}
         </button>
       )
     });
@@ -118,16 +119,16 @@ function ComponentTestInner() {
     addToast({
       type: 'success',
       title: t('final.form_submitted'),
-      message: `Данные: ${JSON.stringify(values)}`
+      message: t('misc.ct_form_data', { data: JSON.stringify(values) })
     });
   };
 
   const handleFormValidation = () => {
     const isValid = validateForm({
-      name: { required: 'Имя обязательно' },
+      name: { required: t('misc.ct_validation_name_required') },
       email: {
-        required: 'Email обязателен',
-        email: 'Некорректный email'
+        required: t('misc.ct_validation_email_required'),
+        email: t('misc.ct_validation_email_invalid')
       }
     });
 
@@ -135,13 +136,13 @@ function ComponentTestInner() {
       addToast({
         type: 'success',
         title: t('final.validation_passed'),
-        message: 'Все поля корректны'
+        message: t('misc.ct_validation_passed_msg')
       });
     } else {
       addToast({
         type: 'error',
         title: t('final.validation_error'),
-        message: 'Проверьте заполнение полей'
+        message: t('misc.ct_validation_error_msg')
       });
     }
   };
@@ -149,60 +150,60 @@ function ComponentTestInner() {
   return (
     <div style={containerStyle}>
       <h1 style={{ ...titleStyle, fontSize: getFontSize('xl') }}>
-        Тест компонентов системы
+        {t('misc.ct_h1_title')}
       </h1>
 
       {/* Тест темы */}
       <div style={sectionStyle}>
-        <h2 style={titleStyle}>Тема и стили</h2>
-        <p>Текущая тема: {theme.isLight ? 'Светлая' : 'Темная'}</p>
-        <p>Цвета: primary={getColor('primary', 'main')}, secondary={getColor('secondary', 'main')}</p>
-        <p>Отступы: sm={getSpacing('sm')}, md={getSpacing('md')}, lg={getSpacing('lg')}</p>
-        <p>Размеры шрифтов: sm={getFontSize('sm')}, md={getFontSize('md')}, lg={getFontSize('lg')}</p>
+        <h2 style={titleStyle}>{t('misc.ct_section_theme_styles')}</h2>
+        <p>{t('misc.ct_current_theme_label')}: {theme.isLight ? t('misc.ct_theme_light') : t('misc.ct_theme_dark')}</p>
+        <p>{t('misc.ct_colors_label')}: primary={getColor('primary', 'main')}, secondary={getColor('secondary', 'main')}</p>
+        <p>{t('misc.ct_spacing_label')}: sm={getSpacing('sm')}, md={getSpacing('md')}, lg={getSpacing('lg')}</p>
+        <p>{t('misc.ct_font_sizes_label')}: sm={getFontSize('sm')}, md={getFontSize('md')}, lg={getFontSize('lg')}</p>
       </div>
 
       {/* Тест уведомлений */}
       <div style={sectionStyle}>
-        <h2 style={titleStyle}>Система уведомлений (Toast)</h2>
+        <h2 style={titleStyle}>{t('misc.ct_section_toast')}</h2>
         <button style={buttonStyle} onClick={() => handleTestToast('success')}>
-          Успех
+          {t('misc.ct_btn_success')}
         </button>
         <button style={buttonStyle} onClick={() => handleTestToast('error')}>
-          Ошибка
+          {t('misc.ct_btn_error')}
         </button>
         <button style={buttonStyle} onClick={() => handleTestToast('warning')}>
-          Предупреждение
+          {t('misc.ct_btn_warning')}
         </button>
         <button style={buttonStyle} onClick={() => handleTestToast('info')}>
-          Информация
+          {t('misc.ct_btn_info')}
         </button>
       </div>
 
       {/* Тест модальных окон */}
       <div style={sectionStyle}>
-        <h2 style={titleStyle}>Модальные окна</h2>
+        <h2 style={titleStyle}>{t('misc.ct_section_modals')}</h2>
         <button style={buttonStyle} onClick={handleTestModal}>
-          Открыть модальное окно
+          {t('misc.ct_open_modal')}
         </button>
       </div>
 
       {/* Тест загрузки */}
       <div style={sectionStyle}>
-        <h2 style={titleStyle}>Компоненты загрузки</h2>
+        <h2 style={titleStyle}>{t('misc.ct_section_loading')}</h2>
         <button style={buttonStyle} onClick={handleTestLoading}>
-          Тест загрузки (2 сек)
+          {t('misc.ct_test_loading_btn')}
         </button>
-        {loading && <Loading text="Загрузка..." />}
+        {loading && <Loading text={t('misc.ct_loading_text')} />}
       </div>
 
       {/* Тест форм */}
       <div style={sectionStyle}>
-        <h2 style={titleStyle}>Система форм</h2>
+        <h2 style={titleStyle}>{t('misc.ct_section_forms')}</h2>
         <form onSubmit={(e) => { e.preventDefault(); handleFormSubmit(form?.values); }}>
           <input
             type="text"
             aria-label="Test form name"
-            placeholder="Имя"
+            placeholder={t('misc.ct_input_name')}
             value={form?.values?.name || ''}
             onChange={(e) => setValue('name', e.target.value)}
             style={inputStyle}
@@ -216,17 +217,17 @@ function ComponentTestInner() {
             style={inputStyle}
           />
           <button type="button" style={buttonStyle} onClick={handleFormValidation}>
-            Проверить валидацию
+            {t('misc.ct_validate_btn')}
           </button>
           <button type="submit" style={buttonStyle}>
-            Отправить форму
+            {t('misc.ct_submit_btn')}
           </button>
         </form>
       </div>
 
       {/* Тест таблиц */}
       <div style={sectionStyle}>
-        <h2 style={titleStyle}>Таблицы</h2>
+        <h2 style={titleStyle}>{t('misc.ct_section_tables')}</h2>
         <Table
           data={tableData}
           columns={tableColumns}
@@ -239,22 +240,22 @@ function ComponentTestInner() {
 
       {/* Тест ролевой системы */}
       <div style={sectionStyle}>
-        <h2 style={titleStyle}>Ролевая система</h2>
-        <p>Профиль: {profile ? JSON.stringify(profile) : 'Не авторизован'}</p>
-        <p>Роль admin: {hasRole(['admin']) ? 'Да' : 'Нет'}</p>
-        <p>Админ: {isAdmin() ? 'Да' : 'Нет'}</p>
+        <h2 style={titleStyle}>{t('misc.ct_section_roles')}</h2>
+        <p>{t('misc.ct_profile_label')}: {profile ? JSON.stringify(profile) : t('misc.ct_not_authorized')}</p>
+        <p>{t('misc.ct_role_admin_label')}: {hasRole(['admin']) ? t('misc.ct_yes') : t('misc.ct_no')}</p>
+        <p>{t('misc.ct_admin_label')}: {isAdmin() ? t('misc.ct_yes') : t('misc.ct_no')}</p>
 
-        <RoleGuard allowedRoles={['admin']} fallback={<p>Доступ запрещен</p>}>
-          <p>Этот контент виден только админам</p>
+        <RoleGuard allowedRoles={['admin']} fallback={<p>{t('misc.ct_access_denied')}</p>}>
+          <p>{t('misc.ct_admin_only_content')}</p>
         </RoleGuard>
       </div>
 
       {/* Тест API */}
       <div style={sectionStyle}>
-        <h2 style={titleStyle}>API интеграция</h2>
-        <p>API клиент: {typeof window !== 'undefined' ? 'Доступен' : 'Недоступен'}</p>
-        <p>Токен: {tokenManager.getAccessToken() ? 'Есть' : 'Нет'}</p>
-        <p>Профиль: {sessionStorage.getItem('auth_profile') ? 'Есть' : 'Нет'}</p>
+        <h2 style={titleStyle}>{t('misc.ct_section_api')}</h2>
+        <p>{t('misc.ct_api_client_label')}: {typeof window !== 'undefined' ? t('misc.ct_available') : t('misc.ct_unavailable')}</p>
+        <p>{t('misc.ct_token_label')}: {tokenManager.getAccessToken() ? t('misc.ct_present') : t('misc.ct_no')}</p>
+        <p>{t('misc.ct_profile_label')}: {sessionStorage.getItem('auth_profile') ? t('misc.ct_present') : t('misc.ct_no')}</p>
       </div>
     </div>
   );

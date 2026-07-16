@@ -5,6 +5,7 @@ import logger from '../../utils/logger';
 import { getApiOrigin } from '../../api/runtime';
 import tokenManager from '../../utils/tokenManager';
 import { Input } from '../ui/macos';
+import { useTranslation } from '../../i18n/useTranslation';
 import {
   Calendar,
   Clock,
@@ -32,6 +33,7 @@ const ScheduleNextModal = ({
   specialtyFilter = null // Фильтр услуг по специальности
 }) => {
   const { getColor, getSpacing, getFontSize } = theme;
+  const { t } = useTranslation();
 
   // Состояния формы
   const [formData, setFormData] = useState({
@@ -175,13 +177,13 @@ const ScheduleNextModal = ({
     try {
       // Валидация
       if (!formData.patient_id) {
-        throw new Error('Выберите пациента');
+        throw new Error(t('misc.snm_err_select_patient'));
       }
       if (!formData.visit_date) {
-        throw new Error('Выберите дату визита');
+        throw new Error(t('misc.snm_err_select_visit_date'));
       }
       if (formData.services.some((s) => !s.service_id)) {
-        throw new Error('Выберите все услуги');
+        throw new Error(t('misc.snm_err_select_all_services'));
       }
 
       const token = tokenManager.getAccessToken();
@@ -221,7 +223,7 @@ const ScheduleNextModal = ({
           }
         }
 
-        setSuccess(`Визит успешно назначен! Токен подтверждения: ${result.confirmation.token}`);
+        setSuccess(t('misc.snm_visit_scheduled', { token: result.confirmation.token }));
 
         // Сброс формы через 2 секунды
         setTimeout(() => {
@@ -230,7 +232,7 @@ const ScheduleNextModal = ({
         }, 2000);
       } else {
         const errorData = await response.json();
-        throw new Error(errorData.detail || 'Ошибка при создании визита');
+        throw new Error(errorData.detail || t('misc.snm_err_create_visit'));
       }
     } catch (err) {
       setError(err.message);
@@ -400,13 +402,13 @@ const ScheduleNextModal = ({
   const getModalTitle = () => {
     switch (specialtyFilter) {
       case 'cardiology':
-        return 'Назначить следующий визит - Кардиология';
+        return t('misc.snm_title_cardiology');
       case 'dermatology':
-        return 'Назначить следующий визит - Дерматология';
+        return t('misc.snm_title_dermatology');
       case 'dentistry':
-        return 'Назначить следующий визит - Стоматология';
+        return t('misc.snm_title_dentistry');
       default:
-        return 'Назначить следующий визит';
+        return t('misc.snm_title_default');
     }
   };
   const handleActivationKeyDown = (event, action) => {
@@ -457,7 +459,7 @@ const ScheduleNextModal = ({
           <div style={formGroupStyle}>
             <label htmlFor="schedule-next-patient" style={labelStyle}>
               <User size={16} style={{ display: 'inline', marginRight: getSpacing('xs') }} />
-              Пациент
+              {t('misc.snm_label_patient')}
             </label>
             <select
               id="schedule-next-patient"
@@ -467,7 +469,7 @@ const ScheduleNextModal = ({
               onChange={(e) => handleInputChange('patient_id', e.target.value)}
               required>
               
-              <option value="">Выберите пациента</option>
+              <option value="">{t('misc.snm_select_patient')}</option>
               {patients.map((p) =>
               <option key={p.id} value={p.id}>
                   {p.first_name} {p.last_name} - {p.phone}
@@ -481,7 +483,7 @@ const ScheduleNextModal = ({
             <div style={{ ...formGroupStyle, flex: 1 }}>
               <label htmlFor="schedule-next-visit-date" style={labelStyle}>
                 <Calendar size={16} style={{ display: 'inline', marginRight: getSpacing('xs') }} />
-                Дата визита
+                {t('misc.snm_label_visit_date')}
               </label>
               <Input
                 id="schedule-next-visit-date"
@@ -498,7 +500,7 @@ const ScheduleNextModal = ({
             <div style={{ ...formGroupStyle, flex: 1 }}>
               <label htmlFor="schedule-next-visit-time" style={labelStyle}>
                 <Clock size={16} style={{ display: 'inline', marginRight: getSpacing('xs') }} />
-                Время
+                {t('misc.snm_label_time')}
               </label>
               <Input
                 id="schedule-next-visit-time"
@@ -515,9 +517,9 @@ const ScheduleNextModal = ({
           {/* Услуги */}
           <div style={formGroupStyle}>
             <label style={labelStyle}>
-              Услуги {specialtyFilter && `(${specialtyFilter === 'cardiology' ? 'Кардиология' :
-              specialtyFilter === 'dermatology' ? 'Дерматология' :
-              specialtyFilter === 'dentistry' ? 'Стоматология' : ''})`}
+              {t('misc.snm_label_services')} {specialtyFilter && `(${specialtyFilter === 'cardiology' ? t('misc.snm_specialty_cardiology') :
+              specialtyFilter === 'dermatology' ? t('misc.snm_specialty_dermatology') :
+              specialtyFilter === 'dentistry' ? t('misc.snm_specialty_dentistry') : ''})`}
             </label>
             {formData.services.map((service, index) =>
             <div key={index} style={serviceRowStyle}>
@@ -530,10 +532,10 @@ const ScheduleNextModal = ({
                   onChange={(e) => handleServiceChange(index, 'service_id', e.target.value)}
                   required>
                   
-                    <option value="">Выберите услугу</option>
+                    <option value="">{t('misc.snm_select_service')}</option>
                     {filteredServices.map((s) =>
                   <option key={s.id} value={s.id}>
-                        {s.name} - {s.price} сум
+                        {t('misc.snm_service_option', { name: s.name, price: s.price })}
                       </option>
                   )}
                   </select>
@@ -547,7 +549,7 @@ const ScheduleNextModal = ({
                   value={service.quantity}
                   onChange={(e) => handleServiceChange(index, 'quantity', parseInt(e.target.value))}
                   min="1"
-                  placeholder="Кол-во" />
+                  placeholder={t('misc.snm_qty_placeholder')} />
                 
                 </div>
                 <button
@@ -567,13 +569,13 @@ const ScheduleNextModal = ({
               onClick={addService}>
               
               <Plus size={16} />
-              Добавить услугу
+              {t('misc.snm_btn_add_service')}
             </button>
           </div>
 
           {/* Тип визита */}
           <div style={formGroupStyle}>
-            <label htmlFor="schedule-next-discount-mode" style={labelStyle}>Тип визита</label>
+            <label htmlFor="schedule-next-discount-mode" style={labelStyle}>{t('misc.snm_label_visit_type')}</label>
             <select
               id="schedule-next-discount-mode"
               aria-label="Schedule next visit type"
@@ -581,15 +583,15 @@ const ScheduleNextModal = ({
               value={formData.discount_mode}
               onChange={(e) => handleInputChange('discount_mode', e.target.value)}>
               
-              <option value="none">Платный</option>
-              <option value="repeat">Повторный</option>
-              <option value="benefit">Льготный</option>
+              <option value="none">{t('misc.snm_visit_type_paid')}</option>
+              <option value="repeat">{t('misc.snm_visit_type_repeat')}</option>
+              <option value="benefit">{t('misc.snm_visit_type_benefit')}</option>
             </select>
           </div>
 
           {/* Канал подтверждения */}
           <div style={formGroupStyle}>
-            <label htmlFor="schedule-next-confirmation-channel" style={labelStyle}>Канал подтверждения</label>
+            <label htmlFor="schedule-next-confirmation-channel" style={labelStyle}>{t('misc.snm_label_confirmation_channel')}</label>
             <select
               id="schedule-next-confirmation-channel"
               aria-label="Schedule next visit confirmation channel"
@@ -598,13 +600,13 @@ const ScheduleNextModal = ({
               onChange={(e) => handleInputChange('confirmation_channel', e.target.value)}>
               
               <option value="telegram">
-                📱 Telegram
+                {t('misc.snm_channel_telegram')}
               </option>
               <option value="pwa">
-                📲 PWA (мобильное приложение)
+                {t('misc.snm_channel_pwa')}
               </option>
               <option value="phone">
-                📞 Телефон (регистратура)
+                {t('misc.snm_channel_phone')}
               </option>
             </select>
           </div>
@@ -617,14 +619,14 @@ const ScheduleNextModal = ({
               onClick={onClose}
               disabled={loading}>
               
-              Отмена
+              {t('misc.snm_btn_cancel')}
             </button>
             <button
               type="submit"
               style={primaryButtonStyle}
               disabled={loading}>
               
-              {loading ? 'Создание...' : 'Назначить визит'}
+              {loading ? t('misc.snm_btn_creating') : t('misc.snm_btn_schedule')}
             </button>
           </div>
         </form>

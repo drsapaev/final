@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';  // PR-41 / High-16: added memoization hooks
+import { useTranslation } from 'react-i18next';
 import {
   Box,
   Card,
@@ -114,6 +115,7 @@ const ONBOARDING_REASON_LABELS = {
 };
 
 const TelegramManager = () => {
+  const { t } = useTranslation();
   const [botStatus, setBotStatus] = useState(null);
   const [templates, setTemplates] = useState([]);
   const [onboardingRequests, setOnboardingRequests] = useState([]);
@@ -251,7 +253,7 @@ const TelegramManager = () => {
       await loadOnboardingRequests();
       await loadOnboardingAnalytics();
     } catch (e) {
-      setError(e?.response?.data?.detail || e?.message || 'Ошибка загрузки данных Telegram');
+      setError(e?.response?.data?.detail || e?.message || t('misc.tg_err_load'));
     } finally {
       setLoading(false);
     }
@@ -446,7 +448,7 @@ const TelegramManager = () => {
   };
 
   const handleCreateTemplate = async () => {
-    setError('В этой сборке доступен просмотр Telegram шаблонов. Создание шаблонов через UI пока не опубликовано в backend contract.');
+    setError(t('misc.tg_err_template_create'));
   };
 
   const registerPatientCommands = async () => {
@@ -458,12 +460,12 @@ const TelegramManager = () => {
       const languages = Array.isArray(response?.data?.registered_languages) ?
       response.data.registered_languages.join(', ') :
       'ru, uz';
-      setSuccess(`Команды пациентского бота зарегистрированы: ${languages}`);
+      setSuccess(t('misc.tg_success_patient_commands', { languages }));
       await loadTelegramData();
     } catch (e) {
       const detail = e?.response?.data?.detail;
       const message = typeof detail === 'string' ? detail : detail?.message || detail?.error;
-      setError(message || e?.message || 'Не удалось зарегистрировать команды Telegram');
+      setError(message || e?.message || t('misc.tg_err_register_commands'));
     } finally {
       setRegisteringCommands(false);
     }
@@ -478,12 +480,12 @@ const TelegramManager = () => {
       const commands = Array.isArray(response?.data?.registered_commands) ?
       response.data.registered_commands.join(', ') :
       'read-only staff commands';
-      setSuccess(`Staff-команды зарегистрированы: ${commands}`);
+      setSuccess(t('misc.tg_success_staff_commands', { commands }));
       await loadTelegramData();
     } catch (e) {
       const detail = e?.response?.data?.detail;
       const message = typeof detail === 'string' ? detail : detail?.message || detail?.error;
-      setError(message || e?.message || 'Не удалось зарегистрировать staff-команды Telegram');
+      setError(message || e?.message || t('misc.tg_err_register_staff_commands'));
     } finally {
       setRegisteringStaffCommands(false);
     }
@@ -684,155 +686,155 @@ const TelegramManager = () => {
   };
   const patientLanguageSummary = patientBotLanguages.length ?
   patientBotLanguages.map((item) => item.label).join(', ') :
-  'Русский';
+  t('misc.tg_lang_russian');
   const patientCapabilities = [
     {
       key: 'book',
       icon: Calendar,
-      menu: '🏥 Записаться на приём',
+      menu: t('misc.tg_cmd_book_menu'),
       command: '/book',
-      label: patientCommandLabel('/book', 'Записаться на приём'),
-      detail: 'Показывает безопасный путь через регистратуру; визит из свободного текста не создаёт.'
+      label: patientCommandLabel('/book', t('misc.tg_cmd_book_label')),
+      detail: t('misc.tg_cmd_book_detail')
     },
     {
       key: 'services',
       icon: Smartphone,
-      menu: '📲 Онлайн-сервисы',
+      menu: t('misc.tg_cmd_services_menu'),
       command: '/services',
-      label: patientCommandLabel('/services', 'Все функции бота'),
+      label: patientCommandLabel('/services', t('misc.tg_cmd_services_label')),
       detail: patientMiniAppManifestFeature?.enabled
-        ? `Backend Mini App manifest готов: ${patientMiniAppManifestEndpoint}; требует initData и не раскрывает записи.`
-        : 'Открывает видимую карту подключённых и будущих функций, включая безопасные заглушки.'
+        ? t('misc.tg_cmd_services_detail_manifest', { endpoint: patientMiniAppManifestEndpoint })
+        : t('misc.tg_cmd_services_detail')
     },
     {
       key: 'queue',
       icon: Ticket,
-      menu: '🎫 Моя очередь',
+      menu: t('misc.tg_cmd_queue_menu'),
       command: '/queue',
-      label: patientCommandLabel('/queue', 'Моя очередь'),
-      detail: 'Номер, кабинет, статус и позиция ожидания без изменения очереди.'
+      label: patientCommandLabel('/queue', t('misc.tg_cmd_queue_label')),
+      detail: t('misc.tg_cmd_queue_detail')
     },
     {
       key: 'visits',
       icon: Calendar,
-      menu: '📅 Мои визиты',
+      menu: t('misc.tg_cmd_visits_menu'),
       command: '/visits',
-      label: patientCommandLabel('/visits', 'Мои визиты'),
-      detail: 'Показывает последние и сегодняшние визиты без диагнозов, услуг и медицинских деталей.'
+      label: patientCommandLabel('/visits', t('misc.tg_cmd_visits_label')),
+      detail: t('misc.tg_cmd_visits_detail')
     },
     {
       key: 'payments',
       icon: CreditCard,
-      menu: '💳 Оплаты и долг',
+      menu: t('misc.tg_cmd_payments_menu'),
       command: '/payments',
-      label: patientCommandLabel('/payments', 'Оплаты и долг'),
+      label: patientCommandLabel('/payments', t('misc.tg_cmd_payments_label')),
       detail: patientPaymentEntryFeature?.enabled
-        ? `Начислено, оплачено, долг; кнопка ведет в защищенный кабинет: ${patientPaymentEntryRoute}.`
-        : 'Начислено, оплачено, долг и незавершённые платежи по визиту.'
+        ? t('misc.tg_cmd_payments_detail_entry', { route: patientPaymentEntryRoute })
+        : t('misc.tg_cmd_payments_detail')
     },
     {
       key: 'results',
       icon: FileText,
-      menu: '📄 Результаты',
+      menu: t('misc.tg_cmd_results_menu'),
       command: '/results',
-      label: patientCommandLabel('/results', 'PDF-результаты'),
-      detail: `До ${patientBot.max_pdf_reports_per_request || 3} готовых PDF только для привязанного пациента.`
+      label: patientCommandLabel('/results', t('misc.tg_cmd_results_label')),
+      detail: t('misc.tg_cmd_results_detail', { count: patientBot.max_pdf_reports_per_request || 3 })
     },
     {
       key: 'forms',
       icon: ClipboardList,
-      menu: '📋 Анкеты пациента',
+      menu: t('misc.tg_cmd_forms_menu'),
       command: '/forms',
-      label: patientCommandLabel('/forms', 'Анкеты пациента'),
+      label: patientCommandLabel('/forms', t('misc.tg_cmd_forms_label')),
       detail: patientFormsEntryFeature?.enabled
-        ? `Запускает пациентские анкеты в защищенном Mini App: ${patientFormsEntryRoute}.`
-        : 'Раздел пока не включен для этого пациента.'
+        ? t('misc.tg_cmd_forms_detail_entry', { route: patientFormsEntryRoute })
+        : t('misc.tg_cmd_forms_detail')
     },
     {
       key: 'documents',
       icon: ReceiptText,
-      menu: '🧾 Документы и чеки',
+      menu: t('misc.tg_cmd_documents_menu'),
       command: '/documents',
-      label: patientCommandLabel('/documents', 'Документы и чеки'),
-      detail: 'Будущий защищённый вход к чекам и документам; внутренние номера не отправляются в Telegram.'
+      label: patientCommandLabel('/documents', t('misc.tg_cmd_documents_label')),
+      detail: t('misc.tg_cmd_documents_detail')
     },
     {
       key: 'doctors',
       icon: Stethoscope,
-      menu: '🧑‍⚕️ Врачи и расписание',
+      menu: t('misc.tg_cmd_doctors_menu'),
       command: '/doctors',
-      label: patientCommandLabel('/doctors', 'Врачи и расписание'),
-      detail: 'Пока показывает безопасную подсказку; запись и расписание остаются через регистратуру.'
+      label: patientCommandLabel('/doctors', t('misc.tg_cmd_doctors_label')),
+      detail: t('misc.tg_cmd_doctors_detail')
     },
     {
       key: 'cabinet',
       icon: Smartphone,
-      menu: '📲 Кабинет пациента',
+      menu: t('misc.tg_cmd_cabinet_menu'),
       command: '/cabinet',
-      label: patientCommandLabel('/cabinet', 'Кабинет пациента'),
-      detail: 'Будущий защищённый вход к Mini App/кабинету, без приёма медицинских данных в чате.'
+      label: patientCommandLabel('/cabinet', t('misc.tg_cmd_cabinet_label')),
+      detail: t('misc.tg_cmd_cabinet_detail')
     },
     {
       key: 'profile',
       icon: UserCheck,
-      menu: '👤 Мой статус',
+      menu: t('misc.tg_cmd_profile_menu'),
       command: '/profile',
-      label: patientCommandLabel('/profile', 'Мой статус'),
-      detail: 'Показывает привязку Telegram к карте пациента и последний визит.'
+      label: patientCommandLabel('/profile', t('misc.tg_cmd_profile_label')),
+      detail: t('misc.tg_cmd_profile_detail')
     },
     {
       key: 'settings',
       icon: Languages,
-      menu: '⚙️ Настройки',
+      menu: t('misc.tg_cmd_settings_menu'),
       command: '/settings',
-      label: patientCommandLabel('/settings', 'Язык и уведомления'),
-      detail: `Языки v1: ${patientLanguageSummary}. После выбора меню сразу обновляется.`
+      label: patientCommandLabel('/settings', t('misc.tg_cmd_settings_label')),
+      detail: t('misc.tg_cmd_settings_detail', { languages: patientLanguageSummary })
     },
     {
       key: 'support',
       icon: Phone,
-      menu: '☎️ Связаться с клиникой',
+      menu: t('misc.tg_cmd_support_menu'),
       command: '/support',
-      label: patientCommandLabel('/support', 'Связаться с клиникой'),
-      detail: 'Подсказка для записи, кассы и срочных вопросов без медицинских данных в чате.'
+      label: patientCommandLabel('/support', t('misc.tg_cmd_support_label')),
+      detail: t('misc.tg_cmd_support_detail')
     },
     {
       key: 'staff',
       icon: UserCog,
-      menu: '👥 Режим сотрудника',
+      menu: t('misc.tg_cmd_staff_menu'),
       command: '/staff',
-      label: patientCommandLabel('/staff', 'Режим сотрудника'),
-      detail: 'Видимый вход для сотрудников: только персональная ссылка администратора или привязанный staff-профиль.'
+      label: patientCommandLabel('/staff', t('misc.tg_cmd_staff_label')),
+      detail: t('misc.tg_cmd_staff_detail')
     }
   ];
   const staffCapabilitySummary = [
     {
       key: 'roles',
       icon: Users,
-      label: 'Ролевые меню',
-      detail: `${staffRoleMenuEnablementRoleCount || staffRoles.length || 0} ролей, ${staffRoleMenuEnablementItemCount || staffMenuItemCount || 0} read-only пунктов.`
+      label: t('misc.tg_staff_cap_roles_label'),
+      detail: t('misc.tg_staff_cap_roles_detail', { roleCount: staffRoleMenuEnablementRoleCount || staffRoles.length || 0, itemCount: staffRoleMenuEnablementItemCount || staffMenuItemCount || 0 })
     },
     {
       key: 'commands',
       icon: MessageSquare,
-      label: 'Staff-команды',
+      label: t('misc.tg_staff_cap_commands_label'),
       detail: staffCommandNames.length ?
-      `${staffCommandNames.join(' ')}; действия изменения состояния выключены.` :
-      'Команды появятся после staff token и регистрации.'
+      t('misc.tg_staff_cap_commands_detail_list', { commands: staffCommandNames.join(' ') }) :
+      t('misc.tg_staff_cap_commands_detail_empty')
     },
     {
       key: 'safety',
       icon: ShieldCheck,
-      label: 'Безопасность',
+      label: t('misc.tg_staff_cap_safety_label'),
       detail: staffAuditReady ?
-      'RBAC, audit и подтверждения включены для read-only режима.' :
-      'RBAC, audit и подтверждения обязательны перед действиями.'
+      t('misc.tg_staff_cap_safety_detail_ready') :
+      t('misc.tg_staff_cap_safety_detail_pending')
     }
   ];
   const templateTypeOptions = [
-    { value: 'text', label: 'Текст' },
-    { value: 'photo', label: 'Фото' },
-    { value: 'document', label: 'Документ' }
+    { value: 'text', label: t('misc.tg_tpl_type_text') },
+    { value: 'photo', label: t('misc.tg_tpl_type_photo') },
+    { value: 'document', label: t('misc.tg_tpl_type_document') }
   ];
   const getOnboardingValue = (request, camelKey, snakeKey, fallback = '') =>
     request?.[camelKey] ?? request?.[snakeKey] ?? fallback;
@@ -1074,13 +1076,13 @@ const TelegramManager = () => {
     <Box sx={{ p: 3 }}>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h4" component="h1">
-          Telegram бот
+          {t('misc.tg_title')}
         </Typography>
         <Button
           variant="outlined"
           onClick={loadTelegramData}>
           <RefreshCw size={16} />
-          Обновить
+          {t('misc.tg_refresh')}
         </Button>
       </Box>
 
@@ -1112,14 +1114,14 @@ const TelegramManager = () => {
                 mb={2}>
                 <Box>
                   <Typography variant="h6" gutterBottom>
-                    Что умеет Telegram-бот
+                    {t('misc.tg_bot_intro_title')}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    Patient bot работает с пациентом, staff/admin bot остаётся безопасным read-only слоем для сотрудников.
+                    {t('misc.tg_bot_intro_desc')}
                   </Typography>
                 </Box>
                 <Badge variant={botStatus?.bot_active ? 'success' : 'warning'} size="small">
-                  {botStatus?.mode === 'webhook' ? 'Webhook' : 'Polling'}
+                  {botStatus?.mode === 'webhook' ? t('misc.tg_bot_intro_mode_webhook') : t('misc.tg_bot_intro_mode_polling')}
                 </Badge>
               </Box>
 
@@ -1129,7 +1131,7 @@ const TelegramManager = () => {
                     style={capabilityPanelStyle}>
                     <Box display="flex" justifyContent="space-between" alignItems="center" mb={1.5}>
                       <Typography variant="subtitle1">
-                        Пациентский бот
+                        {t('misc.tg_patient_bot_title')}
                       </Typography>
                       <Badge variant={enabledPatientFeatures.length ? 'success' : 'warning'} size="small">
                         {patientBot.version || 'v1'}
@@ -1156,7 +1158,7 @@ const TelegramManager = () => {
                             </Typography>
                             <Box display="flex" justifyContent="space-between" alignItems="center" mt="auto" gap={1}>
                               <Typography variant="caption" color="text.secondary">
-                                {'\u041a\u043e\u043c\u0430\u043d\u0434\u0430'}
+                                {t('misc.tg_command_label')}
                               </Typography>
                               <Badge variant="info" size="small">
                                 {item.command}
@@ -1173,10 +1175,10 @@ const TelegramManager = () => {
                     style={{ ...capabilityPanelStyle, height: '100%' }}>
                     <Box display="flex" justifyContent="space-between" alignItems="center" mb={1.5}>
                       <Typography variant="subtitle1">
-                        Staff/admin bot
+                        {t('misc.tg_staff_admin_bot_title')}
                       </Typography>
                       <Badge variant={staffRoleMenuRuntimeEnabled ? 'success' : 'warning'} size="small">
-                        Read-only
+                        {t('misc.tg_read_only')}
                       </Badge>
                     </Box>
                     <Box display="flex" sx={{ flexDirection: 'column' }} gap={1.25}>
@@ -1211,7 +1213,7 @@ const TelegramManager = () => {
           <Card>
             <CardContent>
               <Typography variant="h6" gutterBottom>
-                Статус бота
+                {t('misc.tg_bot_status_title')}
               </Typography>
               <List>
                 <ListItem>
@@ -1223,14 +1225,14 @@ const TelegramManager = () => {
                     
                   </ListItemIcon>
                   <ListItemText
-                    primary="Бот активен"
-                    secondary={botStatus?.bot_active ? 'Да' : 'Нет'} />
+                    primary={t('misc.tg_bot_active')}
+                    secondary={botStatus?.bot_active ? t('misc.tg_yes') : t('misc.tg_no')} />
                   
                   <Badge
                     variant={botStatus?.bot_active ? 'success' : 'error'}
                     size="small">
                     
-                    {botStatus?.bot_active ? 'Активен' : 'Неактивен'}
+                    {botStatus?.bot_active ? t('misc.tg_active') : t('misc.tg_inactive')}
                   </Badge>
                 </ListItem>
                 <ListItem>
@@ -1238,14 +1240,14 @@ const TelegramManager = () => {
                     <Settings />
                   </ListItemIcon>
                   <ListItemText
-                    primary="Webhook настроен"
-                    secondary={botStatus?.webhook_configured ? 'Да' : 'Нет'} />
+                    primary={t('misc.tg_webhook_configured')}
+                    secondary={botStatus?.webhook_configured ? t('misc.tg_yes') : t('misc.tg_no')} />
                   
                   <Badge
                     variant={botStatus?.webhook_configured ? 'success' : 'warning'}
                     size="small">
                     
-                    {botStatus?.webhook_configured ? 'Настроен' : 'Не настроен'}
+                    {botStatus?.webhook_configured ? t('misc.tg_webhook_set') : t('misc.tg_webhook_not_set')}
                   </Badge>
                 </ListItem>
                 <ListItem>
@@ -1253,8 +1255,8 @@ const TelegramManager = () => {
                     <CheckCircle />
                   </ListItemIcon>
                   <ListItemText
-                    primary="Подписчиков"
-                    secondary={`${botStatus?.subscribers_count || 0} привязано / ${botStatus?.total_users || 0} всего`} />
+                    primary={t('misc.tg_subscribers')}
+                    secondary={t('misc.tg_subscribers_count', { linked: botStatus?.subscribers_count || 0, total: botStatus?.total_users || 0 })} />
                   
                 </ListItem>
                 <ListItem>
@@ -1263,7 +1265,7 @@ const TelegramManager = () => {
                   </ListItemIcon>
                   <ListItemText
                     primary="Telegram bot"
-                    secondary={botStatus?.bot_username ? `@${botStatus.bot_username}` : 'Не настроен'} />
+                    secondary={botStatus?.bot_username ? `@${botStatus.bot_username}` : t('misc.tg_not_configured')} />
 
                 </ListItem>
                 <ListItem>
@@ -1271,14 +1273,14 @@ const TelegramManager = () => {
                     <Settings />
                   </ListItemIcon>
                   <ListItemText
-                    primary="Режим подключения"
-                    secondary={botStatus?.mode === 'webhook' ? 'Webhook' : 'Polling'} />
+                    primary={t('misc.tg_connection_mode')}
+                    secondary={botStatus?.mode === 'webhook' ? t('misc.tg_bot_intro_mode_webhook') : t('misc.tg_bot_intro_mode_polling')} />
 
                   <Badge
                     variant={botStatus?.mode === 'webhook' ? 'success' : 'warning'}
                     size="small">
 
-                    {botStatus?.mode === 'webhook' ? 'Webhook' : 'Polling'}
+                    {botStatus?.mode === 'webhook' ? t('misc.tg_bot_intro_mode_webhook') : t('misc.tg_bot_intro_mode_polling')}
                   </Badge>
                 </ListItem>
                 <ListItem>
@@ -1289,7 +1291,7 @@ const TelegramManager = () => {
                     primary="Staff token separation"
                     secondary={staffTokenContract.contract_version ?
                     `${staffTokenSource}; ${staffTokenIssue}; ${staffTokenSecretVisibility}` :
-                    'Dedicated staff bot token contract не опубликован'} />
+                    t('misc.tg_staff_token_contract_not_published')} />
 
                   <Badge
                     variant={staffTokenReady ? 'success' : 'warning'}
@@ -1303,8 +1305,8 @@ const TelegramManager = () => {
                     <CheckCircle />
                   </ListItemIcon>
                   <ListItemText
-                    primary="Привязка пациентов"
-                    secondary={`QR: ${botStatus?.qr_linking_enabled ? 'да' : 'нет'}, телефон: ${botStatus?.contact_linking_enabled ? 'да' : 'нет'}`} />
+                    primary={t('misc.tg_patient_linking')}
+                    secondary={t('misc.tg_linking_summary', { qr: botStatus?.qr_linking_enabled ? t('misc.tg_yes_short') : t('misc.tg_no_short'), phone: botStatus?.contact_linking_enabled ? t('misc.tg_yes_short') : t('misc.tg_no_short') })} />
 
                 </ListItem>
                 <ListItem>
@@ -1315,7 +1317,7 @@ const TelegramManager = () => {
                     primary={`Patient bot ${patientBot.version || 'v1'}`}
                     secondary={enabledPatientFeatures.length ?
                     enabledPatientFeatures.map((feature) => feature.label).join(', ') :
-                    'Функции пациента не активны'} />
+                    t('misc.tg_patient_features_inactive')} />
 
                   <Badge
                     variant={enabledPatientFeatures.length ? 'success' : 'warning'}
@@ -1329,10 +1331,10 @@ const TelegramManager = () => {
                     <Settings />
                   </ListItemIcon>
                   <ListItemText
-                    primary="Языки пациента"
+                    primary={t('misc.tg_patient_languages')}
                     secondary={patientBotLanguages.length ?
                     patientBotLanguages.map((item) => item.label).join(', ') :
-                    'Русский'} />
+                    t('misc.tg_lang_russian')} />
 
                 </ListItem>
                 <ListItem>
@@ -1340,10 +1342,10 @@ const TelegramManager = () => {
                     <Settings />
                   </ListItemIcon>
                   <ListItemText
-                    primary="Команды пациента"
+                    primary={t('misc.tg_patient_commands')}
                     secondary={patientBotCommands.length ?
                     patientBotCommands.map((item) => item.command).join(' ') :
-                    'Нет данных'} />
+                    t('misc.tg_no_data')} />
 
                 </ListItem>
                 <ListItem>
@@ -1353,14 +1355,14 @@ const TelegramManager = () => {
                   <ListItemText
                     primary={`Staff bot ${staffBot.version || 'planning'}`}
                     secondary={staffBot.enabled ?
-                    'Готов к ролевым действиям' :
-                    'План: роли, audit и подтверждения до включения'} />
+                    t('misc.tg_staff_bot_ready') :
+                    t('misc.tg_staff_bot_plan')} />
 
                   <Badge
                     variant={staffBot.enabled ? 'success' : 'warning'}
                     size="small">
 
-                    {staffBot.enabled ? 'Готов' : 'План'}
+                    {staffBot.enabled ? t('misc.tg_staff_bot_ready_badge') : t('misc.tg_staff_bot_plan_badge')}
                   </Badge>
                 </ListItem>
                 <ListItem>
@@ -1370,8 +1372,8 @@ const TelegramManager = () => {
                   <ListItemText
                     primary="Staff guardrails"
                     secondary={staffBotReadiness.length ?
-                    `${readyStaffControls.length}/${staffBotReadiness.length} готово; роли: ${staffRoleSummary}` :
-                    'Требуется отдельный staff/admin contract'} />
+                    `${readyStaffControls.length}/${staffBotReadiness.length} ${t('misc.tg_staff_guardrails_ready')}; ${t('misc.tg_staff_guardrails_roles')}: ${staffRoleSummary}` :
+                    t('misc.tg_staff_guardrails_not_published')} />
 
                 </ListItem>
                 <ListItem>
@@ -1381,8 +1383,8 @@ const TelegramManager = () => {
                   <ListItemText
                     primary="Staff linking foundation"
                     secondary={staffLinkingMethodNames.length ?
-                    `${staffLinkingMethodNames.join(', ')}; до включения: ${staffLinkingContract.required_before_enablement ? 'обязательно' : 'не требуется'}` :
-                    'Контракт привязки сотрудников не опубликован'} />
+                    t('misc.tg_staff_linking_summary', { methods: staffLinkingMethodNames.join(', '), required: staffLinkingContract.required_before_enablement ? t('misc.tg_staff_linking_required') : t('misc.tg_staff_linking_not_required') }) :
+                    t('misc.tg_staff_linking_not_published')} />
 
                   <Badge
                     variant={staffLinkingContract.enabled ? 'success' : 'warning'}
@@ -1450,7 +1452,7 @@ const TelegramManager = () => {
                     primary="Staff authorization"
                     secondary={staffAuthorizationRoles.length ?
                     `${staffAuthorizationRoles.length} role checks; default: ${staffAuthorizationContract.default_decision || 'deny'}` :
-                    'Authorization contract не опубликован'} />
+                    t('misc.tg_auth_contract_not_published')} />
 
                   <Badge
                     variant={staffAuthorizationContract.enabled ? 'success' : 'warning'}
@@ -1466,8 +1468,8 @@ const TelegramManager = () => {
                   <ListItemText
                     primary="Staff menu contract"
                     secondary={staffMenuContract.length ?
-                    `${staffMenuContract.length} ролей, ${staffMenuItemCount} read-only пунктов; действия: выключены` :
-                    'Read-only contract не опубликован'} />
+                    t('misc.tg_staff_menu_summary', { roleCount: staffMenuContract.length, itemCount: staffMenuItemCount }) :
+                    t('misc.tg_staff_menu_not_published')} />
 
                   <Badge
                     variant={staffBot.state_changing_actions_enabled ? 'error' : 'warning'}
@@ -1501,7 +1503,7 @@ const TelegramManager = () => {
                     primary="Staff command registration"
                     secondary={staffCommandNames.length ?
                     `${staffCommandNames.join(' ')}; registration: ${staffCommandRegistrationEnabled ? 'ready' : 'blocked until staff token'}; endpoint: ${staffCommandEndpointReady ? 'published' : 'planned'}` :
-                    'Staff command contract не опубликован'} />
+                    t('misc.tg_staff_command_not_published')} />
 
                   <Badge
                     variant={staffCommandRegistrationEnabled ? 'success' : 'warning'}
@@ -1518,7 +1520,7 @@ const TelegramManager = () => {
                     primary="Staff action confirmations"
                     secondary={staffConfirmationOperations.length ?
                     `${staffConfirmationOperations.length} state-changing actions require confirmation; guard: ${staffConfirmationGuardReady ? 'ready' : 'pending'}; replay: ${staffConfirmationIdempotencyReady ? 'ready' : 'pending'}; actions: ${staffConfirmationActionsEnabled ? 'enabled' : 'disabled'}` :
-                    'Confirmation contract не опубликован'} />
+                    t('misc.tg_confirmation_not_published')} />
 
                   <Badge
                     variant={staffConfirmationGuardReady ? 'success' : 'warning'}
@@ -1567,7 +1569,7 @@ const TelegramManager = () => {
                     primary="Staff audit logging"
                     secondary={staffAuditEvents.length ?
                     `${staffAuditRecordedEvents.length} recorded, ${staffAuditPendingEvents.length} pending; state-change pending: ${staffAuditPendingStateEvents.join(', ') || 'none'}; writer: ${staffAuditContract.record_writer_enabled ? 'enabled' : 'disabled'}; read-only commands: ${staffAuditReadOnlyReady ? 'audited' : 'pending'}` :
-                    'Audit contract не опубликован'} />
+                    t('misc.tg_audit_not_published')} />
 
                   <Badge
                     variant={staffAuditReady ? 'success' : 'warning'}
@@ -1581,10 +1583,10 @@ const TelegramManager = () => {
                     <Send />
                   </ListItemIcon>
                   <ListItemText
-                    primary="Результаты"
+                    primary={t('misc.tg_results_title')}
                     secondary={patientBot.results_delivery === 'telegram_pdf' ?
-                    `PDF в Telegram, до ${patientBot.max_pdf_reports_per_request || 3} файлов` :
-                    'Уведомление в Telegram'} />
+                    t('misc.tg_results_pdf', { count: patientBot.max_pdf_reports_per_request || 3 }) :
+                    t('misc.tg_results_notification')} />
 
                 </ListItem>
                 {botStatus?.webhook_error &&
@@ -1607,7 +1609,7 @@ const TelegramManager = () => {
           <Card>
             <CardContent>
               <Typography variant="h6" gutterBottom>
-                Быстрые действия
+                {t('misc.tg_quick_actions')}
               </Typography>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <Button
@@ -1615,7 +1617,7 @@ const TelegramManager = () => {
                   variant="contained"
                   style={{ paddingTop: 12, paddingBottom: 12 }}>
                   <Settings size={16} />
-                  Настроить бота
+                  {t('misc.tg_configure_bot')}
                 </Button>
                 <Button
                   fullWidth
@@ -1624,7 +1626,7 @@ const TelegramManager = () => {
                   onClick={registerPatientCommands}
                   style={{ paddingTop: 12, paddingBottom: 12 }}>
                   <CheckCircle size={16} />
-                  {registeringCommands ? 'Регистрация команд...' : 'Зарегистрировать команды'}
+                  {registeringCommands ? t('misc.tg_registering_commands') : t('misc.tg_register_commands')}
                 </Button>
                 <Button
                   fullWidth
@@ -1633,14 +1635,14 @@ const TelegramManager = () => {
                   onClick={registerStaffCommands}
                   style={{ paddingTop: 12, paddingBottom: 12 }}>
                   <CheckCircle size={16} />
-                  {registeringStaffCommands ? 'Регистрация staff-команд...' : 'Зарегистрировать staff-команды'}
+                  {registeringStaffCommands ? t('misc.tg_registering_staff_commands') : t('misc.tg_register_staff_commands')}
                 </Button>
                 <Button
                   fullWidth
                   variant="outlined"
                   style={{ paddingTop: 12, paddingBottom: 12 }}>
                   <Send size={16} />
-                  Отправить сообщение
+                  {t('misc.tg_send_message')}
                 </Button>
                 <Button
                   fullWidth
@@ -1648,7 +1650,7 @@ const TelegramManager = () => {
                   onClick={() => setShowTemplateDialog(true)}
                   style={{ paddingTop: 12, paddingBottom: 12 }}>
                   <Plus size={16} />
-                  Новый шаблон
+                  {t('misc.tg_new_template')}
                 </Button>
               </Box>
             </CardContent>
@@ -2083,16 +2085,16 @@ const TelegramManager = () => {
           <Card>
             <CardContent>
               <Typography variant="h6" gutterBottom>
-                Шаблоны сообщений
+                {t('misc.tg_templates_title')}
               </Typography>
               <div style={{ width: '100%', overflowX: 'auto' }}>
                 <Table style={{ minWidth: 640 }}>
                   <TableHead>
                     <TableRow>
-                      <TableHeaderCell>Название</TableHeaderCell>
-                      <TableHeaderCell>Тип</TableHeaderCell>
-                      <TableHeaderCell>Статус</TableHeaderCell>
-                      <TableHeaderCell align="right">Действия</TableHeaderCell>
+                      <TableHeaderCell>{t('misc.tg_col_name')}</TableHeaderCell>
+                      <TableHeaderCell>{t('misc.tg_col_type')}</TableHeaderCell>
+                      <TableHeaderCell>{t('misc.tg_col_status')}</TableHeaderCell>
+                      <TableHeaderCell align="right">{t('misc.tg_col_actions')}</TableHeaderCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -2112,7 +2114,7 @@ const TelegramManager = () => {
                           variant={template.is_active ? 'success' : 'default'}
                           size="small">
                           
-                            {template.is_active ? 'Активен' : 'Неактивен'}
+                            {template.is_active ? t('misc.tg_active') : t('misc.tg_inactive')}
                           </Badge>
                         </TableCell>
                         <TableCell align="right">
@@ -2121,8 +2123,8 @@ const TelegramManager = () => {
                               type="button"
                               variant="ghost"
                               size="small"
-                              aria-label="Редактировать"
-                              title="Редактировать"
+                              aria-label={t('misc.tg_action_edit')}
+                              title={t('misc.tg_action_edit')}
                               style={iconActionStyle}>
                               <Edit size={16} />
                             </Button>
@@ -2130,8 +2132,8 @@ const TelegramManager = () => {
                               type="button"
                               variant="ghost"
                               size="small"
-                              aria-label="Удалить"
-                              title="Удалить"
+                              aria-label={t('misc.tg_action_delete')}
+                              title={t('misc.tg_action_delete')}
                               style={iconActionStyle}>
                               <Trash2 size={16} />
                             </Button>
@@ -2330,12 +2332,12 @@ const TelegramManager = () => {
       </Dialog>
 
       <Dialog open={showTemplateDialog} onClose={() => setShowTemplateDialog(false)} maxWidth="md" fullWidth>
-        <DialogTitle>Создать шаблон сообщения</DialogTitle>
+        <DialogTitle>{t('misc.tg_dialog_create_template')}</DialogTitle>
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 1 }}>
             <Grid item xs={12} sm={6}>
               <Input
-                label="Название шаблона"
+                label={t('misc.tg_field_template_name')}
                 value={templateForm.name}
                 onChange={(e) => setTemplateForm({ ...templateForm, name: e.target.value })}
                 style={{ width: '100%' }}
@@ -2344,7 +2346,7 @@ const TelegramManager = () => {
             </Grid>
             <Grid item xs={12} sm={6}>
               <Select
-                label="Тип сообщения"
+                label={t('misc.tg_field_message_type')}
                 value={templateForm.message_type}
                 options={templateTypeOptions}
                 onChange={(messageType) => setTemplateForm({ ...templateForm, message_type: messageType })}
@@ -2352,19 +2354,19 @@ const TelegramManager = () => {
             </Grid>
             <Grid item xs={12}>
               <Textarea
-                label="Содержание сообщения"
+                label={t('misc.tg_field_message_content')}
                 minRows={6}
                 maxRows={8}
                 value={templateForm.content}
                 onChange={(e) => setTemplateForm({ ...templateForm, content: e.target.value })}
                 required
                 style={{ width: '100%' }}
-                placeholder="Используйте переменные: {patient_name}, {appointment_date}, {doctor_name}" />
+                placeholder={t('misc.tg_placeholder_template_vars')} />
 
             </Grid>
             <Grid item xs={12}>
               <Switch
-                label="Активный шаблон"
+                label={t('misc.tg_field_active_template')}
                 checked={templateForm.is_active}
                 onChange={(isActive) => setTemplateForm({ ...templateForm, is_active: isActive })} />
 
@@ -2372,9 +2374,9 @@ const TelegramManager = () => {
           </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setShowTemplateDialog(false)}>Отмена</Button>
+          <Button onClick={() => setShowTemplateDialog(false)}>{t('misc.tg_cancel')}</Button>
           <Button onClick={handleCreateTemplate} variant="contained">
-            Создать
+            {t('misc.tg_create')}
           </Button>
         </DialogActions>
       </Dialog>

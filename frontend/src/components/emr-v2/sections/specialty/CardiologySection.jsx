@@ -41,6 +41,7 @@ export function CardiologySection({
   onChange,
   disabled = false,
 }) {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState('ecg'); // 'ecg' | 'echo' | 'labs' | 'risk'
 
   // Handlers
@@ -53,7 +54,7 @@ export function CardiologySection({
 
   return (
     <EMRSection
-      title="Кардиологические данные"
+      title={t('misc.cs_title')}
       icon={<Heart size={16} aria-hidden="true" />}
       disabled={disabled}
       defaultOpen={true}>
@@ -64,29 +65,29 @@ export function CardiologySection({
           className={`cardiology-tab ${activeTab === 'ecg' ? 'active' : ''}`}
           onClick={() => setActiveTab('ecg')}
           disabled={disabled}>
-          
-                    ЭКГ
+
+                    {t('misc.cs_tab_ecg')}
                 </button>
                 <button
           className={`cardiology-tab ${activeTab === 'echo' ? 'active' : ''}`}
           onClick={() => setActiveTab('echo')}
           disabled={disabled}>
-          
-                    ЭхоКГ
+
+                    {t('misc.cs_tab_echo')}
                 </button>
                 <button
           className={`cardiology-tab ${activeTab === 'labs' ? 'active' : ''}`}
           onClick={() => setActiveTab('labs')}
           disabled={disabled}>
-          
-                    Анализы
+
+                    {t('misc.cs_tab_labs')}
                 </button>
                 <button
           className={`cardiology-tab ${activeTab === 'risk' ? 'active' : ''}`}
           onClick={() => setActiveTab('risk')}
           disabled={disabled}>
-          
-                    Риски
+
+                    {t('misc.cs_tab_risk')}
                 </button>
             </div>
 
@@ -96,12 +97,9 @@ export function CardiologySection({
                     <div className="cardiology-info-panel" role="status">
                             <div className="cardiology-info-icon"><FileText size={20} aria-hidden="true" /></div>
                             <div className="cardiology-info-text">
-                                <h4>ЭКГ доступна на отдельной вкладке</h4>
+                                <h4>{t('misc.cs_ecg_separate_tab')}</h4>
                                 <p>
-                                    Полный просмотрщик ЭКГ (загрузка файлов, парсинг параметров,
-                                    AI-анализ) находится на вкладке <strong>«ЭКГ»</strong> в боковой
-                                    панели кардиолога. Это устраняет дублирование данных и
-                                    гарантирует, что изменения отображаются в одном месте.
+                                    {t('misc.cs_ecg_separate_tab_desc')}
                                 </p>
                             </div>
                         </div>
@@ -109,22 +107,22 @@ export function CardiologySection({
                     {/* Summary of the latest ECG data stored in specialty_data.ecg */}
                     {(ecgData?.heart_rate || ecgData?.rhythm || ecgData?.interpretation) &&
         <div className="cardiology-interpretation">
-                            <h4>Последняя запись ЭКГ:</h4>
+                            <h4>{t('misc.cs_latest_ecg')}</h4>
                             <div className="cardiology-ecg-summary">
                                 {ecgData?.heart_rate &&
-                                    <div><strong>ЧСС:</strong> {ecgData.heart_rate} уд/мин</div>
+                                    <div><strong>{t('misc.cs_hr')}</strong> {ecgData.heart_rate} {t('misc.cs_unit_bpm')}</div>
                                 }
                                 {ecgData?.rhythm &&
-                                    <div><strong>Ритм:</strong> {ecgData.rhythm}</div>
+                                    <div><strong>{t('misc.cs_rhythm')}</strong> {ecgData.rhythm}</div>
                                 }
                                 {ecgData?.pr_interval &&
-                                    <div><strong>PR:</strong> {ecgData.pr_interval} мс</div>
+                                    <div><strong>PR:</strong> {ecgData.pr_interval} {t('misc.cs_unit_ms')}</div>
                                 }
                                 {ecgData?.qrs_duration &&
-                                    <div><strong>QRS:</strong> {ecgData.qrs_duration} мс</div>
+                                    <div><strong>QRS:</strong> {ecgData.qrs_duration} {t('misc.cs_unit_ms')}</div>
                                 }
                                 {ecgData?.qt_interval &&
-                                    <div><strong>QT:</strong> {ecgData.qt_interval} мс</div>
+                                    <div><strong>QT:</strong> {ecgData.qt_interval} {t('misc.cs_unit_ms')}</div>
                                 }
                                 {ecgData?.st_segment &&
                                     <div><strong>ST:</strong> {ecgData.st_segment}</div>
@@ -135,7 +133,7 @@ export function CardiologySection({
                             </div>
                             {ecgData?.interpretation &&
                                 <p className="cardiology-ecg-interpretation">
-                                    <em>Интерпретация:</em> {ecgData.interpretation}
+                                    <em>{t('misc.cs_interpretation')}</em> {ecgData.interpretation}
                                 </p>
                             }
                         </div>
@@ -149,11 +147,9 @@ export function CardiologySection({
                     <div className="cardiology-info-panel" role="status">
                             <div className="cardiology-info-icon"><FileText size={20} aria-hidden="true" /></div>
                             <div className="cardiology-info-text">
-                                <h4>ЭхоКГ доступна на отдельной вкладке</h4>
+                                <h4>{t('misc.cs_echo_separate_tab')}</h4>
                                 <p>
-                                    Полная форма ЭхоКГ (левый желудочек, предсердия, клапаны,
-                                    заключение) находится на вкладке <strong>«ЭКГ»</strong> в боковой
-                                    панели кардиолога (в разделе ЭхоКГ под загрузчиком ЭКГ).
+                                    {t('misc.cs_echo_separate_tab_desc')}
                                 </p>
                             </div>
                         </div>
@@ -161,27 +157,27 @@ export function CardiologySection({
                     {/* Summary of the latest Echo data stored in specialty_data.echo */}
                     {(echoData?.ef || echoData?.edd || echoData?.la || echoData?.conclusion) &&
         <div className="cardiology-interpretation">
-                            <h4>Последние данные ЭхоКГ:</h4>
+                            <h4>{t('misc.cs_latest_echo')}</h4>
                             <div className="cardiology-ecg-summary">
                                 {echoData?.edd &&
-                                    <div><strong>КДО ЛЖ:</strong> {echoData.edd} мм</div>
+                                    <div><strong>{t('misc.cs_edd_lv')}</strong> {echoData.edd} {t('misc.cs_unit_mm')}</div>
                                 }
                                 {echoData?.esd &&
-                                    <div><strong>КСО ЛЖ:</strong> {echoData.esd} мм</div>
+                                    <div><strong>{t('misc.cs_esd_lv')}</strong> {echoData.esd} {t('misc.cs_unit_mm')}</div>
                                 }
                                 {echoData?.ef &&
-                                    <div><strong>ФВ:</strong> {echoData.ef}%</div>
+                                    <div><strong>{t('misc.cs_ef')}</strong> {echoData.ef}%</div>
                                 }
                                 {echoData?.la &&
-                                    <div><strong>ЛП:</strong> {echoData.la} мм</div>
+                                    <div><strong>{t('misc.cs_la')}</strong> {echoData.la} {t('misc.cs_unit_mm')}</div>
                                 }
                                 {echoData?.aortic?.peak_velocity &&
-                                    <div><strong>Vmax аорт. клапана:</strong> {echoData.aortic.peak_velocity} м/с</div>
+                                    <div><strong>{t('misc.cs_vmax_av')}</strong> {echoData.aortic.peak_velocity} {t('misc.cs_unit_ms2')}</div>
                                 }
                             </div>
                             {echoData?.conclusion &&
                                 <p className="cardiology-ecg-interpretation">
-                                    <em>Заключение:</em> {echoData.conclusion}
+                                    <em>{t('misc.cs_conclusion')}</em> {echoData.conclusion}
                                 </p>
                             }
                         </div>
@@ -199,21 +195,16 @@ export function CardiologySection({
                     <div className="cardiology-info-panel" role="status">
                             <div className="cardiology-info-icon"><FileText size={20} aria-hidden="true" /></div>
                             <div className="cardiology-info-text">
-                                <h4>Полная форма анализов крови — на вкладке «Анализы крови»</h4>
+                                <h4>{t('misc.cs_labs_full_form_tab')}</h4>
                                 <p>
-                                    Ввод, история и средние значения анализов крови доступны на
-                                    отдельной вкладке <strong>«Анализы крови»</strong> в боковой панели
-                                    кардиолога. Ниже приведены единицы измерения и нормальные значения
-                                    для быстрого ориентирования. <strong>Все единицы унифицированы
-                                    с основной формой (мг/дл)</strong> — устраняет риск путаницы
-                                    между мг/дл и ммоль/л (разница в 38.7 раз).
+                                    {t('misc.cs_labs_full_form_tab_desc')}
                                 </p>
                             </div>
                         </div>
 
                     <div className="cardiology-labs-grid">
                         <EMRTextField
-            label="Тропонин I (нг/мл)"
+            label={t('misc.cs_lab_troponin')}
             value={labResults?.troponin_i || ''}
             onChange={(e) => handleLabResultChange('troponin_i', e.target.value)}
             disabled={disabled}
@@ -221,7 +212,7 @@ export function CardiologySection({
             placeholder="< 0.04" />
 
                         <EMRTextField
-            label="CRP (мг/л)"
+            label={t('misc.cs_lab_crp')}
             value={labResults?.crp || ''}
             onChange={(e) => handleLabResultChange('crp', e.target.value)}
             disabled={disabled}
@@ -229,7 +220,7 @@ export function CardiologySection({
             placeholder="< 3.0" />
 
                         <EMRTextField
-            label="Холестерин общий (мг/дл)"
+            label={t('misc.cs_lab_cholesterol_total')}
             value={labResults?.cholesterol_total || ''}
             onChange={(e) => handleLabResultChange('cholesterol_total', e.target.value)}
             disabled={disabled}
@@ -237,7 +228,7 @@ export function CardiologySection({
             placeholder="< 200" />
 
                         <EMRTextField
-            label="Холестерин ЛПВП (мг/дл)"
+            label={t('misc.cs_lab_cholesterol_hdl')}
             value={labResults?.cholesterol_hdl || ''}
             onChange={(e) => handleLabResultChange('cholesterol_hdl', e.target.value)}
             disabled={disabled}
@@ -245,7 +236,7 @@ export function CardiologySection({
             placeholder="> 40" />
 
                         <EMRTextField
-            label="Холестерин ЛПНП (мг/дл)"
+            label={t('misc.cs_lab_cholesterol_ldl')}
             value={labResults?.cholesterol_ldl || ''}
             onChange={(e) => handleLabResultChange('cholesterol_ldl', e.target.value)}
             disabled={disabled}
@@ -253,7 +244,7 @@ export function CardiologySection({
             placeholder="< 100" />
 
                         <EMRTextField
-            label="Триглицериды (мг/дл)"
+            label={t('misc.cs_lab_triglycerides')}
             value={labResults?.triglycerides || ''}
             onChange={(e) => handleLabResultChange('triglycerides', e.target.value)}
             disabled={disabled}
@@ -261,7 +252,7 @@ export function CardiologySection({
             placeholder="< 150" />
 
                         <EMRTextField
-            label="Глюкоза (мг/дл)"
+            label={t('misc.cs_lab_glucose')}
             value={labResults?.glucose || ''}
             onChange={(e) => handleLabResultChange('glucose', e.target.value)}
             disabled={disabled}
@@ -276,15 +267,15 @@ export function CardiologySection({
             {activeTab === 'risk' &&
       <div className="cardiology-tab-content">
                     <div className="cardiology-risk-calculator">
-                        <h4>SCORE2 калькулятор риска</h4>
+                        <h4>{t('misc.cs_score2_title')}</h4>
                         <p className="cardiology-info">
-                            Калькулятор 10-летнего риска сердечно-сосудистых событий (ESC 2021)
+                            {t('misc.cs_score2_desc')}
                         </p>
 
                         {/* Risk Input Fields */}
                         <div className="cardiology-risk-inputs">
                             <EMRTextField
-              label="Возраст (лет)"
+              label={t('misc.cs_age')}
               value={labResults?.patient_age || ''}
               onChange={(e) => handleLabResultChange('patient_age', e.target.value)}
               disabled={disabled}
@@ -292,46 +283,46 @@ export function CardiologySection({
               placeholder="40-69" />
             
                             <div className="cardiology-select-field">
-                                <label>Пол</label>
+                                <label>{t('misc.cs_sex')}</label>
                                 <select
                 value={labResults?.patient_sex || ''}
                 onChange={(e) => handleLabResultChange('patient_sex', e.target.value)}
                 disabled={disabled}
                 className="cardiology-select">
-                
-                                    <option value="">Выберите</option>
-                                    <option value="male">Мужской</option>
-                                    <option value="female">Женский</option>
+
+                                    <option value="">{t('misc.cs_select')}</option>
+                                    <option value="male">{t('misc.cs_male')}</option>
+                                    <option value="female">{t('misc.cs_female')}</option>
                                 </select>
                             </div>
                             <div className="cardiology-select-field">
-                                <label>Курение</label>
+                                <label>{t('misc.cs_smoking')}</label>
                                 <select
                 value={labResults?.smoking || ''}
                 onChange={(e) => handleLabResultChange('smoking', e.target.value)}
                 disabled={disabled}
                 className="cardiology-select">
-                
-                                    <option value="">Выберите</option>
-                                    <option value="no">Не курит</option>
-                                    <option value="yes">Курит</option>
+
+                                    <option value="">{t('misc.cs_select')}</option>
+                                    <option value="no">{t('misc.cs_not_smoking')}</option>
+                                    <option value="yes">{t('misc.cs_smoking_yes')}</option>
                                 </select>
                             </div>
                             <EMRTextField
-              label="Систолическое АД (мм рт.ст.)"
+              label={t('misc.cs_systolic_bp')}
               value={labResults?.systolic_bp || ''}
               onChange={(e) => handleLabResultChange('systolic_bp', e.target.value)}
               disabled={disabled}
               type="number"
               placeholder="120-180" />
-            
+
                             <EMRTextField
-              label="Общий холестерин для SCORE2 (ммоль/л)"
+              label={t('misc.cs_score2_chol')}
               value={labResults?.cholesterol_total || ''}
               onChange={(e) => handleLabResultChange('cholesterol_total', e.target.value)}
               disabled={disabled}
               type="number"
-              placeholder="4-8 (ммоль/л)" />
+              placeholder={t('misc.cs_score2_chol_ph')} />
             
                         </div>
 
@@ -346,7 +337,7 @@ export function CardiologySection({
 
               // Check if all fields are filled
               if (!age || !sex || !labResults?.smoking || !sbp || !cholesterol) {
-                return <p className="cardiology-risk-placeholder">Заполните все поля для расчета риска</p>;
+                return <p className="cardiology-risk-placeholder">{t('misc.cs_fill_all_fields')}</p>;
               }
 
               // Simplified SCORE2 calculation (ESC 2021 low-risk region approximation)
@@ -372,38 +363,38 @@ export function CardiologySection({
               // Determine risk category
               let category, categoryClass, recommendation;
               if (risk < 5) {
-                category = 'Низкий';
+                category = t('misc.cs_risk_low');
                 categoryClass = 'low';
-                recommendation = 'Продолжать здоровый образ жизни';
+                recommendation = t('misc.cs_rec_low');
               } else if (risk < 10) {
-                category = 'Умеренный';
+                category = t('misc.cs_risk_moderate');
                 categoryClass = 'moderate';
-                recommendation = 'Рекомендуется модификация факторов риска';
+                recommendation = t('misc.cs_rec_moderate');
               } else if (risk < 20) {
-                category = 'Высокий';
+                category = t('misc.cs_risk_high');
                 categoryClass = 'high';
-                recommendation = 'Показана медикаментозная терапия';
+                recommendation = t('misc.cs_rec_high');
               } else {
-                category = 'Очень высокий';
+                category = t('misc.cs_risk_very_high');
                 categoryClass = 'very-high';
-                recommendation = 'Требуется агрессивная терапия';
+                recommendation = t('misc.cs_rec_very_high');
               }
 
               return (
                 <div className="cardiology-risk-display">
                                         <div className={`cardiology-risk-score ${categoryClass}`}>
                                             <span className="risk-value">{risk.toFixed(1)}%</span>
-                                            <span className="risk-label">10-летний риск</span>
+                                            <span className="risk-label">{t('misc.cs_10y_risk')}</span>
                                         </div>
                                         <div className={`cardiology-risk-category ${categoryClass}`}>
-                                            <span className="category-name">{category} риск</span>
+                                            <span className="category-name">{category} {t('misc.cs_risk_word')}</span>
                                             <span className="category-recommendation">{recommendation}</span>
                                         </div>
                                         <div className="cardiology-risk-legend">
-                                            <div className="legend-item low">{'<5%'} Низкий</div>
-                                            <div className="legend-item moderate">5-10% Умеренный</div>
-                                            <div className="legend-item high">10-20% Высокий</div>
-                                            <div className="legend-item very-high">{'>20%'} Очень высокий</div>
+                                            <div className="legend-item low">{'<5%'} {t('misc.cs_risk_low')}</div>
+                                            <div className="legend-item moderate">5-10% {t('misc.cs_risk_moderate')}</div>
+                                            <div className="legend-item high">10-20% {t('misc.cs_risk_high')}</div>
+                                            <div className="legend-item very-high">{'>20%'} {t('misc.cs_risk_very_high')}</div>
                                         </div>
                                     </div>);
 

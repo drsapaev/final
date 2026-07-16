@@ -26,9 +26,9 @@ import { useTranslation } from '../../../i18n/useTranslation';
  */
 
 const RULE_SOURCE_OPTIONS = [
-  { value: 'patient.sex', label: 'Пол пациента' },
-  { value: 'patient.age', label: 'Возраст (лет)' },
-  { value: 'patient.age_months', label: 'Возраст (мес.)' },
+  { value: 'patient.sex', labelKey: 'misc.rre_src_sex' },
+  { value: 'patient.age', labelKey: 'misc.rre_src_age' },
+  { value: 'patient.age_months', labelKey: 'misc.rre_src_age_months' },
 ];
 
 const RULE_OP_OPTIONS = [
@@ -38,7 +38,7 @@ const RULE_OP_OPTIONS = [
   { value: 'gt', label: '>' },
   { value: 'le', label: '≤' },
   { value: 'ge', label: '≥' },
-  { value: 'between', label: 'между' },
+  { value: 'between', labelKey: 'misc.rre_op_between' },
 ];
 
 function parseRuleText(text) {
@@ -56,22 +56,23 @@ function serializeRule(rule) {
 }
 
 function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }) {
+  const { t } = useTranslation();
   const rule = parseRuleText(field.reference_rule_text);
   const isStructured = rule === null || (rule && Array.isArray(rule.cases));
 
   if (!isStructured) {
     return (
       <div className="ltw-grid-6">
-        <span>Правила нормы (raw JSON)</span>
+        <span>{t('misc.rre_raw_json')}</span>
         <textarea
           className="macos-input"
-          aria-label="JSON правил нормы"
+          aria-label={t('misc.rre_raw_json_aria')}
           rows={6}
           value={field.reference_rule_text || ''}
           onChange={(event) => updateField(sectionIndex, fieldIndex, 'reference_rule_text', event.target.value)}
         />
         <span className="ltw-text-12 ltw-text-secondary">
-          Структурированный редактор недоступен — формат не распознан.
+          {t('misc.rre_struct_unavailable')}
         </span>
       </div>
     );
@@ -118,16 +119,16 @@ function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }) {
   return (
     <div className="ltw-rule-editor">
       <div className="ltw-flex-between">
-        <span className="ltw-fw-600 ltw-text-14">Правила нормы</span>
+        <span className="ltw-fw-600 ltw-text-14">{t('misc.rre_norm_rules')}</span>
         <Button variant="outline" size="small" onClick={addCase}>
           <Icon name="plus" size={12} />
-          Добавить условие
+          {t('misc.rre_add_condition')}
         </Button>
       </div>
 
       {cases.length === 0 && (
         <span className="ltw-text-13 ltw-text-secondary">
-          Нет условий. Будет использоваться значение по умолчанию.
+          {t('misc.rre_no_conditions')}
         </span>
       )}
 
@@ -136,52 +137,52 @@ function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }) {
         return (
           <div key={caseIndex} className="ltw-case-card">
             <div className="ltw-flex-between">
-              <span className="ltw-text-13 ltw-fw-500">Условие {caseIndex + 1}</span>
-              <Button variant="ghost" size="small" onClick={() => removeCase(caseIndex)} aria-label="Удалить условие">
+              <span className="ltw-text-13 ltw-fw-500">{t('misc.rre_condition_n', { n: caseIndex + 1 })}</span>
+              <Button variant="ghost" size="small" onClick={() => removeCase(caseIndex)} aria-label={t('misc.rre_remove_condition')}>
                 <Icon name="trash" size={12} />
               </Button>
             </div>
 
             <div className="ltw-grid-3">
               <label className="ltw-label-grid">
-                <span className="ltw-text-12">Источник</span>
+                <span className="ltw-text-12">{t('misc.rre_source')}</span>
                 <select
                   className="macos-input"
-                  aria-label="Источник условия"
+                  aria-label={t('misc.rre_source_aria')}
                   value={caseItem.when?.source || 'patient.sex'}
                   onChange={(e) => updateCaseWhen(caseIndex, 'source', e.target.value)}
                 >
-                  {RULE_SOURCE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  {RULE_SOURCE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{t(o.labelKey)}</option>)}
                 </select>
               </label>
               <label className="ltw-label-grid">
-                <span className="ltw-text-12">Оператор</span>
+                <span className="ltw-text-12">{t('misc.rre_operator')}</span>
                 <select
                   className="macos-input"
-                  aria-label="Оператор условия"
+                  aria-label={t('misc.rre_operator_aria')}
                   value={caseItem.when?.op || 'eq'}
                   onChange={(e) => updateCaseWhen(caseIndex, 'op', e.target.value)}
                 >
-                  {RULE_OP_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  {RULE_OP_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.labelKey ? t(o.labelKey) : o.label}</option>)}
                 </select>
               </label>
               {isBetween ? (
                 <div className="ltw-grid-2-50-50">
                   <label className="ltw-label-grid">
-                    <span className="ltw-text-12">Минимум</span>
+                    <span className="ltw-text-12">{t('misc.rre_min')}</span>
                     <input
                       className="macos-input"
-                      aria-label="Минимум условия"
+                      aria-label={t('misc.rre_min_aria')}
                       type="number"
                       value={caseItem.when?.min ?? ''}
                       onChange={(e) => updateCaseWhen(caseIndex, 'min', parseFloat(e.target.value) || 0)}
                     />
                   </label>
                   <label className="ltw-label-grid">
-                    <span className="ltw-text-12">Максимум</span>
+                    <span className="ltw-text-12">{t('misc.rre_max')}</span>
                     <input
                       className="macos-input"
-                      aria-label="Максимум условия"
+                      aria-label={t('misc.rre_max_aria')}
                       type="number"
                       value={caseItem.when?.max ?? ''}
                       onChange={(e) => updateCaseWhen(caseIndex, 'max', parseFloat(e.target.value) || 0)}
@@ -190,22 +191,22 @@ function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }) {
                 </div>
               ) : (
                 <label className="ltw-label-grid">
-                  <span className="ltw-text-12">Значение</span>
+                  <span className="ltw-text-12">{t('misc.rre_value')}</span>
                   {caseItem.when?.source === 'patient.sex' ? (
                     <select
                       className="macos-input"
-                      aria-label="Значение условия"
+                      aria-label={t('misc.rre_value_aria')}
                       value={caseItem.when?.value ?? ''}
                       onChange={(e) => updateCaseWhen(caseIndex, 'value', e.target.value)}
                     >
-                      <option value="">Выберите...</option>
-                      <option value="M">Мужской (M)</option>
-                      <option value="F">Женский (F)</option>
+                      <option value="">{t('misc.rre_select')}</option>
+                      <option value="M">{t('misc.rre_male_m')}</option>
+                      <option value="F">{t('misc.rre_female_f')}</option>
                     </select>
                   ) : (
                     <input
                       className="macos-input"
-                      aria-label="Значение условия"
+                      aria-label={t('misc.rre_value_aria')}
                       value={caseItem.when?.value ?? ''}
                       onChange={(e) => updateCaseWhen(caseIndex, 'value', e.target.value)}
                     />
@@ -216,30 +217,30 @@ function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }) {
 
             <div className="ltw-grid-3-ranges">
               <label className="ltw-label-grid">
-                <span className="ltw-text-12">Текст нормы</span>
+                <span className="ltw-text-12">{t('misc.rre_norm_text')}</span>
                 <input
                   className="macos-input"
-                  aria-label="Текст нормы для условия"
+                  aria-label={t('misc.rre_norm_text_aria')}
                   value={caseItem.text || ''}
                   onChange={(e) => updateCase(caseIndex, 'text', e.target.value)}
                   placeholder="3.5-5.0"
                 />
               </label>
               <label className="ltw-label-grid">
-                <span className="ltw-text-12">Нижняя граница</span>
+                <span className="ltw-text-12">{t('misc.rre_lower_bound')}</span>
                 <input
                   className="macos-input"
-                  aria-label="Нижняя граница нормы"
+                  aria-label={t('misc.rre_lower_bound_aria')}
                   type="number"
                   value={caseItem.low ?? ''}
                   onChange={(e) => updateCase(caseIndex, 'low', parseFloat(e.target.value) || null)}
                 />
               </label>
               <label className="ltw-label-grid">
-                <span className="ltw-text-12">Верхняя граница</span>
+                <span className="ltw-text-12">{t('misc.rre_upper_bound')}</span>
                 <input
                   className="macos-input"
-                  aria-label="Верхняя граница нормы"
+                  aria-label={t('misc.rre_upper_bound_aria')}
                   type="number"
                   value={caseItem.high ?? ''}
                   onChange={(e) => updateCase(caseIndex, 'high', parseFloat(e.target.value) || null)}
@@ -251,33 +252,33 @@ function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }) {
       })}
 
       <div className="ltw-default-card">
-        <span className="ltw-text-13 ltw-fw-500">По умолчанию (если ни одно условие не сработало)</span>
+        <span className="ltw-text-13 ltw-fw-500">{t('misc.rre_default_label')}</span>
         <div className="ltw-grid-3-ranges">
           <label className="ltw-label-grid">
-            <span className="ltw-text-12">Текст нормы</span>
+            <span className="ltw-text-12">{t('misc.rre_norm_text')}</span>
             <input
               className="macos-input"
-              aria-label="Текст нормы по умолчанию"
+              aria-label={t('misc.rre_norm_text_default_aria')}
               value={defaultRule.text || ''}
               onChange={(e) => updateDefault('text', e.target.value)}
               placeholder="3.5-5.0"
             />
           </label>
           <label className="ltw-label-grid">
-            <span className="ltw-text-12">Нижняя граница</span>
+            <span className="ltw-text-12">{t('misc.rre_lower_bound')}</span>
             <input
               className="macos-input"
-              aria-label="Нижняя граница по умолчанию"
+              aria-label={t('misc.rre_lower_bound_default_aria')}
               type="number"
               value={defaultRule.low ?? ''}
               onChange={(e) => updateDefault('low', parseFloat(e.target.value) || null)}
             />
           </label>
           <label className="ltw-label-grid">
-            <span className="ltw-text-12">Верхняя граница</span>
+            <span className="ltw-text-12">{t('misc.rre_upper_bound')}</span>
             <input
               className="macos-input"
-              aria-label="Верхняя граница по умолчанию"
+              aria-label={t('misc.rre_upper_bound_default_aria')}
               type="number"
               value={defaultRule.high ?? ''}
               onChange={(e) => updateDefault('high', parseFloat(e.target.value) || null)}
@@ -288,11 +289,11 @@ function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }) {
 
       <details>
         <summary className="ltw-summary-12">
-          Raw JSON (для продвинутых)
+          {t('misc.rre_raw_json_advanced')}
         </summary>
         <textarea
           className="macos-input ltw-raw-json-textarea"
-          aria-label="Raw JSON правил нормы"
+          aria-label={t('misc.rre_raw_json_aria')}
           rows={6}
           value={field.reference_rule_text || ''}
           onChange={(event) => updateField(sectionIndex, fieldIndex, 'reference_rule_text', event.target.value)}

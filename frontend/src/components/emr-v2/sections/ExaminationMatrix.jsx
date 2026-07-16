@@ -1,6 +1,6 @@
 /**
  * ExaminationMatrix - Быстрый ввод объективного статуса
- * 
+ *
  * Концепция:
  * - Сетка параметров для конкретной специальности
  * - Три состояния: Не выбрано (серый), Норма (зеленый), Патология (красный)
@@ -16,90 +16,90 @@ import { useTranslation } from '../../../i18n/useTranslation';
 // Конфигурация матриц для разных специальностей
 const MATRICES = {
   general: {
-    'Общее': ['Состояние', 'Сознание', 'Кожные покровы', 'Лимфоузлы'],
-    'Дыхание': ['ЧДД', 'Дыхание', 'Хрипы'],
-    'Сердце': ['Тоны', 'Ритм', 'АД', 'Шумы'],
-    'Живот': ['Форма', 'Пальпация', 'Печень', 'Селезенка'],
-    'Физио': ['Мочеиспускание', 'Стул']
+    em_cat_general: ['em_item_condition', 'em_item_consciousness', 'em_item_skin', 'em_item_lymph'],
+    em_cat_respiration: ['em_item_rr', 'em_item_breathing', 'em_item_wheezing'],
+    em_cat_heart: ['em_item_tones', 'em_item_rhythm', 'em_item_bp', 'em_item_murmurs'],
+    em_cat_abdomen: ['em_item_shape', 'em_item_palpation', 'em_item_liver', 'em_item_spleen'],
+    em_cat_physio: ['em_item_urination', 'em_item_stool']
   },
   cardiology: {
-    'Осмотр': ['Окраска кожи', 'Отеки', 'Вены шеи', 'Пульсация'],
-    'Сердце': ['Верхушечный толчок', 'Границы', 'Тоны', 'Ритм', 'Шумы', 'Галоп'],
-    'Легкие': ['Дыхание', 'Хрипы', 'Застойные явления', 'Плевральный выпот'],
-    'Пульс': ['Наполнение', 'Напряжение', 'Дефицит', 'Аритмия'],
-    'АД': ['Систолическое', 'Диастолическое', 'Пульсовое давление']
+    em_cat_examination: ['em_item_skin_color', 'em_item_edema', 'em_item_neck_veins', 'em_item_pulsation'],
+    em_cat_heart: ['em_item_apex_beat', 'em_item_borders', 'em_item_tones', 'em_item_rhythm', 'em_item_murmurs', 'em_item_gallop'],
+    em_cat_lungs: ['em_item_breathing', 'em_item_wheezing', 'em_item_congestion', 'em_item_effusion'],
+    em_cat_pulse: ['em_item_filling', 'em_item_tension', 'em_item_deficit', 'em_item_arrhythmia'],
+    em_cat_bp: ['em_item_systolic', 'em_item_diastolic', 'em_item_pulse_pressure']
   },
   dermatology: {
-    'Тип кожи': ['Нормальная', 'Сухая', 'Жирная', 'Комбинированная', 'Чувствительная'],
-    'Состояние': ['Акне', 'Розацеа', 'Экзема', 'Псориаз', 'Пигментация', 'Морщины'],
-    'Локализация': ['Лицо', 'Шея', 'Декольте', 'Руки', 'Тело'],
-    'Характеристики': ['Размер', 'Цвет', 'Текстура', 'Границы', 'Симметрия']
+    em_cat_skin_type: ['em_item_normal', 'em_item_dry', 'em_item_oily', 'em_item_combined', 'em_item_sensitive'],
+    em_cat_condition: ['em_item_acne', 'em_item_rosacea', 'em_item_eczema', 'em_item_psoriasis', 'em_item_pigmentation', 'em_item_wrinkles'],
+    em_cat_localization: ['em_item_face', 'em_item_neck', 'em_item_decollete', 'em_item_arms', 'em_item_body'],
+    em_cat_characteristics: ['em_item_size', 'em_item_color', 'em_item_texture', 'em_item_borders', 'em_item_symmetry']
   },
   dentist: {
-    'Общий осмотр': ['Состояние слизистой', 'Язык', 'Губы', 'Щеки'],
-    'Пародонт': ['Кровоточивость', 'Карманы', 'Подвижность', 'Рецессия'],
-    'Прикус': ['Ортогнатический', 'Прогнатия', 'Прогения', 'Открытый', 'Глубокий'],
-    'Гигиена': ['Хорошая', 'Удовлетворительная', 'Плохая', 'Очень плохая']
+    em_cat_general_dental: ['em_item_mucosa', 'em_item_tongue', 'em_item_lips', 'em_item_cheeks'],
+    em_cat_periodont: ['em_item_bleeding', 'em_item_pockets', 'em_item_mobility', 'em_item_recession'],
+    em_cat_occlusion: ['em_item_orthognathic', 'em_item_prognathia', 'em_item_progenia', 'em_item_open', 'em_item_deep'],
+    em_cat_hygiene: ['em_item_good', 'em_item_fair', 'em_item_poor', 'em_item_very_poor']
   },
   dentistry: {
-    'Общий осмотр': ['Состояние слизистой', 'Язык', 'Губы', 'Щеки'],
-    'Пародонт': ['Кровоточивость', 'Карманы', 'Подвижность', 'Рецессия'],
-    'Прикус': ['Ортогнатический', 'Прогнатия', 'Прогения', 'Открытый', 'Глубокий'],
-    'Гигиена': ['Хорошая', 'Удовлетворительная', 'Плохая', 'Очень плохая']
+    em_cat_general_dental: ['em_item_mucosa', 'em_item_tongue', 'em_item_lips', 'em_item_cheeks'],
+    em_cat_periodont: ['em_item_bleeding', 'em_item_pockets', 'em_item_mobility', 'em_item_recession'],
+    em_cat_occlusion: ['em_item_orthognathic', 'em_item_prognathia', 'em_item_progenia', 'em_item_open', 'em_item_deep'],
+    em_cat_hygiene: ['em_item_good', 'em_item_fair', 'em_item_poor', 'em_item_very_poor']
   }
 };
 
 // Текстовые шаблоны для генерации
 const TEMPLATES = {
   // General
-  'Состояние': { norm: 'состояние удовлетворительное', path: 'состояние средней тяжести' },
-  'Сознание': { norm: 'сознание ясное', path: 'сознание угнетено' },
-  'Кожные покровы': { norm: 'кожные покровы обычной окраски, чистые', path: 'кожные покровы бледные' },
-  'Отеки': { norm: 'отеков нет', path: 'отеки нижних конечностей' },
-  'Тоны': { norm: 'тоны сердца звучные, ясные', path: 'тоны сердца приглушены' },
-  'Ритм': { norm: 'ритм правильный', path: 'аритмия' },
-  'Дыхание': { norm: 'дыхание везикулярное', path: 'дыхание жесткое' },
-  'Хрипы': { norm: 'хрипов нет', path: 'сухие хрипы' },
-  'Живот': { norm: 'живот мягкий, безболезненный', path: 'живот болезненный при пальпации' },
+  em_item_condition: { norm: 'em_tpl_condition_norm', path: 'em_tpl_condition_path' },
+  em_item_consciousness: { norm: 'em_tpl_consciousness_norm', path: 'em_tpl_consciousness_path' },
+  em_item_skin: { norm: 'em_tpl_skin_norm', path: 'em_tpl_skin_path' },
+  em_item_edema: { norm: 'em_tpl_edema_norm', path: 'em_tpl_edema_path' },
+  em_item_tones: { norm: 'em_tpl_tones_norm', path: 'em_tpl_tones_path' },
+  em_item_rhythm: { norm: 'em_tpl_rhythm_norm', path: 'em_tpl_rhythm_path' },
+  em_item_breathing: { norm: 'em_tpl_breathing_norm', path: 'em_tpl_breathing_path' },
+  em_item_wheezing: { norm: 'em_tpl_wheezing_norm', path: 'em_tpl_wheezing_path' },
+  em_item_abdomen: { norm: 'em_tpl_abdomen_norm', path: 'em_tpl_abdomen_path' },
   // Cardiology
-  'Окраска кожи': { norm: 'кожные покровы обычной окраски', path: 'кожные покровы бледные, цианотичные' },
-  'Вены шеи': { norm: 'вены шеи не набухшие', path: 'набухание вен шеи' },
-  'Верхушечный толчок': { norm: 'верхушечный толчок в пределах нормы', path: 'верхушечный толчок смещен' },
-  'Границы': { norm: 'границы сердца в пределах нормы', path: 'расширение границ сердца' },
-  'Галоп': { norm: 'галопа нет', path: 'ритм галопа' },
-  'Застойные явления': { norm: 'застойных явлений нет', path: 'застойные явления в легких' },
-  'Плевральный выпот': { norm: 'плеврального выпота нет', path: 'признаки плеврального выпота' },
-  'Аритмия': { norm: 'аритмии нет', path: 'аритмия' },
+  em_item_skin_color: { norm: 'em_tpl_skin_color_norm', path: 'em_tpl_skin_color_path' },
+  em_item_neck_veins: { norm: 'em_tpl_neck_veins_norm', path: 'em_tpl_neck_veins_path' },
+  em_item_apex_beat: { norm: 'em_tpl_apex_beat_norm', path: 'em_tpl_apex_beat_path' },
+  em_item_borders: { norm: 'em_tpl_borders_norm', path: 'em_tpl_borders_path' },
+  em_item_gallop: { norm: 'em_tpl_gallop_norm', path: 'em_tpl_gallop_path' },
+  em_item_congestion: { norm: 'em_tpl_congestion_norm', path: 'em_tpl_congestion_path' },
+  em_item_effusion: { norm: 'em_tpl_effusion_norm', path: 'em_tpl_effusion_path' },
+  em_item_arrhythmia: { norm: 'em_tpl_arrhythmia_norm', path: 'em_tpl_arrhythmia_path' },
   // Dermatology
-  'Нормальная': { norm: 'тип кожи нормальный', path: null },
-  'Сухая': { norm: 'кожа сухая', path: null },
-  'Жирная': { norm: 'кожа жирная', path: null },
-  'Комбинированная': { norm: 'кожа комбинированного типа', path: null },
-  'Чувствительная': { norm: 'кожа чувствительная', path: null },
-  'Акне': { norm: 'акне отсутствует', path: 'акне различной степени выраженности' },
-  'Розацеа': { norm: 'розацеа отсутствует', path: 'признаки розацеа' },
-  'Экзема': { norm: 'экземы нет', path: 'экзематозные изменения' },
-  'Псориаз': { norm: 'псориаза нет', path: 'псориатические бляшки' },
-  'Пигментация': { norm: 'пигментация в пределах нормы', path: 'нарушения пигментации' },
-  'Морщины': { norm: 'морщины минимальные', path: 'выраженные морщины' },
+  em_item_normal: { norm: 'em_tpl_normal_norm', path: null },
+  em_item_dry: { norm: 'em_tpl_dry_norm', path: null },
+  em_item_oily: { norm: 'em_tpl_oily_norm', path: null },
+  em_item_combined: { norm: 'em_tpl_combined_norm', path: null },
+  em_item_sensitive: { norm: 'em_tpl_sensitive_norm', path: null },
+  em_item_acne: { norm: 'em_tpl_acne_norm', path: 'em_tpl_acne_path' },
+  em_item_rosacea: { norm: 'em_tpl_rosacea_norm', path: 'em_tpl_rosacea_path' },
+  em_item_eczema: { norm: 'em_tpl_eczema_norm', path: 'em_tpl_eczema_path' },
+  em_item_psoriasis: { norm: 'em_tpl_psoriasis_norm', path: 'em_tpl_psoriasis_path' },
+  em_item_pigmentation: { norm: 'em_tpl_pigmentation_norm', path: 'em_tpl_pigmentation_path' },
+  em_item_wrinkles: { norm: 'em_tpl_wrinkles_norm', path: 'em_tpl_wrinkles_path' },
   // Dentistry
-  'Состояние слизистой': { norm: 'слизистая оболочка полости рта без патологии', path: 'изменения слизистой оболочки' },
-  'Язык': { norm: 'язык без патологии', path: 'изменения языка' },
-  'Губы': { norm: 'губы без патологии', path: 'изменения губ' },
-  'Щеки': { norm: 'слизистая щек без патологии', path: 'изменения слизистой щек' },
-  'Кровоточивость': { norm: 'кровоточивости нет', path: 'кровоточивость десен' },
-  'Карманы': { norm: 'пародонтальных карманов нет', path: 'пародонтальные карманы' },
-  'Подвижность': { norm: 'подвижности зубов нет', path: 'повышенная подвижность зубов' },
-  'Рецессия': { norm: 'рецессии десны нет', path: 'рецессия десны' },
-  'Ортогнатический': { norm: 'ортогнатический прикус', path: null },
-  'Прогнатия': { norm: 'прогнатия', path: null },
-  'Прогения': { norm: 'прогения', path: null },
-  'Открытый': { norm: 'открытый прикус', path: null },
-  'Глубокий': { norm: 'глубокий прикус', path: null },
-  'Хорошая': { norm: 'гигиена полости рта хорошая', path: null },
-  'Удовлетворительная': { norm: 'гигиена полости рта удовлетворительная', path: null },
-  'Плохая': { norm: 'гигиена полости рта плохая', path: null },
-  'Очень плохая': { norm: 'гигиена полости рта очень плохая', path: null }
+  em_item_mucosa: { norm: 'em_tpl_mucosa_norm', path: 'em_tpl_mucosa_path' },
+  em_item_tongue: { norm: 'em_tpl_tongue_norm', path: 'em_tpl_tongue_path' },
+  em_item_lips: { norm: 'em_tpl_lips_norm', path: 'em_tpl_lips_path' },
+  em_item_cheeks: { norm: 'em_tpl_cheeks_norm', path: 'em_tpl_cheeks_path' },
+  em_item_bleeding: { norm: 'em_tpl_bleeding_norm', path: 'em_tpl_bleeding_path' },
+  em_item_pockets: { norm: 'em_tpl_pockets_norm', path: 'em_tpl_pockets_path' },
+  em_item_mobility: { norm: 'em_tpl_mobility_norm', path: 'em_tpl_mobility_path' },
+  em_item_recession: { norm: 'em_tpl_recession_norm', path: 'em_tpl_recession_path' },
+  em_item_orthognathic: { norm: 'em_tpl_orthognathic_norm', path: null },
+  em_item_prognathia: { norm: 'em_tpl_prognathia_norm', path: null },
+  em_item_progenia: { norm: 'em_tpl_progenia_norm', path: null },
+  em_item_open: { norm: 'em_tpl_open_norm', path: null },
+  em_item_deep: { norm: 'em_tpl_deep_norm', path: null },
+  em_item_good: { norm: 'em_tpl_good_norm', path: null },
+  em_item_fair: { norm: 'em_tpl_fair_norm', path: null },
+  em_item_poor: { norm: 'em_tpl_poor_norm', path: null },
+  em_item_very_poor: { norm: 'em_tpl_very_poor_norm', path: null }
 };
 
 const ExaminationMatrix = ({
@@ -107,8 +107,9 @@ const ExaminationMatrix = ({
   onGenerateText,
   isEditable = true
 }) => {
+  const { t } = useTranslation();
   const [activeCategory, setActiveCategory] = useState(Object.keys(MATRICES[specialty] || MATRICES.general)[0]);
-  const [status, setStatus] = useState({}); // { 'Тоны': 'norm' | 'path' }
+  const [status, setStatus] = useState({}); // { 'em_item_tones': 'norm' | 'path' }
 
   // Update categories if specialty changes
   useEffect(() => {
@@ -142,11 +143,11 @@ const ExaminationMatrix = ({
     Object.entries(currentStatus).forEach(([item, type]) => {
       const template = TEMPLATES[item];
       if (template && template[type]) {
-        phrases.push(template[type]);
+        phrases.push(t(`misc.${template[type]}`));
       } else {
         // Fallback for missing templates
         const prefix = type === 'norm' ? 'N: ' : 'Path: ';
-        phrases.push(`${prefix}${item}`);
+        phrases.push(`${prefix}${t(`misc.${item}`)}`);
       }
     });
 
@@ -169,8 +170,8 @@ const ExaminationMatrix = ({
           key={cat}
           className={`ex-matrix__cat-btn ${activeCategory === cat ? 'ex-matrix__cat-btn--active' : ''}`}
           onClick={() => setActiveCategory(cat)}>
-          
-                        {cat}
+
+                        {t(`misc.${cat}`)}
                     </button>
         )}
             </div>
@@ -183,25 +184,25 @@ const ExaminationMatrix = ({
             <div
               key={item}
               className={`ex-matrix__item ${currentStatus ? `ex-matrix__item--${currentStatus}` : 'ex-matrix__item--normal'}`}>
-              
-                            <span className="ex-matrix__label">{item}</span>
+
+                            <span className="ex-matrix__label">{t(`misc.${item}`)}</span>
                             <div className="ex-matrix__actions">
                                 {/* Button: Norm */}
                                 <button
                   className={'ex-matrix__action-btn ex-matrix__action-btn--norm'}
                   onClick={() => handleToggle(item, 'norm')}
-                  aria-label={`Отметить "${item}" как норму`}
-                  title="Норма">
-                  
+                  aria-label={t('misc.em_mark_norm', { item: t(`misc.${item}`) })}
+                  title={t('misc.em_norm')}>
+
                                     <Check size={14} />
                                 </button>
                                 {/* Button: Path */}
                                 <button
                   className={'ex-matrix__action-btn ex-matrix__action-btn--path'}
                   onClick={() => handleToggle(item, 'path')}
-                  aria-label={`Отметить "${item}" как патологию`}
-                  title="Патология">
-                  
+                  aria-label={t('misc.em_mark_path', { item: t(`misc.${item}`) })}
+                  title={t('misc.em_pathology')}>
+
                                     <AlertCircle size={14} />
                                 </button>
                             </div>
