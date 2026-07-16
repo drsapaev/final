@@ -22,6 +22,7 @@ import api from '../../services/api';
 import logger from '../../utils/logger';
 import './QueueManagementCard.css';
 import { useTranslation } from '../../i18n/useTranslation';
+import i18n from '../../i18n';
 
 const normalizeQueueAction = (action) => String(action || '').trim().toLowerCase().replace(/-/g, '_');
 
@@ -114,6 +115,7 @@ export const QueueActionButtons = ({
   styles = {},
   compact = false
 }) => {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
 
   const {
@@ -191,8 +193,8 @@ export const QueueActionButtons = ({
           color="danger"
           icon={XCircle}
           onClick={() => handleAction('no-show')}
-          ariaLabel="Отметить неявку"
-          title="Отметить неявку"
+          ariaLabel={t('misc.qmc_mark_no_show')}
+          title={t('misc.qmc_mark_no_show')}
           {...btnProps} />
       );
     }
@@ -204,8 +206,8 @@ export const QueueActionButtons = ({
           color="info"
           icon={Stethoscope}
           onClick={() => handleAction('diagnostics')}
-          ariaLabel="Направить на обследование"
-          title="На обследование"
+          ariaLabel={t('misc.qmc_send_to_diagnostics_aria')}
+          title={t('misc.qmc_to_diagnostics')}
           {...btnProps} />
       );
     }
@@ -217,8 +219,8 @@ export const QueueActionButtons = ({
           color="info"
           icon={Bell}
           onClick={() => handleAction('call-from-diagnostics')}
-          ariaLabel="Вернуть с диагностики и вызвать повторно"
-          title="Вернуть с диагностики (Вызвать повторно)"
+          ariaLabel={t('misc.qmc_return_from_diagnostics_aria')}
+          title={t('misc.qmc_return_from_diagnostics_title')}
           {...btnProps} />
       );
     }
@@ -230,8 +232,8 @@ export const QueueActionButtons = ({
           color="success"
           icon={CheckCircle}
           onClick={() => handleAction('complete')}
-          ariaLabel="Завершить приём"
-          title="Завершить приём"
+          ariaLabel={t('misc.qmc_complete_visit')}
+          title={t('misc.qmc_complete_visit')}
           {...btnProps} />
       );
     }
@@ -242,9 +244,9 @@ export const QueueActionButtons = ({
           key="incomplete"
           color="warning"
           icon={AlertCircle}
-          onClick={() => handleAction('incomplete', { reason: 'Не вернулся с обследования' })}
-          ariaLabel="Отметить, что пациент не вернулся"
-          title="Не вернулся"
+          onClick={() => handleAction('incomplete', { reason: t('misc.qmc_not_returned_from_diagnostics') })}
+          ariaLabel={t('misc.qmc_mark_not_returned')}
+          title={t('misc.qmc_not_returned')}
           {...btnProps} />
       );
     }
@@ -256,8 +258,8 @@ export const QueueActionButtons = ({
           color="warning"
           icon={RotateCcw}
           onClick={() => handleAction('restore-next')}
-          ariaLabel="Восстановить пациента следующим в очереди"
-          title="Восстановить следующим"
+          ariaLabel={t('misc.qmc_restore_next_aria')}
+          title={t('misc.qmc_restore_next')}
           {...btnProps} />
       );
     }
@@ -281,8 +283,8 @@ export const QueueActionButtons = ({
             color="danger"
             icon={XCircle}
             onClick={() => handleAction('no-show')}
-            ariaLabel="Отметить неявку"
-            title="Отметить неявку"
+            ariaLabel={t('misc.qmc_mark_no_show')}
+            title={t('misc.qmc_mark_no_show')}
             {...btnProps} />
         );
 
@@ -295,22 +297,22 @@ export const QueueActionButtons = ({
               color="info"
               icon={Stethoscope}
               onClick={() => handleAction('diagnostics')}
-              ariaLabel="Направить на обследование"
-              title="На обследование"
+              ariaLabel={t('misc.qmc_send_to_diagnostics_aria')}
+              title={t('misc.qmc_to_diagnostics')}
               {...btnProps} />
             <ActionButton
               color="success"
               icon={CheckCircle}
               onClick={() => handleAction('complete')}
-              ariaLabel="Завершить приём"
-              title="Завершить приём"
+              ariaLabel={t('misc.qmc_complete_visit')}
+              title={t('misc.qmc_complete_visit')}
               {...btnProps} />
             <ActionButton
               color="danger"
               icon={XCircle}
               onClick={() => handleAction('no-show')}
-              ariaLabel="Отметить, что пациент не явился"
-              title="Не явился"
+              ariaLabel={t('misc.qmc_mark_patient_no_show')}
+              title={t('misc.qmc_not_arrived')}
               {...btnProps} />
           </>
         );
@@ -322,22 +324,22 @@ export const QueueActionButtons = ({
               color="info"
               icon={Bell}
               onClick={() => handleAction('call-from-diagnostics')}
-              ariaLabel="Вернуть с диагностики и вызвать повторно"
-              title="Вернуть с диагностики (Вызвать повторно)"
+              ariaLabel={t('misc.qmc_return_from_diagnostics_aria')}
+              title={t('misc.qmc_return_from_diagnostics_title')}
               {...btnProps} />
             <ActionButton
               color="success"
               icon={CheckCircle}
               onClick={() => handleAction('complete')}
-              ariaLabel="Завершить приём"
-              title="Завершить приём"
+              ariaLabel={t('misc.qmc_complete_visit')}
+              title={t('misc.qmc_complete_visit')}
               {...btnProps} />
             <ActionButton
               color="warning"
               icon={AlertCircle}
-              onClick={() => handleAction('incomplete', { reason: 'Не вернулся с обследования' })}
-              ariaLabel="Отметить, что пациент не вернулся"
-              title="Не вернулся"
+              onClick={() => handleAction('incomplete', { reason: t('misc.qmc_not_returned_from_diagnostics') })}
+              ariaLabel={t('misc.qmc_mark_not_returned')}
+              title={t('misc.qmc_not_returned')}
               {...btnProps} />
           </>
         );
@@ -348,8 +350,8 @@ export const QueueActionButtons = ({
             color="warning"
             icon={RotateCcw}
             onClick={() => handleAction('restore-next')}
-            ariaLabel="Восстановить пациента следующим в очереди"
-            title="Восстановить следующим"
+            ariaLabel={t('misc.qmc_restore_next_aria')}
+            title={t('misc.qmc_restore_next')}
             {...btnProps} />
         );
 
@@ -358,20 +360,20 @@ export const QueueActionButtons = ({
       case 'done':
         return (
           <span className="qm-status-text qm-status-text--success">
-            <CheckCircle size={14} /> Завершён
+            <CheckCircle size={14} /> {t('misc.qmc_status_completed')}
           </span>
         );
 
       case 'incomplete':
         return (
           <span className="qm-status-text qm-status-text--danger">
-            <AlertCircle size={14} /> Не завершён
+            <AlertCircle size={14} /> {t('misc.qmc_status_incomplete')}
           </span>
         );
 
       case 'cancelled':
         return (
-          <span className="qm-status-text qm-status-text--secondary">Отменён</span>
+          <span className="qm-status-text qm-status-text--secondary">{t('misc.qmc_status_cancelled')}</span>
         );
 
       default:
@@ -393,6 +395,7 @@ export const QueueActionButtons = ({
  * Карточка статистики очереди (для хедера)
  */
 export const QueueStatsBar = ({ stats, getColor }) => {
+  const { t } = useTranslation();
   // UX Audit Registrar #3: если getColor не передан — используем CSS-классы.
   // Backward compat: если getColor передан — используем inline-стили.
   if (getColor) {
@@ -404,7 +407,7 @@ export const QueueStatsBar = ({ stats, getColor }) => {
           padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
           borderRadius: 'var(--mac-radius-sm)'
         }}>
-          Ожидают: {stats?.waiting || 0}
+          {t('misc.qmc_stats_waiting', { count: stats?.waiting || 0 })}
         </span>
         <span style={{
           background: `${getColor('primary', 500)}20`,
@@ -412,7 +415,7 @@ export const QueueStatsBar = ({ stats, getColor }) => {
           padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
           borderRadius: 'var(--mac-radius-sm)'
         }}>
-          Вызваны: {stats?.called || 0}
+          {t('misc.qmc_stats_called', { count: stats?.called || 0 })}
         </span>
         <span style={{
           background: `${getColor('success', 500)}20`,
@@ -420,7 +423,7 @@ export const QueueStatsBar = ({ stats, getColor }) => {
           padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
           borderRadius: 'var(--mac-radius-sm)'
         }}>
-          Обслужены: {stats?.served || 0}
+          {t('misc.qmc_stats_served', { count: stats?.served || 0 })}
         </span>
       </div>
     );
@@ -430,13 +433,13 @@ export const QueueStatsBar = ({ stats, getColor }) => {
   return (
     <div className="qm-stats-bar">
       <span className="qm-stats-pill qm-stats-pill--warning">
-        Ожидают: {stats?.waiting || 0}
+        {t('misc.qmc_stats_waiting', { count: stats?.waiting || 0 })}
       </span>
       <span className="qm-stats-pill qm-stats-pill--primary">
-        Вызваны: {stats?.called || 0}
+        {t('misc.qmc_stats_called', { count: stats?.called || 0 })}
       </span>
       <span className="qm-stats-pill qm-stats-pill--success">
-        Обслужены: {stats?.served || 0}
+        {t('misc.qmc_stats_served', { count: stats?.served || 0 })}
       </span>
     </div>
   );
@@ -447,18 +450,18 @@ export const QueueStatsBar = ({ stats, getColor }) => {
  */
 export const getQueueStatusInfo = (status) => {
   const statusMap = {
-    waiting: { label: 'Ожидает', variant: 'warning', color: 'var(--mac-warning)' },
-    called: { label: 'Вызван', variant: 'primary', color: 'var(--mac-accent-blue)' },
-    calling: { label: 'Вызывается', variant: 'primary', color: 'var(--mac-accent-blue)' },
-    in_cabinet: { label: 'В кабинете', variant: 'info', color: 'var(--mac-accent-blue)' },
-    in_service: { label: 'На приёме', variant: 'info', color: 'var(--mac-accent-blue)' },
-    diagnostics: { label: 'На обследовании', variant: 'info', color: 'var(--mac-accent-purple)' },
-    served: { label: 'Обслужен', variant: 'success', color: 'var(--mac-success)' },
-    completed: { label: 'Завершён', variant: 'success', color: 'var(--mac-success)' },
-    done: { label: 'Завершён', variant: 'success', color: 'var(--mac-success)' },
-    incomplete: { label: 'Не завершён', variant: 'danger', color: 'var(--mac-error)' },
-    no_show: { label: 'Не явился', variant: 'danger', color: 'var(--mac-error)' },
-    cancelled: { label: 'Отменён', variant: 'secondary', color: 'var(--mac-text-secondary)' }
+    waiting: { label: i18n.t('misc.qmc_status_waiting'), variant: 'warning', color: 'var(--mac-warning)' },
+    called: { label: i18n.t('misc.qmc_status_called'), variant: 'primary', color: 'var(--mac-accent-blue)' },
+    calling: { label: i18n.t('misc.qmc_status_calling'), variant: 'primary', color: 'var(--mac-accent-blue)' },
+    in_cabinet: { label: i18n.t('misc.qmc_status_in_cabinet'), variant: 'info', color: 'var(--mac-accent-blue)' },
+    in_service: { label: i18n.t('misc.qmc_status_in_service'), variant: 'info', color: 'var(--mac-accent-blue)' },
+    diagnostics: { label: i18n.t('misc.qmc_status_diagnostics'), variant: 'info', color: 'var(--mac-accent-purple)' },
+    served: { label: i18n.t('misc.qmc_status_served'), variant: 'success', color: 'var(--mac-success)' },
+    completed: { label: i18n.t('misc.qmc_status_completed'), variant: 'success', color: 'var(--mac-success)' },
+    done: { label: i18n.t('misc.qmc_status_completed'), variant: 'success', color: 'var(--mac-success)' },
+    incomplete: { label: i18n.t('misc.qmc_status_incomplete'), variant: 'danger', color: 'var(--mac-error)' },
+    no_show: { label: i18n.t('misc.qmc_not_arrived'), variant: 'danger', color: 'var(--mac-error)' },
+    cancelled: { label: i18n.t('misc.qmc_status_cancelled'), variant: 'secondary', color: 'var(--mac-text-secondary)' }
   };
 
   return statusMap[status] || { label: status, variant: 'default', color: 'var(--mac-text-secondary)' };

@@ -71,11 +71,11 @@ const AIAnalytics = () => {
       setUsageAnalytics(response.data);
     } catch (error) {
       logger.error('Ошибка загрузки аналитики AI:', error);
-      toast.error('Ошибка загрузки аналитики AI');
+      toast.error(t('misc.aia_error_load_usage'));
     } finally {
       setLoading(false);
     }
-  }, [dateRange.endDate, dateRange.startDate, filters.aiFunction, filters.userId]);
+  }, [dateRange.endDate, dateRange.startDate, filters.aiFunction, filters.userId, t]);
 
   const loadLearningInsights = async () => {
     setLoading(true);
@@ -89,7 +89,7 @@ const AIAnalytics = () => {
       setLearningInsights(response.data);
     } catch (error) {
       logger.error('Ошибка загрузки инсайтов обучения:', error);
-      toast.error('Ошибка загрузки инсайтов обучения');
+      toast.error(t('misc.aia_error_load_insights'));
     } finally {
       setLoading(false);
     }
@@ -122,7 +122,7 @@ const AIAnalytics = () => {
       setCostAnalysis(response.data);
     } catch (error) {
       logger.error('Ошибка загрузки анализа затрат:', error);
-      toast.error('Ошибка загрузки анализа затрат');
+      toast.error(t('misc.aia_error_load_cost'));
     } finally {
       setLoading(false);
     }
@@ -140,7 +140,7 @@ const AIAnalytics = () => {
       setModelComparison(response.data);
     } catch (error) {
       logger.error('Ошибка загрузки сравнения моделей:', error);
-      toast.error('Ошибка загрузки сравнения моделей');
+      toast.error(t('misc.aia_error_load_comparison'));
     } finally {
       setLoading(false);
     }
@@ -150,11 +150,11 @@ const AIAnalytics = () => {
     setLoading(true);
     try {
       const response = await api.post('/analytics/ai/optimize-models');
-      toast.success('Оптимизация AI моделей запущена');
+      toast.success(t('misc.aia_optimization_started'));
       logger.log('Результат оптимизации:', response.data);
     } catch (error) {
       logger.error('Ошибка оптимизации моделей:', error);
-      toast.error('Ошибка оптимизации моделей');
+      toast.error(t('misc.aia_error_optimization'));
     } finally {
       setLoading(false);
     }
@@ -169,11 +169,11 @@ const AIAnalytics = () => {
         end_date: dateRange.endDate,
         anonymize: true
       });
-      toast.success(`Датасет "${dataType}" успешно сгенерирован`);
+      toast.success(t('misc.aia_dataset_generated', { dataType }));
       logger.log('Информация о датасете:', response.data);
     } catch (error) {
       logger.error('Ошибка генерации датасета:', error);
-      toast.error('Ошибка генерации датасета');
+      toast.error(t('misc.aia_error_dataset'));
     } finally {
       setLoading(false);
     }
@@ -188,14 +188,8 @@ const AIAnalytics = () => {
   };
 
   const formatTime = (seconds) => {
-    return `${seconds.toFixed(2)}с`;
+    return t('misc.aia_seconds_short', { seconds: seconds.toFixed(2) });
   };
-
-
-
-
-
-
 
 
 
@@ -209,10 +203,10 @@ const AIAnalytics = () => {
           <div className="ai-analytics-section-header">
             <h3 className="ai-analytics-h3">
               <Activity style={{ width: '20px', height: '20px' }} />
-              Сводка AI использования за {usageSummary.period_days} дней
+              {t('misc.aia_overview_summary_title', { days: usageSummary.period_days })}
             </h3>
             <div className="ai-analytics-timestamp">
-              Обновлено: {new Date(usageSummary.last_updated).toLocaleString()}
+              {t('misc.aia_updated')} {new Date(usageSummary.last_updated).toLocaleString()}
             </div>
           </div>
 
@@ -221,28 +215,28 @@ const AIAnalytics = () => {
               <div className="ai-analytics-stat-value-3xl ai-analytics-stat-value-info">
                 {usageSummary.total_requests}
               </div>
-              <div className="ai-analytics-stat-label">Всего запросов</div>
+              <div className="ai-analytics-stat-label">{t('misc.aia_total_requests')}</div>
             </div>
 
             <div className="ai-analytics-stat-card ai-analytics-stat-card-success">
               <div className="ai-analytics-stat-value-3xl ai-analytics-stat-value-success">
                 {usageSummary.success_rate.toFixed(1)}%
               </div>
-              <div className="ai-analytics-stat-label">Успешность</div>
+              <div className="ai-analytics-stat-label">{t('misc.aia_success_rate')}</div>
             </div>
 
             <div className="ai-analytics-stat-card ai-analytics-stat-card-accent-purple">
               <div className="ai-analytics-stat-value-3xl ai-analytics-stat-value-accent-purple">
                 {formatTime(usageSummary.average_response_time)}
               </div>
-              <div className="ai-analytics-stat-label">Среднее время</div>
+              <div className="ai-analytics-stat-label">{t('misc.aia_average_time')}</div>
             </div>
 
             <div className="ai-analytics-stat-card ai-analytics-stat-card-warning">
               <div className="ai-analytics-stat-value-3xl ai-analytics-stat-value-warning">
                 {formatCurrency(usageSummary.total_cost_usd)}
               </div>
-              <div className="ai-analytics-stat-label">Общие затраты</div>
+              <div className="ai-analytics-stat-label">{t('misc.aia_total_cost')}</div>
             </div>
 
             <div className={`ai-analytics-stat-card ${usageSummary.cost_trend === 'increasing' ? 'ai-analytics-stat-card-trend-increasing' : 'ai-analytics-stat-card-trend-decreasing'}`}>
@@ -250,21 +244,21 @@ const AIAnalytics = () => {
                 {usageSummary.cost_trend === 'increasing' ? <TrendingUp style={{ width: '20px', height: '20px' }} /> : <TrendingDown style={{ width: '20px', height: '20px' }} />}
                 {usageSummary.cost_trend}
               </div>
-              <div className="ai-analytics-stat-label">Тренд затрат</div>
+              <div className="ai-analytics-stat-label">{t('misc.aia_cost_trend')}</div>
             </div>
 
             <div className="ai-analytics-stat-card ai-analytics-stat-card-accent-blue">
               <div className="ai-analytics-stat-value-2xl ai-analytics-stat-value-accent-blue">
                 {usageSummary.most_used_function || 'N/A'}
               </div>
-              <div className="ai-analytics-stat-label">Популярная функция</div>
+              <div className="ai-analytics-stat-label">{t('misc.aia_popular_function')}</div>
             </div>
           </div>
 
           {usageSummary.recommendations && usageSummary.recommendations.length > 0 &&
       <div className="ai-analytics-mt-4">
               <h4 className="ai-analytics-h4">
-                Рекомендации
+                {t('misc.aia_recommendations')}
               </h4>
               <div className="ai-analytics-recommendations-list">
                 {usageSummary.recommendations.map((recommendation, index) =>
@@ -287,7 +281,7 @@ const AIAnalytics = () => {
       <MacOSCard className="ai-analytics-card-padded">
         <h3 className="ai-analytics-h3-mb16">
           <Settings style={{ width: '20px', height: '20px' }} />
-          Быстрые действия
+          {t('misc.aia_quick_actions')}
         </h3>
 
         <div className="ai-analytics-stat-grid-250">
@@ -297,7 +291,7 @@ const AIAnalytics = () => {
           variant="primary"
           className="ai-analytics-action-btn">
             {loading ? <RefreshCw style={{ width: '16px', height: '16px' }} /> : <Target style={{ width: '16px', height: '16px' }} />}
-            Оптимизировать модели
+            {t('misc.aia_optimize_models_btn')}
           </Button>
 
           <Button
@@ -306,7 +300,7 @@ const AIAnalytics = () => {
           variant="success"
           className="ai-analytics-action-btn">
             {loading ? <RefreshCw style={{ width: '16px', height: '16px' }} /> : <Database style={{ width: '16px', height: '16px' }} />}
-            Генерировать датасет диагностики
+            {t('misc.aia_generate_diagnostic_dataset')}
           </Button>
 
           <Button
@@ -315,7 +309,7 @@ const AIAnalytics = () => {
           variant="secondary"
           className="ai-analytics-action-btn">
             {loading ? <RefreshCw style={{ width: '16px', height: '16px' }} /> : <Database style={{ width: '16px', height: '16px' }} />}
-            Генерировать датасет лечения
+            {t('misc.aia_generate_treatment_dataset')}
           </Button>
 
           <Button
@@ -324,7 +318,7 @@ const AIAnalytics = () => {
           variant="warning"
           className="ai-analytics-action-btn">
             {loading ? <RefreshCw style={{ width: '16px', height: '16px' }} /> : <BarChart3 style={{ width: '16px', height: '16px' }} />}
-            Сравнить модели
+            {t('misc.aia_compare_models_btn')}
           </Button>
         </div>
       </MacOSCard>
@@ -339,7 +333,7 @@ const AIAnalytics = () => {
           <MacOSCard className="ai-analytics-card-padded">
             <h3 className="ai-analytics-h3-mb16">
               <BarChart3 style={{ width: '20px', height: '20px' }} />
-              Статистика использования ({usageAnalytics.period.start_date} - {usageAnalytics.period.end_date})
+              {t('misc.aia_usage_stats_title', { start: usageAnalytics.period.start_date, end: usageAnalytics.period.end_date })}
             </h3>
 
             <div className="ai-analytics-stat-grid-sm">
@@ -347,31 +341,31 @@ const AIAnalytics = () => {
                 <div className="ai-analytics-stat-value-xl ai-analytics-stat-value-info">
                   {usageAnalytics.usage_statistics.total_requests}
                 </div>
-                <div className="ai-analytics-stat-label-xs">Всего запросов</div>
+                <div className="ai-analytics-stat-label-xs">{t('misc.aia_total_requests')}</div>
               </div>
               <div className="ai-analytics-stat-text-center">
                 <div className="ai-analytics-stat-value-xl ai-analytics-stat-value-success">
                   {usageAnalytics.usage_statistics.success_rate?.toFixed(1)}%
                 </div>
-                <div className="ai-analytics-stat-label-xs">Успешность</div>
+                <div className="ai-analytics-stat-label-xs">{t('misc.aia_success_rate')}</div>
               </div>
               <div className="ai-analytics-stat-text-center">
                 <div className="ai-analytics-stat-value-xl ai-analytics-stat-value-accent-purple">
                   {formatTime(usageAnalytics.usage_statistics.average_execution_time)}
                 </div>
-                <div className="ai-analytics-stat-label-xs">Среднее время</div>
-              </div>
-              <div className="ai-analytics-stat-text-center">
-                <div className="ai-analytics-stat-value-xl ai-analytics-stat-value-warning">
-                  {usageAnalytics.usage_statistics.total_tokens_used}
-                </div>
-                <div className="ai-analytics-stat-label-xs">Токенов</div>
+                <div className="ai-analytics-stat-label-xs">{t('misc.aia_average_time')}</div>
               </div>
               <div className="ai-analytics-stat-text-center">
                 <div className="ai-analytics-stat-value-xl ai-analytics-stat-value-error">
+                  {usageAnalytics.usage_statistics.total_tokens_used}
+                </div>
+                <div className="ai-analytics-stat-label-xs">{t('misc.aia_tokens')}</div>
+              </div>
+              <div className="ai-analytics-stat-text-center">
+                <div className="ai-analytics-stat-value-xl ai-analytics-stat-value-warning">
                   {formatCurrency(usageAnalytics.usage_statistics.total_cost_usd)}
                 </div>
-                <div className="ai-analytics-stat-label-xs">Затраты</div>
+                <div className="ai-analytics-stat-label-xs">{t('misc.aia_costs')}</div>
               </div>
             </div>
           </MacOSCard>
@@ -380,7 +374,7 @@ const AIAnalytics = () => {
           {Object.keys(usageAnalytics.function_breakdown).length > 0 &&
       <MacOSCard className="ai-analytics-card-padded">
               <h3 className="ai-analytics-h3-mb16">
-                По AI функциям
+                {t('misc.aia_by_ai_functions')}
               </h3>
               <div className="ai-analytics-grid-gap">
                 {Object.entries(usageAnalytics.function_breakdown).map(([func, stats]) =>
@@ -392,7 +386,7 @@ const AIAnalytics = () => {
                         {func}
                       </div>
                       <div className="ai-analytics-function-stats">
-                        {stats.requests} запросов • {stats.success_rate?.toFixed(1)}% успешность
+                        {t('misc.aia_function_stats', { requests: stats.requests, success: stats.success_rate?.toFixed(1) })}
                       </div>
                     </div>
                     <div className="ai-analytics-stat-text-right">
@@ -413,7 +407,7 @@ const AIAnalytics = () => {
           {usageAnalytics.recommendations && usageAnalytics.recommendations.length > 0 &&
       <MacOSCard className="ai-analytics-card-padded">
               <h3 className="ai-analytics-h3-mb16">
-                Рекомендации по оптимизации
+                {t('misc.aia_optimization_recommendations')}
               </h3>
               <div className="ai-analytics-recommendations-list-gap2">
                 {usageAnalytics.recommendations.map((recommendation, index) =>
@@ -438,7 +432,7 @@ const AIAnalytics = () => {
   <div className="ai-analytics-tab-content">
       <div className="ai-analytics-section-header-no-mb">
         <h3 className="ai-analytics-h3">
-          Инсайты для обучения AI
+          {t('misc.aia_learning_insights_title')}
         </h3>
         <Button
         onClick={loadLearningInsights}
@@ -446,7 +440,7 @@ const AIAnalytics = () => {
         variant="outline"
         className="ai-analytics-action-btn-sm">
           {loading ? <RefreshCw style={{ width: '16px', height: '16px' }} /> : <Brain style={{ width: '16px', height: '16px' }} />}
-          Обновить
+          {t('misc.aia_refresh')}
         </Button>
       </div>
 
@@ -456,13 +450,13 @@ const AIAnalytics = () => {
           {learningInsights.medical_patterns &&
       <MacOSCard className="ai-analytics-card-padded">
               <h4 className="ai-analytics-h4">
-                Медицинские паттерны
+                {t('misc.aia_medical_patterns')}
               </h4>
 
               {learningInsights.medical_patterns.common_symptoms && Array.isArray(learningInsights.medical_patterns.common_symptoms) &&
         <div className="ai-analytics-mb-4">
                   <h5 className="ai-analytics-h5">
-                    Частые симптомы
+                    {t('misc.aia_common_symptoms')}
                   </h5>
                   <div className="ai-analytics-symptoms-wrap">
                     {learningInsights.medical_patterns.common_symptoms.map((symptom, index) =>
@@ -480,7 +474,7 @@ const AIAnalytics = () => {
               {learningInsights.medical_patterns.diagnosis_frequency &&
         <div>
                   <h5 className="ai-analytics-h5">
-                    Топ диагнозы
+                    {t('misc.aia_top_diagnoses')}
                   </h5>
                   <div className="ai-analytics-grid-gap-1">
                     {learningInsights.medical_patterns.diagnosis_frequency.top_diagnoses?.map((item, index) =>
@@ -489,7 +483,7 @@ const AIAnalytics = () => {
               className="ai-analytics-diagnosis-row">
                         <span className="ai-analytics-diagnosis-name">{item.diagnosis}</span>
                         <span className="ai-analytics-diagnosis-count">
-                          {item.count} ({item.percentage}%)
+                          {t('misc.aia_diagnosis_count', { count: item.count, pct: item.percentage })}
                         </span>
                       </div>
             )}
@@ -503,7 +497,7 @@ const AIAnalytics = () => {
           {learningInsights.diagnostic_accuracy &&
       <MacOSCard className="ai-analytics-card-padded">
               <h4 className="ai-analytics-h4">
-                Точность диагностики
+                {t('misc.aia_diagnostic_accuracy')}
               </h4>
 
               <div className="ai-analytics-stat-grid-sm">
@@ -511,19 +505,19 @@ const AIAnalytics = () => {
                   <div className="ai-analytics-stat-value-3xl ai-analytics-stat-value-info">
                     {learningInsights.diagnostic_accuracy.ai_vs_doctor_accuracy?.ai_accuracy}%
                   </div>
-                  <div className="ai-analytics-stat-label-xs">AI точность</div>
+                  <div className="ai-analytics-stat-label-xs">{t('misc.aia_ai_accuracy')}</div>
                 </div>
                 <div className="ai-analytics-stat-text-center">
                   <div className="ai-analytics-stat-value-3xl ai-analytics-stat-value-success">
                     {learningInsights.diagnostic_accuracy.ai_vs_doctor_accuracy?.doctor_accuracy}%
                   </div>
-                  <div className="ai-analytics-stat-label-xs">Врач точность</div>
+                  <div className="ai-analytics-stat-label-xs">{t('misc.aia_doctor_accuracy')}</div>
                 </div>
                 <div className="ai-analytics-stat-text-center">
                   <div className="ai-analytics-stat-value-3xl ai-analytics-stat-value-accent-purple">
                     {learningInsights.diagnostic_accuracy.ai_vs_doctor_accuracy?.agreement_rate}%
                   </div>
-                  <div className="ai-analytics-stat-label-xs">Согласованность</div>
+                  <div className="ai-analytics-stat-label-xs">{t('misc.aia_agreement_rate')}</div>
                 </div>
               </div>
             </MacOSCard>
@@ -533,7 +527,7 @@ const AIAnalytics = () => {
           {learningInsights.learning_recommendations &&
       <MacOSCard className="ai-analytics-card-padded">
               <h4 className="ai-analytics-h4">
-                Рекомендации для обучения
+                {t('misc.aia_learning_recommendations')}
               </h4>
               <div className="ai-analytics-recommendations-list-gap2">
                 {learningInsights.learning_recommendations.map((recommendation, index) =>
@@ -558,7 +552,7 @@ const AIAnalytics = () => {
   <div className="ai-analytics-tab-content">
       <div className="ai-analytics-section-header-no-mb">
         <h3 className="ai-analytics-h3">
-          Анализ затрат на AI
+          {t('misc.aia_cost_analysis_title')}
         </h3>
         <Button
         onClick={loadCostAnalysis}
@@ -566,7 +560,7 @@ const AIAnalytics = () => {
         variant="outline"
         className="ai-analytics-action-btn-sm">
           {loading ? <RefreshCw style={{ width: '16px', height: '16px' }} /> : <DollarSign style={{ width: '16px', height: '16px' }} />}
-          Загрузить
+          {t('misc.aia_load')}
         </Button>
       </div>
 
@@ -575,7 +569,7 @@ const AIAnalytics = () => {
           {/* Сводка затрат */}
           <MacOSCard className="ai-analytics-card-padded">
             <h4 className="ai-analytics-h4">
-              Сводка затрат
+              {t('misc.aia_cost_summary')}
             </h4>
 
             <div className="ai-analytics-stat-grid-sm">
@@ -583,19 +577,19 @@ const AIAnalytics = () => {
                 <div className="ai-analytics-stat-value-2xl ai-analytics-stat-value-success">
                   {formatCurrency(costAnalysis.summary?.total_cost_usd || 0)}
                 </div>
-                <div className="ai-analytics-stat-label-xs">Общие затраты</div>
+                <div className="ai-analytics-stat-label-xs">{t('misc.aia_total_cost')}</div>
               </div>
               <div className="ai-analytics-stat-text-center">
                 <div className="ai-analytics-stat-value-2xl ai-analytics-stat-value-info">
                   {formatCurrency(costAnalysis.summary?.average_daily_cost || 0)}
                 </div>
-                <div className="ai-analytics-stat-label-xs">В день</div>
+                <div className="ai-analytics-stat-label-xs">{t('misc.aia_per_day')}</div>
               </div>
               <div className="ai-analytics-stat-text-center">
                 <div className="ai-analytics-stat-value-2xl ai-analytics-stat-value-accent-purple">
                   {formatCurrency(costAnalysis.forecasts?.monthly_usd || 0)}
                 </div>
-                <div className="ai-analytics-stat-label-xs">Прогноз на месяц</div>
+                <div className="ai-analytics-stat-label-xs">{t('misc.aia_month_forecast')}</div>
               </div>
             </div>
           </MacOSCard>
@@ -604,7 +598,7 @@ const AIAnalytics = () => {
           {costAnalysis.function_costs && Object.keys(costAnalysis.function_costs).length > 0 &&
       <MacOSCard className="ai-analytics-card-padded">
               <h4 className="ai-analytics-h4">
-                Затраты по функциям
+                {t('misc.aia_cost_by_function')}
               </h4>
               <div className="ai-analytics-grid-gap">
                 {Object.entries(costAnalysis.function_costs).map(([func, data]) =>
@@ -616,7 +610,7 @@ const AIAnalytics = () => {
                         {func}
                       </div>
                       <div className="ai-analytics-function-stats">
-                        {data.requests} запросов • {data.cost_percentage?.toFixed(1)}% от общих затрат
+                        {t('misc.aia_function_cost_stats', { requests: data.requests, pct: data.cost_percentage?.toFixed(1) })}
                       </div>
                     </div>
                     <div className="ai-analytics-stat-text-right">
@@ -624,7 +618,7 @@ const AIAnalytics = () => {
                         {formatCurrency(data.total_cost)}
                       </div>
                       <div className="ai-analytics-timestamp">
-                        {formatCurrency(data.average_cost_per_request)} за запрос
+                        {t('misc.aia_per_request', { cost: formatCurrency(data.average_cost_per_request) })}
                       </div>
                     </div>
                   </div>
@@ -637,15 +631,15 @@ const AIAnalytics = () => {
           {costAnalysis.cost_optimization?.recommendations &&
       <MacOSCard className="ai-analytics-card-padded">
               <h4 className="ai-analytics-h4">
-                Оптимизация затрат
+                {t('misc.aia_cost_optimization')}
               </h4>
 
               <div className="ai-analytics-cost-savings">
                 <div className="ai-analytics-cost-savings-amount">
-                  Потенциальная экономия: {formatCurrency(costAnalysis.cost_optimization.potential_savings?.amount_usd || 0)}
+                  {t('misc.aia_potential_savings', { amount: formatCurrency(costAnalysis.cost_optimization.potential_savings?.amount_usd || 0) })}
                 </div>
                 <div className="ai-analytics-stat-label">
-                  ({costAnalysis.cost_optimization.potential_savings?.percentage || 0}% от текущих затрат)
+                  {t('misc.aia_potential_savings_pct', { pct: costAnalysis.cost_optimization.potential_savings?.percentage || 0 })}
                 </div>
               </div>
 
@@ -672,7 +666,7 @@ const AIAnalytics = () => {
   <div className="ai-analytics-tab-content">
       <div className="ai-analytics-section-header-no-mb">
         <h3 className="ai-analytics-h3">
-          Сравнение AI моделей
+          {t('misc.aia_model_comparison_title')}
         </h3>
         <Button
         onClick={loadModelComparison}
@@ -680,7 +674,7 @@ const AIAnalytics = () => {
         variant="outline"
         className="ai-analytics-action-btn-sm">
           {loading ? <RefreshCw style={{ width: '16px', height: '16px' }} /> : <Cpu style={{ width: '16px', height: '16px' }} />}
-          Загрузить
+          {t('misc.aia_load')}
         </Button>
       </div>
 
@@ -689,17 +683,17 @@ const AIAnalytics = () => {
           {/* Сравнительная таблица */}
           <MacOSCard className="ai-analytics-card-padded">
             <h4 className="ai-analytics-h4">
-              Сравнение моделей для функции: {modelComparison.function}
+              {t('misc.aia_comparison_for_function', { func: modelComparison.function })}
             </h4>
             
             <Table
           columns={[
-          { key: 'model', label: 'Модель', width: '20%' },
-          { key: 'accuracy', label: 'Точность', width: '15%', align: 'center' },
-          { key: 'speed', label: 'Скорость (с)', width: '15%', align: 'center' },
-          { key: 'cost', label: 'Стоимость', width: '15%', align: 'center' },
-          { key: 'satisfaction', label: 'Удовлетворенность', width: '15%', align: 'center' },
-          { key: 'reliability', label: 'Надежность', width: '20%', align: 'center' }]
+          { key: 'model', label: t('misc.aia_col_model'), width: '20%' },
+          { key: 'accuracy', label: t('misc.aia_col_accuracy'), width: '15%', align: 'center' },
+          { key: 'speed', label: t('misc.aia_col_speed_seconds'), width: '15%', align: 'center' },
+          { key: 'cost', label: t('misc.aia_col_cost'), width: '15%', align: 'center' },
+          { key: 'satisfaction', label: t('misc.aia_col_satisfaction'), width: '15%', align: 'center' },
+          { key: 'reliability', label: t('misc.aia_col_reliability'), width: '20%', align: 'center' }]
           }
           data={Object.entries(modelComparison.models).map(([model, data]) => ({
             model: <span className="ai-analytics-function-name">{model}</span>,
@@ -712,8 +706,8 @@ const AIAnalytics = () => {
           emptyState={
           <MacOSEmptyState
             icon={Cpu}
-            title="Нет данных о моделях"
-            description="Загрузите данные для сравнения AI моделей" />
+            title={t('misc.aia_empty_models_title')}
+            description={t('misc.aia_empty_models_desc')} />
 
           } />
 
@@ -722,7 +716,7 @@ const AIAnalytics = () => {
           {/* Рекомендации */}
           <MacOSCard className="ai-analytics-card-padded">
             <h4 className="ai-analytics-h4">
-              Рекомендации
+              {t('misc.aia_recommendations')}
             </h4>
 
             <div className="ai-analytics-stat-grid ai-analytics-mb-4">
@@ -766,10 +760,10 @@ const AIAnalytics = () => {
         <Brain style={{ width: '32px', height: '32px', color: 'var(--mac-accent-blue)' }} />
         <div>
           <h1 className="ai-analytics-h1">
-          Расширенная аналитика AI
+          {t('misc.aia_page_title')}
           </h1>
           <p className="ai-analytics-h1-subtitle">
-            Мониторинг и оптимизация использования искусственного интеллекта
+            {t('misc.aia_page_subtitle')}
           </p>
         </div>
       </div>
@@ -779,7 +773,7 @@ const AIAnalytics = () => {
         <div className="ai-analytics-filter-grid">
           <div>
             <label className="ai-analytics-filter-label">
-              Начальная дата
+              {t('misc.aia_start_date')}
             </label>
             <Input
               type="date"
@@ -789,7 +783,7 @@ const AIAnalytics = () => {
           </div>
           <div>
             <label className="ai-analytics-filter-label">
-              Конечная дата
+              {t('misc.aia_end_date')}
             </label>
             <Input
               type="date"
@@ -799,18 +793,18 @@ const AIAnalytics = () => {
           </div>
           <div>
             <label className="ai-analytics-filter-label">
-              AI функция
+              {t('misc.aia_ai_function')}
             </label>
             <Select
               value={filters.aiFunction}
               onChange={(e) => setFilters({ ...filters, aiFunction: e.target.value })}
               options={[
-              { value: '', label: 'Все функции' },
-              { value: 'diagnose_symptoms', label: 'Диагностика симптомов' },
-              { value: 'analyze_medical_image', label: 'Анализ изображений' },
-              { value: 'generate_treatment_plan', label: 'Планы лечения' },
-              { value: 'check_drug_interactions', label: 'Взаимодействия препаратов' },
-              { value: 'assess_patient_risk', label: 'Оценка рисков' }]
+              { value: '', label: t('misc.aia_all_functions') },
+              { value: 'diagnose_symptoms', label: t('misc.aia_func_diagnose') },
+              { value: 'analyze_medical_image', label: t('misc.aia_func_image') },
+              { value: 'generate_treatment_plan', label: t('misc.aia_func_treatment') },
+              { value: 'check_drug_interactions', label: t('misc.aia_func_drugs') },
+              { value: 'assess_patient_risk', label: t('misc.aia_func_risk') }]
               } />
 
           </div>
@@ -822,7 +816,7 @@ const AIAnalytics = () => {
               className="ai-analytics-action-btn-full">
 
               {loading ? <RefreshCw style={{ width: '16px', height: '16px' }} /> : <Filter style={{ width: '16px', height: '16px' }} />}
-              Применить
+              {t('misc.aia_apply')}
             </Button>
           </div>
         </div>
@@ -831,11 +825,11 @@ const AIAnalytics = () => {
       {/* Вкладки */}
       <MacOSTab
         tabs={[
-        { id: 'overview', label: 'Обзор', icon: Activity },
-        { id: 'usage', label: 'Использование', icon: BarChart3 },
-        { id: 'learning', label: 'Обучение', icon: Brain },
-        { id: 'cost', label: 'Затраты', icon: DollarSign },
-        { id: 'models', label: 'Модели', icon: Cpu }]
+        { id: 'overview', label: t('misc.aia_tab_overview'), icon: Activity },
+        { id: 'usage', label: t('misc.aia_tab_usage'), icon: BarChart3 },
+        { id: 'learning', label: t('misc.aia_tab_learning'), icon: Brain },
+        { id: 'cost', label: t('misc.aia_costs'), icon: DollarSign },
+        { id: 'models', label: t('misc.aia_tab_models'), icon: Cpu }]
         }
         activeTab={activeTab}
         onTabChange={setActiveTab}
