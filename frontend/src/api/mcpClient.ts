@@ -32,7 +32,7 @@ const MCP_PREFIX = '/mcp';
  * @param {object} [config]
  * @returns {Promise<any>}
  */
-async function mcpRequest(method, path, config = {}) {
+async function mcpRequest(method: string, path: string, config: Record<string, unknown> = {}): Promise<unknown> {
   try {
     const url = `${MCP_PREFIX}${path}`;
     // UX Audit Stage 3: используем api.get()/post()/put() вместо api.request()
@@ -127,7 +127,7 @@ export const mcpAPI = {
   /**
    * Анализ жалоб пациента
    */
-  async analyzeComplaint(data, options = {}) {
+  async analyzeComplaint(data: Record<string, unknown>, options: Record<string, unknown> = {}): Promise<unknown> {
     return mcpRequest('post', '/complaint/analyze', {
       data: {
         complaint: data.complaint,
@@ -162,7 +162,7 @@ export const mcpAPI = {
   /**
    * Подсказки кодов МКБ-10
    */
-  async suggestICD10(data, options = {}) {
+  async suggestICD10(data: Record<string, unknown>, options: Record<string, unknown> = {}): Promise<unknown> {
     return mcpRequest('post', '/icd10/suggest', {
       data: {
         symptoms: data.symptoms,
@@ -221,7 +221,7 @@ export const mcpAPI = {
    * Получить нормальные диапазоны
    */
   async getNormalRanges(testName = null, patientGender = null) {
-    const params = {};
+    const params: Record<string, unknown> = {};
     if (testName) params.test_name = testName;
     if (patientGender) params.patient_gender = patientGender;
     return mcpRequest('get', '/lab/normal-ranges', { params });
@@ -232,14 +232,14 @@ export const mcpAPI = {
   /**
    * Анализ медицинского изображения
    */
-  async analyzeImage(imageFile, imageType, options = {}) {
+  async analyzeImage(imageFile: File | Blob, imageType: string, options: Record<string, unknown> = {}): Promise<unknown> {
     const formData = new FormData();
     formData.append('image', imageFile);
     formData.append('image_type', imageType);
 
-    if (options.modality) formData.append('modality', options.modality);
-    if (options.clinicalContext) formData.append('clinical_context', options.clinicalContext);
-    if (options.provider) formData.append('provider', options.provider);
+    if (options.modality) formData.append('modality', String(options.modality));
+    if (options.clinicalContext) formData.append('clinical_context', String(options.clinicalContext));
+    if (options.provider) formData.append('provider', String(options.provider));
 
     return mcpRequest('post', '/imaging/analyze', {
       data: formData,

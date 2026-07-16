@@ -18,21 +18,30 @@ const API_V1_BASE = getApiBaseUrl();
  * Соответствует Nielsen Heuristic #5 (Error Prevention) — предотвращает
  * setState-after-unmark race conditions и уменьшает сетевой шум.
  */
-async function request(path, options = {}) {
+interface RequestOptions {
+  body?: BodyInit | Record<string, unknown> | null;
+  headers?: Record<string, string>;
+  signal?: AbortSignal;
+  method?: string;
+}
+
+async function request(path: string, options: RequestOptions = {}): Promise<unknown> {
   const token = tokenManager.getAccessToken();
-  const headers = {
+  const headers: Record<string, string> = {
     ...(options.body ? { 'Content-Type': 'application/json' } : {}),
     ...(options.headers || {}),
     ...(token ? { Authorization: `Bearer ${token}` } : {})
   };
 
-  const response = await fetch(`${API_V1_BASE}${path}`, {
-    ...options,
+  const fetchInit: RequestInit = {
+    ...(options as Record<string, unknown>),
     headers,
     // UX-AUDIT-FIX12: пробрасываем signal в fetch, если передан.
     // Если signal уже отменён — fetch выбросит AbortError сразу.
     ...(options.signal ? { signal: options.signal } : {})
-  });
+  };
+
+  const response = await fetch(`${API_V1_BASE}${path}`, fetchInit);
 
   if (!response.ok) {
     let detail = `${response.status} ${response.statusText}`;
@@ -64,7 +73,7 @@ export const labReportingApi = {
   // callers могут передать { limit, offset } для chunked loading, что
   // критично для крупных клиник с 1000+ анализов в день.
   // Backward compat: если params не передан, поведение не меняется.
-  listQueueToday(targetDate = null, params = {}) {
+  listQueueToday(targetDate: string | null = null, params: Record<string, unknown> = {}): Promise<unknown> {
     const search = new URLSearchParams();
     if (targetDate) {
       search.set('target_date', targetDate);
@@ -79,11 +88,11 @@ export const labReportingApi = {
     const suffix = search.size ? `?${search.toString()}` : '';
     // STRAT#16: пробрасываем signal в request() для AbortController support.
     return request(`/lab/queue/today${suffix}`, {
-      ...(params.signal ? { signal: params.signal } : {}),
+      ...(params.signal ? { signal: params.signal as AbortSignal } : {}),
     });
   },
 
-  listOrders(params = {}) {
+  listOrders(params: Record<string, unknown> = {}): Promise<unknown> {
     const search = new URLSearchParams();
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') {
@@ -169,7 +178,7 @@ export const labReportingApi = {
     });
   },
 
-  listInstances(params = {}) {
+  listInstances(params: Record<string, unknown> = {}): Promise<unknown> {
     const search = new URLSearchParams();
     Object.entries(params).forEach(([key, value]) => {
       if (Array.isArray(value)) {
