@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { API_ENDPOINTS } from '../../api/endpoints.ts';
+import { API_ENDPOINTS } from '../../api/endpoints';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const printServicePath = path.resolve(__dirname, '../print.ts');

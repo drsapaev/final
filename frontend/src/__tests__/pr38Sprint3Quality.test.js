@@ -11,7 +11,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const ROOT = path.resolve(process.cwd());
-const USE_PATIENTS = path.join(ROOT, 'src/hooks/usePatients.js');
+const USE_PATIENTS = path.join(ROOT, 'src/hooks/usePatients.ts');
 
 // ---------- 1. High-21: usePatients.js uses axios, not raw fetch ----------
 
@@ -57,7 +57,7 @@ describe('High-22: Dead code removal', () => {
   });
 
   it('src/hooks/useUtils.js is not imported by production code (only by examples/)', () => {
-    const useUtils = path.join(ROOT, 'src/hooks/useUtils.js');
+    const useUtils = path.join(ROOT, 'src/hooks/useUtils.ts');
     if (!fs.existsSync(useUtils)) {
       return; // removed — best outcome
     }
