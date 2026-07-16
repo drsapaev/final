@@ -1,3 +1,6 @@
+// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
+// Proper typing deferred to Phase 9 cleanup (strict mode).
+
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useEffect } from 'react';

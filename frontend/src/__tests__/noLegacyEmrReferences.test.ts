@@ -39,7 +39,8 @@ describe('legacy EMR references', () => {
     const offenders = [];
 
     for (const filePath of collectCodeFiles(ROOT)) {
-      if (path.basename(filePath) === 'noLegacyEmrReferences.test.js') {
+      const baseName = path.basename(filePath);
+      if (baseName === 'noLegacyEmrReferences.test.js' || baseName === 'noLegacyEmrReferences.test.ts') {
         continue;
       }
 
