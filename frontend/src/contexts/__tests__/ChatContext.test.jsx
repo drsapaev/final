@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { MemoryRouter } from 'react-router-dom';
-import { ChatProvider, useChat } from '../ChatContext.jsx';
+import { ChatProvider, useChat } from '../ChatContext.tsx';
 import { MESSAGE_EVENT_TYPES } from '../../constants/messagingContract.js';
 
 const {

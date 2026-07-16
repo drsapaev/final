@@ -2,7 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
-import { ThemeProvider } from '../../../contexts/ThemeContext.jsx';
+import { ThemeProvider } from '../../../contexts/ThemeContext.tsx';
 import { MacOSThemeProvider } from '../../../theme/macosTheme.jsx';
 
 const { apiGet, apiPost, apiDelete, loggerInfo, loggerError } = vi.hoisted(() => ({

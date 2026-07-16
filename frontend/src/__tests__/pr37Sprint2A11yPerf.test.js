@@ -12,7 +12,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const ROOT = path.resolve(process.cwd());
-const MODAL = path.join(ROOT, 'src/components/ui/macos/Modal.jsx');
+const MODAL = path.join(ROOT, 'src/components/ui/macos/Modal.tsx');
 const SEARCH = path.join(ROOT, 'src/pages/Search.jsx');
 
 // ---------- 1. P0-A: Focus trap in Modal ----------

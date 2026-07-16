@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import LabReportWorkbench from '../LabReportWorkbench';
 import { labReportingApi } from '../../../api/labReporting';
-import { ThemeProvider } from '../../../contexts/ThemeContext.jsx';
+import { ThemeProvider } from '../../../contexts/ThemeContext.tsx';
 import { MacOSThemeProvider } from '../../../theme/macosTheme.jsx';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
