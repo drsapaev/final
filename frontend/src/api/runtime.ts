@@ -1,27 +1,37 @@
+interface RuntimeSnapshot {
+  currentOrigin: string;
+  apiOrigin: string;
+  apiBaseUrl: string;
+  wsOrigin: string;
+}
+
+// src/api/runtime.ts
+// Phase 1 — migrated from .js. URL resolution helpers; types added.
+
 const DEFAULT_API_BASE_URL = 'http://localhost:18000';
 const LOCAL_ORIGIN_PATTERN = /^https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\]|0\.0\.0\.0)(?::\d+)?(?:\/|$)/i;
 
-function trimTrailingSlash(value = '') {
+function trimTrailingSlash(value: string = ''): string {
   return value.replace(/\/+$/, '');
 }
 
-function trimLeadingSlash(value = '') {
+function trimLeadingSlash(value: string = ''): string {
   return value.replace(/^\/+/, '');
 }
 
-function isAbsoluteHttpUrl(value = '') {
+function isAbsoluteHttpUrl(value: string = ''): boolean {
   return /^https?:\/\//i.test(value);
 }
 
-function isAbsoluteWsUrl(value = '') {
+function isAbsoluteWsUrl(value: string = ''): boolean {
   return /^wss?:\/\//i.test(value);
 }
 
-function isLocalOrigin(value = '') {
+function isLocalOrigin(value: string = ''): boolean {
   return LOCAL_ORIGIN_PATTERN.test(value);
 }
 
-function isViteDevProxyOrigin(value = '') {
+function isViteDevProxyOrigin(value: string = ''): boolean {
   if (!isLocalOrigin(value)) {
     return false;
   }
@@ -34,7 +44,7 @@ function isViteDevProxyOrigin(value = '') {
   }
 }
 
-function parseOriginParts(value = '') {
+function parseOriginParts(value: string = ''): { protocol: string; host: string } | null {
   if (!value) {
     return null;
   }
@@ -74,7 +84,7 @@ function parseOriginParts(value = '') {
   };
 }
 
-function getBrowserOrigin() {
+function getBrowserOrigin(): string {
   if (typeof window === 'undefined' || !window.location?.origin) {
     return '';
   }
@@ -86,7 +96,7 @@ function getBrowserOrigin() {
   return trimTrailingSlash(window.location.origin);
 }
 
-function buildRuntimeSnapshot() {
+function buildRuntimeSnapshot(): RuntimeSnapshot {
   const currentOrigin = getBrowserOrigin();
   const configuredOrigin = trimTrailingSlash(import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL);
   const preferBrowserOrigin =
@@ -106,12 +116,12 @@ function buildRuntimeSnapshot() {
   };
 }
 
-function syncRuntimeProbeState(snapshot) {
+function syncRuntimeProbeState(snapshot: RuntimeSnapshot): RuntimeSnapshot {
   if (typeof window === 'undefined') {
     return snapshot;
   }
 
-  window.__CLINIC_RUNTIME__ = {
+  (window as unknown as { __CLINIC_RUNTIME__?: unknown }).__CLINIC_RUNTIME__ = {
     currentOrigin: snapshot.currentOrigin,
     apiOrigin: snapshot.apiOrigin,
     apiBaseUrl: snapshot.apiBaseUrl,
@@ -120,19 +130,19 @@ function syncRuntimeProbeState(snapshot) {
   return snapshot;
 }
 
-export function getRuntimeResolution() {
+export function getRuntimeResolution(): RuntimeSnapshot {
   return syncRuntimeProbeState(buildRuntimeSnapshot());
 }
 
-export function getApiOrigin() {
+export function getApiOrigin(): string {
   return getRuntimeResolution().apiOrigin;
 }
 
-export function getApiBaseUrl() {
+export function getApiBaseUrl(): string {
   return getRuntimeResolution().apiBaseUrl;
 }
 
-export function buildApiUrl(path = '') {
+export function buildApiUrl(path: string = ''): string {
   if (!path) {
     return getApiBaseUrl();
   }
@@ -149,11 +159,11 @@ export function buildApiUrl(path = '') {
   return `${getApiBaseUrl()}/${normalizedPath}`;
 }
 
-export function getWsBaseUrl() {
+export function getWsBaseUrl(): string {
   return getRuntimeResolution().wsOrigin;
 }
 
-export function buildWsUrl(path = '') {
+export function buildWsUrl(path: string = ''): string {
   if (!path) {
     return getWsBaseUrl();
   }
