@@ -80,7 +80,15 @@ const MEDICAL_SCHEMAS = {
  * @param {object} options - Validation options
  * @returns {object} Validated and sanitized response
  */
-export function validateAIResponse(response, options = {}) {
+interface AIValidationOptions {
+  expectedType?: 'string' | 'object' | 'array';
+  schema?: Record<string, unknown> | null;
+  sanitize?: boolean;
+  strictMode?: boolean;
+  maxDepth?: number;
+}
+
+export function validateAIResponse(response: unknown, options: AIValidationOptions = {}): unknown {
   const {
     expectedType = 'object', // 'string', 'object', 'array'
     schema = null,
@@ -185,13 +193,13 @@ function validateAgainstSchema(data, schema) {
     // Object schema
     const validated = {};
 
-    for (const [key, rule] of Object.entries(schema)) {
+    for (const [key, rule] of Object.entries(schema as Record<string, unknown>)) {
       if (Object.prototype.hasOwnProperty.call(data, key)) {
         validated[key] = validateField(data[key], rule);
-      } else if (rule.required) {
+      } else if ((rule as { required?: boolean }).required) {
         throw new Error(`Required field missing: ${key}`);
-      } else if (rule.default !== undefined) {
-        validated[key] = rule.default;
+      } else if ((rule as { default?: unknown }).default !== undefined) {
+        validated[key] = (rule as { default?: unknown }).default;
       }
     }
 

@@ -114,12 +114,12 @@ export const EXTENSION_TO_MIME = {
  * @param {number} bytesToRead - Количество байтов для чтения
  * @returns {Promise<string>} Hex строка с сигнатурой
  */
-async function readFileSignature(file, bytesToRead = 12) {
+async function readFileSignature(file: File | Blob, bytesToRead: number = 12): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
 
     reader.onload = (e) => {
-      const arr = new Uint8Array(e.target.result);
+      const arr = new Uint8Array(e.target?.result as ArrayBuffer);
       const hex = Array.from(arr)
         .map(b => b.toString(16).padStart(2, '0').toUpperCase())
         .join('');
@@ -190,7 +190,7 @@ async function validateMagicNumber(file) {
       const reader = new FileReader();
       const dicomCheck = await new Promise((resolve) => {
         reader.onload = (e) => {
-          const arr = new Uint8Array(e.target.result);
+          const arr = new Uint8Array(e.target?.result as ArrayBuffer);
           const dicomSig = Array.from(arr.slice(128, 132))
             .map(b => b.toString(16).padStart(2, '0').toUpperCase())
             .join('');
@@ -229,7 +229,13 @@ async function validateMagicNumber(file) {
  * @param {boolean} options.strictMagicNumber - Строгая проверка magic number (по умолчанию true)
  * @returns {Promise<{valid: boolean, errors: Array<string>, warnings: Array<string>}>}
  */
-export async function validateFile(file, options = {}) {
+interface FileValidationOptions {
+  allowedCategories?: string[];
+  maxSize?: number;
+  strictMagicNumber?: boolean;
+}
+
+export async function validateFile(file: File, options: FileValidationOptions = {}) {
   const {
     allowedCategories = ['images', 'documents'],
     maxSize = 50 * 1024 * 1024, // 50MB по умолчанию
