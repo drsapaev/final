@@ -1,5 +1,4 @@
 import { useTranslation } from '../../i18n/useTranslation';
-import i18n from '../../i18n';
 /**
  * ForgotPassword — password recovery component.
  *
@@ -32,7 +31,7 @@ import { Input } from '../ui/macos';
 // ============================================================================
 // PASSWORD STRENGTH (shared with Setup.jsx — same logic)
 // ============================================================================
-function getPasswordStrength(password) {
+function getPasswordStrength(password, t) {
   if (!password) return { score: 0, label: '', color: 'transparent', percent: 0 };
   let score = 0;
   if (password.length >= 8) score += 1;
@@ -42,181 +41,14 @@ function getPasswordStrength(password) {
   if (/[^a-zA-Z0-9]/.test(password)) score += 1;
   score = Math.min(score, 4);
   const labels = [
-    { label: 'Очень слабый', color: 'var(--mac-error)', percent: 25 },
-    { label: 'Слабый', color: 'var(--mac-warning)', percent: 50 },
-    { label: 'Средний', color: 'var(--mac-warning)', percent: 75 },
-    { label: 'Хороший', color: 'var(--mac-success)', percent: 100 },
-    { label: 'Сильный', color: 'var(--mac-success)', percent: 100 },
+    { label: t('final.fp_strength_very_weak'), color: 'var(--mac-error)', percent: 25 },
+    { label: t('final.fp_strength_weak'), color: 'var(--mac-warning)', percent: 50 },
+    { label: t('final.fp_strength_medium'), color: 'var(--mac-warning)', percent: 75 },
+    { label: t('final.fp_strength_good'), color: 'var(--mac-success)', percent: 100 },
+    { label: t('final.fp_strength_strong'), color: 'var(--mac-success)', percent: 100 },
   ];
   return { score, ...labels[score] };
 }
-
-// ============================================================================
-// TRANSLATIONS (all strings — no hardcoded RU in render)
-// ============================================================================
-const translations = {
-  RU: {
-    title: i18n.t('final.password_recovery_title'),
-    subtitle: i18n.t('final.password_recovery_subtitle'),
-    methodPhone: 'По номеру телефона',
-    methodEmail: 'По электронной почте',
-    phoneLabel: 'Номер телефона',
-    emailLabel: 'Email адрес',
-    continue: 'Продолжить',
-    back: 'Назад',
-    sending: 'Отправка...',
-    newPassword: 'Новый пароль',
-    confirmPassword: 'Подтвердите пароль',
-    resetPassword: 'Сбросить пароль',
-    resetting: 'Сброс...',
-    success: 'Пароль успешно изменён!',
-    backToLogin: 'Вернуться к входу',
-    enterPhone: 'Введите номер телефона',
-    enterEmail: 'Введите email адрес',
-    phoneFormat: 'Формат: +998XXXXXXXXX',
-    emailFormat: 'Формат: example@domain.com',
-    passwordMismatch: 'Пароли не совпадают',
-    passwordTooShort: 'Пароль должен содержать минимум 8 символов',
-    invalidPhone: 'Неверный формат номера телефона',
-    invalidEmail: 'Неверный формат email адреса',
-    // Phone verify step
-    enterCode: 'Введите код подтверждения',
-    codeSentTo: 'Код отправлен на номер:',
-    codeLabel: 'Код подтверждения',
-    enterCodeError: 'Введите 6-значный код',
-    invalidCode: 'Неверный код или код истек',
-    confirm: 'Подтвердить',
-    checking: 'Проверка...',
-    resendCode: 'Отправить код повторно',
-    resendIn: 'Отправить повторно через',
-    seconds: 'с',
-    smsSent: 'Код для сброса пароля отправлен на ваш номер',
-    phoneConfirmed: 'Телефон подтверждён. Теперь введите новый пароль',
-    // Email verify step
-    checkEmail: 'Проверьте ваш email',
-    emailSentTo: 'Мы отправили ссылку для сброса пароля на адрес:',
-    emailInstruction1: 'Перейдите по ссылке в письме для сброса пароля.',
-    emailInstruction2: 'Если письмо не пришло, проверьте папку «Спам».',
-    // Reset password step
-    createNewPassword: 'Создайте новый пароль',
-    enterNewPassword: 'Введите новый пароль для вашего аккаунта',
-    passwordHint: 'Минимум 8 символов. Рекомендуется заглавные/строчные буквы, цифры и спецсимволы.',
-    passwordsMatch: 'Пароли совпадают',
-    passwordsDontMatch: 'Пароли не совпадают',
-    // Success step
-    canLoginNow: 'Теперь вы можете войти в систему с новым паролем',
-    // Errors
-    smsError: 'Ошибка отправки SMS для сброса пароля',
-    emailError: 'Ошибка отправки email для сброса пароля',
-    resetError: 'Ошибка сброса пароля',
-    showPassword: 'Показать пароль',
-    hidePassword: 'Скрыть пароль',
-  },
-  UZ: {
-    title: 'Parolni tiklash',
-    subtitle: 'Parolni tiklash usulini tanlang',
-    methodPhone: 'Telefon raqami orqali',
-    methodEmail: 'Email orqali',
-    phoneLabel: 'Telefon raqami',
-    emailLabel: 'Email manzil',
-    continue: 'Davom etish',
-    back: 'Orqaga',
-    sending: 'Yuborilmoqda...',
-    newPassword: 'Yangi parol',
-    confirmPassword: 'Parolni tasdiqlang',
-    resetPassword: 'Parolni tiklash',
-    resetting: 'Tiklanmoqda...',
-    success: 'Parol muvaffaqiyatli o\'zgartirildi!',
-    backToLogin: 'Kirishga qaytish',
-    enterPhone: 'Telefon raqamini kiriting',
-    enterEmail: 'Email manzilni kiriting',
-    phoneFormat: 'Format: +998XXXXXXXXX',
-    emailFormat: 'Format: example@domain.com',
-    passwordMismatch: 'Parollar mos kelmaydi',
-    passwordTooShort: 'Parol kamida 8 ta belgidan iborat bo\'lishi kerak',
-    invalidPhone: 'Telefon raqami formati noto\'g\'ri',
-    invalidEmail: 'Email manzil formati noto\'g\'ri',
-    enterCode: 'Tasdiqlash kodini kiriting',
-    codeSentTo: 'Kod quyidagi raqamga yuborildi:',
-    codeLabel: 'Tasdiqlash kodi',
-    enterCodeError: '6 xonali kodni kiriting',
-    invalidCode: 'Noto\'g\'ri kod yoki kod muddati tugagan',
-    confirm: 'Tasdiqlash',
-    checking: 'Tekshirilmoqda...',
-    resendCode: 'Kodni qayta yuborish',
-    resendIn: 'Qayta yuborish',
-    seconds: 'soniyadan so\'ng',
-    smsSent: 'Parolni tiklash kodi raqamingizga yuborildi',
-    phoneConfirmed: 'Telefon tasdiqlandi. Endi yangi parolni kiriting',
-    checkEmail: 'Emailingizni tekshiring',
-    emailSentTo: 'Parolni tiklash havolasi quyidagi manzilga yuborildi:',
-    emailInstruction1: 'Parolni tiklash uchun xatdagi havolaga o\'ting.',
-    emailInstruction2: 'Xat kelmagan bo\'lsa, \'Spam\' papkasini tekshiring.',
-    createNewPassword: 'Yangi parol yarating',
-    enterNewPassword: 'Hisobingiz uchun yangi parolni kiriting',
-    passwordHint: 'Kamida 8 ta belgi. Bosh/kichik harflar, raqamlar va maxsus belgilar tavsiya etiladi.',
-    passwordsMatch: 'Parollar mos',
-    passwordsDontMatch: 'Parollar mos emas',
-    canLoginNow: 'Endi yangi parol bilan tizimga kirishingiz mumkin',
-    smsError: 'Parolni tiklash SMS xatosi',
-    emailError: 'Parolni tiklash email xatosi',
-    resetError: 'Parolni tiklash xatosi',
-    showPassword: 'Parolni ko\'rsatish',
-    hidePassword: 'Parolni yashirish',
-  },
-  EN: {
-    title: 'Password Recovery',
-    subtitle: 'Choose password recovery method',
-    methodPhone: 'By phone number',
-    methodEmail: 'By email address',
-    phoneLabel: 'Phone number',
-    emailLabel: 'Email address',
-    continue: 'Continue',
-    back: 'Back',
-    sending: 'Sending...',
-    newPassword: 'New password',
-    confirmPassword: 'Confirm password',
-    resetPassword: 'Reset Password',
-    resetting: 'Resetting...',
-    success: 'Password successfully changed!',
-    backToLogin: 'Back to Login',
-    enterPhone: 'Enter phone number',
-    enterEmail: 'Enter email address',
-    phoneFormat: 'Format: +998XXXXXXXXX',
-    emailFormat: 'Format: example@domain.com',
-    passwordMismatch: 'Passwords do not match',
-    passwordTooShort: 'Password must be at least 8 characters',
-    invalidPhone: 'Invalid phone number format',
-    invalidEmail: 'Invalid email address format',
-    enterCode: 'Enter verification code',
-    codeSentTo: 'Code sent to:',
-    codeLabel: 'Verification code',
-    enterCodeError: 'Enter 6-digit code',
-    invalidCode: 'Invalid or expired code',
-    confirm: 'Confirm',
-    checking: 'Checking...',
-    resendCode: 'Resend code',
-    resendIn: 'Resend in',
-    seconds: 's',
-    smsSent: 'Password reset code sent to your number',
-    phoneConfirmed: 'Phone confirmed. Now enter your new password',
-    checkEmail: 'Check your email',
-    emailSentTo: 'We sent a password reset link to:',
-    emailInstruction1: 'Click the link in the email to reset your password.',
-    emailInstruction2: 'If the email hasn\'t arrived, check your Spam folder.',
-    createNewPassword: 'Create a new password',
-    enterNewPassword: 'Enter a new password for your account',
-    passwordHint: 'Minimum 8 characters. Uppercase/lowercase letters, numbers, and symbols recommended.',
-    passwordsMatch: 'Passwords match',
-    passwordsDontMatch: 'Passwords do not match',
-    canLoginNow: 'You can now log in with your new password',
-    smsError: 'Error sending SMS for password reset',
-    emailError: 'Error sending email for password reset',
-    resetError: 'Error resetting password',
-    showPassword: 'Show password',
-    hidePassword: 'Hide password',
-  },
-};
 
 const RESEND_COOLDOWN_SECONDS = 30;
 
@@ -237,7 +69,7 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
   const [passwordsMatch, setPasswordsMatch] = useState(null);
   const [resendCountdown, setResendCountdown] = useState(0);
 
-  const passwordStrength = getPasswordStrength(newPassword);
+  const passwordStrength = getPasswordStrength(newPassword, t);
 
   // Resend countdown timer
   useEffect(() => {
@@ -323,14 +155,14 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
     try {
       const response = await api.post('/password-reset/initiate', { phone: contact });
       if (response.data.success) {
-        toast.success(t.smsSent);
+        toast.success(t('final.fp_sms_sent'));
         setStep('phone-verify');
         startResendCountdown();
       }
     } catch (error) {
       logger.error('Error sending phone reset:', error);
-      setInlineError(t.smsError);
-      toast.error(t.smsError);
+      setInlineError(t('final.fp_sms_error'));
+      toast.error(t('final.fp_sms_error'));
     } finally {
       setLoading(false);
     }
@@ -342,13 +174,13 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
     try {
       const response = await api.post('/password-reset/initiate', { email: contact });
       if (response.data.success) {
-        toast.success(t.emailSentTo + ' ' + contact);
+        toast.success(t('final.fp_email_sent_to') + ' ' + contact);
         setStep('email-verify');
       }
     } catch (error) {
       logger.error('Error sending email reset:', error);
-      setInlineError(t.emailError);
-      toast.error(t.emailError);
+      setInlineError(t('final.fp_email_error'));
+      toast.error(t('final.fp_email_error'));
     } finally {
       setLoading(false);
     }
@@ -357,15 +189,15 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
   const handleMethodSelect = async () => {
     setInlineError('');
     if (!contact.trim()) {
-      setInlineError(method === 'phone' ? t.enterPhone : t.enterEmail);
+      setInlineError(method === 'phone' ? t('final.fp_enter_phone') : t('final.fp_enter_email'));
       return;
     }
     if (method === 'phone' && !validatePhone(contact)) {
-      setInlineError(t.invalidPhone);
+      setInlineError(t('final.fp_invalid_phone'));
       return;
     }
     if (method === 'email' && !validateEmail(contact)) {
-      setInlineError(t.invalidEmail);
+      setInlineError(t('final.fp_invalid_email'));
       return;
     }
     if (method === 'phone') {
@@ -378,7 +210,7 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
   const handleVerifyPhoneCode = async () => {
     setInlineError('');
     if (!verificationCode || verificationCode.length !== 6) {
-      setInlineError(t.enterCodeError);
+      setInlineError(t('final.fp_enter_code_error'));
       return;
     }
     setLoading(true);
@@ -390,11 +222,11 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
       if (response.data.success) {
         setResetToken(response.data.reset_token);
         setStep('reset-password');
-        toast.success(t.phoneConfirmed);
+        toast.success(t('final.fp_phone_confirmed'));
       }
     } catch (error) {
       logger.error('Error verifying phone code:', error);
-      setInlineError(t.invalidCode);
+      setInlineError(t('final.fp_invalid_code'));
     } finally {
       setLoading(false);
     }
@@ -407,12 +239,12 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
     try {
       const response = await api.post('/password-reset/initiate', { phone: contact });
       if (response.data.success) {
-        toast.success(t.smsSent);
+        toast.success(t('final.fp_sms_sent'));
         startResendCountdown();
       }
     } catch (error) {
       logger.error('Error resending phone reset:', error);
-      setInlineError(t.smsError);
+      setInlineError(t('final.fp_sms_error'));
     } finally {
       setLoading(false);
     }
@@ -422,11 +254,11 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
     setInlineError('');
     // UX Audit #5: minimum 8 characters (was 6)
     if (!newPassword || newPassword.length < 8) {
-      setInlineError(t.passwordTooShort);
+      setInlineError(t('final.fp_password_too_short'));
       return;
     }
     if (newPassword !== confirmPassword) {
-      setInlineError(t.passwordMismatch);
+      setInlineError(t('final.fp_password_mismatch'));
       return;
     }
     setLoading(true);
@@ -437,13 +269,13 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
       });
       if (response.data.success) {
         setStep('success');
-        toast.success(t.success);
+        toast.success(t('final.fp_success'));
         // UX Audit #10: removed 3s auto-return setTimeout.
         // User clicks "Back to Login" explicitly.
       }
     } catch (error) {
       logger.error('Error resetting password:', error);
-      setInlineError(t.resetError);
+      setInlineError(t('final.fp_reset_error'));
     } finally {
       setLoading(false);
     }
@@ -527,15 +359,15 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
   const renderMethodSelection = () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
       <div style={{ textAlign: 'center' }}>
-        <h2 style={{ fontSize: 'var(--mac-font-size-3xl)', fontWeight: 'var(--mac-font-weight-bold)', marginBottom: 'var(--mac-spacing-2)', color: textPrimary }}>{t.title}</h2>
-        <p style={{ color: textSecondary, fontSize: 'var(--mac-font-size-base)' }}>{t.subtitle}</p>
+        <h2 style={{ fontSize: 'var(--mac-font-size-3xl)', fontWeight: 'var(--mac-font-weight-bold)', marginBottom: 'var(--mac-spacing-2)', color: textPrimary }}>{t('final.password_recovery_title')}</h2>
+        <p style={{ color: textSecondary, fontSize: 'var(--mac-font-size-base)' }}>{t('final.password_recovery_subtitle')}</p>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-4)' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--mac-spacing-4)' }}>
           {[
-            { key: 'phone', icon: Phone, label: t.methodPhone },
-            { key: 'email', icon: Mail, label: t.methodEmail },
+            { key: 'phone', icon: Phone, label: t('final.fp_method_phone') },
+            { key: 'email', icon: Mail, label: t('final.fp_method_email') },
           ].map(({ key, icon: Icon, label }) => (
             <button
               key={key}
@@ -572,10 +404,10 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
         </div>
 
         <div>
-          <label style={labelStyle}>{method === 'phone' ? t.phoneLabel : t.emailLabel}</label>
+          <label style={labelStyle}>{method === 'phone' ? t('final.fp_phone_label') : t('final.fp_email_label')}</label>
           <Input
             type={method === 'phone' ? 'tel' : 'email'}
-            aria-label={method === 'phone' ? t.phoneLabel : t.emailLabel}
+            aria-label={method === 'phone' ? t('final.fp_phone_label') : t('final.fp_email_label')}
             value={contact}
             onChange={(e) => {
               const value = method === 'phone' ? formatPhone(e.target.value) : e.target.value;
@@ -601,7 +433,7 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
             }}
           />
           <p style={{ fontSize: 'var(--mac-font-size-xs)', color: textTertiary, marginTop: 'var(--mac-spacing-2)', marginLeft: 'var(--mac-spacing-1)' }}>
-            {method === 'phone' ? t.phoneFormat : t.emailFormat}
+            {method === 'phone' ? t('final.fp_phone_format') : t('final.fp_email_format')}
           </p>
         </div>
 
@@ -615,19 +447,19 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
         <div style={{ display: 'flex', gap: 'var(--mac-spacing-3)' }}>
           <button type="button" onClick={onBack} style={btnOutlineStyle} disabled={loading}>
             <ArrowLeft size={16} />
-            {t.back}
+            {t('final.fp_back')}
           </button>
           <button
             type="button"
             onClick={handleMethodSelect}
             style={btnPrimaryStyle}
-            aria-label={loading ? t.sending : t.continue}
+            aria-label={loading ? t('final.fp_sending') : t('final.fp_continue')}
             disabled={loading || !contact.trim()}
           >
             {loading ? (
-              <><RefreshCw size={16} style={{ animation: 'spin 1s linear infinite' }} />{t.sending}</>
+              <><RefreshCw size={16} style={{ animation: 'spin 1s linear infinite' }} />{t('final.fp_sending')}</>
             ) : (
-              <><Send size={16} />{t.continue}</>
+              <><Send size={16} />{t('final.fp_continue')}</>
             )}
           </button>
         </div>
@@ -642,17 +474,17 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
         <div style={{ ...iconCircleStyle(accentColor), margin: '0 auto 16px' }}>
           <Phone size={32} color={accentColor} />
         </div>
-        <h3 style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-semibold)', marginBottom: 'var(--mac-spacing-2)', color: textPrimary }}>{t.enterCode}</h3>
-        <p style={{ color: textSecondary, fontSize: 'var(--mac-font-size-base)' }}>{t.codeSentTo}</p>
+        <h3 style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-semibold)', marginBottom: 'var(--mac-spacing-2)', color: textPrimary }}>{t('final.fp_enter_code')}</h3>
+        <p style={{ color: textSecondary, fontSize: 'var(--mac-font-size-base)' }}>{t('final.fp_code_sent_to')}</p>
         <p style={{ color: accentColor, fontWeight: 'var(--mac-font-weight-semibold)', marginTop: 'var(--mac-spacing-1)' }}>{contact}</p>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-4)' }}>
         <div>
-          <label style={labelStyle}>{t.codeLabel}</label>
+          <label style={labelStyle}>{t('final.fp_code_label')}</label>
           <Input
             type="text"
-            aria-label={t.codeLabel}
+            aria-label={t('final.fp_code_label')}
             value={verificationCode}
             onChange={(e) => {
               setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6));
@@ -678,7 +510,7 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
         <div style={{ textAlign: 'center' }}>
           {resendCountdown > 0 ? (
             <span style={{ fontSize: 'var(--mac-font-size-sm)', color: textTertiary }}>
-              {t.resendIn} {resendCountdown} {t.seconds}
+              {t('final.fp_resend_in')} {resendCountdown} {t('final.fp_seconds')}
             </span>
           ) : (
             <button
@@ -696,7 +528,7 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
                 font: 'inherit',
               }}
             >
-              {t.resendCode}
+              {t('final.fp_resend_code')}
             </button>
           )}
         </div>
@@ -711,19 +543,19 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
         <div style={{ display: 'flex', gap: 'var(--mac-spacing-3)' }}>
           <button type="button" onClick={() => setStep('method')} style={btnOutlineStyle} disabled={loading}>
             <ArrowLeft size={16} />
-            {t.back}
+            {t('final.fp_back')}
           </button>
           <button
             type="button"
             onClick={handleVerifyPhoneCode}
             style={btnPrimaryStyle}
-            aria-label={loading ? t.checking : t.confirm}
+            aria-label={loading ? t('final.fp_checking') : t('final.fp_confirm')}
             disabled={loading || !verificationCode || verificationCode.length !== 6}
           >
             {loading ? (
-              <><RefreshCw size={16} style={{ animation: 'spin 1s linear infinite' }} />{t.checking}</>
+              <><RefreshCw size={16} style={{ animation: 'spin 1s linear infinite' }} />{t('final.fp_checking')}</>
             ) : (
-              <><Shield size={16} />{t.confirm}</>
+              <><Shield size={16} />{t('final.fp_confirm')}</>
             )}
           </button>
         </div>
@@ -740,17 +572,17 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
         </div>
       </div>
       <div>
-        <h3 style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-semibold)', marginBottom: 'var(--mac-spacing-2)', color: textPrimary }}>{t.checkEmail}</h3>
-        <p style={{ color: textSecondary, fontSize: 'var(--mac-font-size-base)' }}>{t.emailSentTo}</p>
+        <h3 style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-semibold)', marginBottom: 'var(--mac-spacing-2)', color: textPrimary }}>{t('final.fp_check_email')}</h3>
+        <p style={{ color: textSecondary, fontSize: 'var(--mac-font-size-base)' }}>{t('final.fp_email_sent_to')}</p>
         <p style={{ color: accentColor, fontWeight: 'var(--mac-font-weight-semibold)', marginTop: 'var(--mac-spacing-1)' }}>{contact}</p>
       </div>
       <div style={{ fontSize: 'var(--mac-font-size-sm)', color: textTertiary, lineHeight: '1.5' }}>
-        <p>{t.emailInstruction1}</p>
-        <p>{t.emailInstruction2}</p>
+        <p>{t('final.fp_email_instruction1')}</p>
+        <p>{t('final.fp_email_instruction2')}</p>
       </div>
       <button type="button" onClick={() => setStep('method')} style={{ ...btnOutlineStyle, width: '100%' }}>
         <ArrowLeft size={16} />
-        {t.back}
+        {t('final.fp_back')}
       </button>
     </div>
   );
@@ -764,18 +596,18 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
             <Key size={32} color={successColor} />
           </div>
         </div>
-        <h3 style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-semibold)', marginBottom: 'var(--mac-spacing-2)', color: textPrimary }}>{t.createNewPassword}</h3>
-        <p style={{ color: textSecondary, fontSize: 'var(--mac-font-size-base)' }}>{t.enterNewPassword}</p>
+        <h3 style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-semibold)', marginBottom: 'var(--mac-spacing-2)', color: textPrimary }}>{t('final.fp_create_new_password')}</h3>
+        <p style={{ color: textSecondary, fontSize: 'var(--mac-font-size-base)' }}>{t('final.fp_enter_new_password')}</p>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-4)' }}>
         {/* New password with show/hide (UX Audit #4) */}
         <div>
-          <label style={labelStyle}>{t.newPassword}</label>
+          <label style={labelStyle}>{t('final.fp_new_password')}</label>
           <div style={{ position: 'relative' }}>
             <Input
               type={showNewPassword ? 'text' : 'password'}
-              aria-label={t.newPassword}
+              aria-label={t('final.fp_new_password')}
               value={newPassword}
               onChange={(e) => {
                 setNewPassword(e.target.value);
@@ -790,8 +622,8 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
             <button
               type="button"
               onClick={() => setShowNewPassword((v) => !v)}
-              aria-label={showNewPassword ? t.hidePassword : t.showPassword}
-              title={showNewPassword ? t.hidePassword : t.showPassword}
+              aria-label={showNewPassword ? t('final.fp_hide_password') : t('final.fp_show_password')}
+              title={showNewPassword ? t('final.fp_hide_password') : t('final.fp_show_password')}
               style={{
                 position: 'absolute',
                 right: '6px',
@@ -821,17 +653,17 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
             </div>
           )}
           <span style={{ fontSize: 'var(--mac-font-size-xs)', color: textTertiary, display: 'block', marginTop: 'var(--mac-spacing-1)' }}>
-            {t.passwordHint}
+            {t('final.fp_password_hint')}
           </span>
         </div>
 
         {/* Confirm password with show/hide (UX Audit #4) + real-time match (UX Audit #9) */}
         <div>
-          <label style={labelStyle}>{t.confirmPassword}</label>
+          <label style={labelStyle}>{t('final.fp_confirm_password')}</label>
           <div style={{ position: 'relative' }}>
             <Input
               type={showConfirmPassword ? 'text' : 'password'}
-              aria-label={t.confirmPassword}
+              aria-label={t('final.fp_confirm_password')}
               value={confirmPassword}
               onChange={(e) => {
                 setConfirmPassword(e.target.value);
@@ -846,8 +678,8 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
             <button
               type="button"
               onClick={() => setShowConfirmPassword((v) => !v)}
-              aria-label={showConfirmPassword ? t.hidePassword : t.showPassword}
-              title={showConfirmPassword ? t.hidePassword : t.showPassword}
+              aria-label={showConfirmPassword ? t('final.fp_hide_password') : t('final.fp_show_password')}
+              title={showConfirmPassword ? t('final.fp_hide_password') : t('final.fp_show_password')}
               style={{
                 position: 'absolute',
                 right: '6px',
@@ -869,9 +701,9 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
           {confirmPassword && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)', marginTop: 'var(--mac-spacing-1)', fontSize: 'var(--mac-font-size-xs)', fontWeight: 'var(--mac-font-weight-semibold)' }}>
               {passwordsMatch ? (
-                <><CheckCircle size={14} style={{ color: successColor }} /><span style={{ color: successColor }}>{t.passwordsMatch}</span></>
+                <><CheckCircle size={14} style={{ color: successColor }} /><span style={{ color: successColor }}>{t('final.fp_passwords_match')}</span></>
               ) : (
-                <><AlertCircle size={14} style={{ color: 'var(--mac-error, #ef4444)' }} /><span style={{ color: 'var(--mac-error, #ef4444)' }}>{t.passwordsDontMatch}</span></>
+                <><AlertCircle size={14} style={{ color: 'var(--mac-error, #ef4444)' }} /><span style={{ color: 'var(--mac-error, #ef4444)' }}>{t('final.fp_passwords_dont_match')}</span></>
               )}
             </div>
           )}
@@ -888,13 +720,13 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
           type="button"
           onClick={handlePasswordReset}
           style={{ ...btnPrimaryStyle, width: '100%' }}
-          aria-label={loading ? t.resetting : t.resetPassword}
+          aria-label={loading ? t('final.fp_resetting') : t('final.fp_reset_password')}
           disabled={loading || !newPassword || !confirmPassword}
         >
           {loading ? (
-            <><RefreshCw size={16} style={{ animation: 'spin 1s linear infinite' }} />{t.resetting}</>
+            <><RefreshCw size={16} style={{ animation: 'spin 1s linear infinite' }} />{t('final.fp_resetting')}</>
           ) : (
-            <><Shield size={16} />{t.resetPassword}</>
+            <><Shield size={16} />{t('final.fp_reset_password')}</>
           )}
         </button>
       </div>
@@ -910,8 +742,8 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
         </div>
       </div>
       <div>
-        <h3 style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-semibold)', marginBottom: 'var(--mac-spacing-2)', color: textPrimary }}>{t.success}</h3>
-        <p style={{ color: textSecondary, fontSize: 'var(--mac-font-size-base)' }}>{t.canLoginNow}</p>
+        <h3 style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-semibold)', marginBottom: 'var(--mac-spacing-2)', color: textPrimary }}>{t('final.fp_success')}</h3>
+        <p style={{ color: textSecondary, fontSize: 'var(--mac-font-size-base)' }}>{t('final.fp_can_login_now')}</p>
       </div>
       {/* UX Audit #10: removed 3s auto-return, explicit button only */}
       <button
@@ -919,7 +751,7 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
         onClick={onSuccess || onBack}
         style={{ ...btnPrimaryStyle, width: '100%' }}
       >
-        {t.backToLogin}
+        {t('final.fp_back_to_login')}
       </button>
     </div>
   );

@@ -24,6 +24,7 @@ const getUserRole = () => {
 };
 
 export default function PatientPickupView() {
+  const { t } = useTranslation();
   const { patientId } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -41,13 +42,13 @@ export default function PatientPickupView() {
 
   // Get page title based on role/view
   const getPageTitle = () => {
-    if (specialtyParam === 'cardio') return 'История визитов — Кардиология';
-    if (specialtyParam === 'derma') return 'История визитов — Дерматология';
-    if (specialtyParam === 'dental') return 'История визитов — Стоматология';
-    if (isDoctor) return 'История визитов пациента';
-    if (isLabView) return 'Лабораторные анализы';
-    if (isCashierView) return 'История визитов и оплат';
-    return 'Выдача результатов';
+    if (specialtyParam === 'cardio') return t('misc.ppu_title_cardio');
+    if (specialtyParam === 'derma') return t('misc.ppu_title_derma');
+    if (specialtyParam === 'dental') return t('misc.ppu_title_dental');
+    if (isDoctor) return t('misc.ppu_title_patient');
+    if (isLabView) return t('misc.ppu_title_lab');
+    if (isCashierView) return t('misc.ppu_title_cashier');
+    return t('misc.ppu_title_default');
   };
 
   const [patient, setPatient] = useState(null);
@@ -85,11 +86,11 @@ export default function PatientPickupView() {
       }
     } catch (err) {
       logger.error('Error loading patient:', err);
-      setError('Не удалось загрузить данные пациента');
+      setError(t('misc.ppu_load_error'));
     } finally {
       setIsLoading(false);
     }
-  }, [patientId]);
+  }, [patientId, t]);
 
   useEffect(() => {
     loadData();
@@ -108,10 +109,10 @@ export default function PatientPickupView() {
   // Get status badge for lab results
   const getStatusBadge = (status) => {
     const config = {
-      done: { icon: '🟢', label: 'Готов', bg: 'var(--mac-success-bg)', color: 'var(--mac-success)' },
-      in_progress: { icon: '🟡', label: 'В процессе', bg: 'var(--mac-warning-bg)', color: 'var(--mac-warning)' },
-      ordered: { icon: '⚪', label: 'Заказан', bg: 'var(--mac-bg-secondary)', color: 'var(--mac-text-secondary)' },
-      canceled: { icon: '🔴', label: 'Отменён', bg: 'var(--mac-error-bg)', color: 'var(--mac-error)' }
+      done: { icon: '🟢', label: t('misc.ppu_status_done'), bg: 'var(--mac-success-bg)', color: 'var(--mac-success)' },
+      in_progress: { icon: '🟡', label: t('misc.ppu_status_in_progress'), bg: 'var(--mac-warning-bg)', color: 'var(--mac-warning)' },
+      ordered: { icon: '⚪', label: t('misc.ppu_status_ordered'), bg: 'var(--mac-bg-secondary)', color: 'var(--mac-text-secondary)' },
+      canceled: { icon: '🔴', label: t('misc.ppu_status_canceled'), bg: 'var(--mac-error-bg)', color: 'var(--mac-error)' }
     };
     const normalizedStatus = String(status || '').toUpperCase();
     if (['FINALIZED', 'PRINTED'].includes(normalizedStatus)) return config.done;
@@ -136,15 +137,15 @@ export default function PatientPickupView() {
   // Get status badge for visits
   const getVisitStatusBadge = (status) => {
     const config = {
-      scheduled: { icon: '📅', label: 'Запланирован', bg: 'var(--mac-accent-bg)', color: 'var(--mac-accent)' },
-      in_queue: { icon: '⏳', label: 'В очереди', bg: 'var(--mac-warning-bg)', color: 'var(--mac-warning)' },
-      in_progress: { icon: '🟡', label: 'На приёме', bg: 'var(--mac-warning-bg)', color: 'var(--mac-warning)' },
-      completed: { icon: '🟢', label: 'Завершён', bg: 'var(--mac-success-bg)', color: 'var(--mac-success)' },
-      paid: { icon: '💳', label: 'Оплачено', bg: 'var(--mac-success-bg)', color: 'var(--mac-success)' },
-      cancelled: { icon: '🔴', label: 'Отменён', bg: 'var(--mac-error-bg)', color: 'var(--mac-error)' },
-      no_show: { icon: '❌', label: 'Неявка', bg: 'var(--mac-error-bg)', color: 'var(--mac-error)' }
+      scheduled: { icon: '📅', label: t('misc.ppu_visit_status_scheduled'), bg: 'var(--mac-accent-bg)', color: 'var(--mac-accent)' },
+      in_queue: { icon: '⏳', label: t('misc.ppu_visit_status_in_queue'), bg: 'var(--mac-warning-bg)', color: 'var(--mac-warning)' },
+      in_progress: { icon: '🟡', label: t('misc.ppu_visit_status_in_progress'), bg: 'var(--mac-warning-bg)', color: 'var(--mac-warning)' },
+      completed: { icon: '🟢', label: t('misc.ppu_visit_status_completed'), bg: 'var(--mac-success-bg)', color: 'var(--mac-success)' },
+      paid: { icon: '💳', label: t('misc.ppu_visit_status_paid'), bg: 'var(--mac-success-bg)', color: 'var(--mac-success)' },
+      cancelled: { icon: '🔴', label: t('misc.ppu_visit_status_cancelled'), bg: 'var(--mac-error-bg)', color: 'var(--mac-error)' },
+      no_show: { icon: '❌', label: t('misc.ppu_visit_status_no_show'), bg: 'var(--mac-error-bg)', color: 'var(--mac-error)' }
     };
-    return config[status] || { icon: '⚪', label: status || 'Неизвестно', bg: 'var(--mac-bg-secondary)', color: 'var(--mac-text-secondary)' };
+    return config[status] || { icon: '⚪', label: status || t('misc.ppu_visit_status_unknown'), bg: 'var(--mac-bg-secondary)', color: 'var(--mac-text-secondary)' };
   };
 
   // Handle print
@@ -157,7 +158,7 @@ export default function PatientPickupView() {
           <td>${getVisitStatusBadge(visit.status).label}</td>
         </tr>
       `).join('')
-      : '<tr><td colspan="3">Записи не найдены</td></tr>';
+      : `<tr><td colspan="3">${t('misc.ppu_print_no_visits')}</td></tr>`;
 
     const labHtml = labResults.length
       ? labResults.map((result) => `
@@ -167,7 +168,7 @@ export default function PatientPickupView() {
           <td>${getStatusBadge(result.status).label}</td>
         </tr>
       `).join('')
-      : '<tr><td colspan="3">Результаты не найдены</td></tr>';
+      : `<tr><td colspan="3">${t('misc.ppu_print_no_lab_results')}</td></tr>`;
 
     openPrintableWindow({
       features: 'width=900,height=700',
@@ -175,7 +176,7 @@ export default function PatientPickupView() {
       <!doctype html>
       <html lang="ru">
         <head>
-          <title>Выдача результатов пациента</title>
+          <title>${t('misc.ppu_print_title')}</title>
           <style>
             body { font-family: Arial, sans-serif; margin: 24px; color: #111827; }
             h1 { margin: 0 0 12px; font-size: 24px; }
@@ -190,15 +191,15 @@ export default function PatientPickupView() {
         </head>
         <body>
           <h1>${getPageTitle()}</h1>
-          <div class="muted">Печатная форма для выдачи данных пациенту</div>
+          <div class="muted">${t('misc.ppu_print_muted')}</div>
           <div class="meta">
-            <div><strong>Пациент:</strong> ${patient?.full_name || patient?.name || '—'}</div>
-            <div><strong>ID:</strong> ${patientId || '—'}</div>
-            <div><strong>Дата рождения:</strong> ${formatDate(patient?.birth_date || patient?.birthDate)}</div>
-            <div><strong>Телефон:</strong> ${patient?.phone || '—'}</div>
+            <div><strong>${t('misc.ppu_print_patient')}</strong> ${patient?.full_name || patient?.name || '—'}</div>
+            <div><strong>${t('misc.ppu_print_id')}</strong> ${patientId || '—'}</div>
+            <div><strong>${t('misc.ppu_print_birth_date')}</strong> ${formatDate(patient?.birth_date || patient?.birthDate)}</div>
+            <div><strong>${t('misc.ppu_print_phone')}</strong> ${patient?.phone || '—'}</div>
           </div>
 
-          <h2>История визитов</h2>
+          <h2>${t('misc.ppu_print_visits_title')}</h2>
           <table>
             <thead>
               <tr>
@@ -210,12 +211,12 @@ export default function PatientPickupView() {
             <tbody>${visitsHtml}</tbody>
           </table>
 
-          <h2>Лабораторные результаты</h2>
+          <h2>${t('misc.ppu_print_lab_title')}</h2>
           <table>
             <thead>
               <tr>
-                <th>Исследование</th>
-                <th>Результат</th>
+                <th>${t('misc.ppu_print_lab_study')}</th>
+                <th>${t('misc.ppu_print_lab_result')}</th>
                 <th>{t('common.status')}</th>
               </tr>
             </thead>
@@ -237,7 +238,7 @@ export default function PatientPickupView() {
       link.download = `lab_result_${labResult.id}.pdf`;
       link.click();
     } catch {
-      notify.info('PDF пока недоступен');
+      notify.info(t('misc.ppu_pdf_unavailable'));
     }
   };
 
@@ -394,9 +395,9 @@ export default function PatientPickupView() {
     return (
       <div style={styles.container}>
         <AppLoading
-          title="Загрузка данных пациента..."
-          description="Получаем карточку, анализы и историю визитов."
-          ariaLabel="Загружаем данные пациента"
+          title={t('misc.ppu_loading_title')}
+          description={t('misc.ppu_loading_desc')}
+          ariaLabel={t('misc.ppu_loading_aria')}
           style={styles.loading}
         />
             </div>);
@@ -407,7 +408,7 @@ export default function PatientPickupView() {
     return (
       <div style={styles.container}>
         <AppError
-          title="Не удалось загрузить данные пациента"
+          title={t('misc.ppu_load_error')}
           description={error}
           action={
             <Button
@@ -417,8 +418,8 @@ export default function PatientPickupView() {
               onClick={loadData}
               disabled={isLoading}
               loading={isLoading}
-              aria-label="Повторить загрузку данных пациента">
-              Повторить
+              aria-label={t('misc.ppu_retry_aria')}>
+              {t('misc.ppu_retry')}
             </Button>
           }
           style={styles.error}
@@ -435,8 +436,8 @@ export default function PatientPickupView() {
                   type="button"
                   style={styles.backButton}
                   onClick={() => navigate(-1)}
-                  aria-label="Вернуться на предыдущую страницу">
-                    ← Назад
+                  aria-label={t('misc.ppu_back_aria')}>
+                    ← {t('misc.ppu_back')}
                 </button>
                 <h1 id="patient-pickup-title" style={styles.title}>{getPageTitle()}</h1>
             </div>
@@ -444,17 +445,17 @@ export default function PatientPickupView() {
             {/* Patient Info Card */}
             <div style={styles.card}>
                 <h2 style={styles.sectionTitle}>
-                    👤 Информация о пациенте
+                    👤 {t('misc.ppu_patient_info_title')}
                 </h2>
                 <div style={styles.patientInfo}>
                     <div style={styles.infoItem}>
-                        <span style={styles.infoLabel}>ФИО</span>
+                        <span style={styles.infoLabel}>{t('misc.ppu_field_full_name')}</span>
                         <span style={styles.infoValue}>
                             {patient?.last_name} {patient?.first_name} {patient?.middle_name || ''}
                         </span>
                     </div>
                     <div style={styles.infoItem}>
-                        <span style={styles.infoLabel}>Дата рождения</span>
+                        <span style={styles.infoLabel}>{t('misc.ppu_field_birth_date')}</span>
                         <span style={styles.infoValue}>{formatDate(patient?.birth_date)}</span>
                     </div>
                     <div style={styles.infoItem}>
@@ -462,7 +463,7 @@ export default function PatientPickupView() {
                         <span style={styles.infoValue}>{patient?.phone || '—'}</span>
                     </div>
                     <div style={styles.infoItem}>
-                        <span style={styles.infoLabel}>ID пациента</span>
+                        <span style={styles.infoLabel}>{t('misc.ppu_field_patient_id')}</span>
                         <span style={styles.infoValue}>#{patient?.id}</span>
                     </div>
                 </div>
@@ -481,13 +482,13 @@ export default function PatientPickupView() {
             {(isLabView || !isCashierView && !isDoctor) &&
       <div style={styles.card}>
                     <h2 style={styles.sectionTitle}>
-                        🧪 Результаты анализов
+                        🧪 {t('misc.ppu_lab_results_title')}
                     </h2>
 
                     {labResults.length === 0 ?
         <AppEmpty
-          title="Нет результатов анализов"
-          description="Для этого пациента пока нет лабораторных результатов для выдачи."
+          title={t('misc.ppu_no_lab_results_title')}
+          description={t('misc.ppu_no_lab_results_desc')}
           style={styles.emptyState}
         /> :
 
@@ -502,18 +503,18 @@ export default function PatientPickupView() {
                                                 {getLabDisplayName(lab)}
                                             </div>
                                             <div style={styles.labDate}>
-                                                Код: {getLabDisplayCode(lab)} • Заказ #{lab.id}
+                                                {t('misc.ppu_lab_code_order', { code: getLabDisplayCode(lab), id: lab.id })}
                                             </div>
                                         </div>
 
                                         <div
-                  aria-label={`Статус анализа: ${status.label}`}
+                  aria-label={t('misc.ppu_lab_status_aria', { label: status.label })}
                   style={{
                     ...styles.statusBadge,
                     background: status.bg,
                     color: status.color
                   }}>
-                  
+
                                             {status.icon} {status.label}
                                         </div>
 
@@ -523,18 +524,18 @@ export default function PatientPickupView() {
                     type="button"
                     style={styles.actionButton}
                     onClick={() => handlePrint(lab)}
-                    aria-label={`Печать анализа ${getLabDisplayName(lab)}`}
-                    title="Печать">
-                    
-                                                        🖨️ Печать
+                    aria-label={t('misc.ppu_print_lab_aria', { name: getLabDisplayName(lab) })}
+                    title={t('misc.ppu_print_action')}>
+
+                                                        🖨️ {t('misc.ppu_print_action')}
                                                     </button>
                   <button
                     type="button"
                     style={styles.actionButton}
                     onClick={() => handleDownloadPDF(lab)}
-                    aria-label={`Скачать PDF анализа ${getLabDisplayName(lab)}`}
-                    title="Скачать PDF">
-                    
+                    aria-label={t('misc.ppu_download_pdf_aria', { name: getLabDisplayName(lab) })}
+                    title={t('misc.ppu_download_pdf_title_attr')}>
+
                                                         📄 PDF
                                                     </button>
                                             </div>
@@ -551,32 +552,32 @@ export default function PatientPickupView() {
             {!isLabView &&
       <div style={styles.card}>
                     <h2 style={styles.sectionTitle}>
-                        {isCashierView ? '💳 История визитов и оплат' : '📋 История визитов'}
+                        {isCashierView ? `💳 ${t('misc.ppu_title_cashier')}` : `📋 ${t('misc.ppu_print_visits_title')}`}
                     </h2>
 
                     {visits.length === 0 ?
         <AppEmpty
-          title="Нет истории визитов"
-          description="Для этого пациента пока нет визитов, доступных в этом представлении."
+          title={t('misc.ppu_no_visits_title')}
+          description={t('misc.ppu_no_visits_desc')}
           style={styles.emptyState}
         /> :
 
-        <div className="admin-table-wrapper" style={{ overflowX: 'auto' }} aria-label="История визитов пациента">
+        <div className="admin-table-wrapper" style={{ overflowX: 'auto' }} aria-label={t('misc.ppu_title_patient')}>
                             <table style={{
             width: '100%',
             borderCollapse: 'collapse',
             fontSize: 'var(--mac-font-size-base)'
           }}>
-                                <caption style={styles.visuallyHidden}>История визитов пациента</caption>
+                                <caption style={styles.visuallyHidden}>{t('misc.ppu_title_patient')}</caption>
                                 <thead>
                                     <tr style={{
                 background: 'var(--mac-bg-tertiary, #f1f5f9)',
                 borderBottom: '2px solid var(--mac-separator, #e2e8f0)'
               }}>
                                         <th style={{ padding: 'var(--mac-spacing-3)', textAlign: 'left', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-secondary)' }}>{t('common.date')}</th>
-                                        <th style={{ padding: 'var(--mac-spacing-3)', textAlign: 'left', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-secondary)' }}>№ Визита</th>
-                                        <th style={{ padding: 'var(--mac-spacing-3)', textAlign: 'left', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-secondary)' }}>Услуги</th>
-                                        <th style={{ padding: 'var(--mac-spacing-3)', textAlign: 'right', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-secondary)' }}>Сумма</th>
+                                        <th style={{ padding: 'var(--mac-spacing-3)', textAlign: 'left', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-secondary)' }}>{t('misc.ppu_col_visit_num')}</th>
+                                        <th style={{ padding: 'var(--mac-spacing-3)', textAlign: 'left', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-secondary)' }}>{t('misc.ppu_col_services')}</th>
+                                        <th style={{ padding: 'var(--mac-spacing-3)', textAlign: 'right', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-secondary)' }}>{t('misc.ppu_col_amount')}</th>
                                         <th style={{ padding: 'var(--mac-spacing-3)', textAlign: 'center', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-secondary)' }}>{t('common.status')}</th>
                                     </tr>
                                 </thead>
@@ -610,11 +611,11 @@ export default function PatientPickupView() {
                                                     {servicesText}
                                                 </td>
                                                 <td style={{ padding: 'var(--mac-spacing-3)', textAlign: 'right', fontWeight: 'var(--mac-font-weight-semibold)', whiteSpace: 'nowrap' }}>
-                                                    {totalAmount > 0 ? `${totalAmount.toLocaleString('ru-RU')} сум` : '—'}
+                                                    {totalAmount > 0 ? t('misc.ppu_amount_with_currency', { amount: totalAmount.toLocaleString('ru-RU') }) : '—'}
                                                 </td>
                                                 <td style={{ padding: 'var(--mac-spacing-3)', textAlign: 'center' }}>
                                                     <span
-                                                      aria-label={`Статус визита: ${visitStatus.label}`}
+                                                      aria-label={t('misc.ppu_visit_status_aria', { label: visitStatus.label })}
                                                       style={{
                         display: 'inline-flex',
                         alignItems: 'center',
