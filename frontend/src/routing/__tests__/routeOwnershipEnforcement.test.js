@@ -11,7 +11,7 @@ describe('routing anti-regression enforcement', () => {
     const routeRegistry = read('src/routing/routeRegistry.js');
 
     expect(read('src/components/layout/Nav.jsx')).not.toContain('const routes = [');
-    expect(read('src/constants/routes.js')).not.toContain('const routeMap =');
+    expect(read('src/constants/routes.ts')).not.toContain('const routeMap =');
     expect(routeRegistry).not.toContain('component: \'AdminPanel\'');
   });
 

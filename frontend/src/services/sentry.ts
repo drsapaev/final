@@ -112,7 +112,7 @@ export function captureException(error, context) {
   Sentry.captureException(error, { extra: context });
 }
 
-export function captureMessage(message, level = 'info') {
+export function captureMessage(message: string, level: 'info' | 'warning' | 'error' | 'fatal' | 'debug' | 'log' = 'info'): void {
   if (!isInitialized) return;
   Sentry.captureMessage(message, level);
 }
