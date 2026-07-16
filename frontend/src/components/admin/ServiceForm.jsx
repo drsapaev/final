@@ -33,14 +33,9 @@ const SERVICE_GROUP_ALIASES = {
   physiotherapy: 'procedures',
 };
 
-const SERVICE_GROUP_LABELS = {
-  cardiology: 'Кардиология',
-  ecg: 'ЭКГ',
-  dermatology: 'Дерматология',
-  dental: 'Стоматология',
-  laboratory: 'Лаборатория',
-  procedures: 'Процедуры'
-};
+// UX Audit Admin #4.1: service group label keys live under admin2.sf_group_<key>.
+// The lookup is performed via t() at the call site so the dictionary remains
+// free of hardcoded Russian strings.
 
 const resolveServiceGroup = ({ queueTag, departmentKey, categorySpecialty }) => {
   const { t } = useTranslation();
@@ -61,6 +56,7 @@ const getAllowedPrefixesForGroup = (groupKey) => SERVICE_GROUP_PREFIXES[groupKey
 
 
 const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMessage, onSave, onCancel }) => {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState('basic'); // 'basic', 'queue', 'options'
   const [showPreview, setShowPreview] = useState(false); // ✅ PREVIEW: Show changes preview
   const [formData, setFormData] = useState({
@@ -105,7 +101,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
           (s) => (s.code === normalizedCode || s.service_code === normalizedCode) && s.id !== service?.id
         );
         if (duplicate) {
-          setCodeWarning(`⚠️ Код "${normalizedCode}" уже используется: ${duplicate.name}`);
+          setCodeWarning(t('admin2.sf_code_duplicate_warning', { code: normalizedCode, name: duplicate.name }));
         } else {
           setCodeWarning('');
         }
@@ -140,7 +136,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
     );
   const expectedPrefixLabel = allowedPrefixes.length ? allowedPrefixes.join(' / ') : '';
   const selectedGroupLabel = selectedServiceGroup
-    ? SERVICE_GROUP_LABELS[selectedServiceGroup] || selectedServiceGroup
+    ? t(`admin2.sf_group_${selectedServiceGroup}`, { defaultValue: selectedServiceGroup })
     : '';
 
   // Auto-extract category_code from code prefix (guarded by prefix alignment checks)
@@ -156,8 +152,8 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
 
     if (codePrefixMismatch) {
       const errorText = selectedGroupLabel
-        ? `Код ${normalizedCode} не подходит для группы "${selectedGroupLabel}". Допустимые префиксы: ${expectedPrefixLabel}`
-        : `Код ${normalizedCode} не подходит для выбранной категории услуги. Допустимые префиксы: ${expectedPrefixLabel}`;
+        ? t('admin2.sf_code_mismatch_group_error', { code: normalizedCode, group: selectedGroupLabel, prefixes: expectedPrefixLabel })
+        : t('admin2.sf_code_mismatch_category_error', { code: normalizedCode, prefixes: expectedPrefixLabel });
       logger.warn('[FIX:ADM-06] Blocking mismatched service code before save:', {
         normalizedCode,
         selectedServiceGroup,
@@ -228,15 +224,15 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
   };
 
   const tabs = [
-  { key: 'basic', label: 'Основное', icon: Package },
-  { key: 'queue', label: 'Очередь', icon: Users },
-  { key: 'options', label: 'Опции', icon: Filter }];
+  { key: 'basic', label: t('admin2.sf_tab_basic'), icon: Package },
+  { key: 'queue', label: t('admin2.sf_tab_queue'), icon: Users },
+  { key: 'options', label: t('admin2.sf_tab_options'), icon: Filter }];
 
 
   return (
     <MacOSCard variant="default" className="p-6">
       <h3 className="admin-h3-18-600-primary-mb-20">
-        {service ? 'Редактирование услуги' : 'Добавление услуги'}
+        {service ? t('admin2.sf_header_edit') : t('admin2.sf_header_add')}
       </h3>
 
       {/* Tab Navigation */}
@@ -270,7 +266,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
         <div className="admin-grid-auto-250-12">
             <div>
               <label className="admin-label-14-500-primary-mb-8">
-                Название услуги *
+                {t('admin2.sf_label_name')}
               </label>
               <Input
               type="text"
@@ -281,7 +277,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
 
             <div>
               <label className="admin-label-14-500-primary-mb-8">
-                Код услуги (K01, D02...)
+                {t('admin2.sf_label_code')}
               </label>
               <Input
               type="text"
@@ -292,7 +288,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
 
               {formData.code && !isValidServiceCode(formData.code) &&
             <div className="admin-hint-12-warning-mt-4">
-                  Формат: 1 буква + 2 цифры
+                  {t('admin2.sf_hint_code_format')}
                 </div>
             }
               {codeWarning &&
@@ -303,38 +299,38 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
             }
               {checkingDuplicates && !codeWarning &&
             <div className="admin-hint-12-tertiary-mt-4">
-                  Проверка...
+                  {t('admin2.sf_checking_duplicates')}
                 </div>
             }
               {derivedCategoryCode &&
             <div className="admin-hint-12-secondary-mt-4">
-                  Префикс кода: {derivedCategoryCode}
+                  {t('admin2.sf_hint_code_prefix', { prefix: derivedCategoryCode })}
                 </div>
             }
               {selectedGroupLabel && !codePrefixMismatch &&
             <div className="admin-hint-12-secondary-mt-4">
-                  Ожидаемый префикс для {selectedGroupLabel}: {expectedPrefixLabel}
+                  {t('admin2.sf_hint_expected_prefix', { group: selectedGroupLabel, prefixes: expectedPrefixLabel })}
                 </div>
             }
               {codePrefixMismatch &&
             <div className="admin-hint-12-warning-mt-4-flex">
                   <AlertCircle size={14} />
                   {selectedGroupLabel
-                    ? `Код ${normalizedCode} не подходит для группы "${selectedGroupLabel}".`
-                    : `Код ${normalizedCode} не подходит для выбранной группы.`}
+                    ? t('admin2.sf_warn_code_mismatch_group', { code: normalizedCode, group: selectedGroupLabel })
+                    : t('admin2.sf_warn_code_mismatch_no_group', { code: normalizedCode })}
                 </div>
             }
             </div>
 
             <div>
               <label className="admin-label-14-500-primary-mb-8">
-                Категория *
+                {t('admin2.sf_label_category')}
               </label>
               <Select
               value={formData.category_id}
               onChange={(value) => handleChange('category_id', value)}
               options={[
-              { value: '', label: 'Выберите категорию' },
+              { value: '', label: t('admin2.sf_select_category') },
               ...categories.map((category) => ({
                 value: category.id,
                 label: `${category.name_ru} (${category.specialty})`
@@ -344,7 +340,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
 
             <div>
               <label className="admin-label-14-500-primary-mb-8">
-                Цена
+                {t('admin2.sf_label_price')}
               </label>
               <div className="admin-form-row-gap-8">
                 <Input
@@ -368,7 +364,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
 
             <div>
               <label className="admin-label-14-500-primary-mb-8">
-                Длительность (мин)
+                {t('admin2.sf_label_duration')}
               </label>
               <Input
               type="number"
@@ -380,16 +376,16 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
 
             <div>
               <label className="admin-label-14-500-primary-mb-8">
-                Врач (опционально)
+                {t('admin2.sf_label_doctor')}
               </label>
               <Select
               value={formData.doctor_id}
               onChange={(value) => handleChange('doctor_id', value)}
               options={[
-              { value: '', label: 'Все врачи' },
+              { value: '', label: t('admin2.sf_select_all_doctors') },
               ...doctors.map((doctor) => ({
                 value: doctor.id,
-                label: `${doctor.user?.full_name || `Врач #${doctor.id}`} (${doctor.specialty})`
+                label: `${doctor.user?.full_name || t('admin2.sf_doctor_fallback', { id: doctor.id })} (${doctor.specialty})`
               }))]
               } />
             </div>
@@ -401,20 +397,19 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
         <div className="flex flex-col gap-4">
             <div className="admin-info-banner-catalog">
               <p className="admin-p-14-secondary-m0">
-                Выберите вкладку регистратуры, на которой будет отображаться эта услуга.
-                Это определяет, в какую очередь попадёт пациент.
+                {t('admin2.sf_queue_tab_desc')}
               </p>
             </div>
 
             <div>
               <label className="admin-label-14-500-primary-mb-8">
-                Вкладка регистратуры
+                {t('admin2.sf_label_queue_tab')}
               </label>
               <Select
               value={formData.queue_tag}
               onChange={(value) => handleChange('queue_tag', value)}
               options={[
-              { value: '', label: 'Без очереди (услуга не появится в регистратуре)' },
+              { value: '', label: t('admin2.sf_no_queue_option') },
               ...queueProfiles.
               filter((profile) => profile.is_active !== false).
               map((profile) => ({
@@ -427,7 +422,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
             {formData.queue_tag &&
           <div className="admin-success-banner-catalog">
                 <p className="admin-p-14-success-m0">
-                  ✓ Услуга будет отображаться на вкладке с тегом: <strong>{formData.queue_tag}</strong>
+                  {t('admin2.sf_queue_tag_banner_prefix')} <strong>{formData.queue_tag}</strong>
                 </p>
               </div>
           }
@@ -442,36 +437,36 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
               id="active"
               checked={formData.active}
               onChange={(checked) => handleChange('active', checked)}
-              label="Услуга активна" />
+              label={t('admin2.sf_chk_active')} />
 
               <Checkbox
               id="requires_doctor"
               checked={formData.requires_doctor}
               onChange={(checked) => handleChange('requires_doctor', checked)}
-              label="Требует врача" />
+              label={t('admin2.sf_chk_requires_doctor')} />
 
               <Checkbox
               id="is_consultation"
               checked={formData.is_consultation}
               onChange={(checked) => handleChange('is_consultation', checked)}
-              label="Это консультация" />
+              label={t('admin2.sf_chk_is_consultation')} />
 
               <Checkbox
               id="allow_doctor_price_override"
               checked={formData.allow_doctor_price_override}
               onChange={(checked) => handleChange('allow_doctor_price_override', checked)}
-              label="Врач может изменить цену" />
+              label={t('admin2.sf_chk_allow_price_override')} />
 
             </div>
 
             <div className="admin-bg-secondary-box-catalog">
               <h5 className="admin-h5-14-600-primary-mb-8">
-                Подсказки:
+                {t('admin2.sf_hints_title')}
               </h5>
               <ul className="admin-ul-13-secondary-pl-20">
-                <li><strong>Требует врача</strong> — для ЭхоКГ, сложных процедур</li>
-                <li><strong>Консультация</strong> — участвует в расчёте льгот и повторных визитов</li>
-                <li><strong>Врач может изменить цену</strong> — для индивидуальных случаев</li>
+                <li><strong>{t('admin2.sf_hint_requires_doctor_label')}</strong>{t('admin2.sf_hint_requires_doctor_desc')}</li>
+                <li><strong>{t('admin2.sf_hint_consultation_label')}</strong>{t('admin2.sf_hint_consultation_desc')}</li>
+                <li><strong>{t('admin2.sf_hint_price_override_label')}</strong>{t('admin2.sf_hint_price_override_desc')}</li>
               </ul>
             </div>
           </div>
@@ -485,11 +480,11 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
           <div className="admin-form-row-gap-12">
             <Button type="button" variant="outline" onClick={onCancel}>
               <X size={16} className="mr-2" />
-              Отменить
+              {t('admin2.sf_btn_cancel')}
             </Button>
             <Button type="submit">
               <Save size={16} className="mr-2" />
-              Сохранить
+              {t('admin2.sf_btn_save')}
             </Button>
           </div>
         </div>
