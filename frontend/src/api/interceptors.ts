@@ -7,8 +7,16 @@ import { tokenManager } from '../utils/tokenManager';
 import { clearToken as clearAuthState } from '../stores/auth.js';
 import logger from '../utils/logger';
 import { handleError } from '../utils/errorHandler';
+// Phase 1 — typed accessor for axios-like errors in interceptors.
+interface AxiosLikeError {
+  config?: { url?: string; expectedErrorStatuses?: number[]; silent?: boolean };
+  response?: { status?: number };
+  code?: string;
+  name?: string;
+}
 
-export function isExpectedApiErrorStatus(originalRequest, status) {
+
+export function isExpectedApiErrorStatus(originalRequest: { expectedErrorStatuses?: number[] } | undefined, status: unknown): boolean {
   if (!originalRequest || typeof status !== 'number') {
     return false;
   }
@@ -17,13 +25,13 @@ export function isExpectedApiErrorStatus(originalRequest, status) {
   return Array.isArray(expectedStatuses) && expectedStatuses.includes(status);
 }
 
-export function isCanceledApiError(error) {
-  return error?.code === 'ERR_CANCELED' || error?.name === 'CanceledError';
+export function isCanceledApiError(error: unknown): boolean {
+  return (error as AxiosLikeError)?.code === 'ERR_CANCELED' || (error as AxiosLikeError)?.name === 'CanceledError';
 }
 
-export function shouldSuppressApiError(error) {
-  const originalRequest = error?.config;
-  const status = error?.response?.status;
+export function shouldSuppressApiError(error: unknown): boolean {
+  const originalRequest = (error as AxiosLikeError)?.config;
+  const status = (error as AxiosLikeError)?.response?.status;
 
   if (isCanceledApiError(error)) {
     return true;
@@ -36,12 +44,12 @@ export function shouldSuppressApiError(error) {
   return originalRequest?.silent === true && status === 404;
 }
 
-export function shouldClearAuthOnUnauthorized(error, hasToken = tokenManager.hasToken()) {
-  if (!hasToken || error?.response?.status !== 401) {
+export function shouldClearAuthOnUnauthorized(error: unknown, hasToken: boolean = tokenManager.hasToken()): boolean {
+  if (!hasToken || (error as AxiosLikeError)?.response?.status !== 401) {
     return false;
   }
 
-  const requestUrl = String(error?.config?.url || '');
+  const requestUrl = String((error as AxiosLikeError)?.config?.url || '');
   if (
     requestUrl.includes('/auth/login') ||
     requestUrl.includes('/auth/csrf-token') ||
@@ -57,7 +65,7 @@ export function shouldClearAuthOnUnauthorized(error, hasToken = tokenManager.has
 /**
  * Настройка interceptors для API клиента
  */
-export function setupInterceptors() {
+export function setupInterceptors(): void {
   // Request interceptor - добавляем токен к каждому запросу
   api.interceptors.request.use(
     (config) => {
@@ -185,7 +193,7 @@ export function setupInterceptors() {
 /**
  * Установка базового токена при загрузке приложения
  */
-export function initializeAuth() {
+export function initializeAuth(): void {
   const token = tokenManager.getAccessToken();
   if (token) {
     api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
@@ -195,7 +203,7 @@ export function initializeAuth() {
 /**
  * Очистка авторизации
  */
-export function clearAuth() {
+export function clearAuth(): void {
   tokenManager.clearAll();
   delete api.defaults.headers.common['Authorization'];
 }

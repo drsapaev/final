@@ -1,3 +1,18 @@
+// Phase 1 — typed wrapper for errors enriched with axios-like fields.
+interface WrappedApiError extends Error {
+  status?: number;
+  detail?: string;
+  response?: { status?: number; data?: { detail?: unknown } };
+}
+
+function createWrappedError(message: string, extras: { status?: number; detail?: string; response?: unknown }): WrappedApiError {
+  const err = new Error(message) as WrappedApiError;
+  err.status = extras.status;
+  err.detail = extras.detail;
+  err.response = extras.response as WrappedApiError['response'];
+  return err;
+}
+
 /**
  * Payments API client — centralized wrapper over `api` from api/client.js.
  *
@@ -21,21 +36,16 @@ import logger from '../utils/logger';
  * Получить список неоплаченных счетов.
  * @returns {Promise<Array<object>>} Массив счетов (может быть пустым)
  */
-export async function getPendingInvoices() {
+export async function getPendingInvoices(): Promise<Record<string, unknown>[]> {
   try {
     const response = await api.get('/payments/invoices/pending');
     return response.data;
   } catch (error) {
     logger.error('[payments API] getPendingInvoices failed', {
-      status: error?.response?.status,
-      detail: error?.response?.data?.detail,
+      status: (error as WrappedApiError)?.response?.status,
+      detail: (error as WrappedApiError)?.response?.data?.detail,
     });
-    const wrapped = new Error(
-      error?.response?.data?.detail || 'Ошибка загрузки счетов'
-    );
-    wrapped.status = error?.response?.status;
-    wrapped.response = error?.response;
-    throw wrapped;
+    throw createWrappedError(String((error as WrappedApiError)?.response?.data?.detail || 'Ошибка загрузки счетов'), { status: (error as WrappedApiError)?.response?.status as number | undefined, response: (error as WrappedApiError)?.response });
   }
 }
 
@@ -44,21 +54,16 @@ export async function getPendingInvoices() {
  * @param {object} invoiceData - { amount, currency, provider, description, patient_info }
  * @returns {Promise<object>} Created invoice with invoice_id
  */
-export async function createPaymentInvoice(invoiceData) {
+export async function createPaymentInvoice(invoiceData: Record<string, unknown>): Promise<Record<string, unknown>> {
   try {
     const response = await api.post('/payments/invoice/create', invoiceData);
     return response.data;
   } catch (error) {
     logger.error('[payments API] createPaymentInvoice failed', {
-      status: error?.response?.status,
-      detail: error?.response?.data?.detail,
+      status: (error as WrappedApiError)?.response?.status,
+      detail: (error as WrappedApiError)?.response?.data?.detail,
     });
-    const wrapped = new Error(
-      error?.response?.data?.detail || 'Ошибка создания счёта'
-    );
-    wrapped.status = error?.response?.status;
-    wrapped.response = error?.response;
-    throw wrapped;
+    throw createWrappedError(String((error as WrappedApiError)?.response?.data?.detail || 'Ошибка создания счёта'), { status: (error as WrappedApiError)?.response?.status as number | undefined, response: (error as WrappedApiError)?.response });
   }
 }
 
@@ -76,11 +81,12 @@ export async function createPaymentInvoice(invoiceData) {
  * @param {string} [locale='ru-RU'] - Локаль для форматирования
  * @returns {string} Отформатированная строка, например «1 234 567 сум»
  */
-export function formatUZS(amount, locale = 'ru-RU') {
-  if (!Number.isFinite(amount)) return '0 сум';
+export function formatUZS(amount: number | string, locale: string = 'ru-RU'): string {
+  const num = Number(amount);
+  if (!Number.isFinite(num)) return '0 сум';
   const formatted = new Intl.NumberFormat(locale, {
     maximumFractionDigits: 0,
-  }).format(amount);
+  }).format(num);
   return `${formatted} сум`;
 }
 
@@ -94,7 +100,7 @@ export function formatUZS(amount, locale = 'ru-RU') {
  * @param {*} value - Любое значение из input
  * @returns {number} Валидное число ≥ 0 (0 если невалидно)
  */
-export function normalizePaymentAmount(value) {
+export function normalizePaymentAmount(value: unknown): number {
   const num = Number(value);
   if (!Number.isFinite(num) || num < 0) return 0;
   return num;
@@ -106,8 +112,9 @@ export function normalizePaymentAmount(value) {
  * @param {number} amount
  * @returns {boolean} true если сумма валидна для создания счёта
  */
-export function isValidPaymentAmount(amount) {
-  return Number.isFinite(amount) && amount > 0;
+export function isValidPaymentAmount(amount: unknown): boolean {
+  const num = Number(amount);
+  return Number.isFinite(num) && num > 0;
 }
 
 const paymentsAPI = {

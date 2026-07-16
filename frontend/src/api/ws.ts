@@ -12,7 +12,7 @@ function wsEnabled() {
  * Открыть WS очереди. onMessage получает уже распарсенный объект.
  * Возвращает функцию close().
  */
-export function openQueueWS(department, dateStr, onMessage) {
+export function openQueueWS(department: string, dateStr: string, onMessage: (data: unknown) => void): () => void {
   if (!wsEnabled()) return () => {};
   let ws = null;
 
@@ -48,7 +48,7 @@ export function openQueueWS(department, dateStr, onMessage) {
  * Открыть WebSocket для табло очереди (новая система)
  * Подключается к /api/v1/display/ws/board/{board_id}
  */
-export function openDisplayBoardWS(boardId, onMessage, onConnect, onDisconnect) {
+export function openDisplayBoardWS(boardId: string, onMessage: (data: unknown) => void, onConnect: () => void, onDisconnect: () => void): () => void {
   if (!wsEnabled()) return () => {};
   let ws = null;
   let reconnectTimeout = null;
