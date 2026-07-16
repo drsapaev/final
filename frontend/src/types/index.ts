@@ -20,6 +20,7 @@ export * from './api';
 // ============================================================================
 export * from './roles';
 export * from './auth';
+export * from './auth-mapper';
 export * from './auth-store';
 export * from './route';
 

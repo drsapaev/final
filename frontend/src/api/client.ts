@@ -13,8 +13,9 @@ import axios, { type AxiosError, type AxiosInstance, type AxiosRequestConfig, ty
 import { buildApiUrl, buildWsUrl, getApiBaseUrl, getApiOrigin } from './runtime';
 import { tokenManager } from '../utils/tokenManager';
 import logger from '../utils/logger';
-import type { LoginResponse } from '../types/auth';
-import type { User } from '../types/api';
+import type { LoginResponse, LoginResult } from '../types/auth';
+import { parseLoginResponse, AuthInvariantViolationError } from '../types/auth-mapper';
+import type { LoginResponseRaw, User } from '../types/api';
 
 const API_BASE = getApiBaseUrl();
 // PR-39 / Medium-11: CSRF bootstrap defaults to ON. Set VITE_CSRF_BOOTSTRAP=0
@@ -368,10 +369,25 @@ async function me(): Promise<User> {
 
 /**
  * login: perform OAuth2 password flow (x-www-form-urlencoded).
- * Returns the server response (object with access_token, token_type).
- * Caller should call setToken(response.access_token) to persist.
+ *
+ * Returns the domain LoginResult (discriminated union). Callers should narrow
+ * with `if (result.requires_2fa) { ... } else { ... }`.
+ *
+ * The raw DTO from the backend is validated by parseLoginResponse(), which
+ * enforces AUTHENTICATION_LAWS_FOR_AI.md ЗАКОН 2 (blocking 2FA flow):
+ *   - requires_2fa === true  ⇒  no access_token in response
+ *   - requires_2fa === false ⇒  access_token + refresh_token present,
+ *                                no pending_2fa_token
+ *
+ * If the backend violates ЗАКОН 2, parseLoginResponse throws
+ * AuthInvariantViolationError. The error is logged here and re-thrown so
+ * callers can surface it to the user (and the team can surface it to the
+ * backend owner).
+ *
+ * Caller should call setToken(result.access_token) to persist tokens
+ * (only valid in the `requires_2fa === false` branch).
  */
-async function login(username: string, password: string): Promise<LoginResponse> {
+async function login(username: string, password: string): Promise<LoginResult> {
   const credentials = {
     username,
     password,
@@ -379,13 +395,17 @@ async function login(username: string, password: string): Promise<LoginResponse>
   };
 
   const resp = await api.post('/authentication/login', credentials);
+  const dto = resp.data as LoginResponseRaw;
 
-  // Backend contract (docs/AUTHENTICATION_LAWS_FOR_AI.md ЗАКОН 2):
-  // when requires_2fa=true, response has pending_2fa_token and NO access_token.
-  // The raw OpenAPI schema is a flat nullable superset — we narrow to the
-  // discriminated union from types/auth.ts at the type level. Runtime callers
-  // should still check `requires_2fa` before reading token fields.
-  return resp.data as LoginResponse;
+  try {
+    return parseLoginResponse(dto);
+  } catch (err) {
+    if (err instanceof AuthInvariantViolationError) {
+      // Log the invariant violation loudly — backend bugs must be visible.
+      logger.error('[api/client] login() backend violated auth invariant:', err.invariant, err.message, err.dto);
+    }
+    throw err;
+  }
 }
 
 // Backwards-compatible aliases expected by older frontend code

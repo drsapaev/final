@@ -7,6 +7,25 @@
 // will be added in Phase 9 to enforce this.
 //
 // SSOT: backend/openapi.json (auto-generated via openapi-typescript)
+//
+// ============================================================================
+// ARCHITECTURE — DTO vs Domain types (per code review 2026-07-17)
+// ============================================================================
+//
+// This file re-exports the RAW transport shapes from OpenAPI as `*Raw` aliases
+// (LoginResponseRaw, TwoFactorVerifyResponseRaw, etc.). They reflect the
+// backend's transport contract one-to-one — including all nullable fields
+// and the flat superset shape that Pydantic produces.
+//
+// For DOMAIN types that encode business invariants (e.g. the 2FA-flow
+// invariant from AUTHENTICATION_LAWS_FOR_AI.md ЗАКОН 2), see:
+//   - src/types/auth.ts        — domain types (discriminated unions)
+//   - src/types/auth-mapper.ts — runtime validators that convert DTO → domain
+//
+// Rule: generated files in src/types/generated/ are READ-ONLY. Domain
+// invariants are NEVER baked into generated types — they are enforced by
+// mappers at the boundary.
+// ============================================================================
 
 import type { components } from './generated/api';
 
