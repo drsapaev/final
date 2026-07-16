@@ -213,6 +213,8 @@ export default [
       'storybook-static/**',
       '*.config.js',
       '*.config.ts',
+      // Phase 0.5: generated OpenAPI types — do not lint (75K lines, auto-regenerated)
+      'src/types/generated/**',
     ],
   },
 ];
