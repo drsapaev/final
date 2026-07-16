@@ -71,9 +71,11 @@ export default useTranslation;
 
 // Standalone t() — for non-React contexts (tests, module-level constants).
 // Delegates to react-i18next's i18n.t().
-export const t = (key, params) => {
+export const t = (key: unknown, params?: Record<string, unknown>) => {
   if (key === null || key === undefined || typeof key !== 'string') return key;
-  return i18n.t(key, params);
+  // Cast to avoid i18next complex typing; t() accepts (key, options) but
+  // TS overload resolution is too strict here.
+  return (i18n.t as unknown as (k: string, o?: Record<string, unknown>) => string)(key, params as Record<string, unknown> | undefined);
 };
 
 // Standalone tInterpolate() — for backward compat with labTranslations.tInterpolate.

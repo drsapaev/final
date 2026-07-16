@@ -14,7 +14,7 @@ const source = fs.readFileSync(
 );
 
 const translationsSource = fs.readFileSync(
-  path.join(ROOT, 'i18n/locales/ru.js'),
+  path.join(ROOT, 'i18n/locales/ru.ts'),
   'utf8'
 );
 

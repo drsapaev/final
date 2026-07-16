@@ -24,7 +24,7 @@ describe('P0-19: i18n extraction pattern', () => {
     // We verify the legacy namespace still contains the PR-44 marker keys
     // (verificationTitle, verificationCode, sendCode) that were the original
     // extraction demonstration.
-    const ruLocale = path.join(ROOT, 'src/i18n/locales/ru.js');
+    const ruLocale = path.join(ROOT, 'src/i18n/locales/ru.ts');
     const src = fs.readFileSync(ruLocale, 'utf-8');
     // PR-44 marker comment preserved in ru.js header
     expect(src).toMatch(/PR-44/);
