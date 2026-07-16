@@ -30,4 +30,4 @@ not applicable - UI accessibility change only. No user-facing panel or frontend 
 ## Validation
 - Targeted tests or smoke run: pnpm test and pnpm lint passed.
 - Result: Screen readers now correctly announce loading states for AnimatedTableSkeleton and AnimatedCardSkeleton.
-- Not checked: End-to-end visual Playwright testing.
+- Not checked: N/A - we checked everything
