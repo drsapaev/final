@@ -10,30 +10,53 @@ import {
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 
-const TRANSACTION_TYPE_OPTIONS = [
-  { value: 'income', label: '\u0414\u043e\u0445\u043e\u0434' },
-  { value: 'expense', label: '\u0420\u0430\u0441\u0445\u043e\u0434' }
+const getTransactionTypeOptions = (t) => [
+  { value: 'income', label: t('admin2.fm_type_income') },
+  { value: 'expense', label: t('admin2.fm_type_expense') }
 ];
 
-const PAYMENT_METHOD_OPTIONS = [
-  { value: 'cash', label: '\u041d\u0430\u043b\u0438\u0447\u043d\u044b\u0435' },
-  { value: 'card', label: '\u0411\u0430\u043d\u043a\u043e\u0432\u0441\u043a\u0430\u044f \u043a\u0430\u0440\u0442\u0430' },
-  { value: 'transfer', label: '\u0411\u0430\u043d\u043a\u043e\u0432\u0441\u043a\u0438\u0439 \u043f\u0435\u0440\u0435\u0432\u043e\u0434' },
-  { value: 'mobile', label: '\u041c\u043e\u0431\u0438\u043b\u044c\u043d\u044b\u0439 \u043f\u043b\u0430\u0442\u0435\u0436' }
+const getPaymentMethodOptions = (t) => [
+  { value: 'cash', label: t('admin2.fm_payment_cash') },
+  { value: 'card', label: t('admin2.fm_payment_card') },
+  { value: 'transfer', label: t('admin2.fm_payment_transfer') },
+  { value: 'mobile', label: t('admin2.fm_payment_mobile') }
 ];
 
-const STATUS_OPTIONS = [
-  { value: '', label: '\u0421\u0442\u0430\u0442\u0443\u0441 \u043d\u0435 \u043f\u0435\u0440\u0435\u0434\u0430\u043d' },
-  { value: 'pending', label: '\u041e\u0436\u0438\u0434\u0430\u0435\u0442' },
-  { value: 'completed', label: '\u0417\u0430\u0432\u0435\u0440\u0448\u0435\u043d\u0430' },
-  { value: 'cancelled', label: '\u041e\u0442\u043c\u0435\u043d\u0435\u043d\u0430' },
-  { value: 'refunded', label: '\u0412\u043e\u0437\u0432\u0440\u0430\u0442' }
+const getStatusOptions = (t) => [
+  { value: '', label: t('admin2.fm_status_not_set') },
+  { value: 'pending', label: t('admin2.fm_status_pending') },
+  { value: 'completed', label: t('admin2.fm_status_completed') },
+  { value: 'cancelled', label: t('admin2.fm_status_cancelled') },
+  { value: 'refunded', label: t('admin2.fm_status_refunded') }
 ];
-const FinanceModal = ({ 
-  isOpen, 
-  onClose, 
-  transaction = null, 
-  onSave, 
+
+const getIncomeCategories = (t) => [
+  t('admin2.fm_cat_income_consultation'),
+  t('admin2.fm_cat_income_diagnostics'),
+  t('admin2.fm_cat_income_treatment'),
+  t('admin2.fm_cat_income_analyses'),
+  t('admin2.fm_cat_income_procedures'),
+  t('admin2.fm_cat_income_medications'),
+  t('admin2.fm_cat_income_hospitalization'),
+  t('admin2.fm_cat_income_other')
+];
+
+const getExpenseCategories = (t) => [
+  t('admin2.fm_cat_expense_salary'),
+  t('admin2.fm_cat_expense_rent'),
+  t('admin2.fm_cat_expense_utilities'),
+  t('admin2.fm_cat_expense_medications'),
+  t('admin2.fm_cat_expense_equipment'),
+  t('admin2.fm_cat_expense_marketing'),
+  t('admin2.fm_cat_expense_admin'),
+  t('admin2.fm_cat_expense_other')
+];
+
+const FinanceModal = ({
+  isOpen,
+  onClose,
+  transaction = null,
+  onSave,
   loading = false,
   patients = [],
   doctors = []
@@ -53,6 +76,7 @@ const FinanceModal = ({
   });
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { t } = useTranslation();
 
   // Инициализация формы при открытии
   useEffect(() => {
@@ -74,7 +98,7 @@ const FinanceModal = ({
       } else {
         // Устанавливаем сегодняшний день по умолчанию
         const today = new Date().toISOString().split('T')[0];
-        
+
         setFormData({
           type: 'income',
           category: '',
@@ -97,27 +121,27 @@ const FinanceModal = ({
     const newErrors = {};
 
     if (!formData.type) {
-      newErrors.type = 'Тип операции обязателен';
+      newErrors.type = t('admin2.fm_err_type_required');
     }
 
     if (!formData.category) {
-      newErrors.category = 'Категория обязательна';
+      newErrors.category = t('admin2.fm_err_category_required');
     }
 
     if (!formData.amount || isNaN(formData.amount) || parseFloat(formData.amount) <= 0) {
-      newErrors.amount = 'Сумма должна быть положительным числом';
+      newErrors.amount = t('admin2.fm_err_amount_positive');
     }
 
     if (!formData.description.trim()) {
-      newErrors.description = 'Описание обязательно';
+      newErrors.description = t('admin2.fm_err_description_required');
     }
 
     if (!formData.transactionDate) {
-      newErrors.transactionDate = 'Дата операции обязательна';
+      newErrors.transactionDate = t('admin2.fm_err_date_required');
     }
 
     if (formData.paymentMethod === 'card' && !formData.reference.trim()) {
-      newErrors.reference = 'Номер карты обязателен для карточных платежей';
+      newErrors.reference = t('admin2.fm_err_reference_required');
     }
 
     setErrors(newErrors);
@@ -204,28 +228,6 @@ const FinanceModal = ({
     return doctorName || specialization || '';
   };
 
-  const getIncomeCategories = () => [
-    'Консультация врача',
-    'Диагностика',
-    'Лечение',
-    'Анализы',
-    'Процедуры',
-    'Медикаменты',
-    'Госпитализация',
-    'Другие услуги'
-  ];
-
-  const getExpenseCategories = () => [
-    'Зарплата персонала',
-    'Аренда помещения',
-    'Коммунальные услуги',
-    'Медикаменты',
-    'Оборудование',
-    'Маркетинг',
-    'Административные расходы',
-    'Другие расходы'
-  ];
-
   if (!isOpen) return null;
 
   return (
@@ -235,7 +237,7 @@ const FinanceModal = ({
           {/* Заголовок */}
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-semibold admin-text-primary">
-              {transaction ? 'Редактировать транзакцию' : 'Добавить транзакцию'}
+              {transaction ? t('admin2.fm_title_edit') : t('admin2.fm_title_add')}
             </h2>
             <button
               onClick={onClose}
@@ -251,18 +253,18 @@ const FinanceModal = ({
             {/* Основная информация */}
             <div className="space-y-4">
               <h3 className="text-lg font-medium admin-text-primary">
-                Основная информация
+                {t('admin2.fm_section_basic')}
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Тип операции */}
                 <div>
                   <label className="block text-sm font-medium mb-1 admin-text-primary">
-                    Тип операции *
+                    {t('admin2.fm_label_type')}
                   </label>
                   <Select
                     value={formData.type}
                     onChange={(value) => handleChange('type', value)}
-                    options={TRANSACTION_TYPE_OPTIONS}
+                    options={getTransactionTypeOptions(t)}
                     size="large"
                     className="admin-w-full" />
                   {errors.type && (
@@ -276,14 +278,14 @@ const FinanceModal = ({
                 {/* Категория */}
                 <div>
                   <label className="block text-sm font-medium mb-1 admin-text-primary">
-                    Категория *
+                    {t('admin2.fm_label_category')}
                   </label>
                   <Select
                     value={formData.category}
                     onChange={(value) => handleChange('category', value)}
                     options={[
-                      { value: '', label: '\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u043a\u0430\u0442\u0435\u0433\u043e\u0440\u0438\u044e' },
-                      ...(formData.type === 'income' ? getIncomeCategories() : getExpenseCategories()).map((category) => ({
+                      { value: '', label: t('admin2.fm_placeholder_category') },
+                      ...(formData.type === 'income' ? getIncomeCategories(t) : getExpenseCategories(t)).map((category) => ({
                         value: category,
                         label: category
                       }))
@@ -303,7 +305,7 @@ const FinanceModal = ({
                 {/* Сумма */}
                 <div>
                   <label className="block text-sm font-medium mb-1 admin-text-primary">
-                    Сумма (UZS) *
+                    {t('admin2.fm_label_amount')}
                   </label>
                   <div className="relative">
                     <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 admin-text-tertiary" />
@@ -324,7 +326,7 @@ const FinanceModal = ({
                     />
                   </div>
                   <p id="finance-amount-help" className="text-xs mt-1 admin-text-tertiary">
-                    Введите сумму целым числом в UZS. Например: 12500.
+                    {t('admin2.fm_amount_hint')}
                   </p>
                   {errors.amount && (
                     <p className="text-sm text-red-500 mt-1 flex items-center">
@@ -337,7 +339,7 @@ const FinanceModal = ({
                 {/* Дата операции */}
                 <div>
                   <label className="block text-sm font-medium mb-1 admin-text-primary">
-                    Дата операции *
+                    {t('admin2.fm_label_date')}
                   </label>
                   <div className="relative">
                     <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 admin-text-tertiary" />
@@ -364,7 +366,7 @@ const FinanceModal = ({
               {/* Описание */}
               <div>
                 <label className="block text-sm font-medium mb-1 admin-text-primary">
-                  Описание *
+                  {t('admin2.fm_label_description')}
                 </label>
                 <textarea
                   aria-label="Finance transaction description"
@@ -375,7 +377,7 @@ const FinanceModal = ({
                   }`}
                   style={{ '--admin-bd': errors.description ? 'var(--mac-danger)' : 'var(--mac-border)' }}
                   rows="2"
-                  placeholder="Опишите суть операции..."
+                  placeholder={t('admin2.fm_placeholder_description')}
                 />
                 {errors.description && (
                   <p className="text-sm text-red-500 mt-1 flex items-center">
@@ -389,24 +391,24 @@ const FinanceModal = ({
             {/* Связанные данные */}
             <div className="space-y-4">
               <h3 className="text-lg font-medium admin-text-primary">
-                Связанные данные
+                {t('admin2.fm_section_related')}
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Пациент */}
                 <div>
                   <label className="block text-sm font-medium mb-1 admin-text-primary">
-                    Пациент
+                    {t('admin2.fm_label_patient')}
                   </label>
                   <Select
                     value={formData.patientId === '' ? '' : String(formData.patientId)}
                     onChange={(value) => handleChange('patientId', value)}
                     options={[
-                      { value: '', label: '\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u043f\u0430\u0446\u0438\u0435\u043d\u0442\u0430' },
+                      { value: '', label: t('admin2.fm_placeholder_patient') },
                       ...patients.map((patient) => ({
                         value: String(patient.id),
                         label: [patient.lastName, patient.firstName, patient.middleName]
                           .filter(Boolean)
-                          .join(' ') || patient.fullName || patient.name || `\u041f\u0430\u0446\u0438\u0435\u043d\u0442 #${patient.id}`
+                          .join(' ') || patient.fullName || patient.name || t('admin2.fm_patient_fallback', { id: patient.id })
                       }))
                     ]}
                     size="large"
@@ -416,16 +418,16 @@ const FinanceModal = ({
                 {/* Врач */}
                 <div>
                   <label className="block text-sm font-medium mb-1 admin-text-primary">
-                    Врач
+                    {t('admin2.fm_label_doctor')}
                   </label>
                   <Select
                     value={formData.doctorId === '' ? '' : String(formData.doctorId)}
                     onChange={(value) => handleChange('doctorId', value)}
                     options={[
-                      { value: '', label: '\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0432\u0440\u0430\u0447\u0430' },
+                      { value: '', label: t('admin2.fm_placeholder_doctor') },
                       ...doctors.map((doctor) => ({
                         value: String(doctor.id),
-                        label: getDoctorName(doctor.id) || doctor.user?.full_name || doctor.name || `\u0412\u0440\u0430\u0447 #${doctor.id}`
+                        label: getDoctorName(doctor.id) || doctor.user?.full_name || doctor.name || t('admin2.fm_doctor_fallback', { id: doctor.id })
                       }))
                     ]}
                     size="large"
@@ -437,18 +439,18 @@ const FinanceModal = ({
             {/* Платежная информация */}
             <div className="space-y-4">
               <h3 className="text-lg font-medium admin-text-primary">
-                Платежная информация
+                {t('admin2.fm_section_payment')}
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Способ оплаты */}
                 <div>
                   <label className="block text-sm font-medium mb-1 admin-text-primary">
-                    Способ оплаты
+                    {t('admin2.fm_label_payment_method')}
                   </label>
                   <Select
                     value={formData.paymentMethod}
                     onChange={(value) => handleChange('paymentMethod', value)}
-                    options={PAYMENT_METHOD_OPTIONS}
+                    options={getPaymentMethodOptions(t)}
                     size="large"
                     className="admin-w-full" />
                 </div>
@@ -456,12 +458,12 @@ const FinanceModal = ({
                 {/* Статус */}
                 <div>
                   <label className="block text-sm font-medium mb-1 admin-text-primary">
-                    Статус
+                    {t('admin2.fm_label_status')}
                   </label>
                   <Select
                     value={formData.status}
                     onChange={(value) => handleChange('status', value)}
-                    options={STATUS_OPTIONS}
+                    options={getStatusOptions(t)}
                     size="large"
                     className="admin-w-full" />
                 </div>
@@ -471,7 +473,7 @@ const FinanceModal = ({
               {formData.paymentMethod === 'card' && (
                 <div>
                   <label className="block text-sm font-medium mb-1 admin-text-primary">
-                    Номер карты/Транзакции *
+                    {t('admin2.fm_label_reference')}
                   </label>
                   <div className="relative">
                     <Receipt className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 admin-text-tertiary" />
@@ -500,11 +502,11 @@ const FinanceModal = ({
             {/* Дополнительная информация */}
             <div className="space-y-4">
               <h3 className="text-lg font-medium admin-text-primary">
-                Дополнительная информация
+                {t('admin2.fm_section_extra')}
               </h3>
               <div>
                 <label className="block text-sm font-medium mb-1 admin-text-primary">
-                  Заметки
+                  {t('admin2.fm_label_notes')}
                 </label>
                 <textarea
                   aria-label="Finance transaction notes"
@@ -512,7 +514,7 @@ const FinanceModal = ({
                   onChange={(e) => handleChange('notes', e.target.value)}
                   className="w-full px-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent admin-form-control"
                   rows="3"
-                  placeholder="Дополнительная информация о транзакции..."
+                  placeholder={t('admin2.fm_placeholder_notes')}
                 />
               </div>
             </div>
@@ -521,33 +523,33 @@ const FinanceModal = ({
             {(formData.amount && formData.description) && (
               <div className="space-y-4">
                 <h3 className="text-lg font-medium admin-text-primary">
-                  Предварительный просмотр
+                  {t('admin2.fm_section_preview')}
                 </h3>
                 <div className="p-4 rounded-lg admin-modal-preview-box">
                   <div className="space-y-2">
                     <p className="text-sm admin-text-secondary">
-                      <strong>Тип:</strong> {formData.type === 'income' ? 'Доход' : 'Расход'}
+                      <strong>{t('admin2.fm_preview_type')}</strong> {formData.type === 'income' ? t('admin2.fm_type_income') : t('admin2.fm_type_expense')}
                     </p>
                     <p className="text-sm admin-text-secondary">
-                      <strong>Категория:</strong> {formData.category}
+                      <strong>{t('admin2.fm_preview_category')}</strong> {formData.category}
                     </p>
                     <p className="text-sm admin-text-secondary">
-                      <strong>Сумма:</strong> {formData.amount ? `${parseInt(formData.amount).toLocaleString('ru-RU')} UZS` : ''}
+                      <strong>{t('admin2.fm_preview_amount')}</strong> {formData.amount ? `${parseInt(formData.amount).toLocaleString('ru-RU')} UZS` : ''}
                     </p>
                     <p className="text-sm admin-text-secondary">
-                      <strong>Описание:</strong> {formData.description}
+                      <strong>{t('admin2.fm_preview_description')}</strong> {formData.description}
                     </p>
                     <p className="text-sm admin-text-secondary">
-                      <strong>Дата:</strong> {formData.transactionDate}
+                      <strong>{t('admin2.fm_preview_date')}</strong> {formData.transactionDate}
                     </p>
                     {formData.patientId && (
                       <p className="text-sm admin-text-secondary">
-                        <strong>Пациент:</strong> {getPatientName(formData.patientId)}
+                        <strong>{t('admin2.fm_preview_patient')}</strong> {getPatientName(formData.patientId)}
                       </p>
                     )}
                     {formData.doctorId && (
                       <p className="text-sm admin-text-secondary">
-                        <strong>Врач:</strong> {getDoctorName(formData.doctorId)}
+                        <strong>{t('admin2.fm_preview_doctor')}</strong> {getDoctorName(formData.doctorId)}
                       </p>
                     )}
                   </div>
@@ -566,12 +568,12 @@ const FinanceModal = ({
                 {isSubmitting ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                    Сохранение...
+                    {t('admin2.fm_saving')}
                   </>
                 ) : (
                   <>
                     <Save className="w-4 h-4 mr-2" />
-                    {transaction ? 'Сохранить изменения' : 'Добавить транзакцию'}
+                    {transaction ? t('admin2.fm_save_changes') : t('admin2.fm_title_add')}
                   </>
                 )}
               </Button>
@@ -581,7 +583,7 @@ const FinanceModal = ({
                 onClick={onClose}
                 disabled={isSubmitting}
               >
-                Отмена
+                {t('admin2.fm_cancel')}
               </Button>
             </div>
           </form>
@@ -614,4 +616,3 @@ FinanceModal.propTypes = {
   patients: PropTypes.arrayOf(PropTypes.object),
   doctors: PropTypes.arrayOf(PropTypes.object)
 };
-

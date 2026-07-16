@@ -43,11 +43,11 @@ const defaultStats = {
 };
 
 
-function formatTimeAgo(date) {
-  if (!date) return 'Недавно';
+function formatTimeAgo(date, t) {
+  if (!date) return t('admin2.adm_recent');
 
   const dateObj = typeof date === 'string' ? new Date(date) : date;
-  if (Number.isNaN(dateObj.getTime())) return 'Недавно';
+  if (Number.isNaN(dateObj.getTime())) return t('admin2.adm_recent');
 
   const now = new Date();
   const diff = now - dateObj;
@@ -56,10 +56,10 @@ function formatTimeAgo(date) {
   const hours = Math.floor(minutes / 60);
   const days = Math.floor(hours / 24);
 
-  if (seconds < 60) return 'только что';
-  if (minutes < 60) return `${minutes} ${minutes === 1 ? 'минуту' : minutes < 5 ? 'минуты' : 'минут'} назад`;
-  if (hours < 24) return `${hours} ${hours === 1 ? 'час' : hours < 5 ? 'часа' : 'часов'} назад`;
-  if (days < 7) return `${days} ${days === 1 ? 'день' : days < 5 ? 'дня' : 'дней'} назад`;
+  if (seconds < 60) return t('admin2.adm_just_now');
+  if (minutes < 60) return `${minutes} ${minutes === 1 ? t('admin2.adm_min_one') : minutes < 5 ? t('admin2.adm_min_few') : t('admin2.adm_min_many')} ${t('admin2.adm_ago')}`;
+  if (hours < 24) return `${hours} ${hours === 1 ? t('admin2.adm_hour_one') : hours < 5 ? t('admin2.adm_hour_few') : t('admin2.adm_hour_many')} ${t('admin2.adm_ago')}`;
+  if (days < 7) return `${days} ${days === 1 ? t('admin2.adm_day_one') : days < 5 ? t('admin2.adm_day_few') : t('admin2.adm_day_many')} ${t('admin2.adm_ago')}`;
   return dateObj.toLocaleDateString('ru-RU');
 }
 
@@ -79,39 +79,44 @@ function getStatusIcon(status) {
   return <Clock className="admin-w-16-h-16-col-dyn" style={{ '--admin-col0': colorMap.default }} />;
 }
 
-function buildSystemAlerts(systemAlertsData) {
+function buildSystemAlerts(systemAlertsData, t) {
   if (!systemAlertsData?.recent_activity) return [];
 
   return systemAlertsData.recent_activity.slice(0, 5).map((alert, index) => ({
     id: alert.id || index + 1,
     type: alert.status === 'failed' ? 'error' : alert.status === 'pending' ? 'warning' : 'info',
-    message: alert.message || alert.notification_type || 'Системное уведомление',
+    message: alert.message || alert.notification_type || t('admin2.adm_system_notification'),
     priority: alert.status === 'failed' ? 'high' : alert.status === 'pending' ? 'medium' : 'low',
-    time: alert.created_at ? formatTimeAgo(new Date(alert.created_at)) : 'Недавно',
+    time: alert.created_at ? formatTimeAgo(new Date(alert.created_at), t) : t('admin2.adm_recent'),
   }));
 }
 
 // UX Audit Stage 3 (Dashboard issue 4.2): локализация приоритета уведомлений.
 // Раньше отображались английские 'high'/'medium'/'low' в русском UI.
-const PRIORITY_LABELS = {
-  high: 'Высокий',
-  medium: 'Средний',
-  low: 'Низкий',
-};
-
-function getPriorityLabel(priority) {
-  return PRIORITY_LABELS[priority] || priority;
+function getPriorityLabel(priority, t) {
+  const map = {
+    high: t('admin2.adm_priority_high'),
+    medium: t('admin2.adm_priority_medium'),
+    low: t('admin2.adm_priority_low'),
+  };
+  return map[priority] || priority;
 }
 
 // UX Audit Stage 3 (Dashboard issue 4.1):
 // Helper для экспорта данных активности в CSV.
 // Раньше кнопка «Экспорт» не имела onClick — была кнопкой-призраком.
-function exportActivityToCsv(chartData) {
+function exportActivityToCsv(chartData, t) {
   if (!chartData?.data || chartData.data.length === 0) {
     return;
   }
 
-  const headers = ['Дата', 'Записи', 'Платежи', 'Пользователи', 'Всего'];
+  const headers = [
+    t('admin2.adm_csv_date'),
+    t('admin2.adm_csv_appointments'),
+    t('admin2.adm_csv_payments'),
+    t('admin2.adm_csv_users'),
+    t('admin2.adm_csv_total'),
+  ];
   const rows = chartData.data.map((entry, index) => [
     chartData.labels?.[index] || '',
     entry.appointments || 0,
@@ -177,14 +182,14 @@ const AdminDashboard = () => {
 
   const stats = statsData || defaultStats;
   const recentActivities = recentActivitiesData?.activities || [];
-  const systemAlerts = React.useMemo(() => buildSystemAlerts(systemAlertsData), [systemAlertsData]);
+  const systemAlerts = React.useMemo(() => buildSystemAlerts(systemAlertsData, t), [systemAlertsData, t]);
 
   // UX Audit Stage 3 (Dashboard issue 4.1):
   // Handlers для кнопок «Экспорт» и «Все».
   // Раньше это были кнопки-призраки без onClick.
   const handleExportActivity = React.useCallback(() => {
-    exportActivityToCsv(activityChartData);
-  }, [activityChartData]);
+    exportActivityToCsv(activityChartData, t);
+  }, [activityChartData, t]);
 
   const handleViewAllActivities = React.useCallback(() => {
     // Переход к странице аналитики (если есть) или скролл к секции последних действий.
@@ -248,23 +253,23 @@ const AdminDashboard = () => {
         <AdminRouteSwitcher current="dashboard" />
 
         {statsLoading ? (
-          <div className="admin-kpi-grid" aria-label="Загрузка ключевых показателей администратора" aria-busy="true">
+          <div className="admin-kpi-grid" aria-label={t('admin2.adm_kpi_loading_aria')} aria-busy="true">
             <Skeleton type="card" count={6} />
           </div>
         ) : statsError ? (
           <MacOSEmptyState
             icon={AlertCircle}
-            title="Ошибка загрузки статистики"
-            description="Не удалось загрузить данные. Проверьте подключение к серверу."
+            title={t('admin2.adm_error_load_stats')}
+            description={t('admin2.adm_error_load_stats_desc')}
             action={(
               <Button onClick={refreshStats} variant="primary">
                 <RefreshCw size={16} />
-                Повторить попытку
+                {t('admin2.adm_retry')}
               </Button>
             )}
           />
         ) : (
-          <div className="admin-kpi-grid" role="list" aria-label="Ключевые показатели администратора">
+          <div className="admin-kpi-grid" role="list" aria-label={t('admin2.adm_kpi_list_aria')}>
             {dashboardKpis.map((kpi) => (
               <div key={kpi.key} role="listitem">
                 <MacOSStatCard
@@ -283,10 +288,10 @@ const AdminDashboard = () => {
         <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-24">
           <MacOSCard className="admin-bg-var-mac-gradient-sid-bd-1px-solid-var-mac-ma-radius-24-bsh-none-bflt-var-mac-blur-light-webkitba-var-mac-blur-light-p-24">
             <div className="admin-p-16-d-flex-ai-center-jc-between-mb-16">
-              <h3 className="admin-fs-lg-fw-semi-primary-m-0">Активность системы</h3>
+              <h3 className="admin-fs-lg-fw-semi-primary-m-0">{t('admin2.adm_activity_system')}</h3>
               <Button variant="outline" size="sm" onClick={handleExportActivity} disabled={!activityChartData?.data?.length}>
                 <Download className="w-4 h-4 mr-2" aria-hidden="true" />
-                Экспорт
+                {t('admin2.adm_export')}
               </Button>
             </div>
             {activityChartLoading ? (
@@ -297,8 +302,8 @@ const AdminDashboard = () => {
               <div className="admin-h-256-radius-var-mac-radius-md-d-flex-ai-center-jc-center-bg-dyn" style={{ '--admin-bg0': adminSurface }}>
                 <MacOSEmptyState
                   icon={AlertTriangle}
-                  title="Ошибка загрузки графика"
-                  description="Не удалось загрузить данные активности"
+                  title={t('admin2.adm_error_load_chart')}
+                  description={t('admin2.adm_error_load_chart_desc')}
                 />
               </div>
             ) : activityChartData?.data && activityChartData.data.length > 0 ? (
@@ -318,16 +323,16 @@ const AdminDashboard = () => {
                   })}
                 </div>
                 <div className="admin-d-flex-jc-around-mt-8-fs-12-col-dyn" style={{ '--admin-col0': adminTextSecondary }}>
-                  <span>Записи: {activityChartData.data.reduce((sum, entry) => sum + (entry.appointments || 0), 0)}</span>
-                  <span>Платежи: {activityChartData.data.reduce((sum, entry) => sum + (entry.payments || 0), 0)}</span>
-                  <span>Пользователи: {activityChartData.data.reduce((sum, entry) => sum + (entry.users || 0), 0)}</span>
+                  <span>{t('admin2.adm_chart_appointments_count', { count: activityChartData.data.reduce((sum, entry) => sum + (entry.appointments || 0), 0) })}</span>
+                  <span>{t('admin2.adm_chart_payments_count', { count: activityChartData.data.reduce((sum, entry) => sum + (entry.payments || 0), 0) })}</span>
+                  <span>{t('admin2.adm_chart_users_count', { count: activityChartData.data.reduce((sum, entry) => sum + (entry.users || 0), 0) })}</span>
                 </div>
               </div>
             ) : (
               <div className="admin-h-256-radius-var-mac-radius-md-d-flex-ai-center-jc-center-bg-dyn" style={{ '--admin-bg0': adminSurface }}>
                 <div className="text-center">
                   <Activity className="admin-w-48-h-48-m-0-auto-16px-auto-col-dyn" style={{ '--admin-col0': adminTextSecondary }} />
-                  <p className="admin-col-dyn" style={{ '--admin-col0': adminTextSecondary }}>Нет данных за выбранный период</p>
+                  <p className="admin-col-dyn" style={{ '--admin-col0': adminTextSecondary }}>{t('admin2.adm_no_data_period')}</p>
                 </div>
               </div>
             )}
@@ -335,10 +340,10 @@ const AdminDashboard = () => {
 
           <MacOSCard className="admin-bg-var-mac-gradient-sid-bd-1px-solid-var-mac-ma-radius-24-bsh-none-bflt-var-mac-blur-light-webkitba-var-mac-blur-light-p-0-1">
             <div className="admin-p-16-d-flex-ai-center-jc-between-mb-16">
-              <h3 className="admin-fs-lg-fw-semi-primary-m-0">Последние действия</h3>
+              <h3 className="admin-fs-lg-fw-semi-primary-m-0">{t('admin2.adm_recent_actions')}</h3>
               <Button variant="outline" size="sm" onClick={handleViewAllActivities} disabled={recentActivities.length === 0}>
                 <Eye className="w-4 h-4 mr-2" aria-hidden="true" />
-                Все
+                {t('admin2.adm_view_all')}
               </Button>
             </div>
             {recentActivitiesLoading ? (
@@ -349,13 +354,13 @@ const AdminDashboard = () => {
               <div className="p-4">
                 <MacOSEmptyState
                   icon={AlertTriangle}
-                  title="Ошибка загрузки"
-                  description="Не удалось загрузить последние действия"
+                  title={t('admin2.adm_error_load')}
+                  description={t('admin2.adm_error_load_recent_actions_desc')}
                 />
               </div>
             ) : recentActivities.length === 0 ? (
               <div className="admin-p-16-ta-center">
-                <p className="text-[var(--mac-text-secondary)]">Нет последних действий</p>
+                <p className="text-[var(--mac-text-secondary)]">{t('admin2.adm_no_recent_actions')}</p>
               </div>
             ) : (
               <div className="flex flex-col gap-4">
@@ -364,7 +369,7 @@ const AdminDashboard = () => {
                     {getStatusIcon(activity.status)}
                     <div className="admin-flex-1">
                       <p className="admin-fs-sm-fw-med-primary-m-0">{activity.message}</p>
-                      <p className="admin-fs-xs-secondary-m-4px-0-0-0">{activity.user} · {activity.time || formatTimeAgo(activity.created_at)}</p>
+                      <p className="admin-fs-xs-secondary-m-4px-0-0-0">{activity.user} · {activity.time || formatTimeAgo(activity.created_at, t)}</p>
                     </div>
                   </div>
                 ))}
@@ -375,7 +380,7 @@ const AdminDashboard = () => {
 
         <MacOSCard className="admin-bg-var-mac-gradient-sid-bd-1px-solid-var-mac-ma-radius-24-bsh-none-bflt-var-mac-blur-light-webkitba-var-mac-blur-light-p-0-mt-24">
           <div className="admin-p-16-d-flex-ai-center-jc-between-mb-16">
-            <h3 className="admin-fs-lg-fw-semi-primary-m-0">Системные уведомления</h3>
+            <h3 className="admin-fs-lg-fw-semi-primary-m-0">{t('admin2.adm_system_notifications')}</h3>
             <Badge variant="warning">{systemAlerts.length}</Badge>
           </div>
           {systemAlertsLoading ? (
@@ -386,13 +391,13 @@ const AdminDashboard = () => {
             <div className="p-4">
               <MacOSEmptyState
                 icon={AlertTriangle}
-                title="Ошибка загрузки"
-                description="Не удалось загрузить системные уведомления"
+                title={t('admin2.adm_error_load')}
+                description={t('admin2.adm_error_load_system_notifications_desc')}
               />
             </div>
           ) : systemAlerts.length === 0 ? (
             <div className="admin-p-16-ta-center">
-              <p className="text-[var(--mac-text-secondary)]">Нет системных уведомлений</p>
+              <p className="text-[var(--mac-text-secondary)]">{t('admin2.adm_no_system_notifications')}</p>
             </div>
           ) : (
             <div className="flex flex-col gap-4">
@@ -405,7 +410,7 @@ const AdminDashboard = () => {
                   </div>
                   <Badge variant={alert.priority === 'high' ? 'error' : alert.priority === 'medium' ? 'warning' : 'info'}>
                     {/* UX Audit Stage 3 (Dashboard issue 4.2): локализация приоритета. */}
-                    {getPriorityLabel(alert.priority)}
+                    {getPriorityLabel(alert.priority, t)}
                   </Badge>
                 </div>
               ))}
