@@ -39,7 +39,7 @@ const GraphQLExplorer = () => {
   // Примеры GraphQL запросов
   const queryExamples = {
     'patients': {
-      name: 'Получить список пациентов',
+      name: t('admin2.gql_example_patients'),
       query: `query GetPatients($filter: PatientFilter, $pagination: PaginationInput) {
   patients(filter: $filter, pagination: $pagination) {
     items {
@@ -71,7 +71,7 @@ const GraphQLExplorer = () => {
       }
     },
     'doctors': {
-      name: 'Получить список врачей',
+      name: t('admin2.gql_example_doctors'),
       query: `query GetDoctors($filter: DoctorFilter) {
   doctors(filter: $filter) {
     items {
@@ -100,7 +100,7 @@ const GraphQLExplorer = () => {
       }
     },
     'appointments': {
-      name: 'Получить записи за сегодня',
+      name: t('admin2.gql_example_appointments'),
       query: `query GetTodayAppointments($filter: AppointmentFilter) {
   appointments(filter: $filter) {
     items {
@@ -133,7 +133,7 @@ const GraphQLExplorer = () => {
       }
     },
     'visits': {
-      name: 'Получить визиты пациента',
+      name: t('admin2.gql_example_visits'),
       query: `query GetPatientVisits($filter: VisitFilter) {
   visits(filter: $filter) {
     items {
@@ -160,7 +160,7 @@ const GraphQLExplorer = () => {
       }
     },
     'services': {
-      name: 'Получить услуги по категории',
+      name: t('admin2.gql_example_services'),
       query: `query GetServicesByCategory($filter: ServiceFilter) {
   services(filter: $filter) {
     items {
@@ -189,7 +189,7 @@ const GraphQLExplorer = () => {
       }
     },
     'statistics': {
-      name: 'Получить статистику',
+      name: t('admin2.gql_example_statistics'),
       query: `query GetStatistics {
   appointmentStats {
     total
@@ -211,7 +211,7 @@ const GraphQLExplorer = () => {
       variables: {}
     },
     'createPatient': {
-      name: 'Создать пациента (мутация)',
+      name: t('admin2.gql_example_create_patient'),
       query: `mutation CreatePatient($input: PatientInput!) {
   createPatient(input: $input) {
     success
@@ -236,7 +236,7 @@ const GraphQLExplorer = () => {
       }
     },
     'createAppointment': {
-      name: 'Создать запись (мутация)',
+      name: t('admin2.gql_example_create_appointment'),
       query: `mutation CreateAppointment($input: AppointmentInput!) {
   createAppointment(input: $input) {
     success
@@ -309,7 +309,7 @@ const GraphQLExplorer = () => {
 
   const executeQuery = async () => {
     if (!query.trim()) {
-      setError('Введите GraphQL запрос');
+      setError(t('admin2.gql_error_empty_query'));
       return;
     }
 
@@ -321,7 +321,7 @@ const GraphQLExplorer = () => {
         try {
           parsedVariables = JSON.parse(variables);
         } catch {
-          setError('Неверный формат переменных JSON');
+          setError(t('admin2.gql_error_invalid_json'));
           setLoading(false);
           return;
         }
@@ -334,11 +334,11 @@ const GraphQLExplorer = () => {
       setResult(data);
 
       if (data.errors) {
-        setError('GraphQL запрос выполнен с ошибками');
+        setError(t('admin2.gql_error_graphql_errors'));
       }
     } catch (error) {
       logger.error('Ошибка выполнения GraphQL запроса:', error);
-      setError('Ошибка выполнения запроса: ' + error.message);
+      setError(t('admin2.gql_error_execution', { message: error.message }));
       setResult({ error: error.message });
     } finally {
       setLoading(false);
@@ -356,12 +356,12 @@ const GraphQLExplorer = () => {
 
   const copyQuery = () => {
     navigator.clipboard.writeText(query);
-    toast.success('Запрос скопирован в буфер обмена');
+    toast.success(t('admin2.gql_toast_copied'));
   };
 
   const downloadResult = () => {
     if (!result) {
-      toast.error('Нет результата для скачивания');
+      toast.error(t('admin2.gql_toast_no_result'));
       return;
     }
 
@@ -374,7 +374,7 @@ const GraphQLExplorer = () => {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    toast.success('Результат скачан');
+    toast.success(t('admin2.gql_toast_downloaded'));
   };
 
   const formatJSON = (obj) => {
@@ -406,7 +406,7 @@ const GraphQLExplorer = () => {
       {error &&
     <Alert
       type="error"
-      title="Ошибка"
+      title={t('admin2.gql_alert_title_error')}
       description={error}
       onClose={() => setError(null)} />
 
@@ -416,7 +416,7 @@ const GraphQLExplorer = () => {
       <MacOSCard style={sectionCardStyle}>
         <h3 className="admin-m-0-0-16px-0-primary-d-flex-ai-center-gap-8-fs-lg-fw-semi-1">
           <BookOpen size={20} />
-          Примеры запросов
+          {t('admin2.gql_heading_examples')}
         </h3>
 
         <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-8">
@@ -439,7 +439,7 @@ const GraphQLExplorer = () => {
           <div className="admin-d-flex-fw-wrap-jc-between-ai-center-mb-16-gap-12-1">
             <h3 className="admin-m-0-primary-d-flex-ai-center-gap-8-fs-lg-fw-semi-1">
               <Code size={20} />
-              GraphQL Запрос
+              {t('admin2.gql_heading_query')}
             </h3>
             <div className="admin-d-flex-gap-8">
               <Button
@@ -448,7 +448,7 @@ const GraphQLExplorer = () => {
               className="admin-d-flex-ai-center-gap-4-p-4px-8px-fs-xs">
               
                 <Copy size={14} />
-                Копировать
+                {t('admin2.gql_btn_copy')}
               </Button>
               <Button
               onClick={executeQuery}
@@ -457,7 +457,7 @@ const GraphQLExplorer = () => {
               className="admin-d-flex-ai-center-gap-4-p-4px-8px-fs-xs">
               
                 {loading ? <RefreshCw size={14} className="animate-spin" /> : <Play size={14} />}
-                {loading ? 'Выполняется...' : 'Выполнить'}
+                {loading ? t('admin2.gql_btn_executing') : t('admin2.gql_btn_execute')}
               </Button>
             </div>
           </div>
@@ -465,7 +465,7 @@ const GraphQLExplorer = () => {
           <Textarea
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Введите GraphQL запрос..."
+          placeholder={t('admin2.gql_placeholder_query')}
           minRows={10}
           maxRows={18}
           textareaStyle={textareaStyle}
@@ -473,7 +473,7 @@ const GraphQLExplorer = () => {
         
 
           <div className="mt-4">
-            <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">Переменные (JSON)</label>
+            <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">{t('admin2.gql_label_variables')}</label>
             <Textarea
             value={variables}
             onChange={(e) => setVariables(e.target.value)}
@@ -490,7 +490,7 @@ const GraphQLExplorer = () => {
           <div className="admin-d-flex-fw-wrap-jc-between-ai-center-mb-16-gap-12">
             <h3 className="admin-m-0-primary-d-flex-ai-center-gap-8-fs-lg-fw-semi">
               <Activity size={20} />
-              Результат
+              {t('admin2.gql_heading_result')}
             </h3>
             {result &&
           <Button
@@ -499,7 +499,7 @@ const GraphQLExplorer = () => {
             className="admin-d-flex-ai-center-gap-4-p-4px-8px-fs-xs">
             
                 <Download size={14} />
-                Скачать
+                {t('admin2.gql_btn_download')}
               </Button>
           }
           </div>
@@ -517,7 +517,7 @@ const GraphQLExplorer = () => {
               </pre> :
 
           <div className="admin-d-flex-ai-center-jc-center-h-100pct-tertiary">
-                Результат появится здесь после выполнения запроса
+                {t('admin2.gql_result_placeholder')}
               </div>
           }
           </div>
@@ -531,7 +531,7 @@ const GraphQLExplorer = () => {
       <MacOSCard style={sectionCardStyle}>
         <h3 className="admin-m-0-0-16px-0-primary-d-flex-ai-center-gap-8-fs-lg-fw-semi">
           <Database size={20} />
-          GraphQL Схема
+          {t('admin2.gql_heading_schema')}
         </h3>
 
         {schema ?
@@ -567,7 +567,7 @@ const GraphQLExplorer = () => {
             )}
                     {type.fields?.length > 10 &&
             <div className="admin-p-4-ta-center-tertiary-fs-xs">
-                        ... и еще {type.fields.length - 10} полей
+                        {t('admin2.gql_more_fields', { count: type.fields.length - 10 })}
                       </div>
             }
                   </div>
@@ -586,8 +586,8 @@ const GraphQLExplorer = () => {
 
 
   const tabs = [
-  { id: 'explorer', label: 'Исследователь', icon: Search },
-  { id: 'schema', label: 'Схема', icon: Database }];
+  { id: 'explorer', label: t('admin2.gql_tab_explorer'), icon: Search },
+  { id: 'schema', label: t('admin2.gql_tab_schema'), icon: Database }];
 
 
   return (

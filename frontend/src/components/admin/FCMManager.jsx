@@ -28,14 +28,15 @@ import { toast } from 'react-toastify';
 
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
-const formatFcmTokenStatus = (user) => {
+const formatFcmTokenStatus = (user, t) => {
   const fallbackLength = typeof user.fcm_token === 'string' ? user.fcm_token.length : 0;
   const tokenLength = Number.isFinite(user.fcm_token_length) ? user.fcm_token_length : fallbackLength;
 
-  return tokenLength > 0 ? `скрыт (${tokenLength} символов)` : 'не зарегистрирован';
+  return tokenLength > 0 ? t('admin2.fcm_token_hidden', { count: tokenLength }) : t('admin2.fcm_token_not_registered');
 };
 
 const FCMManager = () => {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [fcmStatus, setFcmStatus] = useState(null);
   const [usersWithTokens, setUsersWithTokens] = useState([]);
@@ -76,7 +77,7 @@ const FCMManager = () => {
       );
     } catch (error) {
       logger.error('Error loading FCM data:', error);
-      toast.error('Ошибка загрузки данных FCM');
+      toast.error(t('admin2.fcm_err_load_data'));
     } finally {
       setLoading(false);
     }
@@ -92,13 +93,13 @@ const FCMManager = () => {
       const response = await api.post('/fcm/send-test-notification');
 
       if (response.data.success) {
-        toast.success('Тестовое FCM уведомление отправлено!');
+        toast.success(t('admin2.fcm_toast_test_sent'));
       } else {
-        toast.error(`Ошибка: ${response.data.message}`);
+        toast.error(t('admin2.fcm_err_with_message', { message: response.data.message }));
       }
     } catch (error) {
       logger.error('Error testing FCM:', error);
-      toast.error('Ошибка тестирования FCM');
+      toast.error(t('admin2.fcm_err_test'));
     } finally {
       setLoading(false);
     }
@@ -106,7 +107,7 @@ const FCMManager = () => {
 
   const sendNotification = async () => {
     if (!notificationForm.title.trim() || !notificationForm.body.trim()) {
-      toast.error('Заполните заголовок и текст уведомления');
+      toast.error(t('admin2.fcm_err_form_required'));
       return;
     }
 
@@ -137,7 +138,7 @@ const FCMManager = () => {
       const response = await api.post('/fcm/send-notification', payload);
 
       if (response.data.success) {
-        toast.success(`Уведомление отправлено! ${response.data.message}`);
+        toast.success(t('admin2.fcm_toast_sent', { message: response.data.message }));
         setNotificationForm({
           title: '',
           body: '',
@@ -147,11 +148,11 @@ const FCMManager = () => {
           sound: 'default'
         });
       } else {
-        toast.error(`Ошибка отправки: ${response.data.message}`);
+        toast.error(t('admin2.fcm_err_send', { message: response.data.message }));
       }
     } catch (error) {
       logger.error('Error sending FCM notification:', error);
-      toast.error('Ошибка отправки FCM уведомления');
+      toast.error(t('admin2.fcm_err_send_fcm'));
     } finally {
       setLoading(false);
     }
@@ -163,24 +164,24 @@ const FCMManager = () => {
       <MacOSCard className="admin-p-24">
         <h3 className="admin-fs-lg-fw-med-primary-m-0-0-16px-0-d-flex-ai-center-gap-8-3">
           <Activity className="admin-icon-20" />
-          Статус FCM сервиса
+          {t('admin2.fcm_heading_status')}
         </h3>
         <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16-3">
           <div className="admin-d-flex-ai-center-jc-between-p-16-bd-1px-solid-var-mac-bo-radius-var-mac-radius-md-bgc-bg-secondary-2">
             <div>
               <p className="admin-fs-sm-secondary-m-0-0-8px-0-2">
-                Статус сервиса
+                {t('admin2.fcm_label_service_status')}
               </p>
               <p className="admin-fw-med-m-0-1">
                 {fcmStatus?.active ?
               <Badge variant="success" className="admin-flex-center admin-gap-4">
                     <CheckCircle className="admin-w-12-h-12" />
-                    Активен
+                    {t('admin2.fcm_status_active')}
                   </Badge> :
 
               <Badge variant="secondary" className="admin-flex-center admin-gap-4">
                     <AlertTriangle className="admin-w-12-h-12" />
-                    Неактивен
+                    {t('admin2.fcm_status_inactive')}
                   </Badge>
               }
               </p>
@@ -194,9 +195,9 @@ const FCMManager = () => {
               </p>
               <p className="admin-fw-med-m-0">
                 {fcmStatus?.server_key_configured ?
-              <Badge variant="success">Настроен</Badge> :
+              <Badge variant="success">{t('admin2.fcm_status_configured')}</Badge> :
 
-              <Badge variant="secondary">Не настроен</Badge>
+              <Badge variant="secondary">{t('admin2.fcm_status_not_configured')}</Badge>
               }
               </p>
             </div>
@@ -205,7 +206,7 @@ const FCMManager = () => {
           <div className="admin-d-flex-ai-center-jc-between-p-16-bd-1px-solid-var-mac-bo-radius-var-mac-radius-md-bgc-bg-secondary">
             <div>
               <p className="admin-fs-sm-secondary-m-0-0-8px-0">
-                Пользователей с токенами
+                {t('admin2.fcm_label_users_with_tokens')}
               </p>
               <p className="admin-fs-2xl-fw-bold-primary-m-0">
                 {usersWithTokens.length}
@@ -220,7 +221,7 @@ const FCMManager = () => {
       <MacOSCard className="admin-p-24">
         <h3 className="admin-fs-lg-fw-med-primary-m-0-0-16px-0-d-flex-ai-center-gap-8-2">
           <Zap className="admin-icon-20" />
-          Быстрые действия
+          {t('admin2.fcm_heading_quick_actions')}
         </h3>
         <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16-2">
           <Button
@@ -229,7 +230,7 @@ const FCMManager = () => {
           className="admin-flex-center-8">
           
             <TestTube className="admin-icon-16" />
-            Тест FCM
+            {t('admin2.fcm_btn_test')}
           </Button>
 
           <Button
@@ -239,7 +240,7 @@ const FCMManager = () => {
           className="admin-flex-center-8">
           
             <RefreshCw className="admin-icon-16" />
-            Обновить данные
+            {t('admin2.fcm_btn_refresh')}
           </Button>
 
           <Button
@@ -248,7 +249,7 @@ const FCMManager = () => {
           className="admin-flex-center-8">
           
             <Send className="admin-icon-16" />
-            Отправить уведомление
+            {t('admin2.fcm_btn_send_notification')}
           </Button>
         </div>
       </MacOSCard>
@@ -260,37 +261,37 @@ const FCMManager = () => {
       <MacOSCard className="admin-p-24">
         <h3 className="admin-fs-lg-fw-med-primary-m-0-0-16px-0-d-flex-ai-center-gap-8-1">
           <Send className="admin-icon-20" />
-          Отправка FCM уведомлений
+          {t('admin2.fcm_heading_send')}
         </h3>
         <div className="admin-flex-col-16">
           <div>
             <label className="admin-d-block-fs-sm-fw-med-primary-mb-8-14">
-              Заголовок
+              {t('admin2.fcm_label_title')}
             </label>
             <Input
             type="text"
             value={notificationForm.title}
             onChange={(e) => setNotificationForm((prev) => ({ ...prev, title: e.target.value }))}
-            placeholder="Заголовок уведомления"
+            placeholder={t('admin2.fcm_placeholder_title')}
             className="admin-w-full" />
           
           </div>
 
           <div>
             <label className="admin-d-block-fs-sm-fw-med-primary-mb-8-13">
-              Текст сообщения
+              {t('admin2.fcm_label_body')}
             </label>
             <Textarea
             value={notificationForm.body}
             onChange={(e) => setNotificationForm((prev) => ({ ...prev, body: e.target.value }))}
-            placeholder="Текст уведомления..."
+            placeholder={t('admin2.fcm_placeholder_body')}
             className="admin-w-100pct-minh-100" />
           
           </div>
 
           <div>
             <label className="admin-d-block-fs-sm-fw-med-primary-mb-8-12">
-              Изображение (URL)
+              {t('admin2.fcm_label_image')}
             </label>
             <Input
             type="url"
@@ -303,16 +304,16 @@ const FCMManager = () => {
 
           <div>
             <label className="admin-d-block-fs-sm-fw-med-primary-mb-8-11">
-              Звук
+              {t('admin2.fcm_label_sound')}
             </label>
             <Select
             value={notificationForm.sound}
             onChange={(value) => setNotificationForm((prev) => ({ ...prev, sound: value }))}
             options={[
-            { value: 'default', label: 'По умолчанию' },
-            { value: 'notification', label: 'Уведомление' },
-            { value: 'alert', label: 'Предупреждение' },
-            { value: 'chime', label: 'Звонок' }]
+            { value: 'default', label: t('admin2.fcm_sound_default') },
+            { value: 'notification', label: t('admin2.fcm_sound_notification') },
+            { value: 'alert', label: t('admin2.fcm_sound_alert') },
+            { value: 'chime', label: t('admin2.fcm_sound_chime') }]
             }
             size="large"
             className="admin-w-full" />
@@ -321,11 +322,11 @@ const FCMManager = () => {
 
           <div>
             <label className="admin-d-block-fs-sm-fw-med-primary-mb-8-10">
-              Получатели
+              {t('admin2.fcm_label_recipients')}
             </label>
             <div className="admin-flex-col-8">
               <p className="admin-fs-xs-secondary-m-0">
-                Если не выбрать пользователей, уведомление будет отправлено всем активным пользователям
+                {t('admin2.fcm_recipients_hint')}
               </p>
               
               <div className="admin-maxh-160-ovy-auto-bd-1px-solid-var-mac-bo-radius-var-mac-radius-md-p-8-bgc-bg-secondary">
@@ -367,7 +368,7 @@ const FCMManager = () => {
           disabled={loading || !fcmStatus?.active || !notificationForm.title.trim() || !notificationForm.body.trim()}
           className="admin-w-full">
           
-            {loading ? 'Отправка...' : 'Отправить FCM уведомление'}
+            {loading ? t('admin2.fcm_btn_sending') : t('admin2.fcm_btn_send')}
           </Button>
         </div>
       </MacOSCard>
@@ -379,7 +380,7 @@ const FCMManager = () => {
       <MacOSCard className="admin-p-24">
         <h3 className="admin-fs-lg-fw-med-primary-m-0-0-16px-0-d-flex-ai-center-gap-8">
           <Users className="admin-icon-20" />
-          Пользователи с FCM токенами ({usersWithTokens.length})
+          {t('admin2.fcm_heading_users', { count: usersWithTokens.length })}
         </h3>
         <div className="admin-flex-col-16">
           {usersWithTokens.map((user) =>
@@ -398,11 +399,11 @@ const FCMManager = () => {
                     {user.full_name || user.username}
                   </p>
                   <p className="admin-fs-xs-secondary-m-0-0-4px-0">
-                    FCM токен: {formatFcmTokenStatus(user)}
+                    {t('admin2.fcm_label_token')} {formatFcmTokenStatus(user, t)}
                   </p>
                   {user.last_login &&
               <p className="admin-fs-xs-tertiary-m-0">
-                      Последний вход: {new Date(user.last_login).toLocaleString()}
+                      {t('admin2.fcm_label_last_login')} {new Date(user.last_login).toLocaleString()}
                     </p>
               }
                 </div>
@@ -410,7 +411,7 @@ const FCMManager = () => {
               
               <div className="admin-flex-center-8">
                 <Badge variant={user.push_enabled ? 'success' : 'secondary'}>
-                  {user.push_enabled ? 'Push включен' : 'Push отключен'}
+                  {user.push_enabled ? t('admin2.fcm_push_on') : t('admin2.fcm_push_off')}
                 </Badge>
                 
                 <Badge variant="outline">
@@ -422,7 +423,7 @@ const FCMManager = () => {
           
           {usersWithTokens.length === 0 &&
         <div className="admin-ta-center-p-32px-0-secondary-fs-sm">
-              Нет пользователей с зарегистрированными FCM токенами
+              {t('admin2.fcm_empty_users')}
             </div>
         }
         </div>
@@ -431,9 +432,9 @@ const FCMManager = () => {
 
 
   const tabs = [
-  { id: 'overview', label: 'Обзор', icon: Activity },
-  { id: 'notifications', label: 'Уведомления', icon: Bell },
-  { id: 'users', label: 'Пользователи', icon: Users }];
+  { id: 'overview', label: t('admin2.fcm_tab_overview'), icon: Activity },
+  { id: 'notifications', label: t('admin2.fcm_tab_notifications'), icon: Bell },
+  { id: 'users', label: t('admin2.fcm_tab_users'), icon: Users }];
 
 
   return (
@@ -447,7 +448,7 @@ const FCMManager = () => {
               Firebase Cloud Messaging
             </h1>
             <p className="admin-secondary-fs-sm-m-0-3">
-              Управление push-уведомлениями
+              {t('admin2.fcm_subtitle')}
             </p>
           </div>
         </div>
@@ -456,12 +457,12 @@ const FCMManager = () => {
           {fcmStatus?.active ?
           <Badge variant="success" className="admin-flex-center admin-gap-4">
               <CheckCircle className="admin-w-12-h-12" />
-              FCM активен
+              {t('admin2.fcm_status_active_short')}
             </Badge> :
 
           <Badge variant="secondary" className="admin-flex-center admin-gap-4">
               <AlertTriangle className="admin-w-12-h-12" />
-              FCM неактивен
+              {t('admin2.fcm_status_inactive_short')}
             </Badge>
           }
         </div>

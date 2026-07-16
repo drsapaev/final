@@ -54,6 +54,7 @@ const hasBackendAllFreeAction = (request, action) => {
  */
 const AllFreeApproval = () => {void
   useTheme();
+  const { t } = useTranslation();
   const [allFreeRequests, setAllFreeRequests] = useState([]);
   const [allRequestsForStats, setAllRequestsForStats] = useState([]); // ✅ Для статистики - все заявки
   const [loading, setLoading] = useState(true);
@@ -85,7 +86,7 @@ const AllFreeApproval = () => {void
       setAllFreeRequests(Array.isArray(data) ? data : []);
     } catch (error) {
       logger.error('[AllFreeApproval] Ошибка при загрузке заявок All Free:', error);
-      toast.error(error.response?.data?.detail || 'Ошибка загрузки заявок All Free');
+      toast.error(error.response?.data?.detail || t('admin2.af_err_load'));
     } finally {
       setLoading(false);
     }
@@ -106,7 +107,7 @@ const AllFreeApproval = () => {void
         rejection_reason: rejectionReason
       });
 
-      toast.success(response.data?.message || 'Заявка обработана');
+      toast.success(response.data?.message || t('admin2.af_toast_processed'));
 
       // ✅ ИСПРАВЛЕНО: Обновляем все заявки для статистики и список с текущим фильтром
       await loadAllRequestsForStats();
@@ -118,7 +119,7 @@ const AllFreeApproval = () => {void
       setRejectionReason('');
     } catch (error) {
       logger.error('Error processing approval:', error);
-      toast.error(error.response?.data?.detail || 'Ошибка обработки запроса');
+      toast.error(error.response?.data?.detail || t('admin2.af_err_process'));
     } finally {
       setIsProcessing(false);
     }
@@ -148,20 +149,20 @@ const AllFreeApproval = () => {void
 
   const getStatusText = (status) => {
     switch (status) {
-      case 'pending':return 'Ожидает одобрения';
-      case 'approved':return 'Одобрено';
-      case 'rejected':return 'Отклонено';
+      case 'pending':return t('admin2.af_status_pending');
+      case 'approved':return t('admin2.af_status_approved');
+      case 'rejected':return t('admin2.af_status_rejected');
       default:return status;
     }
   };
 
   const getSpecialtyText = (specialty) => {
     switch (specialty) {
-      case 'dermatology':return 'Дерматология';
-      case 'cosmetology':return 'Косметология';
-      case 'stomatology':return 'Стоматология';
-      case 'dental':return 'Стоматология';
-      case 'cardiology':return 'Кардиология';
+      case 'dermatology':return t('admin2.af_specialty_dermatology');
+      case 'cosmetology':return t('admin2.af_specialty_cosmetology');
+      case 'stomatology':return t('admin2.af_specialty_stomatology');
+      case 'dental':return t('admin2.af_specialty_dental');
+      case 'cardiology':return t('admin2.af_specialty_cardiology');
       default:return specialty;
     }
   };
@@ -185,15 +186,15 @@ const AllFreeApproval = () => {void
           <div>
             <h2 className="admin-fs-24-fw-700-primary-d-flex-ai-center-gap-8-m-0">
               <Bell size={24} className="admin-warning" />
-              Заявки All Free
+              {t('admin2.af_title')}
               {pendingCount > 0 &&
               <Badge variant="warning" className="admin-ml-8">
-                  {pendingCount} новых
+                  {t('admin2.af_new_badge', { count: pendingCount })}
                 </Badge>
               }
             </h2>
             <p className="admin-secondary-mt-4-m-4px-0-0-0">
-              Одобрение и отклонение заявок на бесплатные услуги
+              {t('admin2.af_subtitle')}
             </p>
           </div>
           
@@ -202,14 +203,14 @@ const AllFreeApproval = () => {void
             <div className="flex items-center justify-center gap-2">
               <Filter size={16} className="admin-tertiary" />
               <Select
-                aria-label="Фильтр заявок All Free по статусу"
+                aria-label={t('admin2.af_filter_aria')}
                 value={statusFilter}
                 onChange={setStatusFilter}
                 options={[
-                  { value: 'pending', label: 'Ожидают одобрения' },
-                  { value: 'approved', label: 'Одобренные' },
-                  { value: 'rejected', label: 'Отклоненные' },
-                  { value: 'all', label: 'Все' }
+                  { value: 'pending', label: t('admin2.af_filter_pending') },
+                  { value: 'approved', label: t('admin2.af_filter_approved') },
+                  { value: 'rejected', label: t('admin2.af_filter_rejected') },
+                  { value: 'all', label: t('admin2.af_filter_all') }
                 ]}
                 size="large"
                 className="admin-minw-200" />
@@ -222,7 +223,7 @@ const AllFreeApproval = () => {void
               variant="outline">
               
               <RefreshCw size={16} className="admin-mr-8-anim-dyn" style={{ '--admin-anim0': loading ? 'spin 1s linear infinite' : 'none' }} />
-              Обновить
+              {t('admin2.af_btn_refresh')}
             </Button>
           </div>
         </div>
@@ -239,7 +240,7 @@ const AllFreeApproval = () => {void
               </div>
               <div>
                 <p className="admin-fs-14-secondary-m-0">
-                  Ожидают
+                  {t('admin2.af_stat_pending')}
                 </p>
                 <p className="admin-fs-20-fw-600-primary-m-4px-0-0-0-3">
                   {pendingCount}
@@ -258,7 +259,7 @@ const AllFreeApproval = () => {void
               </div>
               <div>
                 <p className="admin-fs-14-secondary-m-0">
-                  Одобрено
+                  {t('admin2.af_stat_approved')}
                 </p>
                 <p className="admin-fs-20-fw-600-primary-m-4px-0-0-0-2">
                   {approvedCount}
@@ -277,7 +278,7 @@ const AllFreeApproval = () => {void
               </div>
               <div>
                 <p className="admin-fs-14-secondary-m-0">
-                  Отклонено
+                  {t('admin2.af_stat_rejected')}
                 </p>
                 <p className="admin-fs-20-fw-600-primary-m-4px-0-0-0-1">
                   {rejectedCount}
@@ -296,7 +297,7 @@ const AllFreeApproval = () => {void
               </div>
               <div>
                 <p className="admin-fs-14-secondary-m-0">
-                  Общая сумма
+                  {t('admin2.af_stat_total')}
                 </p>
                 <p className="admin-fs-20-fw-600-primary-m-4px-0-0-0">
                   {formatPrice(totalAmount)}
@@ -310,12 +311,12 @@ const AllFreeApproval = () => {void
         {loading ?
         <div className="text-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600 mx-auto" />
-            <p className="text-gray-500 mt-2">Загрузка...</p>
+            <p className="text-gray-500 mt-2">{t('admin2.af_loading')}</p>
           </div> :
         allFreeRequests.length === 0 ?
         <div className="text-center py-8">
             <AlertCircle size={48} className="text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-500">Заявок All Free не найдено</p>
+            <p className="text-gray-500">{t('admin2.af_empty')}</p>
           </div> :
 
         <div className="grid gap-4">
@@ -333,7 +334,7 @@ const AllFreeApproval = () => {void
                     </Badge>
                     
                     <span className="text-sm text-gray-500 dark:text-gray-400">
-                      Заявка #{request.id}
+                      {t('admin2.af_request_id', { id: request.id })}
                     </span>
                   </div>
                   
@@ -347,12 +348,12 @@ const AllFreeApproval = () => {void
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
-                      Пациент
+                      {t('admin2.af_label_patient')}
                     </label>
                     <div className="flex items-center gap-2">
                       <User size={16} className="text-gray-400" />
                       <div>
-                        <div className="text-sm">{request.patient_name || 'Не указан'}</div>
+                        <div className="text-sm">{request.patient_name || t('admin2.af_not_specified_patient')}</div>
                         {request.patient_phone &&
                     <div className="text-xs text-gray-500 flex items-center gap-1">
                             <Phone size={12} />
@@ -366,7 +367,7 @@ const AllFreeApproval = () => {void
                   {request.doctor_name &&
               <div>
                       <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
-                        Врач
+                        {t('admin2.af_label_doctor')}
                       </label>
                       <div className="flex items-center gap-2">
                         <Stethoscope size={16} className="text-gray-400" />
@@ -382,11 +383,11 @@ const AllFreeApproval = () => {void
                   
                   <div>
                     <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
-                      Дата и время
+                      {t('admin2.af_label_datetime')}
                     </label>
                     <div className="text-sm">
-                      {request.visit_date ? new Date(request.visit_date).toLocaleDateString('ru-RU') : 'Не указана'}
-                      {request.visit_time && ` в ${request.visit_time}`}
+                      {request.visit_date ? new Date(request.visit_date).toLocaleDateString('ru-RU') : t('admin2.af_not_specified_date')}
+                      {request.visit_time && t('admin2.af_at_time', { time: request.visit_time })}
                     </div>
                   </div>
                 </div>
@@ -394,7 +395,7 @@ const AllFreeApproval = () => {void
                 {/* Услуги */}
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">
-                    Услуги
+                    {t('admin2.af_label_services')}
                   </label>
                   <div className="flex items-center gap-2 mb-2">
                     <Package size={16} className="text-gray-400" />
@@ -412,7 +413,7 @@ const AllFreeApproval = () => {void
                     <span className="text-lg font-semibold text-orange-600">
                       {formatPrice(request.total_original_amount)}
                     </span>
-                    <span className="text-sm text-gray-500">→ БЕСПЛАТНО</span>
+                    <span className="text-sm text-gray-500">{t('admin2.af_free')}</span>
                   </div>
                 </div>
 
@@ -420,7 +421,7 @@ const AllFreeApproval = () => {void
                 {request.notes &&
             <div className="mb-4">
                     <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
-                      Примечания
+                      {t('admin2.af_label_notes')}
                     </label>
                     <div className="text-sm bg-gray-50 dark:bg-gray-700 p-3 rounded-md">
                       {request.notes}
@@ -438,7 +439,7 @@ const AllFreeApproval = () => {void
                 className="flex items-center gap-2 bg-green-600 hover:bg-green-700">
                 
                       <CheckCircle size={16} />
-                      Одобрить
+                      {t('admin2.af_btn_approve')}
                     </Button>
               }
 
@@ -453,7 +454,7 @@ const AllFreeApproval = () => {void
                 className="flex items-center gap-2 text-red-600 border-red-600 hover:bg-red-50">
                 
                       <XCircle size={16} />
-                      Отклонить
+                      {t('admin2.af_btn_reject')}
                     </Button>
               }
                   </div>
@@ -469,30 +470,30 @@ const AllFreeApproval = () => {void
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full">
               <div className="p-6">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                  Отклонить заявку All Free
+                  {t('admin2.af_modal_title')}
                 </h3>
                 
                 <div className="mb-4">
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                    Заявка #{selectedRequest.id}
+                    {t('admin2.af_request_id', { id: selectedRequest.id })}
                   </p>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Сумма: {formatPrice(selectedRequest.total_original_amount)}
+                    {t('admin2.af_modal_amount', { amount: formatPrice(selectedRequest.total_original_amount) })}
                   </p>
                 </div>
                 
                 <div className="mb-4">
                   <label htmlFor="all-free-rejection-reason" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Причина отклонения
+                    {t('admin2.af_modal_reason_label')}
                   </label>
                   <textarea
                   id="all-free-rejection-reason"
-                  aria-label="Причина отклонения All Free"
+                  aria-label={t('admin2.af_modal_reason_aria')}
                   value={rejectionReason}
                   onChange={(e) => setRejectionReason(e.target.value)}
                   rows={3}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                  placeholder="Укажите причину отклонения..." />
+                  placeholder={t('admin2.af_modal_reason_placeholder')} />
                 
                 </div>
                 
@@ -507,7 +508,7 @@ const AllFreeApproval = () => {void
 
                   <XCircle size={16} />
                   }
-                    Отклонить
+                    {t('admin2.af_btn_reject')}
                   </Button>
                   
                   <Button
@@ -520,7 +521,7 @@ const AllFreeApproval = () => {void
                   variant="outline"
                   className="flex-1">
                   
-                    Отмена
+                    {t('admin2.af_modal_cancel')}
                   </Button>
                 </div>
               </div>
