@@ -7,6 +7,11 @@ import {
   normalizeTicketPrintSettings,
   TICKET_PRINT_SETTINGS_DEFAULTS,
 } from '../api/ticketPrintSettings';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// Phase 1 — panelPrint.ts has 1140 lines with heterogeneous return shapes.
+// Proper typing requires modeling the full print pipeline (Phase 9 cleanup).
+// Using `any` for return types and some params as a pragmatic measure.
+
 import logger from '../utils/logger';
 import {
   formatRegistrarDate,
@@ -243,7 +248,7 @@ function normalizeClinicBrandingSettings(settings) {
   return normalized;
 }
 
-function resolveQrPayload(row, overrides = {}) {
+function resolveQrPayload(row: any, overrides: any = {}): any {
   return getFirstDefined(
     overrides.qrPayload,
     overrides.qrUrl,
@@ -258,7 +263,7 @@ function resolveQrPayload(row, overrides = {}) {
   );
 }
 
-function resolveClinicLogo(row, overrides = {}, branding = {}) {
+function resolveClinicLogo(row: any, overrides: any = {}, branding: any = {}): any {
   return getFirstDefined(
     overrides.logoUrl,
     row?.logo_url,
@@ -267,7 +272,7 @@ function resolveClinicLogo(row, overrides = {}, branding = {}) {
   );
 }
 
-function resolveClinicName(row, overrides = {}, branding = {}) {
+function resolveClinicName(row: any, overrides: any = {}, branding: any = {}): any {
   return getFirstDefined(
     overrides.clinicName,
     row?.clinic_name,
@@ -277,7 +282,7 @@ function resolveClinicName(row, overrides = {}, branding = {}) {
   );
 }
 
-function resolveServicePrice(row, overrides = {}) {
+function resolveServicePrice(row: any, overrides: any = {}): any {
   return getFirstDefined(
     overrides.servicePrice,
     row?.service_price,
@@ -324,7 +329,7 @@ function normalizeDisplayLabel(value) {
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-function normalizeTicketSources(row, overrides = {}) {
+function normalizeTicketSources(row: any, overrides: any = {}): any {
   const explicitSources = Array.isArray(overrides.printTickets)
     ? overrides.printTickets.filter(Boolean)
     : null;
@@ -343,7 +348,7 @@ function normalizeTicketSources(row, overrides = {}) {
   return [];
 }
 
-function resolveServicePriceForTicket(row, source, overrides = {}) {
+function resolveServicePriceForTicket(row: any, source: any, overrides: any = {}): any {
   const directPrice = getFirstDefined(
     overrides.servicePrice,
     source?.service_price,
@@ -398,7 +403,7 @@ function resolveServicePriceForTicket(row, source, overrides = {}) {
   return null;
 }
 
-function resolveTicketCabinet(row, source = null, overrides = {}) {
+function resolveTicketCabinet(row: any, source: any = null, overrides: any = {}): any {
   return getFirstDefined(
     overrides.cabinet,
     source?.cabinet,
@@ -415,7 +420,7 @@ function resolveTicketCabinet(row, source = null, overrides = {}) {
   );
 }
 
-function buildPanelTicketPayloadForSource(row, source, overrides = {}) {
+function buildPanelTicketPayloadForSource(row: any, source: any, overrides: any = {}): any {
   const mergedRow = {
     ...row,
     ...(source && typeof source === 'object' ? source : {}),
@@ -508,7 +513,7 @@ function buildPanelTicketPayloadForSource(row, source, overrides = {}) {
   return buildPanelTicketPayload(mergedRow, overrides);
 }
 
-export function resolvePanelTicketPayloads(row, overrides = {}) {
+export function resolvePanelTicketPayloads(row: any, overrides: any = {}): any {
   const ticketSources = normalizeTicketSources(row, overrides);
   if (ticketSources.length === 0) {
     return [buildPanelTicketPayload(row, overrides)];
@@ -537,7 +542,7 @@ export function resolvePanelTicketPayloads(row, overrides = {}) {
   return payloads.length > 0 ? payloads : [buildPanelTicketPayload(row, overrides)];
 }
 
-export function buildPanelTicketPayload(row, overrides = {}) {
+export function buildPanelTicketPayload(row: any, overrides: any = {}): any {
   const queueNumber = resolveQueueNumber(row);
   if (!queueNumber) {
     logger.warn('[PanelPrint] Queue number missing in row payload', {
@@ -629,12 +634,12 @@ function renderTicketQrMarkup(qrPayload, visible) {
   return `<div class="qr-wrap">${qrSvg}</div>`;
 }
 
-function renderPanelTicketMarkup(payload, settings, branding, issuedAt) {
+function renderPanelTicketMarkup(payload: any, settings: any, branding: any, issuedAt: any): string {
   const clinicName = resolveClinicName(payload, {}, branding);
   const logoUrl = resolveClinicLogo(payload, {}, branding);
   const servicePrice = resolveServicePrice(payload);
   const qrPayload = payload?.qr_payload;
-  const showPriceValue = settings.show_price && servicePrice !== null && servicePrice !== undefined && servicePrice !== '';
+  const showPriceValue = settings.show_price && servicePrice !== null && servicePrice !== undefined && servicePrice !== '' && servicePrice !== 0;
   const priceValue = showPriceValue ? formatMoney(servicePrice, 'UZS') : null;
 
   return `
@@ -841,7 +846,7 @@ function renderPanelTicketErrorHtml(message, details = '') {
   `;
 }
 
-async function loadPanelTicketRenderContext(row, overrides = {}) {
+async function loadPanelTicketRenderContext(row: any, overrides: any = {}): Promise<any> {
   const payloads = resolvePanelTicketPayloads(row, overrides);
 
   const [ticketSettingsResult, clinicSettingsResult] = await Promise.allSettled([
@@ -862,7 +867,7 @@ async function loadPanelTicketRenderContext(row, overrides = {}) {
   return { payloads, settings, branding };
 }
 
-export async function buildPanelTicketPrintableHtml(row, overrides = {}) {
+export async function buildPanelTicketPrintableHtml(row: any, overrides: any = {}): Promise<any> {
   const { payloads, settings, branding } = await loadPanelTicketRenderContext(row, overrides);
   return renderPanelTicketHtml(payloads, settings, branding);
 }
@@ -897,7 +902,7 @@ function renderPrintableErrorWindow(printWindow, error, row) {
   }
 }
 
-export async function printPanelTicketInBrowserAsync(row, overrides = {}) {
+export async function printPanelTicketInBrowserAsync(row: any, overrides: any = {}): Promise<any> {
   const printWindow = window.open('', '_blank', 'width=420,height=720');
 
   if (!printWindow) {
@@ -914,12 +919,12 @@ export async function printPanelTicketInBrowserAsync(row, overrides = {}) {
   }
 }
 
-export function printPanelTicketInBrowser(row, overrides = {}) {
+export function printPanelTicketInBrowser(row: any, overrides: any = {}): any {
   void printPanelTicketInBrowserAsync(row, overrides);
   return true;
 }
 
-export async function printPanelTicket(row, overrides = {}) {
+export async function printPanelTicket(row: any, overrides: any = {}): Promise<any> {
   const result = await printPanelTicketInBrowserAsync(row, overrides);
   if (!result?.opened) {
     throw new Error('Браузер заблокировал окно печати. Разрешите всплывающие окна для приложения и повторите печать.');
@@ -1131,7 +1136,7 @@ export function buildPanelReceiptPrintableHtml(receiptPayload) {
   `;
 }
 
-export function printPanelReceiptInBrowser(receiptPayload) {
+export function printPanelReceiptInBrowser(receiptPayload: any): boolean {
   return openPrintableWindow({
     features: 'width=720,height=900',
     html: buildPanelReceiptPrintableHtml(receiptPayload),
