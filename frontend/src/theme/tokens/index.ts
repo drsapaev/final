@@ -8,4 +8,5 @@ export * from './typography';
 export * from './shape';
 export * from './shadows';
 export * from './motion';
-export * from './colors';
+// Note: './colors' was removed — no colors.ts file exists in this directory.
+// Colors are exported from src/theme/tokens.ts (the main tokens module).

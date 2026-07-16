@@ -4,6 +4,7 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import jsxA11y from 'eslint-plugin-jsx-a11y';
 import globals from 'globals';
 import tsParser from '@typescript-eslint/parser';
+import tseslint from '@typescript-eslint/eslint-plugin';
 import noHardcodedColors from './scripts/no-hardcoded-colors.js';
 
 export default [
@@ -130,6 +131,9 @@ export default [
   },
   {
     files: ['**/*.{ts,tsx}'],
+    plugins: {
+      '@typescript-eslint': tseslint,
+    },
     languageOptions: {
       parser: tsParser,
       ecmaVersion: 2022,
@@ -147,6 +151,11 @@ export default [
     },
     rules: {
       'no-unused-vars': 'off',
+      // Phase 0 — TS rules (lenient at start; strict at Phase 9)
+      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-explicit-any': 'off',                       // ← off at start; warn at Phase 9
+      '@typescript-eslint/explicit-function-return-type': 'off',         // ← off at start; warn at Phase 9
+      '@typescript-eslint/explicit-module-boundary-types': 'off',
     },
   },
   {
