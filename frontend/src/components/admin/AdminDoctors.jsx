@@ -24,33 +24,39 @@ import logger from '../../utils/logger';
 
 // PR-19: departmentOptions now loaded dynamically from /admin/departments
 // (was hardcoded — new departments didn't appear in filter dropdown)
-const statusOptions = [
-  { value: '', label: 'Все статусы' },
-  { value: 'active', label: 'Активен' },
-  { value: 'inactive', label: 'Неактивен' },
+const STATUS_OPTION_KEYS = [
+  { value: '', labelKey: 'admin2.ad_status_all' },
+  { value: 'active', labelKey: 'admin2.ad_status_active' },
+  { value: 'inactive', labelKey: 'admin2.ad_status_inactive' },
 ];
 
-const getDoctorName = (doctor) =>
-  doctor.user?.full_name || doctor.name || doctor.user?.username || 'Неизвестно';
+const getStatusOptions = (t) =>
+  STATUS_OPTION_KEYS.map(({ value, labelKey }) => ({
+    value,
+    label: t(labelKey),
+  }));
 
-const getDoctorInitials = (doctor) =>
-  getDoctorName(doctor)
+const getDoctorName = (doctor, t) =>
+  doctor.user?.full_name || doctor.name || doctor.user?.username || t('admin2.ad_doctor_unknown');
+
+const getDoctorInitials = (doctor, t) =>
+  getDoctorName(doctor, t)
     .split(' ')
     .filter(Boolean)
     .map((part) => part[0])
     .join('')
     .toUpperCase()
-    .slice(0, 2) || 'Д';
+    .slice(0, 2) || t('admin2.ad_doctor_initial');
 
 // PR-19: dynamic department label lookup (was hardcoded)
-const getDepartmentLabel = (department, deptList = []) => {
-  const { t } = useTranslation();
-  if (!department) return 'Не указано';
+const getDepartmentLabel = (department, deptList = [], t) => {
+  if (!department) return t('admin2.ad_not_specified');
   const found = deptList.find((d) => d.key === department);
   return found ? found.name_ru : department;
 };
 
 const AdminDoctors = () => {
+  const { t } = useTranslation();
   // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
   const [confirm, confirmDialog] = useConfirm();
   const {
@@ -92,9 +98,11 @@ const AdminDoctors = () => {
 
   // PR-19: build departmentOptions dynamically
   const departmentOptions = [
-    { value: '', label: 'Все отделения' },
+    { value: '', label: t('admin2.ad_department_all') },
     ...departments.map((d) => ({ value: d.key, label: d.name_ru || d.key })),
   ];
+
+  const statusOptions = getStatusOptions(t);
 
   const filtersActive = Boolean(searchTerm || filterSpecialization || filterDepartment || filterStatus);
 
@@ -109,12 +117,12 @@ const AdminDoctors = () => {
   };
 
   const handleDeleteDoctor = async (doctor) => {
-    const doctorName = getDoctorName(doctor);
+    const doctorName = getDoctorName(doctor, t);
     // P-013 fix: replaced window.confirm() with shared useConfirm hook.
     const confirmed = await confirm({
       title: t('admin.deactivate_doctor_title'),
-      message: `Деактивировать врача «${doctorName}»?`,
-      description: 'Врач будет отмечен как неактивный, но останется в базе данных. Записи к этому врачу будут скрыты из расписания.',
+      message: t('admin2.ad_deactivate_message', { name: doctorName }),
+      description: t('admin2.ad_deactivate_description'),
       confirmLabel: t('admin.deactivate_confirm'),
       cancelLabel: t('admin.cancel'),
       intent: 'warning',
@@ -126,10 +134,10 @@ const AdminDoctors = () => {
 
     try {
       await deleteDoctor(doctor.id);
-      notify.success(`Врач "${doctorName}" успешно деактивирован`);
+      notify.success(t('admin2.ad_deactivate_success', { name: doctorName }));
     } catch (deleteError) {
       logger.error('Ошибка деактивации врача:', deleteError);
-      notify.error(`Ошибка при деактивации врача: ${deleteError.message || 'Неизвестная ошибка'}`);
+      notify.error(t('admin2.ad_deactivate_error', { error: deleteError.message || t('admin2.ad_error_unknown') }));
     }
   };
 
@@ -160,16 +168,16 @@ const AdminDoctors = () => {
             <h2
               className="admin-title-20"
             >
-              Управление врачами
+              {t('admin2.ad_title')}
             </h2>
             <p
               className="admin-patients-subtitle"
             >
-              Аккаунты врачей, специализации, кабинеты и онлайн-лимиты.
+              {t('admin2.ad_subtitle')}
             </p>
           </div>
           <Button onClick={handleCreateDoctor} startIcon={<Plus size={16} />}>
-            Добавить врача
+            {t('admin2.ad_add_doctor')}
           </Button>
         </div>
 
@@ -178,37 +186,37 @@ const AdminDoctors = () => {
         >
           <Input
             type="text"
-            placeholder="Поиск врачей..."
+            placeholder={t('admin2.ad_search_placeholder')}
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
             icon={Search}
             iconPosition="left"
-            aria-label="Поиск врачей"
+            aria-label={t('admin2.ad_search_aria')}
           />
           {/* UX Audit Admin #4.7: фильтр специализации — Select вместо текстового инпута. */}
           <Select
             value={filterSpecialization}
             onChange={setFilterSpecialization}
             options={[
-              { value: '', label: 'Все специализации' },
+              { value: '', label: t('admin2.ad_specialization_all') },
               ...[...new Set(doctors.map((d) => d.specialty).filter(Boolean))].map((s) => ({ value: s, label: s })),
             ]}
             size="large"
-            aria-label="Фильтр по специализации"
+            aria-label={t('admin2.ad_filter_specialization_aria')}
           />
           <Select
             value={filterDepartment}
             onChange={setFilterDepartment}
             options={departmentOptions}
             size="large"
-            aria-label="Фильтр по отделению"
+            aria-label={t('admin2.ad_filter_department_aria')}
           />
           <Select
             value={filterStatus}
             onChange={setFilterStatus}
             options={statusOptions}
             size="large"
-            aria-label="Фильтр по статусу врача"
+            aria-label={t('admin2.ad_filter_status_aria')}
           />
         </div>
 
@@ -217,8 +225,8 @@ const AdminDoctors = () => {
           <div style={{ marginBottom: '12px' }}>
             <Button variant="ghost" size="sm" onClick={() => {
               setSearchTerm(''); setFilterSpecialization(''); setFilterDepartment(''); setFilterStatus('');
-            }} aria-label="Сбросить все фильтры">
-              ✕ Сбросить фильтры
+            }} aria-label={t('admin2.ad_reset_filters_aria')}>
+              {t('admin2.ad_reset_filters')}
             </Button>
           </div>
         )}
@@ -229,43 +237,43 @@ const AdminDoctors = () => {
           ) : error ? (
             <MacOSEmptyState
               icon={RefreshCw}
-              title="Ошибка загрузки врачей"
-              description="Не удалось загрузить список врачей. Проверьте соединение и попробуйте снова."
+              title={t('admin2.ad_error_load_title')}
+              description={t('admin2.ad_error_load_description')}
               action={
                 <Button onClick={refresh} startIcon={<RefreshCw size={16} />}>
-                  Обновить
+                  {t('admin2.ad_refresh')}
                 </Button>
               }
             />
           ) : doctors.length === 0 ? (
             <MacOSEmptyState
               icon={Stethoscope}
-              title="Врачи не найдены"
+              title={t('admin2.ad_empty_title')}
               description={
                 filtersActive
-                  ? 'Попробуйте изменить параметры поиска.'
-                  : 'В системе пока нет врачей.'
+                  ? t('admin2.ad_empty_filters')
+                  : t('admin2.ad_empty_no_doctors')
               }
               action={
                 <Button onClick={handleCreateDoctor} startIcon={<Plus size={16} />}>
-                  Добавить первого врача
+                  {t('admin2.ad_add_first_doctor')}
                 </Button>
               }
             />
           ) : (
             <div className="admin-table-wrapper">
-            <table className="admin-w-100pct-bc-collapse" aria-label="Таблица врачей">
+            <table className="admin-w-100pct-bc-collapse" aria-label={t('admin2.ad_table_aria')}>
               <thead>
                 <tr
                   className="admin-patients-thead-row"
                 >
-                  <th scope="col" className="admin-patients-th">Врач</th>
-                  <th scope="col" className="admin-patients-th">Специализация</th>
-                  <th scope="col" className="admin-patients-th">Отделение</th>
-                  <th scope="col" className="admin-patients-th">Опыт</th>
-                  <th scope="col" className="admin-patients-th">Статус</th>
-                  <th scope="col" className="admin-patients-th">Пациенты</th>
-                  <th scope="col" className="admin-patients-th">Действия</th>
+                  <th scope="col" className="admin-patients-th">{t('admin2.ad_th_doctor')}</th>
+                  <th scope="col" className="admin-patients-th">{t('admin2.ad_th_specialization')}</th>
+                  <th scope="col" className="admin-patients-th">{t('admin2.ad_th_department')}</th>
+                  <th scope="col" className="admin-patients-th">{t('admin2.ad_th_experience')}</th>
+                  <th scope="col" className="admin-patients-th">{t('admin2.ad_th_status')}</th>
+                  <th scope="col" className="admin-patients-th">{t('admin2.ad_th_patients')}</th>
+                  <th scope="col" className="admin-patients-th">{t('admin2.ad_th_actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -275,7 +283,7 @@ const AdminDoctors = () => {
                     className="admin-patients-tbody-row"
                     >
                     <td
-                      aria-label={`Врач ${getDoctorName(doctor)}`}
+                      aria-label={t('admin2.ad_doctor_aria', { name: getDoctorName(doctor, t) })}
                       className="admin-p-12-16"
                     >
                       <div className="admin-flex-center-12">
@@ -283,18 +291,18 @@ const AdminDoctors = () => {
                           aria-hidden="true"
                           className="admin-patients-avatar"
                         >
-                          {getDoctorInitials(doctor)}
+                          {getDoctorInitials(doctor, t)}
                         </div>
                         <div>
                           <p
                             className="admin-patients-name"
                           >
-                            {getDoctorName(doctor)}
+                            {getDoctorName(doctor, t)}
                           </p>
                           <p
                             className="admin-patients-email"
                           >
-                            {doctor.user?.email || doctor.email || 'Нет email'}
+                            {doctor.user?.email || doctor.email || t('admin2.ad_no_email')}
                           </p>
                           {doctor.user?.phone ? (
                             <p
@@ -305,10 +313,10 @@ const AdminDoctors = () => {
                           ) : null}
                           <div className="admin-doctors-badges-row">
                             <Badge variant={doctor.user?.is_active === false ? 'warning' : 'success'}>
-                              {doctor.user?.is_active === false ? 'Аккаунт неактивен' : 'Аккаунт активен'}
+                              {doctor.user?.is_active === false ? t('admin2.ad_account_inactive') : t('admin2.ad_account_active')}
                             </Badge>
                             <Badge variant={doctor.cabinet ? 'info' : 'warning'}>
-                              {doctor.cabinet ? `Кабинет ${doctor.cabinet}` : 'Кабинет не задан'}
+                              {doctor.cabinet ? t('admin2.ad_cabinet_label', { number: doctor.cabinet }) : t('admin2.ad_cabinet_not_set')}
                             </Badge>
                           </div>
                         </div>
@@ -316,33 +324,33 @@ const AdminDoctors = () => {
                     </td>
                     <td className="admin-p-12-16">
                       <Badge variant="info">
-                        {doctor.specialty || doctor.specialization || 'Не указано'}
+                        {doctor.specialty || doctor.specialization || t('admin2.ad_not_specified')}
                       </Badge>
                     </td>
                     <td className="admin-p-12-16">
                       <Badge variant="success">
-                        {getDepartmentLabel(doctor.specialty || doctor.department, departments)}
+                        {getDepartmentLabel(doctor.specialty || doctor.department, departments, t)}
                       </Badge>
                     </td>
                     <td className="admin-patients-td">
-                      {doctor.experience ? `${doctor.experience} лет` : 'Не указано'}
+                      {doctor.experience ? t('admin2.ad_experience_years', { count: doctor.experience }) : t('admin2.ad_not_specified')}
                     </td>
                     <td className="admin-p-12-16">
                       <Badge variant={doctor.active ? 'success' : 'warning'}>
-                        {doctor.active ? 'Активен' : 'Неактивен'}
+                        {doctor.active ? t('admin2.ad_status_active') : t('admin2.ad_status_inactive')}
                       </Badge>
                     </td>
-                    <td className="admin-patients-td">{doctor.patientsCount || 0} пациентов</td>
+                    <td className="admin-patients-td">{t('admin2.ad_patients_count', { count: doctor.patientsCount || 0 })}</td>
                     <td
-                      aria-label={`Действия для врача ${getDoctorName(doctor)}`}
+                      aria-label={t('admin2.ad_actions_aria', { name: getDoctorName(doctor, t) })}
                       className="admin-p-12-16"
                     >
                       <div className="flex items-center justify-center gap-2">
-                        <IconButton label="Редактировать врача" onClick={() => handleEditDoctor(doctor)}>
+                        <IconButton label={t('admin2.ad_edit_doctor')} onClick={() => handleEditDoctor(doctor)}>
                           <Edit size={16} />
                         </IconButton>
                         <IconButton
-                          label="Деактивировать врача"
+                          label={t('admin2.ad_deactivate_doctor_aria')}
                           tone="danger"
                           onClick={() => handleDeleteDoctor(doctor)}
                         >

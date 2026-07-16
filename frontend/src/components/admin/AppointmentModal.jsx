@@ -22,6 +22,8 @@ const AppointmentModal = ({
   doctors = [],
   patients = []
 }) => {
+  const { t } = useTranslation();
+  const { t } = useTranslation();
   const [formData, setFormData] = useState({
     patientId: '',
     doctorId: '',
@@ -81,35 +83,35 @@ const AppointmentModal = ({
     const newErrors = {};
 
     if (!formData.patientId) {
-      newErrors.patientId = 'Пациент обязателен';
+      newErrors.patientId = t('admin2.am_err_patient_required');
     }
 
     if (!formData.doctorId) {
-      newErrors.doctorId = 'Врач обязателен';
+      newErrors.doctorId = t('admin2.am_err_doctor_required');
     }
 
     if (!formData.appointmentDate) {
-      newErrors.appointmentDate = 'Дата записи обязательна';
+      newErrors.appointmentDate = t('admin2.am_err_date_required');
     } else {
       const appointmentDate = new Date(formData.appointmentDate);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
       if (appointmentDate < today) {
-        newErrors.appointmentDate = 'Дата записи не может быть в прошлом';
+        newErrors.appointmentDate = t('admin2.am_err_date_past');
       }
     }
 
     if (!formData.appointmentTime) {
-      newErrors.appointmentTime = 'Время записи обязательно';
+      newErrors.appointmentTime = t('admin2.am_err_time_required');
     }
 
     if (!formData.reason.trim()) {
-      newErrors.reason = 'Причина обращения обязательна';
+      newErrors.reason = t('admin2.am_err_reason_required');
     }
 
     if (formData.duration < 15 || formData.duration > 120) {
-      newErrors.duration = 'Длительность должна быть от 15 до 120 минут';
+      newErrors.duration = t('admin2.am_err_duration_range');
     }
 
     setErrors(newErrors);
@@ -142,7 +144,7 @@ const AppointmentModal = ({
       onClose();
     } catch (error) {
       logger.error('Ошибка сохранения записи:', error);
-      setSubmitError(error?.response?.data?.detail || error?.message || 'Ошибка сохранения записи');
+      setSubmitError(error?.response?.data?.detail || error?.message || t('admin2.am_err_save'));
     } finally {
       setIsSubmitting(false);
     }
@@ -173,7 +175,7 @@ const AppointmentModal = ({
 
   const getDoctorDisplayName = (doctor) => {
     if (!doctor) return '';
-    return doctor.user?.full_name || doctor.user?.username || doctor.name || `Врач #${doctor.id}`;
+    return doctor.user?.full_name || doctor.user?.username || doctor.name || t('admin2.am_doctor_fallback', { id: doctor.id });
   };
 
   const getDoctorName = (doctorId) => {
@@ -187,7 +189,7 @@ const AppointmentModal = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={appointment ? 'Редактировать запись' : 'Создать запись на прием'}
+      title={appointment ? t('admin2.am_title_edit') : t('admin2.am_title_create')}
       size="lg">
       
           {/* Submit error (P1 fix: show save errors instead of swallowing) */}
@@ -200,19 +202,19 @@ const AppointmentModal = ({
             {/* Основная информация */}
             <div className="admin-mb-24">
               <h3 className="admin-fs-lg-fw-semi-primary-mb-16">
-                Основная информация
+                {t('admin2.am_section_main')}
               </h3>
               <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16">
                 {/* Пациент */}
                 <div>
                   <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
-                    Пациент *
+                    {t('admin2.am_label_patient')}
                   </label>
                   <Select
                 value={formData.patientId}
                 onChange={(value) => handleChange('patientId', value)}
                 options={[
-                { value: '', label: 'Выберите пациента' },
+                { value: '', label: t('admin2.am_placeholder_patient') },
                 ...patients.map((patient) => ({
                   value: String(patient.id),
                   label: `${getPatientDisplayName(patient)}${patient.phone ? ` - ${patient.phone}` : ''}`
@@ -232,16 +234,16 @@ const AppointmentModal = ({
                 {/* Врач */}
                 <div>
                   <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
-                    Врач *
+                    {t('admin2.am_label_doctor')}
                   </label>
                   <Select
                 value={formData.doctorId}
                 onChange={(value) => handleChange('doctorId', value)}
                 options={[
-                { value: '', label: 'Выберите врача' },
+                { value: '', label: t('admin2.am_placeholder_doctor') },
                 ...doctors.map((doctor) => ({
                   value: String(doctor.id),
-                  label: `${getDoctorDisplayName(doctor)} - ${doctor.specialty || doctor.specialization || '—'}${doctor.active === false ? ' • неактивен' : ''}${doctor.user?.is_active === false ? ' • аккаунт неактивен' : ''}${doctor.cabinet ? ` • кабинет ${doctor.cabinet}` : ''}`
+                  label: `${getDoctorDisplayName(doctor)} - ${doctor.specialty || doctor.specialization || '—'}${doctor.active === false ? t('admin2.am_suffix_inactive') : ''}${doctor.user?.is_active === false ? t('admin2.am_suffix_account_inactive') : ''}${doctor.cabinet ? t('admin2.am_suffix_cabinet', { cabinet: doctor.cabinet }) : ''}`
                 }))]
                 }
                 error={errors.doctorId}
@@ -260,7 +262,7 @@ const AppointmentModal = ({
                 {/* Дата записи */}
                 <div>
                   <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
-                    Дата записи *
+                    {t('admin2.am_label_date')}
                   </label>
                   <Input
                 type="date"
@@ -280,7 +282,7 @@ const AppointmentModal = ({
                 {/* Время записи */}
                 <div>
                   <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
-                    Время записи *
+                    {t('admin2.am_label_time')}
                   </label>
                   <Input
                 type="time"
@@ -300,7 +302,7 @@ const AppointmentModal = ({
                 {/* Длительность */}
                 <div>
                   <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
-                    Длительность (мин)
+                    {t('admin2.am_label_duration')}
                   </label>
                   <Input
                 type="number"
@@ -323,20 +325,20 @@ const AppointmentModal = ({
               {/* Статус */}
               <div>
                 <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
-                  Статус записи
+                  {t('admin2.am_label_status')}
                 </label>
                 <Select
               value={formData.status}
               onChange={(value) => handleChange('status', value)}
               options={[
-              { value: '', label: 'По умолчанию backend' },
-              { value: 'pending', label: 'Ожидает' },
-              { value: 'confirmed', label: 'Подтверждена' },
-              { value: 'paid', label: 'Оплачена' },
-              { value: 'in_visit', label: 'На приеме' },
-              { value: 'completed', label: 'Завершена' },
-              { value: 'cancelled', label: 'Отменена' },
-              { value: 'no_show', label: 'Не явился' }]
+              { value: '', label: t('admin2.am_status_default') },
+              { value: 'pending', label: t('admin2.am_status_pending') },
+              { value: 'confirmed', label: t('admin2.am_status_confirmed') },
+              { value: 'paid', label: t('admin2.am_status_paid') },
+              { value: 'in_visit', label: t('admin2.am_status_in_visit') },
+              { value: 'completed', label: t('admin2.am_status_completed') },
+              { value: 'cancelled', label: t('admin2.am_status_cancelled') },
+              { value: 'no_show', label: t('admin2.am_status_no_show') }]
               }
               size="large" />
             
@@ -346,18 +348,18 @@ const AppointmentModal = ({
             {/* Детали записи */}
             <div className="admin-mb-24">
               <h3 className="admin-fs-lg-fw-semi-primary-mb-16">
-                Детали записи
+                {t('admin2.am_section_details')}
               </h3>
               <div>
                 <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
-                  Причина обращения *
+                  {t('admin2.am_label_reason')}
                 </label>
                 <Textarea
               value={formData.reason}
               onChange={(e) => handleChange('reason', e.target.value)}
               error={errors.reason}
               rows={3}
-              placeholder="Опишите причину обращения к врачу" />
+              placeholder={t('admin2.am_placeholder_reason')} />
             
                 {errors.reason &&
             <p className="admin-fs-xs-error-mt-4-d-flex-ai-center-gap-4">
@@ -369,13 +371,13 @@ const AppointmentModal = ({
 
               <div>
                 <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
-                  Дополнительные заметки
+                  {t('admin2.am_label_notes')}
                 </label>
                 <Textarea
               value={formData.notes}
               onChange={(e) => handleChange('notes', e.target.value)}
               rows={2}
-              placeholder="Дополнительная информация о записи" />
+              placeholder={t('admin2.am_placeholder_notes')} />
             
               </div>
             </div>
@@ -383,12 +385,12 @@ const AppointmentModal = ({
             {/* Контактная информация */}
             <div className="admin-mb-24">
               <h3 className="admin-fs-lg-fw-semi-primary-mb-16">
-                Контактная информация
+                {t('admin2.am_section_contacts')}
               </h3>
               <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16">
                 <div>
                   <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
-                    Телефон для связи
+                    {t('admin2.am_label_phone')}
                   </label>
                   <Input
                 type="tel"
@@ -400,7 +402,7 @@ const AppointmentModal = ({
                 </div>
                 <div>
                   <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
-                    Email для уведомлений
+                    {t('admin2.am_label_email')}
                   </label>
                   <Input
                 type="email"
@@ -417,14 +419,14 @@ const AppointmentModal = ({
             {formData.patientId && formData.doctorId &&
         <div className="admin-mb-24">
                 <h3 className="admin-fs-lg-fw-semi-primary-mb-16">
-                  Предварительный просмотр
+                  {t('admin2.am_section_preview')}
                 </h3>
                 <div className="admin-p-16-radius-var-mac-border-radiu-bg-bg-secondary-bd-1px-solid-var-mac-bo-d-flex-fd-column-gap-8">
                   <p className="admin-fs-sm-secondary-m-0">
-                    <strong className="admin-text-primary">Пациент:</strong> {getPatientName(formData.patientId)}
+                    <strong className="admin-text-primary">{t('admin2.am_preview_patient')}</strong> {getPatientName(formData.patientId)}
                   </p>
                   <p className="admin-fs-sm-secondary-m-0">
-                    <strong className="admin-text-primary">Врач:</strong> {getDoctorName(formData.doctorId)}
+                    <strong className="admin-text-primary">{t('admin2.am_preview_doctor')}</strong> {getDoctorName(formData.doctorId)}
                   </p>
                   <div className="admin-d-flex-fw-wrap-gap-8-mt-8">
                     <Badge
@@ -435,28 +437,28 @@ const AppointmentModal = ({
                       }
                     >
                       {selectedDoctor?.active === false
-                        ? 'Врач неактивен'
+                        ? t('admin2.am_badge_doctor_inactive')
                         : selectedDoctor?.user?.is_active === false
-                          ? 'Аккаунт врача неактивен'
-                          : 'Связь активна'}
+                          ? t('admin2.am_badge_doctor_account_inactive')
+                          : t('admin2.am_badge_link_active')}
                     </Badge>
                     <Badge variant={selectedDoctor?.cabinet ? 'info' : 'warning'}>
-                      {selectedDoctor?.cabinet ? `Кабинет ${selectedDoctor.cabinet}` : 'Кабинет не задан'}
+                      {selectedDoctor?.cabinet ? t('admin2.am_badge_cabinet', { cabinet: selectedDoctor.cabinet }) : t('admin2.am_badge_cabinet_not_set')}
                     </Badge>
                   </div>
                   <p className="admin-fs-sm-secondary-m-0">
-                    <strong className="admin-text-primary">Дата и время:</strong> {formData.appointmentDate} в {formData.appointmentTime}
+                    <strong className="admin-text-primary">{t('admin2.am_preview_datetime')}</strong> {formData.appointmentDate} {t('admin2.am_preview_at')} {formData.appointmentTime}
                   </p>
                   <p className="admin-fs-sm-secondary-m-0">
-                    <strong className="admin-text-primary">Длительность:</strong> {formData.duration} минут
+                    <strong className="admin-text-primary">{t('admin2.am_preview_duration_label')}</strong> {formData.duration} {t('admin2.am_preview_duration_minutes')}
                   </p>
                   <p className="admin-fs-sm-secondary-m-0">
-                    <strong className="admin-text-primary">Статус:</strong> {formData.status === 'pending' ? 'Ожидает' :
-              formData.status === 'confirmed' ? 'Подтверждена' :
-              formData.status === 'paid' ? 'Оплачена' :
-              formData.status === 'in_visit' ? 'На приеме' :
-              formData.status === 'completed' ? 'Завершена' :
-              formData.status === 'cancelled' ? 'Отменена' : 'Не явился'}
+                    <strong className="admin-text-primary">{t('admin2.am_preview_status')}</strong> {formData.status === 'pending' ? t('admin2.am_status_pending') :
+              formData.status === 'confirmed' ? t('admin2.am_status_confirmed') :
+              formData.status === 'paid' ? t('admin2.am_status_paid') :
+              formData.status === 'in_visit' ? t('admin2.am_status_in_visit') :
+              formData.status === 'completed' ? t('admin2.am_status_completed') :
+              formData.status === 'cancelled' ? t('admin2.am_status_cancelled') : t('admin2.am_status_no_show')}
                   </p>
                 </div>
               </div>
@@ -474,12 +476,12 @@ const AppointmentModal = ({
                 {isSubmitting ?
             <>
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                    Сохранение...
+                    {t('admin2.am_btn_saving')}
                   </> :
 
             <>
                     <Save className="w-4 h-4 mr-2" />
-                    {appointment ? 'Сохранить изменения' : 'Создать запись'}
+                    {appointment ? t('admin2.am_btn_save') : t('admin2.am_btn_create')}
                   </>
             }
               </Button>
@@ -489,7 +491,7 @@ const AppointmentModal = ({
             onClick={onClose}
             disabled={isSubmitting}>
             
-                Отмена
+                {t('admin2.am_btn_cancel')}
               </Button>
             </div>
           </form>

@@ -70,21 +70,23 @@ const BranchManagement = () => {
     services_available: ['cardiology', 'dermatology', 'stomatology']
   });
 
+  const { t } = useTranslation();
+
   const statusOptions = [
-  { value: 'active', label: 'Активный', color: 'success' },
-  { value: 'inactive', label: 'Неактивный', color: 'error' },
-  { value: 'maintenance', label: 'Обслуживание', color: 'warning' }];
+  { value: 'active', label: t('admin2.br_status_active'), color: 'success' },
+  { value: 'inactive', label: t('admin2.br_status_inactive'), color: 'error' },
+  { value: 'maintenance', label: t('admin2.br_status_maintenance'), color: 'warning' }];
 
 
   const specialtyOptions = [
-  { value: 'cardiology', label: 'Кардиология' },
-  { value: 'dermatology', label: 'Дерматология' },
-  { value: 'stomatology', label: 'Стоматология' },
-  { value: 'neurology', label: 'Неврология' },
-  { value: 'orthopedics', label: 'Ортопедия' },
-  { value: 'pediatrics', label: 'Педиатрия' },
-  { value: 'gynecology', label: 'Гинекология' },
-  { value: 'urology', label: 'Урология' }];
+  { value: 'cardiology', label: t('admin2.br_specialty_cardiology') },
+  { value: 'dermatology', label: t('admin2.br_specialty_dermatology') },
+  { value: 'stomatology', label: t('admin2.br_specialty_stomatology') },
+  { value: 'neurology', label: t('admin2.br_specialty_neurology') },
+  { value: 'orthopedics', label: t('admin2.br_specialty_orthopedics') },
+  { value: 'pediatrics', label: t('admin2.br_specialty_pediatrics') },
+  { value: 'gynecology', label: t('admin2.br_specialty_gynecology') },
+  { value: 'urology', label: t('admin2.br_specialty_urology') }];
 
 
   const normalizeBranchPhone = (value) => {
@@ -154,10 +156,10 @@ const BranchManagement = () => {
 
       const normalizedPhone = normalizeBranchPhone(formData.phone);
       if (formData.phone.trim() && normalizedPhone === null) {
-        setFormErrors({ phone: 'Используйте формат +998 71 123 45 67' });
+        setFormErrors({ phone: t('admin2.br_phone_format_error') });
         setMessage({
           type: 'error',
-          text: 'Телефон филиала должен быть в формате +998 71 123 45 67'
+          text: t('admin2.br_phone_invalid_message')
         });
         return;
       }
@@ -169,10 +171,10 @@ const BranchManagement = () => {
 
       if (editingBranch) {
         await api.put(`/clinic/branches/${editingBranch.id}`, payload);
-        setMessage({ type: 'success', text: 'Филиал обновлен' });
+        setMessage({ type: 'success', text: t('admin2.br_update_success') });
       } else {
         await api.post('/clinic/branches', payload);
-        setMessage({ type: 'success', text: 'Филиал создан' });
+        setMessage({ type: 'success', text: t('admin2.br_create_success') });
       }
 
       setShowAddForm(false);
@@ -180,7 +182,7 @@ const BranchManagement = () => {
       resetForm();
       loadBranches();
     } catch {
-      setMessage({ type: 'error', text: 'Ошибка сохранения филиала' });
+      setMessage({ type: 'error', text: t('admin2.br_save_error') });
     } finally {
       setSaving(false);
     }
@@ -199,10 +201,10 @@ const BranchManagement = () => {
   const handleDelete = async (branchId) => {
     try {
       await api.delete(`/clinic/branches/${branchId}`);
-      setMessage({ type: 'success', text: 'Филиал удален' });
+      setMessage({ type: 'success', text: t('admin2.br_delete_success') });
       loadBranches();
     } catch {
-      setMessage({ type: 'error', text: 'Ошибка удаления филиала' });
+      setMessage({ type: 'error', text: t('admin2.br_delete_error') });
     }
   };
 
@@ -238,10 +240,10 @@ const BranchManagement = () => {
     return matchesSearch && matchesStatus;
   });
   const hasBranchFilters = searchTerm.trim() !== '' || statusFilter !== 'all';
-  const branchEmptyTitle = hasBranchFilters ? 'Филиалы по фильтрам не найдены' : 'Филиалы ещё не добавлены';
+  const branchEmptyTitle = hasBranchFilters ? t('admin2.br_empty_filtered_title') : t('admin2.br_empty_title');
   const branchEmptyDescription = hasBranchFilters ?
-  'Измените поисковый запрос или статус, чтобы увидеть другие филиалы.' :
-  'Создайте первый филиал, чтобы начать управлять филиальной структурой клиники.';
+  t('admin2.br_empty_filtered_desc') :
+  t('admin2.br_empty_desc');
 
   return (
     <div className="admin-d-flex-fd-column-gap-24-ov-hidden-1">
@@ -249,10 +251,10 @@ const BranchManagement = () => {
       <div className="admin-d-flex-jc-between-ai-center-fw-wrap-gap-16-1">
         <div>
           <h2 className="admin-fs-2xl-fw-bold-primary-m-0-0-8px-0-1">
-            Управление филиалами
+            {t('admin2.br_title')}
           </h2>
           <p className="admin-secondary-fs-sm-m-0-1">
-            Создание и управление филиалами клиники
+            {t('admin2.br_subtitle')}
           </p>
         </div>
         {stats &&
@@ -262,7 +264,7 @@ const BranchManagement = () => {
                 {stats.total_branches}
               </div>
               <div className="text-sm text-[var(--mac-text-secondary)]">
-                Всего филиалов
+                {t('admin2.br_stat_total')}
               </div>
             </div>
             <div className="text-center">
@@ -270,7 +272,7 @@ const BranchManagement = () => {
                 {stats.active_branches}
               </div>
               <div className="text-sm text-[var(--mac-text-secondary)]">
-                Активных
+                {t('admin2.br_stat_active')}
               </div>
             </div>
           </div>
@@ -281,7 +283,7 @@ const BranchManagement = () => {
       {message.text &&
       <Alert
         type={message.type === 'success' ? 'success' : 'error'}
-        title={message.type === 'success' ? 'Успешно' : 'Ошибка'}
+        title={message.type === 'success' ? t('admin2.br_alert_success') : t('admin2.br_alert_error')}
         message={message.text} />
 
       }
@@ -292,8 +294,8 @@ const BranchManagement = () => {
           <div className="admin-flex-1-pos-relative">
             <Input
               type="text"
-              aria-label="Поиск филиалов по названию, адресу или коду"
-              placeholder="Поиск по названию, адресу или коду..."
+              aria-label={t('admin2.br_search_aria')}
+              placeholder={t('admin2.br_search_placeholder')}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="admin-pl-40" />
@@ -302,11 +304,11 @@ const BranchManagement = () => {
           </div>
           <div className="admin-d-flex-gap-12-fw-wrap-1">
             <Select
-              aria-label="Фильтр филиалов по статусу"
+              aria-label={t('admin2.br_filter_status_aria')}
               value={statusFilter}
               onChange={setStatusFilter}
               options={[
-                { value: 'all', label: 'Все статусы' },
+                { value: 'all', label: t('admin2.br_status_all') },
                 ...statusOptions.map((option) => ({ value: option.value, label: option.label }))
               ]}
               size="large"
@@ -316,7 +318,7 @@ const BranchManagement = () => {
               className="admin-d-flex-ai-center-gap-8-bgc-blue-bd-none-p-8px-16px-1">
               
               <Plus aria-hidden="true" className="w-4 h-4" />
-              <span>Добавить филиал</span>
+              <span>{t('admin2.br_add_branch')}</span>
             </Button>
           </div>
         </div>
@@ -327,12 +329,12 @@ const BranchManagement = () => {
       <MacOSCard className="admin-p-24-ov-hidden-1">
           <div className="admin-d-flex-jc-between-ai-center-mb-16-1">
             <h3 className="admin-fs-lg-fw-semi-primary-m-0-1">
-              {editingBranch ? 'Редактировать филиал' : 'Добавить филиал'}
+              {editingBranch ? t('admin2.br_form_edit_title') : t('admin2.br_add_branch')}
             </h3>
             <Button
             variant="outline"
             type="button"
-            aria-label={editingBranch ? 'Закрыть форму редактирования филиала' : 'Закрыть форму добавления филиала'}
+            aria-label={editingBranch ? t('admin2.br_close_edit_aria') : t('admin2.br_close_add_aria')}
             onClick={() => {
               setShowAddForm(false);
               setEditingBranch(null);
@@ -348,42 +350,42 @@ const BranchManagement = () => {
             <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16-1">
               <div>
                 <label className="admin-d-block-fs-sm-fw-med-primary-mb-4-17">
-                  Название филиала *
+                  {t('admin2.br_label_name')}
                 </label>
                 <Input
                 type="text"
                 required
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Введите название филиала" />
+                placeholder={t('admin2.br_placeholder_name')} />
               
               </div>
               <div>
                 <label className="admin-d-block-fs-sm-fw-med-primary-mb-4-16">
-                  Код филиала *
+                  {t('admin2.br_label_code')}
                 </label>
                 <Input
                 type="text"
                 required
                 value={formData.code}
                 onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                placeholder="Введите код филиала" />
+                placeholder={t('admin2.br_placeholder_code')} />
               
               </div>
               <div>
                 <label className="admin-d-block-fs-sm-fw-med-primary-mb-4-15">
-                  Адрес
+                  {t('admin2.br_label_address')}
                 </label>
                 <Input
                 type="text"
                 value={formData.address}
                 onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                placeholder="Введите адрес филиала" />
+                placeholder={t('admin2.br_placeholder_address')} />
               
               </div>
               <div>
                 <label className="admin-d-block-fs-sm-fw-med-primary-mb-4-14">
-                  Телефон
+                  {t('admin2.br_label_phone')}
                 </label>
                 <Input
                 type="tel"
@@ -397,7 +399,7 @@ const BranchManagement = () => {
                 placeholder="+998 71 123 45 67"
                 error={formErrors.phone} />
               <p className="admin-m-4px-0-0-0-fs-xs-secondary">
-                Формат: +998 71 123 45 67
+                {t('admin2.br_phone_format_hint')}
               </p>
               
               </div>
@@ -409,15 +411,15 @@ const BranchManagement = () => {
                 type="email"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                placeholder="Введите email филиала" />
+                placeholder={t('admin2.br_placeholder_email')} />
               
               </div>
               <div>
                 <label className="admin-d-block-fs-sm-fw-med-primary-mb-4-12">
-                  Статус
+                  {t('admin2.br_label_status')}
                 </label>
                 <Select
-                aria-label="Статус филиала"
+                aria-label={t('admin2.br_status_select_aria')}
                 value={formData.status}
                 onChange={(value) => setFormData({ ...formData, status: value })}
                 options={statusOptions.map((option) => ({ value: option.value, label: option.label }))}
@@ -425,20 +427,20 @@ const BranchManagement = () => {
               </div>
               <div>
                 <label className="admin-d-block-fs-sm-fw-med-primary-mb-4-11">
-                  Вместимость
+                  {t('admin2.br_label_capacity')}
                 </label>
                 <Input
                 type="number"
                 value={formData.capacity}
                 onChange={(e) => setFormData({ ...formData, capacity: parseInt(e.target.value) })}
-                placeholder="Введите вместимость" />
+                placeholder={t('admin2.br_placeholder_capacity')} />
               
               </div>
             </div>
 
             <div>
               <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
-                Доступные услуги
+                {t('admin2.br_label_services')}
               </label>
               <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-8">
                 {specialtyOptions.map((specialty) =>
@@ -476,7 +478,7 @@ const BranchManagement = () => {
               }}
               disabled={saving}>
               
-                Отмена
+                {t('admin2.br_cancel')}
               </Button>
               <Button
               type="submit"
@@ -487,12 +489,12 @@ const BranchManagement = () => {
                 {saving ?
               <>
                     <RefreshCw aria-hidden="true" className="admin-w-16-h-16-anim-spin-1s-linear-infin-1" />
-                    Сохранение...
+                    {t('admin2.br_saving')}
                   </> :
 
               <>
                     <Save aria-hidden="true" className="w-4 h-4" />
-                    {editingBranch ? 'Обновить' : 'Создать'}
+                    {editingBranch ? t('admin2.br_update_btn') : t('admin2.br_create_btn')}
                   </>
               }
               </Button>
@@ -518,7 +520,7 @@ const BranchManagement = () => {
         action={
         <Button onClick={() => setShowAddForm(true)} variant="primary">
               <Plus aria-hidden="true" focusable="false" className="w-4 h-4 mr-2" />
-              Добавить филиал
+              {t('admin2.br_add_branch')}
             </Button>
         } /> :
 
@@ -562,14 +564,14 @@ const BranchManagement = () => {
             }
                 <div className="admin-d-flex-ai-center-gap-8-fs-sm-secondary-4">
                   <Users aria-hidden="true" className="w-4 h-4" />
-                  <span>Вместимость: {branch.capacity}</span>
+                  <span>{t('admin2.br_capacity_label', { count: branch.capacity })}</span>
                 </div>
               </div>
 
               {branch.services_available && branch.services_available.length > 0 &&
           <div className="mb-4">
                   <p className="admin-fs-sm-fw-med-primary-mb-8">
-                    Услуги:
+                    {t('admin2.br_services_label')}
                   </p>
                   <div className="admin-d-flex-fw-wrap-gap-4">
                     {branch.services_available.map((service) => {
@@ -591,7 +593,7 @@ const BranchManagement = () => {
                 <Button
               type="button"
               variant="outline"
-              aria-label={`Редактировать филиал ${branch.name}`}
+              aria-label={t('admin2.br_edit_aria', { name: branch.name })}
               onClick={() => handleEdit(branch)}
               className="admin-p-6px-12px-1">
 
@@ -600,7 +602,7 @@ const BranchManagement = () => {
                 <Button
               type="button"
               variant="outline"
-              aria-label={`Удалить филиал ${branch.name}`}
+              aria-label={t('admin2.br_delete_aria', { name: branch.name })}
               onClick={() => handleDelete(branch.id)}
               className="admin-p-6px-12px-error-bd-c-error-1">
               
