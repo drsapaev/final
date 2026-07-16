@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect } from 'react';
 import logger from '../../utils/logger';
 import {
@@ -41,6 +41,7 @@ const PhotoArchive = ({
   onSave,
   onClose
 }) => {
+  const { t } = useTranslation();
   const [formData, setFormData] = useState({
     // Основные данные
     patientId,
@@ -218,11 +219,11 @@ const PhotoArchive = ({
 
   // Категории медиа файлов
   const categories = [
-  { id: 'all', label: 'Все', icon: FileImage },
-  { id: 'photo', label: 'Фото', icon: Camera },
-  { id: 'radiograph', label: 'Рентген', icon: FileText },
-  { id: 'video', label: 'Видео', icon: Video },
-  { id: 'document', label: 'Документы', icon: FileText }];
+  { id: 'all', label: t('dental.dental_pa_cat_all'), icon: FileImage },
+  { id: 'photo', label: t('dental.dental_pa_cat_photo'), icon: Camera },
+  { id: 'radiograph', label: t('dental.dental_pa_cat_radiograph'), icon: FileText },
+  { id: 'video', label: t('dental.dental_pa_cat_video'), icon: Video },
+  { id: 'document', label: t('dental.dental_pa_cat_document'), icon: FileText }];
 
 
   // Зубы для фильтрации
@@ -263,7 +264,7 @@ const PhotoArchive = ({
             <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-opacity flex items-center justify-center">
               <div className="opacity-0 group-hover:opacity-100 transition-opacity text-white text-center">
                 <Eye className="h-6 w-6 mx-auto mb-1" />
-                <span className="text-sm">Просмотр</span>
+                <span className="text-sm">{t('dental.dental_pa_view_label')}</span>
               </div>
             </div>
           </div>
@@ -288,7 +289,7 @@ const PhotoArchive = ({
               {file.tooth &&
           <div className="flex items-center gap-1">
                   <MapPin className="h-3 w-3" />
-                  Зуб {file.tooth}
+                  {t('dental.dental_pa_tooth_label', { tooth: file.tooth })}
                 </div>
           }
               {file.tags.length > 0 &&
@@ -303,14 +304,14 @@ const PhotoArchive = ({
         <div className="mt-2 flex gap-1">
                 <button
             onClick={() => handleFileUpdate(file.id, {})}
-            aria-label={`Редактировать файл ${file.name}`}
+            aria-label={t('dental.dental_pa_aria_edit_file', { name: file.name })}
             className="flex-1 px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200">
             
                   <Edit className="h-3 w-3 mx-auto" />
                 </button>
                 <button
             onClick={() => handleFileDelete(file.id)}
-            aria-label={`Удалить файл ${file.name}`}
+            aria-label={t('dental.dental_pa_aria_delete_file', { name: file.name })}
             className="flex-1 px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200">
             
                   <Trash2 className="h-3 w-3 mx-auto" />
@@ -333,7 +334,7 @@ const PhotoArchive = ({
             <div
           className="w-16 h-16 bg-gray-100 rounded flex items-center justify-center cursor-pointer"
           role="button"
-          aria-label={`Открыть файл ${file.name}`}
+          aria-label={t('dental.dental_pa_aria_open_file', { name: file.name })}
           tabIndex={0}
           onClick={() => openFileViewer(file)}
           onKeyDown={(event) => handleActivationKeyDown(event, () => openFileViewer(file))}>
@@ -370,7 +371,7 @@ const PhotoArchive = ({
                   {file.tooth &&
               <span className="flex items-center gap-1">
                       <MapPin className="h-3 w-3" />
-                      Зуб {file.tooth}
+                      {t('dental.dental_pa_tooth_label', { tooth: file.tooth })}
                     </span>
               }
                   <span className="text-xs text-gray-500">
@@ -403,8 +404,8 @@ const PhotoArchive = ({
               setShowImageViewer(true);
             }}
             className="p-2 text-gray-500 hover:text-blue-600"
-            aria-label={`Просмотреть файл ${file.name}`}
-            title="Просмотр">
+            aria-label={t('dental.dental_pa_aria_view_file', { name: file.name })}
+            title={t('dental.dental_pa_title_view')}>
             
                 <Eye className="h-4 w-4" />
               </button>
@@ -417,8 +418,8 @@ const PhotoArchive = ({
               link.click();
             }}
             className="p-2 text-gray-500 hover:text-green-600"
-            aria-label={`Скачать файл ${file.name}`}
-            title="Скачать">
+            aria-label={t('dental.dental_pa_aria_download_file', { name: file.name })}
+            title={t('dental.dental_pa_title_download')}>
             
                 <Download className="h-4 w-4" />
               </button>
@@ -427,8 +428,8 @@ const PhotoArchive = ({
           <button
             onClick={() => handleFileDelete(file.id)}
             className="p-2 text-gray-500 hover:text-red-600"
-            aria-label={`Удалить файл ${file.name}`}
-            title="Удалить">
+            aria-label={t('dental.dental_pa_aria_delete_file', { name: file.name })}
+            title={t('dental.dental_pa_title_delete')}>
             
                   <Trash2 className="h-4 w-4" />
                 </button>
@@ -473,7 +474,7 @@ const PhotoArchive = ({
                   <div
                 className="aspect-video bg-gray-100 flex items-center justify-center cursor-pointer"
                 role="button"
-                aria-label={`Открыть файл ${file.name}`}
+                aria-label={t('dental.dental_pa_aria_open_file', { name: file.name })}
                 tabIndex={0}
                 onClick={() => openFileViewer(file)}
                 onKeyDown={(event) => handleActivationKeyDown(event, () => openFileViewer(file))}>
@@ -505,7 +506,7 @@ const PhotoArchive = ({
                     
                     {file.tooth &&
                 <div className="text-xs text-gray-600 mb-1">
-                        Зуб {file.tooth}
+                        {t('dental.dental_pa_tooth_label', { tooth: file.tooth })}
                       </div>
                 }
                     
@@ -532,7 +533,7 @@ const PhotoArchive = ({
           {/* Кнопка закрытия */}
           <button
             onClick={() => setShowImageViewer(false)}
-            aria-label="Закрыть просмотр файла"
+            aria-label={t('dental.dental_pa_aria_close_viewer')}
             className="absolute top-4 right-4 z-10 p-2 bg-black bg-opacity-50 text-white rounded-full hover:bg-opacity-75">
             
             <X className="h-6 w-6" />
@@ -551,7 +552,7 @@ const PhotoArchive = ({
                 <div className="text-center text-white">
                   <FileImage className="h-16 w-16 mx-auto mb-4" />
                   <p className="text-lg">{selectedFile.name}</p>
-                  <p className="text-sm text-gray-300">Предпросмотр недоступен</p>
+                  <p className="text-sm text-gray-300">{t('dental.dental_pa_preview_unavailable')}</p>
                 </div>
               </div>
             }
@@ -563,9 +564,9 @@ const PhotoArchive = ({
               <div>
                 <h3 className="text-lg font-semibold">{selectedFile.name}</h3>
                 <div className="text-sm text-gray-300 space-y-1">
-                  <div>Дата: {new Date(selectedFile.date).toLocaleDateString('ru-RU')}</div>
-                  {selectedFile.tooth && <div>Зуб: {selectedFile.tooth}</div>}
-                  {selectedFile.description && <div>Описание: {selectedFile.description}</div>}
+                  <div>{t('dental.dental_pa_meta_date', { date: new Date(selectedFile.date).toLocaleDateString('ru-RU') })}</div>
+                  {selectedFile.tooth && <div>{t('dental.dental_pa_meta_tooth', { tooth: selectedFile.tooth })}</div>}
+                  {selectedFile.description && <div>{t('dental.dental_pa_meta_description', { description: selectedFile.description })}</div>}
                 </div>
               </div>
               
@@ -577,7 +578,7 @@ const PhotoArchive = ({
                     link.download = selectedFile.name;
                     link.click();
                   }}
-                  aria-label={`Скачать файл ${selectedFile.name}`}
+                  aria-label={t('dental.dental_pa_aria_download_file', { name: selectedFile.name })}
                   className="p-2 bg-blue-600 text-white rounded hover:bg-blue-700">
                   
                   <Download className="h-4 w-4" />
@@ -597,10 +598,10 @@ const PhotoArchive = ({
         <div className="flex items-center justify-between p-6 border-b">
           <div>
             <h2 className="text-xl font-semibold">
-              Фото и рентген архив: {patientName}
+              {t('dental.dental_pa_title', { name: patientName })}
             </h2>
             <p className="text-gray-600 text-sm">
-              {formData.mediaFiles.length} файлов | {isEditing ? 'Режим редактирования' : 'Просмотр'}
+              {t('dental.dental_pa_file_count', { count: formData.mediaFiles.length })} | {isEditing ? t('dental.dental_pa_mode_edit') : t('dental.dental_pa_mode_view')}
             </p>
           </div>
           
@@ -611,7 +612,7 @@ const PhotoArchive = ({
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
               
                 <Edit className="h-4 w-4" />
-                Редактировать
+                {t('dental.dental_pa_btn_edit')}
               </button> :
 
             <>
@@ -620,7 +621,7 @@ const PhotoArchive = ({
                 className="flex items-center gap-2 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600">
                 
                   <X className="h-4 w-4" />
-                  Отмена
+                  {t('dental.dental_pa_btn_cancel')}
                 </button>
                 <button
                 onClick={handleSave}
@@ -628,13 +629,13 @@ const PhotoArchive = ({
                 className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50">
                 
                   <Save className="h-4 w-4" />
-                  {loading ? 'Сохранение...' : 'Сохранить'}
+                  {loading ? t('dental.dental_pa_btn_saving') : t('dental.dental_pa_btn_save')}
                 </button>
               </>
             }
             <button
               onClick={onClose}
-              aria-label="Закрыть фотоархив"
+              aria-label={t('dental.dental_pa_aria_close')}
               className="p-2 text-gray-500 hover:text-gray-700">
               
               <X className="h-5 w-5" />
@@ -651,8 +652,8 @@ const PhotoArchive = ({
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
                   type="text"
-                  aria-label="Поиск файлов фотоархива"
-                  placeholder="Поиск файлов..."
+                  aria-label={t('dental.dental_pa_aria_search')}
+                  placeholder={t('dental.dental_pa_ph_search')}
                   value={formData.searchQuery}
                   onChange={(e) => handleInputChange('searchQuery', e.target.value)}
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
@@ -679,27 +680,27 @@ const PhotoArchive = ({
                 onChange={(e) => handleInputChange('filters.tooth', e.target.value)}
                 className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                 
-                <option value="all">Все зубы</option>
+                <option value="all">{t('dental.dental_pa_all_teeth')}</option>
                 {teeth.slice(1).map((tooth) =>
-                <option key={tooth} value={tooth}>Зуб {tooth}</option>
+                <option key={tooth} value={tooth}>{t('dental.dental_pa_tooth_label', { tooth })}</option>
                 )}
               </select>
               
               <input
                 type="date"
-                aria-label="Фильтр фотоархива: дата с"
+                aria-label={t('dental.dental_pa_aria_date_from')}
                 value={formData.filters.dateFrom}
                 onChange={(e) => handleInputChange('filters.dateFrom', e.target.value)}
-                placeholder="От"
+                placeholder={t('dental.dental_pa_ph_date_from')}
                 className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
               
               
               <input
                 type="date"
-                aria-label="Фильтр фотоархива: дата до"
+                aria-label={t('dental.dental_pa_aria_date_to')}
                 value={formData.filters.dateTo}
                 onChange={(e) => handleInputChange('filters.dateTo', e.target.value)}
-                placeholder="До"
+                placeholder={t('dental.dental_pa_ph_date_to')}
                 className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
               
             </div>
@@ -711,30 +712,30 @@ const PhotoArchive = ({
                 onChange={(e) => setSortBy(e.target.value)}
                 className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                 
-                <option value="date">По дате</option>
-                <option value="tooth">По зубу</option>
-                <option value="category">По категории</option>
-                <option value="name">По имени</option>
+                <option value="date">{t('dental.dental_pa_sort_date')}</option>
+                <option value="tooth">{t('dental.dental_pa_sort_tooth')}</option>
+                <option value="category">{t('dental.dental_pa_sort_category')}</option>
+                <option value="name">{t('dental.dental_pa_sort_name')}</option>
               </select>
               
               <div className="flex border border-gray-300 rounded-md">
                 <button
                   onClick={() => setViewMode('grid')}
-                  aria-label="Показать архив плиткой"
+                  aria-label={t('dental.dental_pa_aria_view_grid')}
                   className={`px-3 py-2 ${viewMode === 'grid' ? 'bg-blue-500 text-white' : 'text-gray-700'}`}>
                   
                   <ImageIcon className="h-4 w-4" />
                 </button>
                 <button
                   onClick={() => setViewMode('list')}
-                  aria-label="Показать архив списком"
+                  aria-label={t('dental.dental_pa_aria_view_list')}
                   className={`px-3 py-2 ${viewMode === 'list' ? 'bg-blue-500 text-white' : 'text-gray-700'}`}>
                   
                   <FileText className="h-4 w-4" />
                 </button>
                 <button
                   onClick={() => setViewMode('timeline')}
-                  aria-label="Показать архив по временной шкале"
+                  aria-label={t('dental.dental_pa_aria_view_timeline')}
                   className={`px-3 py-2 ${viewMode === 'timeline' ? 'bg-blue-500 text-white' : 'text-gray-700'}`}>
                   
                   <Calendar className="h-4 w-4" />
@@ -749,10 +750,10 @@ const PhotoArchive = ({
         <div className="p-4 border-b bg-blue-50">
             <label className="flex items-center gap-2 p-4 border-2 border-dashed border-blue-300 rounded-lg cursor-pointer hover:border-blue-500">
               <Upload className="h-5 w-5 text-blue-500" />
-              <span className="text-blue-700">Загрузить файлы</span>
+              <span className="text-blue-700">{t('dental.dental_pa_btn_upload')}</span>
               <input
               type="file"
-              aria-label="Загрузить файлы в фотоархив"
+              aria-label={t('dental.dental_pa_aria_upload')}
               multiple
               accept="image/*,video/*,.pdf,.doc,.docx"
               onChange={(e) => handleFileUpload(e.target.files)}
@@ -767,17 +768,17 @@ const PhotoArchive = ({
           {sortedFiles.length === 0 ?
           <div className="text-center py-12">
               <Camera className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-700 mb-2">Архив пуст</h3>
+              <h3 className="text-lg font-semibold text-gray-700 mb-2">{t('dental.dental_pa_empty_title')}</h3>
               <p className="text-gray-600 mb-4">
-                {isEditing ? 'Загрузите файлы для создания архива' : 'Нет файлов для отображения'}
+                {isEditing ? t('dental.dental_pa_empty_edit_hint') : t('dental.dental_pa_empty_view_hint')}
               </p>
               {isEditing &&
             <label className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 cursor-pointer">
                   <Upload className="h-4 w-4" />
-                  Загрузить файлы
+                  {t('dental.dental_pa_btn_upload')}
                   <input
                 type="file"
-                aria-label="Загрузить файлы в пустой фотоархив"
+                aria-label={t('dental.dental_pa_aria_upload_empty')}
                 multiple
                 accept="image/*,video/*,.pdf,.doc,.docx"
                 onChange={(e) => handleFileUpload(e.target.files)}

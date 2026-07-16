@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 /**
  * Treatment Planner Component  
  * План лечения с этапами
@@ -220,30 +220,8 @@ const priorityBadgeVariant = {
   low: 'info',
 };
 
-const COPY = {
-  title: t('dental2.treatment_plan_title'),
-  addStageAction: 'Добавить этап',
-  printAction: 'Печать',
-  planNameLabel: 'Название плана',
-  metricStages: 'Этапов',
-  metricVisits: 'Визитов',
-  metricCost: 'Стоимость (сум)',
-  noDate: 'Не назначено',
-  visitSuffix: 'визит',
-  emptyPlan: 'План лечения пуст. Добавьте этапы лечения.',
-  savePlan: 'Сохранить план',
-  dialogTitle: 'Добавить этап лечения',
-  stageNameLabel: 'Название этапа',
-  descriptionLabel: 'Описание',
-  dateLabel: 'Дата',
-  priorityLabel: 'Приоритет',
-  durationLabel: 'Визитов',
-  costLabel: 'Стоимость (сум)',
-  cancelAction: 'Отмена',
-  addDialogAction: 'Добавить',
-  deleteAction: 'Удалить',
-};
 const TreatmentPlanner = ({ visitId, onUpdate }) => {
+  const { t } = useTranslation();
   const [treatmentPlan, setTreatmentPlan] = useState({
     name: '',
     stages: [],
@@ -263,9 +241,9 @@ const TreatmentPlanner = ({ visitId, onUpdate }) => {
   });
 
   const PRIORITIES = {
-    high: { label: 'Высокий', color: 'error' },
-    medium: { label: 'Средний', color: 'warning' },
-    low: { label: 'Низкий', color: 'info' },
+    high: { label: t('dental.dental_tp_priority_high'), color: 'error' },
+    medium: { label: t('dental.dental_tp_priority_medium'), color: 'warning' },
+    low: { label: t('dental.dental_tp_priority_low'), color: 'info' },
   };
 
   const handleSaveStage = () => {
@@ -333,7 +311,7 @@ const TreatmentPlanner = ({ visitId, onUpdate }) => {
                 <td>${index + 1}</td>
                 <td>${stage.name || ''}</td>
                 <td>${stage.description || ''}</td>
-                <td>${stage.date || 'Не назначено'}</td>
+                <td>${stage.date || t('dental.dental_tp_no_date')}</td>
                 <td>${stage.duration || 0}</td>
                 <td>${stage.cost || 0}</td>
                 <td>${PRIORITIES[stage.priority]?.label || stage.priority || ''}</td>
@@ -341,14 +319,14 @@ const TreatmentPlanner = ({ visitId, onUpdate }) => {
             `
           )
           .join('')
-      : '<tr><td colspan="7">Этапы лечения не добавлены</td></tr>';
+      : `<tr><td colspan="7">${t('dental.dental_tp_print_no_stages')}</td></tr>`;
 
     openPrintableWindow({
       html: `
       <!doctype html>
       <html lang="ru">
         <head>
-          <title>План лечения</title>
+          <title>${t('dental.dental_tp_print_doc_title')}</title>
           <style>
             body { font-family: Arial, sans-serif; margin: 24px; color: #111827; }
             h1 { margin: 0 0 12px; font-size: 24px; }
@@ -363,25 +341,25 @@ const TreatmentPlanner = ({ visitId, onUpdate }) => {
           </style>
         </head>
         <body>
-          <h1>${treatmentPlan.name || 'План лечения'}</h1>
-          <div class="meta muted">План лечения для печати из стоматологической панели</div>
+          <h1>${treatmentPlan.name || t('dental.dental_tp_print_default_name')}</h1>
+          <div class="meta muted">${t('dental.dental_tp_print_doc_meta')}</div>
           <div class="summary">
-            <div><strong>Этапов:</strong> ${treatmentPlan.stages.length}</div>
-            <div><strong>Визитов:</strong> ${treatmentPlan.totalDuration}</div>
-            <div><strong>Стоимость:</strong> ${(treatmentPlan.totalCost / 1000).toFixed(0)}k сум</div>
+            <div><strong>${t('dental.dental_tp_print_summary_stages')}</strong> ${treatmentPlan.stages.length}</div>
+            <div><strong>${t('dental.dental_tp_print_summary_visits')}</strong> ${treatmentPlan.totalDuration}</div>
+            <div><strong>${t('dental.dental_tp_print_summary_cost')}</strong> ${t('dental.dental_tp_print_summary_cost_value', { value: (treatmentPlan.totalCost / 1000).toFixed(0) })}</div>
           </div>
-          <h2>Этапы</h2>
+          <h2>${t('dental.dental_tp_print_stages_heading')}</h2>
           <div className="admin-table-wrapper">
 <table>
             <thead>
               <tr>
                 <th>#</th>
-                <th>Название</th>
-                <th>Описание</th>
-                <th>Дата</th>
-                <th>Визиты</th>
-                <th>Стоимость</th>
-                <th>Приоритет</th>
+                <th>${t('dental.dental_tp_print_th_name')}</th>
+                <th>${t('dental.dental_tp_print_th_description')}</th>
+                <th>${t('dental.dental_tp_print_th_date')}</th>
+                <th>${t('dental.dental_tp_print_th_visits')}</th>
+                <th>${t('dental.dental_tp_print_th_cost')}</th>
+                <th>${t('dental.dental_tp_print_th_priority')}</th>
               </tr>
             </thead>
             <tbody>${stagesHtml}</tbody>
@@ -400,42 +378,42 @@ const TreatmentPlanner = ({ visitId, onUpdate }) => {
           <div style={styles.header}>
             <h2 style={styles.title}>
               <ClipboardList size={18} aria-hidden="true" />
-              {COPY.title}
+              {t('dental.dental_tp_title')}
             </h2>
 
             <div style={styles.actions}>
               <Button type="button" size="small" onClick={() => setStageDialog(true)}>
                 <Plus size={iconSize} aria-hidden="true" />
-                {COPY.addStageAction}
+                {t('dental.dental_tp_add_stage')}
               </Button>
               <Button type="button" size="small" onClick={handlePrint}>
                 <Printer size={iconSize} aria-hidden="true" />
-                {COPY.printAction}
+                {t('dental.dental_tp_print')}
               </Button>
             </div>
           </div>
 
           <div style={styles.fieldGrid}>
             <Input
-              label={COPY.planNameLabel}
+              label={t('dental.dental_tp_plan_name_label')}
               value={treatmentPlan.name}
               onChange={(e) => setTreatmentPlan({ ...treatmentPlan, name: e.target.value })}
               style={{ width: '100%', boxSizing: 'border-box' }}
             />
           </div>
 
-          <div style={styles.metrics} aria-label="Сводка плана лечения">
+          <div style={styles.metrics} aria-label={t('dental.dental_tp_aria_summary')}>
             <div style={styles.metric}>
               <span style={styles.metricValue}>{treatmentPlan.stages.length}</span>
-              <span style={styles.metricLabel}>{COPY.metricStages}</span>
+              <span style={styles.metricLabel}>{t('dental.dental_tp_metric_stages')}</span>
             </div>
             <div style={styles.metric}>
               <span style={styles.metricValue}>{treatmentPlan.totalDuration}</span>
-              <span style={styles.metricLabel}>{COPY.metricVisits}</span>
+              <span style={styles.metricLabel}>{t('dental.dental_tp_metric_visits')}</span>
             </div>
             <div style={styles.metric}>
               <span style={styles.metricValue}>{(treatmentPlan.totalCost / 1000).toFixed(0)}k</span>
-              <span style={styles.metricLabel}>{COPY.metricCost}</span>
+              <span style={styles.metricLabel}>{t('dental.dental_tp_metric_cost')}</span>
             </div>
           </div>
 
@@ -453,11 +431,11 @@ const TreatmentPlanner = ({ visitId, onUpdate }) => {
                       <div style={styles.stageMeta}>
                         <Badge size="small" variant="outline">
                           <CalendarDays style={styles.badgeIcon} aria-hidden="true" />
-                          {stage.date || COPY.noDate}
+                          {stage.date || t('dental.dental_tp_no_date')}
                         </Badge>
                         <Badge size="small" variant="outline">
                           <Clock style={styles.badgeIcon} aria-hidden="true" />
-                          {`${stage.duration} ${COPY.visitSuffix}`}
+                          {`${stage.duration} ${t('dental.dental_tp_visit_suffix')}`}
                         </Badge>
                         <Badge size="small" variant="outline">
                           <DollarSign style={styles.badgeIcon} aria-hidden="true" />
@@ -470,8 +448,8 @@ const TreatmentPlanner = ({ visitId, onUpdate }) => {
                     </div>
                     <button
                       type="button"
-                      aria-label={COPY.deleteAction}
-                      title={COPY.deleteAction}
+                      aria-label={t('dental.dental_tp_delete')}
+                      title={t('dental.dental_tp_delete')}
                       style={styles.iconButton}
                       onClick={() => handleDeleteStage(stage.id)}
                     >
@@ -483,14 +461,14 @@ const TreatmentPlanner = ({ visitId, onUpdate }) => {
             </ul>
           ) : (
             <Alert severity="info">
-              {COPY.emptyPlan}
+              {t('dental.dental_tp_empty_plan')}
             </Alert>
           )}
 
           {treatmentPlan.stages.length > 0 && (
             <div style={styles.saveRow}>
               <Button type="button" variant="primary" size="large" onClick={savePlan}>
-                {COPY.savePlan}
+                {t('dental.dental_tp_save_plan')}
               </Button>
             </div>
           )}
@@ -498,19 +476,19 @@ const TreatmentPlanner = ({ visitId, onUpdate }) => {
       </Card>
 
       <Dialog open={stageDialog} onClose={() => setStageDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>{COPY.dialogTitle}</DialogTitle>
+        <DialogTitle>{t('dental.dental_tp_dialog_title')}</DialogTitle>
 
         <DialogContent style={{ maxHeight: '70vh', overflow: 'auto' }}>
           <div style={styles.dialogGrid}>
             <Input
-              label={COPY.stageNameLabel}
+              label={t('dental.dental_tp_stage_name_label')}
               value={stageForm.name}
               onChange={(e) => setStageForm({ ...stageForm, name: e.target.value })}
               style={{ width: '100%', boxSizing: 'border-box' }}
             />
 
             <Textarea
-              label={COPY.descriptionLabel}
+              label={t('dental.dental_tp_description_label')}
               value={stageForm.description}
               onChange={(e) => setStageForm({ ...stageForm, description: e.target.value })}
               minRows={2}
@@ -520,14 +498,14 @@ const TreatmentPlanner = ({ visitId, onUpdate }) => {
             <div style={styles.twoColumnGrid}>
               <Input
                 type="date"
-                label={COPY.dateLabel}
+                label={t('dental.dental_tp_date_label')}
                 value={stageForm.date}
                 onChange={(e) => setStageForm({ ...stageForm, date: e.target.value })}
                 style={{ width: '100%', boxSizing: 'border-box' }}
               />
 
               <Select
-                label={COPY.priorityLabel}
+                label={t('dental.dental_tp_priority_label')}
                 value={stageForm.priority}
                 onChange={(value) => setStageForm({ ...stageForm, priority: value })}
                 options={Object.entries(PRIORITIES).map(([key, priority]) => ({
@@ -538,7 +516,7 @@ const TreatmentPlanner = ({ visitId, onUpdate }) => {
 
               <Input
                 type="number"
-                label={COPY.durationLabel}
+                label={t('dental.dental_tp_duration_label')}
                 value={stageForm.duration}
                 onChange={(e) => setStageForm({ ...stageForm, duration: parseInt(e.target.value) || 1 })}
                 style={{ width: '100%', boxSizing: 'border-box' }}
@@ -546,7 +524,7 @@ const TreatmentPlanner = ({ visitId, onUpdate }) => {
 
               <Input
                 type="number"
-                label={COPY.costLabel}
+                label={t('dental.dental_tp_cost_label')}
                 value={stageForm.cost}
                 onChange={(e) => setStageForm({ ...stageForm, cost: parseInt(e.target.value) || 0 })}
                 style={{ width: '100%', boxSizing: 'border-box' }}
@@ -556,9 +534,9 @@ const TreatmentPlanner = ({ visitId, onUpdate }) => {
         </DialogContent>
 
         <DialogActions>
-          <Button type="button" onClick={() => setStageDialog(false)}>{COPY.cancelAction}</Button>
+          <Button type="button" onClick={() => setStageDialog(false)}>{t('dental.dental_tp_cancel')}</Button>
           <Button type="button" variant="primary" onClick={handleSaveStage} disabled={!stageForm.name}>
-            {COPY.addDialogAction}
+            {t('dental.dental_tp_add')}
           </Button>
         </DialogActions>
       </Dialog>

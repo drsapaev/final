@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect } from 'react';
 import logger from '../../utils/logger';
 import {
@@ -29,6 +29,7 @@ const ExaminationForm = ({
   onSave,
   onClose
 }) => {
+  const { t } = useTranslation();
   const [formData, setFormData] = useState({
     // Основные данные осмотра
     examinationDate: new Date().toISOString().split('T')[0],
@@ -177,12 +178,12 @@ const ExaminationForm = ({
 
   // Вкладки
   const tabs = [
-  { id: 'general', label: 'Общий осмотр', icon: Eye },
-  { id: 'hygiene', label: 'Индексы гигиены', icon: Activity },
-  { id: 'periodontal', label: 'Пародонт', icon: Heart },
-  { id: 'measurements', label: 'Измерения', icon: AlertCircle },
-  { id: 'photos', label: 'Фото/Рентген', icon: Camera },
-  { id: 'conclusion', label: 'Заключение', icon: CheckCircle }];
+  { id: 'general', label: t('dental.dental_ef_tab_general'), icon: Eye },
+  { id: 'hygiene', label: t('dental.dental_ef_tab_hygiene'), icon: Activity },
+  { id: 'periodontal', label: t('dental.dental_ef_tab_periodontal'), icon: Heart },
+  { id: 'measurements', label: t('dental.dental_ef_tab_measurements'), icon: AlertCircle },
+  { id: 'photos', label: t('dental.dental_ef_tab_photos'), icon: Camera },
+  { id: 'conclusion', label: t('dental.dental_ef_tab_conclusion'), icon: CheckCircle }];
 
 
   // Рендер общего осмотра
@@ -191,76 +192,76 @@ const ExaminationForm = ({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Лицо
+            {t('dental.dental_ef_general_face')}
           </label>
           <textarea
-          aria-label="Осмотр лица"
+          aria-label={t('dental.dental_ef_general_aria_face')}
           value={formData.generalCondition.face || ''}
           onChange={(e) => handleInputChange('generalCondition.face', e.target.value)}
           disabled={!isEditing}
           rows={3}
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-          placeholder="Симметрия, цвет кожи, отеки, высыпания" />
+          placeholder={t('dental.dental_ef_general_ph_face')} />
         
         </div>
         
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Губы
+            {t('dental.dental_ef_general_lips')}
           </label>
           <textarea
-          aria-label="Осмотр губ"
+          aria-label={t('dental.dental_ef_general_aria_lips')}
           value={formData.generalCondition.lips || ''}
           onChange={(e) => handleInputChange('generalCondition.lips', e.target.value)}
           disabled={!isEditing}
           rows={3}
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-          placeholder="Цвет, влажность, трещины, герпес" />
+          placeholder={t('dental.dental_ef_general_ph_lips')} />
         
         </div>
         
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Язык
+            {t('dental.dental_ef_general_tongue')}
           </label>
           <textarea
-          aria-label="Осмотр языка"
+          aria-label={t('dental.dental_ef_general_aria_tongue')}
           value={formData.generalCondition.tongue || ''}
           onChange={(e) => handleInputChange('generalCondition.tongue', e.target.value)}
           disabled={!isEditing}
           rows={3}
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-          placeholder="Цвет, налет, сосочки, движения" />
+          placeholder={t('dental.dental_ef_general_ph_tongue')} />
         
         </div>
         
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Слизистая оболочка
+            {t('dental.dental_ef_general_mucosa')}
           </label>
           <textarea
-          aria-label="Осмотр слизистой оболочки"
+          aria-label={t('dental.dental_ef_general_aria_mucosa')}
           value={formData.generalCondition.mucosa || ''}
           onChange={(e) => handleInputChange('generalCondition.mucosa', e.target.value)}
           disabled={!isEditing}
           rows={3}
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-          placeholder="Цвет, целостность, эрозии, язвы" />
+          placeholder={t('dental.dental_ef_general_ph_mucosa')} />
         
         </div>
         
         <div className="md:col-span-2">
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Десны
+            {t('dental.dental_ef_general_gums')}
           </label>
           <textarea
-          aria-label="Осмотр десен"
+          aria-label={t('dental.dental_ef_general_aria_gums')}
           value={formData.generalCondition.gums || ''}
           onChange={(e) => handleInputChange('generalCondition.gums', e.target.value)}
           disabled={!isEditing}
           rows={3}
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-          placeholder="Цвет, консистенция, кровоточивость, отечность" />
+          placeholder={t('dental.dental_ef_general_ph_gums')} />
         
         </div>
       </div>
@@ -271,21 +272,21 @@ const ExaminationForm = ({
   const renderHygieneIndices = () =>
   <div className="space-y-6">
       <div className="bg-blue-50 p-4 rounded-lg">
-        <h3 className="text-lg font-semibold mb-2">Индексы гигиены полости рта</h3>
+        <h3 className="text-lg font-semibold mb-2">{t('dental.dental_ef_hygiene_title')}</h3>
         <p className="text-sm text-gray-600">
-          Оценка состояния гигиены полости рта пациента
+          {t('dental.dental_ef_hygiene_subtitle')}
         </p>
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            OHI-S (Упрощенный индекс гигиены)
+            {t('dental.dental_ef_hygiene_ohis_label')}
           </label>
           <div className="flex items-center gap-2">
             <input
             type="number"
-            aria-label="Индекс гигиены OHI-S"
+            aria-label={t('dental.dental_ef_hygiene_aria_ohis')}
             step="0.1"
             min="0"
             max="6"
@@ -296,8 +297,8 @@ const ExaminationForm = ({
           
             <span className="text-sm text-gray-600">
               {formData.hygieneIndices.ohis ?
-            parseFloat(formData.hygieneIndices.ohis) < 1.2 ? 'Хорошая' :
-            parseFloat(formData.hygieneIndices.ohis) < 3.0 ? 'Удовлетворительная' : 'Плохая' : ''
+            parseFloat(formData.hygieneIndices.ohis) < 1.2 ? t('dental.dental_ef_hygiene_good') :
+            parseFloat(formData.hygieneIndices.ohis) < 3.0 ? t('dental.dental_ef_hygiene_satisfactory') : t('dental.dental_ef_hygiene_poor') : ''
             }
             </span>
           </div>
@@ -305,12 +306,12 @@ const ExaminationForm = ({
         
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            PLI (Индекс зубного налета)
+            {t('dental.dental_ef_hygiene_pli_label')}
           </label>
           <div className="flex items-center gap-2">
             <input
             type="number"
-            aria-label="Индекс зубного налета PLI"
+            aria-label={t('dental.dental_ef_hygiene_aria_pli')}
             step="0.1"
             min="0"
             max="3"
@@ -321,9 +322,9 @@ const ExaminationForm = ({
           
             <span className="text-sm text-gray-600">
               {formData.hygieneIndices.pli ?
-            parseFloat(formData.hygieneIndices.pli) < 0.5 ? 'Отличная' :
-            parseFloat(formData.hygieneIndices.pli) < 1.0 ? 'Хорошая' :
-            parseFloat(formData.hygieneIndices.pli) < 2.0 ? 'Удовлетворительная' : 'Плохая' : ''
+            parseFloat(formData.hygieneIndices.pli) < 0.5 ? t('dental.dental_ef_hygiene_excellent') :
+            parseFloat(formData.hygieneIndices.pli) < 1.0 ? t('dental.dental_ef_hygiene_good') :
+            parseFloat(formData.hygieneIndices.pli) < 2.0 ? t('dental.dental_ef_hygiene_satisfactory') : t('dental.dental_ef_hygiene_poor') : ''
             }
             </span>
           </div>
@@ -331,12 +332,12 @@ const ExaminationForm = ({
         
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            CPI (Коммунальный пародонтальный индекс)
+            {t('dental.dental_ef_hygiene_cpi_label')}
           </label>
           <div className="flex items-center gap-2">
             <input
             type="number"
-            aria-label="Пародонтальный индекс CPI"
+            aria-label={t('dental.dental_ef_hygiene_aria_cpi')}
             step="0.1"
             min="0"
             max="4"
@@ -347,10 +348,10 @@ const ExaminationForm = ({
           
             <span className="text-sm text-gray-600">
               {formData.hygieneIndices.cpi ?
-            parseFloat(formData.hygieneIndices.cpi) === 0 ? 'Здоровый' :
-            parseFloat(formData.hygieneIndices.cpi) === 1 ? 'Кровоточивость' :
-            parseFloat(formData.hygieneIndices.cpi) === 2 ? 'Зубной камень' :
-            parseFloat(formData.hygieneIndices.cpi) === 3 ? 'Карман 4-5мм' : 'Карман 6+мм' : ''
+            parseFloat(formData.hygieneIndices.cpi) === 0 ? t('dental.dental_ef_hygiene_cpi_0') :
+            parseFloat(formData.hygieneIndices.cpi) === 1 ? t('dental.dental_ef_hygiene_cpi_1') :
+            parseFloat(formData.hygieneIndices.cpi) === 2 ? t('dental.dental_ef_hygiene_cpi_2') :
+            parseFloat(formData.hygieneIndices.cpi) === 3 ? t('dental.dental_ef_hygiene_cpi_3') : t('dental.dental_ef_hygiene_cpi_4') : ''
             }
             </span>
           </div>
@@ -358,12 +359,12 @@ const ExaminationForm = ({
         
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Индекс кровоточивости
+            {t('dental.dental_ef_hygiene_bleeding_label')}
           </label>
           <div className="flex items-center gap-2">
             <input
             type="number"
-            aria-label="Индекс кровоточивости"
+            aria-label={t('dental.dental_ef_hygiene_aria_bleeding')}
             step="0.1"
             min="0"
             max="100"
@@ -383,16 +384,16 @@ const ExaminationForm = ({
   const renderPeriodontalPockets = () =>
   <div className="space-y-6">
       <div className="bg-green-50 p-4 rounded-lg">
-        <h3 className="text-lg font-semibold mb-2">Пародонтальные карманы</h3>
+        <h3 className="text-lg font-semibold mb-2">{t('dental.dental_ef_perio_title')}</h3>
         <p className="text-sm text-gray-600">
-          Измерение глубины пародонтальных карманов по каждому зубу
+          {t('dental.dental_ef_perio_subtitle')}
         </p>
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Верхняя челюсть */}
         <div>
-          <h4 className="font-semibold mb-3">Верхняя челюсть</h4>
+          <h4 className="font-semibold mb-3">{t('dental.dental_ef_perio_upper')}</h4>
           <div className="space-y-2">
             {[18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28].map((toothId) =>
           <div key={toothId} className="flex items-center gap-2">
@@ -402,7 +403,7 @@ const ExaminationForm = ({
               <input
                 key={position}
                 type="number"
-                aria-label={`Пародонтальный карман зуб ${toothId}, позиция ${position}`}
+                aria-label={t('dental.dental_ef_perio_aria_pocket', { tooth: toothId, position })}
                 step="0.5"
                 min="0"
                 max="10"
@@ -421,7 +422,7 @@ const ExaminationForm = ({
         
         {/* Нижняя челюсть */}
         <div>
-          <h4 className="font-semibold mb-3">Нижняя челюсть</h4>
+          <h4 className="font-semibold mb-3">{t('dental.dental_ef_perio_lower')}</h4>
           <div className="space-y-2">
             {[48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38].map((toothId) =>
           <div key={toothId} className="flex items-center gap-2">
@@ -431,7 +432,7 @@ const ExaminationForm = ({
               <input
                 key={position}
                 type="number"
-                aria-label={`Пародонтальный карман зуб ${toothId}, позиция ${position}`}
+                aria-label={t('dental.dental_ef_perio_aria_pocket', { tooth: toothId, position })}
                 step="0.5"
                 min="0"
                 max="10"
@@ -450,8 +451,8 @@ const ExaminationForm = ({
       </div>
       
       <div className="text-xs text-gray-600">
-        <p><strong>M</strong> - Мезиальная, <strong>B</strong> - Буккальная, <strong>L</strong> - Лингвальная, <strong>D</strong> - Дистальная</p>
-        <p>Измерения в миллиметрах (0-10 мм)</p>
+        <p>{t('dental.dental_ef_perio_legend', { interpolation: { escapeValue: false } })}</p>
+        <p>{t('dental.dental_ef_perio_unit_mm')}</p>
       </div>
     </div>;
 
@@ -460,101 +461,101 @@ const ExaminationForm = ({
   const renderMeasurements = () =>
   <div className="space-y-6">
       <div className="bg-yellow-50 p-4 rounded-lg">
-        <h3 className="text-lg font-semibold mb-2">Ортодонтические измерения</h3>
+        <h3 className="text-lg font-semibold mb-2">{t('dental.dental_ef_meas_title')}</h3>
         <p className="text-sm text-gray-600">
-          Измерения прикуса и окклюзии
+          {t('dental.dental_ef_meas_subtitle')}
         </p>
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Overjet (Горизонтальное перекрытие)
+            {t('dental.dental_ef_meas_overjet_label')}
           </label>
           <div className="flex items-center gap-2">
             <input
             type="number"
-            aria-label="Overjet в миллиметрах"
+            aria-label={t('dental.dental_ef_meas_aria_overjet')}
             step="0.1"
             value={formData.measurements.overjet || ''}
             onChange={(e) => handleInputChange('measurements.overjet', e.target.value)}
             disabled={!isEditing}
             className="w-20 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100" />
           
-            <span className="text-sm text-gray-600">мм</span>
+            <span className="text-sm text-gray-600">{t('dental.dental_ef_meas_unit_mm')}</span>
           </div>
         </div>
         
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Overbite (Вертикальное перекрытие)
+            {t('dental.dental_ef_meas_overbite_label')}
           </label>
           <div className="flex items-center gap-2">
             <input
             type="number"
-            aria-label="Overbite в миллиметрах"
+            aria-label={t('dental.dental_ef_meas_aria_overbite')}
             step="0.1"
             value={formData.measurements.overbite || ''}
             onChange={(e) => handleInputChange('measurements.overbite', e.target.value)}
             disabled={!isEditing}
             className="w-20 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100" />
           
-            <span className="text-sm text-gray-600">мм</span>
+            <span className="text-sm text-gray-600">{t('dental.dental_ef_meas_unit_mm')}</span>
           </div>
         </div>
         
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Срединная линия
+            {t('dental.dental_ef_meas_midline_label')}
           </label>
           <select
-          aria-label="Срединная линия"
+          aria-label={t('dental.dental_ef_meas_aria_midline')}
           value={formData.measurements.midline || ''}
           onChange={(e) => handleInputChange('measurements.midline', e.target.value)}
           disabled={!isEditing}
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100">
           
-            <option value="">Выберите</option>
-            <option value="coincident">Совпадает</option>
-            <option value="deviated_right">Смещена вправо</option>
-            <option value="deviated_left">Смещена влево</option>
+            <option value="">{t('dental.dental_ef_meas_select_placeholder')}</option>
+            <option value="coincident">{t('dental.dental_ef_meas_midline_coincident')}</option>
+            <option value="deviated_right">{t('dental.dental_ef_meas_midline_right')}</option>
+            <option value="deviated_left">{t('dental.dental_ef_meas_midline_left')}</option>
           </select>
         </div>
         
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Перекрестный прикус
+            {t('dental.dental_ef_meas_crossbite_label')}
           </label>
           <select
-          aria-label="Перекрестный прикус"
+          aria-label={t('dental.dental_ef_meas_aria_crossbite')}
           value={formData.measurements.crossbite || ''}
           onChange={(e) => handleInputChange('measurements.crossbite', e.target.value)}
           disabled={!isEditing}
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100">
           
-            <option value="">Выберите</option>
-            <option value="none">Отсутствует</option>
-            <option value="anterior">Передний</option>
-            <option value="posterior">Задний</option>
-            <option value="both">Передний и задний</option>
+            <option value="">{t('dental.dental_ef_meas_select_placeholder')}</option>
+            <option value="none">{t('dental.dental_ef_meas_crossbite_none')}</option>
+            <option value="anterior">{t('dental.dental_ef_meas_crossbite_anterior')}</option>
+            <option value="posterior">{t('dental.dental_ef_meas_crossbite_posterior')}</option>
+            <option value="both">{t('dental.dental_ef_meas_crossbite_both')}</option>
           </select>
         </div>
         
         <div className="md:col-span-2">
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Открытый прикус
+            {t('dental.dental_ef_meas_openbite_label')}
           </label>
           <div className="flex items-center gap-2">
             <input
             type="number"
-            aria-label="Открытый прикус в миллиметрах"
+            aria-label={t('dental.dental_ef_meas_aria_openbite')}
             step="0.1"
             value={formData.measurements.openBite || ''}
             onChange={(e) => handleInputChange('measurements.openBite', e.target.value)}
             disabled={!isEditing}
             className="w-20 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100" />
           
-            <span className="text-sm text-gray-600">мм (0 = отсутствует)</span>
+            <span className="text-sm text-gray-600">{t('dental.dental_ef_meas_openbite_unit')}</span>
           </div>
         </div>
       </div>
@@ -565,16 +566,16 @@ const ExaminationForm = ({
   const renderPhotosAndRadiographs = () =>
   <div className="space-y-6">
       <div className="bg-purple-50 p-4 rounded-lg">
-        <h3 className="text-lg font-semibold mb-2">Фото и рентгенологические данные</h3>
+        <h3 className="text-lg font-semibold mb-2">{t('dental.dental_ef_photo_title')}</h3>
         <p className="text-sm text-gray-600">
-          Загрузка фотографий и рентгеновских снимков
+          {t('dental.dental_ef_photo_subtitle')}
         </p>
       </div>
       
       {/* Фотографии */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
-          <h4 className="font-semibold mb-3">Фотографии «До»</h4>
+          <h4 className="font-semibold mb-3">{t('dental.dental_ef_photo_before_title')}</h4>
           <div className="space-y-2">
             {formData.photos.before.map((photo, index) =>
           <div key={photo.id} className="flex items-center gap-2 p-2 border rounded">
@@ -583,7 +584,7 @@ const ExaminationForm = ({
                 {isEditing &&
             <button
               onClick={() => handleArrayRemove('photos.before', index)}
-              aria-label={`Удалить фото до осмотра ${index + 1}`}
+              aria-label={t('dental.dental_ef_photo_aria_remove_before', { index: index + 1 })}
               className="text-red-500 hover:text-red-700">
               
                     <Trash2 className="h-4 w-4" />
@@ -594,10 +595,10 @@ const ExaminationForm = ({
             {isEditing &&
           <label className="flex items-center gap-2 p-2 border-2 border-dashed border-gray-300 rounded cursor-pointer hover:border-blue-500">
                 <Upload className="h-4 w-4" />
-                <span className="text-sm">Загрузить фото</span>
+                <span className="text-sm">{t('dental.dental_ef_photo_btn_upload')}</span>
                 <input
               type="file"
-              aria-label="Загрузить фото до осмотра"
+              aria-label={t('dental.dental_ef_photo_aria_upload_before')}
               accept="image/*"
               onChange={(e) => {
                 if (e.target.files[0]) {
@@ -612,7 +613,7 @@ const ExaminationForm = ({
         </div>
         
         <div>
-          <h4 className="font-semibold mb-3">Фотографии «После»</h4>
+          <h4 className="font-semibold mb-3">{t('dental.dental_ef_photo_after_title')}</h4>
           <div className="space-y-2">
             {formData.photos.after.map((photo, index) =>
           <div key={photo.id} className="flex items-center gap-2 p-2 border rounded">
@@ -621,7 +622,7 @@ const ExaminationForm = ({
                 {isEditing &&
             <button
               onClick={() => handleArrayRemove('photos.after', index)}
-              aria-label={`Удалить фото после осмотра ${index + 1}`}
+              aria-label={t('dental.dental_ef_photo_aria_remove_after', { index: index + 1 })}
               className="text-red-500 hover:text-red-700">
               
                     <Trash2 className="h-4 w-4" />
@@ -632,10 +633,10 @@ const ExaminationForm = ({
             {isEditing &&
           <label className="flex items-center gap-2 p-2 border-2 border-dashed border-gray-300 rounded cursor-pointer hover:border-blue-500">
                 <Upload className="h-4 w-4" />
-                <span className="text-sm">Загрузить фото</span>
+                <span className="text-sm">{t('dental.dental_ef_photo_btn_upload')}</span>
                 <input
               type="file"
-              aria-label="Загрузить фото после осмотра"
+              aria-label={t('dental.dental_ef_photo_aria_upload_after')}
               accept="image/*"
               onChange={(e) => {
                 if (e.target.files[0]) {
@@ -650,7 +651,7 @@ const ExaminationForm = ({
         </div>
         
         <div>
-          <h4 className="font-semibold mb-3">Внутриротовые фото</h4>
+          <h4 className="font-semibold mb-3">{t('dental.dental_ef_photo_intraoral_title')}</h4>
           <div className="space-y-2">
             {formData.photos.intraoral.map((photo, index) =>
           <div key={photo.id} className="flex items-center gap-2 p-2 border rounded">
@@ -659,7 +660,7 @@ const ExaminationForm = ({
                 {isEditing &&
             <button
               onClick={() => handleArrayRemove('photos.intraoral', index)}
-              aria-label={`Удалить внутриротовое фото ${index + 1}`}
+              aria-label={t('dental.dental_ef_photo_aria_remove_intraoral', { index: index + 1 })}
               className="text-red-500 hover:text-red-700">
               
                     <Trash2 className="h-4 w-4" />
@@ -670,10 +671,10 @@ const ExaminationForm = ({
             {isEditing &&
           <label className="flex items-center gap-2 p-2 border-2 border-dashed border-gray-300 rounded cursor-pointer hover:border-blue-500">
                 <Upload className="h-4 w-4" />
-                <span className="text-sm">Загрузить фото</span>
+                <span className="text-sm">{t('dental.dental_ef_photo_btn_upload')}</span>
                 <input
               type="file"
-              aria-label="Загрузить внутриротовое фото"
+              aria-label={t('dental.dental_ef_photo_aria_upload_intraoral')}
               accept="image/*"
               onChange={(e) => {
                 if (e.target.files[0]) {
@@ -688,7 +689,7 @@ const ExaminationForm = ({
         </div>
         
         <div>
-          <h4 className="font-semibold mb-3">Внеротовые фото</h4>
+          <h4 className="font-semibold mb-3">{t('dental.dental_ef_photo_extraoral_title')}</h4>
           <div className="space-y-2">
             {formData.photos.extraoral.map((photo, index) =>
           <div key={photo.id} className="flex items-center gap-2 p-2 border rounded">
@@ -697,7 +698,7 @@ const ExaminationForm = ({
                 {isEditing &&
             <button
               onClick={() => handleArrayRemove('photos.extraoral', index)}
-              aria-label={`Удалить внеротовое фото ${index + 1}`}
+              aria-label={t('dental.dental_ef_photo_aria_remove_extraoral', { index: index + 1 })}
               className="text-red-500 hover:text-red-700">
               
                     <Trash2 className="h-4 w-4" />
@@ -708,10 +709,10 @@ const ExaminationForm = ({
             {isEditing &&
           <label className="flex items-center gap-2 p-2 border-2 border-dashed border-gray-300 rounded cursor-pointer hover:border-blue-500">
                 <Upload className="h-4 w-4" />
-                <span className="text-sm">Загрузить фото</span>
+                <span className="text-sm">{t('dental.dental_ef_photo_btn_upload')}</span>
                 <input
               type="file"
-              aria-label="Загрузить внеротовое фото"
+              aria-label={t('dental.dental_ef_photo_aria_upload_extraoral')}
               accept="image/*"
               onChange={(e) => {
                 if (e.target.files[0]) {
@@ -728,35 +729,35 @@ const ExaminationForm = ({
       
       {/* Рентгенологические данные */}
       <div className="border-t pt-6">
-        <h4 className="font-semibold mb-3">Рентгенологические данные</h4>
+        <h4 className="font-semibold mb-3">{t('dental.dental_ef_radio_title')}</h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Ортопантомограмма
+              {t('dental.dental_ef_radio_panoramic_label')}
             </label>
             <input
             type="text"
-            aria-label="Ортопантомограмма"
+            aria-label={t('dental.dental_ef_radio_aria_panoramic')}
             value={formData.radiographs.panoramic || ''}
             onChange={(e) => handleInputChange('radiographs.panoramic', e.target.value)}
             disabled={!isEditing}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-            placeholder="Номер снимка или описание" />
+            placeholder={t('dental.dental_ef_radio_ph_number')} />
           
           </div>
           
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              КЛКТ
+              {t('dental.dental_ef_radio_cbct_label')}
             </label>
             <input
             type="text"
-            aria-label="КЛКТ"
+            aria-label={t('dental.dental_ef_radio_aria_cbct')}
             value={formData.radiographs.cbct || ''}
             onChange={(e) => handleInputChange('radiographs.cbct', e.target.value)}
             disabled={!isEditing}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-            placeholder="Номер снимка или описание" />
+            placeholder={t('dental.dental_ef_radio_ph_number')} />
           
           </div>
         </div>
@@ -768,39 +769,39 @@ const ExaminationForm = ({
   const renderConclusion = () =>
   <div className="space-y-6">
       <div className="bg-green-50 p-4 rounded-lg">
-        <h3 className="text-lg font-semibold mb-2">Заключение и рекомендации</h3>
+        <h3 className="text-lg font-semibold mb-2">{t('dental.dental_ef_conclusion_title')}</h3>
         <p className="text-sm text-gray-600">
-          Итоговое заключение по результатам осмотра
+          {t('dental.dental_ef_conclusion_subtitle')}
         </p>
       </div>
       
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Заключение
+          {t('dental.dental_ef_conclusion_label')}
         </label>
         <textarea
-        aria-label="Заключение по результатам осмотра"
+        aria-label={t('dental.dental_ef_conclusion_aria')}
         value={formData.conclusion || ''}
         onChange={(e) => handleInputChange('conclusion', e.target.value)}
         disabled={!isEditing}
         rows={4}
         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-        placeholder="Основные находки и диагнозы" />
+        placeholder={t('dental.dental_ef_conclusion_ph_findings')} />
       
       </div>
       
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Рекомендации
+          {t('dental.dental_ef_conclusion_label_rec')}
         </label>
         <textarea
-        aria-label="Рекомендации по результатам осмотра"
+        aria-label={t('dental.dental_ef_conclusion_aria_rec')}
         value={formData.recommendations || ''}
         onChange={(e) => handleInputChange('recommendations', e.target.value)}
         disabled={!isEditing}
         rows={4}
         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-        placeholder="Рекомендации по лечению и профилактике" />
+        placeholder={t('dental.dental_ef_conclusion_ph_rec')} />
       
       </div>
     </div>;
@@ -833,10 +834,10 @@ const ExaminationForm = ({
         <div className="flex items-center justify-between p-6 border-b">
           <div>
             <h2 className="text-xl font-semibold">
-              Объективный осмотр
+              {t('dental.dental_ef_title')}
             </h2>
             <p className="text-gray-600 text-sm">
-              {formData.examinationDate} | {isEditing ? 'Режим редактирования' : 'Просмотр данных'}
+              {t('dental.dental_ef_subtitle', { date: formData.examinationDate, mode: isEditing ? t('dental.dental_ef_mode_edit') : t('dental.dental_ef_mode_view') })}
             </p>
           </div>
           
@@ -847,7 +848,7 @@ const ExaminationForm = ({
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
               
                 <Edit className="h-4 w-4" />
-                Редактировать
+                {t('dental.dental_ef_btn_edit')}
               </button> :
 
             <>
@@ -856,7 +857,7 @@ const ExaminationForm = ({
                 className="flex items-center gap-2 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600">
                 
                   <X className="h-4 w-4" />
-                  Отмена
+                  {t('dental.dental_ef_btn_cancel')}
                 </button>
                 <button
                 onClick={handleSave}
@@ -864,13 +865,13 @@ const ExaminationForm = ({
                 className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50">
                 
                   <Save className="h-4 w-4" />
-                  {loading ? 'Сохранение...' : 'Сохранить'}
+                  {loading ? t('dental.dental_ef_btn_saving') : t('dental.dental_ef_btn_save')}
                 </button>
               </>
             }
             <button
               onClick={onClose}
-              aria-label="Закрыть форму осмотра"
+              aria-label={t('dental.dental_ef_aria_close')}
               className="p-2 text-gray-500 hover:text-gray-700">
               
               <X className="h-5 w-5" />

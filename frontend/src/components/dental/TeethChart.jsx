@@ -37,7 +37,7 @@ import {
   ADULT_TEETH as TEETH_NUMBERS,
   DECIDUOUS_TEETH,
 } from './dentalConstants';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }) => {
   const { t } = useTranslation();
@@ -93,11 +93,11 @@ const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }) => {
     return (
       <div
         key={toothNumber}
-        title={`Зуб №${toothNumber} • ${STATUS_NAMES[status]}`}>
+        title={t('dental.dental_tc_tooth_title', { toothNumber, status: STATUS_NAMES[status] })}>
         
         <button
           onClick={() => handleToothClick(toothNumber)}
-          aria-label={`Зуб ${toothNumber}: ${STATUS_NAMES[status]}`}
+          aria-label={t('dental.dental_tc_tooth_aria', { toothNumber, status: STATUS_NAMES[status] })}
           style={{
             color: STATUS_COLORS[status],
             border: isSelected ? '2px solid var(--mac-accent-blue)' : '1px solid var(--mac-border)',
@@ -146,7 +146,7 @@ const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }) => {
         <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Typography variant="h6">
             <Hospital style={{ marginRight: 8, verticalAlign: 'middle' }} />
-            Зубная карта
+            {t('dental.dental_tc_chart_title')}
           </Typography>
           
           <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
@@ -163,7 +163,7 @@ const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }) => {
                 }}
                 onClick={() => setViewMode('adult')}>
                 
-                Постоянные
+                {t('dental.dental_tc_adult')}
               </button>
               <button
                 style={{
@@ -175,7 +175,7 @@ const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }) => {
                 }}
                 onClick={() => setViewMode('child')}>
                 
-                Молочные
+                {t('dental.dental_tc_deciduous')}
               </button>
             </div>
             
@@ -183,7 +183,7 @@ const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }) => {
             <div style={{ display: 'flex', border: '1px solid var(--mac-border)', borderRadius: 8, overflow: 'hidden' }}>
               <button
                 onClick={() => setZoom(Math.max(0.5, zoom - 0.1))}
-                aria-label="Уменьшить зубную карту"
+                aria-label={t('dental.dental_tc_aria_zoom_out')}
                 style={{
                   padding: '8px 12px',
                   border: 'none',
@@ -198,7 +198,7 @@ const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }) => {
               </button>
               <button
                 onClick={() => setZoom(Math.min(2, zoom + 0.1))}
-                aria-label="Увеличить зубную карту"
+                aria-label={t('dental.dental_tc_aria_zoom_in')}
                 style={{
                   padding: '8px 12px',
                   border: 'none',
@@ -219,7 +219,7 @@ const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }) => {
               onClick={handleClearAll}>
               
                 <RefreshCw style={{ width: 16, height: 16, marginRight: 8 }} />
-                Очистить
+                {t('dental.dental_tc_btn_clear')}
               </Button>
             }
           </Box>
@@ -229,7 +229,7 @@ const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }) => {
         {!readOnly &&
         <div style={{ marginBottom: 24 }}>
             <Typography variant="subtitle2" style={{ marginBottom: 8 }}>
-              Выберите состояние для отметки:
+              {t('dental.dental_tc_status_prompt')}
             </Typography>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {Object.entries(STATUS_NAMES).map(([status, name]) =>
@@ -259,14 +259,14 @@ const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }) => {
             {/* Верхняя челюсть */}
             <div style={{ marginBottom: 32 }}>
               <Typography variant="caption" style={{ textAlign: 'center', display: 'block', marginBottom: 8 }}>
-                Верхняя челюсть
+                {t('dental.dental_tc_upper_jaw')}
               </Typography>
               
               <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2 }}>
                 {/* Правая сторона (1 квадрант) */}
                 <Box>
                   <Typography variant="caption" align="center" display="block">
-                    Правая
+                    {t('dental.dental_tc_right_side')}
                   </Typography>
                   {renderTeethRow(currentTeeth.upperRight, true)}
                 </Box>
@@ -277,7 +277,7 @@ const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }) => {
                 {/* Левая сторона (2 квадрант) */}
                 <Box>
                   <Typography variant="caption" align="center" display="block">
-                    Левая
+                    {t('dental.dental_tc_left_side')}
                   </Typography>
                   {renderTeethRow(currentTeeth.upperLeft)}
                 </Box>
@@ -307,7 +307,7 @@ const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }) => {
               </div>
               
               <Typography variant="caption" align="center" display="block" sx={{ mt: 1 }}>
-                Нижняя челюсть
+                {t('dental.dental_tc_lower_jaw')}
               </Typography>
             </div>
           </div>
@@ -316,7 +316,7 @@ const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }) => {
         {/* Легенда */}
         <Box sx={{ mt: 3 }}>
           <Typography variant="subtitle2" gutterBottom>
-            Обозначения:
+            {t('dental.dental_tc_legend_title')}
           </Typography>
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
             {Object.entries(STATUS_NAMES).map(([status, name]) =>
@@ -339,7 +339,7 @@ const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }) => {
         {Object.keys(teethData).length > 0 &&
         <Box sx={{ mt: 3, p: 2, bgcolor: 'background.paper', borderRadius: 1 }}>
             <Typography variant="subtitle2" gutterBottom>
-              Статистика:
+              {t('dental.dental_tc_stats_title')}
             </Typography>
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
               {Object.entries(
