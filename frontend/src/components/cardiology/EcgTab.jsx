@@ -14,7 +14,7 @@ import { Plus } from 'lucide-react';
 import { Button } from '../ui/macos';
 import ECGViewer from './ECGViewer';
 import EchoForm from './EchoForm';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 /**
  * @param {Object} props

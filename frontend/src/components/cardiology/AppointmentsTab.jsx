@@ -13,7 +13,7 @@ import { Calendar } from 'lucide-react';
 import { MacOSCard, Skeleton, MacOSEmptyState } from '../ui/macos';
 import AppointmentSummaryBar from '../doctor/AppointmentSummaryBar';
 import EnhancedAppointmentsTable from '../tables/EnhancedAppointmentsTable';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 export function AppointmentsTab({
   appointments = [],
@@ -25,16 +25,17 @@ export function AppointmentsTab({
   services = {},
   isDark = false,
 }) {
+  const { t } = useTranslation();
   return (
     <div style={{ width: '100%', maxWidth: 'none', display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
       <MacOSCard className="cardio-card-fullwidth">
         <div className="cardio-appointments-header">
           <h3 className="cardio-appointments-title">
             <Calendar size={20} className="cardio-icon-mr" style={{ marginRight: 'var(--mac-spacing-3)', color: 'var(--mac-accent)' }} />
-            Записи к кардиологу
+            {t('cardio.cardio_appt_title')}
           </h3>
           <AppointmentSummaryBar
-            ariaLabel="Сводка записей кардиолога"
+            ariaLabel={t('cardio.cardio_appt_summary_aria')}
             items={appointmentSummaryItems}
             onRefresh={onRefresh}
             refreshDisabled={appointmentsLoading}
@@ -45,7 +46,7 @@ export function AppointmentsTab({
         {appointmentsLoading ? (
           <Skeleton type="table" count={5} />
         ) : appointments.length === 0 ? (
-          <MacOSEmptyState type="calendar" title="Записи не найдены" description="В системе пока нет записей к кардиологу" />
+          <MacOSEmptyState type="calendar" title={t('cardio.cardio_appt_empty_title')} description={t('cardio.cardio_appt_empty_desc')} />
         ) : (
           <EnhancedAppointmentsTable
             data={appointments}

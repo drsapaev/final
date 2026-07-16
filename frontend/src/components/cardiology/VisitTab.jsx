@@ -14,7 +14,7 @@ import { User, FileText, RefreshCw, Save, Calendar, Phone } from 'lucide-react';
 import { Button, MacOSCard, MacOSEmptyState } from '../ui/macos';
 import { EMRContainerV2 } from '../emr-v2/EMRContainerV2';
 import { formatRegistrarDate, formatRegistrarDateTime } from '../../utils/dateUtils';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 export function VisitTab({
   selectedPatient,
@@ -33,11 +33,11 @@ export function VisitTab({
       <MacOSCard className="cardio-empty-state" style={{ padding: '48px' }}>
         <MacOSEmptyState
           icon={Calendar}
-          title="Выберите визит"
-          description="Откройте прием из очереди или списка записей, либо используйте ссылку с visitId."
+          title={t('cardio.cardio_visit_empty_title')}
+          description={t('cardio.cardio_visit_empty_desc')}
           action={
             <Button variant="outline" onClick={onGoToAppointments} style={{ marginTop: 'var(--mac-spacing-4)' }}>
-              Перейти к записям
+              {t('cardio.cardio_visit_goto_appointments')}
             </Button>
           }
         />
@@ -51,12 +51,12 @@ export function VisitTab({
       <MacOSCard className="cardio-card-padded">
         <h3 className="cardio-section-heading">
           <User size={20} className="cardio-icon-mr cardio-icon-blue" />
-          Пациент: {selectedPatient.patient_name || selectedPatient.patient?.full_name || `№${selectedPatient.number}`}
+          {t('cardio.cardio_visit_patient_label', { name: selectedPatient.patient_name || selectedPatient.patient?.full_name || `№${selectedPatient.number}` })}
         </h3>
 
         <div className="cardio-grid-auto">
           <div>
-            <label className="cardio-form-label-block">ФИО пациента</label>
+            <label className="cardio-form-label-block">{t('cardio.cardio_visit_fio_label')}</label>
             <div className="cardio-patient-name cardio-patient-name-primary">{selectedPatient.patient_name}</div>
           </div>
 
@@ -95,18 +95,18 @@ export function VisitTab({
             }}>
               {emr.status || 'draft'}
             </span>
-            {emr.version != null && <span title="Версия EMR">v{emr.version}</span>}
+            {emr.version != null && <span title={t('cardio.cardio_visit_emr_version_title')}>v{emr.version}</span>}
             {emr.updated_at && (
-              <span title="Последнее изменение">
-                изм. {formatRegistrarDateTime(emr.updated_at, 'ru-RU')}
+              <span title={t('cardio.cardio_visit_emr_updated_title')}>
+                {t('cardio.cardio_visit_emr_updated_prefix', { datetime: formatRegistrarDateTime(emr.updated_at, 'ru-RU') })}
               </span>
             )}
             {emr.signed_at && (
-              <span title="Подписана">
-                подписана {formatRegistrarDate(emr.signed_at, 'ru-RU')}
+              <span title={t('cardio.cardio_visit_emr_signed_title')}>
+                {t('cardio.cardio_visit_emr_signed_prefix', { date: formatRegistrarDate(emr.signed_at, 'ru-RU') })}
               </span>
             )}
-            {emr.signed_by != null && emr.signed_by > 0 && <span title="Кем подписана">врач #{emr.signed_by}</span>}
+            {emr.signed_by != null && emr.signed_by > 0 && <span title={t('cardio.cardio_visit_emr_signed_by_title')}>{t('cardio.cardio_visit_doctor_prefix', { id: emr.signed_by })}</span>}
           </div>
         )}
       </MacOSCard>
@@ -115,7 +115,7 @@ export function VisitTab({
       <MacOSCard className="cardio-card-padded">
         <h3 className="cardio-section-heading">
           <FileText size={20} className="cardio-icon-mr cardio-icon-blue" />
-          Электронная медицинская карта
+          {t('cardio.cardio_visit_emr_title')}
         </h3>
         <EMRContainerV2
           visitId={selectedPatient?.visit_id}
@@ -127,10 +127,10 @@ export function VisitTab({
       {/* Action buttons */}
       <MacOSCard className="cardio-card-padded">
         <div className="flex justify-end" style={{ gap: 'var(--mac-spacing-3)' }}>
-          <Button variant="outline" onClick={onCancel}>Отменить</Button>
+          <Button variant="outline" onClick={onCancel}>{t('cardio.cardio_visit_cancel')}</Button>
           <Button onClick={onComplete} disabled={loading}>
             {loading ? <RefreshCw size={16} className="cardio-icon-mr" /> : <Save size={16} className="cardio-icon-mr" />}
-            Завершить прием
+            {t('cardio.cardio_visit_complete')}
           </Button>
         </div>
       </MacOSCard>

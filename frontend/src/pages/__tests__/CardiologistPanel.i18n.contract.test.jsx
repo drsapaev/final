@@ -19,8 +19,8 @@ const translationsSource = fs.readFileSync(
 );
 
 describe('CardiologistPanel STRAT#32 — i18n migration', () => {
-  it('imports useTranslation from i18n adapter', () => {
-    expect(source).toContain("from '../i18n/adapter'");
+  it('imports useTranslation from unified i18n', () => {
+    expect(source).toContain("from '../i18n/useTranslation'");
     expect(source).toContain('useTranslation');
   });
 

@@ -4,7 +4,7 @@
  * Phase 3: stale MASTER_TODO_LIST reference removed.
  */
 import logger from '../../utils/logger';
-import { useTranslation } from '../../i18n/adapter';
+import i18n from '../../i18n';
 // Парсер для SCP формата
 // C-1 fix: previously this returned hardcoded fake parameters (heartRate: 75,
 // prInterval: 160, etc.) regardless of file contents. Those fake values were
@@ -24,7 +24,7 @@ export const parseSCPFile = async (file) => {
     if (buffer.byteLength < 6) {
       return {
         success: false,
-        error: 'Файл слишком мал для SCP-ECG формата (минимум 6 байт)',
+        error: i18n.t('cardio.cardio_parser_scp_too_small'),
       };
     }
 
@@ -37,7 +37,7 @@ export const parseSCPFile = async (file) => {
 
     return {
       success: false,
-      error: 'Парсинг SCP-ECG формата не реализован. Загрузите файл в формате XML/HL7 aECG или обратитесь к администратору для интеграции SCP-библиотеки.',
+      error: i18n.t('cardio.cardio_parser_scp_not_implemented'),
       format: 'SCP',
       raw: buffer,
     };
@@ -45,7 +45,7 @@ export const parseSCPFile = async (file) => {
     logger.error('Ошибка парсинга SCP:', error);
     return {
       success: false,
-      error: 'Не удалось прочитать SCP файл',
+      error: i18n.t('cardio.cardio_parser_scp_read_failed'),
     };
   }
 };
@@ -103,7 +103,7 @@ export const parseXMLFile = async (file) => {
     logger.error('Ошибка парсинга XML:', error);
     return {
       success: false,
-      error: 'Не удалось распарсить XML файл'
+      error: i18n.t('cardio.cardio_parser_xml_parse_failed')
     };
   }
 };
@@ -155,12 +155,12 @@ export const parseECGFile = async (file) => {
       success: true,
       parameters: null,
       format: 'PDF',
-      message: 'PDF файлы можно только просматривать'
+      message: i18n.t('cardio.cardio_parser_pdf_view_only')
     };
   } else {
     return {
       success: false,
-      error: 'Неподдерживаемый формат файла'
+      error: i18n.t('cardio.cardio_parser_unsupported_format')
     };
   }
 };
@@ -175,32 +175,32 @@ export const analyzeECGParameters = (parameters) => {
   // Анализ ЧСС
   const hr = parseInt(parameters.heartRate);
   if (hr > 100) {
-    findings.push('Тахикардия');
-    if (hr > 150) alerts.push('Выраженная тахикардия');
+    findings.push(i18n.t('cardio.cardio_parser_tachycardia'));
+    if (hr > 150) alerts.push(i18n.t('cardio.cardio_parser_severe_tachycardia'));
   } else if (hr < 60) {
-    findings.push('Брадикардия');
-    if (hr < 40) alerts.push('Выраженная брадикардия');
+    findings.push(i18n.t('cardio.cardio_parser_bradycardia'));
+    if (hr < 40) alerts.push(i18n.t('cardio.cardio_parser_severe_bradycardia'));
   } else {
-    findings.push('Нормальная ЧСС');
+    findings.push(i18n.t('cardio.cardio_parser_normal_hr'));
   }
 
   // Анализ интервала PR
   const pr = parseInt(parameters.prInterval);
   if (pr > 200) {
-    findings.push('Удлинение интервала PR');
-    if (pr > 300) alerts.push('AV блокада');
+    findings.push(i18n.t('cardio.cardio_parser_pr_prolonged'));
+    if (pr > 300) alerts.push(i18n.t('cardio.cardio_parser_av_block'));
   } else if (pr < 120) {
-    findings.push('Укорочение интервала PR');
-    alerts.push('Возможен синдром WPW');
+    findings.push(i18n.t('cardio.cardio_parser_pr_short'));
+    alerts.push(i18n.t('cardio.cardio_parser_wpw_possible'));
   }
 
   // Анализ QRS
   const qrs = parseInt(parameters.qrsInterval);
   if (qrs > 120) {
-    findings.push('Расширение комплекса QRS');
-    alerts.push('Возможна блокада ножки пучка Гиса');
+    findings.push(i18n.t('cardio.cardio_parser_qrs_wide'));
+    alerts.push(i18n.t('cardio.cardio_parser_bundle_branch_block'));
   } else if (qrs < 80) {
-    findings.push('Узкий комплекс QRS');
+    findings.push(i18n.t('cardio.cardio_parser_qrs_narrow'));
   }
 
   // Анализ QT
@@ -208,22 +208,22 @@ export const analyzeECGParameters = (parameters) => {
   const qtc = parseInt(parameters.qtcInterval);
 
   if (qtc > 450 || qt > 450) {
-    findings.push('Удлинение интервала QT');
+    findings.push(i18n.t('cardio.cardio_parser_qt_prolonged'));
     if (qtc > 500 || qt > 500) {
-      alerts.push('Критическое удлинение QT - риск аритмий');
+      alerts.push(i18n.t('cardio.cardio_parser_qt_critical'));
     }
   } else if (qtc < 340 || qt < 340) {
-    findings.push('Укорочение интервала QT');
+    findings.push(i18n.t('cardio.cardio_parser_qt_short'));
   }
 
   // Анализ электрической оси
   const axis = parseInt(parameters.axis);
   if (axis < -30) {
-    findings.push('Отклонение ЭОС влево');
+    findings.push(i18n.t('cardio.cardio_parser_axis_left'));
   } else if (axis > 90) {
-    findings.push('Отклонение ЭОС вправо');
+    findings.push(i18n.t('cardio.cardio_parser_axis_right'));
   } else {
-    findings.push('Нормальное положение ЭОС');
+    findings.push(i18n.t('cardio.cardio_parser_axis_normal'));
   }
 
   return {
@@ -235,16 +235,16 @@ export const analyzeECGParameters = (parameters) => {
 
 // Генерация текстового заключения
 function generateSummary(findings, alerts) {
-  let summary = 'ЭКГ анализ: ';
+  let summary = i18n.t('cardio.cardio_parser_analysis_prefix');
 
   if (alerts.length > 0) {
-    summary += 'ВНИМАНИЕ! ' + alerts.join('. ') + '. ';
+    summary += i18n.t('cardio.cardio_parser_attention_prefix') + alerts.join('. ') + '. ';
   }
 
   if (findings.length > 0) {
-    summary += 'Выявлено: ' + findings.join(', ') + '.';
+    summary += i18n.t('cardio.cardio_parser_findings_prefix') + findings.join(', ') + '.';
   } else {
-    summary += 'Параметры в пределах нормы.';
+    summary += i18n.t('cardio.cardio_parser_normal_params');
   }
 
   return summary;
@@ -255,7 +255,7 @@ export const exportECGParameters = (parameters) => {
   return {
     basic: {
       heartRate: parameters.heartRate,
-      rhythm: parameters.rhythm || 'Синусовый'
+      rhythm: parameters.rhythm || i18n.t('cardio.cardio_parser_sinus_rhythm')
     },
     intervals: {
       pr: parameters.prInterval,

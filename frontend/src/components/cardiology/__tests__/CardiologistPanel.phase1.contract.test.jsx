@@ -29,7 +29,8 @@ describe('CardiologistPanel Phase 1 safety contract (C-1 through C-7 + H-1)', ()
 
     // Must return success: false when SCP parsing is not implemented.
     expect(scpBlock).toContain('success: false');
-    expect(scpBlock).toContain('Парсинг SCP-ECG формата не реализован');
+    // i18n-unification: hardcoded Russian replaced with i18n key
+    expect(scpBlock).toContain("cardio_parser_scp_not_implemented");
   });
 
   it('C-2: ECGParser has no void artifacts', () => {
@@ -63,7 +64,8 @@ describe('CardiologistPanel Phase 1 safety contract (C-1 through C-7 + H-1)', ()
 
     // Must render UI when type === 'ecg'.
     expect(source).toContain('showForm.type === \'ecg\'');
-    expect(source).toContain('Добавить запись ЭКГ');
+    // i18n-unification: hardcoded Russian replaced with i18n key
+    expect(source).toContain('cardio_panel_add_ecg_title');
 
     // Must persist to /cardio/ecg endpoint.
     expect(source).toContain('/cardio/ecg');
@@ -73,25 +75,29 @@ describe('CardiologistPanel Phase 1 safety contract (C-1 through C-7 + H-1)', ()
   it('C-5: ECGViewer onDrop catch has notify.error', () => {
     const source = readSource('components/cardiology/ECGViewer.jsx');
 
-    expect(source).toContain('Не удалось загрузить ЭКГ-файл');
+    // i18n-unification: hardcoded Russian replaced with i18n key
+    expect(source).toContain('cardio_ecg_upload_failed');
   });
 
   it('C-6: ECGViewer downloadFile catch has notify.error', () => {
     const source = readSource('components/cardiology/ECGViewer.jsx');
 
-    expect(source).toContain("t('final.ecg_download_failed')");
+    // i18n-unification: t() replaced with tI18n() (reactive)
+    expect(source).toContain("tI18n('final.ecg_download_failed')");
   });
 
   it('C-7: ECGViewer deleteFile catch has notify.error', () => {
     const source = readSource('components/cardiology/ECGViewer.jsx');
 
-    expect(source).toContain("t('final.ecg_delete_failed')");
+    // i18n-unification: t() replaced with tI18n() (reactive)
+    expect(source).toContain("tI18n('final.ecg_delete_failed')");
   });
 
   it('H-1: ECGViewer parseECGFileData catch has notify.warning', () => {
     const source = readSource('components/cardiology/ECGViewer.jsx');
 
-    expect(source).toContain("t('final.ecg_parse_warning')");
+    // i18n-unification: t() replaced with tI18n() (reactive)
+    expect(source).toContain("tI18n('final.ecg_parse_warning')");
   });
 
   it('ECGViewer imports notify + getErrorMessage', () => {

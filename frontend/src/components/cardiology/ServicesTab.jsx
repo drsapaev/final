@@ -8,7 +8,7 @@
  */
 
 import DoctorServiceSelector from '../doctor/DoctorServiceSelector';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 export function ServicesTab() {
   const { t } = useTranslation();

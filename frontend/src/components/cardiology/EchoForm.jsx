@@ -25,7 +25,7 @@ import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const DEFAULT_ECHO_DATA = {
   // Левый желудочек
@@ -143,6 +143,7 @@ function buildEchoEmrPayload(existingEmr, echoData) {
 }
 
 const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }) => {
+  const { t } = useTranslation();
   const [echoData, setEchoData] = useState(DEFAULT_ECHO_DATA);
 
   const [loading, setLoading] = useState(false);
@@ -189,7 +190,7 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }) => {
       if (!visitId) {
         if (onSave) {
           onSave(echoData);
-          setSuccess('Результаты ЭхоКГ сохранены в черновике приема');
+          setSuccess(t('cardio.cardio_echo_saved_draft'));
           return;
         }
         throw new Error('visit_id is required to save Echo results');
@@ -199,14 +200,14 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }) => {
       const response = await api.post(`/v2/emr/${visitId}`, buildEchoEmrPayload(existingEmr, echoData));
 
       if (response.status === 200) {
-        setSuccess('Результаты ЭхоКГ сохранены успешно');
+        setSuccess(t('cardio.cardio_echo_saved_success'));
         if (onSave) {
           onSave(response.data?.data?.specialty_data?.echo || echoData);
         }
         onDataUpdate?.(response.data);
       }
     } catch (err) {
-      setError('Ошибка при сохранении результатов ЭхоКГ');
+      setError(t('cardio.cardio_echo_save_error'));
       logger.error('Echo form save error:', err);
     } finally {
       setLoading(false);
@@ -269,7 +270,7 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }) => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
           <Typography variant="h6">
             <Heart style={{ marginRight: 8, verticalAlign: 'middle' }} />
-            Результаты ЭхоКГ
+            {t('cardio.cardio_echo_results_title')}
           </Typography>
           
           <div style={{ display: 'flex', gap: 8 }}>
@@ -283,7 +284,7 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }) => {
               disabled={loading}>
               
               <Save style={{ width: 16, height: 16, marginRight: 8 }} />
-              Сохранить
+              {t('cardio.cardio_echo_save_button')}
             </Button>
           </div>
         </div>
@@ -304,61 +305,61 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }) => {
 
         {/* Левый желудочек */}
         {renderSection(
-          'Левый желудочек',
+          t('cardio.cardio_echo_section_left_ventricle'),
           'leftVentricle',
           [
-          { key: 'edd', label: 'КДР', placeholder: 'Норма: 35-55 мм' },
-          { key: 'esd', label: 'КСР', placeholder: 'Норма: 20-35 мм' },
-          { key: 'ef', label: 'ФВ', placeholder: 'Норма: 55-75%' },
-          { key: 'fs', label: 'ФС', placeholder: 'Норма: 28-45%' },
-          { key: 'ivs', label: 'МЖП', placeholder: 'Норма: 6-11 мм' },
-          { key: 'pw', label: 'ЗС', placeholder: 'Норма: 6-11 мм' }],
+          { key: 'edd', label: t('cardio.cardio_echo_field_edd'), placeholder: t('cardio.cardio_echo_ph_edd') },
+          { key: 'esd', label: t('cardio.cardio_echo_field_esd'), placeholder: t('cardio.cardio_echo_ph_esd') },
+          { key: 'ef', label: t('cardio.cardio_echo_field_ef'), placeholder: t('cardio.cardio_echo_ph_ef') },
+          { key: 'fs', label: t('cardio.cardio_echo_field_fs'), placeholder: t('cardio.cardio_echo_ph_fs') },
+          { key: 'ivs', label: t('cardio.cardio_echo_field_ivs'), placeholder: t('cardio.cardio_echo_ph_ivs') },
+          { key: 'pw', label: t('cardio.cardio_echo_field_pw'), placeholder: t('cardio.cardio_echo_ph_pw') }],
 
           expandedSections.leftVentricle
         )}
 
         {/* Правый желудочек */}
         {renderSection(
-          'Правый желудочек',
+          t('cardio.cardio_echo_section_right_ventricle'),
           'rightVentricle',
           [
-          { key: 'rvdd', label: 'КДР ПЖ', placeholder: 'Норма: 19-28 мм' },
-          { key: 'rvot', label: 'ВТ ПЖ', placeholder: 'Норма: 19-28 мм' }],
+          { key: 'rvdd', label: t('cardio.cardio_echo_field_rvdd'), placeholder: t('cardio.cardio_echo_ph_rvdd') },
+          { key: 'rvot', label: t('cardio.cardio_echo_field_rvot'), placeholder: t('cardio.cardio_echo_ph_rvot') }],
 
           expandedSections.rightVentricle
         )}
 
         {/* Предсердия */}
         {renderSection(
-          'Предсердия',
+          t('cardio.cardio_echo_section_atria'),
           'atria',
           [
-          { key: 'la', label: 'ЛП', placeholder: 'Норма: 19-40 мм' },
-          { key: 'ra', label: 'ПП', placeholder: 'Норма: 19-40 мм' }],
+          { key: 'la', label: t('cardio.cardio_echo_field_la'), placeholder: t('cardio.cardio_echo_ph_la') },
+          { key: 'ra', label: t('cardio.cardio_echo_field_ra'), placeholder: t('cardio.cardio_echo_ph_ra') }],
 
           expandedSections.atria
         )}
 
         {/* Клапаны */}
         {renderSection(
-          'Клапаны',
+          t('cardio.cardio_echo_section_valves'),
           'valves',
           [
-          { key: 'mitral.e', label: 'Митральный клапан E', placeholder: 'Норма: 0.6-1.3 м/с' },
-          { key: 'mitral.a', label: 'Митральный клапан A', placeholder: 'Норма: 0.4-0.8 м/с' },
-          { key: 'aortic.peak_velocity', label: 'Аортальный клапан', placeholder: 'Норма: 1.0-1.7 м/с' },
-          { key: 'tricuspid.e', label: 'Трехстворчатый клапан E', placeholder: 'Норма: 0.3-0.7 м/с' }],
+          { key: 'mitral.e', label: t('cardio.cardio_echo_field_mitral_e'), placeholder: t('cardio.cardio_echo_ph_mitral_e') },
+          { key: 'mitral.a', label: t('cardio.cardio_echo_field_mitral_a'), placeholder: t('cardio.cardio_echo_ph_mitral_a') },
+          { key: 'aortic.peak_velocity', label: t('cardio.cardio_echo_field_aortic'), placeholder: t('cardio.cardio_echo_ph_aortic') },
+          { key: 'tricuspid.e', label: t('cardio.cardio_echo_field_tricuspid_e'), placeholder: t('cardio.cardio_echo_ph_tricuspid_e') }],
 
           expandedSections.valves
         )}
 
         {/* Дополнительные параметры */}
         {renderSection(
-          'Дополнительные параметры',
+          t('cardio.cardio_echo_section_additional'),
           'additional',
           [
-          { key: 'pericardium', label: 'Перикард', placeholder: 'Описание состояния перикарда' },
-          { key: 'aorta', label: 'Аорта', placeholder: 'Описание состояния аорты' }],
+          { key: 'pericardium', label: t('cardio.cardio_echo_field_pericardium'), placeholder: t('cardio.cardio_echo_ph_pericardium') },
+          { key: 'aorta', label: t('cardio.cardio_echo_field_aorta'), placeholder: t('cardio.cardio_echo_ph_aorta') }],
 
           expandedSections.additional
         )}
@@ -366,12 +367,12 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }) => {
         {/* Комментарии */}
         <div style={{ marginTop: 24 }}>
           <Typography variant="subtitle1" style={{ marginBottom: 8 }}>
-            Комментарии
+            {t('cardio.cardio_echo_comments_title')}
           </Typography>
           <Textarea
             value={echoData.additional.comments}
             onChange={(e) => handleChange('additional', 'comments', e.target.value)}
-            placeholder="Дополнительные замечания и наблюдения..."
+            placeholder={t('cardio.cardio_echo_ph_comments')}
             rows={4} />
           
         </div>
@@ -379,12 +380,12 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }) => {
         {/* Заключение */}
         <div style={{ marginTop: 24 }}>
           <Typography variant="subtitle1" style={{ marginBottom: 8 }}>
-            Заключение
+            {t('cardio.cardio_echo_conclusion_title')}
           </Typography>
           <Textarea
             value={echoData.conclusion}
             onChange={(e) => setEchoData((prev) => ({ ...prev, conclusion: e.target.value }))}
-            placeholder="Заключение по результатам ЭхоКГ..."
+            placeholder={t('cardio.cardio_echo_ph_conclusion')}
             rows={6} />
           
         </div>
