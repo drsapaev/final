@@ -69,6 +69,7 @@ const normalizeGroupSummary = (payload) => ({
 });
 
 const GroupPermissionsManager = () => {
+  const { t } = useTranslation();
   // Состояние
   const [activeTab, setActiveTab] = useState('users');
   const [loading, setLoading] = useState(false);
@@ -114,7 +115,7 @@ const GroupPermissionsManager = () => {
       setCacheStats(normalizeCacheStats(cacheRes.data?.cache_stats || cacheRes.data));
     } catch (error) {
       logger.error('Ошибка загрузки данных:', error);
-      toast.error('Ошибка загрузки данных');
+      toast.error(t('admin2.gpm_load_data_error'));
     } finally {
       setLoading(false);
     }
@@ -129,7 +130,7 @@ const GroupPermissionsManager = () => {
       setUserPermissions(normalizeUserPermissions(response.data));
     } catch (error) {
       logger.error('Ошибка загрузки разрешений пользователя:', error);
-      toast.error('Ошибка загрузки разрешений пользователя');
+      toast.error(t('admin2.gpm_load_user_perms_error'));
     } finally {
       setLoading(false);
     }
@@ -144,7 +145,7 @@ const GroupPermissionsManager = () => {
       setGroupSummary(normalizeGroupSummary(response.data));
     } catch (error) {
       logger.error('Ошибка загрузки сводки группы:', error);
-      toast.error('Ошибка загрузки сводки группы');
+      toast.error(t('admin2.gpm_load_group_summary_error'));
     } finally {
       setLoading(false);
     }
@@ -165,12 +166,12 @@ const GroupPermissionsManager = () => {
       const hasPermission = Boolean(response.data?.has_permission);
       toast.success(
         hasPermission ?
-        `✅ У пользователя есть разрешение "${permission}"` :
-        `❌ У пользователя нет разрешения "${permission}"`
+        t('admin2.gpm_user_has_permission', { permission }) :
+        t('admin2.gpm_user_no_permission', { permission })
       );
     } catch (error) {
       logger.error('Ошибка проверки разрешения:', error);
-      toast.error('Ошибка проверки разрешения');
+      toast.error(t('admin2.gpm_check_permission_error'));
     }
   };
 
@@ -184,7 +185,7 @@ const GroupPermissionsManager = () => {
       await loadGroupSummary(groupId);
     } catch (error) {
       logger.error('Ошибка назначения роли:', error);
-      toast.error(error.response?.data?.detail || 'Ошибка назначения роли');
+      toast.error(error.response?.data?.detail || t('admin2.gpm_assign_role_error'));
     }
   };
 
@@ -196,7 +197,7 @@ const GroupPermissionsManager = () => {
       await loadGroupSummary(groupId);
     } catch (error) {
       logger.error('Ошибка отзыва роли:', error);
-      toast.error(error.response?.data?.detail || 'Ошибка отзыва роли');
+      toast.error(error.response?.data?.detail || t('admin2.gpm_revoke_role_error'));
     }
   };
 
@@ -254,7 +255,7 @@ const GroupPermissionsManager = () => {
       setCacheStats(normalizeCacheStats(cacheRes.data?.cache_stats || cacheRes.data));
     } catch (error) {
       logger.error('Ошибка очистки кэша:', error);
-      toast.error('Ошибка очистки кэша');
+      toast.error(t('admin2.gpm_clear_cache_error'));
     }
   };
 
@@ -301,11 +302,11 @@ const GroupPermissionsManager = () => {
       <MacOSCard className="admin-card-sidebar-300">
         <h3 className="admin-list-h3">
           <Users className="w-5 h-5" />
-          Пользователи
+          {t('admin2.gpm_users')}
         </h3>
         
         <Input
-        placeholder="Поиск пользователей..."
+        placeholder={t('admin2.gpm_search_users_ph')}
         value={searchTerm}
         onChange={(e) => setSearchTerm(e.target.value)}
         className="mb-4" />
@@ -335,17 +336,17 @@ const GroupPermissionsManager = () => {
                 {user.username}
               </div>
               <div className="admin-list-sub-xs">
-                {user.full_name || 'Без имени'}
+                {user.full_name || t('admin2.gpm_no_name')}
               </div>
               <div className="admin-list-sub-tertiary-xs">
-                Роль: {user.role}
+                {t('admin2.gpm_role_label', { role: user.role })}
               </div>
             </div>
         )}
 
           {filteredUsers.length === 0 &&
         <div className="admin-empty-p-16-sm-secondary">
-              Пользователи не найдены
+              {t('admin2.gpm_users_not_found')}
             </div>
         }
         </div>
@@ -358,14 +359,14 @@ const GroupPermissionsManager = () => {
             <div className="admin-flex-between-mb-16">
               <h3 className="admin-header-h3-m0">
                 <Shield className="w-5 h-5" />
-                Разрешения: {selectedUser.username}
+                {t('admin2.gpm_permissions_for_user', { username: selectedUser.username })}
               </h3>
               <Button
             onClick={() => loadUserPermissions(selectedUser.id)}
             disabled={loading}>
             
                 <RefreshCw className="w-4 h-4" />
-                Обновить
+                {t('admin2.gpm_refresh')}
               </Button>
             </div>
 
@@ -379,19 +380,19 @@ const GroupPermissionsManager = () => {
         <div>
                 <div className="mb-4">
                   <Badge variant="primary">
-                    Всего разрешений: {userPermissions.permissions_count}
+                    {t('admin2.gpm_total_permissions', { count: userPermissions.permissions_count })}
                   </Badge>
                   <Badge variant="secondary" className="admin-ml-8">
-                    Ролей: {userPermissions.roles.length}
+                    {t('admin2.gpm_roles_count', { count: userPermissions.roles.length })}
                   </Badge>
                   <Badge variant="info" className="admin-ml-8">
-                    Групп: {userPermissions.groups.length}
+                    {t('admin2.gpm_groups_count', { count: userPermissions.groups.length })}
                   </Badge>
                 </div>
 
                 <div className="mb-6">
                   <h4 className="admin-form-h4">
-                    Роли:
+                    {t('admin2.gpm_roles_section')}
                   </h4>
                   <div className="admin-flex-wrap-8">
                     {userPermissions.roles.map((role) =>
@@ -402,7 +403,7 @@ const GroupPermissionsManager = () => {
 
                 <div className="mb-6">
                   <h4 className="admin-form-h4">
-                    Группы:
+                    {t('admin2.gpm_groups_section')}
                   </h4>
                   <div className="admin-flex-wrap-8">
                     {userPermissions.groups.map((group) =>
@@ -413,7 +414,7 @@ const GroupPermissionsManager = () => {
 
                 <div>
                   <h4 className="admin-form-h4">
-                    Разрешения:
+                    {t('admin2.gpm_permissions_section')}
                   </h4>
                   <div className="admin-max-h-300-overflow admin-perms-grid">
                     {userPermissions.permissions.map((permission) =>
@@ -429,7 +430,7 @@ const GroupPermissionsManager = () => {
                 {/* Инструменты проверки разрешений */}
                 <div className="admin-perm-summary-box">
                   <h4 className="admin-form-h4">
-                    Проверить разрешение:
+                    {t('admin2.gpm_check_permission_section')}
                   </h4>
                   <div className="admin-flex-start-end admin-gap-8">
                     <div className="admin-flex-1">
@@ -442,7 +443,7 @@ const GroupPermissionsManager = () => {
                     }
                   }}
                   options={[
-                  { value: '', label: 'Выберите разрешение...' },
+                  { value: '', label: t('admin2.gpm_select_permission_ph') },
                   ...permissions.map((perm) => ({
                     value: perm.codename,
                     label: `${perm.name} (${perm.codename})`
@@ -457,14 +458,14 @@ const GroupPermissionsManager = () => {
               </div> :
 
         <div className="admin-empty-sm-center-secondary">
-                Выберите пользователя для просмотра разрешений
+                {t('admin2.gpm_select_user_hint')}
               </div>
         }
           </> :
 
       <div className="admin-empty-p-32-sm-secondary">
             <User className="admin-icon-48-mb-16-tertiary" />
-            <p className="admin-m-0">Выберите пользователя из списка слева</p>
+            <p className="admin-m-0">{t('admin2.gpm_select_user_left')}</p>
           </div>
       }
       </MacOSCard>
@@ -477,11 +478,11 @@ const GroupPermissionsManager = () => {
       <MacOSCard className="admin-card-sidebar-300">
         <h3 className="admin-list-h3">
           <Users className="w-5 h-5" />
-          Группы
+          {t('admin2.gpm_groups')}
         </h3>
         
         <Input
-        placeholder="Поиск групп..."
+        placeholder={t('admin2.gpm_search_groups_ph')}
         value={searchTerm}
         onChange={(e) => setSearchTerm(e.target.value)}
         className="mb-4" />
@@ -514,7 +515,7 @@ const GroupPermissionsManager = () => {
                 {group.name}
               </div>
               <div className="admin-list-sub-tertiary-xs">
-                Пользователей: {group.users_count} | Ролей: {group.roles_count}
+                {t('admin2.gpm_group_users_roles_summary', { users_count: group.users_count, roles_count: group.roles_count })}
               </div>
               <Badge variant={group.group_type === 'department' ? 'primary' : 'secondary'} className="admin-text-xs">
                 {group.group_type}
@@ -531,14 +532,14 @@ const GroupPermissionsManager = () => {
             <div className="admin-flex-between-mb-16">
               <h3 className="admin-header-h3-m0">
                 <Shield className="w-5 h-5" />
-                Группа: {selectedGroup.display_name}
+                {t('admin2.gpm_group_title', { name: selectedGroup.display_name })}
               </h3>
               <Button
             onClick={() => loadGroupSummary(selectedGroup.id)}
             disabled={loading}>
             
                 <RefreshCw className="w-4 h-4" />
-                Обновить
+                {t('admin2.gpm_refresh')}
               </Button>
             </div>
 
@@ -552,19 +553,19 @@ const GroupPermissionsManager = () => {
         <div>
                 <div className="mb-4">
                   <Badge variant="primary">
-                    Пользователей: {groupSummary.users_count}
+                    {t('admin2.gpm_group_users_count', { count: groupSummary.users_count })}
                   </Badge>
                   <Badge variant="secondary" className="admin-ml-8">
-                    Ролей: {groupSummary.roles.length}
+                    {t('admin2.gpm_group_roles_count', { count: groupSummary.roles.length })}
                   </Badge>
                   <Badge variant="info" className="admin-ml-8">
-                    Разрешений: {groupSummary.permissions_count}
+                    {t('admin2.gpm_group_permissions_count', { count: groupSummary.permissions_count })}
                   </Badge>
                 </div>
 
                 <div className="mb-6">
                   <h4 className="admin-form-h4">
-                    Роли группы:
+                    {t('admin2.gpm_group_roles_section')}
                   </h4>
                   <div className="admin-flex-wrap-8-mb-8">
                     {groupSummary.roles.map((role) =>
@@ -597,7 +598,7 @@ const GroupPermissionsManager = () => {
                     }
                   }}
                   options={[
-                  { value: '', label: 'Выберите роль...' },
+                  { value: '', label: t('admin2.gpm_select_role_ph') },
                   ...roles.filter((role) => !groupSummary.roles.some((gr) => gr.id === role.id)).map((role) => ({
                     value: role.id,
                     label: role.display_name
@@ -612,7 +613,7 @@ const GroupPermissionsManager = () => {
 
                 <div>
                   <h4 className="admin-form-h4">
-                    Разрешения по категориям:
+                    {t('admin2.gpm_permissions_by_category')}
                   </h4>
                   <div className="admin-max-h-300-overflow">
                     {Object.entries(groupSummary.permissions_by_category).map(([category, perms]) =>
@@ -640,14 +641,14 @@ const GroupPermissionsManager = () => {
               </div> :
 
         <div className="admin-empty-sm-center-secondary">
-                Загрузка сводки группы...
+                {t('admin2.gpm_loading_group_summary')}
               </div>
         }
           </> :
 
       <div className="admin-empty-p-32-sm-secondary">
             <Users className="admin-icon-48-mb-16-tertiary" />
-            <p className="admin-m-0">Выберите группу из списка слева</p>
+            <p className="admin-m-0">{t('admin2.gpm_select_group_left')}</p>
           </div>
       }
       </MacOSCard>
@@ -659,11 +660,11 @@ const GroupPermissionsManager = () => {
       <div className="admin-flex-between-mb-24">
         <h3 className="admin-header-h3-m0">
           <Settings className="w-5 h-5" />
-          Управление кэшем разрешений
+          {t('admin2.gpm_cache_management')}
         </h3>
         <Button onClick={clearCache} variant="danger">
           <Trash2 className="w-4 h-4" />
-          Очистить кэш
+          {t('admin2.gpm_clear_cache')}
         </Button>
       </div>
 
@@ -674,10 +675,10 @@ const GroupPermissionsManager = () => {
               <Clock className="admin-icon-24-info" />
               <div>
                 <div className="admin-stat-number-xl-bold">
-                  {cacheStats.cache_ttl}с
+                  {cacheStats.cache_ttl}{t('admin2.gpm_seconds_short')}
                 </div>
                 <div className="admin-text-sm-secondary">
-                  TTL кэша
+                  {t('admin2.gpm_cache_ttl')}
                 </div>
               </div>
             </div>
@@ -691,7 +692,7 @@ const GroupPermissionsManager = () => {
                   {cacheStats.cache_size}
                 </div>
                 <div className="admin-text-sm-secondary">
-                  Записей в кэше
+                  {t('admin2.gpm_cache_entries')}
                 </div>
               </div>
             </div>
@@ -705,7 +706,7 @@ const GroupPermissionsManager = () => {
                   {cacheStats.cached_users.length}
                 </div>
                 <div className="admin-text-sm-secondary">
-                  Пользователей в кэше
+                  {t('admin2.gpm_cached_users_count')}
                 </div>
               </div>
             </div>
@@ -715,7 +716,7 @@ const GroupPermissionsManager = () => {
 
       <div className="mt-6">
         <h4 className="admin-form-h4">
-          Пользователи в кэше:
+          {t('admin2.gpm_cached_users_section')}
         </h4>
         <div className="admin-cache-users-list">
           {cacheStats?.cached_users.map((userId) =>
@@ -733,17 +734,17 @@ const GroupPermissionsManager = () => {
       <div className="mb-6">
         <h1 className="admin-page-h1">
           <Shield className="admin-icon-32" />
-          Управление разрешениями групп
+          {t('admin2.gpm_page_title')}
         </h1>
         <p className="admin-page-p">
-          Управление ролями, группами и разрешениями пользователей
+          {t('admin2.gpm_page_subtitle')}
         </p>
       </div>
 
       {/* Табы */}
       <div className="admin-tabs-scroll">
         <SegmentedControl
-          aria-label="Разделы разрешений групп"
+          aria-label={t('admin2.gpm_tabs_aria_label')}
           value={activeTab}
           onChange={setActiveTab}
           options={[
@@ -752,7 +753,7 @@ const GroupPermissionsManager = () => {
               label: (
                 <span className="admin-inline-flex-center-8">
                   <User size={14} aria-hidden="true" />
-                  Пользователи
+                  {t('admin2.gpm_users')}
                 </span>
               )
             },
@@ -761,7 +762,7 @@ const GroupPermissionsManager = () => {
               label: (
                 <span className="admin-inline-flex-center-8">
                   <Users size={14} aria-hidden="true" />
-                  Группы
+                  {t('admin2.gpm_groups')}
                 </span>
               )
             },
@@ -770,7 +771,7 @@ const GroupPermissionsManager = () => {
               label: (
                 <span className="admin-inline-flex-center-8">
                   <Settings size={14} aria-hidden="true" />
-                  Кэш
+                  {t('admin2.gpm_tab_cache')}
                 </span>
               )
             }
