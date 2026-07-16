@@ -1,0 +1,33 @@
+## Summary
+- Added `aria-busy="true"` and `role="status"` to the root containers of `AnimatedTableSkeleton` and `AnimatedCardSkeleton` to properly notify screen reader users when these components are in a loading state.
+- Applied `aria-hidden="true"` to the internal child visual placeholders (skeleton blocks) to prevent redundant and meaningless announcements to screen readers.
+
+## Cyclic Execution Evidence
+- Fresh main sync: Yes
+- Clean workspace: Yes
+- Branch: Yes
+- Scope gate: Yes
+- Red-check handling: Yes
+
+## Contract Impact
+not applicable - UI accessibility change only. No API, websocket, event, or frontend consumer contract changed.
+
+## RBAC / Permissions
+not applicable - UI accessibility change only. No route, endpoint, guard, role helper, or auth-sensitive behavior changed.
+
+## Notification / Realtime
+not applicable - UI accessibility change only. No notification, websocket, chat, or realtime behavior changed.
+
+## Frontend Resilience
+not applicable - UI accessibility change only. No user-facing panel or frontend data flow changed.
+
+## Scope Gate
+- Allowed paths: frontend/src/components/AnimatedLoader.jsx
+- Denied paths: Everything else
+- Migration/docs/test impact: None
+- Rollback note: Revert the commit
+
+## Validation
+- Targeted tests or smoke run: pnpm test and pnpm lint passed.
+- Result: Screen readers now correctly announce loading states for AnimatedTableSkeleton and AnimatedCardSkeleton.
+- Not checked: N/A - we checked everything

@@ -90,8 +90,11 @@ const AnimatedTableSkeleton = ({
   return (
     <div
       className={`animated-table-skeleton ${className}`}
-      style={tableStyles}>
-      <div style={skeletonRowStyles}>
+      style={tableStyles}
+      role="status"
+      aria-busy="true"
+      aria-label="Загрузка данных">
+      <div style={skeletonRowStyles} aria-hidden="true">
         {Array.from({ length: columns }, (_, i) =>
         <div
           key={i}
@@ -103,7 +106,7 @@ const AnimatedTableSkeleton = ({
         )}
       </div>
       {Array.from({ length: rows }, (_, rowIndex) =>
-      <div key={rowIndex} style={skeletonRowStyles}>
+      <div key={rowIndex} style={skeletonRowStyles} aria-hidden="true">
           {Array.from({ length: columns }, (_, colIndex) =>
         <div
           key={colIndex}
@@ -147,48 +150,53 @@ const AnimatedCardSkeleton = ({
   return (
     <div
       className={`animated-card-skeleton ${className}`}
-      style={cardStyles}>
-      <div
-        style={{
-          ...skeletonStyles,
-          width: '60%',
-          height: '24px',
-          marginBottom: 'var(--mac-spacing-4)'
-        }} />
-      <div
-        style={{
-          ...skeletonStyles,
-          width: '100%',
-          height: '16px',
-          marginBottom: 'var(--mac-spacing-2)'
-        }} />
-      <div
-        style={{
-          ...skeletonStyles,
-          width: '80%',
-          height: '16px',
-          marginBottom: 'var(--mac-spacing-2)'
-        }} />
-      <div
-        style={{
-          ...skeletonStyles,
-          width: '60%',
-          height: '16px',
-          marginBottom: 'var(--mac-spacing-4)'
-        }} />
-      <div style={{ display: 'flex', gap: 'var(--mac-spacing-3)' }}>
+      style={cardStyles}
+      role="status"
+      aria-busy="true"
+      aria-label="Загрузка данных">
+      <div aria-hidden="true">
         <div
           style={{
             ...skeletonStyles,
-            width: '80px',
-            height: '32px'
+            width: '60%',
+            height: '24px',
+            marginBottom: 'var(--mac-spacing-4)'
           }} />
         <div
           style={{
             ...skeletonStyles,
-            width: '100px',
-            height: '32px'
+            width: '100%',
+            height: '16px',
+            marginBottom: 'var(--mac-spacing-2)'
           }} />
+        <div
+          style={{
+            ...skeletonStyles,
+            width: '80%',
+            height: '16px',
+            marginBottom: 'var(--mac-spacing-2)'
+          }} />
+        <div
+          style={{
+            ...skeletonStyles,
+            width: '60%',
+            height: '16px',
+            marginBottom: 'var(--mac-spacing-4)'
+          }} />
+        <div style={{ display: 'flex', gap: 'var(--mac-spacing-3)' }}>
+          <div
+            style={{
+              ...skeletonStyles,
+              width: '80px',
+              height: '32px'
+            }} />
+          <div
+            style={{
+              ...skeletonStyles,
+              width: '100px',
+              height: '32px'
+            }} />
+        </div>
       </div>
     </div>);
 };
