@@ -33,11 +33,11 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
   const [errorMessage, setErrorMessage] = useState('');
   const [expandedItems, setExpandedItems] = useState(new Set());
   const historyRegionLabel = serviceName
-    ? `История изменений услуги: ${serviceName}`
-    : 'История изменений услуги';
+    ? t('admin2.sah_history_region_with_name', { name: serviceName })
+    : t('admin2.sah_history_region');
   const refreshHistoryLabel = serviceName
-    ? `Обновить историю изменений услуги ${serviceName}`
-    : 'Обновить историю изменений услуги';
+    ? t('admin2.sah_refresh_aria_with_name', { name: serviceName })
+    : t('admin2.sah_refresh_aria');
   const historyTitleId = `service-audit-history-title-${serviceId}`;
 
   useEffect(() => {
@@ -57,7 +57,7 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
         error?.response?.data?.detail ||
           error?.data?.detail ||
           error?.message ||
-          'Не удалось загрузить историю изменений.'
+          t('admin2.sah_load_error')
       );
       logger.error('Ошибка загрузки истории:', error);
     } finally {
@@ -110,39 +110,39 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
 
   const getActionLabel = (action) => {
     const labels = {
-      create: 'Создание',
-      update: 'Изменение',
-      delete: 'Удаление',
-      activate: 'Активация',
-      deactivate: 'Деактивация'
+      create: t('admin2.sah_action_create'),
+      update: t('admin2.sah_action_update'),
+      delete: t('admin2.sah_action_delete'),
+      activate: t('admin2.sah_action_activate'),
+      deactivate: t('admin2.sah_action_deactivate')
     };
     return labels[action] || action;
   };
 
   const formatFieldName = (field) => {
     const fieldNames = {
-      name: 'Название',
-      code: 'Код',
-      service_code: 'Код услуги',
-      price: 'Цена',
-      currency: 'Валюта',
-      category_id: 'Категория',
-      category_code: 'Код категории',
-      duration_minutes: 'Длительность',
-      doctor_id: 'Врач',
-      department_key: 'Отделение',
-      queue_tag: 'Тег очереди',
-      requires_doctor: 'Требует врача',
-      is_consultation: 'Консультация',
-      allow_doctor_price_override: 'Переопределение цены',
-      active: 'Активность'
+      name: t('admin2.sah_field_name'),
+      code: t('admin2.sah_field_code'),
+      service_code: t('admin2.sah_field_service_code'),
+      price: t('admin2.sah_field_price'),
+      currency: t('admin2.sah_field_currency'),
+      category_id: t('admin2.sah_field_category_id'),
+      category_code: t('admin2.sah_field_category_code'),
+      duration_minutes: t('admin2.sah_field_duration_minutes'),
+      doctor_id: t('admin2.sah_field_doctor_id'),
+      department_key: t('admin2.sah_field_department_key'),
+      queue_tag: t('admin2.sah_field_queue_tag'),
+      requires_doctor: t('admin2.sah_field_requires_doctor'),
+      is_consultation: t('admin2.sah_field_is_consultation'),
+      allow_doctor_price_override: t('admin2.sah_field_allow_doctor_price_override'),
+      active: t('admin2.sah_field_active')
     };
     return fieldNames[field] || field;
   };
 
   const formatValue = (value) => {
     if (value === null || value === undefined) return '—';
-    if (typeof value === 'boolean') return value ? 'Да' : 'Нет';
+    if (typeof value === 'boolean') return value ? t('admin2.sah_value_yes') : t('admin2.sah_value_no');
     if (typeof value === 'number') return value.toString();
     return String(value);
   };
@@ -168,7 +168,7 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
         className="admin-p-24"
       >
         <AppLoading
-          title="Загрузка истории изменений..."
+          title={t('admin2.sah_loading_title')}
           ariaLabel={historyRegionLabel}
           className="admin-minh-200"
         />
@@ -185,17 +185,17 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
         className="admin-p-24"
       >
         <AppError
-          title="Не удалось загрузить историю изменений"
+          title={t('admin2.sah_error_title')}
           description={errorMessage}
           action={
             <Button
               variant="outline"
               size="sm"
-              aria-label={`Повторить загрузку. ${refreshHistoryLabel}`}
+              aria-label={t('admin2.sah_retry_aria', { label: refreshHistoryLabel })}
               onClick={loadHistory}
             >
               <RefreshCw size={14} className="admin-mr-6" />
-              Повторить
+              {t('admin2.sah_retry')}
             </Button>
           }
         />
@@ -213,8 +213,8 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
       >
         <AppEmpty
           icon={History}
-          title="История изменений пуста"
-          description="Изменения услуги будут отображаться здесь."
+          title={t('admin2.sah_empty_title')}
+          description={t('admin2.sah_empty_desc')}
         />
       </MacOSCard>
     );
@@ -232,7 +232,7 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
           <History size={20} className="admin-accent" />
           <div>
             <h3 id={historyTitleId} className="admin-fs-16-fw-600-primary-m-0">
-              История изменений
+              {t('admin2.sah_title')}
             </h3>
             {serviceName && (
               <p className="admin-fs-13-secondary-m-2px-0-0-0">
@@ -248,7 +248,7 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
           onClick={loadHistory}
         >
           <RefreshCw size={14} className="admin-mr-6" />
-          Обновить
+          {t('admin2.sah_refresh_btn')}
         </Button>
       </div>
 
@@ -264,8 +264,8 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
           const changesPanelId = `service-audit-history-changes-${item.id}`;
           const changesCount = hasChanges ? Object.keys(item.changes).length : 0;
           const changesToggleLabel = isExpanded
-            ? `Скрыть изменения записи ${getActionLabel(item.action)}`
-            : `Показать изменения записи ${getActionLabel(item.action)} (${changesCount})`;
+            ? t('admin2.sah_hide_changes_for_action', { action: getActionLabel(item.action) })
+            : t('admin2.sah_show_changes_for_action', { action: getActionLabel(item.action), count: changesCount });
 
           return (
             <div
@@ -293,7 +293,7 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
                   <div className="admin-d-flex-ai-center-gap-12-fs-13-secondary-mb-dyn" style={{ '--admin-mb0': hasChanges ? '8px' : '0' }}>
                     <div className="admin-flex-center admin-gap-4">
                       <User size={12} />
-                      <span>{item.user_name || 'Система'}</span>
+                      <span>{item.user_name || t('admin2.sah_system')}</span>
                     </div>
                     <div className="admin-flex-center admin-gap-4">
                       <Clock size={12} />
@@ -318,7 +318,7 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
                         className="admin-bg-none-bd-none-p-4px-0-cur-pointer-d-flex-ai-center-gap-4-fs-13-accent-fw-500"
                       >
                         {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                        {isExpanded ? 'Скрыть изменения' : `Показать изменения (${changesCount})`}
+                        {isExpanded ? t('admin2.sah_hide_changes') : t('admin2.sah_show_changes', { count: changesCount })}
                       </button>
 
                       {isExpanded && (
