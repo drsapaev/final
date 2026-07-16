@@ -31,7 +31,7 @@ describe('LabPanel Phase 1 safety contract (H-1, H-2, H-3)', () => {
   });
 
   it('H-2: useLabHotkeys hook exists and is wired in LabPanel', () => {
-    const hookSource = readSource('hooks/useLabHotkeys.js');
+    const hookSource = readSource('hooks/useLabHotkeys.ts');
     const panelSource = readSource('pages/LabPanel.jsx');
 
     // Hook file exists with correct exports
@@ -46,7 +46,7 @@ describe('LabPanel Phase 1 safety contract (H-1, H-2, H-3)', () => {
   });
 
   it('H-2: useLabHotkeys supports Ctrl+1/2/3 for tab switching', () => {
-    const source = readSource('hooks/useLabHotkeys.js');
+    const source = readSource('hooks/useLabHotkeys.ts');
 
     expect(source).toContain('\'1\': \'queue\'');
     expect(source).toContain('\'2\': \'templates\'');

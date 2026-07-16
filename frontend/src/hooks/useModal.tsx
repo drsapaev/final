@@ -1,0 +1,310 @@
+// @ts-nocheck — Phase 2: file converted .js → .ts but not yet fully typed.
+// Proper typing deferred to Phase 9 cleanup (strict mode).
+
+/**
+ * Улучшенная система модальных окон для медицинских интерфейсов
+ * Основана на принципах доступности и медицинских стандартах UX
+ */
+
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useReducedMotion } from './useEnhancedMediaQuery';
+import PropTypes from 'prop-types';
+
+// Hook for managing animations
+const useAnimation = (isActive, type = 'fade', duration = 300) => {
+  void type;
+  const [shouldRender, setShouldRender] = useState(isActive);
+  const [animationClasses, setAnimationClasses] = useState('');
+
+  useEffect(() => {
+    if (isActive) {
+      setShouldRender(true);
+      setTimeout(() => {
+        setAnimationClasses('active');
+      }, 10);
+    } else {
+      setAnimationClasses('');
+      const timer = setTimeout(() => {
+        setShouldRender(false);
+      }, duration);
+      return () => clearTimeout(timer);
+    }
+  }, [isActive, duration]);
+
+  return { shouldRender, animationClasses };
+};
+
+// Хук для управления модальными окнами
+export const useModal = (initialOpen = false) => {
+  const [isOpen, setIsOpen] = useState(initialOpen);
+  const [isAnimating, setIsAnimating] = useState(false);
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const openModal = useCallback((item: unknown = null) => {
+    setSelectedItem(item);
+    setIsOpen(true);
+    setIsAnimating(true);
+  }, []);
+
+  const closeModal = useCallback(() => {
+    setIsAnimating(false);
+    setLoading(false);
+    setTimeout(() => {
+      setIsOpen(false);
+      setSelectedItem(null);
+    }, 300);
+  }, []);
+
+  const toggleModal = useCallback((item: unknown = null) => {
+    if (isOpen) {
+      closeModal();
+    } else {
+      openModal(item);
+    }
+  }, [isOpen, openModal, closeModal]);
+
+  const setModalLoading = useCallback((isLoading) => {
+    setLoading(isLoading);
+  }, []);
+
+  return {
+    isOpen,
+    isAnimating,
+    selectedItem,
+    loading,
+    openModal,
+    closeModal,
+    toggleModal,
+    setModalLoading
+  };
+};
+
+// Хук для управления несколькими модальными окнами
+export const useModals = () => {
+  const [modals, setModals] = useState({});
+
+  const openModal = useCallback((id) => {
+    setModals(prev => ({
+      ...prev,
+      [id]: { isOpen: true, isAnimating: true }
+    }));
+  }, []);
+
+  const closeModal = useCallback((id) => {
+    setModals(prev => ({
+      ...prev,
+      [id]: { isOpen: prev[id]?.isOpen || false, isAnimating: false }
+    }));
+
+    setTimeout(() => {
+      setModals(prev => ({
+        ...prev,
+        [id]: { isOpen: false, isAnimating: false }
+      }));
+    }, 300);
+  }, []);
+
+  const toggleModal = useCallback((id) => {
+    const modal = modals[id];
+    if (modal?.isOpen) {
+      closeModal(id);
+    } else {
+      openModal(id);
+    }
+  }, [modals, openModal, closeModal]);
+
+  const isModalOpen = useCallback((id) => {
+    return modals[id]?.isOpen || false;
+  }, [modals]);
+
+  const isModalAnimating = useCallback((id) => {
+    return modals[id]?.isAnimating || false;
+  }, [modals]);
+
+  return {
+    modals,
+    openModal,
+    closeModal,
+    toggleModal,
+    isModalOpen,
+    isModalAnimating
+  };
+};
+
+// Компонент модального окна
+export const Modal = ({
+  isOpen,
+  onClose,
+  title,
+  children,
+  size = 'md',
+  closable = true,
+  maskClosable = true,
+  className = '',
+  ...props
+}) => {
+  const { prefersReducedMotion } = useReducedMotion();
+  const { shouldRender, animationClasses } = useAnimation(isOpen, 'modal', 300);
+  const modalRef = useRef(null);
+
+  const sizes = {
+    sm: 'max-w-md',
+    md: 'max-w-lg',
+    lg: 'max-w-2xl',
+    xl: 'max-w-4xl',
+    full: 'max-w-full'
+  };
+
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === 'Escape' && isOpen && closable) {
+        onClose();
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('keydown', handleEscape);
+      document.body.style.overflow = 'hidden';
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+      document.body.style.overflow = 'unset';
+    };
+  }, [isOpen, closable, onClose]);
+
+  const handleMaskClick = (e) => {
+    if (e.target === e.currentTarget && maskClosable && closable) {
+      onClose();
+    }
+  };
+
+  if (!shouldRender) return null;
+
+  return (
+    <div
+      className={`modal-mask ${animationClasses}`}
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'color-mix(in srgb, black, transparent 50%)',
+        zIndex: 9999,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 'var(--mac-spacing-5)'
+      }}
+      onMouseDown={handleMaskClick}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={title ? 'modal-title' : undefined}
+    >
+      <div
+        ref={modalRef}
+        className={`modal-content ${sizes[size]} ${className}`}
+        style={{
+          backgroundColor: 'var(--mac-bg-primary)',
+          borderRadius: 'var(--mac-radius-lg)',
+          boxShadow: 'var(--mac-shadow-xl)',
+          maxHeight: '90vh',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          width: '100%'
+        }}
+        onMouseDownCapture={(e) => e.stopPropagation()}
+        {...props}
+      >
+        {title && (
+          <div
+            className="modal-header"
+            style={{
+              padding: '20px 24px',
+              borderBottom: '1px solid var(--mac-border)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}
+          >
+            <h2
+              id="modal-title"
+              style={{
+                margin: 0,
+                fontSize: 'var(--mac-font-size-xl)',
+                fontWeight: 'var(--mac-font-weight-semibold)',
+                color: 'var(--mac-text-primary)'
+              }}
+            >
+              {title}
+            </h2>
+
+            {closable && (
+              <button
+                onClick={onClose}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: 'var(--mac-font-size-3xl)',
+                  cursor: 'pointer',
+                  color: 'var(--mac-text-secondary)',
+                  padding: 'var(--mac-spacing-1)',
+                  borderRadius: 'var(--mac-radius-sm)',
+                  transition: prefersReducedMotion ? 'none' : 'background-color 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  if (!prefersReducedMotion) {
+                    e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!prefersReducedMotion) {
+                    e.target.style.backgroundColor = 'transparent';
+                  }
+                }}
+                aria-label="Закрыть модальное окно"
+              >
+                ×
+              </button>
+            )}
+          </div>
+        )}
+
+        <div
+          className="modal-body"
+          style={{
+            padding: 'var(--mac-spacing-6)',
+            overflow: 'auto',
+            flex: 1
+          }}
+        >
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
+Modal.propTypes = {
+  ...(Modal.propTypes || {}),
+  children: PropTypes.any,
+  className: PropTypes.any,
+  closable: PropTypes.any,
+  isOpen: PropTypes.any,
+  maskClosable: PropTypes.any,
+  onClose: PropTypes.any,
+  size: PropTypes.any,
+  title: PropTypes.any,
+};
+
+// Placeholder components for backwards compatibility
+export const ModalWithActions = Modal;
+export const ConfirmModal = Modal;
+export const FormModal = Modal;
+export const InfoModal = Modal;
+
+export default useModal;

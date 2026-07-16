@@ -15,7 +15,7 @@ vi.mock('../../api/client', () => ({
   setToken: vi.fn(),
 }));
 
-vi.mock('../../hooks/useSetupStatus.js', () => ({
+vi.mock('../../hooks/useSetupStatus.ts', () => ({
   useSetupStatus: () => ({
     initialized: true,
     isLoading: false,
