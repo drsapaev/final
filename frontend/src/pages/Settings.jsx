@@ -35,13 +35,14 @@ function TabButton({ active, onClick, children }) {
 }
 
 function Row({ k, v, onSave }) {
+  const { t } = useTranslation();
   const [val, setVal] = useState(String(v ?? ''));
   useEffect(() => setVal(String(v ?? '')), [v]);
   return (
     <div className="settings-row">
       <div className="settings-label-semibold">{k}</div>
       <Input aria-label={`Setting value for ${k}`} value={val} onChange={(e) => setVal(e.target.value)} className="settings-input" />
-      <button onClick={() => onSave(k, val)} className="settings-btn">Сохранить</button>
+      <button onClick={() => onSave(k, val)} className="settings-btn">{t('misc.save')}</button>
     </div>);
 
 }
@@ -55,6 +56,7 @@ function Row({ k, v, onSave }) {
 export default function Settings() {void
   useTheme();void
   useState('Settings');
+  const { t } = useTranslation();
   // P-013 fix: shared ConfirmDialog hook (replaces 1 native confirm() call).
   const [confirm, confirmDialog] = useConfirm();
   const [tab, setTab] = useState('license');
@@ -87,11 +89,11 @@ export default function Settings() {void
       const response = await api.post('/activation/activate', { key });
       const res = response?.data ?? response;
       if (!res?.ok) {
-        setErrAct(res?.reason || 'Не удалось активировать');
+        setErrAct(res?.reason || t('misc.settings_activation_failed'));
       }
       await loadStatus();
     } catch (e) {
-      setErrAct(e?.data?.detail || e?.message || 'Ошибка активации');
+      setErrAct(e?.data?.detail || e?.message || t('misc.settings_activation_error'));
     } finally {
       setBusyAct(false);
     }
@@ -135,9 +137,9 @@ export default function Settings() {void
   async function deleteProvider(providerId) {
     // P-013 fix: replaced native confirm() with shared useConfirm hook.
     const ok = await confirm({
-      title: 'Удаление провайдера',
-      message: 'Удалить этого провайдера?',
-      description: 'Это действие необратимо.',
+      title: t('misc.settings_provider_delete_title'),
+      message: t('misc.settings_provider_delete_message'),
+      description: t('misc.settings_irreversible_action'),
       confirmLabel: t('misc.delete'),
       cancelLabel: t('misc.cancel'),
       intent: 'danger',
@@ -178,7 +180,7 @@ export default function Settings() {void
       }
       setItems(arr.map((x) => ({ key: x.key ?? x.name ?? '', value: x.value ?? '' })));
     } catch (e) {
-      setErrCat(e?.data?.detail || e?.message || 'Ошибка загрузки настроек');
+      setErrCat(e?.data?.detail || e?.message || t('misc.settings_load_error'));
       setItems([]);
     } finally {
       setBusyCat(false);
@@ -190,7 +192,7 @@ export default function Settings() {void
       await api.put('/settings', { category, key, value });
       await loadCat(category);
     } catch (e) {
-      notify.error(e?.data?.detail || e?.message || 'Ошибка сохранения');
+      notify.error(e?.data?.detail || e?.message || t('misc.settings_save_error'));
     }
   }
 
@@ -222,17 +224,17 @@ export default function Settings() {void
     <div>
       <RoleGate roles={['Admin']}>
         <div className="settings-page">
-          <h2 className="settings-h2">Настройки</h2>
+          <h2 className="settings-h2">{t('misc.settings_page_title')}</h2>
 
           <div className="settings-tab-bar">
-            <TabButton active={tab === 'license'} onClick={() => setTab('license')}>Лицензия</TabButton>
-            <TabButton active={tab === 'printer'} onClick={() => setTab('printer')}>Принтер</TabButton>
-            <TabButton active={tab === 'online_queue'} onClick={() => setTab('online_queue')}>Онлайн-очередь</TabButton>
-            <TabButton active={tab === 'display_board'} onClick={() => setTab('display_board')}>Табло очереди</TabButton>
-            <TabButton active={tab === 'payment_providers'} onClick={() => setTab('payment_providers')}>Провайдеры оплаты</TabButton>
-            <TabButton active={tab === 'notifications'} onClick={() => setTab('notifications')}>Уведомления (System)</TabButton>
-            <TabButton active={tab === 'appearance'} onClick={() => setTab('appearance')}>Тема и стиль</TabButton>
-            <TabButton active={tab === 'security'} onClick={() => setTab('security')}>Безопасность</TabButton>
+            <TabButton active={tab === 'license'} onClick={() => setTab('license')}>{t('misc.settings_tab_license')}</TabButton>
+            <TabButton active={tab === 'printer'} onClick={() => setTab('printer')}>{t('misc.settings_tab_printer')}</TabButton>
+            <TabButton active={tab === 'online_queue'} onClick={() => setTab('online_queue')}>{t('misc.settings_tab_online_queue')}</TabButton>
+            <TabButton active={tab === 'display_board'} onClick={() => setTab('display_board')}>{t('misc.settings_tab_display_board')}</TabButton>
+            <TabButton active={tab === 'payment_providers'} onClick={() => setTab('payment_providers')}>{t('misc.settings_tab_payment_providers')}</TabButton>
+            <TabButton active={tab === 'notifications'} onClick={() => setTab('notifications')}>{t('misc.settings_tab_notifications')}</TabButton>
+            <TabButton active={tab === 'appearance'} onClick={() => setTab('appearance')}>{t('misc.settings_tab_appearance')}</TabButton>
+            <TabButton active={tab === 'security'} onClick={() => setTab('security')}>{t('misc.settings_tab_security')}</TabButton>
           </div>
 
           {tab === 'appearance' &&
@@ -244,18 +246,18 @@ export default function Settings() {void
                 <div className="settings-card-body">
                   <AccentPicker />
                   <div className="settings-hint">
-                    Акцентный цвет перекрашивает кнопки, focus states, badges и первичные действия. Он сохраняется локально в браузере, отдельно от theme preference.
+                    {t('misc.settings_accent_hint')}
                   </div>
                 </div>
               </div>
 
               <div className="settings-card">
-                <div className="settings-card-title">Как использовать вместе</div>
+                <div className="settings-card-title">{t('misc.settings_use_together_title')}</div>
                 <div className="settings-card-body-gap8">
-                  <div>1. Сначала выберите theme для фона, sidebar и карточек.</div>
-                  <div>2. Потом подберите accent для primary actions и focus состояний.</div>
+                  <div>{t('misc.settings_use_together_step1')}</div>
+                  <div>{t('misc.settings_use_together_step2')}</div>
                   <div className="settings-hint-75">
-                    Theme сохраняется в вашем профиле. Accent хранится только в текущем браузере.
+                    {t('misc.settings_use_together_hint')}
                   </div>
                 </div>
               </div>
@@ -265,7 +267,7 @@ export default function Settings() {void
           {tab === 'notifications' &&
           <div className="settings-tab-content">
               <div className="settings-card">
-                <div className="settings-card-title">Статус системы уведомлений</div>
+                <div className="settings-card-title">{t('misc.settings_notifications_status_title')}</div>
                 <NotificationSystemStatus />
               </div>
             </div>
@@ -274,33 +276,33 @@ export default function Settings() {void
           {tab === 'license' &&
           <div className="settings-tab-content">
               <div className="settings-card">
-                <div className="settings-card-title-mb6">Статус активации</div>
+                <div className="settings-card-title-mb6">{t('misc.settings_activation_status')}</div>
                 <div className="settings-info-grid">
-                  <div>Состояние: {badge}</div>
-                  <div>Ключ: <code>{status?.key || '—'}</code></div>
+                  <div>{t('misc.settings_state_label')} {badge}</div>
+                  <div>{t('misc.settings_key_label')} <code>{status?.key || '—'}</code></div>
                   <div>Machine hash: <code>{status?.machine_hash || '—'}</code></div>
-                  <div>Действует до: <b>{status?.expiry_date || '—'}</b></div>
+                  <div>{t('misc.settings_expiry_label')} <b>{status?.expiry_date || '—'}</b></div>
                 </div>
               </div>
 
               <div className="settings-card">
-                <div className="settings-card-title-mb6">Активация сервера</div>
+                <div className="settings-card-title-mb6">{t('misc.settings_activation_title')}</div>
                 {errAct && <div className="settings-error-box">{String(errAct)}</div>}
                 <div className="settings-activation-row">
                   <Input
-                  placeholder="Вставьте ключ активации"
+                  placeholder={t('misc.settings_activation_key_placeholder')}
                   aria-label="Activation key"
                   value={key}
                   onChange={(e) => setKey(e.target.value)}
                   className="settings-input" />
                 
                   <button onClick={doActivate} disabled={busyAct || !key.trim()} className="settings-btn-primary">
-                    {busyAct ? '...' : 'Активировать'}
+                    {busyAct ? '...' : t('misc.settings_activate_btn')}
                   </button>
-                  <button onClick={loadStatus} className="settings-btn">Обновить статус</button>
+                  <button onClick={loadStatus} className="settings-btn">{t('misc.settings_refresh_status_btn')}</button>
                 </div>
                 <div style={{ fontSize: 12, opacity: .7, marginTop: 6 }}>
-                  При отсутствии ключа — обратитесь к администратору для выдачи.
+                  {t('misc.settings_no_key_hint')}
                 </div>
               </div>
             </div>
@@ -310,9 +312,9 @@ export default function Settings() {void
           <div className="settings-tab-content">
               <div className="settings-card">
                 <div className="settings-card-title-mb6">
-                  Категория: <code>{cat}</code>
+                  {t('misc.settings_category_label')} <code>{cat}</code>
                 </div>
-                {busyCat && <div style={{ opacity: .7 }}>Загрузка…</div>}
+                {busyCat && <div style={{ opacity: .7 }}>{t('misc.settings_loading')}</div>}
                 {errCat && <div className="settings-error-box">{String(errCat)}</div>}
                 <div className="settings-role-map-list">
                   {items.map((it) =>
@@ -324,7 +326,7 @@ export default function Settings() {void
 
                 )}
                   {!busyCat && items.length === 0 &&
-                <div style={{ opacity: .7 }}>Записей нет</div>
+                <div style={{ opacity: .7 }}>{t('misc.settings_no_entries')}</div>
                 }
                 </div>
               </div>
@@ -332,24 +334,24 @@ export default function Settings() {void
               {tab === 'display_board' &&
             <>
                   <div className="settings-card">
-                    <div className="settings-card-title-mb6">Табло: бренд и объявления</div>
+                    <div className="settings-card-title-mb6">{t('misc.settings_board_brand_title')}</div>
                     <div className="settings-role-map-list">
-                      <KVField label="Бренд (brand)" defKey="brand" items={items} onSave={(k, v) => saveKV('display_board', k, v)} />
-                      <KVField label="Логотип (logo URL)" defKey="logo" items={items} onSave={(k, v) => saveKV('display_board', k, v)} />
-                      <KVField label="Объявление RU (announcement_ru)" defKey="announcement_ru" items={items} onSave={(k, v) => saveKV('display_board', k, v)} />
-                      <KVField label="Объявление UZ (announcement_uz)" defKey="announcement_uz" items={items} onSave={(k, v) => saveKV('display_board', k, v)} />
-                      <KVField label="Объявление EN (announcement_en)" defKey="announcement_en" items={items} onSave={(k, v) => saveKV('display_board', k, v)} />
-                      <KVField label="Основной цвет (primary_color)" defKey="primary_color" items={items} onSave={(k, v) => saveKV('display_board', k, v)} />
-                      <KVField label="Цвет фона (bg_color)" defKey="bg_color" items={items} onSave={(k, v) => saveKV('display_board', k, v)} />
-                      <KVField label="Цвет текста (text_color)" defKey="text_color" items={items} onSave={(k, v) => saveKV('display_board', k, v)} />
-                      <KVField label="Контраст по умолчанию (contrast_default=true/false)" defKey="contrast_default" items={items} onSave={(k, v) => saveKV('display_board', k, v)} />
-                      <KVField label="Киоск по умолчанию (kiosk_default=true/false)" defKey="kiosk_default" items={items} onSave={(k, v) => saveKV('display_board', k, v)} />
-                      <KVField label="Звук по умолчанию (sound_default=true/false)" defKey="sound_default" items={items} onSave={(k, v) => saveKV('display_board', k, v)} />
+                      <KVField label={t('misc.settings_board_brand_label')} defKey="brand" items={items} onSave={(k, v) => saveKV('display_board', k, v)} />
+                      <KVField label={t('misc.settings_board_logo_label')} defKey="logo" items={items} onSave={(k, v) => saveKV('display_board', k, v)} />
+                      <KVField label={t('misc.settings_board_announcement_ru_label')} defKey="announcement_ru" items={items} onSave={(k, v) => saveKV('display_board', k, v)} />
+                      <KVField label={t('misc.settings_board_announcement_uz_label')} defKey="announcement_uz" items={items} onSave={(k, v) => saveKV('display_board', k, v)} />
+                      <KVField label={t('misc.settings_board_announcement_en_label')} defKey="announcement_en" items={items} onSave={(k, v) => saveKV('display_board', k, v)} />
+                      <KVField label={t('misc.settings_board_primary_color_label')} defKey="primary_color" items={items} onSave={(k, v) => saveKV('display_board', k, v)} />
+                      <KVField label={t('misc.settings_board_bg_color_label')} defKey="bg_color" items={items} onSave={(k, v) => saveKV('display_board', k, v)} />
+                      <KVField label={t('misc.settings_board_text_color_label')} defKey="text_color" items={items} onSave={(k, v) => saveKV('display_board', k, v)} />
+                      <KVField label={t('misc.settings_board_contrast_label')} defKey="contrast_default" items={items} onSave={(k, v) => saveKV('display_board', k, v)} />
+                      <KVField label={t('misc.settings_board_kiosk_label')} defKey="kiosk_default" items={items} onSave={(k, v) => saveKV('display_board', k, v)} />
+                      <KVField label={t('misc.settings_board_sound_label')} defKey="sound_default" items={items} onSave={(k, v) => saveKV('display_board', k, v)} />
                     </div>
                   </div>
 
                   <div className="settings-card">
-                    <div className="settings-card-title-mb6">Табло: мэппинг Роль → Отделение</div>
+                    <div className="settings-card-title-mb6">{t('misc.settings_board_role_map_title')}</div>
                     <RoleMapEditor items={items} onSave={(k, v) => saveKV('display_board', k, v)} />
                   </div>
                 </>
@@ -359,7 +361,7 @@ export default function Settings() {void
             <div className="settings-tab-content">
                   <div className="settings-card">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                      <div className="settings-label-semibold">Провайдеры оплаты</div>
+                      <div className="settings-label-semibold">{t('misc.settings_payment_providers_title')}</div>
                       <button
                     onClick={() => setShowAddProvider(true)}
                     style={{
@@ -371,12 +373,12 @@ export default function Settings() {void
                       cursor: 'pointer'
                     }}>
                     
-                        + Добавить провайдера
+                        {t('misc.settings_add_provider_btn')}
                       </button>
                     </div>
 
                     {loadingProviders ?
-                <div style={{ opacity: 0.7 }}>Загрузка...</div> :
+                <div style={{ opacity: 0.7 }}>{t('misc.settings_loading_providers')}</div> :
 
                 <div className="settings-role-map-list">
                         {providers.map((provider) =>
@@ -388,7 +390,7 @@ export default function Settings() {void
 
                   )}
                         {providers.length === 0 &&
-                  <div style={{ opacity: 0.7 }}>Провайдеры не найдены</div>
+                  <div style={{ opacity: 0.7 }}>{t('misc.settings_no_providers')}</div>
                   }
                       </div>
                 }
@@ -400,7 +402,7 @@ export default function Settings() {void
             <ProviderModal
               onClose={() => setShowAddProvider(false)}
               onSave={createProvider}
-              title="Добавить провайдера" />
+              title={t('misc.settings_add_provider_title')} />
 
             }
 
@@ -409,7 +411,7 @@ export default function Settings() {void
               provider={editingProvider}
               onClose={() => setEditingProvider(null)}
               onSave={(data) => updateProvider(editingProvider.id, data)}
-              title="Редактировать провайдера" />
+              title={t('misc.settings_edit_provider_title')} />
 
             }
             </div>
@@ -418,16 +420,16 @@ export default function Settings() {void
           {tab === 'security' &&
           <div className="settings-tab-content">
               <div className="settings-card">
-                <div className="settings-card-title">Двухфакторная аутентификация (2FA)</div>
+                <div className="settings-card-title">{t('misc.settings_2fa_title')}</div>
                 <TwoFactorManager />
               </div>
 
               <div className="settings-card">
-                <div className="settings-card-title">Верификация телефона</div>
+                <div className="settings-card-title">{t('misc.settings_phone_verification_title')}</div>
                 <PhoneVerification
                 showPhoneInput={true}
-                title="Верификация телефона"
-                onVerified={() => notify.success('Телефон успешно подтверждён!')} />
+                title={t('misc.settings_phone_verification_title')}
+                onVerified={() => notify.success(t('misc.settings_phone_verified'))} />
 
               </div>
             </div>
@@ -442,6 +444,7 @@ export default function Settings() {void
 
 // Компонент карточки провайдера
 function ProviderCard({ provider, onEdit, onDelete }) {
+  const { t } = useTranslation();
   return (
     <div style={{
       border: '1px solid var(--border-color)',
@@ -465,7 +468,7 @@ function ProviderCard({ provider, onEdit, onDelete }) {
               fontSize: 'var(--mac-font-size-xs)'
             }}>
             
-            Редактировать
+            {t('misc.settings_edit_btn')}
           </button>
           <button
             onClick={onDelete}
@@ -479,14 +482,14 @@ function ProviderCard({ provider, onEdit, onDelete }) {
               fontSize: 'var(--mac-font-size-xs)'
             }}>
             
-            Удалить
+            {t('misc.delete')}
           </button>
         </div>
       </div>
       <div style={{ fontSize: 'var(--mac-font-size-base)', opacity: 0.8 }}>
-        <div>Код: {provider.code}</div>
-        <div>Активен: {provider.is_active ? 'Да' : 'Нет'}</div>
-        {provider.description && <div>Описание: {provider.description}</div>}
+        <div>{t('misc.settings_code_label')} {provider.code}</div>
+        <div>{t('misc.settings_active_label')} {provider.is_active ? t('misc.yes') : t('misc.no')}</div>
+        {provider.description && <div>{t('misc.settings_description_label')} {provider.description}</div>}
       </div>
     </div>);
 
@@ -494,6 +497,7 @@ function ProviderCard({ provider, onEdit, onDelete }) {
 
 // Модальное окно для добавления/редактирования провайдера
 function ProviderModal({ provider, onClose, onSave, title }) {
+  const { t } = useTranslation();
   const [formData, setFormData] = useState({
     name: provider?.name || '',
     code: provider?.code || '',
@@ -509,7 +513,7 @@ function ProviderModal({ provider, onClose, onSave, title }) {
     try {
       await onSave(formData);
     } catch (error) {
-      notify.error(t('misc.operation_error') + ' сохранения: ' + (error.message || 'Неизвестная ошибка'));
+      notify.error(t('misc.settings_save_operation_error', { msg: error.message || t('misc.settings_unknown_error') }));
     }
   };
 
@@ -554,7 +558,7 @@ function ProviderModal({ provider, onClose, onSave, title }) {
 
         <form onSubmit={handleSubmit} className="settings-tab-content">
           <div>
-            <label style={{ display: 'block', marginBottom: 4, fontWeight: 'var(--mac-font-weight-semibold)' }}>Название *</label>
+            <label style={{ display: 'block', marginBottom: 4, fontWeight: 'var(--mac-font-weight-semibold)' }}>{t('misc.settings_name_required')}</label>
             <Input
               type="text"
               aria-label="Provider name"
@@ -573,7 +577,7 @@ function ProviderModal({ provider, onClose, onSave, title }) {
           </div>
 
           <div>
-            <label style={{ display: 'block', marginBottom: 4, fontWeight: 'var(--mac-font-weight-semibold)' }}>Код *</label>
+            <label style={{ display: 'block', marginBottom: 4, fontWeight: 'var(--mac-font-weight-semibold)' }}>{t('misc.settings_code_required')}</label>
             <Input
               type="text"
               aria-label="Provider code"
@@ -592,7 +596,7 @@ function ProviderModal({ provider, onClose, onSave, title }) {
           </div>
 
           <div>
-            <label style={{ display: 'block', marginBottom: 4, fontWeight: 'var(--mac-font-weight-semibold)' }}>Описание</label>
+            <label style={{ display: 'block', marginBottom: 4, fontWeight: 'var(--mac-font-weight-semibold)' }}>{t('misc.settings_description')}</label>
             <textarea
               aria-label="Provider description"
               value={formData.description}
@@ -611,7 +615,7 @@ function ProviderModal({ provider, onClose, onSave, title }) {
           </div>
 
           <div>
-            <label style={{ display: 'block', marginBottom: 4, fontWeight: 'var(--mac-font-weight-semibold)' }}>Секретный ключ *</label>
+            <label style={{ display: 'block', marginBottom: 4, fontWeight: 'var(--mac-font-weight-semibold)' }}>{t('misc.settings_secret_key_required')}</label>
             <Input
               type="password"
               aria-label="Provider secret key"
@@ -668,7 +672,7 @@ function ProviderModal({ provider, onClose, onSave, title }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Checkbox id="is_active" aria-label="Provider active" checked={formData.is_active} onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })} />
             
-            <label htmlFor="is_active" className="settings-label-semibold">Активен</label>
+            <label htmlFor="is_active" className="settings-label-semibold">{t('misc.settings_active')}</label>
           </div>
 
           <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 16 }}>
@@ -684,7 +688,7 @@ function ProviderModal({ provider, onClose, onSave, title }) {
                 cursor: 'pointer'
               }}>
               
-              Отмена
+              {t('misc.cancel')}
             </button>
             <button
               type="submit"
@@ -697,7 +701,7 @@ function ProviderModal({ provider, onClose, onSave, title }) {
                 cursor: 'pointer'
               }}>
               
-              Сохранить
+              {t('misc.save')}
             </button>
           </div>
         </form>
@@ -756,6 +760,7 @@ const errBox = {
 };
 
 function KVField({ label, defKey, items, onSave }) {
+  const { t } = useTranslation();
   const found = (items || []).find((x) => x.key === defKey);
   const [val, setVal] = useState(found?.value || '');
   useEffect(() => setVal(found?.value || ''), [found?.value]);
@@ -763,13 +768,14 @@ function KVField({ label, defKey, items, onSave }) {
     <div className="settings-row">
       <div className="settings-label-semibold">{label}</div>
       <Input aria-label={`${label} setting value`} value={val} onChange={(e) => setVal(e.target.value)} className="settings-input" />
-      <button onClick={() => onSave(defKey, val)} className="settings-btn">Сохранить</button>
+      <button onClick={() => onSave(defKey, val)} className="settings-btn">{t('misc.save')}</button>
     </div>);
 
 }
 
 // Отдельный компонент для роли чтобы избежать hooks в map
 function RoleMapItem({ role, items, onSave }) {
+  const { t } = useTranslation();
   const found = (items || []).find((x) => x.key === role);
   const [val, setVal] = useState(found?.value || '');
   useEffect(() => setVal(found?.value || ''), [found?.value]);
@@ -782,10 +788,10 @@ function RoleMapItem({ role, items, onSave }) {
         value={val}
         onChange={(e) => setVal(e.target.value)}
         className="settings-input"
-        placeholder="Например: Cardio" />
+        placeholder={t('misc.settings_role_placeholder')} />
       
       <button onClick={() => onSave(role, val)} className="settings-btn">
-        Сохранить
+        {t('misc.save')}
       </button>
     </div>);
 

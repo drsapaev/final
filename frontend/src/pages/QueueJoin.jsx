@@ -23,47 +23,47 @@ import {
   Checkbox } from '../components/ui/macos';
 import { useTranslation } from '../i18n/useTranslation';
 
-const formatSpecialistLabel = (specialist) => {
-  const doctorName =
-    specialist?.doctor_name ||
-    specialist?.full_name ||
-    specialist?.name ||
-    specialist?.specialty_display ||
-    specialist?.specialty ||
-    'Специалист';
-  const specialtyLabel =
-    specialist?.specialty_display ||
-    specialist?.specialty ||
-    '';
-  const cabinetLabel = specialist?.cabinet ? `Каб. ${specialist.cabinet}` : '';
-
-  return [doctorName, specialtyLabel, cabinetLabel]
-    .filter(Boolean)
-    .join(' • ');
-};
-
-const MISSING_QUEUE_TOKEN_MESSAGE = 'QR-код не найден. Откройте ссылку из клиники или отсканируйте QR-код заново.';
-const QUEUE_JOIN_MESSAGES = {
-  sessionStartFailed: 'Не удалось начать сессию очереди.',
-  registrationUnavailable: 'Запись в очередь недоступна.',
-  qrTokenUnavailable: 'QR-токен не найден или срок его действия истек.',
-  requiredFields: 'Заполните обязательные поля.',
-  sessionExpired: 'Сессия очереди истекла. Создаем новую сессию...',
-  sessionCreateFailed: 'Не удалось создать сессию очереди. Обновите страницу.',
-  nameTooShort: 'Введите полное имя пациента (минимум 2 символа).',
-  nameTooLong: 'ФИО слишком длинное (максимум 200 символов).',
-  phoneTooShort: 'Телефон указан не полностью (минимум 12 цифр: +998 XX XXX XX XX).',
-  phoneTooLong: 'Телефон слишком длинный (максимум 12 цифр).',
-  missingSessionToken: 'Сессия очереди недоступна или истекла. Обновите страницу.',
-  joinFailed: 'Не удалось присоединиться к очереди.',
-  selectSpecialist: 'Выберите специалиста.',
-};
-
 const QueueJoin = () => {
   const { token: paramToken } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { t } = useTranslation();
+
+  const formatSpecialistLabel = (specialist) => {
+    const doctorName =
+      specialist?.doctor_name ||
+      specialist?.full_name ||
+      specialist?.name ||
+      specialist?.specialty_display ||
+      specialist?.specialty ||
+      t('misc.qj_specialist_default');
+    const specialtyLabel =
+      specialist?.specialty_display ||
+      specialist?.specialty ||
+      '';
+    const cabinetLabel = specialist?.cabinet ? t('misc.qj_cabinet_label', { cabinet: specialist.cabinet }) : '';
+
+    return [doctorName, specialtyLabel, cabinetLabel]
+      .filter(Boolean)
+      .join(' • ');
+  };
+
+  const MISSING_QUEUE_TOKEN_MESSAGE = t('misc.qj_missing_token');
+  const QUEUE_JOIN_MESSAGES = {
+    sessionStartFailed: t('misc.qj_session_start_failed'),
+    registrationUnavailable: t('misc.qj_registration_unavailable'),
+    qrTokenUnavailable: t('misc.qj_qr_token_unavailable'),
+    requiredFields: t('misc.qj_required_fields'),
+    sessionExpired: t('misc.qj_session_expired'),
+    sessionCreateFailed: t('misc.qj_session_create_failed'),
+    nameTooShort: t('misc.qj_name_too_short'),
+    nameTooLong: t('misc.qj_name_too_long'),
+    phoneTooShort: t('misc.qj_phone_too_short'),
+    phoneTooLong: t('misc.qj_phone_too_long'),
+    missingSessionToken: t('misc.qj_missing_session_token'),
+    joinFailed: t('misc.qj_join_failed'),
+    selectSpecialist: t('misc.qj_select_specialist'),
+  };
 
   // Получаем токен из URL параметров или query параметров (для PWA пути)
   const token = paramToken || searchParams.get('token');
@@ -493,11 +493,11 @@ const QueueJoin = () => {
 
   const formatWaitTime = (minutes) => {
     if (minutes < 60) {
-      return `${minutes} мин`;
+      return t('misc.qj_wait_minutes', { minutes });
     }
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
-    return `${hours} соат ${mins} мин`;
+    return t('misc.qj_wait_hours_minutes', { hours, mins });
   };
 
   const formatCountdown = (seconds) => {
@@ -593,8 +593,8 @@ const QueueJoin = () => {
       <div className="min-h-screen flex items-center justify-center p-4 qj-page-base">
         <div className="max-w-md w-full text-center qj-glass-card">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4 qj-spinner"></div>
-          <h2 className="qj-title">Загрузка...</h2>
-          <p className="qj-body-text">Информация об очереди</p>
+          <h2 className="qj-title">{t('misc.qj_loading_title')}</h2>
+          <p className="qj-body-text">{t('misc.qj_loading_info')}</p>
         </div>
       </div>
     );
@@ -622,14 +622,14 @@ const QueueJoin = () => {
               }}
               className="qj-recovery-btn qj-recovery-btn-primary"
             >
-              Попробовать снова
+              {t('misc.qj_retry_btn')}
             </button>
             <button
               type="button"
               onClick={() => navigate('/')}
               className="qj-recovery-btn qj-recovery-btn-danger"
             >
-              Главная страница
+              {t('misc.qj_home_btn')}
             </button>
           </div>
         </div>
@@ -655,9 +655,9 @@ const QueueJoin = () => {
             color: 'var(--mac-text-primary)',
             marginBottom: 'var(--mac-spacing-3)',
             letterSpacing: '-0.02em'
-          }}>Очередь скоро откроется</h2>
+          }}>{t('misc.qj_waiting_title')}</h2>
           <p className="qj-body-text-mb6">
-            Запись в очередь откроется в {queueInfo?.start_time}
+            {t('misc.qj_waiting_will_open_at', { time: queueInfo?.start_time })}
           </p>
 
           {/* Обратный отсчет - macOS стиль */}
@@ -672,7 +672,7 @@ const QueueJoin = () => {
             }}>
               {formatCountdown(countdown)}
             </div>
-            <p className="qj-muted-caption">до открытия записи</p>
+            <p className="qj-muted-caption">{t('misc.qj_waiting_until_open')}</p>
           </div>
 
           {/* Информация о враче и кабинете - macOS стиль */}
@@ -680,7 +680,7 @@ const QueueJoin = () => {
             <div className="qj-info-row">
               <div className="flex items-center">
                 <User style={{ width: '18px', height: '18px', color: 'var(--mac-text-tertiary)', marginRight: 'var(--mac-spacing-2)' }} />
-                <span className="qj-info-label">Специалист</span>
+                <span className="qj-info-label">{t('misc.qj_label_specialist')}</span>
               </div>
               <span className="qj-info-value">{queueInfo?.specialist_name}</span>
             </div>
@@ -688,7 +688,7 @@ const QueueJoin = () => {
             <div className="qj-info-row">
               <div className="flex items-center">
                 <MapPin style={{ width: '18px', height: '18px', color: 'var(--mac-text-tertiary)', marginRight: 'var(--mac-spacing-2)' }} />
-                <span className="qj-info-label">Бўлим</span>
+                <span className="qj-info-label">{t('misc.qj_label_department')}</span>
               </div>
               <span className="qj-info-value">{queueInfo?.department_name}</span>
             </div>
@@ -696,21 +696,21 @@ const QueueJoin = () => {
             <div className="qj-info-row-accent">
               <div className="flex items-center">
                 <Calendar style={{ width: '18px', height: '18px', color: 'var(--mac-accent-blue)', marginRight: 'var(--mac-spacing-2)' }} />
-                <span className="qj-info-label-accent">День приёма</span>
+                <span className="qj-info-label-accent">{t('misc.qj_label_appointment_day')}</span>
               </div>
               <span style={{ fontSize: 'var(--mac-font-size-base)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-accent-blue)' }}>
                 {queueInfo?.target_date ? new Date(queueInfo.target_date).toLocaleDateString('ru-RU', {
                   year: 'numeric',
                   month: 'long',
                   day: 'numeric'
-                }) : 'Сегодня'}
+                }) : t('misc.qj_today')}
               </span>
             </div>
           </div>
 
           <div className="qj-hint">
-            <p >Не закрывайте эту страницу</p>
-            <p>Когда запись откроется, вы будете автоматически перенаправлены</p>
+            <p >{t('misc.qj_waiting_keep_open')}</p>
+            <p>{t('misc.qj_waiting_auto_redirect')}</p>
           </div>
 
           <div className="flex gap-3">
@@ -720,7 +720,7 @@ const QueueJoin = () => {
               onMouseEnter={(e) => e.target.style.background = 'color-mix(in srgb, var(--mac-text-tertiary), transparent 82%)'}
               onMouseLeave={(e) => e.target.style.background = 'color-mix(in srgb, var(--mac-text-tertiary), transparent 88%)'}
             >
-              Главная страница
+              {t('misc.qj_home_btn')}
             </button>
             <button
               onClick={loadTokenInfo}
@@ -728,7 +728,7 @@ const QueueJoin = () => {
               onMouseEnter={(e) => e.target.style.background = 'var(--mac-accent-blue-hover)'}
               onMouseLeave={(e) => e.target.style.background = 'var(--mac-accent-blue)'}
             >
-              Обновить
+              {t('misc.qj_refresh_btn')}
             </button>
           </div>
         </div>
@@ -744,11 +744,11 @@ const QueueJoin = () => {
     // Определяем название вкладки для подсказки пользователю
     const getDepartmentName = (specialty) => {
       const normalized = (specialty || '').toLowerCase();
-      if (normalized === 'cardio' || normalized === 'cardiology') return 'Кардиология';
-      if (normalized === 'derma' || normalized === 'dermatology') return 'Дерматология';
-      if (normalized === 'dentist' || normalized === 'dentistry' || normalized === 'stomatology') return 'Стоматология';
-      if (normalized === 'lab' || normalized === 'laboratory') return 'Лаборатория';
-      return 'соответствующей';
+      if (normalized === 'cardio' || normalized === 'cardiology') return t('misc.qj_dept_cardiology');
+      if (normalized === 'derma' || normalized === 'dermatology') return t('misc.qj_dept_dermatology');
+      if (normalized === 'dentist' || normalized === 'dentistry' || normalized === 'stomatology') return t('misc.qj_dept_dentistry');
+      if (normalized === 'lab' || normalized === 'laboratory') return t('misc.qj_dept_laboratory');
+      return t('misc.qj_dept_default');
     };
 
     const departmentName = getDepartmentName(result.entries?.[0]?.department || result.entries?.[0]?.specialty);
@@ -763,7 +763,7 @@ const QueueJoin = () => {
             margin: '0 auto 20px'
           }} aria-hidden="true" />
           <h2 id="queue-join-success-title" className="qj-title-success">
-            {isMultiple ? 'Вы зарегистрированы в очередях!' : 'Вы в очереди!'}
+            {isMultiple ? t('misc.qj_success_multiple_title') : t('misc.qj_success_single_title')}
           </h2>
 
           {isMultiple ? (
@@ -771,7 +771,7 @@ const QueueJoin = () => {
             <>
               <div className="qj-success-box">
                 <p className="qj-success-entries-title">
-                  Вы зарегистрированы в {result.entries.length} очередях:
+                  {t('misc.qj_success_registered_in', { count: result.entries.length })}
                 </p>
                 <div className="qj-success-entries-list">
                   {result.entries.map((entry, idx) => (
@@ -791,16 +791,16 @@ const QueueJoin = () => {
                         <span style={{ fontSize: 'var(--mac-font-size-3xl)' }}>{entry.icon || null}</span>
                         <div>
                           <div style={{ fontSize: 'var(--mac-font-size-lg)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>
-                            {entry.specialist_name || entry.department || `Специалист ${idx + 1}`}
+                            {entry.specialist_name || entry.department || t('misc.qj_specialist_n', { n: idx + 1 })}
                           </div>
                           <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)', marginTop: 'var(--mac-spacing-1)' }}>
-                            Время: {entry.queue_time ? formatRegistrarTime(entry.queue_time, 'ru-RU') : '—'}
+                            {t('misc.qj_time_value', { value: entry.queue_time ? formatRegistrarTime(entry.queue_time, 'ru-RU') : '—' })}
                           </div>
                         </div>
                       </div>
                       <div style={{ textAlign: 'right' }}>
                         <div style={{ fontSize: 'var(--mac-font-size-3xl)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-success)' }}>№{entry.queue_number || entry.number || '—'}</div>
-                        <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)' }}>в очереди</div>
+                        <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)' }}>{t('misc.qj_in_queue')}</div>
                       </div>
                     </div>
                   ))}
@@ -813,10 +813,10 @@ const QueueJoin = () => {
                 marginBottom: 'var(--mac-spacing-6)',
                 lineHeight: '1.5'
               }}>
-                <p>Пожалуйста, будьте готовы к приёму.</p>
-                <p>Мы сообщим вам, когда подойдёт ваша очередь.</p>
+                <p>{t('misc.qj_be_ready')}</p>
+                <p>{t('misc.qj_we_will_notify')}</p>
                 <p style={{ marginTop: 'var(--mac-spacing-3)', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-accent-blue)' }}>
-                  Записи можно посмотреть во вкладках специалистов
+                  {t('misc.qj_view_entries_tabs')}
                 </p>
               </div>
             </>
@@ -827,7 +827,7 @@ const QueueJoin = () => {
                 <div className="qj-success-number">
                   №{result.queue_number}
                 </div>
-                <p className="qj-success-label">Ваш номер в очереди</p>
+                <p className="qj-success-label">{t('misc.qj_your_number')}</p>
               </div>
 
               <div className="qj-info-list">
@@ -841,9 +841,9 @@ const QueueJoin = () => {
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center' }}>
                     <Users style={{ width: '18px', height: '18px', color: 'var(--mac-text-tertiary)', marginRight: 'var(--mac-spacing-2)' }} />
-                    <span className="qj-info-label">Перед вами</span>
+                    <span className="qj-info-label">{t('misc.qj_ahead_of_you')}</span>
                   </div>
-                  <span className="qj-info-value">{result.queue_number - 1} к.</span>
+                  <span className="qj-info-value">{t('misc.qj_count_short', { count: result.queue_number - 1 })}</span>
                 </div>
 
                 {result.estimated_wait_time && (
@@ -857,7 +857,7 @@ const QueueJoin = () => {
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center' }}>
                       <Timer style={{ width: '18px', height: '18px', color: 'var(--mac-text-tertiary)', marginRight: 'var(--mac-spacing-2)' }} />
-                      <span className="qj-info-label">Ожидание</span>
+                      <span className="qj-info-label">{t('misc.qj_waiting_label')}</span>
                     </div>
                     <span className="qj-info-value">{formatWaitTime(result.estimated_wait_time)}</span>
                   </div>
@@ -874,7 +874,7 @@ const QueueJoin = () => {
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center' }}>
                       <User style={{ width: '18px', height: '18px', color: 'var(--mac-text-tertiary)', marginRight: 'var(--mac-spacing-2)' }} />
-                      <span className="qj-info-label">Специалист</span>
+                      <span className="qj-info-label">{t('misc.qj_label_specialist')}</span>
                     </div>
                     <span className="qj-info-value">{result.specialist_name}</span>
                   </div>
@@ -887,10 +887,10 @@ const QueueJoin = () => {
                 marginBottom: 'var(--mac-spacing-6)',
                 lineHeight: '1.5'
               }}>
-                <p>Пожалуйста, будьте готовы к приёму.</p>
-                <p>Мы сообщим вам, когда подойдёт ваша очередь.</p>
+                <p>{t('misc.qj_be_ready')}</p>
+                <p>{t('misc.qj_we_will_notify')}</p>
                 <p style={{ marginTop: 'var(--mac-spacing-3)', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-accent-blue)' }}>
-                  Запись можно посмотреть во вкладке «{departmentName}»
+                  {t('misc.qj_view_entry_tab', { name: departmentName })}
                 </p>
               </div>
             </>
@@ -901,7 +901,7 @@ const QueueJoin = () => {
             type="button"
             className="qj-recovery-btn qj-recovery-btn-success"
           >
-            Понятно
+            {t('misc.qj_ok_btn')}
           </button>
         </div>
       </main>
@@ -915,20 +915,20 @@ const QueueJoin = () => {
         aria-live="polite"
         className="qj-sr-only"
       >
-        {step === 'select-specialists' && 'Выберите специалистов и продолжайте регистрацию.'}
-        {step === 'form' && 'Заполните обязательные поля: ФИО и телефон.'}
-        {step === 'info' && 'Проверьте информацию по очереди и перейдите к форме.'}
+        {step === 'select-specialists' && t('misc.qj_sr_select_specialists_step')}
+        {step === 'form' && t('misc.qj_sr_form_step')}
+        {step === 'info' && t('misc.qj_sr_info_step')}
       </div>
       <div className="max-w-md w-full overflow-hidden qj-glass-card">
 
         {/* Заголовок с информацией об очереди - macOS стиль с правильным spacing */}
         <div className="text-white qj-main-header">
-          <h1 className="qj-main-title">Присоединиться к очереди</h1>
+          <h1 className="qj-main-title">{t('misc.qj_main_title')}</h1>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <div className="flex items-center" style={{ opacity: 0.95 }}>
               <MapPin style={{ width: '16px', height: '16px', marginRight: 'var(--mac-spacing-2)', flexShrink: 0 }} />
-              <span style={{ fontSize: 'var(--mac-font-size-base)', lineHeight: '1.4' }}>{queueInfo?.department_name || 'Умумий амалиёт'}</span>
+              <span style={{ fontSize: 'var(--mac-font-size-base)', lineHeight: '1.4' }}>{queueInfo?.department_name || t('misc.qj_general_practice')}</span>
             </div>
 
             <div className="flex items-center" style={{ opacity: 0.9 }}>
@@ -949,11 +949,11 @@ const QueueJoin = () => {
                   fontWeight: 'var(--mac-font-weight-medium)',
                   lineHeight: '1.4'
                 }}>
-                  День приёма: {new Date(queueInfo.target_date).toLocaleDateString('ru-RU', {
+                  {t('misc.qj_appointment_day_value', { date: new Date(queueInfo.target_date).toLocaleDateString('ru-RU', {
                     day: 'numeric',
                     month: 'long',
                     year: 'numeric'
-                  })}
+                  }) })}
                 </span>
               </div>
             )}
@@ -976,7 +976,7 @@ const QueueJoin = () => {
                 {/* P-024 fix: previously "Мутахассисларни танланг" (UZ) while the
                     rest of the screen is Russian — mixed i18n on a public kiosk flow.
                     Unified to Russian to match the surrounding copy. */}
-                Выберите специалистов
+                {t('misc.qj_select_specialists_title')}
               </h3>
               <p style={{
                 color: 'var(--mac-text-secondary)',
@@ -984,7 +984,7 @@ const QueueJoin = () => {
                 lineHeight: '1.5',
                 margin: 0
               }}>
-                Можно выбрать несколько специалистов одновременно
+                {t('misc.qj_select_specialists_hint')}
               </p>
             </div>
 
@@ -1003,7 +1003,7 @@ const QueueJoin = () => {
                   fontSize: 'var(--mac-font-size-lg)'
                 }}>
                   {/* UX Audit Registrar #2: унифицирован i18n — был UZ, теперь RU. */}
-                  Загрузка специалистов...
+                  {t('misc.qj_loading_specialists')}
                 </div>
               ) : availableSpecialists.length === 0 ? (
                 <div style={{
@@ -1018,7 +1018,7 @@ const QueueJoin = () => {
                   flexDirection: 'column',
                   gap: '10px'
                 }}>
-                  <span> {/* UX Audit Registrar #2: был UZ, теперь RU. */} Сейчас нет специалистов для выбора через QR.</span>
+                  <span> {/* UX Audit Registrar #2: был UZ, теперь RU. */} {t('misc.qj_no_specialists')}</span>
                   <button
                     type="button"
                     onClick={loadTokenInfo}
@@ -1040,7 +1040,7 @@ const QueueJoin = () => {
                       e.currentTarget.style.background = 'var(--mac-accent-blue)';
                     }}
                   >
-                    Обновить
+                    {t('misc.qj_refresh_btn')}
                   </button>
                 </div>
               ) : (
@@ -1131,7 +1131,7 @@ const QueueJoin = () => {
                 }
               }}
             >
-              Продолжить ({selectedSpecialists.length})
+              {t('misc.qj_continue_with_count', { count: selectedSpecialists.length })}
             </button>
 
             {error && (
@@ -1180,7 +1180,7 @@ const QueueJoin = () => {
                   fontSize: 'var(--mac-font-size-sm)',
                   color: 'var(--mac-text-tertiary)',
                   fontWeight: 'var(--mac-font-weight-medium)'
-                }}>в очереди</div>
+                }}>{t('misc.qj_in_queue')}</div>
               </div>
 
               <div style={{
@@ -1212,7 +1212,7 @@ const QueueJoin = () => {
                   fontSize: 'var(--mac-font-size-sm)',
                   color: 'var(--mac-text-tertiary)',
                   fontWeight: 'var(--mac-font-weight-medium)'
-                }}>мин кутиш</div>
+                }}>{t('misc.qj_estimated_wait')}</div>
               </div>
             </div>
 
@@ -1231,7 +1231,7 @@ const QueueJoin = () => {
                 margin: 0,
                 maxWidth: '320px'
               }}>
-                Заполните форму ниже, чтобы присоединиться к очереди
+                {t('misc.qj_fill_form_hint')}
               </p>
               <button
                 onClick={() => setStep('form')}
@@ -1251,7 +1251,7 @@ const QueueJoin = () => {
                 onMouseEnter={(e) => e.target.style.background = 'var(--mac-accent-blue-hover)'}
                 onMouseLeave={(e) => e.target.style.background = 'var(--mac-accent-blue)'}
               >
-                Продолжить
+                {t('misc.qj_continue_btn')}
               </button>
             </div>
           </div>
@@ -1266,7 +1266,7 @@ const QueueJoin = () => {
                   htmlFor="queue-patient-name"
                   className="qj-form-label"
                 >
-                  ФИО *
+                  {t('misc.qj_form_label_full_name')}
                 </label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5" style={{ color: 'var(--mac-text-tertiary)' }} />
@@ -1274,7 +1274,7 @@ const QueueJoin = () => {
                     id="queue-patient-name"
                     name="patient_name"
                     type="text"
-                    aria-label="ФИО пациента"
+                    aria-label={t('misc.qj_form_aria_full_name')}
                     value={formData.patientName}
                     onChange={(e) => handleInputChange('patientName', e.target.value)}
                     style={{
@@ -1300,7 +1300,7 @@ const QueueJoin = () => {
                       e.target.style.border = '1px solid color-mix(in srgb, var(--mac-text-secondary), transparent 76%)';
                       e.target.style.boxShadow = 'none';
                     }}
-                    placeholder="Введите фамилию и имя"
+                    placeholder={t('misc.qj_form_placeholder_full_name')}
                     autoComplete="name"
                     autoFocus
                     aria-required="true"
@@ -1317,7 +1317,7 @@ const QueueJoin = () => {
                   htmlFor="queue-phone"
                   className="qj-form-label"
                 >
-                  Номер телефона *
+                  {t('misc.qj_form_label_phone')}
                 </label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5" style={{ color: 'var(--mac-text-tertiary)' }} />
@@ -1325,7 +1325,7 @@ const QueueJoin = () => {
                     id="queue-phone"
                     name="phone"
                     type="tel"
-                    aria-label="Номер телефона пациента"
+                    aria-label={t('misc.qj_form_aria_phone')}
                     value={formData.phone}
                     onChange={handlePhoneChange}
                     onKeyDown={(e) => {
@@ -1386,7 +1386,7 @@ const QueueJoin = () => {
                   />
                 </div>
                 <div id="queue-phone-hint" style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)', marginTop: 'var(--mac-spacing-1)' }}>
-                  Формат: +998 (XX) XXX-XX-XX
+                  {t('misc.qj_form_phone_format')}
                 </div>
               </div>
 
@@ -1396,16 +1396,16 @@ const QueueJoin = () => {
                   htmlFor="queue-telegram-id"
                   className="qj-form-label"
                 >
-                  Telegram ID (ихтиёрий)
+                  {t('misc.qj_form_label_telegram')}
                 </label>
                 <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)', marginBottom: 'var(--mac-spacing-2)' }}>
-                  Для уведомлений в Telegram
+                  {t('misc.qj_form_hint_telegram')}
                 </div>
                 <Input
                   id="queue-telegram-id"
                   name="telegram_id"
                   type="number"
-                  aria-label="Telegram ID (необязательно)"
+                  aria-label={t('misc.qj_form_aria_telegram')}
                   value={formData.telegramId}
                   onChange={(e) => handleInputChange('telegramId', e.target.value)}
                   style={{
@@ -1428,7 +1428,7 @@ const QueueJoin = () => {
                     e.target.style.border = '1px solid color-mix(in srgb, var(--mac-text-secondary), transparent 76%)';
                     e.target.style.boxShadow = 'none';
                   }}
-                  placeholder="(необязательно)"
+                  placeholder={t('misc.qj_form_placeholder_optional')}
                 />
               </div>
 
@@ -1466,7 +1466,7 @@ const QueueJoin = () => {
                   onMouseEnter={(e) => e.target.style.background = 'color-mix(in srgb, var(--mac-text-tertiary), transparent 82%)'}
                   onMouseLeave={(e) => e.target.style.background = 'color-mix(in srgb, var(--mac-text-tertiary), transparent 88%)'}
                 >
-                  Назад
+                  {t('misc.qj_back_btn')}
                 </button>
                 <button
                   type="submit"
@@ -1487,7 +1487,7 @@ const QueueJoin = () => {
                   onMouseEnter={(e) => !loading && (e.target.style.background = 'var(--mac-accent-blue-hover)')}
                   onMouseLeave={(e) => !loading && (e.target.style.background = 'var(--mac-accent-blue)')}
                 >
-                  {loading ? 'Присоединяемся...' : 'Присоединиться'}
+                  {loading ? t('misc.qj_joining_btn') : t('misc.qj_join_btn')}
                 </button>
               </div>
             </form>

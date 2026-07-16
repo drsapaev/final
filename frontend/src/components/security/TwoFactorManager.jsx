@@ -171,10 +171,10 @@ EmptyState.propTypes = {
   title: PropTypes.string.isRequired,
 };
 
-function formatDate(dateString) {
-  if (!dateString) return 'Не указано';
+function formatDate(dateString, t) {
+  if (!dateString) return t('misc.tfm_date_not_specified');
   const parsed = new Date(dateString);
-  if (Number.isNaN(parsed.getTime())) return 'Не указано';
+  if (Number.isNaN(parsed.getTime())) return t('misc.tfm_date_not_specified');
   return parsed.toLocaleString('ru-RU');
 }
 
@@ -183,6 +183,7 @@ function resolveApiError(error, fallbackMessage) {
 }
 
 function DeviceCard({ badgeLabel, details, lastUsed, name, pending, onCancel, onConfirm, onToggle }) {
+  const { t } = useTranslation();
   return (
     <Card shadow="none" style={{ borderStyle: 'solid' }}>
       <CardContent style={{ display: 'grid', gap: 12 }}>
@@ -198,7 +199,7 @@ function DeviceCard({ badgeLabel, details, lastUsed, name, pending, onCancel, on
           <div style={{ display: 'grid', gap: 4 }}>
             <div style={{ fontSize: 14, fontWeight: 'var(--mac-font-weight-semibold)' }}>{name}</div>
             <div style={{ fontSize: 12, color: 'var(--mac-text-secondary)' }}>{details}</div>
-            <div style={{ fontSize: 12, color: 'var(--mac-text-secondary)' }}>Последний вход: {lastUsed}</div>
+            <div style={{ fontSize: 12, color: 'var(--mac-text-secondary)' }}>{t('misc.tfm_device_last_login')} {lastUsed}</div>
           </div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
             {badgeLabel && (
@@ -215,7 +216,7 @@ function DeviceCard({ badgeLabel, details, lastUsed, name, pending, onCancel, on
               </span>
             )}
             <Button variant="ghost" onClick={onToggle} startIcon={<Trash2 size={16} />}>
-              Отозвать доступ
+              {t('misc.tfm_device_revoke_access')}
             </Button>
           </div>
         </div>
@@ -223,13 +224,13 @@ function DeviceCard({ badgeLabel, details, lastUsed, name, pending, onCancel, on
         {pending && (
           <Alert severity="warning">
             <div style={{ display: 'grid', gap: 12 }}>
-              <div>После отзыва доступа при следующем входе снова потребуется подтверждение 2FA.</div>
+              <div>{t('misc.tfm_device_revoke_warning')}</div>
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                 <Button variant="danger" onClick={onConfirm} startIcon={<Trash2 size={16} />}>
-                  Подтвердить отзыв
+                  {t('misc.tfm_device_confirm_revoke')}
                 </Button>
                 <Button variant="ghost" onClick={onCancel}>
-                  Отмена
+                  {t('misc.tfm_cancel')}
                 </Button>
               </div>
             </div>
@@ -252,6 +253,7 @@ DeviceCard.propTypes = {
 };
 
 export default function TwoFactorManager() {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -298,7 +300,7 @@ export default function TwoFactorManager() {
         setVerificationCode('');
       }
     } catch (err) {
-      setError(resolveApiError(err, 'Ошибка загрузки статуса 2FA'));
+      setError(resolveApiError(err, t('misc.tfm_error_load_status')));
     }
   }
 
@@ -331,7 +333,7 @@ export default function TwoFactorManager() {
 
   async function loadBackupCodes() {
     if (!status?.enabled) {
-      setError('Сначала завершите настройку 2FA и подтвердите код из приложения.');
+      setError(t('misc.tfm_backup_codes_setup_required'));
       return;
     }
 
@@ -343,7 +345,7 @@ export default function TwoFactorManager() {
       logger.info('[FIX:2FA] Loaded backup codes for enabled 2FA');
     } catch (err) {
       logger.error('Error loading backup codes:', err);
-      setError(resolveApiError(err, 'Ошибка загрузки резервных кодов'));
+      setError(resolveApiError(err, t('misc.tfm_error_load_backup_codes')));
     } finally {
       setLoading(false);
     }
@@ -363,10 +365,10 @@ export default function TwoFactorManager() {
       setSetupData(response.data);
       setBackupCodes(response.data?.backup_codes || []);
       setVerificationCode('');
-      setSuccess('Сканируйте QR-код и подтвердите 6-значный код из приложения, чтобы включить 2FA.');
+      setSuccess(t('misc.tfm_setup_qr_prompt'));
       logger.info('[FIX:2FA] 2FA setup created, waiting for verify-setup');
     } catch (err) {
-      setError(resolveApiError(err, 'Ошибка настройки 2FA'));
+      setError(resolveApiError(err, t('misc.tfm_error_setup')));
     } finally {
       setLoading(false);
     }
@@ -374,7 +376,7 @@ export default function TwoFactorManager() {
 
   async function handleVerify2FASetup() {
     if (verificationCode.length !== 6) {
-      setError('Введите 6-значный код из приложения-аутентификатора');
+      setError(t('misc.tfm_verify_code_invalid_length'));
       return;
     }
 
@@ -388,14 +390,14 @@ export default function TwoFactorManager() {
         params: { totp_code: verificationCode },
       });
       if (response.data?.success) {
-        setSuccess('2FA успешно включена');
+        setSuccess(t('misc.tfm_enable_success'));
         await loadStatus();
       } else {
-        setError(response.data?.detail || response.data?.message || 'Неверный код подтверждения');
+        setError(response.data?.detail || response.data?.message || t('misc.tfm_verify_code_invalid'));
       }
     } catch (err) {
       logger.error('Error verifying 2FA setup:', err);
-      setError(resolveApiError(err, 'Ошибка подтверждения 2FA'));
+      setError(resolveApiError(err, t('misc.tfm_error_verify')));
     } finally {
       setLoading(false);
     }
@@ -403,7 +405,7 @@ export default function TwoFactorManager() {
 
   async function handleDisable2FA() {
     if (!disablePassword || !disableCode) {
-      setError('Введите пароль и код из приложения, чтобы отключить 2FA.');
+      setError(t('misc.tfm_disable_require_credentials'));
       return;
     }
 
@@ -420,10 +422,10 @@ export default function TwoFactorManager() {
       setDisableCode('');
       setShowDisableForm(false);
       setBackupCodes([]);
-      setSuccess('2FA успешно отключена');
+      setSuccess(t('misc.tfm_disable_success'));
       await loadAll();
     } catch (err) {
-      setError(resolveApiError(err, 'Ошибка отключения 2FA'));
+      setError(resolveApiError(err, t('misc.tfm_error_disable')));
     } finally {
       setLoading(false);
     }
@@ -431,7 +433,7 @@ export default function TwoFactorManager() {
 
   async function handleRegenerateBackupCodes() {
     if (!status?.enabled) {
-      setError('Нельзя обновить резервные коды, пока 2FA не включена и не подтверждена.');
+      setError(t('misc.tfm_regenerate_require_enabled'));
       return;
     }
 
@@ -444,9 +446,9 @@ export default function TwoFactorManager() {
       const response = await api.post('/2fa/backup-codes/regenerate');
       setBackupCodes(response.data?.backup_codes || []);
       setConfirmRegenerate(false);
-      setSuccess('Резервные коды обновлены. Старый комплект больше недействителен.');
+      setSuccess(t('misc.tfm_regenerate_success'));
     } catch (err) {
-      setError(resolveApiError(err, 'Ошибка генерации резервных кодов'));
+      setError(resolveApiError(err, t('misc.tfm_error_regenerate')));
     } finally {
       setLoading(false);
     }
@@ -460,10 +462,10 @@ export default function TwoFactorManager() {
     try {
       await api.delete(`/2fa/devices/${deviceId}`);
       setDeviceToRevoke(null);
-      setSuccess('Доступ устройства отозван');
+      setSuccess(t('misc.tfm_revoke_device_success'));
       await loadDevices();
     } catch (err) {
-      setError(resolveApiError(err, 'Ошибка отзыва доступа'));
+      setError(resolveApiError(err, t('misc.tfm_error_revoke_device')));
     } finally {
       setLoading(false);
     }
@@ -472,10 +474,10 @@ export default function TwoFactorManager() {
   async function copyToClipboard(text) {
     try {
       await navigator.clipboard.writeText(text);
-      setSuccess('Скопировано в буфер обмена');
+      setSuccess(t('misc.tfm_copied_to_clipboard'));
     } catch (err) {
       logger.error('[FIX:2FA] Failed to copy to clipboard', err);
-      setError('Не удалось скопировать в буфер обмена');
+      setError(t('misc.tfm_error_copy_to_clipboard'));
     }
   }
 
@@ -495,8 +497,8 @@ export default function TwoFactorManager() {
       {success && <Alert severity="success">{success}</Alert>}
 
       <SectionShell
-        title="Защита входа"
-        description="Управляйте двухфакторной аутентификацией без вложенных экранов и всплывающих системных prompt."
+        title={t('misc.tfm_section_protection_title')}
+        description={t('misc.tfm_section_protection_desc')}
         action={(
           <Button
             variant="outline"
@@ -504,7 +506,7 @@ export default function TwoFactorManager() {
             disabled={loading}
             startIcon={<RefreshCw size={16} />}
           >
-            Обновить данные
+            {t('misc.tfm_refresh_data')}
           </Button>
         )}
       >
@@ -518,33 +520,33 @@ export default function TwoFactorManager() {
           <MetricCard
             accent={accentGradients.purple}
             icon={ShieldCheck}
-            label="Статус 2FA"
-            value={status?.enabled ? 'Включена' : 'Отключена'}
+            label={t('misc.tfm_metric_2fa_status')}
+            value={status?.enabled ? t('misc.tfm_metric_status_enabled') : t('misc.tfm_metric_status_disabled')}
           />
           <MetricCard
             accent={accentGradients.info}
             icon={Key}
-            label="Резервные коды"
-            value={status?.enabled ? `${status?.backup_codes_count || 0} доступно` : 'Недоступны'}
+            label={t('misc.tfm_metric_backup_codes')}
+            value={status?.enabled ? t('misc.tfm_metric_backup_codes_available', { count: status?.backup_codes_count || 0 }) : t('misc.tfm_metric_backup_codes_unavailable')}
           />
           <MetricCard
             accent={accentGradients.success}
             icon={Smartphone}
-            label="Доверенные устройства"
-            value={`${status?.trusted_devices_count ?? devices.length} шт.`}
+            label={t('misc.tfm_metric_trusted_devices')}
+            value={t('misc.tfm_metric_trusted_devices_count', { count: status?.trusted_devices_count ?? devices.length })}
           />
           <MetricCard
             accent={accentGradients.warning}
             icon={Clock3}
-            label="Последнее использование"
-            value={formatDate(status?.last_used)}
+            label={t('misc.tfm_metric_last_used')}
+            value={formatDate(status?.last_used, t)}
           />
         </div>
 
         {status?.enabled ? (
           <div style={{ display: 'grid', gap: 16 }}>
             <Alert severity="info">
-              2FA уже включена. Здесь можно загрузить резервные коды, проверить связанные устройства и безопасно отключить защиту.
+              {t('misc.tfm_2fa_already_enabled_info')}
             </Alert>
 
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -554,7 +556,7 @@ export default function TwoFactorManager() {
                 disabled={loading}
                 startIcon={<Key size={16} />}
               >
-                Показать резервные коды
+                {t('misc.tfm_show_backup_codes')}
               </Button>
               <Button
                 variant="ghost"
@@ -562,7 +564,7 @@ export default function TwoFactorManager() {
                 disabled={loading}
                 startIcon={<RefreshCw size={16} />}
               >
-                Создать новый комплект кодов
+                {t('misc.tfm_create_new_codes_set')}
               </Button>
               <Button
                 variant="danger"
@@ -570,7 +572,7 @@ export default function TwoFactorManager() {
                 disabled={loading}
                 startIcon={<Trash2 size={16} />}
               >
-                {showDisableForm ? 'Скрыть форму отключения' : 'Отключить 2FA'}
+                {showDisableForm ? t('misc.tfm_hide_disable_form') : t('misc.tfm_disable_2fa')}
               </Button>
             </div>
 
@@ -578,7 +580,7 @@ export default function TwoFactorManager() {
               <Alert severity="warning">
                 <div style={{ display: 'grid', gap: 12 }}>
                   <div>
-                    Новый комплект резервных кодов немедленно сделает старый недействительным. Сначала сохраните действующие коды, если они ещё нужны.
+                    {t('misc.tfm_regenerate_confirm_warning')}
                   </div>
                   <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                     <Button
@@ -587,10 +589,10 @@ export default function TwoFactorManager() {
                       disabled={loading}
                       startIcon={<RefreshCw size={16} />}
                     >
-                      Подтвердить обновление кодов
+                      {t('misc.tfm_confirm_codes_update')}
                     </Button>
                     <Button variant="ghost" onClick={() => setConfirmRegenerate(false)}>
-                      Отмена
+                      {t('misc.tfm_cancel')}
                     </Button>
                   </div>
                 </div>
@@ -600,23 +602,23 @@ export default function TwoFactorManager() {
             {showDisableForm && (
               <Card shadow="none" style={{ borderStyle: 'dashed' }}>
                 <CardHeader style={{ paddingBottom: 12 }}>
-                  <CardTitle>Отключение 2FA</CardTitle>
+                  <CardTitle>{t('misc.tfm_disable_2fa_title')}</CardTitle>
                 </CardHeader>
                 <CardContent style={{ display: 'grid', gap: 14 }}>
                   <div style={{ fontSize: 13, color: 'var(--mac-text-secondary)' }}>
-                    Для отключения нужен текущий пароль и 6-значный код из приложения-аутентификатора.
+                    {t('misc.tfm_disable_form_desc')}
                   </div>
                   <Input
                     type="password"
                     value={disablePassword}
                     onChange={(event) => setDisablePassword(event.target.value)}
-                    placeholder="Текущий пароль"
+                    placeholder={t('misc.tfm_disable_form_password_placeholder')}
                   />
                   <Input
                     type="text"
                     value={disableCode}
                     onChange={(event) => setDisableCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
-                    placeholder="Код из приложения"
+                    placeholder={t('misc.tfm_disable_form_code_placeholder')}
                   />
                   <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                     <Button
@@ -625,7 +627,7 @@ export default function TwoFactorManager() {
                       disabled={loading}
                       startIcon={<Trash2 size={16} />}
                     >
-                      Подтвердить отключение
+                      {t('misc.tfm_confirm_disable')}
                     </Button>
                     <Button
                       variant="ghost"
@@ -635,7 +637,7 @@ export default function TwoFactorManager() {
                         setDisableCode('');
                       }}
                     >
-                      Отмена
+                      {t('misc.tfm_cancel')}
                     </Button>
                   </div>
                 </CardContent>
@@ -646,8 +648,8 @@ export default function TwoFactorManager() {
           <div style={{ display: 'grid', gap: 16 }}>
             <EmptyState
               icon={Shield}
-              title="2FA ещё не активирована"
-              description="Сначала создайте QR-код и секрет, затем подтвердите код из приложения-аутентификатора."
+              title={t('misc.tfm_2fa_not_activated_title')}
+              description={t('misc.tfm_2fa_not_activated_desc')}
               action={(
                 <Button
                   variant="primary"
@@ -655,7 +657,7 @@ export default function TwoFactorManager() {
                   disabled={loading}
                   startIcon={<ShieldCheck size={16} />}
                 >
-                  Включить 2FA
+                  {t('misc.tfm_enable_2fa')}
                 </Button>
               )}
             />
@@ -663,7 +665,7 @@ export default function TwoFactorManager() {
             {setupData && (
               <Card shadow="none" style={{ borderStyle: 'dashed' }}>
                 <CardHeader style={{ paddingBottom: 12 }}>
-                  <CardTitle>Подтверждение настройки 2FA</CardTitle>
+                  <CardTitle>{t('misc.tfm_setup_verification_title')}</CardTitle>
                 </CardHeader>
                 <CardContent style={{ display: 'grid', gap: 18 }}>
                   <div
@@ -690,13 +692,13 @@ export default function TwoFactorManager() {
                           style={{ maxWidth: '100%', borderRadius: 12 }}
                         />
                       ) : (
-                        <div style={{ fontSize: 13, color: 'var(--mac-text-secondary)' }}>QR код недоступен</div>
+                        <div style={{ fontSize: 13, color: 'var(--mac-text-secondary)' }}>{t('misc.tfm_qr_unavailable')}</div>
                       )}
                     </div>
 
                     <div style={{ display: 'grid', gap: 14, alignContent: 'start' }}>
                       <div style={{ fontSize: 13, color: 'var(--mac-text-secondary)' }}>
-                        Отсканируйте QR-код любым TOTP-приложением или введите секрет вручную.
+                        {t('misc.tfm_scan_qr_hint')}
                       </div>
                       <div
                         style={{
@@ -716,14 +718,14 @@ export default function TwoFactorManager() {
                           onClick={() => copyToClipboard(setupData.secret_key)}
                           startIcon={<Copy size={16} />}
                         >
-                          Копировать
+                          {t('misc.tfm_copy')}
                         </Button>
                       </div>
                       <Input
                         type="text"
                         value={verificationCode}
                         onChange={(event) => setVerificationCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
-                        placeholder="Введите 6-значный код"
+                        placeholder={t('misc.tfm_enter_6digit_code')}
                       />
                       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                         <Button
@@ -732,7 +734,7 @@ export default function TwoFactorManager() {
                           disabled={loading || verificationCode.length !== 6}
                           startIcon={<CheckCircle size={16} />}
                         >
-                          Подтвердить и включить 2FA
+                          {t('misc.tfm_confirm_and_enable')}
                         </Button>
                         <Button
                           variant="ghost"
@@ -741,7 +743,7 @@ export default function TwoFactorManager() {
                             setVerificationCode('');
                           }}
                         >
-                          Отменить настройку
+                          {t('misc.tfm_cancel_setup')}
                         </Button>
                       </div>
                     </div>
@@ -754,8 +756,8 @@ export default function TwoFactorManager() {
       </SectionShell>
 
       <SectionShell
-        title="Методы восстановления"
-        description="Каналы, которые помогут вернуть доступ к аккаунту, если устройство с TOTP будет потеряно."
+        title={t('misc.tfm_section_recovery_title')}
+        description={t('misc.tfm_section_recovery_desc')}
       >
         {recoveryMethods.length > 0 ? (
           <div style={{ display: 'grid', gap: 12 }}>
@@ -800,7 +802,7 @@ export default function TwoFactorManager() {
                     ...(method.verified ? toneChipStyles.success : toneChipStyles.warning),
                   }}
                 >
-                  {method.verified ? 'Подтверждён' : 'Не подтверждён'}
+                  {method.verified ? t('misc.tfm_recovery_verified') : t('misc.tfm_recovery_not_verified')}
                 </span>
               </div>
             ))}
@@ -808,29 +810,29 @@ export default function TwoFactorManager() {
         ) : (
           <EmptyState
             icon={Mail}
-            title="Методы восстановления не настроены"
-            description="Сейчас доступ возможен только через приложение-аутентификатор и резервные коды."
+            title={t('misc.tfm_recovery_empty_title')}
+            description={t('misc.tfm_recovery_empty_desc')}
           />
         )}
       </SectionShell>
 
       <SectionShell
-        title="Доверенные устройства"
-        description="Устройства, на которых вход уже подтверждался через 2FA."
+        title={t('misc.tfm_section_devices_title')}
+        description={t('misc.tfm_section_devices_desc')}
       >
         {devices.length > 0 ? (
           <div style={{ display: 'grid', gap: 12 }}>
             {devices.map((device) => (
               <DeviceCard
                 key={device.id}
-                badgeLabel={device.trusted ? 'Доверено' : device.active ? 'Активно' : ''}
+                badgeLabel={device.trusted ? t('misc.tfm_device_badge_trusted') : device.active ? t('misc.tfm_device_badge_active') : ''}
                 details={[
-                  device.device_type ? `Тип: ${device.device_type}` : null,
+                  device.device_type ? t('misc.tfm_device_type_label', { type: device.device_type }) : null,
                   device.ip_address,
                   device.user_agent,
-                ].filter(Boolean).join(' • ') || 'Нет дополнительной информации'}
-                lastUsed={formatDate(device.last_used)}
-                name={device.device_name || 'Неизвестное устройство'}
+                ].filter(Boolean).join(' • ') || t('misc.tfm_device_no_extra_info')}
+                lastUsed={formatDate(device.last_used, t)}
+                name={device.device_name || t('misc.tfm_device_unknown')}
                 pending={deviceToRevoke === device.id}
                 onToggle={() => setDeviceToRevoke(deviceToRevoke === device.id ? null : device.id)}
                 onCancel={() => setDeviceToRevoke(null)}
@@ -841,15 +843,15 @@ export default function TwoFactorManager() {
         ) : (
           <EmptyState
             icon={Smartphone}
-            title="Нет доверенных устройств"
-            description="Список заполнится после входов, подтверждённых через 2FA."
+            title={t('misc.tfm_devices_empty_title')}
+            description={t('misc.tfm_devices_empty_desc')}
           />
         )}
       </SectionShell>
 
       <SectionShell
-        title="Резервные коды"
-        description="Аварийный способ входа, если доступ к приложению-аутентификатору временно потерян."
+        title={t('misc.tfm_section_backup_codes_title')}
+        description={t('misc.tfm_section_backup_codes_desc')}
         action={status?.enabled ? (
           <Button
             variant="outline"
@@ -857,20 +859,20 @@ export default function TwoFactorManager() {
             disabled={loading}
             startIcon={<Download size={16} />}
           >
-            Загрузить текущие коды
+            {t('misc.tfm_load_current_codes')}
           </Button>
         ) : null}
       >
         {!status?.enabled ? (
           <EmptyState
             icon={Key}
-            title="Резервные коды пока недоступны"
-            description="Они появятся только после завершения настройки и подтверждения 2FA."
+            title={t('misc.tfm_backup_codes_unavailable_title')}
+            description={t('misc.tfm_backup_codes_unavailable_desc')}
           />
         ) : backupCodes.length > 0 ? (
           <div style={{ display: 'grid', gap: 16 }}>
             <Alert severity="warning">
-              Сохраните эти коды в безопасном месте. Каждый код можно использовать только один раз.
+              {t('misc.tfm_backup_codes_save_warning')}
             </Alert>
             <div
               style={{
@@ -893,35 +895,35 @@ export default function TwoFactorManager() {
                 >
                   <code style={{ fontSize: 13 }}>{code}</code>
                   <Button variant="ghost" onClick={() => copyToClipboard(code)} startIcon={<Copy size={16} />}>
-                    Копия
+                    {t('misc.tfm_copy_button_short')}
                   </Button>
                 </div>
               ))}
             </div>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
               <Button variant="outline" onClick={() => copyToClipboard(backupCodes.join('\n'))} startIcon={<Copy size={16} />}>
-                Копировать все
+                {t('misc.tfm_copy_all')}
               </Button>
               <Button variant="outline" onClick={downloadBackupCodes} startIcon={<Download size={16} />}>
-                Скачать TXT
+                {t('misc.tfm_download_txt')}
               </Button>
               <Button variant="ghost" onClick={() => setConfirmRegenerate(true)} disabled={loading} startIcon={<RefreshCw size={16} />}>
-                Создать новый комплект
+                {t('misc.tfm_create_new_set')}
               </Button>
             </div>
           </div>
         ) : (
           <EmptyState
             icon={Key}
-            title="Коды ещё не загружены"
-            description="Можно загрузить текущий набор или создать новый комплект кодов."
+            title={t('misc.tfm_backup_codes_not_loaded_title')}
+            description={t('misc.tfm_backup_codes_not_loaded_desc')}
             action={(
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
                 <Button variant="outline" onClick={loadBackupCodes} disabled={loading} startIcon={<Download size={16} />}>
-                  Загрузить текущие коды
+                  {t('misc.tfm_load_current_codes')}
                 </Button>
                 <Button variant="ghost" onClick={() => setConfirmRegenerate(true)} disabled={loading} startIcon={<RefreshCw size={16} />}>
-                  Создать новый комплект
+                  {t('misc.tfm_create_new_set')}
                 </Button>
               </div>
             )}
@@ -930,8 +932,8 @@ export default function TwoFactorManager() {
       </SectionShell>
 
       <SectionShell
-        title="Журнал безопасности"
-        description="Последние события, связанные с 2FA, доверенными сессиями и восстановлением доступа."
+        title={t('misc.tfm_section_logs_title')}
+        description={t('misc.tfm_section_logs_desc')}
       >
         {securityLogs.length > 0 ? (
           <div style={{ display: 'grid', gap: 12 }}>
@@ -973,8 +975,8 @@ export default function TwoFactorManager() {
         ) : (
           <EmptyState
             icon={Clock3}
-            title="Пока нет событий безопасности"
-            description="История заполнится после действий с 2FA, доверенными устройствами и восстановлением доступа."
+            title={t('misc.tfm_logs_empty_title')}
+            description={t('misc.tfm_logs_empty_desc')}
           />
         )}
       </SectionShell>
