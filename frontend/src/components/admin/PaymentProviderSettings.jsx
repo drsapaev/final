@@ -65,8 +65,8 @@ const PaymentProviderSettings = () => {
         setSettings((prev) => ({ ...prev, ...data }));
       },
       {
-        loadingMessage: 'Загрузка настроек...',
-        errorMessage: 'Ошибка загрузки настроек'
+        loadingMessage: t('admin2.pps_loading_message'),
+        errorMessage: t('admin2.pps_load_error')
       }
     );
   }, [executeAction]);
@@ -80,11 +80,11 @@ const PaymentProviderSettings = () => {
     await executeAction(
       async () => {
         await savePaymentProviderSettings(settings);
-        toast.success('Настройки сохранены успешно');
+        toast.success(t('admin2.pps_save_success'));
       },
       {
-        loadingMessage: 'Сохранение настроек...',
-        errorMessage: 'Ошибка сохранения настроек'
+        loadingMessage: t('admin2.pps_saving_message'),
+        errorMessage: t('admin2.pps_save_error')
       }
     );
   };
@@ -98,20 +98,20 @@ const PaymentProviderSettings = () => {
           ...prev,
           [providerName]: {
             success: Boolean(result?.success),
-            message: result.message || result.detail || 'Тест завершён',
+            message: result.message || result.detail || t('admin2.pps_test_finished'),
             timestamp: new Date().toLocaleString()
           }
         }));
 
         if (result?.success) {
-          toast.success(`${providerName.toUpperCase()}: Тест прошёл успешно`);
+          toast.success(t('admin2.pps_test_success', { provider: providerName.toUpperCase() }));
         } else {
-          toast.error(`${providerName.toUpperCase()}: ${result.message || result.detail}`);
+          toast.error(t('admin2.pps_test_error_toast', { provider: providerName.toUpperCase(), message: result.message || result.detail }));
         }
       },
       {
-        loadingMessage: `Тестирование ${providerName.toUpperCase()}...`,
-        errorMessage: `Ошибка тестирования ${providerName.toUpperCase()}`
+        loadingMessage: t('admin2.pps_testing_message', { provider: providerName.toUpperCase() }),
+        errorMessage: t('admin2.pps_test_error_message', { provider: providerName.toUpperCase() })
       }
     );
   };
@@ -179,7 +179,7 @@ const PaymentProviderSettings = () => {
                 onChange={() => toggleProviderEnabled(providerName)}
               />
               <span className="admin-text-sm admin-text-secondary">
-                {providerConfig.enabled ? 'Включён' : 'Отключён'}
+                {providerConfig.enabled ? t('admin2.pps_status_enabled') : t('admin2.pps_status_disabled')}
               </span>
             </div>
           </div>
@@ -191,7 +191,7 @@ const PaymentProviderSettings = () => {
             className="admin-d-flex-ai-center-gap-8-p-6px-12px"
           >
             <RefreshCw className="admin-icon-16" />
-            Тест
+            {t('admin2.pps_test_button')}
           </Button>
         </div>
 
@@ -221,7 +221,7 @@ const PaymentProviderSettings = () => {
                 onChange={(checked) => updateProviderSetting(providerName, 'test_mode', checked)}
               />
               <span className="admin-fs-sm-primary">
-                Тестовый режим
+                {t('admin2.pps_test_mode')}
               </span>
             </div>
 
@@ -235,7 +235,7 @@ const PaymentProviderSettings = () => {
                     type="text"
                     value={providerConfig.service_id}
                     onChange={(e) => updateProviderSetting(providerName, 'service_id', e.target.value)}
-                    placeholder="Введите Service ID"
+                    placeholder={t('admin2.pps_ph_service_id')}
                     className="admin-w-full"
                   />
                 </div>
@@ -248,7 +248,7 @@ const PaymentProviderSettings = () => {
                     type="text"
                     value={providerConfig.merchant_id}
                     onChange={(e) => updateProviderSetting(providerName, 'merchant_id', e.target.value)}
-                    placeholder="Введите Merchant ID"
+                    placeholder={t('admin2.pps_ph_merchant_id')}
                     className="admin-w-full"
                   />
                 </div>
@@ -262,7 +262,7 @@ const PaymentProviderSettings = () => {
                       type={showSecrets.click ? 'text' : 'password'}
                       value={providerConfig.secret_key}
                       onChange={(e) => updateProviderSetting(providerName, 'secret_key', e.target.value)}
-                      placeholder="Введите Secret Key"
+                      placeholder={t('admin2.pps_ph_secret_key')}
                       className="admin-w-100pct-pr-40"
                     />
                     <Button
@@ -307,7 +307,7 @@ const PaymentProviderSettings = () => {
                     type="text"
                     value={providerConfig.merchant_id}
                     onChange={(e) => updateProviderSetting(providerName, 'merchant_id', e.target.value)}
-                    placeholder="Введите Merchant ID"
+                    placeholder={t('admin2.pps_ph_merchant_id')}
                     className="admin-w-full"
                   />
                 </div>
@@ -321,7 +321,7 @@ const PaymentProviderSettings = () => {
                       type={showSecrets.payme ? 'text' : 'password'}
                       value={providerConfig.secret_key}
                       onChange={(e) => updateProviderSetting(providerName, 'secret_key', e.target.value)}
-                      placeholder="Введите Secret Key"
+                      placeholder={t('admin2.pps_ph_secret_key')}
                       className="admin-w-100pct-pr-40"
                     />
                     <Button
@@ -382,7 +382,7 @@ const PaymentProviderSettings = () => {
           <div className="admin-flex-center-12">
             <Settings className="admin-w-32-h-32-blue" />
             <h2 className="admin-fs-2xl-fw-semi-primary-m-0">
-              Настройки платежных провайдеров
+              {t('admin2.pps_title')}
             </h2>
           </div>
 
@@ -392,7 +392,7 @@ const PaymentProviderSettings = () => {
             className="admin-d-flex-ai-center-gap-8-bgc-blue-bd-none-p-8px-16px"
           >
             <Save className="admin-icon-16" />
-            Сохранить
+            {t('admin2.pps_save_button')}
           </Button>
         </div>
 
@@ -400,13 +400,13 @@ const PaymentProviderSettings = () => {
           {/* Общие настройки */}
           <MacOSCard className="admin-p-24">
             <h3 className="admin-fs-lg-fw-semi-primary-mb-16">
-              Общие настройки
+              {t('admin2.pps_general_section')}
             </h3>
 
             <div className="admin-flex-col-16">
               <div>
                 <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
-                  Провайдер по умолчанию
+                  {t('admin2.pps_default_provider')}
                 </label>
                 <Select
                   value={settings.default_provider}
@@ -425,13 +425,13 @@ const PaymentProviderSettings = () => {
                   <AlertTriangle className="admin-w-20-h-20-warning-mt-2-fsk-0" />
                   <div>
                     <p className="admin-fs-sm-fw-med-warning-m-0-0-8px-0">
-                      <strong>Важно:</strong>
+                      <strong>{t('admin2.pps_important')}</strong>
                     </p>
                     <ul className="admin-fs-sm-warning-m-0-pl-16">
-                      <li>Провайдер по умолчанию будет предложен пользователям первым</li>
-                      <li>Тестовый режим использует sandbox окружение провайдеров</li>
-                      <li>Обязательно протестируйте настройки перед использованием</li>
-                      <li>Secret Key хранится в зашифрованном виде</li>
+                      <li>{t('admin2.pps_info_default_first')}</li>
+                      <li>{t('admin2.pps_info_test_mode')}</li>
+                      <li>{t('admin2.pps_info_test_before_use')}</li>
+                      <li>{t('admin2.pps_info_secret_encrypted')}</li>
                     </ul>
                   </div>
                 </div>
@@ -442,7 +442,7 @@ const PaymentProviderSettings = () => {
           {/* Настройки провайдеров */}
           <MacOSCard className="admin-p-24">
             <h3 className="admin-fs-lg-fw-semi-primary-mb-16">
-              Конфигурация провайдеров
+              {t('admin2.pps_providers_section')}
             </h3>
 
             <div className="admin-flex-col-24">
