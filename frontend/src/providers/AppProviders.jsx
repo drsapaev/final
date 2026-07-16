@@ -1,4 +1,4 @@
-import { TranslationProvider } from '../hooks/useTranslation';
+import { TranslationProvider } from '../i18n/useTranslation';
 import { AppDataProvider } from '../contexts/AppDataContext';
 import { ChatProvider } from '../contexts/ChatContext';
 import { ToastProvider } from '../components/common/Toast';

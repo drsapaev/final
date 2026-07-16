@@ -33,7 +33,7 @@ import { getErrorMessage } from '../../utils/errorHandler';
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
 import './PaymentWidget.css';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 // UX Audit #4 regression fix: dividerStyle, providerOptionStyle, providerNameStyle
 // вынесены в CSS-классы .pw-divider, .pw-provider-option, .pw-provider-name.
@@ -42,12 +42,15 @@ const PaymentWidget = ({
   visitId,
   amount,
   currency = 'UZS',
-  description = 'Оплата медицинских услуг',
+  description,
   onSuccess,
   onError,
   onCancel
 }) => {
+  const { t } = useTranslation();
   // UX Audit #4 regression fix: useTheme() удалён — больше не нужен.
+  // i18n: fallback description is resolved at render time so t() is available.
+  const effectiveDescription = description ?? t('payment.pay_widg_default_description');
 
   // Icon aliases
   const CreditCardIcon = CreditCard;
@@ -114,11 +117,11 @@ const PaymentWidget = ({
       }
     } catch (err) {
       logger.error('Ошибка загрузки провайдеров:', err);
-      setError(getErrorMessage(err, 'Не удалось загрузить способы оплаты. Проверьте соединение и попробуйте снова.'));
+      setError(getErrorMessage(err, t('payment.pay_widg_load_providers_error')));
     } finally {
       setProvidersLoading(false);
     }
-  }, [currency]);
+  }, [currency, t]);
 
   // Загрузка доступных провайдеров
   useEffect(() => {
@@ -176,16 +179,16 @@ const PaymentWidget = ({
       }
       if (attemptsRef.current >= MAX_POLLING_ATTEMPTS) {
         clearPolling();
-        setError('Время ожидания оплаты истекло. Проверьте статус платежа вручную.');
+        setError(t('payment.pay_widg_timeout'));
         setPaymentStatus('failed');
       }
     }, POLLING_INTERVAL_MS);
-  }, [clearPolling]);
+  }, [clearPolling, t]);
 
   // Инициализация платежа
   const initializePayment = async () => {
     if (!selectedProvider || !visitId || !amount) {
-      setError('Не все данные для платежа заполнены');
+      setError(t('payment.pay_widg_missing_data'));
       return;
     }
 
@@ -197,9 +200,9 @@ const PaymentWidget = ({
     });
 
     if (!token) {
-      setError('Для оплаты требуется авторизация. Пожалуйста, войдите в систему.');
+      setError(t('payment.pay_widg_auth_required'));
       if (onError) {
-        onError('Требуется авторизация');
+        onError(t('payment.pay_widg_auth_required_short'));
       }
       return;
     }
@@ -213,7 +216,7 @@ const PaymentWidget = ({
         provider: selectedProvider,
         amount: parseFloat(amount),
         currency: currency,
-        description: description,
+        description: effectiveDescription,
         return_url: `${window.location.origin}/payment/success`,
         cancel_url: `${window.location.origin}/payment/cancel`
       };
@@ -286,13 +289,13 @@ const PaymentWidget = ({
         throw new Error(
           getErrorMessage(
             response.data?.error_message || '',
-            'Не удалось инициализировать платёж. Проверьте соединение и попробуйте снова.'
+            t('payment.pay_widg_init_error')
           )
         );
       }
     } catch (err) {
       logger.error('Ошибка инициализации платежа:', err);
-      const errorMessage = getErrorMessage(err, 'Не удалось обработать платёж. Проверьте соединение и попробуйте снова.');
+      const errorMessage = getErrorMessage(err, t('payment.pay_widg_process_error'));
       setError(errorMessage);
       setPaymentStatus('failed');
 
@@ -359,13 +362,13 @@ const PaymentWidget = ({
       case 'pending':
         return (
           <Alert severity="info" icon={<InfoIcon />}>
-            Выберите способ оплаты и нажмите «Оплатить»
+            {t('payment.pay_widg_select_method')}
           </Alert>);
 
       case 'initialized':
         return (
           <Alert severity="success" icon={<CheckIcon />}>
-            Платеж инициализирован. ID: {paymentData?.payment_id}
+            {t('payment.pay_widg_initialized', { id: paymentData?.payment_id })}
           </Alert>);
 
       case 'redirected':
@@ -373,31 +376,31 @@ const PaymentWidget = ({
         return (
           <Alert severity="info" icon={<InfoIcon />}>
             <div className="pw-provider-option-row">
-              <span>Перенаправление на страницу оплаты...</span>
+              <span>{t('payment.pay_widg_redirecting')}</span>
               {pollingRef.current && (
                 <span className="pw-provider-option-name">
-                  Автоматическая проверка статуса: попытка {pollingAttempts} из {MAX_POLLING_ATTEMPTS}
+                  {t('payment.pay_widg_auto_check', { current: pollingAttempts, max: MAX_POLLING_ATTEMPTS })}
                 </span>
               )}
               <div className="pw-provider-option-badges">
                 <Button
                   size="small"
                   onClick={checkPaymentStatus}>
-                  Проверить статус
+                  {t('payment.pay_widg_check_status')}
                 </Button>
                 {pollingRef.current ? (
                   <Button
                     size="small"
                     variant="outlined"
                     onClick={clearPolling}>
-                    Остановить отслеживание
+                    {t('payment.pay_widg_stop_tracking')}
                   </Button>
                 ) : (
                   <Button
                     size="small"
                     variant="outlined"
                     onClick={startPolling}>
-                    Начать отслеживание
+                    {t('payment.pay_widg_start_tracking')}
                   </Button>
                 )}
               </div>
@@ -407,7 +410,7 @@ const PaymentWidget = ({
       case 'paid':
         return (
           <Alert severity="success" icon={<CheckIcon />}>
-            Платеж успешно завершен!
+            {t('payment.pay_widg_paid_success')}
           </Alert>);
 
       case 'failed':
@@ -415,20 +418,20 @@ const PaymentWidget = ({
       case 'canceled':
         return (
           <Alert severity="error" icon={<ErrorIcon />}>
-            Платеж не удался. Попробуйте еще раз.
+            {t('payment.pay_widg_payment_failed')}
           </Alert>);
 
       case 'refunded':
       case 'void':
         return (
           <Alert severity="warning" icon={<ErrorIcon />}>
-            Статус: {paymentStatus}
+            {t('payment.pay_widg_status_label', { status: paymentStatus })}
           </Alert>);
 
       default:
         return paymentStatus ? (
           <Alert severity="info" icon={<InfoIcon />}>
-            Статус: {paymentStatus}
+            {t('payment.pay_widg_status_label', { status: paymentStatus })}
           </Alert>) : null;
     }
   };
@@ -440,7 +443,7 @@ const PaymentWidget = ({
           <Box display="flex" justifyContent="center" alignItems="center" className="pw-loading-box">
             <CircularProgress />
             <Typography variant="body1" className="pw-loading-text">
-              Загрузка способов оплаты...
+              {t('payment.pay_widg_loading_methods')}
             </Typography>
           </Box>
         </CardContent>
@@ -453,7 +456,7 @@ const PaymentWidget = ({
       <Card>
         <CardContent>
           <Alert severity="warning">
-            Нет доступных способов оплаты для валюты {currency}
+            {t('payment.pay_widg_no_methods', { currency })}
           </Alert>
         </CardContent>
       </Card>);
@@ -467,7 +470,7 @@ const PaymentWidget = ({
         <Box display="flex" alignItems="center" className="pw-header-row">
           <PaymentIcon className="pw-header-icon" />
           <Typography variant="h6" component="h2">
-            Оплата услуг
+            {t('payment.pay_widg_payment_for_services')}
           </Typography>
         </Box>
 
@@ -476,7 +479,7 @@ const PaymentWidget = ({
           <div className="pw-payment-info-row">
             <div className="pw-payment-info-cell">
               <Typography variant="body2" color="textSecondary">
-                Сумма к оплате:
+                {t('payment.pay_widg_amount_due')}
               </Typography>
               <Typography variant="h5" color="primary" className="pw-amount-bold">
                 {formatAmount(amount, currency)}
@@ -484,10 +487,10 @@ const PaymentWidget = ({
             </div>
             <div className="pw-payment-info-cell">
               <Typography variant="body2" color="textSecondary">
-                Описание:
+                {t('payment.pay_widg_description')}
               </Typography>
               <Typography variant="body1">
-                {description}
+                {effectiveDescription}
               </Typography>
             </div>
           </div>
@@ -498,7 +501,7 @@ const PaymentWidget = ({
         {/* Выбор провайдера */}
         <Select
           id="payment-provider"
-          label="Способ оплаты"
+          label={t('payment.pay_widg_method_label')}
           value={selectedProvider}
           onChange={(value) => setSelectedProvider(value)}
           disabled={loading}
@@ -554,10 +557,10 @@ const PaymentWidget = ({
             {loading ?
             <>
                 <CircularProgress size={20} className="pw-submit-spinner" />
-                Обработка...
+                {t('payment.pay_widg_processing')}
               </> :
 
-            `Оплатить ${formatAmount(amount, currency)}`
+            t('payment.pay_widg_pay_amount', { amount: formatAmount(amount, currency) })
             }
           </Button>
 
@@ -569,7 +572,7 @@ const PaymentWidget = ({
             onClick={cancelPayment}
             disabled={loading}>
 
-              Отмена
+              {t('payment.pay_widg_cancel')}
             </Button>
           }
         </Box>

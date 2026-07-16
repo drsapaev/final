@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Download, X, Smartphone, Monitor } from 'lucide-react';
 import { Button, Card } from '../ui/macos';
 import logger from '../../utils/logger';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 /**
  * Компонент для предложения установки PWA
  */

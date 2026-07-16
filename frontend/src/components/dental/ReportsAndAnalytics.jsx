@@ -44,7 +44,7 @@ import {
   X } from
 'lucide-react';
 import PropTypes from 'prop-types';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 /**
  * Отчеты и аналитика для стоматологической ЭМК
@@ -98,6 +98,7 @@ const ReportsAndAnalytics = ({
   initialData = null,
   onClose
 }) => {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState('overview');
   const [dateRange, setDateRange] = useState('30d');
   const analyticsData = initialData || EMPTY_ANALYTICS_DATA;
@@ -150,28 +151,28 @@ const ReportsAndAnalytics = ({
       {/* Основные метрики */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {renderMetricCard(
-        'Всего пациентов',
+        t('dental.dental_ra_metric_total_patients'),
         analyticsData.overview.totalPatients.toLocaleString(),
         analyticsData.overview.growthRate,
         <Users className="h-6 w-6" />,
         'blue'
       )}
         {renderMetricCard(
-        'Записей на прием',
+        t('dental.dental_ra_metric_appointments'),
         analyticsData.overview.totalAppointments.toLocaleString(),
         8.2,
         <Calendar className="h-6 w-6" />,
         'green'
       )}
         {renderMetricCard(
-        'Выручка',
-        `${(analyticsData.overview.totalRevenue / 1000000).toFixed(1)}М сум`,
+        t('dental.dental_ra_metric_revenue'),
+        t('dental.dental_ra_revenue_million', { value: (analyticsData.overview.totalRevenue / 1000000).toFixed(1) }),
         15.7,
         <DollarSign className="h-6 w-6" />,
         'purple'
       )}
         {renderMetricCard(
-        'Средняя оценка',
+        t('dental.dental_ra_metric_rating'),
         analyticsData.overview.averageRating,
         0.3,
         <Star className="h-6 w-6" />,
@@ -183,7 +184,7 @@ const ReportsAndAnalytics = ({
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* График выручки */}
         <div className="bg-white rounded-lg p-6 shadow-sm border">
-          <h3 className="text-lg font-semibold mb-4">Выручка по месяцам</h3>
+          <h3 className="text-lg font-semibold mb-4">{t('dental.dental_ra_revenue_monthly')}</h3>
           <div className="h-64 flex items-end justify-between space-x-2">
             {analyticsData.revenue.monthly.map((item, index) =>
           <div key={index} className="flex flex-col items-center">
@@ -199,7 +200,7 @@ const ReportsAndAnalytics = ({
 
         {/* Распределение по категориям */}
         <div className="bg-white rounded-lg p-6 shadow-sm border">
-          <h3 className="text-lg font-semibold mb-4">Выручка по категориям</h3>
+          <h3 className="text-lg font-semibold mb-4">{t('dental.dental_ra_revenue_categories')}</h3>
           <div className="space-y-3">
             {analyticsData.revenue.byCategory.map((item, index) =>
           <div key={index} className="flex items-center justify-between">
@@ -214,7 +215,7 @@ const ReportsAndAnalytics = ({
         </div>
                 <div className="text-right">
                   <div className="text-sm font-semibold">{item.percentage}%</div>
-                  <div className="text-xs text-gray-600">{item.revenue.toLocaleString()} сум</div>
+                  <div className="text-xs text-gray-600">{t('dental.dental_ra_revenue_sum', { value: item.revenue.toLocaleString() })}</div>
             </div>
             </div>
           )}
@@ -224,7 +225,7 @@ const ReportsAndAnalytics = ({
 
       {/* Статистика записей */}
       <div className="bg-white rounded-lg p-6 shadow-sm border">
-        <h3 className="text-lg font-semibold mb-4">Статистика записей</h3>
+        <h3 className="text-lg font-semibold mb-4">{t('dental.dental_ra_appointments_stats')}</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {analyticsData.appointments.byStatus.map((item, index) =>
         <div key={index} className="text-center">
@@ -244,11 +245,11 @@ const ReportsAndAnalytics = ({
       {/* Статистика пациентов */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-white rounded-lg p-6 shadow-sm border">
-          <h3 className="text-lg font-semibold mb-4">Возрастные группы</h3>
+          <h3 className="text-lg font-semibold mb-4">{t('dental.dental_ra_age_groups')}</h3>
           <div className="space-y-3">
             {analyticsData.patients.ageGroups.map((group, index) =>
           <div key={index} className="flex items-center justify-between">
-                <span className="text-sm font-medium">{group.age} лет</span>
+                <span className="text-sm font-medium">{t('dental.dental_ra_age_label', { age: group.age })}</span>
           <div className="flex items-center gap-2">
                   <div className="w-32 bg-gray-200 rounded-full h-2">
                     <div
@@ -264,7 +265,7 @@ const ReportsAndAnalytics = ({
         </div>
 
         <div className="bg-white rounded-lg p-6 shadow-sm border">
-          <h3 className="text-lg font-semibold mb-4">Распределение по полу</h3>
+          <h3 className="text-lg font-semibold mb-4">{t('dental.dental_ra_gender_distribution')}</h3>
           <div className="space-y-4">
             {analyticsData.patients.genderDistribution.map((item, index) =>
           <div key={index} className="flex items-center justify-between">
@@ -286,19 +287,19 @@ const ReportsAndAnalytics = ({
 
       {/* Новые и возвращающиеся пациенты */}
     <div className="bg-white rounded-lg p-6 shadow-sm border">
-        <h3 className="text-lg font-semibold mb-4">Типы пациентов</h3>
+        <h3 className="text-lg font-semibold mb-4">{t('dental.dental_ra_patient_types')}</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="text-center">
             <div className="text-3xl font-bold text-green-600 mb-2">
               {analyticsData.patients.newPatients}
             </div>
-            <div className="text-sm text-gray-600">Новые пациенты</div>
+            <div className="text-sm text-gray-600">{t('dental.dental_ra_new_patients')}</div>
         </div>
           <div className="text-center">
             <div className="text-3xl font-bold text-blue-600 mb-2">
               {analyticsData.patients.returningPatients}
         </div>
-            <div className="text-sm text-gray-600">Возвращающиеся пациенты</div>
+            <div className="text-sm text-gray-600">{t('dental.dental_ra_returning_patients')}</div>
       </div>
         </div>
       </div>
@@ -310,7 +311,7 @@ const ReportsAndAnalytics = ({
   <div className="space-y-6">
       <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
         <div className="px-6 py-4 border-b">
-          <h3 className="text-lg font-semibold">Статистика врачей</h3>
+          <h3 className="text-lg font-semibold">{t('dental.dental_ra_doctors_stats')}</h3>
       </div>
       <div className="overflow-x-auto">
         <div className="admin-table-wrapper">
@@ -318,25 +319,25 @@ const ReportsAndAnalytics = ({
           <thead className="bg-gray-50">
             <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Врач
+                  {t('dental.dental_ra_th_doctor')}
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Специальность
+                  {t('dental.dental_ra_th_specialty')}
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Пациенты
+                  {t('dental.dental_ra_th_patients')}
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Записи
+                  {t('dental.dental_ra_th_appointments')}
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Выручка
+                  {t('dental.dental_ra_th_revenue')}
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Рейтинг
+                  {t('dental.dental_ra_th_rating')}
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Эффективность
+                  {t('dental.dental_ra_th_efficiency')}
                 </th>
             </tr>
           </thead>
@@ -363,7 +364,7 @@ const ReportsAndAnalytics = ({
                     <div className="text-sm text-gray-900">{doctor.appointments}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{doctor.revenue.toLocaleString()} сум</div>
+                    <div className="text-sm text-gray-900">{t('dental.dental_ra_revenue_sum', { value: doctor.revenue.toLocaleString() })}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center" aria-label={`Rating ${doctor.rating}`}>
@@ -397,23 +398,23 @@ const ReportsAndAnalytics = ({
   <div className="space-y-6">
       <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
         <div className="px-6 py-4 border-b">
-          <h3 className="text-lg font-semibold">Статистика процедур</h3>
+          <h3 className="text-lg font-semibold">{t('dental.dental_ra_procedures_stats')}</h3>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead className="bg-gray-50">
             <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Процедура
+                  {t('dental.dental_ra_th_procedure')}
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Количество
+                  {t('dental.dental_ra_th_count')}
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Выручка
+                  {t('dental.dental_ra_th_revenue')}
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Рост
+                  {t('dental.dental_ra_th_growth')}
                 </th>
             </tr>
           </thead>
@@ -446,7 +447,7 @@ const ReportsAndAnalytics = ({
                     <div className="text-sm text-gray-900">{procedure.count}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{procedure.revenue.toLocaleString()} сум</div>
+                    <div className="text-sm text-gray-900">{t('dental.dental_ra_revenue_sum', { value: procedure.revenue.toLocaleString() })}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className={`flex items-center ${
@@ -475,9 +476,9 @@ const ReportsAndAnalytics = ({
         {/* Заголовок */}
         <div className="flex items-center justify-between p-6 border-b">
           <div>
-            <h2 className="text-xl font-semibold">Отчеты и аналитика</h2>
+            <h2 className="text-xl font-semibold">{t('dental.dental_ra_dialog_title')}</h2>
             <p className="text-gray-600 text-sm">
-              Статистика и аналитика работы клиники
+              {t('dental.dental_ra_dialog_subtitle')}
             </p>
           </div>
           
@@ -487,10 +488,10 @@ const ReportsAndAnalytics = ({
               onChange={(e) => handleDateRangeChange(e.target.value)}
               className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
               
-              <option value="7d">Последние 7 дней</option>
-              <option value="30d">Последние 30 дней</option>
-              <option value="90d">Последние 90 дней</option>
-              <option value="1y">Последний год</option>
+              <option value="7d">{t('dental.dental_ra_range_7d')}</option>
+              <option value="30d">{t('dental.dental_ra_range_30d')}</option>
+              <option value="90d">{t('dental.dental_ra_range_90d')}</option>
+              <option value="1y">{t('dental.dental_ra_range_1y')}</option>
             </select>
             
             <button
@@ -499,12 +500,12 @@ const ReportsAndAnalytics = ({
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50">
 
               <Download className="h-4 w-4" />
-              Экспорт PDF
+              {t('dental.dental_ra_btn_export_pdf')}
             </button>
             
             <button
               onClick={onClose}
-              aria-label="Закрыть отчеты и аналитику стоматологии"
+              aria-label={t('dental.dental_ra_aria_close')}
               className="p-2 text-gray-500 hover:text-gray-700">
               
               <X className="h-5 w-5" />
@@ -516,10 +517,10 @@ const ReportsAndAnalytics = ({
         <div className="border-b">
           <nav className="flex space-x-8 px-6">
             {[
-            { id: 'overview', label: 'Обзор', icon: BarChart3 },
-            { id: 'patients', label: 'Пациенты', icon: Users },
-            { id: 'doctors', label: 'Врачи', icon: User },
-            { id: 'procedures', label: 'Процедуры', icon: Scissors }].
+            { id: 'overview', label: t('dental.dental_ra_tab_overview'), icon: BarChart3 },
+            { id: 'patients', label: t('dental.dental_ra_tab_patients'), icon: Users },
+            { id: 'doctors', label: t('dental.dental_ra_tab_doctors'), icon: User },
+            { id: 'procedures', label: t('dental.dental_ra_tab_procedures'), icon: Scissors }].
             map((tab) =>
             <button
               key={tab.id}

@@ -44,7 +44,7 @@ import { resolveCanonicalVisitId } from '../utils/canonicalVisit';
 import { printPanelTicket } from '../services/panelPrint';
 import notify from '../services/notify';
 // STRAT#34: useTranslation adapter for confirm/notify i18n.
-import { useTranslation } from '../i18n/adapter';
+import { useTranslation } from '../i18n/useTranslation';
 import { useConfirm } from '../components/common/ConfirmDialog';
 import { useSessionTimeoutWarning } from '../hooks/useSessionTimeoutWarning';
 import { useDentalHotkeys } from '../hooks/useDentalHotkeys';
@@ -99,7 +99,7 @@ function resolveDoctorQueueEntryId(row) {
   return null;
 }
 
-function buildPatientsFromAppointments(appointments) {
+function buildPatientsFromAppointments(appointments, t) {
   const patientsById = new Map();
 
   appointments.forEach((appointment) => {
@@ -109,7 +109,7 @@ function buildPatientsFromAppointments(appointments) {
     }
 
     const patientName =
-      appointment.patient_fio || appointment.patient_name || appointment.name || 'Пациент';
+      appointment.patient_fio || appointment.patient_name || appointment.name || t('dental.dental_panel_patient_default');
 
     patientsById.set(patientId, {
       id: patientId,
@@ -485,7 +485,7 @@ const DentistPanelUnified = () => {
       appointmentsTableDataRef.current = dentistAppointmentsCache;
       setAppointmentsTableData(dentistAppointmentsCache);
       setPatients((prev) => {
-        const derivedPatients = buildPatientsFromAppointments(dentistAppointmentsCache);
+        const derivedPatients = buildPatientsFromAppointments(dentistAppointmentsCache, tI18n);
         return derivedPatients.length > 0 ? derivedPatients : prev;
       });
       return dentistAppointmentsCache;
@@ -527,10 +527,10 @@ const DentistPanelUnified = () => {
                     patient_birth_year: entry.patient_birth_year || '',
                     address: entry.address || '',
                     visit_type:
-                      entry.discount_mode === 'repeat' ? 'Повторный' :
-                      entry.discount_mode === 'benefit' ? 'Льготный' :
+                      entry.discount_mode === 'repeat' ? tI18n('dental.dental_panel_discount_repeat') :
+                      entry.discount_mode === 'benefit' ? tI18n('dental.dental_panel_discount_benefit') :
                       entry.discount_mode === 'all_free' ? 'All Free' :
-                      'Платный',
+                      tI18n('dental.dental_panel_discount_paid'),
                     discount_mode: entry.discount_mode || 'none',
                     services: entry.services || [],
                     service_codes: entry.service_codes || [],
@@ -550,7 +550,7 @@ const DentistPanelUnified = () => {
                     canonical_status: entry.canonical_status ?? null,
                     queue_status: entry.queue_status ?? null,
                     queue_position: entry.queue_position,
-                    doctor: entry.doctor_name || 'Врач',
+                    doctor: entry.doctor_name || tI18n('dental.dental_panel_doctor_default'),
                     specialty: queue.specialty,
                     ...adaptTimeFields(entry, data),
                     status: entry.status ?? null,
@@ -580,7 +580,7 @@ const DentistPanelUnified = () => {
         appointmentsTableDataRef.current = enrichedAppointmentsData;
         setAppointmentsTableData(enrichedAppointmentsData);
         setPatients((prev) => {
-          const derivedPatients = buildPatientsFromAppointments(enrichedAppointmentsData);
+          const derivedPatients = buildPatientsFromAppointments(enrichedAppointmentsData, tI18n);
             return derivedPatients.length > 0 ? derivedPatients : prev;
           });
           return enrichedAppointmentsData;
@@ -609,7 +609,7 @@ const DentistPanelUnified = () => {
         dentistAppointmentsLoadPromise = null;
       }
     }
-  }, [getAllPatientServicesCb]);
+  }, [getAllPatientServicesCb, tI18n]);
 
   // Загружаем записи при переключении на вкладку
   useEffect(() => {
@@ -641,8 +641,8 @@ const DentistPanelUnified = () => {
   ), []);
 
   const resolvePatientName = useCallback((patient) => (
-    patient?.patient_name || patient?.patient_fio || patient?.name || 'Пациент'
-  ), []);
+    patient?.patient_name || patient?.patient_fio || patient?.name || tI18n('dental.dental_panel_patient_default')
+  ), [tI18n]);
 
   // Обработчики для таблицы записей
   const handleAppointmentRowClick = async (row) => {
@@ -701,18 +701,18 @@ const DentistPanelUnified = () => {
         break;
       case 'payment':
         logger.info('[Dentist] Открытие окна оплаты для:', row.patient_fio);
-        notify.info(`Оплата для пациента: ${row.patient_fio}. Функция будет реализована позже.`);
+        notify.info(tI18n('dental.dental_panel_payment_todo', { name: row.patient_fio }));
         break;
       case 'print':
         logger.info('[Dentist] Печать талона для:', row.patient_fio);
         try {
           const printResult = await printPanelTicket(row, {
-            specialtyName: 'Стоматология'
+            specialtyName: tI18n('dental.dental_panel_specialty_name')
           });
-          notify.success(printResult?.message || `Талон для ${row.patient_fio} отправлен на печать`);
+          notify.success(printResult?.message || tI18n('dental.dental_panel_ticket_printed', { name: row.patient_fio }));
         } catch (error) {
           logger.error('[Dentist] Ошибка печати талона:', error);
-          notify.error(error.message || 'Не удалось отправить талон на печать');
+          notify.error(error.message || tI18n('dental.dental_panel_ticket_print_failed'));
         }
         break;
       case 'complete':
@@ -762,7 +762,7 @@ const DentistPanelUnified = () => {
 
   const loadPatients = useCallback(async () => {
     try {
-      const derivedPatients = buildPatientsFromAppointments(appointmentsTableDataRef.current);
+      const derivedPatients = buildPatientsFromAppointments(appointmentsTableDataRef.current, tI18n);
       if (derivedPatients.length > 0) {
         logger.info('[Dentist] Загружаю пациентов из уже загруженных записей', {
           count: derivedPatients.length,
@@ -777,6 +777,7 @@ const DentistPanelUnified = () => {
         Array.isArray(refreshedAppointments) && refreshedAppointments.length > 0
           ? refreshedAppointments
           : appointmentsTableDataRef.current,
+        tI18n,
       );
 
       if (refreshedPatients.length > 0) {
@@ -785,7 +786,7 @@ const DentistPanelUnified = () => {
     } catch (e) {
       logger.error('Ошибка загрузки пациентов:', e);
     }
-  }, [loadDentistryAppointments]);
+  }, [loadDentistryAppointments, tI18n]);
 
   const loadTreatmentPlans = useCallback(async () => {
     try {
@@ -912,7 +913,7 @@ const DentistPanelUnified = () => {
             matchingAppointment.patient_fio ||
             matchingAppointment.patient_name ||
             matchingAppointment.name ||
-            'Пациент';
+            tI18n('dental.dental_panel_patient_default');
 
           const patientObj = {
             id: matchingAppointment.appointment_id || matchingAppointment.id || patientIdFromUrl || visitIdFromUrl,
@@ -934,8 +935,8 @@ const DentistPanelUnified = () => {
 
         if (visitIdFromUrl || patientIdFromUrl) {
           const fallbackLabel = patientIdFromUrl
-            ? `Пациент #${patientIdFromUrl}`
-            : `Визит #${visitIdFromUrl}`;
+            ? tI18n('dental.dental_panel_patient_url_fallback', { id: patientIdFromUrl })
+            : tI18n('dental.dental_panel_visit_url_fallback', { id: visitIdFromUrl });
 
           const patientObj = {
             id: patientIdFromUrl || visitIdFromUrl,
@@ -1042,24 +1043,25 @@ const DentistPanelUnified = () => {
   // trigger unnecessary surgical intervention, hospitalization, or IV
   // antibiotics. The doctor must explicitly confirm when one of these codes
   // is present in the visit's icd10 field.
-  const CRITICAL_ICD10_CODES = useRef({
-    'K04': 'Заболевания пульпы и периапикальных тканей (пульпит, периодонтит)',
-    'K10': 'Заболевания челюстей (остеомиелит, абсцесс, киста)',
-  }).current;
+  const CRITICAL_ICD10_CODES = useRef(['K04', 'K10']).current;
 
   const getCriticalDiagnosisWarning = useCallback(
     (icd10Code) => {
       if (!icd10Code || typeof icd10Code !== 'string') return null;
       const code = icd10Code.trim().toUpperCase();
       // Match by prefix (e.g. "K04" matches "K04.0", "K04.9", "K049")
-      for (const [prefix, label] of Object.entries(CRITICAL_ICD10_CODES)) {
+      for (const prefix of CRITICAL_ICD10_CODES) {
         if (code.startsWith(prefix)) {
-          return { code: prefix, label, fullCode: code };
+          return {
+            code: prefix,
+            label: tI18n(`dental.dental_panel_critical_${prefix}`),
+            fullCode: code,
+          };
         }
       }
       return null;
     },
-    [CRITICAL_ICD10_CODES]
+    [CRITICAL_ICD10_CODES, tI18n]
   );
 
   const handleCompleteVisit = async () => {
@@ -1089,26 +1091,20 @@ const DentistPanelUnified = () => {
     let confirmOptions;
     if (criticalWarning) {
       confirmOptions = {
-        title: `Критический диагноз: ${criticalWarning.label} (${criticalWarning.code})`,
-        message:
-          `Код МКБ-10 ${criticalWarning.fullCode} соответствует критическому стоматологическому диагнозу: ` +
-          `"${criticalWarning.label}". Подтвердите, что диагноз установлен корректно. ` +
-          'Ошибочный диагноз может привести к ненужному хирургическому вмешательству, ' +
-          'госпитализации или назначению IV антибиотиков.',
-        description:
-          'После завершения приёма EMR будет сохранена с этим диагнозом. ' +
-          'Изменение диагноза после подписания возможно только через поправку (amend).',
-        confirmLabel: 'Подтверждаю диагноз',
-        cancelLabel: 'Отмена — проверить диагноз',
+        title: tI18n('dental.dental_panel_critical_title', { label: criticalWarning.label, code: criticalWarning.code }),
+        message: tI18n('dental.dental_panel_critical_message', { fullCode: criticalWarning.fullCode, label: criticalWarning.label }),
+        description: tI18n('dental.dental_panel_critical_description'),
+        confirmLabel: tI18n('dental.dental_panel_critical_confirm'),
+        cancelLabel: tI18n('dental.dental_panel_critical_cancel'),
         intent: 'danger',
       };
     } else {
       confirmOptions = {
-        title: 'Завершить приём?',
-        message: 'Приём будет сохранён. Убедитесь, что диагноз, план лечения и протокол заполнены.',
-        description: 'После завершения изменения возможны только через поправку EMR.',
-        confirmLabel: 'Завершить приём',
-        cancelLabel: 'Отмена',
+        title: tI18n('dental.dental_panel_complete_title'),
+        message: tI18n('dental.dental_panel_complete_message'),
+        description: tI18n('dental.dental_panel_complete_description'),
+        confirmLabel: tI18n('dental.dental_panel_complete_confirm'),
+        cancelLabel: tI18n('dental.dental_panel_complete_cancel'),
         intent: 'primary',
       };
     }
@@ -1157,7 +1153,7 @@ const DentistPanelUnified = () => {
         const next = await queueService.callNextWaiting(SPECIALTY_KEYS.DENTISTRY);
         logger.info('[Dentistry] callNextWaiting(dentistry): result', next);
         if (next?.success && next?.entry?.number) {
-          notify.success(`Вызван следующий пациент №${next.entry.number}`);
+          notify.success(tI18n('dental.dental_panel_next_patient_called', { number: next.entry.number }));
         }
       } catch (err) {
         logger.warn('[Dentistry] callNextWaiting(dentistry): failed', err);
@@ -1166,7 +1162,7 @@ const DentistPanelUnified = () => {
     } catch (error) {
       logger.error('[Dentistry] handleCompleteVisit: error', error);
       notify.error(
-        error?.message || 'Не удалось завершить приём. Проверьте соединение и попробуйте снова.'
+        error?.message || tI18n('dental.dental_panel_complete_failed')
       );
     } finally {
       logger.info('[Dentistry] handleCompleteVisit: finish');
@@ -1278,7 +1274,7 @@ const DentistPanelUnified = () => {
       historyOfPresentIllness: template.description || '',
       procedures: Array.isArray(template.steps)
         ? template.steps.map((step, index) => ({
-          name: typeof step === 'string' ? step : step?.name || `Шаг ${index + 1}`,
+          name: typeof step === 'string' ? step : step?.name || tI18n('dental.dental_panel_step_label', { index: index + 1 }),
           teeth: '',
           notes: '',
           duration: typeof step === 'object' && step !== null ? step.duration || 0 : 0,
@@ -1288,7 +1284,7 @@ const DentistPanelUnified = () => {
         ? template.materials.map((material) => ({
           name: material?.name || '',
           quantity: material?.quantity || '',
-          notes: material?.required ? 'Обязательный материал' : '',
+          notes: material?.required ? tI18n('dental.dental_panel_required_material') : '',
         }))
         : [],
       anesthesia: Array.isArray(template.anesthesia)
@@ -1316,15 +1312,15 @@ const DentistPanelUnified = () => {
       recommendations: template.aftercare || '',
       nextVisit: { date: '', time: '', purpose: '' },
     };
-  }, []);
+  }, [tI18n]);
 
   const handleProtocolTemplateSelect = useCallback((template) => {
-    const templateName = template?.name || 'Шаблон протокола';
+    const templateName = template?.name || tI18n('dental.dental_panel_template_default');
     const currentPatientName = resolvePatientName(selectedPatient);
     const draft = {
       patient_id: selectedPatient?.patient_id || selectedPatient?.id || null,
-      patient_name: currentPatientName || `Шаблон: ${templateName}`,
-      patient_fio: currentPatientName || `Шаблон: ${templateName}`,
+      patient_name: currentPatientName || tI18n('dental.dental_panel_template_label', { name: templateName }),
+      patient_fio: currentPatientName || tI18n('dental.dental_panel_template_label', { name: templateName }),
       visit_id: selectedPatient?.visit_id || null,
       source: 'protocol-template',
       visitData: buildVisitProtocolDraftFromTemplate(template),
@@ -1338,7 +1334,7 @@ const DentistPanelUnified = () => {
     setProtocolTemplateDraft(draft);
     setShowProtocolTemplates(false);
     setShowVisitProtocol(true);
-  }, [buildVisitProtocolDraftFromTemplate, resolvePatientName, selectedPatient]);
+  }, [buildVisitProtocolDraftFromTemplate, resolvePatientName, selectedPatient, tI18n]);
 
   const handleReports = () => {
     setShowReports(true);
@@ -1350,7 +1346,7 @@ const DentistPanelUnified = () => {
     }
 
     const patientId = patient?.patient?.id || patient?.patient_id || patient?.id || null;
-    const patientName = patient?.patient_name || patient?.patient_fio || patient?.name || 'Пациент';
+    const patientName = patient?.patient_name || patient?.patient_fio || patient?.name || tI18n('dental.dental_panel_patient_default');
     const localRecord = buildDentistVisitProtocolCard(patient, visitData, {
       source: 'local_cache',
     });
@@ -1380,7 +1376,7 @@ const DentistPanelUnified = () => {
       setSavedVisitProtocols((prev) => upsertDentistVisitProtocol(prev, localRecord));
       return localRecord;
     }
-  }, []);
+  }, [tI18n]);
 
   const reopenVisitProtocol = useCallback(async (protocolRecord) => {
     const backendProtocol = await loadDentistVisitProtocolByVisitId(protocolRecord?.visit_id, protocolRecord);
@@ -1394,14 +1390,14 @@ const DentistPanelUnified = () => {
     setSelectedPatient({
       id: selectedProtocol.patient_id || protocolRecord?.patient_id || null,
       patient_id: selectedProtocol.patient_id || protocolRecord?.patient_id || null,
-      patient_name: selectedProtocol.patient_name || protocolRecord?.patient_name || 'Пациент',
-      patient_fio: selectedProtocol.patient_name || protocolRecord?.patient_name || 'Пациент',
+      patient_name: selectedProtocol.patient_name || protocolRecord?.patient_name || tI18n('dental.dental_panel_patient_default'),
+      patient_fio: selectedProtocol.patient_name || protocolRecord?.patient_name || tI18n('dental.dental_panel_patient_default'),
       visit_id: selectedProtocol.visit_id || protocolRecord?.visit_id || null,
       visitData: selectedProtocol.visitData || protocolRecord?.visitData || null,
       source: selectedProtocol.source || protocolRecord?.source || 'reports',
     });
     setShowVisitProtocol(true);
-  }, [loadDentistVisitProtocolByVisitId, setSelectedPatient]);
+  }, [loadDentistVisitProtocolByVisitId, setSelectedPatient, tI18n]);
 
   const handleDentalChart = (patient) => {
     setSelectedPatient({
@@ -1497,29 +1493,29 @@ const DentistPanelUnified = () => {
   const appointmentSummaryItems = useMemo(() => [
     {
       key: 'total',
-      label: 'Всего',
+      label: tI18n('dental.dental_panel_stat_total'),
       value: appointmentsTableData.length,
       variant: 'info'
     },
     {
       key: 'waiting',
-      label: 'Ожидают',
+      label: tI18n('dental.dental_panel_stat_waiting'),
       value: countAppointmentsByStatuses(appointmentsTableData, DENTISTRY_WAITING_STATUSES),
       variant: 'warning'
     },
     {
       key: 'called',
-      label: 'Вызваны',
+      label: tI18n('dental.dental_panel_stat_called'),
       value: countAppointmentsByStatuses(appointmentsTableData, DENTISTRY_CALLED_STATUSES),
       variant: 'primary'
     },
     {
       key: 'completed',
-      label: 'Приняты',
+      label: tI18n('dental.dental_panel_stat_completed'),
       value: countAppointmentsByStatuses(appointmentsTableData, DENTISTRY_COMPLETED_STATUSES),
       variant: 'success'
     }
-  ], [appointmentsTableData]);
+  ], [appointmentsTableData, tI18n]);
 
   // Вкладки
   // Рендер дашборда
@@ -1542,10 +1538,10 @@ const DentistPanelUnified = () => {
         <div className="dental-appointments-header">
           <h3 className="dental-appointments-title">
             <Calendar className="dental-icon-20 dental-text-success dental-mr-8" />
-            Записи к стоматологу
+            {tI18n('dental.dental_panel_appointments_title')}
           </h3>
           <AppointmentSummaryBar
-            ariaLabel="Сводка записей стоматолога"
+            ariaLabel={tI18n('dental.dental_panel_appointments_summary_aria')}
             items={appointmentSummaryItems}
             onRefresh={loadDentistryAppointments}
             refreshDisabled={appointmentsLoading}
@@ -1576,9 +1572,9 @@ const DentistPanelUnified = () => {
   const renderExaminations = () =>
   <div className="dental-flex-col dental-gap-24">
       <Card padding="lg">
-        <h3 className="dental-text-primary">Объективные осмотры</h3>
+        <h3 className="dental-text-primary">{tI18n('dental.dental_panel_examinations_title')}</h3>
         <p className="dental-text-desc dental-text-secondary">
-          Выберите пациента для проведения или просмотра объективного осмотра
+          {tI18n('dental.dental_panel_examinations_subtitle')}
         </p>
 
         <div className="dental-grid-auto-fill-250">
@@ -1587,7 +1583,7 @@ const DentistPanelUnified = () => {
           key={patient.id}
           role="button"
           tabIndex={0}
-          aria-label="Открыть осмотр пациента"
+          aria-label={tI18n('dental.dental_panel_aria_examination')}
           className="dental-card-btn"
           onClick={() => handleExamination(patient)}
           onKeyDown={(event) => handleCardKeyDown(event, () => handleExamination(patient))}
@@ -1606,7 +1602,7 @@ const DentistPanelUnified = () => {
                 </div>
                 <div>
                   <p className="dental-text-primary">{patient.name}</p>
-                  <p className="dental-text-desc dental-text-secondary">Провести осмотр</p>
+                  <p className="dental-text-desc dental-text-secondary">{tI18n('dental.dental_panel_examination_action')}</p>
                 </div>
               </div>
             </div>
@@ -1620,9 +1616,9 @@ const DentistPanelUnified = () => {
   const renderDiagnoses = () =>
   <div className="dental-flex-col dental-gap-24">
       <Card padding="lg">
-        <h3 className="dental-text-primary">Диагнозы и назначения</h3>
+        <h3 className="dental-text-primary">{tI18n('dental.dental_panel_diagnoses_title')}</h3>
         <p className="dental-text-desc dental-text-secondary">
-          Выберите пациента для постановки диагнозов и назначений
+          {tI18n('dental.dental_panel_diagnoses_subtitle')}
         </p>
 
         <div className="dental-grid-auto-fill-250">
@@ -1631,7 +1627,7 @@ const DentistPanelUnified = () => {
           key={patient.id}
           role="button"
           tabIndex={0}
-          aria-label="Открыть диагноз пациента"
+          aria-label={tI18n('dental.dental_panel_aria_diagnosis')}
           className="dental-card-btn"
           onClick={() => handleDiagnosis(patient)}
           onKeyDown={(event) => handleCardKeyDown(event, () => handleDiagnosis(patient))}
@@ -1650,7 +1646,7 @@ const DentistPanelUnified = () => {
                 </div>
                 <div>
                   <p className="dental-text-primary">{patient.name}</p>
-                  <p className="dental-text-desc dental-text-secondary">Поставить диагноз</p>
+                  <p className="dental-text-desc dental-text-secondary">{tI18n('dental.dental_panel_diagnosis_action')}</p>
                 </div>
               </div>
             </div>
@@ -1681,9 +1677,9 @@ const DentistPanelUnified = () => {
     return (
       <div className="dental-flex-col dental-gap-24">
         <Card padding="lg">
-          <h3 className="dental-text-primary">Протоколы визитов</h3>
+          <h3 className="dental-text-primary">{tI18n('dental.dental_panel_visits_title')}</h3>
           <p className="dental-text-desc dental-text-secondary">
-            Выберите пациента из очереди или выберите из списка для создания протокола визита
+            {tI18n('dental.dental_panel_visits_subtitle')}
           </p>
 
           <div className="dental-grid-auto-fill-250">
@@ -1692,7 +1688,7 @@ const DentistPanelUnified = () => {
               key={patient.id}
               role="button"
               tabIndex={0}
-              aria-label="Открыть протокол визита"
+              aria-label={tI18n('dental.dental_panel_aria_visit')}
               className="dental-card-btn"
               onClick={() => handleVisitProtocol(patient)}
               onKeyDown={(event) => handleCardKeyDown(event, () => handleVisitProtocol(patient))}
@@ -1711,7 +1707,7 @@ const DentistPanelUnified = () => {
                   </div>
                   <div>
                     <p className="dental-text-primary">{patient.name}</p>
-                    <p className="dental-text-desc dental-text-secondary">Создать протокол</p>
+                    <p className="dental-text-desc dental-text-secondary">{tI18n('dental.dental_panel_visit_action')}</p>
                   </div>
                 </div>
               </div>
@@ -1726,9 +1722,9 @@ const DentistPanelUnified = () => {
   const renderPhotos = () =>
   <div className="dental-flex-col dental-gap-24">
       <Card padding="lg">
-        <h3 className="dental-text-primary">Фото и рентген архив</h3>
+        <h3 className="dental-text-primary">{tI18n('dental.dental_panel_photos_title')}</h3>
         <p className="dental-text-desc dental-text-secondary">
-          Выберите пациента для просмотра и управления фото и рентгеновскими снимками
+          {tI18n('dental.dental_panel_photos_subtitle')}
         </p>
 
         <div className="dental-grid-auto-fill-250">
@@ -1737,7 +1733,7 @@ const DentistPanelUnified = () => {
           key={patient.id}
           role="button"
           tabIndex={0}
-          aria-label="Открыть фотоархив пациента"
+          aria-label={tI18n('dental.dental_panel_aria_photos')}
           className="dental-card-btn"
           onClick={() => handlePhotoArchive(patient)}
           onKeyDown={(event) => handleCardKeyDown(event, () => handlePhotoArchive(patient))}
@@ -1756,7 +1752,7 @@ const DentistPanelUnified = () => {
                 </div>
                 <div>
                   <p className="dental-text-primary">{patient.name}</p>
-                  <p className="dental-text-desc dental-text-secondary">Открыть архив</p>
+                  <p className="dental-text-desc dental-text-secondary">{tI18n('dental.dental_panel_photos_action')}</p>
                 </div>
               </div>
             </div>
@@ -1783,9 +1779,9 @@ const DentistPanelUnified = () => {
   const renderDentalChart = () =>
   <div className="dental-flex-col dental-gap-24">
       <Card padding="lg">
-        <h3 className="dental-text-primary">Схемы зубов</h3>
+        <h3 className="dental-text-primary">{tI18n('dental.dental_panel_chart_title')}</h3>
         <p className="dental-text-desc dental-text-secondary">
-          Выберите пациента для просмотра и редактирования схемы зубов
+          {tI18n('dental.dental_panel_chart_subtitle')}
         </p>
 
         <div className="dental-grid-auto-fill-250">
@@ -1794,7 +1790,7 @@ const DentistPanelUnified = () => {
           key={patient.id}
           role="button"
           tabIndex={0}
-          aria-label="Открыть схему зубов пациента"
+          aria-label={tI18n('dental.dental_panel_aria_chart')}
           className="dental-card-btn"
           onClick={() => handleDentalChart(patient)}
           onKeyDown={(event) => handleCardKeyDown(event, () => handleDentalChart(patient))}
@@ -1813,7 +1809,7 @@ const DentistPanelUnified = () => {
                 </div>
                 <div>
                   <p className="dental-text-primary">{patient.name}</p>
-                  <p className="dental-text-desc dental-text-secondary">Открыть схему</p>
+                  <p className="dental-text-desc dental-text-secondary">{tI18n('dental.dental_panel_chart_action')}</p>
                 </div>
               </div>
             </div>
@@ -1829,7 +1825,7 @@ const DentistPanelUnified = () => {
   const renderAIAssistant = () =>
   <div className="dental-flex-col dental-gap-24">
       <Card padding="lg">
-        <h3 className="dental-text-primary">AI Помощник</h3>
+        <h3 className="dental-text-primary">{tI18n('dental.dental_panel_ai_title')}</h3>
         <AIAssistant
         specialty="dentistry"
         onSuggestionSelect={(type, suggestion) => {
@@ -1896,7 +1892,7 @@ const DentistPanelUnified = () => {
 
   const selectedPatientId = selectedPatient?.patient?.id || selectedPatient?.patient_id || selectedPatient?.id || null;
   const selectedPatientDisplayName =
-    selectedPatient?.patient_name || selectedPatient?.patient_fio || selectedPatient?.name || 'Пациент';
+    selectedPatient?.patient_name || selectedPatient?.patient_fio || selectedPatient?.name || tI18n('dental.dental_panel_patient_default');
 
   return (
     <div className="dentist-panel dental-text-primary">
@@ -1983,7 +1979,7 @@ const DentistPanelUnified = () => {
       <Suspense
         fallback={
           <Card role="status" aria-live="polite" className="dental-lazy-fallback">
-            Загрузка отчетов...
+            {tI18n('dental.dental_panel_reports_loading')}
           </Card>
         }>
         <LazyReportsAndAnalytics
@@ -2005,11 +2001,11 @@ const DentistPanelUnified = () => {
           <div className="dental-modal-card-xl">
             <div className="dental-flex-between-16">
               <h2 className="dental-heading-xl dental-text-primary">
-                Схема зубов: {selectedPatientDisplayName}
+                {tI18n('dental.dental_panel_chart_modal_title', { name: selectedPatientDisplayName })}
               </h2>
               <button
               onClick={() => setShowDentalChart(false)}
-              aria-label={`Закрыть схему зубов пациента ${selectedPatientDisplayName}`}
+              aria-label={tI18n('dental.dental_panel_chart_modal_close', { name: selectedPatientDisplayName })}
               className="dental-text-desc dental-text-secondary"
               onMouseEnter={(e) => {
                 e.target.style.color = 'var(--mac-text-primary)';
@@ -2042,11 +2038,11 @@ const DentistPanelUnified = () => {
           <div className="dental-modal-card-xl">
             <div className="dental-flex-between-16">
               <h2 className="dental-heading-xl dental-text-primary">
-                План лечения: {selectedPatientDisplayName}
+                {tI18n('dental.dental_panel_plan_modal_title', { name: selectedPatientDisplayName })}
               </h2>
               <button
               onClick={() => setShowTreatmentPlanner(false)}
-              aria-label={`Закрыть план лечения пациента ${selectedPatientDisplayName}`}
+              aria-label={tI18n('dental.dental_panel_plan_modal_close', { name: selectedPatientDisplayName })}
               className="dental-text-desc dental-text-secondary"
               onMouseEnter={(e) => {
                 e.target.style.color = 'var(--mac-text-primary)';
@@ -2078,17 +2074,17 @@ const DentistPanelUnified = () => {
           <div className="bg-white rounded-lg w-full max-w-4xl h-full max-h-[90vh] overflow-auto">
             <div className="p-6 border-b">
               <h2 className="text-xl font-semibold">
-                Новый стоматологический осмотр — {selectedPatientDisplayName}
+                {tI18n('dental.dental_panel_exam_form_title', { name: selectedPatientDisplayName })}
               </h2>
             </div>
             <div className="p-6">
               <form onSubmit={handleExaminationSubmit} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium var(--mac-text-primary) mb-2">Дата осмотра *</label>
+                    <label className="block text-sm font-medium var(--mac-text-primary) mb-2">{tI18n('dental.dental_panel_exam_label_date')}</label>
                     <Input
                     type="date"
-                    aria-label="Дата осмотра"
+                    aria-label={tI18n('dental.dental_panel_exam_aria_date')}
                     value={examinationForm.examination_date}
                     onChange={(e) => setExaminationForm({ ...examinationForm, examination_date: e.target.value })}
                     required
@@ -2096,77 +2092,77 @@ const DentistPanelUnified = () => {
 
                   </div>
                   <div>
-                    <label className="block text-sm font-medium var(--mac-text-primary) mb-2">Гигиена полости рта</label>
+                    <label className="block text-sm font-medium var(--mac-text-primary) mb-2">{tI18n('dental.dental_panel_exam_label_hygiene')}</label>
                     <select
                     value={examinationForm.oral_hygiene}
                     onChange={(e) => setExaminationForm({ ...examinationForm, oral_hygiene: e.target.value })}
                     className="w-full px-3 py-2 border var(--mac-border) rounded-md  var(--mac-accent) ">
 
-                      <option value="">Выберите</option>
-                      <option value="excellent">Отличная</option>
-                      <option value="good">Хорошая</option>
-                      <option value="fair">Удовлетворительная</option>
-                      <option value="poor">Плохая</option>
+                      <option value="">{tI18n('dental.dental_panel_option_select')}</option>
+                      <option value="excellent">{tI18n('dental.dental_panel_hygiene_excellent')}</option>
+                      <option value="good">{tI18n('dental.dental_panel_hygiene_good')}</option>
+                      <option value="fair">{tI18n('dental.dental_panel_hygiene_fair')}</option>
+                      <option value="poor">{tI18n('dental.dental_panel_hygiene_poor')}</option>
                     </select>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium var(--mac-text-primary) mb-2">Статус кариеса</label>
+                    <label className="block text-sm font-medium var(--mac-text-primary) mb-2">{tI18n('dental.dental_panel_exam_label_caries')}</label>
                     <select
                     value={examinationForm.caries_status}
                     onChange={(e) => setExaminationForm({ ...examinationForm, caries_status: e.target.value })}
                     className="w-full px-3 py-2 border var(--mac-border) rounded-md  var(--mac-accent) ">
 
-                      <option value="">Выберите</option>
-                      <option value="none">Нет кариеса</option>
-                      <option value="initial">Начальный</option>
-                      <option value="superficial">Поверхностный</option>
-                      <option value="medium">Средний</option>
-                      <option value="deep">Глубокий</option>
+                      <option value="">{tI18n('dental.dental_panel_option_select')}</option>
+                      <option value="none">{tI18n('dental.dental_panel_caries_none')}</option>
+                      <option value="initial">{tI18n('dental.dental_panel_caries_initial')}</option>
+                      <option value="superficial">{tI18n('dental.dental_panel_caries_superficial')}</option>
+                      <option value="medium">{tI18n('dental.dental_panel_caries_medium')}</option>
+                      <option value="deep">{tI18n('dental.dental_panel_caries_deep')}</option>
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium var(--mac-text-primary) mb-2">Статус пародонта</label>
+                    <label className="block text-sm font-medium var(--mac-text-primary) mb-2">{tI18n('dental.dental_panel_exam_label_periodontal')}</label>
                     <select
                     value={examinationForm.periodontal_status}
                     onChange={(e) => setExaminationForm({ ...examinationForm, periodontal_status: e.target.value })}
                     className="w-full px-3 py-2 border var(--mac-border) rounded-md  var(--mac-accent) ">
 
-                      <option value="">Выберите</option>
-                      <option value="healthy">Здоровый</option>
-                      <option value="gingivitis">Гингивит</option>
-                      <option value="periodontitis">Пародонтит</option>
-                      <option value="advanced">Тяжелый</option>
+                      <option value="">{tI18n('dental.dental_panel_option_select')}</option>
+                      <option value="healthy">{tI18n('dental.dental_panel_periodontal_healthy')}</option>
+                      <option value="gingivitis">{tI18n('dental.dental_panel_periodontal_gingivitis')}</option>
+                      <option value="periodontitis">{tI18n('dental.dental_panel_periodontal_periodontitis')}</option>
+                      <option value="advanced">{tI18n('dental.dental_panel_periodontal_advanced')}</option>
                     </select>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium var(--mac-text-primary) mb-2">Прикус</label>
+                    <label className="block text-sm font-medium var(--mac-text-primary) mb-2">{tI18n('dental.dental_panel_exam_label_occlusion')}</label>
                     <select
                     value={examinationForm.occlusion}
                     onChange={(e) => setExaminationForm({ ...examinationForm, occlusion: e.target.value })}
                     className="w-full px-3 py-2 border var(--mac-border) rounded-md  var(--mac-accent) ">
 
-                      <option value="">Выберите</option>
-                      <option value="normal">Нормальный</option>
-                      <option value="open_bite">Открытый</option>
-                      <option value="deep_bite">Глубокий</option>
-                      <option value="cross_bite">Перекрестный</option>
-                      <option value="crowding">Скученность</option>
+                      <option value="">{tI18n('dental.dental_panel_option_select')}</option>
+                      <option value="normal">{tI18n('dental.dental_panel_occlusion_normal')}</option>
+                      <option value="open_bite">{tI18n('dental.dental_panel_occlusion_open')}</option>
+                      <option value="deep_bite">{tI18n('dental.dental_panel_occlusion_deep')}</option>
+                      <option value="cross_bite">{tI18n('dental.dental_panel_occlusion_cross')}</option>
+                      <option value="crowding">{tI18n('dental.dental_panel_occlusion_crowding')}</option>
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium var(--mac-text-primary) mb-2">Отсутствующие зубы</label>
+                    <label className="block text-sm font-medium var(--mac-text-primary) mb-2">{tI18n('dental.dental_panel_exam_label_missing')}</label>
                     <Input
                     type="text"
-                    aria-label="Отсутствующие зубы"
+                    aria-label={tI18n('dental.dental_panel_exam_aria_missing')}
                     value={examinationForm.missing_teeth}
                     onChange={(e) => setExaminationForm({ ...examinationForm, missing_teeth: e.target.value })}
-                    placeholder="Номера отсутствующих зубов"
+                    placeholder={tI18n('dental.dental_panel_exam_placeholder_missing')}
                     className="w-full px-3 py-2 border var(--mac-border) rounded-md  var(--mac-accent) " />
 
                   </div>
@@ -2174,54 +2170,54 @@ const DentistPanelUnified = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium var(--mac-text-primary) mb-2">Зубной налет</label>
+                    <label className="block text-sm font-medium var(--mac-text-primary) mb-2">{tI18n('dental.dental_panel_exam_label_plaque')}</label>
                     <select
                     value={examinationForm.dental_plaque}
                     onChange={(e) => setExaminationForm({ ...examinationForm, dental_plaque: e.target.value })}
                     className="w-full px-3 py-2 border var(--mac-border) rounded-md  var(--mac-accent) ">
 
-                      <option value="">Выберите</option>
-                      <option value="none">Нет</option>
-                      <option value="minimal">Минимальный</option>
-                      <option value="moderate">Умеренный</option>
-                      <option value="heavy">Тяжелый</option>
+                      <option value="">{tI18n('dental.dental_panel_option_select')}</option>
+                      <option value="none">{tI18n('dental.dental_panel_plaque_none')}</option>
+                      <option value="minimal">{tI18n('dental.dental_panel_plaque_minimal')}</option>
+                      <option value="moderate">{tI18n('dental.dental_panel_plaque_moderate')}</option>
+                      <option value="heavy">{tI18n('dental.dental_panel_plaque_heavy')}</option>
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium var(--mac-text-primary) mb-2">Кровоточивость десен</label>
+                    <label className="block text-sm font-medium var(--mac-text-primary) mb-2">{tI18n('dental.dental_panel_exam_label_bleeding')}</label>
                     <select
                     value={examinationForm.gingival_bleeding}
                     onChange={(e) => setExaminationForm({ ...examinationForm, gingival_bleeding: e.target.value })}
                     className="w-full px-3 py-2 border var(--mac-border) rounded-md  var(--mac-accent) ">
 
-                      <option value="">Выберите</option>
-                      <option value="none">Нет</option>
-                      <option value="mild">Легкая</option>
-                      <option value="moderate">Умеренная</option>
-                      <option value="severe">Тяжелая</option>
+                      <option value="">{tI18n('dental.dental_panel_option_select')}</option>
+                      <option value="none">{tI18n('dental.dental_panel_bleeding_none')}</option>
+                      <option value="mild">{tI18n('dental.dental_panel_bleeding_mild')}</option>
+                      <option value="moderate">{tI18n('dental.dental_panel_bleeding_moderate')}</option>
+                      <option value="severe">{tI18n('dental.dental_panel_bleeding_severe')}</option>
                     </select>
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium var(--mac-text-primary) mb-2">Диагноз</label>
+                  <label className="block text-sm font-medium var(--mac-text-primary) mb-2">{tI18n('dental.dental_panel_exam_label_diagnosis')}</label>
                   <textarea
-                  aria-label="Диагноз осмотра"
+                  aria-label={tI18n('dental.dental_panel_exam_aria_diagnosis')}
                   value={examinationForm.diagnosis}
                   onChange={(e) => setExaminationForm({ ...examinationForm, diagnosis: e.target.value })}
-                  placeholder="Стоматологический диагноз"
+                  placeholder={tI18n('dental.dental_panel_exam_placeholder_diagnosis')}
                   rows={3}
                   className="w-full px-3 py-2 border var(--mac-border) rounded-md  var(--mac-accent) " />
 
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium var(--mac-text-primary) mb-2">Рекомендации</label>
+                  <label className="block text-sm font-medium var(--mac-text-primary) mb-2">{tI18n('dental.dental_panel_exam_label_recommendations')}</label>
                   <textarea
-                  aria-label="Рекомендации по осмотру"
+                  aria-label={tI18n('dental.dental_panel_exam_aria_recommendations')}
                   value={examinationForm.recommendations}
                   onChange={(e) => setExaminationForm({ ...examinationForm, recommendations: e.target.value })}
-                  placeholder="Рекомендации по лечению и уходу"
+                  placeholder={tI18n('dental.dental_panel_exam_placeholder_recommendations')}
                   rows={3}
                   className="w-full px-3 py-2 border var(--mac-border) rounded-md  var(--mac-accent) " />
 
@@ -2230,14 +2226,14 @@ const DentistPanelUnified = () => {
                 <div className="flex gap-2">
                   <Button type="submit" className="flex items-center gap-2">
                     <Save className="h-4 w-4" />
-                    Сохранить осмотр
+                    {tI18n('dental.dental_panel_exam_btn_save')}
                   </Button>
                   <Button
                   type="button"
                   variant="outline"
                   onClick={() => setShowExaminationForm(false)}>
 
-                    Отмена
+                    {tI18n('dental.dental_panel_exam_btn_cancel')}
                   </Button>
                 </div>
               </form>

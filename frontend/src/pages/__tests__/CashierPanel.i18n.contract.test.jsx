@@ -19,8 +19,9 @@ const translationsSource = fs.readFileSync(
 );
 
 describe('CashierPanel STRAT#31 — i18n migration', () => {
-  it('imports useTranslation from i18n adapter', () => {
-    expect(source).toContain("from '../i18n/adapter'");
+  it('imports useTranslation from unified i18n', () => {
+    // i18n-unification: now imports from unified useTranslation, not adapter shim
+    expect(source).toContain("from '../i18n/useTranslation'");
     expect(source).toContain('useTranslation');
   });
 

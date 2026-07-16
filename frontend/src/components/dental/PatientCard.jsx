@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect } from 'react';
 import logger from '../../utils/logger';
 import {
@@ -33,6 +33,7 @@ const PatientCard = ({
   onClose,
   isEditMode = false
 }) => {
+  const { t } = useTranslation();
   const [formData, setFormData] = useState({
     // Основные данные
     id: '',
@@ -180,10 +181,10 @@ const PatientCard = ({
 
   // Вкладки
   const tabs = [
-  { id: 'basic', label: 'Основные данные', icon: User },
-  { id: 'documents', label: 'Документы', icon: FileText },
-  { id: 'medical', label: 'Мед. анамнез', icon: Heart },
-  { id: 'emergency', label: 'Экстренные контакты', icon: AlertTriangle }];
+  { id: 'basic', label: t('dental.dental_pc_tab_basic'), icon: User },
+  { id: 'documents', label: t('dental.dental_pc_tab_documents'), icon: FileText },
+  { id: 'medical', label: t('dental.dental_pc_tab_medical'), icon: Heart },
+  { id: 'emergency', label: t('dental.dental_pc_tab_emergency'), icon: AlertTriangle }];
 
 
   // Рендер основных данных
@@ -193,11 +194,11 @@ const PatientCard = ({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Фамилия *
+            {t('dental.dental_pc_label_surname')}
           </label>
           <input
           type="text"
-          aria-label="Фамилия пациента"
+          aria-label={t('dental.dental_pc_aria_surname')}
           value={formData.surname || ''}
           onChange={(e) => handleInputChange('surname', e.target.value)}
           disabled={!isEditing}
@@ -208,11 +209,11 @@ const PatientCard = ({
         
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Имя *
+            {t('dental.dental_pc_label_name')}
           </label>
           <input
           type="text"
-          aria-label="Имя пациента"
+          aria-label={t('dental.dental_pc_aria_name')}
           value={formData.name || ''}
           onChange={(e) => handleInputChange('name', e.target.value)}
           disabled={!isEditing}
@@ -223,11 +224,11 @@ const PatientCard = ({
         
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Отчество
+            {t('dental.dental_pc_label_patronymic')}
           </label>
           <input
           type="text"
-          aria-label="Отчество пациента"
+          aria-label={t('dental.dental_pc_aria_patronymic')}
           value={formData.patronymic || ''}
           onChange={(e) => handleInputChange('patronymic', e.target.value)}
           disabled={!isEditing}
@@ -237,11 +238,11 @@ const PatientCard = ({
         
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Дата рождения *
+            {t('dental.dental_pc_label_birth_date')}
           </label>
           <input
           type="date"
-          aria-label="Дата рождения"
+          aria-label={t('dental.dental_pc_aria_birth_date')}
           value={formData.birthDate || ''}
           onChange={(e) => handleInputChange('birthDate', e.target.value)}
           disabled={!isEditing}
@@ -252,7 +253,7 @@ const PatientCard = ({
         
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Пол *
+            {t('dental.dental_pc_label_gender')}
           </label>
           <select
           value={formData.gender || ''}
@@ -261,19 +262,19 @@ const PatientCard = ({
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
           required>
           
-            <option value="">Выберите пол</option>
-            <option value="male">Мужской</option>
-            <option value="female">Женский</option>
+            <option value="">{t('dental.dental_pc_select_gender')}</option>
+            <option value="male">{t('dental.dental_pc_gender_male')}</option>
+            <option value="female">{t('dental.dental_pc_gender_female')}</option>
           </select>
         </div>
         
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Возраст
+            {t('dental.dental_pc_label_age')}
           </label>
           <input
           type="text"
-          aria-label="Возраст"
+          aria-label={t('dental.dental_pc_aria_age')}
           value={formData.birthDate ?
           Math.floor((new Date() - new Date(formData.birthDate)) / (365.25 * 24 * 60 * 60 * 1000)) : ''
           }
@@ -285,17 +286,17 @@ const PatientCard = ({
 
       {/* Контактная информация */}
       <div className="border-t pt-6">
-        <h3 className="text-lg font-semibold mb-4">Контактная информация</h3>
+        <h3 className="text-lg font-semibold mb-4">{t('dental.dental_pc_contact_info_title')}</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Телефон *
+              {t('dental.dental_pc_label_phone')}
             </label>
             <div className="relative">
               <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <input
               type="tel"
-              aria-label="Телефон пациента"
+              aria-label={t('dental.dental_pc_aria_phone')}
               value={formData.phone || ''}
               onChange={(e) => handleInputChange('phone', e.target.value)}
               disabled={!isEditing}
@@ -307,13 +308,13 @@ const PatientCard = ({
           
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Email
+              {t('dental.dental_pc_label_email')}
             </label>
             <div className="relative">
               <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <input
               type="email"
-              aria-label="Email пациента"
+              aria-label={t('dental.dental_pc_aria_email')}
               value={formData.email || ''}
               onChange={(e) => handleInputChange('email', e.target.value)}
               disabled={!isEditing}
@@ -324,18 +325,18 @@ const PatientCard = ({
           
           <div className="md:col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Адрес
+              {t('dental.dental_pc_label_address')}
             </label>
             <div className="relative">
               <MapPin className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
               <textarea
-              aria-label="Адрес пациента"
+              aria-label={t('dental.dental_pc_aria_address')}
               value={formData.address || ''}
               onChange={(e) => handleInputChange('address', e.target.value)}
               disabled={!isEditing}
               rows={2}
               className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-              placeholder="Полный адрес проживания" />
+              placeholder={t('dental.dental_pc_ph_address')} />
             
             </div>
           </div>
@@ -351,16 +352,16 @@ const PatientCard = ({
       <div className="border rounded-lg p-6">
         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
           <CreditCard className="h-5 w-5" />
-          Паспортные данные
+          {t('dental.dental_pc_passport_title')}
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Серия
+              {t('dental.dental_pc_label_passport_series')}
             </label>
             <input
             type="text"
-            aria-label="Серия паспорта"
+            aria-label={t('dental.dental_pc_aria_passport_series')}
             value={formData.passport.series || ''}
             onChange={(e) => handleInputChange('passport.series', e.target.value)}
             disabled={!isEditing}
@@ -371,11 +372,11 @@ const PatientCard = ({
           
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Номер
+              {t('dental.dental_pc_label_passport_number')}
             </label>
             <input
             type="text"
-            aria-label="Номер паспорта"
+            aria-label={t('dental.dental_pc_aria_passport_number')}
             value={formData.passport.number || ''}
             onChange={(e) => handleInputChange('passport.number', e.target.value)}
             disabled={!isEditing}
@@ -386,26 +387,26 @@ const PatientCard = ({
           
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Выдан
+              {t('dental.dental_pc_label_passport_issued_by')}
             </label>
             <input
             type="text"
-            aria-label="Кем выдан паспорт"
+            aria-label={t('dental.dental_pc_aria_passport_issued_by')}
             value={formData.passport.issuedBy || ''}
             onChange={(e) => handleInputChange('passport.issuedBy', e.target.value)}
             disabled={!isEditing}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-            placeholder="Орган выдачи" />
+            placeholder={t('dental.dental_pc_ph_passport_issued_by')} />
           
           </div>
           
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Дата выдачи
+              {t('dental.dental_pc_label_passport_issue_date')}
             </label>
             <input
             type="date"
-            aria-label="Дата выдачи паспорта"
+            aria-label={t('dental.dental_pc_aria_passport_issue_date')}
             value={formData.passport.issueDate || ''}
             onChange={(e) => handleInputChange('passport.issueDate', e.target.value)}
             disabled={!isEditing}
@@ -419,16 +420,16 @@ const PatientCard = ({
       <div className="border rounded-lg p-6">
         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
           <Shield className="h-5 w-5" />
-          Страховые данные
+          {t('dental.dental_pc_insurance_title')}
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Номер полиса
+              {t('dental.dental_pc_label_policy_number')}
             </label>
             <input
             type="text"
-            aria-label="Номер страхового полиса"
+            aria-label={t('dental.dental_pc_aria_policy_number')}
             value={formData.insurance.policyNumber || ''}
             onChange={(e) => handleInputChange('insurance.policyNumber', e.target.value)}
             disabled={!isEditing}
@@ -439,26 +440,26 @@ const PatientCard = ({
           
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Страховая компания
+              {t('dental.dental_pc_label_insurance_company')}
             </label>
             <input
             type="text"
-            aria-label="Страховая компания"
+            aria-label={t('dental.dental_pc_aria_insurance_company')}
             value={formData.insurance.company || ''}
             onChange={(e) => handleInputChange('insurance.company', e.target.value)}
             disabled={!isEditing}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-            placeholder="Название страховой компании" />
+            placeholder={t('dental.dental_pc_ph_insurance_company')} />
           
           </div>
           
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Действует до
+              {t('dental.dental_pc_label_valid_until')}
             </label>
             <input
             type="date"
-            aria-label="Действителен до"
+            aria-label={t('dental.dental_pc_aria_valid_until')}
             value={formData.insurance.validUntil || ''}
             onChange={(e) => handleInputChange('insurance.validUntil', e.target.value)}
             disabled={!isEditing}
@@ -468,7 +469,7 @@ const PatientCard = ({
           
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Тип страхования
+              {t('dental.dental_pc_label_insurance_type')}
             </label>
             <select
             value={formData.insurance.type || ''}
@@ -476,8 +477,8 @@ const PatientCard = ({
             disabled={!isEditing}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100">
             
-              <option value="voluntary">Добровольное</option>
-              <option value="mandatory">Обязательное</option>
+              <option value="voluntary">{t('dental.dental_pc_insurance_voluntary')}</option>
+              <option value="mandatory">{t('dental.dental_pc_insurance_mandatory')}</option>
             </select>
           </div>
         </div>
@@ -491,23 +492,23 @@ const PatientCard = ({
       {/* Жалобы */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Жалобы на момент обращения
+          {t('dental.dental_pc_label_complaints')}
         </label>
         <textarea
-        aria-label="Текущие жалобы"
+        aria-label={t('dental.dental_pc_aria_complaints')}
         value={formData.medicalHistory.complaints || ''}
         onChange={(e) => handleInputChange('medicalHistory.complaints', e.target.value)}
         disabled={!isEditing}
         rows={3}
         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-        placeholder="Опишите жалобы пациента" />
+        placeholder={t('dental.dental_pc_ph_complaints')} />
       
       </div>
 
       {/* Соматические заболевания */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Соматические заболевания
+          {t('dental.dental_pc_label_somatic_diseases')}
         </label>
         <div className="space-y-2">
           {formData.medicalHistory.somaticDiseases.map((disease, index) =>
@@ -522,14 +523,14 @@ const PatientCard = ({
             }}
             disabled={!isEditing}
             className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-            aria-label={`Соматическое заболевание ${index + 1}`}
-            placeholder="Название заболевания" />
+            aria-label={t('dental.dental_pc_aria_somatic_disease', { index: index + 1 })}
+            placeholder={t('dental.dental_pc_ph_disease_name')} />
           
               {isEditing &&
           <button
             type="button"
             onClick={() => handleArrayRemove('medicalHistory.somaticDiseases', index)}
-            aria-label={`Удалить соматическое заболевание ${index + 1}`}
+            aria-label={t('dental.dental_pc_aria_remove_somatic_disease', { index: index + 1 })}
             className="text-red-500 hover:text-red-700">
             
                   <X className="h-4 w-4" />
@@ -544,7 +545,7 @@ const PatientCard = ({
           className="flex items-center gap-2 text-blue-600 hover:text-blue-800">
           
               <Plus className="h-4 w-4" />
-              Добавить заболевание
+              {t('dental.dental_pc_btn_add_disease')}
             </button>
         }
         </div>
@@ -553,7 +554,7 @@ const PatientCard = ({
       {/* Аллергии */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Аллергии
+          {t('dental.dental_pc_label_allergies')}
         </label>
         <div className="space-y-2">
           {formData.medicalHistory.allergies.map((allergy, index) =>
@@ -568,14 +569,14 @@ const PatientCard = ({
             }}
             disabled={!isEditing}
             className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-            aria-label={`Аллергия ${index + 1}`}
-            placeholder="Аллерген (например: лидокаин, пенициллин)" />
+            aria-label={t('dental.dental_pc_aria_allergy', { index: index + 1 })}
+            placeholder={t('dental.dental_pc_ph_allergy')} />
           
               {isEditing &&
           <button
             type="button"
             onClick={() => handleArrayRemove('medicalHistory.allergies', index)}
-            aria-label={`Удалить аллергию ${index + 1}`}
+            aria-label={t('dental.dental_pc_aria_remove_allergy', { index: index + 1 })}
             className="text-red-500 hover:text-red-700">
             
                   <X className="h-4 w-4" />
@@ -590,7 +591,7 @@ const PatientCard = ({
           className="flex items-center gap-2 text-blue-600 hover:text-blue-800">
           
               <Plus className="h-4 w-4" />
-              Добавить аллергию
+              {t('dental.dental_pc_btn_add_allergy')}
             </button>
         }
         </div>
@@ -599,7 +600,7 @@ const PatientCard = ({
       {/* Текущие лекарства */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Текущие лекарства
+          {t('dental.dental_pc_label_current_medications')}
         </label>
         <div className="space-y-2">
           {formData.medicalHistory.currentMedications.map((medication, index) =>
@@ -614,14 +615,14 @@ const PatientCard = ({
             }}
             disabled={!isEditing}
             className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-            aria-label={`Текущее лекарство ${index + 1}`}
-            placeholder="Название лекарства и дозировка" />
+            aria-label={t('dental.dental_pc_aria_medication', { index: index + 1 })}
+            placeholder={t('dental.dental_pc_ph_medication')} />
           
               {isEditing &&
           <button
             type="button"
             onClick={() => handleArrayRemove('medicalHistory.currentMedications', index)}
-            aria-label={`Удалить текущее лекарство ${index + 1}`}
+            aria-label={t('dental.dental_pc_aria_remove_medication', { index: index + 1 })}
             className="text-red-500 hover:text-red-700">
             
                   <X className="h-4 w-4" />
@@ -636,7 +637,7 @@ const PatientCard = ({
           className="flex items-center gap-2 text-blue-600 hover:text-blue-800">
           
               <Plus className="h-4 w-4" />
-              Добавить лекарство
+              {t('dental.dental_pc_btn_add_medication')}
             </button>
         }
         </div>
@@ -646,7 +647,7 @@ const PatientCard = ({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Группа крови
+            {t('dental.dental_pc_label_blood_type')}
           </label>
           <select
           value={formData.medicalHistory.bloodType || ''}
@@ -654,7 +655,7 @@ const PatientCard = ({
           disabled={!isEditing}
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100">
           
-            <option value="">Не указана</option>
+            <option value="">{t('dental.dental_pc_blood_not_specified')}</option>
             <option value="A+">A+</option>
             <option value="A-">A-</option>
             <option value="B+">B+</option>
@@ -668,7 +669,7 @@ const PatientCard = ({
         
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Резус-фактор
+            {t('dental.dental_pc_label_rh_factor')}
           </label>
           <select
           value={formData.medicalHistory.rhFactor || ''}
@@ -676,9 +677,9 @@ const PatientCard = ({
           disabled={!isEditing}
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100">
           
-            <option value="">Не указан</option>
-            <option value="positive">Положительный (+)</option>
-            <option value="negative">Отрицательный (-)</option>
+            <option value="">{t('dental.dental_pc_rh_not_specified')}</option>
+            <option value="positive">{t('dental.dental_pc_rh_positive')}</option>
+            <option value="negative">{t('dental.dental_pc_rh_negative')}</option>
           </select>
         </div>
       </div>
@@ -686,16 +687,16 @@ const PatientCard = ({
       {/* Стоматологический анамнез */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Стоматологический анамнез
+          {t('dental.dental_pc_label_dental_history')}
         </label>
         <textarea
-        aria-label="Стоматологический анамнез"
+        aria-label={t('dental.dental_pc_aria_dental_history')}
         value={formData.medicalHistory.dentalHistory || ''}
         onChange={(e) => handleInputChange('medicalHistory.dentalHistory', e.target.value)}
         disabled={!isEditing}
         rows={3}
         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-        placeholder="Предыдущее стоматологическое лечение, импланты, протезы, ортодонтия" />
+        placeholder={t('dental.dental_pc_ph_dental_history')} />
       
       </div>
     </div>;
@@ -707,27 +708,27 @@ const PatientCard = ({
       <div className="border rounded-lg p-6">
         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
           <AlertTriangle className="h-5 w-5 text-orange-500" />
-          Экстренный контакт
+          {t('dental.dental_pc_emergency_title')}
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              ФИО контактного лица
+              {t('dental.dental_pc_label_emergency_name')}
             </label>
             <input
             type="text"
-            aria-label="Имя контактного лица"
+            aria-label={t('dental.dental_pc_aria_emergency_name')}
             value={formData.emergencyContact.name || ''}
             onChange={(e) => handleInputChange('emergencyContact.name', e.target.value)}
             disabled={!isEditing}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-            placeholder="Фамилия Имя Отчество" />
+            placeholder={t('dental.dental_pc_ph_emergency_name')} />
           
           </div>
           
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Родство
+              {t('dental.dental_pc_label_relationship')}
             </label>
             <select
             value={formData.emergencyContact.relationship || ''}
@@ -735,24 +736,24 @@ const PatientCard = ({
             disabled={!isEditing}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100">
             
-              <option value="">Выберите родство</option>
-              <option value="spouse">Супруг/супруга</option>
-              <option value="parent">Родитель</option>
-              <option value="child">Ребенок</option>
-              <option value="sibling">Брат/сестра</option>
-              <option value="other">Другое</option>
+              <option value="">{t('dental.dental_pc_select_relationship')}</option>
+              <option value="spouse">{t('dental.dental_pc_rel_spouse')}</option>
+              <option value="parent">{t('dental.dental_pc_rel_parent')}</option>
+              <option value="child">{t('dental.dental_pc_rel_child')}</option>
+              <option value="sibling">{t('dental.dental_pc_rel_sibling')}</option>
+              <option value="other">{t('dental.dental_pc_rel_other')}</option>
             </select>
           </div>
           
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Телефон
+              {t('dental.dental_pc_label_emergency_phone')}
             </label>
             <div className="relative">
               <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <input
               type="tel"
-              aria-label="Телефон контактного лица"
+              aria-label={t('dental.dental_pc_aria_emergency_phone')}
               value={formData.emergencyContact.phone || ''}
               onChange={(e) => handleInputChange('emergencyContact.phone', e.target.value)}
               disabled={!isEditing}
@@ -764,16 +765,16 @@ const PatientCard = ({
           
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Адрес
+              {t('dental.dental_pc_label_emergency_address')}
             </label>
             <input
             type="text"
-            aria-label="Адрес контактного лица"
+            aria-label={t('dental.dental_pc_aria_emergency_address')}
             value={formData.emergencyContact.address || ''}
             onChange={(e) => handleInputChange('emergencyContact.address', e.target.value)}
             disabled={!isEditing}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-            placeholder="Адрес проживания" />
+            placeholder={t('dental.dental_pc_ph_emergency_address')} />
           
           </div>
         </div>
@@ -804,10 +805,10 @@ const PatientCard = ({
         <div className="flex items-center justify-between p-6 border-b">
           <div>
             <h2 className="text-xl font-semibold">
-              {patient ? `Карточка пациента: ${patient.surname} ${patient.name}` : 'Новый пациент'}
+              {patient ? t('dental.dental_pc_title_with_patient', { name: `${patient.surname} ${patient.name}` }) : t('dental.dental_pc_title_new')}
             </h2>
             <p className="text-gray-600 text-sm">
-              {isEditing ? 'Режим редактирования' : 'Просмотр данных'}
+              {isEditing ? t('dental.dental_pc_mode_edit') : t('dental.dental_pc_mode_view')}
             </p>
           </div>
           
@@ -818,7 +819,7 @@ const PatientCard = ({
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
               
                 <Edit className="h-4 w-4" />
-                Редактировать
+                {t('dental.dental_pc_btn_edit')}
               </button> :
 
             <>
@@ -827,7 +828,7 @@ const PatientCard = ({
                 className="flex items-center gap-2 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600">
                 
                   <X className="h-4 w-4" />
-                  Отмена
+                  {t('dental.dental_pc_btn_cancel')}
                 </button>
                 <button
                 onClick={handleSave}
@@ -835,13 +836,13 @@ const PatientCard = ({
                 className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50">
                 
                   <Save className="h-4 w-4" />
-                  {loading ? 'Сохранение...' : 'Сохранить'}
+                  {loading ? t('dental.dental_pc_btn_saving') : t('dental.dental_pc_btn_save')}
                 </button>
               </>
             }
             <button
               onClick={onClose}
-              aria-label={`Закрыть карточку пациента ${formData.surname || ''} ${formData.name || ''}`.trim()}
+              aria-label={t('dental.dental_pc_aria_close', { name: `${formData.surname || ''} ${formData.name || ''}`.trim() })}
               className="p-2 text-gray-500 hover:text-gray-700">
               
               <X className="h-5 w-5" />

@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 import {
   Calendar,
   CreditCard,
@@ -31,33 +31,35 @@ import FinanceModal from './FinanceModal';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
 
-const categoryOptions = [
-  { value: '', label: 'Все категории' },
-  { value: 'Консультация врача', label: 'Консультация врача' },
-  { value: 'Диагностика', label: 'Диагностика' },
-  { value: 'Лечение', label: 'Лечение' },
-  { value: 'Анализы', label: 'Анализы' },
-  { value: 'Процедуры', label: 'Процедуры' },
-  { value: 'Зарплата персонала', label: 'Зарплата персонала' },
-  { value: 'Коммунальные услуги', label: 'Коммунальные услуги' },
-  { value: 'Медикаменты', label: 'Медикаменты' },
-];
+function getCategoryOptions(t) {
+  return [
+    { value: '', label: t('admin2.fo_cat_all') },
+    { value: 'Консультация врача', label: t('admin2.fo_cat_consultation') },
+    { value: 'Диагностика', label: t('admin2.fo_cat_diagnostics') },
+    { value: 'Лечение', label: t('admin2.fo_cat_treatment') },
+    { value: 'Анализы', label: t('admin2.fo_cat_tests') },
+    { value: 'Процедуры', label: t('admin2.fo_cat_procedures') },
+    { value: 'Зарплата персонала', label: t('admin2.fo_cat_salary') },
+    { value: 'Коммунальные услуги', label: t('admin2.fo_cat_utilities') },
+    { value: 'Медикаменты', label: t('admin2.fo_cat_medications') },
+  ];
+}
 
 
-function getTransactionTypeLabel(type) {
+function getTransactionTypeLabel(type, t) {
   const typeMap = {
-    income: 'Доход',
-    expense: 'Расход',
+    income: t('admin2.fo_type_income'),
+    expense: t('admin2.fo_type_expense'),
   };
   return typeMap[type] || type;
 }
 
-function getTransactionStatusLabel(status) {
+function getTransactionStatusLabel(status, t) {
   const statusMap = {
-    pending: 'Ожидает',
-    completed: 'Завершена',
-    cancelled: 'Отменена',
-    refunded: 'Возврат',
+    pending: t('admin2.fo_status_pending'),
+    completed: t('admin2.fo_status_completed'),
+    cancelled: t('admin2.fo_status_cancelled'),
+    refunded: t('admin2.fo_status_refunded'),
   };
   return statusMap[status] || status;
 }
@@ -72,18 +74,18 @@ function getTransactionStatusVariant(status) {
   return variantMap[status] || 'secondary';
 }
 
-function getPaymentMethodLabel(method) {
+function getPaymentMethodLabel(method, t) {
   const methodMap = {
-    cash: 'Наличные',
-    card: 'Карта',
-    transfer: 'Перевод',
-    mobile: 'Мобильный',
+    cash: t('admin2.fo_method_cash'),
+    card: t('admin2.fo_method_card'),
+    transfer: t('admin2.fo_method_transfer'),
+    mobile: t('admin2.fo_method_mobile'),
   };
   return methodMap[method] || method;
 }
 
-function formatTransactionDate(transactionDate) {
-  if (!transactionDate) return 'Не указано';
+function formatTransactionDate(transactionDate, t) {
+  if (!transactionDate) return t('admin2.fo_no_date');
   const parsed = new Date(transactionDate);
   if (Number.isNaN(parsed.getTime())) return transactionDate;
   return parsed.toLocaleDateString('ru-RU');
@@ -94,6 +96,7 @@ function truncateDescription(description = '') {
 }
 
 const AdminFinanceOverview = () => {
+  const { t } = useTranslation();
   // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
   const [confirm, confirmDialog] = useConfirm();
   const {
@@ -135,8 +138,8 @@ const AdminFinanceOverview = () => {
     // P-013 fix: replaced window.confirm() with shared useConfirm hook.
     const ok = await confirm({
       title: t('admin.delete_transaction_title'),
-      message: `Удалить транзакцию «${transaction.description}»?`,
-      description: 'Это действие необратимо.',
+      message: t('admin2.fo_delete_transaction_message', { description: transaction.description }),
+      description: t('admin2.fo_action_irreversible'),
       confirmLabel: t('admin.delete_confirm'),
       cancelLabel: t('admin.cancel'),
       intent: 'danger',
@@ -179,7 +182,7 @@ const AdminFinanceOverview = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="admin-fs-sm-fw-med-secondary-m-0">
-                Общий доход
+                {t('admin2.fo_total_income')}
               </p>
               <p className="admin-fs-2xl-fw-bold-success-m-4px-0-0-0">
                 {formatCurrency(financialStats.totalIncome)}
@@ -193,7 +196,7 @@ const AdminFinanceOverview = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="admin-fs-sm-fw-med-secondary-m-0">
-                Общие расходы
+                {t('admin2.fo_total_expense')}
               </p>
               <p className="admin-fs-2xl-fw-bold-error-m-4px-0-0-0">
                 {formatCurrency(financialStats.totalExpense)}
@@ -207,7 +210,7 @@ const AdminFinanceOverview = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="admin-fs-sm-fw-med-secondary-m-0">
-                Чистая прибыль
+                {t('admin2.fo_net_profit')}
               </p>
               <p className="admin-fs-2xl-fw-bold-m-4px-0-0-0-col-dyn" style={{ '--admin-col0': financialStats.netProfit >= 0 ? 'var(--mac-success)' : 'var(--mac-error)' }}>
                 {formatCurrency(financialStats.netProfit)}
@@ -221,7 +224,7 @@ const AdminFinanceOverview = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="admin-fs-sm-fw-med-secondary-m-0">
-                Всего транзакций
+                {t('admin2.fo_total_transactions')}
               </p>
               <p className="admin-fs-2xl-fw-bold-primary-m-4px-0-0-0">
                 {financialStats.transactionCount}
@@ -235,11 +238,11 @@ const AdminFinanceOverview = () => {
       <MacOSCard variant="default" className="admin-bg-var-mac-gradient-sid-bd-1px-solid-var-mac-ma-radius-24-bsh-none-bflt-var-mac-blur-light-webkitba-var-mac-blur-light-p-0">
         <div className="admin-p-16-d-flex-ai-center-jc-between-mb-24">
           <h2 className="admin-fs-20-fw-600-primary-m-0">
-            Финансовый учет
+            {t('admin2.fo_finance_accounting')}
           </h2>
           <Button onClick={handleCreateTransaction}>
             <Plus className="w-4 h-4 mr-2" />
-            Добавить транзакцию
+            {t('admin2.fo_add_transaction')}
           </Button>
         </div>
 
@@ -247,7 +250,7 @@ const AdminFinanceOverview = () => {
           <div className="admin-flex-1-1-260px">
             <Input
               type="text"
-              placeholder="Поиск транзакций..."
+              placeholder={t('admin2.fo_search_placeholder')}
               value={financeSearchTerm}
               onChange={(event) => setFinanceSearchTerm(event.target.value)}
               icon={Search}
@@ -258,36 +261,36 @@ const AdminFinanceOverview = () => {
             value={filterType}
             onChange={(value) => setFilterType(value)}
             options={[
-              { value: '', label: 'Все типы' },
-              { value: 'income', label: 'Доходы' },
-              { value: 'expense', label: 'Расходы' },
+              { value: '', label: t('admin2.fo_filter_type_all') },
+              { value: 'income', label: t('admin2.fo_filter_type_income') },
+              { value: 'expense', label: t('admin2.fo_filter_type_expense') },
             ]}
           />
           <Select
             value={filterCategory}
             onChange={(value) => setFilterCategory(value)}
-            options={categoryOptions}
+            options={getCategoryOptions(t)}
           />
           <Select
             value={filterDateRange}
             onChange={(value) => setFilterDateRange(value)}
             options={[
-              { value: '', label: 'Все время' },
-              { value: 'today', label: 'Сегодня' },
-              { value: 'week', label: 'Неделя' },
-              { value: 'month', label: 'Месяц' },
-              { value: 'year', label: 'Год' },
+              { value: '', label: t('admin2.fo_filter_date_all') },
+              { value: 'today', label: t('admin2.fo_filter_date_today') },
+              { value: 'week', label: t('admin2.fo_filter_date_week') },
+              { value: 'month', label: t('admin2.fo_filter_date_month') },
+              { value: 'year', label: t('admin2.fo_filter_date_year') },
             ]}
           />
           <Select
             value={financeFilterStatus}
             onChange={(value) => setFinanceFilterStatus(value)}
             options={[
-              { value: '', label: 'Все статусы' },
-              { value: 'pending', label: 'Ожидает' },
-              { value: 'completed', label: 'Завершена' },
-              { value: 'cancelled', label: 'Отменена' },
-              { value: 'refunded', label: 'Возврат' },
+              { value: '', label: t('admin2.fo_filter_status_all') },
+              { value: 'pending', label: t('admin2.fo_status_pending') },
+              { value: 'completed', label: t('admin2.fo_status_completed') },
+              { value: 'cancelled', label: t('admin2.fo_status_cancelled') },
+              { value: 'refunded', label: t('admin2.fo_status_refunded') },
             ]}
           />
         </div>
@@ -298,41 +301,49 @@ const AdminFinanceOverview = () => {
           ) : financeError ? (
             <MacOSEmptyState
               icon={CreditCard}
-              title="Ошибка загрузки транзакций"
-              description="Не удалось загрузить список транзакций"
+              title={t('admin2.fo_error_title')}
+              description={t('admin2.fo_error_desc')}
               action={(
                 <Button onClick={refreshFinance}>
                   <RefreshCw className="w-4 h-4 mr-2" />
-                  Обновить
+                  {t('admin2.fo_refresh_btn')}
                 </Button>
               )}
             />
           ) : transactions.length === 0 ? (
             <MacOSEmptyState
               icon={CreditCard}
-              title="Транзакции не найдены"
+              title={t('admin2.fo_empty_title')}
               description={financeSearchTerm || filterType || filterCategory || filterDateRange || financeFilterStatus
-                ? 'Попробуйте изменить параметры поиска'
-                : 'В системе пока нет транзакций'}
+                ? t('admin2.fo_empty_desc_filtered')
+                : t('admin2.fo_empty_desc')}
               action={(
                 <Button onClick={handleCreateTransaction}>
                   <Plus className="w-4 h-4 mr-2" />
-                  Добавить первую транзакцию
+                  {t('admin2.fo_add_first_transaction')}
                 </Button>
               )}
             />
           ) : (
             <div className="admin-table-wrapper">
-            <table className="w-full" aria-label="Таблица транзакций">
+            <table className="w-full" aria-label={t('admin2.fo_table_aria')}>
               <thead>
                 <tr className="admin-bd-b-1px-solid-var-mac-se">
-                  {['Тип', 'Категория', 'Сумма', 'Описание', 'Дата', 'Статус', 'Действия'].map((heading) => (
+                  {[
+                    { key: 'type', label: t('admin2.fo_col_type') },
+                    { key: 'category', label: t('admin2.fo_col_category') },
+                    { key: 'amount', label: t('admin2.fo_col_amount') },
+                    { key: 'description', label: t('admin2.fo_col_description') },
+                    { key: 'date', label: t('admin2.fo_col_date') },
+                    { key: 'status', label: t('admin2.fo_col_status') },
+                    { key: 'actions', label: t('admin2.fo_col_actions') },
+                  ].map(({ key, label }) => (
                     <th
-                      key={heading}
+                      key={key}
                       scope="col"
                       className="admin-ta-left-p-var-mac-spacing-3-va-fw-semi-fs-sm-var-mac-table-header"
                     >
-                      {heading}
+                      {label}
                     </th>
                   ))}
                 </tr>
@@ -351,7 +362,7 @@ const AdminFinanceOverview = () => {
                   >
                     <td className="admin-p-var-mac-spacing-3-va">
                       <Badge variant={transaction.type === 'income' ? 'success' : 'error'}>
-                        {getTransactionTypeLabel(transaction.type)}
+                        {getTransactionTypeLabel(transaction.type, t)}
                       </Badge>
                     </td>
                     <td className="admin-p-var-mac-spacing-3-va">
@@ -371,7 +382,7 @@ const AdminFinanceOverview = () => {
                         {transaction.type === 'income' ? '+' : '-'}{formatCurrency(transaction.amount)}
                       </p>
                       <p className="admin-fs-sm-secondary-m-4px-0-0-0">
-                        {getPaymentMethodLabel(transaction.paymentMethod)}
+                        {getPaymentMethodLabel(transaction.paymentMethod, t)}
                       </p>
                     </td>
                     <td className="admin-p-var-mac-spacing-3-va">
@@ -385,11 +396,11 @@ const AdminFinanceOverview = () => {
                       )}
                     </td>
                     <td className="admin-p-var-mac-spacing-3-va-fs-sm-secondary">
-                      {formatTransactionDate(transaction.transactionDate)}
+                      {formatTransactionDate(transaction.transactionDate, t)}
                     </td>
                     <td className="admin-p-var-mac-spacing-3-va">
                       <Badge variant={getTransactionStatusVariant(transaction.status)}>
-                        {getTransactionStatusLabel(transaction.status)}
+                        {getTransactionStatusLabel(transaction.status, t)}
                       </Badge>
                     </td>
                     <td className="admin-p-var-mac-spacing-3-va">
@@ -404,8 +415,8 @@ const AdminFinanceOverview = () => {
                           onMouseLeave={(event) => {
                             event.currentTarget.style.backgroundColor = 'transparent';
                           }}
-                          aria-label="Редактировать транзакцию"
-                          title="Редактировать"
+                          aria-label={t('admin2.fo_edit_aria')}
+                          title={t('admin2.fo_edit_btn')}
                         >
                           <Edit className="w-4 h-4" />
                         </button>
@@ -419,8 +430,8 @@ const AdminFinanceOverview = () => {
                           onMouseLeave={(event) => {
                             event.currentTarget.style.backgroundColor = 'transparent';
                           }}
-                          aria-label="Удалить транзакцию"
-                          title="Удалить"
+                          aria-label={t('admin2.fo_delete_aria')}
+                          title={t('admin2.fo_delete_btn')}
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>

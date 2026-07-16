@@ -27,7 +27,7 @@ import { AlertCircle, RefreshCw } from 'lucide-react';
 import { MacOSEmptyState } from '../ui/macos';
 import { Skeleton } from '../ui/macos';
 import { Button } from '../ui/macos';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const DEFAULT_SKELETON_ROWS = 4;
 

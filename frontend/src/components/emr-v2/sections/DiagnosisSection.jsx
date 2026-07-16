@@ -14,7 +14,7 @@ import EMRSmartFieldV2 from './EMRSmartFieldV2';
 import EMRTextField from './EMRTextField';
 import { useDoctorPhrases } from '../../../hooks/useDoctorPhrases';
 import './DiagnosisSection.css';
-import { useTranslation } from '../../../i18n/adapter';
+import { useTranslation } from '../../../i18n/useTranslation';
 
 function normalizeTextValue(value) {
     if (typeof value === 'string') {
@@ -66,6 +66,7 @@ export function DiagnosisSection({
     experimentalGhostMode = false,
     onTelemetry,
 }) {
+  const { t } = useTranslation();
     const diagnosisText = normalizeTextValue(diagnosis);
     const icd10Text = normalizeTextValue(icd10Code);
 
@@ -92,7 +93,7 @@ export function DiagnosisSection({
 
     return (
         <EMRSection
-            title="Диагноз"
+            title={t('misc.ds_diagnoz')}
             icon="🩺"
             required
             disabled={disabled}
@@ -104,11 +105,11 @@ export function DiagnosisSection({
                 <EMRSmartFieldV2
                     value={diagnosisText}
                     onChange={onDiagnosisChange}
-                    placeholder="Основной диагноз..."
+                    placeholder={t('misc.ds_osnovnoy_diagnoz')}
                     multiline
                     rows={2}
                     disabled={disabled}
-                    label="Диагноз"
+                    label={t('misc.ds_diagnoz')}
                     required
                     id="emr-diagnosis"
                     fieldName="diagnosis"
@@ -127,16 +128,16 @@ export function DiagnosisSection({
                         <ICD10Component
                             value={icd10Text}
                             onChange={onIcd10Change}
-                            placeholder="Код МКБ-10"
+                            placeholder={t('misc.ds_kod_mkb_10')}
                             disabled={disabled}
                         />
                     ) : (
                         <EMRTextField
                             value={icd10Text}
                             onChange={onIcd10Change}
-                            placeholder="например, J06.9"
+                            placeholder={t('misc.ds_naprimer_j06_9')}
                             disabled={disabled}
-                            label="Код МКБ-10"
+                            label={t('misc.ds_kod_mkb_10')}
                             id="emr-icd10"
                         />
                     )}

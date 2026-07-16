@@ -2,7 +2,7 @@ import React from 'react';
 import Icon from '../Icon';
 import { useTheme } from '../../contexts/ThemeContext';
 import PropTypes from 'prop-types';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 /**
  * Унифицированная медицинская таблица в стиле MediLab

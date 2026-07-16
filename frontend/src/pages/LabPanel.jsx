@@ -15,16 +15,10 @@ import { useSessionTimeoutWarning } from '../hooks/useSessionTimeoutWarning';
 import { useLabHotkeys } from '../hooks/useLabHotkeys';
 import notifyService from '../services/notify';
 import './lab.css';
-import { useTranslation } from '../i18n/adapter';
+import { useTranslation } from '../i18n/useTranslation';
 
 // P-03 fix: API_V1_BASE и tokenManager больше не нужны — loadLabAppointments
 // использует labReportingApi.listQueueToday() с собственным auth-токеном.
-
-const tabs = [
-  { id: 'queue', label: 'Очередь', icon: 'testtube.2' },
-  { id: 'templates', label: 'Шаблоны', icon: 'rectangle.stack.badge.plus' },
-  { id: 'reports', label: 'Отчёты', icon: 'doc.text' }
-];
 
 const LAB_PANEL_TITLE_ID = 'lab-panel-title';
 const LAB_PANEL_TABLIST_ID = 'lab-panel-tabs';
@@ -82,6 +76,12 @@ function buildTemplateResolutionPayload(appointment) {
 }
 
 export default function LabPanel() {
+  const { t } = useTranslation();
+  const tabs = [
+    { id: 'queue', label: t('misc.lp_ochered'), icon: 'testtube.2' },
+    { id: 'templates', label: t('misc.lp_shablony'), icon: 'rectangle.stack.badge.plus' },
+    { id: 'reports', label: t('misc.lp_otchety'), icon: 'doc.text' },
+  ];
   const location = useLocation();
   const navigate = useNavigate();
   const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
@@ -125,7 +125,7 @@ export default function LabPanel() {
       type,
       text,
       retryAction: typeof options.retryAction === 'function' ? options.retryAction : null,
-      retryLabel: options.retryLabel || 'Повторить',
+      retryLabel: options.retryLabel || t('misc.lp_povtorit'),
     });
   }, []);
 
@@ -149,7 +149,7 @@ export default function LabPanel() {
     onWarning: () => setSessionWarning({ active: true }),
     onExpired: () => {
       setSessionWarning(null);
-      notifyService.error('Сессия истекла. Пожалуйста, войдите снова.');
+      notifyService.error(t('misc.lp_sessiya_istekla_pozhaluysta_'));
       if (typeof window !== 'undefined') {
         window.location.href = '/login';
       }
@@ -280,9 +280,9 @@ export default function LabPanel() {
       logger.error('[LabPanel] loadLabAppointments failed', error);
       notify(
         'error',
-        getErrorMessage(error, 'Не удалось загрузить лабораторную очередь. Проверьте соединение и попробуйте снова.'),
+        getErrorMessage(error, t('misc.lp_ne_udalos_zagruzit_laborator')),
         // QW-4 fix: кнопка «Повторить» в Alert.
-        { retryAction: () => loadLabAppointments(), retryLabel: 'Загрузить снова' }
+        { retryAction: () => loadLabAppointments(), retryLabel: t('misc.lp_zagruzit_snova') }
       );
     } finally {
       setAppointmentsLoading(false);
@@ -318,7 +318,7 @@ export default function LabPanel() {
       // STRAT#16: не показываем error notification для отменённых запросов.
       if (isAbortLikeError(error)) return;
       logger.error('[LabPanel] loadMoreAppointments failed', error);
-      notify('error', getErrorMessage(error, 'Не удалось загрузить дополнительные записи очереди.'));
+      notify('error', getErrorMessage(error, t('misc.lp_ne_udalos_zagruzit_dopolnite')));
     } finally {
       setLoadingMore(false);
     }
@@ -351,9 +351,9 @@ export default function LabPanel() {
       logger.error('[LabPanel] loadTemplates failed', error);
       notify(
         'error',
-        getErrorMessage(error, 'Не удалось загрузить шаблоны лаборатории. Проверьте соединение и попробуйте снова.'),
+        getErrorMessage(error, t('misc.lp_ne_udalos_zagruzit_shablony_')),
         // QW-4 fix: кнопка «Повторить» в Alert.
-        { retryAction: () => loadTemplates(), retryLabel: 'Загрузить снова' }
+        { retryAction: () => loadTemplates(), retryLabel: t('misc.lp_zagruzit_snova') }
       );
     }
   // M-5 fix: removed selectedTemplate?.id from deps — it caused triple
@@ -374,9 +374,9 @@ export default function LabPanel() {
       logger.error('[LabPanel] loadReportHistory failed', error);
       notify(
         'error',
-        getErrorMessage(error, 'Не удалось загрузить историю лабораторных отчётов. Проверьте соединение и попробуйте снова.'),
+        getErrorMessage(error, t('misc.lp_ne_udalos_zagruzit_istoriyu_')),
         // QW-4 fix: кнопка «Повторить» в Alert.
-        { retryAction: () => loadReportHistory(patientId), retryLabel: 'Загрузить снова' }
+        { retryAction: () => loadReportHistory(patientId), retryLabel: t('misc.lp_zagruzit_snova') }
       );
     }
   }, [notify]);
@@ -389,9 +389,9 @@ export default function LabPanel() {
       logger.error('[LabPanel] loadRecentReports failed', error);
       notify(
         'error',
-        getErrorMessage(error, 'Не удалось загрузить список лабораторных отчётов. Проверьте соединение и попробуйте снова.'),
+        getErrorMessage(error, t('misc.lp_ne_udalos_zagruzit_spisok_la')),
         // QW-4 fix: кнопка «Повторить» в Alert.
-        { retryAction: () => loadRecentReports(), retryLabel: 'Загрузить снова' }
+        { retryAction: () => loadRecentReports(), retryLabel: t('misc.lp_zagruzit_snova') }
       );
     }
   }, [notify]);
@@ -424,7 +424,7 @@ export default function LabPanel() {
         'error',
         getErrorMessage(
           error,
-          'Не удалось определить доступные отчёты для выбранного визита. Проверьте соединение и попробуйте снова.'
+          t('misc.lp_ne_udalos_opredelit_dostupny')
         )
       );
     } finally {
@@ -452,7 +452,7 @@ export default function LabPanel() {
       logger.error('[LabPanel] loadInstance failed', error);
       notify(
         'error',
-        getErrorMessage(error, 'Не удалось открыть лабораторный отчёт. Проверьте соединение и попробуйте снова.')
+        getErrorMessage(error, t('misc.lp_ne_udalos_otkryt_laboratorny'))
       );
     }
   }, [loadReportHistory, notify, switchTab]);
@@ -573,7 +573,7 @@ export default function LabPanel() {
               className="lab-panel-title"
             >
               <Icon name="cross.case" size={22} />
-              <span>Панель лаборатории</span>
+              <span>{t('misc.lp_panel_laboratorii')}</span>
             </h1>
             <div
               id={LAB_PANEL_TABLIST_ID}
@@ -589,7 +589,7 @@ export default function LabPanel() {
                   role="tab"
                   aria-selected={activeTab === tab.id}
                   aria-controls={getLabPanelTabPanelId(tab.id)}
-                  aria-label={`${tab.label}: ${statusCounters[tab.id]} записей`}
+                  aria-label={t('misc.lp_tab_label_statuscounters_tab', { label: tab.label, id: statusCounters[tab.id] })}
                   tabIndex={activeTab === tab.id ? 0 : -1}
                   variant={activeTab === tab.id ? 'primary' : 'outline'}
                   onClick={() => switchTab(tab.id)}
@@ -633,14 +633,14 @@ export default function LabPanel() {
                       }}
                     >
                       <Icon name="arrow.clockwise" size={14} />
-                      {message.retryLabel || 'Повторить'}
+                      {message.retryLabel || t('misc.lp_povtorit')}
                     </Button>
                   )}
                   <Button
                     size="small"
                     variant="outline"
                     onClick={dismissMessage}
-                    aria-label="Закрыть уведомление"
+                    aria-label={t('misc.lp_zakryt_uvedomlenie')}
                   >
                     <Icon name="xmark" size={14} />
                   </Button>
@@ -707,7 +707,7 @@ export default function LabPanel() {
               const template = await labReportingApi.getTemplate(templateId);
               setSelectedTemplate(template);
             } catch (error) {
-              notify('error', getErrorMessage(error, 'Не удалось загрузить шаблон. Проверьте соединение и попробуйте снова.'));
+              notify('error', getErrorMessage(error, t('misc.lp_ne_udalos_zagruzit_shablon_p')));
             }
           }}
           onTemplatesChanged={async (preferredTemplateId = null) => {
@@ -727,7 +727,7 @@ export default function LabPanel() {
         {/* WF-16 fix: breadcrumb навигация для wayfinding.
             Показывает путь: Очередь → Пациент → Отчёт #N (статус). */}
         {(selectedAppointment || activeInstance) && (
-          <nav aria-label="Навигация" className="lab-breadcrumb-nav">
+          <nav aria-label={t('misc.lp_navigatsiya')} className="lab-breadcrumb-nav">
             <button
               type="button"
               onClick={() => switchTab('queue')}
@@ -738,7 +738,7 @@ export default function LabPanel() {
             {selectedAppointment && (
               <>
                 <span>›</span>
-                <span>{selectedAppointment.patient_fio || `Пациент #${selectedAppointment.patient_id}`}</span>
+                <span>{selectedAppointment.patient_fio || t('misc.lp_patsient_selectedappointment', { patient_id: selectedAppointment.patient_id })}</span>
               </>
             )}
             {activeInstance && (
@@ -775,7 +775,7 @@ export default function LabPanel() {
         {sessionWarning && (
           <div
             role="alertdialog"
-            aria-label="Предупреждение об истечении сессии"
+            aria-label={t('misc.lp_preduprezhdenie_ob_istecheni')}
             className="lab-session-warning-overlay"
           >
             <div className="lab-session-warning-dialog">
@@ -790,7 +790,7 @@ export default function LabPanel() {
                 <button onClick={() => setSessionWarning(null)} className="lab-session-warning-btn-later">
                   Позже
                 </button>
-                <button onClick={() => { setSessionWarning(null); notifyService.info('Продлеваем сессию...'); }} className="lab-session-warning-btn-extend">
+                <button onClick={() => { setSessionWarning(null); notifyService.info(t('misc.lp_prodlevaem_sessiyu')); }} className="lab-session-warning-btn-extend">
                   Продлить сессию
                 </button>
               </div>

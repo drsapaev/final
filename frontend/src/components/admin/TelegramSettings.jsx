@@ -24,10 +24,10 @@ import {
 
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
-const DEFAULT_LANGUAGE_OPTIONS = [
-  { value: 'ru', label: '\u0420\u0443\u0441\u0441\u043a\u0438\u0439' },
+const getLanguageOptions = (t) => [
+  { value: 'ru', label: t('admin2.ts_lang_ru') },
   { value: 'uz', label: 'O\'zbekcha' },
   { value: 'en', label: 'English' }
 ];
@@ -52,7 +52,7 @@ const TelegramSettings = () => {
   const [stats, setStats] = useState({});
   const [showToken, setShowToken] = useState(false);
   const [testChatId, setTestChatId] = useState('');
-  const [testMessage, setTestMessage] = useState('Тестовое сообщение от админ панели');
+  const [testMessage, setTestMessage] = useState(t('admin2.ts_default_test_message'));
   const [message, setMessage] = useState({ type: '', text: '' });
 
   useEffect(() => {
@@ -84,7 +84,7 @@ const TelegramSettings = () => {
 
     } catch (error) {
       logger.error('Ошибка загрузки Telegram данных:', error);
-      setMessage({ type: 'error', text: 'Ошибка загрузки Telegram данных' });
+      setMessage({ type: 'error', text: t('admin2.ts_load_data_error') });
     } finally {
       setLoading(false);
     }
@@ -100,10 +100,10 @@ const TelegramSettings = () => {
       setMessage({ type: '', text: '' });
 
       const { data: result } = await api.put('/admin/telegram/settings', settings);
-      setMessage({ type: 'success', text: result.message || 'Настройки сохранены' });
+      setMessage({ type: 'success', text: result.message || t('admin2.ts_settings_saved') });
     } catch (error) {
       logger.error('Ошибка сохранения:', error);
-      setMessage({ type: 'error', text: 'Ошибка сохранения настроек Telegram' });
+      setMessage({ type: 'error', text: t('admin2.ts_save_error') });
     } finally {
       setSaving(false);
     }
@@ -137,7 +137,7 @@ const TelegramSettings = () => {
 
   const sendTestMessage = async () => {
     if (!testChatId || !testMessage) {
-      setMessage({ type: 'error', text: 'Укажите Chat ID и текст сообщения' });
+      setMessage({ type: 'error', text: t('admin2.ts_test_required') });
       return;
     }
 
@@ -158,7 +158,7 @@ const TelegramSettings = () => {
       <MacOSCard className="admin-p-32">
         <div className="admin-flex-ai-center-jc-center">
           <RefreshCw className="admin-w-20-h-20-mr-8-anim-spin1slinearinfinite" />
-          <span className="text-[var(--mac-text-primary)]">Загрузка Telegram настроек...</span>
+          <span className="text-[var(--mac-text-primary)]">{t('admin2.ts_loading')}</span>
         </div>
       </MacOSCard>);
 
@@ -170,17 +170,17 @@ const TelegramSettings = () => {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="admin-2xl-semi-primary-m-0-mb-4">
-            Настройки Telegram
+            {t('admin2.ts_page_title')}
           </h2>
           <p className="admin-sm-secondary-m-0">
-            Управление Telegram ботом и уведомлениями
+            {t('admin2.ts_page_subtitle')}
           </p>
         </div>
 
         <div className="admin-flex-gap-12">
           <Button variant="outline" onClick={loadData} disabled={loading}>
             <RefreshCw className="w-4 h-4 mr-2" />
-            Обновить
+            {t('admin2.ts_refresh')}
           </Button>
           <Button onClick={saveSettings} disabled={saving}>
             {saving ?
@@ -188,7 +188,7 @@ const TelegramSettings = () => {
 
             <Save className="w-4 h-4 mr-2" />
             }
-            Сохранить
+            {t('admin2.ts_save')}
           </Button>
         </div>
       </div>
@@ -218,7 +218,7 @@ const TelegramSettings = () => {
             {stats.total_users || 0}
           </div>
           <div className="text-sm text-[var(--mac-text-secondary)]">
-            Всего пользователей
+            {t('admin2.ts_stat_total_users')}
           </div>
         </MacOSCard>
         <MacOSCard className="admin-p-24-ta-center">
@@ -226,7 +226,7 @@ const TelegramSettings = () => {
             {stats.messages_sent || 0}
           </div>
           <div className="text-sm text-[var(--mac-text-secondary)]">
-            Сообщений отправлено
+            {t('admin2.ts_stat_messages_sent')}
           </div>
         </MacOSCard>
         <MacOSCard className="admin-p-24-ta-center">
@@ -234,7 +234,7 @@ const TelegramSettings = () => {
             {stats.messages_delivered || 0}
           </div>
           <div className="text-sm text-[var(--mac-text-secondary)]">
-            Доставлено
+            {t('admin2.ts_stat_messages_delivered')}
           </div>
         </MacOSCard>
         <MacOSCard className="admin-p-24-ta-center">
@@ -242,7 +242,7 @@ const TelegramSettings = () => {
             {stats.messages_failed || 0}
           </div>
           <div className="text-sm text-[var(--mac-text-secondary)]">
-            Ошибок
+            {t('admin2.ts_stat_messages_failed')}
           </div>
         </MacOSCard>
       </div>
@@ -252,14 +252,14 @@ const TelegramSettings = () => {
         <MacOSCard className="p-6">
           <h3 className="admin-lg-med-mb-16-flex-ai-center-primary-m-0">
             <Bot className="admin-w-20-h-20-mr-8-blue" />
-            Настройки бота
+            {t('admin2.ts_bot_settings_title')}
           </h3>
 
           <div className="flex flex-col gap-4">
             <div>
               <label className="admin-block-sm-med-primary-mb-8">
                 <Key className="admin-w-16-h-16-inline-mr-4" />
-                Токен бота
+                {t('admin2.ts_bot_token_label')}
               </label>
               <div className="admin-flex">
                 <Input
@@ -281,7 +281,7 @@ const TelegramSettings = () => {
                 </Button>
               </div>
               <p className="admin-sm-secondary-mt-4-m-0">
-                Получите токен у @BotFather в Telegram
+                {t('admin2.ts_bot_token_hint')}
               </p>
             </div>
 
@@ -289,20 +289,20 @@ const TelegramSettings = () => {
             {botInfo &&
             <div className="admin-p-12-bg-success-bg-bd-1solidvar-mac-success-border-radius-var--mac-radius-md">
                 <h4 className="admin-med-success-mb-8-m-0">
-                  Информация о боте:
+                  {t('admin2.ts_bot_info_title')}
                 </h4>
                 <div className="admin-sm-flex-col-gap-4">
                   <div className="text-[var(--mac-text-primary)]"><strong>Username:</strong> @{botInfo.username}</div>
-                  <div className="text-[var(--mac-text-primary)]"><strong>Имя:</strong> {botInfo.first_name}</div>
+                  <div className="text-[var(--mac-text-primary)]"><strong>{t('admin2.ts_bot_info_name')}</strong> {botInfo.first_name}</div>
                   <div className="text-[var(--mac-text-primary)]"><strong>ID:</strong> {botInfo.id}</div>
-                  <div className="text-[var(--mac-text-primary)]"><strong>Группы:</strong> {botInfo.can_join_groups ? 'Да' : 'Нет'}</div>
+                  <div className="text-[var(--mac-text-primary)]"><strong>{t('admin2.ts_bot_info_groups')}</strong> {botInfo.can_join_groups ? t('admin2.ts_yes') : t('admin2.ts_no')}</div>
                 </div>
               </div>
             }
 
             <div>
               <label className="admin-block-sm-med-primary-mb-8">
-                ID чатов администраторов
+                {t('admin2.ts_admin_chat_ids_label')}
               </label>
               <Input
                 value={settings.admin_chat_ids?.join(', ') || ''}
@@ -311,18 +311,18 @@ const TelegramSettings = () => {
                 className="admin-w-100pct-minh-60" />
               
               <p className="admin-sm-secondary-mt-4-m-0">
-                ID чатов для получения служебных уведомлений
+                {t('admin2.ts_admin_chat_ids_hint')}
               </p>
             </div>
 
             <div className="admin-flex-gap-12">
               <Button onClick={testBot} disabled={!settings.bot_token}>
                 <TestTube className="w-4 h-4 mr-2" />
-                Тест бота
+                {t('admin2.ts_test_bot_button')}
               </Button>
               <Button onClick={setWebhook} disabled={!settings.bot_token}>
                 <Webhook className="w-4 h-4 mr-2" />
-                Установить webhook
+                {t('admin2.ts_set_webhook_button')}
               </Button>
             </div>
           </div>
@@ -332,7 +332,7 @@ const TelegramSettings = () => {
         <MacOSCard className="p-6">
           <h3 className="admin-lg-med-mb-16-flex-ai-center-primary-m-0">
             <Bell className="admin-w-20-h-20-mr-8-success" />
-            Уведомления
+            {t('admin2.ts_notifications_title')}
           </h3>
 
           <div className="flex flex-col gap-4">
@@ -343,7 +343,7 @@ const TelegramSettings = () => {
                   onChange={(e) => handleSettingChange('notifications_enabled', e.target.checked)}
                   className="admin-mr-12" />
                 
-                <span className="admin-sm-med-primary">Уведомления включены</span>
+                <span className="admin-sm-med-primary">{t('admin2.ts_notifications_enabled')}</span>
               </label>
 
               <label className="admin-flex-ai-center">
@@ -352,7 +352,7 @@ const TelegramSettings = () => {
                   onChange={(e) => handleSettingChange('appointment_reminders', e.target.checked)}
                   className="admin-mr-12" />
                 
-                <span className="admin-sm-med-primary">Напоминания о приемах</span>
+                <span className="admin-sm-med-primary">{t('admin2.ts_appointment_reminders')}</span>
               </label>
 
               <label className="admin-flex-ai-center">
@@ -361,7 +361,7 @@ const TelegramSettings = () => {
                   onChange={(e) => handleSettingChange('lab_results_notifications', e.target.checked)}
                   className="admin-mr-12" />
                 
-                <span className="admin-sm-med-primary">Готовность анализов</span>
+                <span className="admin-sm-med-primary">{t('admin2.ts_lab_results_notifications')}</span>
               </label>
 
               <label className="admin-flex-ai-center">
@@ -370,21 +370,21 @@ const TelegramSettings = () => {
                   onChange={(e) => handleSettingChange('payment_notifications', e.target.checked)}
                   className="admin-mr-12" />
                 
-                <span className="admin-sm-med-primary">Уведомления об оплате</span>
+                <span className="admin-sm-med-primary">{t('admin2.ts_payment_notifications')}</span>
               </label>
             </div>
 
             <div>
               <label className="admin-block-sm-med-primary-mb-8">
                 <Globe className="admin-w-16-h-16-inline-mr-4" />
-                Язык по умолчанию
+                {t('admin2.ts_default_language')}
               </label>
               <Select
                 value={settings.default_language}
                 onChange={(value) => handleSettingChange('default_language', value)}
-                options={DEFAULT_LANGUAGE_OPTIONS}
+                options={getLanguageOptions(t)}
                 className="w-full"
-                aria-label={'\u042f\u0437\u044b\u043a \u043f\u043e \u0443\u043c\u043e\u043b\u0447\u0430\u043d\u0438\u044e'}
+                aria-label={t('admin2.ts_default_language')}
               ></Select>
               
             </div>
@@ -399,12 +399,12 @@ const TelegramSettings = () => {
                 <h4 className="admin-med-mb-8-m-0" style={{ '--admin-color': webhookInfo.webhook_set ?
                 'var(--mac-success)' :
                 'var(--mac-warning)' }}>
-                  Webhook: {webhookInfo.webhook_set ? 'Настроен' : 'Не настроен'}
+                  Webhook: {webhookInfo.webhook_set ? t('admin2.ts_webhook_configured') : t('admin2.ts_webhook_not_configured')}
                 </h4>
                 {webhookInfo.webhook_info &&
               <div className="admin-sm-flex-col-gap-4">
-                    <div className="text-[var(--mac-text-primary)]"><strong>URL:</strong> {webhookInfo.webhook_info.url || 'Не установлен'}</div>
-                    <div className="text-[var(--mac-text-primary)]"><strong>Обновления:</strong> {webhookInfo.webhook_info.pending_update_count || 0}</div>
+                    <div className="text-[var(--mac-text-primary)]"><strong>URL:</strong> {webhookInfo.webhook_info.url || t('admin2.ts_url_not_set')}</div>
+                    <div className="text-[var(--mac-text-primary)]"><strong>{t('admin2.ts_webhook_updates_label')}</strong> {webhookInfo.webhook_info.pending_update_count || 0}</div>
                   </div>
               }
               </div>
@@ -417,13 +417,13 @@ const TelegramSettings = () => {
       <MacOSCard className="p-6">
         <h3 className="admin-lg-med-mb-16-flex-ai-center-primary-m-0">
           <Send className="admin-w-20-h-20-mr-8-purple" />
-          Тестирование отправки сообщений
+          {t('admin2.ts_test_send_title')}
         </h3>
 
         <div className="admin-grid-gtc-rauto-fitcminmax300pxc1fr-gap-16">
           <div>
             <label className="admin-block-sm-med-primary-mb-8">
-              Chat ID получателя
+              {t('admin2.ts_test_chat_id_label')}
             </label>
             <Input
               type="text"
@@ -433,18 +433,18 @@ const TelegramSettings = () => {
               className="w-full" />
             
             <p className="admin-sm-secondary-mt-4-m-0">
-              ID чата для отправки тестового сообщения
+              {t('admin2.ts_test_chat_id_hint')}
             </p>
           </div>
 
           <div>
             <label className="admin-block-sm-med-primary-mb-8">
-              Текст сообщения
+              {t('admin2.ts_test_message_label')}
             </label>
             <Input
               value={testMessage}
               onChange={(e) => setTestMessage(e.target.value)}
-              placeholder="Введите текст сообщения..."
+              placeholder={t('admin2.ts_test_message_ph')}
               className="admin-w-100pct-minh-80" />
             
           </div>
@@ -456,7 +456,7 @@ const TelegramSettings = () => {
             disabled={!settings.bot_token || !testChatId || !testMessage}>
             
             <Send className="w-4 h-4 mr-2" />
-            Отправить тест
+            {t('admin2.ts_send_test_button')}
           </Button>
         </div>
       </MacOSCard>
@@ -465,14 +465,14 @@ const TelegramSettings = () => {
       <MacOSCard className="admin-p-24-bg-info-bg-bd-1solidvar-mac-info-border">
         <h3 className="admin-lg-med-mb-8-flex-ai-center-info-m-0">
           <MessageSquare className="admin-w-20-h-20-mr-8" />
-          Настройка Telegram бота
+          {t('admin2.ts_setup_title')}
         </h3>
         <div className="admin-sm-secondary-flex-col-gap-8">
-          <p className="admin-m-0">1. Создайте бота через @BotFather в Telegram</p>
-          <p className="admin-m-0">2. Получите токен бота и вставьте его выше</p>
-          <p className="admin-m-0">3. Нажмите «Тест бота» для проверки подключения</p>
-          <p className="admin-m-0">4. Установите webhook для получения сообщений</p>
-          <p className="admin-m-0">5. Добавьте ID чатов администраторов для служебных уведомлений</p>
+          <p className="admin-m-0">{t('admin2.ts_setup_step_1')}</p>
+          <p className="admin-m-0">{t('admin2.ts_setup_step_2')}</p>
+          <p className="admin-m-0">{t('admin2.ts_setup_step_3')}</p>
+          <p className="admin-m-0">{t('admin2.ts_setup_step_4')}</p>
+          <p className="admin-m-0">{t('admin2.ts_setup_step_5')}</p>
         </div>
       </MacOSCard>
     </div>);

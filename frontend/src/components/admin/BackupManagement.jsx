@@ -26,7 +26,7 @@ import {
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const emptyBackupStats = {
   total_backups: 0,
@@ -70,31 +70,32 @@ const BackupManagement = () => {
   const [editingBackup, setEditingBackup] = useState(null);
   const [message, setMessage] = useState({ type: '', text: '' });
   const [stats, setStats] = useState(null);
+  const { t } = useTranslation();
 
   // Форма резервной копии
   const [formData, setFormData] = useState(defaultBackupForm);
 
   const statusOptions = [
-  { value: 'pending', label: 'Ожидает', color: 'gray' },
-  { value: 'in_progress', label: 'Выполняется', color: 'warning' },
-  { value: 'completed', label: 'Завершено', color: 'success' },
-  { value: 'failed', label: 'Ошибка', color: 'error' },
-  { value: 'cancelled', label: 'Отменено', color: 'gray' }];
+  { value: 'pending', label: t('admin2.bk_status_pending'), color: 'gray' },
+  { value: 'in_progress', label: t('admin2.bk_status_in_progress'), color: 'warning' },
+  { value: 'completed', label: t('admin2.bk_status_completed'), color: 'success' },
+  { value: 'failed', label: t('admin2.bk_status_failed'), color: 'error' },
+  { value: 'cancelled', label: t('admin2.bk_status_cancelled'), color: 'gray' }];
 
 
   const typeOptions = [
-  { value: 'full', label: 'Полная копия' },
-  { value: 'incremental', label: 'Инкрементальная' },
-  { value: 'differential', label: 'Дифференциальная' },
-  { value: 'database', label: 'База данных' },
-  { value: 'files', label: 'Файлы' }];
+  { value: 'full', label: t('admin2.bk_type_full') },
+  { value: 'incremental', label: t('admin2.bk_type_incremental') },
+  { value: 'differential', label: t('admin2.bk_type_differential') },
+  { value: 'database', label: t('admin2.bk_type_database') },
+  { value: 'files', label: t('admin2.bk_type_files') }];
 
 
   const scheduleOptions = [
-  { value: 'manual', label: 'Вручную' },
-  { value: 'daily', label: 'Ежедневно' },
-  { value: 'weekly', label: 'Еженедельно' },
-  { value: 'monthly', label: 'Ежемесячно' }];
+  { value: 'manual', label: t('admin2.bk_schedule_manual') },
+  { value: 'daily', label: t('admin2.bk_schedule_daily') },
+  { value: 'weekly', label: t('admin2.bk_schedule_weekly') },
+  { value: 'monthly', label: t('admin2.bk_schedule_monthly') }];
 
 
   const loadBackups = useCallback(async () => {
@@ -126,10 +127,10 @@ const BackupManagement = () => {
 
       if (editingBackup) {
         await api.put(`/clinic/backups/${editingBackup.id}`, formData);
-        setMessage({ type: 'success', text: 'Настройки обновлены' });
+        setMessage({ type: 'success', text: t('admin2.bk_msg_updated') });
       } else {
         await api.post('/clinic/backups', formData);
-        setMessage({ type: 'success', text: 'Резервная копия создана' });
+        setMessage({ type: 'success', text: t('admin2.bk_msg_created') });
       }
 
       setShowAddForm(false);
@@ -137,7 +138,7 @@ const BackupManagement = () => {
       resetForm();
       loadBackups();
     } catch {
-      setMessage({ type: 'error', text: 'Ошибка сохранения резервной копии' });
+      setMessage({ type: 'error', text: t('admin2.bk_msg_save_error') });
     } finally {
       setSaving(false);
     }
@@ -156,10 +157,10 @@ const BackupManagement = () => {
   const handleDelete = async (backupId) => {
     try {
       await api.delete(`/clinic/backups/${backupId}`);
-      setMessage({ type: 'success', text: 'Резервная копия удалена' });
+      setMessage({ type: 'success', text: t('admin2.bk_msg_deleted') });
       loadBackups();
     } catch {
-      setMessage({ type: 'error', text: 'Ошибка удаления резервной копии' });
+      setMessage({ type: 'error', text: t('admin2.bk_msg_delete_error') });
     }
   };
 
@@ -169,11 +170,11 @@ const BackupManagement = () => {
       const cleanedCount = response.data?.cleaned_count ?? 0;
       setMessage({
         type: 'success',
-        text: `Очищено ${cleanedCount} просроченных резервных копий`
+        text: t('admin2.bk_msg_cleanup_success', { count: cleanedCount })
       });
       loadBackups();
     } catch {
-      setMessage({ type: 'error', text: 'Ошибка очистки просроченных резервных копий' });
+      setMessage({ type: 'error', text: t('admin2.bk_msg_cleanup_error') });
     }
   };
 
@@ -220,10 +221,10 @@ const BackupManagement = () => {
     return matchesSearch && matchesStatus && matchesType;
   });
   const hasBackupFilters = searchTerm.trim() !== '' || statusFilter !== 'all' || typeFilter !== 'all';
-  const backupEmptyTitle = hasBackupFilters ? 'Резервные копии по фильтрам не найдены' : 'Резервные копии ещё не созданы';
+  const backupEmptyTitle = hasBackupFilters ? t('admin2.bk_empty_title_filtered') : t('admin2.bk_empty_title_initial');
   const backupEmptyDescription = hasBackupFilters ?
-  'Измените поиск, статус или тип, чтобы увидеть другие резервные копии.' :
-  'Создайте первую резервную копию, чтобы зафиксировать состояние системы.';
+  t('admin2.bk_empty_desc_filtered') :
+  t('admin2.bk_empty_desc_initial');
 
   return (
     <div className="admin-d-flex-fd-column-gap-24-ov-hidden-2">
@@ -231,10 +232,10 @@ const BackupManagement = () => {
       <div className="admin-d-flex-jc-between-ai-center-fw-wrap-gap-16-2">
         <div>
           <h2 className="admin-fs-2xl-fw-bold-primary-m-0-0-8px-0-2">
-            Управление резервными копиями
+            {t('admin2.bk_page_title')}
           </h2>
           <p className="admin-secondary-fs-sm-m-0-4">
-            Создание и управление резервными копиями системы
+            {t('admin2.bk_page_subtitle')}
           </p>
         </div>
         {stats &&
@@ -244,7 +245,7 @@ const BackupManagement = () => {
                 {stats.total_backups}
               </div>
               <div className="text-sm text-[var(--mac-text-secondary)]">
-                Всего копий
+                {t('admin2.bk_stat_total')}
               </div>
             </div>
             <div className="text-center">
@@ -252,7 +253,7 @@ const BackupManagement = () => {
                 {stats.completed_backups}
               </div>
               <div className="text-sm text-[var(--mac-text-secondary)]">
-                Завершено
+                {t('admin2.bk_status_completed')}
               </div>
             </div>
             <div className="text-center">
@@ -260,7 +261,7 @@ const BackupManagement = () => {
                 {formatFileSize(stats.total_size)}
               </div>
               <div className="text-sm text-[var(--mac-text-secondary)]">
-                Общий размер
+                {t('admin2.bk_stat_size')}
               </div>
             </div>
           </div>
@@ -271,7 +272,7 @@ const BackupManagement = () => {
       {message.text &&
       <Alert
         type={message.type === 'success' ? 'success' : 'error'}
-        title={message.type === 'success' ? 'Успешно' : 'Ошибка'}
+        title={message.type === 'success' ? t('admin2.bk_alert_success') : t('admin2.bk_alert_error')}
         message={message.text} />
 
       }
@@ -282,8 +283,8 @@ const BackupManagement = () => {
           <div className="admin-flex-1-pos-relative">
             <Input
               type="text"
-              aria-label="Поиск резервных копий по названию или описанию"
-              placeholder="Поиск по названию или описанию..."
+              aria-label={t('admin2.bk_search_aria')}
+              placeholder={t('admin2.bk_search_placeholder')}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="admin-pl-40" />
@@ -292,21 +293,21 @@ const BackupManagement = () => {
           </div>
           <div className="admin-d-flex-gap-12-fw-wrap-2">
             <Select
-              aria-label="Фильтр резервных копий по статусу"
+              aria-label={t('admin2.bk_filter_status_aria')}
               value={statusFilter}
               onChange={setStatusFilter}
               options={[
-                { value: 'all', label: 'Все статусы' },
+                { value: 'all', label: t('admin2.bk_filter_all_statuses') },
                 ...statusOptions.map((option) => ({ value: option.value, label: option.label }))
               ]}
               size="large"
               className="admin-minw-150" />
             <Select
-              aria-label="Фильтр резервных копий по типу"
+              aria-label={t('admin2.bk_filter_type_aria')}
               value={typeFilter}
               onChange={setTypeFilter}
               options={[
-                { value: 'all', label: 'Все типы' },
+                { value: 'all', label: t('admin2.bk_filter_all_types') },
                 ...typeOptions.map((option) => ({ value: option.value, label: option.label }))
               ]}
               size="large"
@@ -316,16 +317,16 @@ const BackupManagement = () => {
               className="admin-d-flex-ai-center-gap-8-bgc-blue-bd-none-p-8px-16px-2">
               
               <Plus aria-hidden="true" className="w-4 h-4" />
-              <span>Создать копию</span>
+              <span>{t('admin2.bk_btn_create')}</span>
             </Button>
             <Button
               type="button"
-              aria-label="Очистить просроченные резервные копии"
+              aria-label={t('admin2.bk_btn_cleanup_aria')}
               onClick={handleCleanupExpired}
               variant="outline"
               className="flex items-center justify-center gap-2">
               <RefreshCw aria-hidden="true" className="w-4 h-4" />
-              <span>Очистить просроченные</span>
+              <span>{t('admin2.bk_btn_cleanup')}</span>
             </Button>
           </div>
         </div>
@@ -336,12 +337,12 @@ const BackupManagement = () => {
       <MacOSCard className="admin-p-24-ov-hidden-2">
           <div className="admin-d-flex-jc-between-ai-center-mb-16-4">
             <h3 className="admin-fs-lg-fw-semi-primary-m-0-3">
-              {editingBackup ? 'Редактировать резервную копию' : 'Создать резервную копию'}
+              {editingBackup ? t('admin2.bk_form_edit_title') : t('admin2.bk_form_create_title')}
             </h3>
             <Button
             variant="outline"
             type="button"
-            aria-label={editingBackup ? 'Закрыть форму редактирования резервной копии' : 'Закрыть форму создания резервной копии'}
+            aria-label={editingBackup ? t('admin2.bk_form_close_edit_aria') : t('admin2.bk_form_close_create_aria')}
             onClick={() => {
               setShowAddForm(false);
               setEditingBackup(null);
@@ -357,22 +358,22 @@ const BackupManagement = () => {
             <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16-4">
               <div>
                 <label className="admin-d-block-fs-sm-fw-med-primary-mb-4-21">
-                  Название *
+                  {t('admin2.bk_field_name')}
                 </label>
                 <Input
                 type="text"
                 required
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Введите название резервной копии" />
+                placeholder={t('admin2.bk_field_name_placeholder')} />
               
               </div>
               <div>
                 <label className="admin-d-block-fs-sm-fw-med-primary-mb-4-20">
-                  Тип копии *
+                  {t('admin2.bk_field_type')}
                 </label>
                 <Select
-                aria-label="Тип резервной копии"
+                aria-label={t('admin2.bk_field_type_aria')}
                 value={formData.backup_type}
                 onChange={(value) => setFormData({ ...formData, backup_type: value })}
                 options={typeOptions.map((option) => ({ value: option.value, label: option.label }))}
@@ -380,10 +381,10 @@ const BackupManagement = () => {
               </div>
               <div>
                 <label className="admin-d-block-fs-sm-fw-med-primary-mb-4-19">
-                  Расписание
+                  {t('admin2.bk_field_schedule')}
                 </label>
                 <Select
-                aria-label="Расписание резервной копии"
+                aria-label={t('admin2.bk_field_schedule_aria')}
                 value={formData.schedule}
                 onChange={(value) => setFormData({ ...formData, schedule: value })}
                 options={scheduleOptions.map((option) => ({ value: option.value, label: option.label }))}
@@ -391,26 +392,26 @@ const BackupManagement = () => {
               </div>
               <div>
                 <label className="admin-d-block-fs-sm-fw-med-primary-mb-4-18">
-                  Хранение (дни)
+                  {t('admin2.bk_field_retention')}
                 </label>
                 <Input
                 type="number"
                 min="1"
                 value={formData.retention_days}
                 onChange={(e) => setFormData({ ...formData, retention_days: parseInt(e.target.value) })}
-                placeholder="Введите количество дней" />
+                placeholder={t('admin2.bk_field_retention_placeholder')} />
               
               </div>
             </div>
 
             <div>
               <label className="admin-d-block-fs-sm-fw-med-primary-mb-8-15">
-                Описание
+                {t('admin2.bk_field_description')}
               </label>
               <Textarea
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="Введите описание резервной копии"
+              placeholder={t('admin2.bk_field_description_placeholder')}
               rows={3} />
             
             </div>
@@ -422,7 +423,7 @@ const BackupManagement = () => {
                 onChange={(checked) => setFormData({ ...formData, compression: checked })} />
               
                 <span className="admin-fs-sm-primary-2">
-                  Сжатие архива
+                  {t('admin2.bk_field_compression')}
                 </span>
               </div>
               <div className="admin-flex-center-12">
@@ -431,7 +432,7 @@ const BackupManagement = () => {
                 onChange={(checked) => setFormData({ ...formData, encryption: checked })} />
               
                 <span className="admin-fs-sm-primary-1">
-                  Шифрование архива
+                  {t('admin2.bk_field_encryption')}
                 </span>
               </div>
             </div>
@@ -446,8 +447,8 @@ const BackupManagement = () => {
                 resetForm();
               }}
               disabled={saving}>
-              
-                Отмена
+
+                {t('admin2.cancel')}
               </Button>
               <Button
               type="submit"
@@ -458,12 +459,12 @@ const BackupManagement = () => {
                 {saving ?
               <>
                     <RefreshCw aria-hidden="true" className="admin-w-16-h-16-anim-spin-1s-linear-infin-2" />
-                    Сохранение...
+                    {t('admin2.bk_btn_saving')}
                   </> :
 
               <>
                     <Save aria-hidden="true" className="w-4 h-4" />
-                    {editingBackup ? 'Обновить' : 'Создать'}
+                    {editingBackup ? t('admin2.bk_btn_update') : t('admin2.bk_btn_create_submit')}
                   </>
               }
               </Button>
@@ -489,7 +490,7 @@ const BackupManagement = () => {
         action={
         <Button onClick={() => setShowAddForm(true)} variant="primary">
               <Plus aria-hidden="true" focusable="false" className="w-4 h-4 mr-2" />
-              Создать копию
+              {t('admin2.bk_btn_create')}
             </Button>
         } /> :
 
@@ -503,7 +504,7 @@ const BackupManagement = () => {
                     {backup.name}
                   </h3>
                   <p className="admin-fs-sm-secondary-m-0-2">
-                    {getTypeLabel(backup.backup_type)} • Хранение {backup.retention_days} дней
+                    {getTypeLabel(backup.backup_type)} • {t('admin2.bk_retention_inline', { days: backup.retention_days })}
                   </p>
                 </div>
                 <Badge
@@ -523,7 +524,7 @@ const BackupManagement = () => {
                 </div>
                 <div className="admin-d-flex-ai-center-gap-8-fs-sm-secondary-9">
                   <Clock aria-hidden="true" className="w-4 h-4" />
-                  <span>Хранение: {backup.retention_days} дней</span>
+                  <span>{t('admin2.bk_retention_label', { days: backup.retention_days })}</span>
                 </div>
                 {backup.file_path &&
             <div className="admin-d-flex-ai-center-gap-8-fs-sm-secondary-8">
@@ -544,7 +545,7 @@ const BackupManagement = () => {
                 <Button
               type="button"
               variant="outline"
-              aria-label={`Редактировать резервную копию ${backup.name}`}
+              aria-label={t('admin2.bk_row_edit_aria', { name: backup.name })}
               onClick={() => handleEdit(backup)}
               className="admin-p-6px-12px-2">
               
@@ -553,7 +554,7 @@ const BackupManagement = () => {
                 <Button
               type="button"
               variant="outline"
-              aria-label={`Удалить резервную копию ${backup.name}`}
+              aria-label={t('admin2.bk_row_delete_aria', { name: backup.name })}
               onClick={() => handleDelete(backup.id)}
               className="admin-p-6px-12px-error-bd-c-error-2">
               

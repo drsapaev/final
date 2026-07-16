@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import { CheckCircle, XCircle, Info } from 'lucide-react';
@@ -29,11 +29,12 @@ import './CashPaymentModal.css';
  * unified payment method options (MEDIUM #16),
  * and uses consistent Russian aria-labels (HIGH #8).
  */
-const PAYMENT_METHOD_OPTIONS = [
-  { value: 'cash', label: 'Наличные' },
-  { value: 'card', label: 'Карта' },
-  { value: 'click', label: 'Click' },
-  { value: 'payme', label: 'PayMe' },
+// i18n: payment method labels are translated at call time via getPaymentMethodOptions(t).
+const getPaymentMethodOptions = (t) => [
+  { value: 'cash', label: t('payment.pay_cash_method_cash') },
+  { value: 'card', label: t('payment.pay_cash_method_card') },
+  { value: 'click', label: t('payment.pay_cash_method_click') },
+  { value: 'payme', label: t('payment.pay_cash_method_payme') },
 ];
 
 // UX Audit #1.2: Quick cash denominations (UZS banknotes) + "exact amount" button.
@@ -41,6 +42,7 @@ const PAYMENT_METHOD_OPTIONS = [
 const QUICK_CASH_DENOMINATIONS = [50000, 100000, 200000, 500000];
 
 const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
+    const { t } = useTranslation();
     // Auto-fill amount from appointment data
     const defaultAmount = appointment?.total_amount ||
         appointment?.remaining_amount ||
@@ -102,19 +104,19 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
             onClose={onClose}
             maxWidth="sm"
             fullWidth
-            aria-label="Диалог обработки оплаты">
+            aria-label={t('payment.pay_cash_dialog_aria')}>
             <DialogTitle>
                 <Box
                     display="flex"
                     alignItems="center"
                     justifyContent="space-between"
                     className="cpm-dialog-header">
-                    <span>Обработка оплаты</span>
+                    <span>{t('payment.pay_cash_title')}</span>
                     <Button
                         variant="ghost"
                         size="small"
                         onClick={onClose}
-                        aria-label="Закрыть окно обработки оплаты">
+                        aria-label={t('payment.pay_cash_close_aria')}>
                         <XCircle size={20} aria-hidden="true" />
                     </Button>
                 </Box>
@@ -123,10 +125,10 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
             <DialogContent>
                 <Box mb={2}>
                     <Typography variant="body2" color="textSecondary" className="cpm-patient-label-text">
-                        Пациент:
+                        {t('payment.pay_cash_patient')}
                     </Typography>
                     <Typography variant="body1" className="cpm-patient-name-text">
-                        {appointment?.patient_name || `Пациент #${appointment?.patient_id}`}
+                        {appointment?.patient_name || t('payment.pay_cash_patient_fallback', { id: appointment?.patient_id })}
                     </Typography>
                     <Typography variant="body2" color="textSecondary">
                         {appointment?.department} • {appointment?.appointment_date} {appointment?.appointment_time}
@@ -141,7 +143,7 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
                             gap={1}
                             className="cpm-amount-hint-box">
                             <Info size={14} aria-hidden="true" />
-                            Сумма к оплате: {formatUZS(defaultAmount)}
+                            {t('payment.pay_cash_amount_due')} {formatUZS(defaultAmount)}
                         </Box>
                     )}
                 </Box>
@@ -149,29 +151,29 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
                 <form onSubmit={handleSubmit} id="cash-payment-form">
                     <Box mb={2}>
                         <Label htmlFor="cash-payment-amount" className="cpm-field-label">
-                            Сумма (сум)
+                            {t('payment.pay_cash_amount_label')}
                         </Label>
                         <Input
                             id="cash-payment-amount"
                             type="number"
-                            aria-label="Сумма оплаты"
+                            aria-label={t('payment.pay_cash_amount_aria')}
                             value={paymentData.amount}
                             onChange={(e) => setPaymentData(prev => ({ ...prev, amount: e.target.value }))}
-                            placeholder="Введите сумму"
+                            placeholder={t('payment.pay_cash_amount_placeholder')}
                             required
                         />
                     </Box>
 
                     <Box mb={2}>
                         <Label htmlFor="cash-payment-method" className="cpm-field-label">
-                            Способ оплаты
+                            {t('payment.pay_cash_method_label')}
                         </Label>
                         <Select
                             id="cash-payment-method"
-                            aria-label="Способ оплаты"
+                            aria-label={t('payment.pay_cash_method_aria')}
                             value={paymentData.method}
                             onChange={(value) => setPaymentData(prev => ({ ...prev, method: value }))}
-                            options={PAYMENT_METHOD_OPTIONS}
+                            options={getPaymentMethodOptions(t)}
                             className="cpm-select-full"
                         />
                     </Box>
@@ -179,20 +181,20 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
                     {paymentData.method === 'cash' && (
                         <Box mb={2}>
                             <Label htmlFor="cash-payment-received" className="cpm-field-label">
-                                Получено от пациента (сум)
+                                {t('payment.pay_cash_received_label')}
                             </Label>
                             <Input
                                 id="cash-payment-received"
                                 type="number"
-                                aria-label="Полученная сумма от пациента"
+                                aria-label={t('payment.pay_cash_received_aria')}
                                 value={paymentData.receivedAmount}
                                 onChange={(e) => setPaymentData(prev => ({ ...prev, receivedAmount: e.target.value }))}
-                                placeholder="Введите полученную сумму"
+                                placeholder={t('payment.pay_cash_received_placeholder')}
                                 error={insufficientCash}
                             />
                             {/* UX Audit #1.2: Quick amount buttons — law of Fitts + Hick.
                                 Reduces 6-7 keystrokes per transaction to a single click. */}
-                            <div className="cpm-quick-amounts" role="group" aria-label="Быстрый ввод полученной суммы">
+                            <div className="cpm-quick-amounts" role="group" aria-label={t('payment.pay_cash_quick_aria')}>
                                 {QUICK_CASH_DENOMINATIONS.map((nominal) => (
                                     <Button
                                         key={nominal}
@@ -200,7 +202,7 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
                                         size="small"
                                         variant="outline"
                                         onClick={() => setPaymentData(prev => ({ ...prev, receivedAmount: String(nominal) }))}
-                                        aria-label={`Ввести ${formatUZS(nominal)} как полученную сумму`}>
+                                        aria-label={t('payment.pay_cash_quick_nominal_aria', { amount: formatUZS(nominal) })}>
                                         {formatUZS(nominal)}
                                     </Button>
                                 ))}
@@ -209,13 +211,13 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
                                     size="small"
                                     variant="primary"
                                     onClick={() => setPaymentData(prev => ({ ...prev, receivedAmount: String(numericAmount) }))}
-                                    aria-label="Ввести точную сумму без сдачи">
-                                    Без сдачи
+                                    aria-label={t('payment.pay_cash_exact_aria')}>
+                                    {t('payment.pay_cash_exact_btn')}
                                 </Button>
                             </div>
                             {insufficientCash && (
                                 <Typography variant="caption" className="cpm-insufficient-error">
-                                    Недостаточно средств. Нужно ещё: {formatUZS(numericAmount - numericReceived)}
+                                    {t('payment.pay_cash_insufficient', { amount: formatUZS(numericAmount - numericReceived) })}
                                 </Typography>
                             )}
                             {changeDue > 0 && (
@@ -224,7 +226,7 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
                                     px={1.5}
                                     py={1}
                                     className="cpm-change-due-box">
-                                    Сдача: {formatUZS(changeDue)}
+                                    {t('payment.pay_cash_change_due', { amount: formatUZS(changeDue) })}
                                 </Box>
                             )}
                         </Box>
@@ -232,14 +234,14 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
 
                     <Box mb={1}>
                         <Label htmlFor="cash-payment-note" className="cpm-field-label">
-                            Примечание (необязательно)
+                            {t('payment.pay_cash_note_label')}
                         </Label>
                         <Textarea
                             id="cash-payment-note"
-                            aria-label="Примечание к оплате"
+                            aria-label={t('payment.pay_cash_note_aria')}
                             value={paymentData.note}
                             onChange={(e) => setPaymentData(prev => ({ ...prev, note: e.target.value }))}
-                            placeholder="Дополнительная информация"
+                            placeholder={t('payment.pay_cash_note_placeholder')}
                             minRows={3}
                         />
                     </Box>
@@ -248,11 +250,11 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
 
             <DialogActions>
                 <Button type="button" variant="outline" onClick={onClose}>
-                    Отмена
+                    {t('payment.pay_cash_cancel')}
                 </Button>
                 <Button type="submit" variant="primary" form="cash-payment-form">
                     <CheckCircle size={16} className="cpm-submit-icon" aria-hidden="true" />
-                    Обработать оплату
+                    {t('payment.pay_cash_submit')}
                 </Button>
             </DialogActions>
         </Dialog>

@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 // Система модальных окон
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import PropTypes from 'prop-types';
@@ -9,6 +9,7 @@ const ModalContext = createContext();
 let openModalExternal = null;
 
 const getFontSize = (size) => {
+  const { t } = useTranslation();
   const sizes = {
     sm: '0.875rem',
     md: '1rem',

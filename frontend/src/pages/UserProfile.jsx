@@ -33,7 +33,7 @@ import TwoFactorManager from '../components/security/TwoFactorManager';
 import { getState as getAuthState, setProfile as setAuthProfile } from '../stores/auth';
 import { getErrorMessage } from '../utils/errorHandler';
 import logger from '../utils/logger';
-import { useTranslation } from '../i18n/adapter';
+import { useTranslation } from '../i18n/useTranslation';
 
 const SELF_PROFILE_CACHE_MS = 30_000;
 let selfProfileCache = null;
@@ -57,18 +57,9 @@ const editableFields = [
   'avatar_url',
 ];
 
-const genderOptions = [
-  { value: '', label: 'Не указан' },
-  { value: 'male', label: 'Мужской' },
-  { value: 'female', label: 'Женский' },
-  { value: 'other', label: 'Другой' },
-];
 
-const languageOptions = [
-  { value: 'ru', label: 'Русский' },
-  { value: 'uz', label: 'O`zbekcha' },
-  { value: 'en', label: 'English' },
-];
+
+
 
 const timezoneOptions = [
   { value: 'Asia/Tashkent', label: 'Asia/Tashkent' },
@@ -76,14 +67,14 @@ const timezoneOptions = [
   { value: 'UTC', label: 'UTC' },
 ];
 
-function formatDateTime(value) {
+function formatDateTime(value, emptyLabel) {
   if (!value) {
-    return 'Не указано';
+    return emptyLabel;
   }
 
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) {
-    return 'Не указано';
+    return emptyLabel;
   }
 
   return parsed.toLocaleString('ru-RU');
@@ -282,6 +273,21 @@ ProfileField.propTypes = {
 };
 
 export default function UserProfile() {
+  const { t } = useTranslation();
+
+  const genderOptions = [
+    { value: '', label: t('misc.up_gender_none') },
+    { value: 'male', label: t('misc.up_gender_male') },
+    { value: 'female', label: t('misc.up_gender_female') },
+    { value: 'other', label: t('misc.up_gender_other') },
+  ];
+
+  const languageOptions = [
+    { value: 'ru', label: t('misc.up_lang_ru') },
+    { value: 'uz', label: 'O`zbekcha' },
+    { value: 'en', label: 'English' },
+  ];
+
   const [profile, setProfile] = useState(null);
   const [draft, setDraft] = useState(() => normalizeProfileForDraft(null));
   const [loading, setLoading] = useState(true);
@@ -297,19 +303,19 @@ export default function UserProfile() {
 
     return [
       {
-        label: profile.email_verified ? 'Email подтвержден' : 'Email не подтвержден',
+        label: profile.email_verified ? t('misc.up_email_verified') : t('misc.up_email_not_verified'),
         tone: profile.email_verified ? 'success' : 'warning',
       },
       {
-        label: profile.phone_verified ? 'Телефон подтвержден' : 'Телефон не подтвержден',
+        label: profile.phone_verified ? t('misc.up_phone_verified') : t('misc.up_phone_not_verified'),
         tone: profile.phone_verified ? 'success' : 'warning',
       },
       {
-        label: profile.two_factor_enabled ? '2FA включена' : '2FA выключена',
+        label: profile.two_factor_enabled ? t('misc.up_2fa_enabled') : t('misc.up_2fa_disabled'),
         tone: profile.two_factor_enabled ? 'success' : 'info',
       },
       {
-        label: profile.is_active ? 'Аккаунт активен' : 'Аккаунт выключен',
+        label: profile.is_active ? t('misc.up_account_active') : t('misc.up_account_inactive'),
         tone: profile.is_active ? 'success' : 'error',
       },
     ];
@@ -367,7 +373,7 @@ export default function UserProfile() {
         if (fallbackProfile) {
           setProfile(fallbackProfile);
           setDraft(normalizeProfileForDraft(fallbackProfile));
-          setError('Показаны кешированные данные профиля. Лимит backend временно исчерпан.');
+          setError(t('misc.up_err_rate_limited'));
           logger.warn('[FIX:PROFILE] Self profile request hit rate limit, using cached auth profile fallback');
           return;
         }
@@ -375,7 +381,7 @@ export default function UserProfile() {
 
       logger.error('[FIX:PROFILE] Failed to load self profile', err);
       setError(
-        getErrorMessage(err, 'Не удалось загрузить профиль. Проверьте соединение и попробуйте снова.')
+        getErrorMessage(err, t('misc.up_err_load_profile'))
       );
     } finally {
       setLoading(false);
@@ -408,11 +414,11 @@ export default function UserProfile() {
       setProfile(updatedProfile);
       setDraft(normalizeProfileForDraft(updatedProfile));
       setAuthProfile(updatedProfile);
-      setSuccess('Профиль успешно сохранен.');
+      setSuccess(t('misc.up_success_profile_saved'));
     } catch (err) {
       logger.error('[FIX:PROFILE] Failed to save self profile', err);
       setError(
-        getErrorMessage(err, 'Не удалось сохранить профиль. Проверьте поля формы и попробуйте снова.')
+        getErrorMessage(err, t('misc.up_err_save_profile'))
       );
     } finally {
       setSaving(false);
@@ -420,17 +426,17 @@ export default function UserProfile() {
   }
 
   if (loading) {
-    return <div style={{ padding: 24 }}>Загрузка профиля...</div>;
+    return <div style={{ padding: 24 }}>{t('misc.up_loading_profile')}</div>;
   }
 
   if (!profile) {
     return (
       <div style={{ maxWidth: 760, margin: '0 auto', padding: '24px 20px' }}>
         <Alert severity="error" style={{ marginBottom: 16 }}>
-          {error || 'Профиль не удалось загрузить.'}
+          {error || t('misc.up_err_profile_unavailable')}
         </Alert>
         <Button onClick={() => loadProfile({ force: true })} startIcon={<RefreshCw size={16} />}>
-          Повторить загрузку
+          {t('misc.up_btn_retry_load')}
         </Button>
       </div>
     );
@@ -499,7 +505,7 @@ export default function UserProfile() {
                 ))}
               </div>
               <div style={{ color: 'var(--mac-text-secondary)', fontSize: 14 }}>
-                {profile.role} · {profile.email || 'Email не указан'}
+                {profile.role} · {profile.email || t('misc.up_email_not_set')}
               </div>
             </div>
 
@@ -510,7 +516,7 @@ export default function UserProfile() {
                 disabled={saving}
                 startIcon={<RefreshCw size={16} />}
               >
-                Обновить
+                {t('misc.up_btn_refresh')}
               </Button>
               <Button
                 variant="primary"
@@ -519,7 +525,7 @@ export default function UserProfile() {
                 loading={saving}
                 startIcon={<Save size={16} />}
               >
-                Сохранить профиль
+                {t('misc.up_btn_save_profile')}
               </Button>
             </div>
           </div>
@@ -533,26 +539,26 @@ export default function UserProfile() {
           >
             <ProfileMetaCard
               icon={UserRound}
-              label="Логин"
+              label={t('misc.up_label_username')}
               value={profile.username}
               accent="linear-gradient(135deg, var(--mac-accent), color-mix(in srgb, var(--mac-accent), white 20%))"
             />
             <ProfileMetaCard
               icon={CalendarDays}
-              label="Создан"
-              value={formatDateTime(profile.created_at)}
+              label={t('misc.up_label_created')}
+              value={formatDateTime(profile.created_at, t('misc.up_date_not_set'))}
               accent="linear-gradient(135deg, var(--mac-success), color-mix(in srgb, var(--mac-success), white 18%))"
             />
             <ProfileMetaCard
               icon={Clock3}
-              label="Последний вход"
-              value={formatDateTime(profile.last_login)}
+              label={t('misc.up_label_last_login')}
+              value={formatDateTime(profile.last_login, t('misc.up_date_not_set'))}
               accent="linear-gradient(135deg, var(--mac-warning), color-mix(in srgb, var(--mac-warning), white 18%))"
             />
             <ProfileMetaCard
               icon={ShieldCheck}
-              label="Безопасность"
-              value={profile.two_factor_enabled ? '2FA активна' : '2FA не настроена'}
+              label={t('misc.up_label_security')}
+              value={profile.two_factor_enabled ? t('misc.up_2fa_active') : t('misc.up_2fa_not_setup')}
               accent="linear-gradient(135deg, var(--mac-accent-purple), color-mix(in srgb, var(--mac-accent), white 12%))"
             />
           </div>
@@ -574,19 +580,19 @@ export default function UserProfile() {
         <ProfileTabButton
           active={activeTab === 'info'}
           icon={UserCircle2}
-          label="Личные данные"
+          label={t('misc.up_tab_personal')}
           onClick={() => setActiveTab('info')}
         />
         <ProfileTabButton
           active={activeTab === 'notifications'}
           icon={Bell}
-          label="Уведомления"
+          label={t('misc.up_tab_notifications')}
           onClick={() => setActiveTab('notifications')}
         />
         <ProfileTabButton
           active={activeTab === 'security'}
           icon={ShieldCheck}
-          label="Безопасность"
+          label={t('misc.up_label_security')}
           onClick={() => setActiveTab('security')}
         />
       </div>
@@ -604,11 +610,10 @@ export default function UserProfile() {
             >
               <div>
                 <div style={{ fontSize: 15, fontWeight: 'var(--mac-font-weight-semibold)', marginBottom: 6 }}>
-                  Основной профиль
+                  {t('misc.up_main_profile_title')}
                 </div>
                 <div style={{ fontSize: 13, color: 'var(--mac-text-secondary)' }}>
-                  Сначала заполните имя, email и телефон. Остальные поля улучшают карточку
-                  пользователя, но не обязательны для базовой работы в системе.
+                  {t('misc.up_main_profile_desc')}
                 </div>
               </div>
               <div
@@ -620,8 +625,8 @@ export default function UserProfile() {
                 }}
               >
                 {hasChanges
-                  ? 'Есть несохранённые изменения. После сохранения обновится и профиль в auth store.'
-                  : 'Форма синхронизирована с сервером. Можно безопасно переключаться между вкладками.'}
+                  ? t('misc.up_changes_unsaved')
+                  : t('misc.up_form_synced')}
               </div>
             </CardContent>
           </Card>
@@ -629,9 +634,9 @@ export default function UserProfile() {
           <Card shadow="default">
             <CardHeader style={{ paddingBottom: 12 }}>
               <div>
-                <CardTitle>Основные данные</CardTitle>
+                <CardTitle>{t('misc.up_card_basic_data')}</CardTitle>
                 <div style={{ marginTop: 6, fontSize: 13, color: 'var(--mac-text-secondary)' }}>
-                  Эти поля чаще всего видят коллеги и другие модули системы.
+                  {t('misc.up_card_basic_data_desc')}
                 </div>
               </div>
             </CardHeader>
@@ -643,12 +648,12 @@ export default function UserProfile() {
                   gap: 16,
                 }}
               >
-                <ProfileField label="Полное имя">
+                <ProfileField label={t('misc.up_label_full_name')}>
                   <Input
                     value={draft.full_name}
                     onChange={(event) => updateDraft('full_name', event.target.value)}
                     icon={UserRound}
-                    placeholder="Как отображать имя в системе"
+                    placeholder={t('misc.up_placeholder_full_name')}
                   />
                 </ProfileField>
                 <ProfileField label="Email">
@@ -660,7 +665,7 @@ export default function UserProfile() {
                     placeholder="user@example.com"
                   />
                 </ProfileField>
-                <ProfileField label="Телефон">
+                <ProfileField label={t('misc.up_label_phone')}>
                   <Input
                     value={draft.phone}
                     onChange={(event) => updateDraft('phone', event.target.value)}
@@ -668,7 +673,7 @@ export default function UserProfile() {
                     placeholder="+998901234567"
                   />
                 </ProfileField>
-                <ProfileField label="Дата рождения">
+                <ProfileField label={t('misc.up_label_birth_date')}>
                   <Input
                     type="date"
                     value={draft.date_of_birth}
@@ -683,9 +688,9 @@ export default function UserProfile() {
           <Card shadow="default">
             <CardHeader style={{ paddingBottom: 12 }}>
               <div>
-                <CardTitle>Детали профиля</CardTitle>
+                <CardTitle>{t('misc.up_card_details')}</CardTitle>
                 <div style={{ marginTop: 6, fontSize: 13, color: 'var(--mac-text-secondary)' }}>
-                  Дополнительные сведения для персонализации, локализации и внутреннего профиля.
+                  {t('misc.up_card_details_desc')}
                 </div>
               </div>
             </CardHeader>
@@ -698,57 +703,57 @@ export default function UserProfile() {
                   marginBottom: 16,
                 }}
               >
-                <ProfileField label="Имя">
+                <ProfileField label={t('misc.up_label_first_name')}>
                   <Input
                     value={draft.first_name}
                     onChange={(event) => updateDraft('first_name', event.target.value)}
-                    placeholder="Имя"
+                    placeholder={t('misc.up_placeholder_first_name')}
                   />
                 </ProfileField>
-                <ProfileField label="Фамилия">
+                <ProfileField label={t('misc.up_label_last_name')}>
                   <Input
                     value={draft.last_name}
                     onChange={(event) => updateDraft('last_name', event.target.value)}
-                    placeholder="Фамилия"
+                    placeholder={t('misc.up_placeholder_last_name')}
                   />
                 </ProfileField>
-                <ProfileField label="Отчество">
+                <ProfileField label={t('misc.up_label_middle_name')}>
                   <Input
                     value={draft.middle_name}
                     onChange={(event) => updateDraft('middle_name', event.target.value)}
-                    placeholder="Отчество"
+                    placeholder={t('misc.up_placeholder_middle_name')}
                   />
                 </ProfileField>
-                <ProfileField label="Пол">
+                <ProfileField label={t('misc.up_label_gender')}>
                   <Select
                     value={draft.gender}
                     onChange={(event) => updateDraft('gender', event.target.value)}
                     options={genderOptions}
                   />
                 </ProfileField>
-                <ProfileField label="Язык интерфейса">
+                <ProfileField label={t('misc.up_label_language')}>
                   <Select
                     value={draft.language}
                     onChange={(event) => updateDraft('language', event.target.value)}
                     options={languageOptions}
                   />
                 </ProfileField>
-                <ProfileField label="Часовой пояс">
+                <ProfileField label={t('misc.up_label_timezone')}>
                   <Select
                     value={draft.timezone}
                     onChange={(event) => updateDraft('timezone', event.target.value)}
                     options={timezoneOptions}
                   />
                 </ProfileField>
-                <ProfileField label="Национальность">
+                <ProfileField label={t('misc.up_label_nationality')}>
                   <Input
                     value={draft.nationality}
                     onChange={(event) => updateDraft('nationality', event.target.value)}
                     icon={Languages}
-                    placeholder="Например, Uzbek"
+                    placeholder={t('misc.up_placeholder_nationality')}
                   />
                 </ProfileField>
-                <ProfileField label="Сайт">
+                <ProfileField label={t('misc.up_label_website')}>
                   <Input
                     value={draft.website}
                     onChange={(event) => updateDraft('website', event.target.value)}
@@ -759,7 +764,7 @@ export default function UserProfile() {
               </div>
 
               <div style={{ display: 'grid', gap: 16 }}>
-                <ProfileField label="URL аватара">
+                <ProfileField label={t('misc.up_label_avatar_url')}>
                   <Input
                     value={draft.avatar_url}
                     onChange={(event) => updateDraft('avatar_url', event.target.value)}
@@ -767,11 +772,11 @@ export default function UserProfile() {
                     placeholder="https://..."
                   />
                 </ProfileField>
-                <ProfileField label="О себе">
+                <ProfileField label={t('misc.up_label_bio')}>
                   <Textarea
                     value={draft.bio}
                     onChange={(event) => updateDraft('bio', event.target.value)}
-                    placeholder="Краткая информация о пользователе"
+                    placeholder={t('misc.up_placeholder_bio')}
                     minRows={4}
                     maxRows={8}
                   />
@@ -792,10 +797,10 @@ export default function UserProfile() {
             >
               <div style={{ minWidth: 240 }}>
                 <div style={{ fontSize: 15, fontWeight: 'var(--mac-font-weight-semibold)', marginBottom: 6 }}>
-                  Завершение редактирования
+                  {t('misc.up_card_finish_editing')}
                 </div>
                 <div style={{ fontSize: 13, color: 'var(--mac-text-secondary)' }}>
-                  Верните исходные значения или сохраните изменения без прокрутки к верхней панели.
+                  {t('misc.up_card_finish_desc')}
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -804,7 +809,7 @@ export default function UserProfile() {
                   onClick={() => setDraft(normalizeProfileForDraft(profile))}
                   disabled={!hasChanges || saving}
                 >
-                  Вернуть исходные данные
+                  {t('misc.up_btn_reset')}
                 </Button>
                 <Button
                   variant="primary"
@@ -813,7 +818,7 @@ export default function UserProfile() {
                   loading={saving}
                   startIcon={<Save size={16} />}
                 >
-                  Сохранить изменения
+                  {t('misc.up_btn_save_changes')}
                 </Button>
               </div>
             </CardContent>

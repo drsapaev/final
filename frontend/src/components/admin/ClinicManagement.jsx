@@ -35,7 +35,7 @@ import DepartmentManagement from './DepartmentManagement';
 import ClinicSettings from './ClinicSettings';
 
 import logger from '../../utils/logger';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 const ClinicManagement = () => {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState('overview');
@@ -49,13 +49,13 @@ const ClinicManagement = () => {
   // Other admin components use useConfirm() hook (P-013 fix).
 
   const tabs = [
-  { id: 'overview', label: 'Обзор', icon: BarChart3 },
-  { id: 'branches', label: 'Филиалы', icon: Building2 },
-  { id: 'departments', label: 'Отделения', icon: Layers },
-  { id: 'equipment', label: 'Оборудование', icon: Wrench },
-  { id: 'licenses', label: 'Лицензии', icon: Key },
-  { id: 'backups', label: 'Резервные копии', icon: HardDrive },
-  { id: 'settings', label: 'Настройки', icon: Settings }];
+  { id: 'overview', label: t('admin2.cm_tab_overview'), icon: BarChart3 },
+  { id: 'branches', label: t('admin2.cm_tab_branches'), icon: Building2 },
+  { id: 'departments', label: t('admin2.cm_tab_departments'), icon: Layers },
+  { id: 'equipment', label: t('admin2.cm_tab_equipment'), icon: Wrench },
+  { id: 'licenses', label: t('admin2.cm_tab_licenses'), icon: Key },
+  { id: 'backups', label: t('admin2.cm_tab_backups'), icon: HardDrive },
+  { id: 'settings', label: t('admin2.cm_tab_settings'), icon: Settings }];
 
 
   useEffect(() => {
@@ -94,7 +94,7 @@ const ClinicManagement = () => {
       logger.error('Ошибка загрузки данных системы:', error);
       setStats(null);
       setSystemHealth(null);
-      setMessage({ type: 'error', text: 'Ошибка загрузки данных системы' });
+      setMessage({ type: 'error', text: t('admin2.cm_err_load_system_data') });
     } finally {
       setLoading(false);
     }
@@ -111,10 +111,10 @@ const ClinicManagement = () => {
 
   const getHealthLabel = (status) => {
     switch (status) {
-      case 'healthy':return 'Здорово';
-      case 'warning':return 'Предупреждение';
-      case 'critical':return 'Критично';
-      default:return 'Неизвестно';
+      case 'healthy':return t('admin2.cm_health_healthy');
+      case 'warning':return t('admin2.cm_health_warning');
+      case 'critical':return t('admin2.cm_health_critical');
+      default:return t('admin2.cm_health_unknown');
     }
   };
 
@@ -133,7 +133,7 @@ const ClinicManagement = () => {
       <MacOSCard className="p-4">
           <div className="admin-d-flex-ai-center-jc-between-mb-16">
           <h3 className="admin-fs-lg-fw-semi-primary-m-0-2">
-            Состояние системы
+            {t('admin2.cm_system_status_title')}
           </h3>
           <Button
           variant="outline"
@@ -156,14 +156,14 @@ const ClinicManagement = () => {
             text={getHealthLabel(systemHealth.status)} />
           
               <span className="text-sm text-[var(--mac-text-secondary)]">
-                Последняя проверка: {new Date().toLocaleString()}
+                {t('admin2.cm_last_check', { date: new Date().toLocaleString() })}
               </span>
             </div>
             
             {systemHealth.warnings && systemHealth.warnings.length > 0 &&
         <div className="flex flex-col gap-2">
                 <h4 className="admin-fs-sm-fw-med-primary-1">
-                  Предупреждения:
+                  {t('admin2.cm_warnings_label')}
                 </h4>
                 {systemHealth.warnings.map((warning, index) =>
           <div key={index} className="admin-d-flex-ai-center-gap-8-fs-sm-warning">
@@ -177,8 +177,8 @@ const ClinicManagement = () => {
 
       <MacOSEmptyState
         icon={Activity}
-        title="Загрузка состояния системы"
-        description="Получение данных о состоянии системы..." />
+        title={t('admin2.cm_loading_system_status')}
+        description={t('admin2.cm_loading_system_status_desc')} />
 
       }
       </MacOSCard>
@@ -187,36 +187,36 @@ const ClinicManagement = () => {
       {stats ?
     <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-24">
           <MacOSStatCard
-        title="Филиалы"
+        title={t('admin2.cm_stat_branches')}
         value={stats.total_branches}
-        subtitle={`${stats.active_branches} активных`}
+        subtitle={t('admin2.cm_stat_branches_active', { count: stats.active_branches })}
         icon={Building2}
         iconColor="var(--mac-accent-blue)"
         trend="positive" />
       
 
           <MacOSStatCard
-        title="Оборудование"
+        title={t('admin2.cm_stat_equipment')}
         value={stats.total_equipment}
-        subtitle={`${stats.active_equipment} активного`}
+        subtitle={t('admin2.cm_stat_equipment_active', { count: stats.active_equipment })}
         icon={Wrench}
         iconColor="var(--mac-success)"
         trend="positive" />
       
 
           <MacOSStatCard
-        title="Лицензии"
+        title={t('admin2.cm_stat_licenses')}
         value={stats.total_licenses}
-        subtitle={`${stats.active_licenses} активных`}
+        subtitle={t('admin2.cm_stat_licenses_active', { count: stats.active_licenses })}
         icon={Key}
         iconColor="var(--mac-warning)"
         trend="positive" />
       
 
           <MacOSStatCard
-        title="Резервные копии"
+        title={t('admin2.cm_stat_backups')}
         value={stats.total_backups}
-        subtitle={`${stats.recent_backups} за неделю`}
+        subtitle={t('admin2.cm_stat_backups_recent', { count: stats.recent_backups })}
         icon={HardDrive}
         iconColor="var(--mac-error)"
         trend="neutral" />
@@ -225,8 +225,8 @@ const ClinicManagement = () => {
 
     <MacOSEmptyState
       icon={BarChart3}
-      title="Статистика недоступна"
-      description="Не удалось загрузить статистику системы" />
+      title={t('admin2.cm_stats_unavailable')}
+      description={t('admin2.cm_stats_unavailable_desc')} />
 
     }
 
@@ -239,32 +239,32 @@ const ClinicManagement = () => {
       {/* UX Audit Admin #2.5: динамические данные из systemHealth вместо hardcoded. */}
       <MacOSCard className="p-4">
           <h3 className="admin-fs-lg-fw-semi-primary-mb-16">
-            Системная информация
+            {t('admin2.cm_system_info')}
           </h3>
         <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16-fw-wrap">
           <div className="flex flex-col gap-2">
             <div className="admin-d-flex-jc-between-fs-sm-5">
-              <span className="text-[var(--mac-text-secondary)]">Статус системы:</span>
+              <span className="text-[var(--mac-text-secondary)]">{t('admin2.cm_label_system_status')}</span>
               <Badge variant={systemHealth?.overall_status === 'healthy' ? 'success' : 'error'}
-                text={systemHealth?.overall_status === 'healthy' ? 'Работает' : 'Ошибка'} />
+                text={systemHealth?.overall_status === 'healthy' ? t('admin2.cm_status_running') : t('admin2.cm_status_error')} />
             </div>
             <div className="admin-d-flex-jc-between-fs-sm-3">
-              <span className="text-[var(--mac-text-secondary)]">Статус БД:</span>
+              <span className="text-[var(--mac-text-secondary)]">{t('admin2.cm_label_db_status')}</span>
               <Badge variant={systemHealth?.db === 'healthy' ? 'success' : 'error'}
-                text={systemHealth?.db === 'healthy' ? 'Подключена' : 'Недоступна'} />
+                text={systemHealth?.db === 'healthy' ? t('admin2.cm_db_connected') : t('admin2.cm_db_unavailable')} />
             </div>
           </div>
           <div className="flex flex-col gap-2">
             <div className="admin-d-flex-jc-between-fs-sm-2">
-              <span className="text-[var(--mac-text-secondary)]">Последнее обновление:</span>
+              <span className="text-[var(--mac-text-secondary)]">{t('admin2.cm_label_last_update')}</span>
               <span className="admin-fw-med-primary-1">
                 {new Date().toLocaleDateString()}
               </span>
             </div>
             <div className="admin-d-flex-jc-between-fs-sm">
-              <span className="text-[var(--mac-text-secondary)]">Безопасность:</span>
+              <span className="text-[var(--mac-text-secondary)]">{t('admin2.cm_label_security')}</span>
               <Badge variant={systemHealth?.security === 'active' ? 'success' : 'warning'}
-                text={systemHealth?.security === 'active' ? 'Активна' : 'Проверьте настройки'} />
+                text={systemHealth?.security === 'active' ? t('admin2.cm_security_active') : t('admin2.cm_security_check_settings')} />
             </div>
           </div>
         </div>
@@ -281,7 +281,7 @@ const ClinicManagement = () => {
           <div className="admin-d-flex-ai-center-gap-12-mb-24-1">
             <Building2 className="admin-w-32-h-32-blue" />
             <h2 className="admin-fs-2xl-fw-semi-primary-m-0-1">
-              Управление клиникой
+              {t('admin2.cm_page_title')}
             </h2>
           </div>
           <Skeleton height="600px" />
@@ -298,17 +298,17 @@ const ClinicManagement = () => {
           <div className="admin-d-flex-ai-center-gap-12-mb-24">
             <Building2 className="admin-w-32-h-32-blue" />
             <h2 className="admin-fs-2xl-fw-semi-primary-m-0">
-              Управление клиникой
+              {t('admin2.cm_page_title')}
             </h2>
           </div>
           <MacOSEmptyState
             icon={AlertTriangle}
-            title="Не удалось загрузить данные"
-            description="Проверьте подключение к серверу и попробуйте обновить страницу"
+            title={t('admin2.cm_load_data_failed')}
+            description={t('admin2.cm_load_data_failed_desc')}
             action={
             <Button onClick={loadSystemData} variant="primary">
                 <RefreshCw className="w-4 h-4 mr-2" />
-                Попробовать снова
+                {t('admin2.cm_retry')}
               </Button>
             } />
           
@@ -325,10 +325,10 @@ const ClinicManagement = () => {
           <div className="admin-d-flex-jc-between-ai-center-mb-24-pb-24-bd-b-1px-solid-var-mac-bo">
           <div>
             <h1 className="admin-fs-var-mac-font-size-3x-fw-bold-primary-m-0-0-8px-0">
-              Управление клиникой
+              {t('admin2.cm_page_title')}
             </h1>
             <p className="admin-secondary-fs-sm-m-0-2">
-              Централизованное управление всеми аспектами клиники
+              {t('admin2.cm_page_subtitle')}
             </p>
           </div>
         </div>
@@ -337,7 +337,7 @@ const ClinicManagement = () => {
         {message.text &&
           <Alert
             type={message.type === 'success' ? 'success' : 'error'}
-            title={message.type === 'success' ? 'Успешно' : 'Ошибка'}
+            title={message.type === 'success' ? t('admin2.cm_success') : t('admin2.cm_status_error')}
             message={message.text}
             className="mb-6" />
 
@@ -347,7 +347,7 @@ const ClinicManagement = () => {
         {error && stats &&
           <Alert
             type="warning"
-            title="Предупреждение"
+            title={t('admin2.cm_warning')}
             message={error}
             className="mb-6" />
 
@@ -356,7 +356,7 @@ const ClinicManagement = () => {
         {/* Навигация по вкладкам */}
         <div className="admin-maxw-100pct-ovx-auto-pb-6-mb-24-scrollba-thin">
           <SegmentedControl
-            aria-label="Разделы управления клиникой"
+            aria-label={t('admin2.cm_tabs_aria')}
             value={activeTab}
             onChange={setActiveTab}
             options={tabs.map((tab) => {

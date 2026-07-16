@@ -49,7 +49,7 @@ import PropTypes from 'prop-types';
 import AppointmentPagination from './AppointmentPagination';  // PR-75
 // UX Audit R-3.1: единая CSV-функция с PHI masking.
 import { generateCSV, downloadCSV } from '../../pages/registrar/registrarCsv';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const SESSION_COLORS = [
   'var(--mac-accent-blue)', // blue
@@ -209,63 +209,9 @@ const EnhancedAppointmentsTable = ({
     return rows.map((r) => r.queue_number ?? r.number ?? '?').join(', ');
   }, []);
 
-  // Переводы
-  const t = useMemo(() =>
-  ({
-    ru: {
-      search: 'Поиск',
-      filter: 'Фильтр',
-      export: 'Экспорт',
-      selectAll: 'Выбрать все',
-      selected: 'Выбрано',
-      actions: 'Действия',
-      noData: 'Нет данных',
-      loading: 'Загрузка...',
-      page: 'Страница',
-      of: 'из',
-      rows: 'строк',
-      // Колонки
-      number: '№',
-      patient: 'Пациент',
-      phone: 'Телефон',
-      birthYear: 'Г.р.',
-      address: 'Адрес',
-      visitType: 'Тип',
-      services: 'Услуги',
-      paymentType: 'Оплата',
-      doctor: 'Врач',
-      date: 'Дата',
-      time: 'Время',
-      status: 'Статус',
-      cost: 'Стоимость',
-      payment: 'Оплата',
-      // Типы обращения
-      paid: 'Платный',
-      repeat: 'Повторный',
-      free: 'Льготный',
-      allfree: 'All Free',
-      mixed: 'Смешанный',
-      // Виды оплаты
-      cash: 'Наличные',
-      card: 'Карта',
-      online: 'Онлайн',
-      paymentFree: 'Бесплатно',
-      approvalPending: 'Ожидает одобрения',
-      pendingPayment: 'Ожидает оплаты',
-      unknownPayment: 'Не указан',
-      mixedPayment: 'Смешано',
-      // Статусы
-      scheduled: 'Запланирован',
-      confirmed: 'Подтвержден',
-      queued: 'В очереди',
-      in_cabinet: 'В кабинете',
-      done: 'Завершен',
-      cancelled: 'Отменен',
-      no_show: 'Неявка',
-      paid_pending: 'Ожидает оплаты',
-      payment_paid: 'Оплачен'
-    }
-  })[language] || {}, [language]);
+  // Переводы — i18next unified.
+  const { t } = useTranslation();
+  void language; // legacy prop, kept for backward compat; translations come from i18next.
 
   // Сортировка данных
   const sortedData = useMemo(() => {
@@ -377,14 +323,14 @@ const EnhancedAppointmentsTable = ({
         color: 'var(--mac-accent-blue)',
         bg: withOpacity('var(--mac-accent-blue)', 0.12),
         icon: Calendar,
-        text: 'Запланирован',
+        text: t('misc.eat_status_scheduled'),
         emoji: '📅'
       },
       confirmed: {
         color: 'var(--mac-success)',
         bg: withOpacity('var(--mac-success)', 0.12),
         icon: CheckCircle,
-        text: 'Подтверждён',
+        text: t('misc.eat_status_confirmed'),
         emoji: '✅'
       },
 
@@ -393,42 +339,42 @@ const EnhancedAppointmentsTable = ({
         color: 'var(--mac-warning)',
         bg: withOpacity('var(--mac-warning)', 0.12),
         icon: Clock,
-        text: 'В очереди',
+        text: t('misc.eat_status_waiting'),
         emoji: '⏳'
       },
       queued: {
         color: 'var(--mac-warning)',
         bg: withOpacity('var(--mac-warning)', 0.12),
         icon: Clock,
-        text: 'В очереди',
+        text: t('misc.eat_status_queued'),
         emoji: '⏳'
       },
       called: {
         color: 'var(--mac-accent-blue)',
         bg: withOpacity('var(--mac-accent-blue)', 0.12),
         icon: User,
-        text: 'Вызван',
+        text: t('misc.eat_status_called'),
         emoji: '📢'
       },
       in_progress: {
         color: 'var(--mac-accent-blue)',
         bg: withOpacity('var(--mac-accent-blue)', 0.12),
         icon: User,
-        text: 'На приёме',
+        text: t('misc.eat_status_in_progress'),
         emoji: '👨‍⚕️'
       },
       in_cabinet: {
         color: 'var(--mac-accent-blue)',
         bg: withOpacity('var(--mac-accent-blue)', 0.12),
         icon: User,
-        text: 'В кабинете',
+        text: t('misc.eat_status_in_cabinet'),
         emoji: '👤'
       },
       in_visit: {
         color: 'var(--mac-accent-blue)',
         bg: withOpacity('var(--mac-accent-blue)', 0.12),
         icon: User,
-        text: 'На приёме',
+        text: t('misc.eat_status_in_visit'),
         emoji: '👨‍⚕️'
       },
 
@@ -437,14 +383,14 @@ const EnhancedAppointmentsTable = ({
         color: 'var(--mac-success)',
         bg: withOpacity('var(--mac-success)', 0.12),
         icon: CheckCircle,
-        text: 'Обслужен',
+        text: t('misc.eat_status_served'),
         emoji: '✅'
       },
       done: {
         color: 'var(--mac-success)',
         bg: withOpacity('var(--mac-success)', 0.12),
         icon: CheckCircle,
-        text: 'Обслужен',
+        text: t('misc.eat_status_done'),
         emoji: '✅'
       },
 
@@ -453,21 +399,21 @@ const EnhancedAppointmentsTable = ({
         color: 'var(--mac-warning)',
         bg: withOpacity('var(--mac-warning)', 0.12),
         icon: CreditCard,
-        text: 'Ожидает оплаты',
+        text: t('misc.eat_status_paid_pending'),
         emoji: '⏳'
       },
       payment_paid: {
         color: 'var(--mac-success)',
         bg: withOpacity('var(--mac-success)', 0.12),
         icon: CheckCircle,
-        text: 'Оплачен',
+        text: t('misc.eat_status_payment_paid'),
         emoji: '✅'
       },
       paid: {
         color: 'var(--mac-success)',
         bg: withOpacity('var(--mac-success)', 0.12),
         icon: CheckCircle,
-        text: 'Оплачен',
+        text: t('misc.eat_status_paid'),
         emoji: '✅'
       },
 
@@ -476,7 +422,7 @@ const EnhancedAppointmentsTable = ({
         color: 'var(--mac-error)',
         bg: withOpacity('var(--mac-error)', 0.12),
         icon: XCircle,
-        text: 'Отменён',
+        text: t('misc.eat_status_cancelled'),
         emoji: '❌'
       },
       // ✅ Исправлено: поддержка написания с одной l (как на бэкенде)
@@ -484,14 +430,14 @@ const EnhancedAppointmentsTable = ({
         color: 'var(--mac-error)',
         bg: withOpacity('var(--mac-error)', 0.12),
         icon: XCircle,
-        text: 'Отменён',
+        text: t('misc.eat_status_canceled'),
         emoji: '❌'
       },
       no_show: {
         color: 'var(--mac-text-secondary)',
         bg: withOpacity('var(--mac-text-secondary)', 0.12),
         icon: AlertCircle,
-        text: 'Не явился',
+        text: t('misc.eat_status_no_show'),
         emoji: '👻'
       },
 
@@ -500,7 +446,7 @@ const EnhancedAppointmentsTable = ({
         color: 'var(--mac-accent-blue)',
         bg: withOpacity('var(--mac-accent-blue)', 0.12),
         icon: Calendar,
-        text: 'Запланирован',
+        text: t('misc.eat_status_plan'),
         emoji: '📅'
       }
     };
@@ -529,7 +475,7 @@ const EnhancedAppointmentsTable = ({
         <span>{config.text}</span>
       </div>);
 
-  }, [withOpacity]);
+  }, [withOpacity, t]);
 
   // ✅ УНИВЕРСАЛЬНЫЙ МАППИНГ УСЛУГ (работает с любыми данными из админ панели)
   const createServiceMapping = useCallback(() => {
@@ -572,11 +518,11 @@ const EnhancedAppointmentsTable = ({
       servicesList = appointmentServices.map((service) => {
         // Обрабатываем строки-числа (ID услуг)
         if (typeof service === 'string' && /^\d+$/.test(service)) {
-          return serviceMapping[service] || `Услуга ${service}`;
+          return serviceMapping[service] || t('misc.eat_service_label', { service });
         }
         // Если это просто число
         if (typeof service === 'number') {
-          return serviceMapping[service] || serviceMapping[String(service)] || `Услуга ${service}`;
+          return serviceMapping[service] || serviceMapping[String(service)] || t('misc.eat_service_label', { service });
         }
         // Потом обычные строки
         if (typeof service === 'string') return service;
@@ -711,14 +657,14 @@ const EnhancedAppointmentsTable = ({
       });
 
       // Показываем все услуги пациента из всех отделений
-      tooltipText = `🏥 Все услуги пациента (${allPatientServiceNames.length}):\n\n`;
+      tooltipText = `${t('misc.eat_all_services_tooltip', { count: allPatientServiceNames.length })}\n\n`;
       allPatientServiceNames.forEach((service, idx) => {
         tooltipText += `${idx + 1}. ${service}\n`;
       });
 
       // Добавляем информацию о текущих услугах с полными названиями
       if (serviceNamesForTooltip.length > 0) {
-        tooltipText += `\n📋 Текущие услуги (${serviceNamesForTooltip.length}):\n`;
+        tooltipText += `\n${t('misc.eat_current_services_tooltip', { count: serviceNamesForTooltip.length })}\n`;
         serviceNamesForTooltip.forEach((serviceName) => {
           tooltipText += `• ${serviceName}\n`;
         });
@@ -726,7 +672,7 @@ const EnhancedAppointmentsTable = ({
     } else {
       // Fallback: показываем только текущие услуги с полными названиями
       tooltipText = serviceNamesForTooltip.length > 1 ?
-      `Услуги:\n${serviceNamesForTooltip.map((serviceName, idx) => `${idx + 1}. ${serviceName}`).join('\n')}` :
+      `${t('misc.eat_services_tooltip')}\n${serviceNamesForTooltip.map((serviceName, idx) => `${idx + 1}. ${serviceName}`).join('\n')}` :
       serviceNamesForTooltip[0] || '';
     }
 
@@ -753,7 +699,7 @@ const EnhancedAppointmentsTable = ({
         )}
       </div>);
 
-  }, [withOpacity, createServiceMapping, services]);
+  }, [withOpacity, createServiceMapping, services, t]);
 
   // Рендер типа обращения
   const renderVisitType = useCallback((visitType) => {
@@ -765,7 +711,7 @@ const EnhancedAppointmentsTable = ({
       mixed: 'var(--mac-text-secondary)'
     };
 
-    const typeText = t[visitType] || visitType;
+    const typeText = t(`misc.eat_${visitType}`, { defaultValue: visitType });
     const color = typeColors[visitType] || 'var(--mac-text-secondary)';
 
     // ✅ ИСПРАВЛЕНО: Для allfree используем rgba напрямую, так как withOpacity работает только с CSS переменными
@@ -797,7 +743,7 @@ const EnhancedAppointmentsTable = ({
 
   }, [withOpacity, t]);
 
-  // Рендер вида оплаты
+  // Рендер вида оплаты (i18next migration)
   const renderPaymentType = useCallback((paymentType, paymentStatus) => {
     const paymentIcons = {
       cash: '💵',
@@ -828,13 +774,13 @@ const EnhancedAppointmentsTable = ({
     };
 
     const paymentLabels = {
-      free: t.paymentFree || 'Бесплатно',
-      approval_pending: t.approvalPending || 'Ожидает одобрения',
-      pending_payment: t.pendingPayment || 'Ожидает оплаты',
-      unknown_payment: t.unknownPayment || 'Не указан',
-      mixed_payment: t.mixedPayment || 'Смешано'
+      free: t('misc.eat_payment_free'),
+      approval_pending: t('misc.eat_approval_pending'),
+      pending_payment: t('misc.eat_pending_payment'),
+      unknown_payment: t('misc.eat_unknown_payment'),
+      mixed_payment: t('misc.eat_mixed_payment')
     };
-    const typeText = paymentLabels[paymentType] || t[paymentType] || paymentType;
+    const typeText = paymentLabels[paymentType] || t(`misc.eat_${paymentType}`, { defaultValue: paymentType });
     const icon = paymentIcons[paymentType] || '💰';
     const color = paymentColors[paymentType] || 'var(--mac-text-secondary)';void (
     statusColors[paymentStatus] || 'var(--mac-text-secondary)');
@@ -868,7 +814,7 @@ const EnhancedAppointmentsTable = ({
 
   }, [withOpacity, t]);
 
-  // Функция для форматирования номера телефона
+  // Функция для форматирования номера телефона (i18next migration)
   const formatPhoneNumber = useCallback((phone) => {
     if (!phone) return '—';
 
@@ -942,31 +888,31 @@ const EnhancedAppointmentsTable = ({
           waiting: {
             bg: 'var(--mac-warning, #ff9500)',
             icon: '⏳',
-            text: 'Ожидает',
+            text: t('misc.eat_q_status_waiting'),
             pulse: true
           },
           called: {
             bg: 'var(--mac-accent-blue, #007aff)',
             icon: '📢',
-            text: 'Вызван',
+            text: t('misc.eat_status_called'),
             pulse: true
           },
           served: {
             bg: 'var(--mac-success, #34c759)',
             icon: '✅',
-            text: 'Обслужен',
+            text: t('misc.eat_status_served'),
             pulse: false
           },
           no_show: {
             bg: 'var(--mac-error, #ff3b30)',
             icon: '❌',
-            text: 'Не явился',
+            text: t('misc.eat_status_no_show'),
             pulse: false
           },
           unknown: {
             bg: 'var(--mac-text-secondary, #8e8e93)',
             icon: '?',
-            text: 'Неизвестно',
+            text: t('misc.eat_q_status_unknown'),
             pulse: false
           }
         };
@@ -1007,7 +953,7 @@ const EnhancedAppointmentsTable = ({
                 fontSize: 'var(--mac-font-size-xs)',
                 fontWeight: 'var(--mac-font-weight-semibold)',
               }}
-              title={row.queue_numbers.map((q) => `${q.queue_name || 'Очередь'}: №${q.number}`).join('\n')}
+              title={row.queue_numbers.map((q) => t('misc.eat_queue_label', { queueName: q.queue_name || t('misc.eat_queue_default'), number: q.number })).join('\n')}
             >
               +{row.queue_numbers.length - 1}
             </span>
@@ -1024,31 +970,31 @@ const EnhancedAppointmentsTable = ({
           waiting: {
             bg: 'var(--mac-warning, #ff9500)',
             icon: '⏳',
-            text: 'Ожидает',
+            text: t('misc.eat_q_status_waiting'),
             pulse: true
           },
           called: {
             bg: 'var(--mac-accent-blue, #007aff)',
             icon: '📢',
-            text: 'Вызван',
+            text: t('misc.eat_status_called'),
             pulse: true
           },
           served: {
             bg: 'var(--mac-success, #34c759)',
             icon: '✅',
-            text: 'Обслужен',
+            text: t('misc.eat_status_served'),
             pulse: false
           },
           no_show: {
             bg: 'var(--mac-error, #ff3b30)',
             icon: '❌',
-            text: 'Не явился',
+            text: t('misc.eat_status_no_show'),
             pulse: false
           },
           unknown: {
             bg: 'var(--mac-text-secondary, #8e8e93)',
             icon: '?',
-            text: 'Неизвестно',
+            text: t('misc.eat_q_status_unknown'),
             pulse: false
           }
         };
@@ -1070,7 +1016,7 @@ const EnhancedAppointmentsTable = ({
               display: 'inline-block',
               boxShadow: 'var(--mac-shadow-sm, 0 2px 4px rgba(0,0,0,0.1))'
             }}
-            title={`${firstQueue.queue_name || 'Очередь'}: №${firstQueue.number}`}>
+            title={t('misc.eat_queue_label', { queueName: firstQueue.queue_name || t('misc.eat_queue_default'), number: firstQueue.number })}>
 
             {firstQueue.number}
           </span>
@@ -1087,7 +1033,7 @@ const EnhancedAppointmentsTable = ({
                 fontSize: 'var(--mac-font-size-xs)',
                 fontWeight: 'var(--mac-font-weight-semibold)',
               }}
-              title={row.queue_numbers.map((q) => `${q.queue_name || 'Очередь'}: №${q.number}`).join('\n')}
+              title={row.queue_numbers.map((q) => t('misc.eat_queue_label', { queueName: q.queue_name || t('misc.eat_queue_default'), number: q.number })).join('\n')}
             >
               +{row.queue_numbers.length - 1}
             </span>
@@ -1134,7 +1080,7 @@ const EnhancedAppointmentsTable = ({
         #{fallbackIndex}
       </span>);
 
-  }, [data, withOpacity]);
+  }, [data, withOpacity, t]);
 
 
   // Инлайновый лоадер без раннего возврата
@@ -1143,7 +1089,7 @@ const EnhancedAppointmentsTable = ({
       <div className="eat-td">
         <div
         className="loading-spinner eat-loader-spinner" />
-        {t.loading}
+        {t('misc.eat_loading')}
       </div>
     </div>;
 
@@ -1164,7 +1110,7 @@ const EnhancedAppointmentsTable = ({
           <div className="eat-search-input-wrap">
             <Input
               type="text"
-              placeholder={t.search}
+              placeholder={t('misc.eat_search')}
               value={filterConfig.search}
               onChange={(e) => setFilterConfig((prev) => ({ ...prev, search: e.target.value }))}
               icon={Search}
@@ -1177,15 +1123,15 @@ const EnhancedAppointmentsTable = ({
             value={filterConfig.status}
             onChange={(e) => setFilterConfig((prev) => ({ ...prev, status: e.target.value }))}
             options={[
-            { value: '', label: t.filter },
-            { value: 'scheduled', label: t.scheduled },
-            { value: 'confirmed', label: t.confirmed },
-            { value: 'queued', label: t.queued },
-            { value: 'in_cabinet', label: t.in_cabinet },
-            { value: 'done', label: t.done },
-            { value: 'cancelled', label: t.cancelled },
-            { value: 'paid_pending', label: t.paid_pending },
-            { value: 'paid', label: t.paid }]
+            { value: '', label: t('misc.eat_filter') },
+            { value: 'scheduled', label: t('misc.eat_scheduled') },
+            { value: 'confirmed', label: t('misc.eat_confirmed') },
+            { value: 'queued', label: t('misc.eat_queued') },
+            { value: 'in_cabinet', label: t('misc.eat_in_cabinet') },
+            { value: 'done', label: t('misc.eat_done') },
+            { value: 'cancelled', label: t('misc.eat_cancelled') },
+            { value: 'paid_pending', label: t('misc.eat_paid_pending') },
+            { value: 'paid', label: t('misc.eat_payment_paid') }]
             }
             className="eat-filter-select" />
 
@@ -1197,13 +1143,13 @@ const EnhancedAppointmentsTable = ({
             className="eat-export-btn">
 
             <Download size={16} />
-            {t.export}
+            {t('misc.eat_export')}
           </Button>
 
           {/* Информация о выбранных */}
           {showCheckboxes && selectedRows.size > 0 &&
           <Badge variant="info">
-              {t.selected}: {selectedRows.size}
+              {t('misc.eat_selected')}: {selectedRows.size}
             </Badge>
           }
         </div>
@@ -1234,8 +1180,8 @@ const EnhancedAppointmentsTable = ({
                 width: '40px',
                 color: 'var(--mac-text-primary)'
               }}
-              aria-label={t.selectAll}>
-                  <Checkbox aria-label={t.selectAll} checked={selectedRows.size === paginatedData.length && paginatedData.length > 0}
+              aria-label={t('misc.eat_select_all')}>
+                  <Checkbox aria-label={t('misc.eat_select_all')} checked={selectedRows.size === paginatedData.length && paginatedData.length > 0}
                   onChange={(e) => handleSelectAll(e.target.checked)}
                   />
 
@@ -1258,7 +1204,7 @@ const EnhancedAppointmentsTable = ({
                 }}>
 
                 <div className="eat-th-content">
-                  {t.number}
+                  {t('misc.eat_number')}
                   {sortConfig.key === 'queue_number' && (
                   sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)
                   }
@@ -1281,7 +1227,7 @@ const EnhancedAppointmentsTable = ({
                 }}>
 
                 <div className="eat-th-content">
-                  {t.patient}
+                  {t('misc.eat_patient')}
                   {sortConfig.key === 'patient_fio' && (
                   sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)
                   }
@@ -1299,7 +1245,7 @@ const EnhancedAppointmentsTable = ({
                 fontSize: 'var(--mac-font-size-base)',
                 minWidth: '170px'
               }}>
-                  {t.phone}
+                  {t('misc.eat_phone')}
                 </th>
               }
 
@@ -1319,7 +1265,7 @@ const EnhancedAppointmentsTable = ({
                 }}>
 
                 <div className="eat-th-content">
-                  {t.birthYear}
+                  {t('misc.eat_birth_year')}
                   {sortConfig.key === 'patient_birth_year' && (
                   sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)
                   }
@@ -1338,7 +1284,7 @@ const EnhancedAppointmentsTable = ({
                 minWidth: '140px'
               }}>
 
-                  {t.address}
+                  {t('misc.eat_address')}
                 </th>
               }
 
@@ -1353,7 +1299,7 @@ const EnhancedAppointmentsTable = ({
                 minWidth: isDoctorView ? '70px' : '80px',
                 width: isDoctorView ? '70px' : 'auto'
               }}>
-                {t.visitType}
+                {t('misc.eat_visit_type')}
               </th>
 
               {/* Услуги */}
@@ -1367,7 +1313,7 @@ const EnhancedAppointmentsTable = ({
                 minWidth: isDoctorView ? '12%' : '180px',
                 width: isDoctorView ? '12%' : 'auto'
               }}>
-                {t.services}
+                {t('misc.eat_services')}
               </th>
 
               {/* Вид оплаты */}
@@ -1381,7 +1327,7 @@ const EnhancedAppointmentsTable = ({
                 minWidth: isDoctorView ? '8%' : '100px',
                 width: isDoctorView ? '8%' : 'auto'
               }}>
-                {t.paymentType}
+                {t('misc.eat_payment_type')}
               </th>
 
               {/* Дата и время */}
@@ -1400,7 +1346,7 @@ const EnhancedAppointmentsTable = ({
                 }}>
 
                 <div className="eat-th-content">
-                  {t.date}
+                  {t('misc.eat_date')}
                   {sortConfig.key === 'appointment_date' && (
                   sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)
                   }
@@ -1423,7 +1369,7 @@ const EnhancedAppointmentsTable = ({
                 }}>
 
                 <div className="eat-th-content">
-                  {t.status}
+                  {t('misc.eat_status')}
                   {sortConfig.key === 'status' && (
                   sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)
                   }
@@ -1447,7 +1393,7 @@ const EnhancedAppointmentsTable = ({
                 }}>
 
                 <div className="eat-th-content--end">
-                  {t.cost}
+                  {t('misc.eat_cost')}
                   {sortConfig.key === 'cost' && (
                   sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)
                   }
@@ -1465,7 +1411,7 @@ const EnhancedAppointmentsTable = ({
                 width: isDoctorView ? '15%' : 'auto',
                 minWidth: isDoctorView ? '15%' : '200px'
               }}>
-                {t.actions}
+                {t('misc.eat_actions')}
               </th>
             </tr>
           </thead>
@@ -1476,7 +1422,7 @@ const EnhancedAppointmentsTable = ({
                 colSpan="10"
                 className="eat-empty-row">
 
-                  {t.noData}
+                  {t('misc.eat_no_data')}
                 </td>
               </tr> :
 
@@ -1539,14 +1485,14 @@ const EnhancedAppointmentsTable = ({
                     }
                   }}
                   onClick={() => onRowClick?.(row)}
-                  title={row.session_id ? `Сессия: ${row.session_id}` : undefined}>
+                  title={row.session_id ? t('misc.eat_session_label', { sessionId: row.session_id }) : undefined}>
 
                     {/* Чекбокс */}
                     {showCheckboxes &&
                   <td
                     className="eat-td-base"
-                    aria-label={`${t.selectAll}: ${row.patient_fio || row.patient_name || row.id}`}>
-                        <Checkbox aria-label={`${t.selectAll}: ${row.patient_fio || row.patient_name || row.id}`} checked={selectedRows.has(row.id)} onChange={(e) => {
+                    aria-label={`${t('misc.eat_select_all')}: ${row.patient_fio || row.patient_name || row.id}`}>
+                        <Checkbox aria-label={`${t('misc.eat_select_all')}: ${row.patient_fio || row.patient_name || row.id}`} checked={selectedRows.has(row.id)} onChange={(e) => {
                         e.stopPropagation();
                         handleRowSelect(row.id, e.target.checked);
                       }}
@@ -1595,7 +1541,7 @@ const EnhancedAppointmentsTable = ({
                             fontWeight: 'var(--mac-font-weight-semibold)',
                             whiteSpace: 'nowrap'
                           }}
-                          title="Приоритет: ранняя онлайн-регистрация">
+                          title={t('misc.eat_qr_priority_title')}>
 
                               QR
                             </span>
@@ -1618,7 +1564,7 @@ const EnhancedAppointmentsTable = ({
                         </div>
                         {row.patient_birth_year &&
                       <div className="eat-patient-age">
-                            {new Date().getFullYear() - row.patient_birth_year} лет
+                            {t('misc.eat_years_old', { count: new Date().getFullYear() - row.patient_birth_year })}
                           </div>
                       }
                       </div>
@@ -1784,7 +1730,7 @@ const EnhancedAppointmentsTable = ({
                           const flagCount = row.latest_lab_report.flagged_findings_count || 0;
                           return (
                             <span
-                              title={`${row.latest_lab_report.template_name || 'Лабораторный отчёт'} — ${isReady ? 'Готов' : 'В работе'}${flagCount > 0 ? `, отклонений: ${flagCount}` : ''}`}
+                              title={`${row.latest_lab_report.template_name || t('misc.eat_lab_report_default')} — ${isReady ? t('misc.eat_lab_ready') : t('misc.eat_lab_in_progress')}${flagCount > 0 ? t('misc.eat_lab_flagged', { count: flagCount }) : ''}`}
                               style={{
                                 display: 'inline-flex',
                                 alignItems: 'center',
@@ -1796,7 +1742,7 @@ const EnhancedAppointmentsTable = ({
                                 background: isReady ? 'rgba(52, 199, 89, 0.12)' : 'rgba(255, 149, 0, 0.12)',
                                 color: isReady ? 'var(--mac-success)' : 'var(--mac-warning)',
                               }}>
-                              {isReady ? '🔬 Готов' : '🔬 В работе'}
+                              {isReady ? t('misc.eat_lab_ready_badge') : t('misc.eat_lab_in_progress_badge')}
                               {flagCount > 0 && ` ⚠${flagCount}`}
                             </span>
                           );
@@ -1821,7 +1767,7 @@ const EnhancedAppointmentsTable = ({
 
                         if (timeDisplay.primaryDate || timeDisplay.primaryTime) {
                           return (
-                            <div title={`Часовой пояс: ${timeDisplay.timeZone}`}>
+                            <div title={t('misc.eat_timezone_label', { timeZone: timeDisplay.timeZone })}>
                                 <div className="eat-time-label">
                                   {timeDisplay.primaryLabel}
                                 </div>
@@ -1891,7 +1837,7 @@ const EnhancedAppointmentsTable = ({
                           fontSize: '9px',
                           fontWeight: 'var(--mac-font-weight-medium)',
                         }}>
-                          💰 {row.payment_status === 'paid_pending' ? 'Ожидает оплаты' : row.payment_status}
+                          💰 {row.payment_status === 'paid_pending' ? t('misc.eat_pending_payment') : row.payment_status}
                         </div>
                       )}
                     </td>
@@ -1916,15 +1862,15 @@ const EnhancedAppointmentsTable = ({
                   }}>
                       {(() => {
                       if (row.cost_display === 'free') {
-                        return 'Бесплатно';
+                        return t('misc.eat_payment_free');
                       }
                       const discountMode = row.discount_mode;
                       const amount = getDisplayAmount(row);
                       const isZeroCostRegistration = ['all_free', 'repeat', 'benefit', 'mixed'].includes(discountMode) && amount <= 0;
                       if (isZeroCostRegistration) {
-                        return 'Бесплатно';
+                        return t('misc.eat_payment_free');
                       }
-                      return amount > 0 ? `${amount.toLocaleString()} сум` : '—';
+                      return amount > 0 ? t('misc.eat_amount_with_currency', { amount: amount.toLocaleString() }) : '—';
                     })()}
                     </td>
 
@@ -1972,9 +1918,9 @@ const EnhancedAppointmentsTable = ({
                           e.stopPropagation();
                           onActionClick?.('payment', row, e);
                         }}
-                        title="Оплата">
+                        title={t('misc.eat_payment')}>
 
-                              Оплата
+                              {t('misc.eat_payment')}
                             </button>
                       }
 
@@ -1991,9 +1937,9 @@ const EnhancedAppointmentsTable = ({
                           e.stopPropagation();
                           onActionClick?.('call', row, e);
                         }}
-                        title="Вызвать">
+                        title={t('misc.eat_call_action')}>
 
-                            Вызвать
+                            {t('misc.eat_call_action')}
                           </button>
                       }
 
@@ -2010,8 +1956,8 @@ const EnhancedAppointmentsTable = ({
                           e.stopPropagation();
                           onActionClick?.('print', row, e);
                         }}
-                        title="Печать"
-                        aria-label="Печать">
+                        title={t('misc.eat_print')}
+                        aria-label={t('misc.eat_print')}>
 
                             <FileText size={14} />
                           </button>
@@ -2030,9 +1976,9 @@ const EnhancedAppointmentsTable = ({
                           e.stopPropagation();
                           onActionClick?.('complete', row, e);
                         }}
-                        title="Завершить">
+                        title={t('misc.eat_complete')}>
 
-                            Завершить
+                            {t('misc.eat_complete')}
                           </button>
                       }
 
@@ -2073,8 +2019,8 @@ const EnhancedAppointmentsTable = ({
                           e.stopPropagation();
                           onActionClick?.('view', row, e);
                         }}
-                        title="Просмотр"
-                        aria-label="Просмотр">
+                        title={t('misc.eat_view')}
+                        aria-label={t('misc.eat_view')}>
 
                           <Eye size={14} />
                         </button>
@@ -2092,8 +2038,8 @@ const EnhancedAppointmentsTable = ({
                           e.stopPropagation();
                           onActionClick?.('edit', row, e);
                         }}
-                        title="Редактировать"
-                        aria-label="Редактировать">
+                        title={t('misc.eat_edit')}
+                        aria-label={t('misc.eat_edit')}>
 
                           <Edit size={14} />
                         </button>
@@ -2111,8 +2057,8 @@ const EnhancedAppointmentsTable = ({
                           e.stopPropagation();
                           onActionClick?.('view_emr', row, e);
                         }}
-                        title="Просмотр EMR"
-                        aria-label="Просмотр EMR">
+                        title={t('misc.eat_view_emr')}
+                        aria-label={t('misc.eat_view_emr')}>
 
                               <FileText size={14} />
                             </button>
@@ -2132,8 +2078,8 @@ const EnhancedAppointmentsTable = ({
                           e.stopPropagation();
                           onActionClick?.('reschedule', row, e);
                         }}
-                        title="Перенос"
-                        aria-label="Перенос записи">
+                        title={t('misc.eat_reschedule')}
+                        aria-label={t('misc.eat_reschedule_aria')}>
                           <CalendarClock size={14} />
                         </button>
                       }
@@ -2150,8 +2096,8 @@ const EnhancedAppointmentsTable = ({
                           e.stopPropagation();
                           onActionClick?.('cancel', row, e);
                         }}
-                        title="Отмена"
-                        aria-label="Отмена записи">
+                        title={t('misc.eat_cancel')}
+                        aria-label={t('misc.eat_cancel_aria')}>
                           <X size={14} />
                         </button>
                       }
@@ -2168,8 +2114,8 @@ const EnhancedAppointmentsTable = ({
                           e.stopPropagation();
                           onActionClick?.('more', row, e);
                         }}
-                        title="Еще"
-                        aria-label="Еще">
+                        title={t('misc.eat_more')}
+                        aria-label={t('misc.eat_more')}>
 
                           <MoreHorizontal size={14} />
                         </button>
@@ -2187,9 +2133,9 @@ const EnhancedAppointmentsTable = ({
                           e.stopPropagation();
                           onActionClick?.('schedule_next', row, e);
                         }}
-                        title="Назначить следующий визит">
+                        title={t('misc.eat_schedule_next_title')}>
 
-                            Следующий
+                            {t('misc.eat_schedule_next')}
                           </button>
                       }
                       </div>
@@ -2207,7 +2153,7 @@ const EnhancedAppointmentsTable = ({
       {totalPages > 1 &&
       <div className="eat-pagination">
           <div className="eat-pagination-info">
-            <span>{t.page}</span>
+            <span>{t('misc.eat_page')}</span>
             <select
             value={currentPage}
             onChange={(e) => setCurrentPage(parseInt(e.target.value))}
@@ -2219,11 +2165,11 @@ const EnhancedAppointmentsTable = ({
                 </option>
             )}
             </select>
-            <span>{t.of} {totalPages}</span>
+            <span>{t('misc.eat_of')} {totalPages}</span>
           </div>
 
           <div className="eat-pagination-info">
-            <span>Показано: {paginatedData.length} из {filteredData.length}</span>
+            <span>{t('misc.eat_shown_of', { shown: paginatedData.length, total: filteredData.length })}</span>
           </div>
 
           <div style={{
@@ -2245,7 +2191,7 @@ const EnhancedAppointmentsTable = ({
               cursor: currentPage === 1 ? 'not-allowed' : 'pointer'
             }}>
 
-              Назад
+              {t('misc.eat_back')}
             </button>
             <button
             className="pagination-button"
@@ -2261,7 +2207,7 @@ const EnhancedAppointmentsTable = ({
               cursor: currentPage === totalPages ? 'not-allowed' : 'pointer'
             }}>
 
-              Далее
+              {t('misc.eat_next')}
             </button>
           </div>
         </div>

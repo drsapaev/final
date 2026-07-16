@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { FolderTree, Package } from 'lucide-react';
@@ -11,9 +11,9 @@ import { useTheme } from '../../contexts/ThemeContext';
 const LazyQueueProfilesManager = React.lazy(() => import('./QueueProfilesManager'));
 const LazyServiceCatalog = React.lazy(() => import('./ServiceCatalog'));
 
-const SERVICE_TABS = [
-  { key: 'catalog', label: 'Справочник услуг', icon: Package },
-  { key: 'queue-profiles', label: 'Вкладки регистратуры', icon: FolderTree },
+const getServiceTabs = (t) => [
+  { key: 'catalog', label: t('admin2.asv_tab_catalog'), icon: Package },
+  { key: 'queue-profiles', label: t('admin2.asv_tab_queue_profiles'), icon: FolderTree },
 ];
 
 const getInitialServicesTab = (search) => {
@@ -25,7 +25,9 @@ const AdminServices = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { isDark } = useTheme();
+  const { t } = useTranslation();
   const [servicesTab, setServicesTab] = useState(() => getInitialServicesTab(location.search));
+  const serviceTabs = getServiceTabs(t);
 
   useEffect(() => {
     localStorage.setItem('servicesTab', servicesTab);
@@ -44,7 +46,7 @@ const AdminServices = () => {
   return (
     <div>
       <div className="admin-services-tab-bar">
-        {SERVICE_TABS.map((tab) => {
+        {serviceTabs.map((tab) => {
           const TabIcon = tab.icon;
           const isActive = servicesTab === tab.key;
           return (

@@ -22,7 +22,7 @@ import {
 } from '../../api/registrar';
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 /**
  * Интегрированный селектор врачей для регистратуры
  * Использует данные врачей и расписаний из админ панели
@@ -34,6 +34,7 @@ const IntegratedDoctorSelector = ({
   showSchedule = true,
   className = ''
 }) => {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [doctors, setDoctors] = useState([]);
   const [queueSettings, setQueueSettings] = useState({});
@@ -53,12 +54,12 @@ const IntegratedDoctorSelector = ({
   };
 
   const specialtyNames = {
-    cardiology: 'Кардиология',
-    dermatology: 'Дерматология',
-    stomatology: 'Стоматология'
+    cardiology: t('misc.ids_kardiologiya'),
+    dermatology: t('misc.ids_dermatologiya'),
+    stomatology: t('misc.ids_stomatologiya')
   };
 
-  const weekdayNames = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+  const weekdayNames = [t('misc.ids_pn'), t('misc.ids_vt'), t('misc.ids_sr'), t('misc.ids_cht'), t('misc.ids_pt'), t('misc.ids_sb'), t('misc.ids_vs')];
 
   useEffect(() => {
     loadData();
@@ -85,7 +86,7 @@ const IntegratedDoctorSelector = ({
       }
     } catch (err) {
       logger.error('Ошибка загрузки данных врачей:', err);
-      setError('Ошибка загрузки данных врачей');
+      setError(t('misc.ids_oshibka_zagruzki_dannyh_vrac'));
     } finally {
       setLoading(false);
     }
@@ -123,7 +124,7 @@ const IntegratedDoctorSelector = ({
       <Card className={`p-4 ${className}`}>
         <div className="flex items-center justify-center">
           <RefreshCw className="animate-spin mr-2" size={20} />
-          <span>Загрузка врачей...</span>
+          <span>{t('misc.ids_zagruzka_vrachey')}</span>
         </div>
       </Card>
     );
@@ -148,7 +149,7 @@ const IntegratedDoctorSelector = ({
           Врачи не найдены
         </h3>
         <p className="text-gray-500">
-          {specialty ? `Нет врачей специальности "${specialty}"` : 'Добавьте врачей в админ панели'}
+          {specialty ? t('misc.ids_net_vrachey_spetsialnosti_sp', { specialty: specialty }) : t('misc.ids_dobavte_vrachey_v_admin_pane')}
         </p>
       </Card>
     );
@@ -181,7 +182,7 @@ const IntegratedDoctorSelector = ({
                 <div className="flex-1">
                   <div className="flex items-center space-x-2 mb-1">
                     <h4 className="text-lg font-medium text-gray-900 dark:text-white">
-                      {doctor.user?.full_name || `Врач #${doctor.id}`}
+                      {doctor.user?.full_name || t('misc.ids_vrach_doctor_id', { id: doctor.id })}
                     </h4>
                     {isSelected && (
                       <CheckCircle size={20} className="text-blue-600" />

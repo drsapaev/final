@@ -9,7 +9,7 @@ import {
   describePatientError,
 } from './patientUtils';
 import PanelEmptyState from './PanelEmptyState';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 /**
  * L-H-4 fix: PatientCabinetSummary выделен в отдельный файл (~200 строк).
@@ -70,8 +70,8 @@ function PatientCabinetSummary({ mode = 'cabinet' }) {
     return (
       <PanelEmptyState
         icon="doc.text"
-        title="Откройте из Telegram"
-        description="Защищённый кабинет требует Telegram Mini App identity перед показом данных пациента."
+        title={t('patient.pat_cab_missing_init_title')}
+        description={t('patient.pat_cab_missing_init_desc')}
       />
     );
   }
@@ -80,8 +80,8 @@ function PatientCabinetSummary({ mode = 'cabinet' }) {
     return (
       <PanelEmptyState
         icon="doc.text"
-        title="Загрузка кабинета…"
-        description="Проверяем защищённый Telegram Mini App identity."
+        title={t('patient.pat_cab_loading_title')}
+        description={t('patient.pat_cab_loading_desc')}
         variant="loading"
       />
     );
@@ -91,8 +91,8 @@ function PatientCabinetSummary({ mode = 'cabinet' }) {
     return (
       <PanelEmptyState
         icon="exclamationmark.triangle"
-        title="Кабинет недоступен"
-        description={cabinetError || 'Не удалось загрузить защищённый кабинет пациента.'}
+        title={t('patient.pat_cab_error_title')}
+        description={cabinetError || t('patient.pat_cab_error_desc')}
         variant="error"
       />
     );
@@ -132,16 +132,16 @@ function PatientCabinetSummary({ mode = 'cabinet' }) {
   };
 
   const cabinetTitle = isPaymentsMode
-    ? 'Платежи и долг'
+    ? t('patient.pat_cab_title_payments')
     : isReportsMode
-      ? 'Отчёты и документы'
-      : (cabinetSummary?.patient?.name || 'Привязанный пациент');
+      ? t('patient.pat_cab_title_reports')
+      : (cabinetSummary?.patient?.name || t('patient.pat_cab_title_default'));
 
   const cabinetSubtitle = isPaymentsMode
-    ? `Защищённая сумма платежей для ${cabinetSummary?.patient?.name || 'привязанного пациента'}.`
+    ? t('patient.pat_cab_subtitle_payments', { name: cabinetSummary?.patient?.name || t('patient.pat_cab_linked_patient_genitive') })
     : isReportsMode
-      ? `Готовые файлы отчётов для ${cabinetSummary?.patient?.name || 'привязанного пациента'}.`
-      : 'Защищённая сводка кабинета из привязанного Telegram-профиля пациента.';
+      ? t('patient.pat_cab_subtitle_reports', { name: cabinetSummary?.patient?.name || t('patient.pat_cab_linked_patient_genitive') })
+      : t('patient.pat_cab_subtitle_default');
 
   return (
     <div className="pp-cabinet-root">
@@ -151,56 +151,56 @@ function PatientCabinetSummary({ mode = 'cabinet' }) {
             <div className="pp-card-title">{cabinetTitle}</div>
             <p className="pp-card-subtitle">{cabinetSubtitle}</p>
           </div>
-          <Badge variant="success">Mini App защищено</Badge>
+          <Badge variant="success">{t('patient.pat_cab_secure_badge')}</Badge>
         </div>
 
         <div className="pp-card-body">
           {/* Payment totals */}
           <div className="pp-payments-grid">
             <div className="pp-payment-card">
-              <div className="pp-payment-label">Счёт</div>
+              <div className="pp-payment-label">{t('patient.pat_cab_label_billed')}</div>
               <div className="pp-payment-value">{payments.billed ?? '0'} UZS</div>
             </div>
             <div className="pp-payment-card">
-              <div className="pp-payment-label">Оплачено</div>
+              <div className="pp-payment-label">{t('patient.pat_cab_label_paid')}</div>
               <div className="pp-payment-value">{payments.paid ?? '0'} UZS</div>
             </div>
             <div className="pp-payment-card">
-              <div className="pp-payment-label">Ожидает</div>
+              <div className="pp-payment-label">{t('patient.pat_cab_label_pending')}</div>
               <div className="pp-payment-value">{payments.pending ?? '0'} UZS</div>
             </div>
             <div className="pp-payment-card">
-              <div className="pp-payment-label">Долг</div>
+              <div className="pp-payment-label">{t('patient.pat_cab_label_debt')}</div>
               <div className="pp-payment-value">{payments.debt ?? '0'} UZS</div>
             </div>
           </div>
 
           {isPaymentsMode && (
             <div className="pp-info-box">
-              <div className="pp-info-title">Связанная активность</div>
+              <div className="pp-info-title">{t('patient.pat_cab_info_title')}</div>
               <div className="pp-info-grid">
-                <div>Связанные визиты: {payments.linked_visit_count ?? 0}</div>
-                <div>Активные записи в очереди: {payments.active_queue_count ?? 0}</div>
+                <div>{t('patient.pat_cab_info_visits', { count: payments.linked_visit_count ?? 0 })}</div>
+                <div>{t('patient.pat_cab_info_queue', { count: payments.active_queue_count ?? 0 })}</div>
               </div>
               <div className="pp-info-hint">
-                Онлайн-оплата и возврат недоступны в Telegram; персонал клиники выполняет платёжные операции в приложении клиники.
+                {t('patient.pat_cab_info_hint')}
               </div>
             </div>
           )}
 
           {isReportsMode && (
             <div className="pp-reports-section">
-              <div className="pp-section-title">Готовые отчёты</div>
+              <div className="pp-section-title">{t('patient.pat_cab_section_reports')}</div>
               <div className="pp-reports-list">
                 {reports.length > 0 ? reports.map((report) => (
                   <div key={report.id} className="pp-report-card">
                     <div className="pp-report-info">
-                      <div className="pp-report-name">{report.name || 'Лабораторный отчёт'}</div>
-                      <div className="pp-report-date">{report.ready_at || 'Дата готовности ожидается'}</div>
+                      <div className="pp-report-name">{report.name || t('patient.pat_cab_report_name_default')}</div>
+                      <div className="pp-report-date">{report.ready_at || t('patient.pat_cab_report_date_default')}</div>
                       {reportDownloads[report.id] === 'error' && (
                         <div className="pp-message pp-message--error" role="alert">
                           <Icon name="exclamationmark.triangle" size={14} />
-                          Не удалось открыть отчёт. Попробуйте снова из Telegram.
+                          {t('patient.pat_cab_report_error')}
                         </div>
                       )}
                     </div>
@@ -212,7 +212,7 @@ function PatientCabinetSummary({ mode = 'cabinet' }) {
                         onClick={() => downloadReport(report)}
                       >
                         <Icon name="arrow.clockwise" size={16} />
-                        Повторить
+                        {t('patient.pat_cab_retry')}
                       </Button>
                     ) : (
                       <Button
@@ -223,12 +223,12 @@ function PatientCabinetSummary({ mode = 'cabinet' }) {
                         onClick={() => downloadReport(report)}
                       >
                         <Icon name="doc.text" size={16} />
-                        Открыть PDF
+                        {t('patient.pat_cab_open_pdf')}
                       </Button>
                     )}
                   </div>
                 )) : (
-                  <div className="pp-empty-hint">Готовых отчётов пока нет.</div>
+                  <div className="pp-empty-hint">{t('patient.pat_cab_no_reports_yet')}</div>
                 )}
               </div>
             </div>
@@ -238,42 +238,42 @@ function PatientCabinetSummary({ mode = 'cabinet' }) {
             <div className="pp-cabinet-grid">
               {/* Appointments */}
               <div className="pp-subsection">
-                <div className="pp-section-title">Записи</div>
+                <div className="pp-section-title">{t('patient.pat_cab_section_appointments')}</div>
                 <div className="pp-subsection-list">
                   {appointments.length > 0 ? appointments.map((appointment) => (
                     <div key={appointment.id} className="pp-list-item">
                       <div>
-                        <div className="pp-list-item-primary">{appointment.date || 'Дата ожидается'}</div>
-                        <div className="pp-list-item-secondary">{appointment.time || 'Время ожидается'} · {appointment.department || 'Отделение ожидается'}</div>
+                        <div className="pp-list-item-primary">{appointment.date || t('patient.pat_cab_date_pending')}</div>
+                        <div className="pp-list-item-secondary">{appointment.time || t('patient.pat_cab_time_pending')} · {appointment.department || t('patient.pat_cab_dept_pending')}</div>
                       </div>
                       <Badge variant={appointment.status ? 'info' : 'outline'}>
-                        {appointment.status || 'статус недоступен'}
+                        {appointment.status || t('patient.pat_cab_status_unavailable')}
                       </Badge>
                     </div>
                   )) : (
-                    <div className="pp-empty-hint">Записей пока нет.</div>
+                    <div className="pp-empty-hint">{t('patient.pat_cab_no_appointments')}</div>
                   )}
                 </div>
               </div>
 
               {/* Visits */}
               <div className="pp-subsection">
-                <div className="pp-section-title">Визиты</div>
+                <div className="pp-section-title">{t('patient.pat_cab_section_visits')}</div>
                 <div className="pp-subsection-list">
                   {visits.length > 0 ? visits.map((visit) => (
                     <div key={visit.id} className="pp-list-item">
-                      <div className="pp-list-item-primary">Визит #{visit.id}</div>
-                      <div className="pp-list-item-secondary">{visit.date || 'Дата ожидается'} · {visit.status || 'статус недоступен'}</div>
+                      <div className="pp-list-item-primary">{t('patient.pat_cab_visit_n', { id: visit.id })}</div>
+                      <div className="pp-list-item-secondary">{visit.date || t('patient.pat_cab_date_pending')} · {visit.status || t('patient.pat_cab_status_unavailable')}</div>
                     </div>
                   )) : (
-                    <div className="pp-empty-hint">Недавних визитов пока нет.</div>
+                    <div className="pp-empty-hint">{t('patient.pat_cab_no_visits')}</div>
                   )}
                 </div>
               </div>
 
               {/* Queue */}
               <div className="pp-subsection">
-                <div className="pp-section-title">Очередь сегодня</div>
+                <div className="pp-section-title">{t('patient.pat_cab_section_queue')}</div>
                 <div className="pp-subsection-list">
                   {queue.length > 0 ? queue.map((entry) => (
                     <div key={`${entry.number}-${entry.status}`} className="pp-list-item">
@@ -281,27 +281,27 @@ function PatientCabinetSummary({ mode = 'cabinet' }) {
                       <div className="pp-list-item-secondary">{entry.status}{entry.cabinet ? ` · ${entry.cabinet}` : ''}</div>
                     </div>
                   )) : (
-                    <div className="pp-empty-hint">Сегодня нет активной записи в очереди.</div>
+                    <div className="pp-empty-hint">{t('patient.pat_cab_no_queue')}</div>
                   )}
                 </div>
               </div>
 
               {/* Reports */}
               <div className="pp-subsection">
-                <div className="pp-section-title">Готовые отчёты</div>
+                <div className="pp-section-title">{t('patient.pat_cab_section_reports')}</div>
                 <div className="pp-subsection-list">
                   {reports.length > 0 ? reports.map((report) => (
                     <div key={report.id} className="pp-list-item">
                       <div>
-                        <div className="pp-list-item-primary">{report.name || 'Лабораторный отчёт'}</div>
-                        <div className="pp-list-item-secondary">{report.ready_at || 'Дата готовности ожидается'}</div>
+                        <div className="pp-list-item-primary">{report.name || t('patient.pat_cab_report_name_default')}</div>
+                        <div className="pp-list-item-secondary">{report.ready_at || t('patient.pat_cab_report_date_default')}</div>
                       </div>
                       <Badge variant={report.status ? 'success' : 'outline'}>
-                        {report.status || 'статус недоступен'}
+                        {report.status || t('patient.pat_cab_status_unavailable')}
                       </Badge>
                     </div>
                   )) : (
-                    <div className="pp-empty-hint">Готовых отчётов пока нет.</div>
+                    <div className="pp-empty-hint">{t('patient.pat_cab_no_reports_yet')}</div>
                   )}
                 </div>
               </div>

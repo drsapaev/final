@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import {
@@ -124,6 +124,9 @@ const AppointmentWizardV2 = ({
   // Проверка прав доступа
   const { hasRole } = useRoleAccess();
   const hasRegistrarAccess = hasRole(['Admin', 'Registrar', 'Receptionist']);
+
+  // i18n: unified translation hook — required for all t('misc.aw_*') calls below.
+  const { t } = useTranslation();
 
   // UX Audit Registrar #2: useConfirm hook для замены window.confirm().
   // Возвращает [confirm, dialog]; dialog должен быть отрендерен в JSX.
@@ -373,7 +376,7 @@ const AppointmentWizardV2 = ({
 
       if (existingPatient && existingPatient.id !== wizardData.patient.id) {
         setPhoneError({
-          message: 'Пациент с таким номером уже существует',
+          message: t('misc.aw_phone_already_exists'),
           patient: existingPatient
         });
       } else {
@@ -418,7 +421,7 @@ const AppointmentWizardV2 = ({
     });
     setFormattedBirthDate('');
     setCurrentStep(STEP_PATIENT);
-    toast.success('Форма очищена');
+    toast.success(t('misc.aw_form_cleared'));
   };
 
   // ===================== МАСКИ ВВОДА =====================
@@ -478,9 +481,9 @@ const AppointmentWizardV2 = ({
             patient.first_name || '',
             patient.middle_name || ''].
             filter((p) => p);
-            patient.fio = parts.join(' ').trim() || 'Без имени';
+            patient.fio = parts.join(' ').trim() || t('misc.aw_no_name');
           } else if (!patient.fio) {
-            patient.fio = 'Без имени';
+            patient.fio = t('misc.aw_no_name');
           }
           return patient;
         });
@@ -548,9 +551,9 @@ const AppointmentWizardV2 = ({
       patient.first_name || '',
       patient.middle_name || ''].
       filter((p) => p);
-      patientFio = parts.join(' ').trim() || 'Без имени';
+      patientFio = parts.join(' ').trim() || t('misc.aw_no_name');
     } else if (!patientFio) {
-      patientFio = 'Без имени';
+      patientFio = t('misc.aw_no_name');
     }
 
     // Сохраняем данные пациента (без парсинга ФИО - backend сделает это при создании)
@@ -644,7 +647,7 @@ const AppointmentWizardV2 = ({
 
   // ✅ SSOT: Функция для получения названия услуги из servicesData
   const getServiceName = useCallback((item) => {
-    if (!item) return 'Неизвестная услуга';
+    if (!item) return t('misc.aw_unknown_service');
 
     // Приоритет 1: Если есть service_id, ищем в servicesData
     if (item.service_id) {
@@ -695,9 +698,9 @@ const AppointmentWizardV2 = ({
 
     // Fallback: возвращаем service_name (если это название) или код
     // ⭐ FINAL DEFENSIVE: Убеждаемся, что возвращаем строку
-    const fallback = serviceName || searchName || 'Неизвестная услуга';
+    const fallback = serviceName || searchName || t('misc.aw_unknown_service');
     return typeof fallback === 'string' ? fallback : JSON.stringify(fallback);
-  }, [servicesData]);
+  }, [servicesData, t]);
 
   // Эффект для обогащения данных корзины реальными ID и ценами после загрузки servicesData
   useEffect(() => {
@@ -881,7 +884,7 @@ const AppointmentWizardV2 = ({
       if (!patientId) {
         initialMap[item.id] = {
           eligible: false,
-          reason: 'Проверка доступна после выбора существующего пациента',
+          reason: t('misc.aw_repeat_check_needs_patient'),
           repeat_discount_percent: 0,
           repeat_window_days: 0
         };
@@ -891,7 +894,7 @@ const AppointmentWizardV2 = ({
       if (!item.doctor_id) {
         initialMap[item.id] = {
           eligible: false,
-          reason: 'Выберите врача для проверки повторной скидки',
+          reason: t('misc.aw_repeat_check_needs_doctor'),
           repeat_discount_percent: 0,
           repeat_window_days: 0
         };
@@ -951,7 +954,7 @@ const AppointmentWizardV2 = ({
           if (!Number.isNaN(key)) {
             fallbackMap[key] = {
               eligible: false,
-              reason: 'Не удалось проверить повторную скидку',
+              reason: t('misc.aw_repeat_check_failed'),
               repeat_discount_percent: 0,
               repeat_window_days: 0
             };
@@ -1021,12 +1024,12 @@ const AppointmentWizardV2 = ({
 
   const applyRepeatSuggestion = useCallback(() => {
     if (!repeatSuggestionSummary.hasConsultations) {
-      toast.info('Добавьте консультацию, чтобы применить повторную скидку');
+      toast.info(t('misc.aw_repeat_add_consultation'));
       return;
     }
 
     if (repeatSuggestionSummary.hasUnknown || isRepeatEligibilityLoading) {
-      toast.info('Дождитесь завершения проверки повторной скидки');
+      toast.info(t('misc.aw_repeat_wait_check'));
       return;
     }
 
@@ -1041,14 +1044,14 @@ const AppointmentWizardV2 = ({
       const discountPercent = repeatSuggestionSummary.maxDiscountPercent;
       toast.success(
         discountPercent > 0 ?
-        `Применена повторная скидка ${discountPercent}%` :
-        'Применен режим повторного визита'
+        t('misc.aw_repeat_applied_with_percent', { percent: discountPercent }) :
+        t('misc.aw_repeat_mode_applied')
       );
       return;
     }
 
     toast.warning(MIXED_REPEAT_WARNING);
-  }, [repeatSuggestionSummary, isRepeatEligibilityLoading]);
+  }, [repeatSuggestionSummary, isRepeatEligibilityLoading, t]);
 
   // 🔧 УПРОЩЕННАЯ ФИЛЬТРАЦИЯ: Показываем все услуги без привязки к врачам
   const filterServices = (allServices) => {
@@ -1167,15 +1170,15 @@ const AppointmentWizardV2 = ({
     const normalizedFio = rawFio.trim();
 
     if (!normalizedFio) {
-      return 'Введите ФИО пациента';
+      return t('misc.aw_fio_enter');
     }
 
     if (!PATIENT_NAME_PATTERN.test(normalizedFio)) {
-      return 'ФИО может содержать только буквы, пробелы, дефисы и апостроф';
+      return t('misc.aw_fio_invalid_chars');
     }
 
     if (/\s{3,}/.test(normalizedFio)) {
-      return 'ФИО содержит слишком много пробелов подряд';
+      return t('misc.aw_fio_too_many_spaces');
     }
 
     const nameParts = normalizedFio.split(/\s+/).filter(Boolean);
@@ -1184,15 +1187,15 @@ const AppointmentWizardV2 = ({
     const middleName = nameParts.length > 2 ? nameParts.slice(2).join(' ') : '';
 
     if (lastName.length < 2) {
-      return 'Фамилия должна содержать минимум 2 буквы';
+      return t('misc.aw_lastname_too_short');
     }
 
     if (firstName.length < 2) {
-      return 'Имя должно содержать минимум 2 буквы';
+      return t('misc.aw_firstname_too_short');
     }
 
     if (middleName && middleName.length < 2) {
-      return 'Отчество должно содержать минимум 2 буквы';
+      return t('misc.aw_middlename_too_short');
     }
 
     return null;
@@ -1211,10 +1214,10 @@ const AppointmentWizardV2 = ({
       // ✅ Телефон теперь необязателен (дети, пожилые без телефона)
       // Проверяем формат только если телефон указан
       if (wizardData.patient.phone.trim() && !isValidUzbekPhone(wizardData.patient.phone)) {
-        newErrors.phone = 'Номер телефона должен быть в формате +998XXXXXXXXX';
+        newErrors.phone = t('misc.aw_phone_invalid_format');
       }
       if (!wizardData.patient.gender) {// ✅ Валидация пола
-        newErrors.gender = 'Выберите пол';
+        newErrors.gender = t('misc.aw_gender_required');
       }
       // Валидация даты рождения
       if (formattedBirthDate && formattedBirthDate !== '00.00.0000') {
@@ -1227,12 +1230,12 @@ const AppointmentWizardV2 = ({
         dayNum < 1 || dayNum > 31 ||
         monthNum < 1 || monthNum > 12 ||
         yearNum < 1900 || yearNum > new Date().getFullYear()) {
-          newErrors.birth_date = 'Введите корректную дату рождения (ДД.ММ.ГГГГ)';
+          newErrors.birth_date = t('misc.aw_birth_date_invalid');
         }
       }
     } else if (step === 2) {
       if (wizardData.cart.items.length === 0) {
-        newErrors.cart = 'Добавьте хотя бы одну услугу';
+        newErrors.cart = t('misc.aw_cart_empty');
       }
       // Проверяем, что для услуг, требующих врача, врач выбран
       const missingDoctors = wizardData.cart.items.filter((item) => {
@@ -1240,7 +1243,7 @@ const AppointmentWizardV2 = ({
         return service?.requires_doctor && !item.doctor_id;
       });
       if (missingDoctors.length > 0) {
-        newErrors.doctors = 'Выберите врачей для всех услуг, которые их требуют';
+        newErrors.doctors = t('misc.aw_doctors_required');
       }
     }
     // Убрана валидация для шагов 3 и 4
@@ -1310,12 +1313,12 @@ const AppointmentWizardV2 = ({
     const isRepeatMode = wizardData.cart.discount_mode === 'repeat' && !wizardData.cart.all_free;
     if (isRepeatMode) {
       if (!repeatSuggestionSummary.hasConsultations) {
-        setErrors((prev) => ({ ...prev, repeat: 'Повторная скидка применяется только к консультациям. Добавьте консультацию в корзину или выберите другой тип скидки.' }));
+        setErrors((prev) => ({ ...prev, repeat: t('misc.aw_repeat_only_consultations') }));
         setCurrentStep(STEP_CART); // Ensure user is on the cart step to see the error
         return;
       }
       if (repeatSuggestionSummary.hasUnknown || isRepeatEligibilityLoading) {
-        setErrors((prev) => ({ ...prev, repeat: 'Дождитесь завершения проверки повторной скидки перед завершением.' }));
+        setErrors((prev) => ({ ...prev, repeat: t('misc.aw_repeat_wait_before_complete') }));
         setCurrentStep(STEP_CART);
         return;
       }
@@ -1344,7 +1347,7 @@ const AppointmentWizardV2 = ({
     // Проверяем токен авторизации
     const token = tokenManager.getAccessToken();
     if (!token) {
-      toast.error('Требуется авторизация. Пожалуйста, войдите в систему заново.');
+      toast.error(t('misc.aw_auth_required'));
       return;
     }
 
@@ -1358,30 +1361,30 @@ const AppointmentWizardV2 = ({
 
     // PR-25: itemized breakdown — show each service + doctor + price
     const itemizedLines = cartItems.map((item) => {
-      const svcName = item.service_name || item.name || `Услуга #${item.service_id}`;
+      const svcName = item.service_name || item.name || t('misc.aw_service_hash', { id: item.service_id });
       const qty = item.quantity || 1;
       const price = Number(item.price) || 0;
-      const docName = item.doctor_name || (item.doctor_id ? `Врач #${item.doctor_id}` : '');
-      const priceStr = price > 0 ? `${new Intl.NumberFormat('ru-RU').format(price * qty)} сум` : 'бесплатно';
+      const docName = item.doctor_name || (item.doctor_id ? t('misc.aw_doctor_hash', { id: item.doctor_id }) : '');
+      const priceStr = price > 0 ? `${new Intl.NumberFormat('ru-RU').format(price * qty)} ${t('misc.aw_currency_sum')}` : t('misc.aw_free');
       return `• ${svcName}${qty > 1 ? ` ×${qty}` : ''}${docName ? ` — ${docName}` : ''} — ${priceStr}`;
     });
 
     const summaryLines = [
-      `Пациент: ${wizardData.patient.fio || '—'}`,
+      t('misc.aw_summary_patient', { name: wizardData.patient.fio || '—' }),
       '',
       ...itemizedLines,
       '',
-      doctorCount > 1 ? `Врачей: ${doctorCount}` : null,
-      totalAmount > 0 ? `Итого: ${new Intl.NumberFormat('ru-RU').format(totalAmount)} сум` : 'Бесплатно',
+      doctorCount > 1 ? t('misc.aw_summary_doctors_count', { count: doctorCount }) : null,
+      totalAmount > 0 ? t('misc.aw_summary_total', { amount: new Intl.NumberFormat('ru-RU').format(totalAmount) }) : t('misc.aw_summary_free'),
     ].filter(Boolean);
 
     // UX Audit Registrar #2: window.confirm() → useConfirm hook.
     // PR-24: parameterize title/CTA by editMode so user sees "Обновить" not "Создать"
     const confirmed = await confirm({
-      title: editMode ? 'Обновить запись' : 'Создать запись',
-      message: editMode ? 'Обновить запись с указанными данными?' : 'Создать запись с указанными данными?',
+      title: editMode ? t('misc.aw_confirm_update_title') : t('misc.aw_confirm_create_title'),
+      message: editMode ? t('misc.aw_confirm_update_message') : t('misc.aw_confirm_create_message'),
       description: summaryLines.join('\n'),
-      confirmLabel: editMode ? 'Обновить' : 'Создать',
+      confirmLabel: editMode ? t('misc.aw_confirm_update_label') : t('misc.aw_confirm_create_label'),
       cancelLabel: t('misc.cancel'),
       intent: 'primary',
     });
@@ -1395,12 +1398,12 @@ const AppointmentWizardV2 = ({
     try {
       const isAuthorized = await checkAuthProbe();
       if (!isAuthorized) {
-        toast.error('Сессия истекла. Пожалуйста, войдите в систему заново.');
+        toast.error(t('misc.aw_session_expired'));
         return;
       }
     } catch (error) {
       logger.error('❌ Ошибка проверки токена:', error);
-      toast.error('Ошибка проверки авторизации. Пожалуйста, войдите в систему заново.');
+      toast.error(t('misc.aw_auth_check_failed'));
       return;
     }
 
@@ -1409,7 +1412,7 @@ const AppointmentWizardV2 = ({
     try {
       // ✅ ИСПРАВЛЕНО: Валидация корзины перед подготовкой данных
       if (!wizardData.cart.items || wizardData.cart.items.length === 0) {
-        toast.error('Корзина пуста. Пожалуйста, добавьте услуги.');
+        toast.error(t('misc.aw_cart_empty_add_services'));
         return;
       }
 
@@ -1417,14 +1420,14 @@ const AppointmentWizardV2 = ({
       const itemsWithoutServiceId = wizardData.cart.items.filter((item) => !item.service_id);
       if (itemsWithoutServiceId.length > 0) {
         logger.error('❌ Найдены элементы корзины без service_id:', itemsWithoutServiceId);
-        toast.error('Некоторые услуги не могут быть обработаны. Пожалуйста, удалите их из корзины и добавьте заново.');
+        toast.error(t('misc.aw_services_unprocessable_readd'));
         return;
       }
 
       // ✅ ИСПРАВЛЕНО: Сначала группируем услуги по визитам
       let visits = groupCartItemsByVisit();
       if (!visits || visits.length === 0) {
-        toast.error('Корзина пуста или содержит невалидные услуги. Пожалуйста, проверьте выбранные услуги.');
+        toast.error(t('misc.aw_cart_empty_or_invalid'));
         return;
       }
 
@@ -1437,7 +1440,7 @@ const AppointmentWizardV2 = ({
 
       if (invalidVisits.length > 0) {
         logger.error('❌ Найдены визиты с невалидными услугами:', invalidVisits);
-        toast.error('Некоторые услуги не могут быть обработаны. Пожалуйста, перезагрузите страницу и попробуйте снова.');
+        toast.error(t('misc.aw_services_unprocessable_reload'));
         return;
       }
 
@@ -1548,7 +1551,7 @@ const AppointmentWizardV2 = ({
         // ✅ УПРОЩЕНО: Отправляем полное ФИО в API, backend нормализует его (Single Source of Truth)
         // Валидация обязательных полей
         if (!wizardData.patient.fio || !wizardData.patient.fio.trim()) {
-          throw new Error('ФИО пациента обязательно для заполнения');
+          throw new Error(t('misc.aw_fio_required'));
         }
 
         const token = tokenManager.getAccessToken();
@@ -1605,15 +1608,15 @@ const AppointmentWizardV2 = ({
             } else {
               // 🚨 НЕ используем fallback - требуем точное совпадение
               logger.error('❌ Exact phone match not found after 400');
-              throw new Error(`Пациент с телефоном ${wizardData.patient.phone} уже существует, но не найден в базе данных.`);
+              throw new Error(t('misc.aw_patient_phone_exists_not_found', { phone: wizardData.patient.phone }));
             }
           } else if (createError.status === 400) {
             // Нет телефона и ошибка создания - это проблема валидации
-            throw new Error(`Ошибка валидации данных пациента: ${createError.message}`);
+            throw new Error(t('misc.aw_patient_validation_error', { message: createError.message }));
           } else {
             // Другие ошибки (5xx, network)
             logger.error('❌ Ошибка создания пациента:', createError.status, createError.message);
-            throw new Error(`Ошибка создания пациента: ${createError.status || ''} ${createError.message}`);
+            throw new Error(t('misc.aw_patient_creation_error', { status: createError.status || '', message: createError.message }));
           }
         }
       }
@@ -1623,7 +1626,7 @@ const AppointmentWizardV2 = ({
         logger.error('❌ Не удалось определить patient_id перед созданием корзины', {
           wizardPatient: wizardData.patient
         });
-        toast.error('Не удалось определить пациента. Пожалуйста, перезагрузите страницу и попробуйте ещё раз.');
+        toast.error(t('misc.aw_patient_not_determined'));
         return;
       }
 
@@ -1643,7 +1646,7 @@ const AppointmentWizardV2 = ({
             status: updateError.status,
             errorText: updateError.message
           });
-          toast.error('Не удалось сохранить пол пациента. Проверьте доступ и попробуйте ещё раз.');
+          toast.error(t('misc.aw_patient_gender_save_failed'));
           return;
         }
       }
@@ -1736,7 +1739,7 @@ const AppointmentWizardV2 = ({
             });
 
             logger.log('✅ QR-запись успешно обновлена:', updateResult);
-            toast.success('Запись успешно обновлена');
+            toast.success(t('misc.aw_record_updated_success'));
 
             // Завершаем без создания новых записей
             // (QW-08: removed dead if(!editMode){localStorage.removeItem(...)} block)
@@ -1746,8 +1749,8 @@ const AppointmentWizardV2 = ({
           } catch (updateError) {
             // ⭐ FIX: Не продолжаем с fallback - это создавало дубликаты!
             logger.error('❌ Ошибка обновления QR-записи:', updateError);
-            const errorMessage = updateError?.response?.data?.detail || updateError?.message || 'Неизвестная ошибка';
-            toast.error(`Ошибка обновления записи: ${errorMessage}`);
+            const errorMessage = updateError?.response?.data?.detail || updateError?.message || t('misc.aw_unknown_error');
+            toast.error(t('misc.aw_record_update_error', { message: errorMessage }));
             setIsProcessing?.(false);
             return; // ⭐ CRITICAL: Не создаём дубликаты через cart endpoint
           }
@@ -2083,13 +2086,13 @@ const AppointmentWizardV2 = ({
             }
 
             await cancelRemovedQueueEntries(originalQueueIds, wizardData.cart.items, 'edit-delta');
-            toast.success('Запись обновлена');
+            toast.success(t('misc.aw_record_updated_short'));
             onComplete?.(editDeltaResult);
             onClose();
             return;
           } catch (editDeltaError) {
             logger.error('[AppointmentWizardV2] edit delta failed', editDeltaError);
-            toast.error(editDeltaError?.response?.data?.detail || editDeltaError?.message || 'Не удалось обновить запись');
+            toast.error(editDeltaError?.response?.data?.detail || editDeltaError?.message || t('misc.aw_record_update_failed'));
             return;
           }
         }
@@ -2122,7 +2125,7 @@ const AppointmentWizardV2 = ({
               });
 
               logger.log('✅ Batch endpoint успешно создал записи:', batchResult);
-              toast.success(`Добавлено ${servicesWithSpecialist.length} новых услуг в очередь`);
+              toast.success(t('misc.aw_added_new_services_to_queue', { count: servicesWithSpecialist.length }));
 
               // Если есть услуги без специалиста, обрабатываем их через обычный cart endpoint
               if (newServicesWithoutDoctor.length > 0) {
@@ -2189,7 +2192,7 @@ const AppointmentWizardV2 = ({
               }
             } catch (batchError) {
               logger.error('❌ Ошибка batch endpoint:', batchError);
-              toast.error(`Ошибка добавления услуг: ${batchError.message || 'Неизвестная ошибка'}`);
+              toast.error(t('misc.aw_add_services_error', { message: batchError.message || t('misc.aw_unknown_error') }));
               // Продолжаем с обычным cart endpoint как fallback
               logger.log('ℹ️ Продолжаем с cart endpoint как fallback...');
             }
@@ -2270,7 +2273,7 @@ const AppointmentWizardV2 = ({
           // updatePatient() бросает Error с .message и .status при неудаче.
           await updatePatient(patientId, patientUpdateData);
           logger.log('✅ Данные пациента успешно обновлены');
-          toast.success('Данные пациента обновлены');
+          toast.success(t('misc.aw_patient_data_updated'));
 
           // ✅ НОВОЕ: Обработка удаленных записей очереди (для patient update path)
           const currentQueueIds = new Set(
@@ -2286,12 +2289,12 @@ const AppointmentWizardV2 = ({
             await cancelRemovedQueueEntries(originalQueueIds, wizardData.cart.items, 'patient-update');
           }
 
-          onComplete?.({ success: true, message: 'Данные пациента обновлены' });
+          onComplete?.({ success: true, message: t('misc.aw_patient_data_updated') });
           onClose();
           return;
         } catch (patientError) {
           logger.error('❌ Ошибка обновления данных пациента:', patientError);
-          toast.error(`Ошибка обновления данных пациента: ${patientError.message || 'Неизвестная ошибка'}`);
+          toast.error(t('misc.aw_patient_data_update_error', { message: patientError.message || t('misc.aw_unknown_error') }));
           // Продолжаем с обычным flow (хотя visits пустой, это не должно произойти)
         }
       }
@@ -2306,7 +2309,7 @@ const AppointmentWizardV2 = ({
           return;
         }
         // В режиме создания, если визитов нет, показываем предупреждение
-        toast.warning('Корзина пуста. Добавьте услуги для создания записи.');
+        toast.warning(t('misc.aw_cart_empty_create_record'));
         return;
       }
 
@@ -2328,14 +2331,14 @@ const AppointmentWizardV2 = ({
         result = await createRegistrarCart(cartData);
       } catch (cartError) {
         // Обработка ошибок создания корзины
-        let errorMessage = cartError.message || `Ошибка создания записи (${cartError.status || 'network'})`;
+        let errorMessage = cartError.message || t('misc.aw_record_creation_error_status', { status: cartError.status || 'network' });
         const isPermissionError = cartError.status === 403;
 
         logger.error('❌ Ошибка создания корзины:', cartError.status, errorMessage);
 
         if (isPermissionError) {
           if (errorMessage.includes('Not enough permissions')) {
-            errorMessage = 'У вас нет прав для создания записей. Необходима роль Регистратора или Администратора.';
+            errorMessage = t('misc.aw_no_permissions');
           }
           toast.error(errorMessage, {
             duration: 5000,
@@ -2348,7 +2351,7 @@ const AppointmentWizardV2 = ({
           // Закрываем мастер при ошибке прав доступа
           onClose();
         } else {
-          toast.error(`Ошибка создания записи: ${errorMessage}`);
+          toast.error(t('misc.aw_record_creation_error', { message: errorMessage }));
         }
         return; // ❌ НЕ закрываем мастер при других ошибках
       }
@@ -2358,7 +2361,7 @@ const AppointmentWizardV2 = ({
       // Всегда завершаем после создания корзины (без онлайн оплаты в UI)
       // (QW-08: removed dead if(!editMode){localStorage.removeItem(...)} block)
 
-      toast.success(editMode ? 'Запись обновлена!' : 'Запись создана успешно!');
+      toast.success(editMode ? t('misc.aw_record_updated_bang') : t('misc.aw_record_created_success'));
 
       // ✅ НОВОЕ: Обработка удаленных записей очереди (для cart creation path)
       const currentQueueIds = new Set(
@@ -2378,7 +2381,7 @@ const AppointmentWizardV2 = ({
       onClose();
     } catch (error) {
       logger.error('Ошибка завершения мастера:', error);
-      toast.error(error.message || 'Произошла ошибка');
+      toast.error(error.message || t('misc.aw_error_occurred'));
     } finally {
       setIsProcessing(false);
     }
@@ -2503,21 +2506,21 @@ const AppointmentWizardV2 = ({
 
   const actions = [
   {
-    label: 'Очистить форму',
+    label: t('misc.aw_clear_form'),
     onClick: clearDraft,
     variant: 'secondary',
     icon: <Trash2 size={16} />,
     disabled: isProcessing
   },
   currentStep > STEP_PATIENT && {
-    label: 'Назад',
+    label: t('misc.aw_back'),
     onClick: prevStep,
     variant: 'secondary',
     icon: <ArrowLeft size={16} />,
     disabled: isProcessing
   },
   {
-    label: currentStep === totalSteps ? 'Завершить' : 'Далее',
+    label: currentStep === totalSteps ? t('misc.aw_finish') : t('misc.aw_next'),
     onClick: currentStep === totalSteps ? handleComplete : nextStep,
     variant: 'primary',
     icon: currentStep === totalSteps ? <Check size={16} /> : <ArrowRight size={16} />,
@@ -2533,10 +2536,10 @@ const AppointmentWizardV2 = ({
     setIsReloadingServices(true);
     try {
       await loadServices();
-      toast.success('Список услуг обновлён');
+      toast.success(t('misc.aw_services_list_updated'));
     } catch (error) {
       logger.error('Ошибка обновления услуг:', error);
-      toast.error('Не удалось обновить список услуг');
+      toast.error(t('misc.aw_services_list_update_failed'));
     } finally {
       setIsReloadingServices(false);
     }
@@ -2629,10 +2632,10 @@ const AppointmentWizardV2 = ({
         <div style={{ minWidth: 0 }}>
           {editModeBanner}
           <h3 style={wizardHeaderTitleStyle}>
-            {editMode ? 'Редактирование записи' : 'Регистрация пациента'}
+            {editMode ? t('misc.aw_edit_record_title') : t('misc.aw_register_patient_title')}
           </h3>
           <p style={wizardHeaderSubtitleStyle}>
-            Шаг 1 из 2 · данные пациента и карточка записи
+            {t('misc.aw_step1_subtitle')}
           </p>
         </div>
       </div>
@@ -2640,8 +2643,8 @@ const AppointmentWizardV2 = ({
       <button
       type="button"
       onClick={onClose}
-      title="Закрыть"
-      aria-label="Закрыть"
+      title={t('misc.aw_close')}
+      aria-label={t('misc.aw_close')}
       style={wizardHeaderCloseStyle}
       onMouseEnter={(e) => {
         e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)';
@@ -2662,7 +2665,7 @@ const AppointmentWizardV2 = ({
       {/* 1. Поиск (Слева) */}
       <div style={{ flex: '0 0 300px', minWidth: 0 }}>
         <Input
-        placeholder="Поиск услуги (название или код)..."
+        placeholder={t('misc.aw_search_service_placeholder')}
         value={serviceSearchQuery}
         onChange={(e) => setServiceSearchQuery(e.target.value)}
         icon={Search}
@@ -2737,7 +2740,7 @@ const AppointmentWizardV2 = ({
         type="button"
         onClick={handleReloadServices}
         disabled={isReloadingServices}
-        title="Обновить список услуг"
+        title={t('misc.aw_refresh_services_title')}
         aria-label={isReloadingServices ? 'Refreshing service list' : 'Refresh service list'}
         style={{
           width: '34px',
@@ -2773,7 +2776,7 @@ const AppointmentWizardV2 = ({
         <button
         type="button"
         onClick={onClose}
-        title="Закрыть"
+        title={t('misc.aw_close')}
         aria-label="Close appointment wizard"
         style={{
           width: '34px',
@@ -2812,7 +2815,7 @@ const AppointmentWizardV2 = ({
       <ModernDialog
         isOpen={isOpen}
         onClose={onClose}
-        title="Доступ запрещен"
+        title={t('misc.aw_access_denied_title')}
         maxWidth="40rem">
 
         <div style={{
@@ -2832,7 +2835,7 @@ const AppointmentWizardV2 = ({
             marginBottom: 'var(--mac-spacing-3)',
             color: 'var(--mac-text-primary)'
           }}>
-            Недостаточно прав доступа
+            {t('misc.aw_insufficient_rights')}
           </h3>
           <p style={{
             fontSize: 'var(--mac-font-size-md)',
@@ -2840,15 +2843,14 @@ const AppointmentWizardV2 = ({
             marginBottom: 'var(--mac-spacing-4)',
             lineHeight: 1.6
           }}>
-            Для создания записей пациентов необходима роль Регистратора
-            (включая Receptionist) или Администратора.
+            {t('misc.aw_insufficient_rights_description')}
           </p>
           <Button
             onClick={onClose}
             variant="primary"
             style={{ marginTop: 'var(--mac-spacing-4)' }}>
 
-            Закрыть
+            {t('misc.aw_close')}
           </Button>
         </div>
       </ModernDialog>);

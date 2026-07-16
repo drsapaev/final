@@ -11,7 +11,7 @@ import {
   describePatientError,
 } from './patientUtils';
 import PanelEmptyState from './PanelEmptyState';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 /**
  * L-H-4 fix: PatientBookingPanel выделен в отдельный файл (~120 строк).
@@ -46,8 +46,8 @@ function PatientBookingPanel() {
     return (
       <PanelEmptyState
         icon="calendar"
-        title="Откройте из Telegram"
-        description="Защищённая запись требует Telegram Mini App identity перед созданием визита."
+        title={t('patient.pat_book_missing_init_title')}
+        description={t('patient.pat_book_missing_init_desc')}
       />
     );
   }
@@ -106,17 +106,17 @@ function PatientBookingPanel() {
       <div className="pp-card">
         <div className="pp-card-header">
           <div>
-            <div className="pp-card-title">Заявка на запись</div>
-            <p className="pp-card-subtitle">Создайте защищённую заявку на запись, привязанную к вашему Telegram-профилю пациента.</p>
+            <div className="pp-card-title">{t('patient.pat_book_title')}</div>
+            <p className="pp-card-subtitle">{t('patient.pat_book_subtitle')}</p>
           </div>
           <Badge variant={createdBooking ? 'success' : 'info'}>
-            {createdBooking ? 'Создана' : 'Mini App защищено'}
+            {createdBooking ? t('patient.pat_book_status_created') : t('patient.pat_book_status_secure')}
           </Badge>
         </div>
         <div className="pp-card-body pp-grid-2">
           <Input
             type="date"
-            label="Дата"
+            label={t('patient.pat_book_label_date')}
             value={bookingForm.appointmentDate}
             disabled={isBusy}
             // L-M-11 fix: min=today — запрещаем past-dates на клиенте
@@ -126,50 +126,50 @@ function PatientBookingPanel() {
           />
           <Input
             type="time"
-            label="Предпочтительное время"
+            label={t('patient.pat_book_label_time')}
             value={bookingForm.appointmentTime}
             disabled={isBusy}
             onChange={(event) => handleChange('appointmentTime', event.target.value)}
           />
           <Input
-            label="Отделение"
+            label={t('patient.pat_book_label_department')}
             value={bookingForm.department}
             disabled={isBusy}
             maxLength={64}
-            placeholder="Например: Кардиология"
+            placeholder={t('patient.pat_book_placeholder_department')}
             onChange={(event) => handleChange('department', event.target.value)}
           />
           <Input
-            label="Услуги"
+            label={t('patient.pat_book_label_services')}
             value={bookingForm.servicesText}
             disabled={isBusy}
-            placeholder="Консультация, анализы"
+            placeholder={t('patient.pat_book_placeholder_services')}
             onChange={(event) => handleChange('servicesText', event.target.value)}
           />
           <div className="pp-grid-span-2">
             <Textarea
-              label="Комментарий"
+              label={t('patient.pat_book_label_notes')}
               value={bookingForm.notes}
               disabled={isBusy}
               minRows={3}
               maxRows={6}
               maxLength={1000}
-              placeholder="Необязательный комментарий для регистратуры"
+              placeholder={t('patient.pat_book_placeholder_notes')}
               onChange={(event) => handleChange('notes', event.target.value)}
             />
           </div>
 
           {appointment && (
             <div className="pp-grid-span-2 pp-booking-summary">
-              <div className="pp-summary-title">Сводка записи</div>
+              <div className="pp-summary-title">{t('patient.pat_book_summary_title')}</div>
               <div className="pp-summary-grid">
-                <div>Дата: {appointment.appointment_date}</div>
-                <div>Время: {appointment.appointment_time || 'Регистратура подтвердит'}</div>
-                <div>Отделение: {appointment.department || 'Не указано'}</div>
-                <div>Оплата: {appointment.payment_type} / {appointment.payment_currency}</div>
+                <div>{t('patient.pat_book_summary_date', { value: appointment.appointment_date })}</div>
+                <div>{t('patient.pat_book_summary_time', { value: appointment.appointment_time || t('patient.pat_book_summary_time_pending') })}</div>
+                <div>{t('patient.pat_book_summary_department', { value: appointment.department || t('patient.pat_book_summary_department_pending') })}</div>
+                <div>{t('patient.pat_book_summary_payment', { type: appointment.payment_type, currency: appointment.payment_currency })}</div>
               </div>
               {Array.isArray(appointment.services) && appointment.services.length > 0 && (
-                <div className="pp-summary-services">Услуги: {appointment.services.join(', ')}</div>
+                <div className="pp-summary-services">{t('patient.pat_book_summary_services', { value: appointment.services.join(', ') })}</div>
               )}
             </div>
           )}
@@ -177,7 +177,7 @@ function PatientBookingPanel() {
           {createdBooking && (
             <div className="pp-grid-span-2 pp-message pp-message--success" role="status">
               <Icon name="checkmark.circle" size={16} />
-              Заявка на визит #{createdBooking.appointment_id} создана.
+              {t('patient.pat_book_created', { id: createdBooking.appointment_id })}
             </div>
           )}
           {bookingError && (
@@ -196,7 +196,7 @@ function PatientBookingPanel() {
               onClick={previewBooking}
             >
               <Icon name="doc.text" size={16} />
-              Проверить заявку
+              {t('patient.pat_book_preview_button')}
             </Button>
             <Button
               variant="primary"
@@ -206,7 +206,7 @@ function PatientBookingPanel() {
               onClick={createBooking}
             >
               <Icon name="calendar" size={16} />
-              Записаться
+              {t('patient.pat_book_book_button')}
             </Button>
           </div>
         </div>

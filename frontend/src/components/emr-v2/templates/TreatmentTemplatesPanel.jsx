@@ -15,17 +15,17 @@ import PropTypes from 'prop-types';
 import treatmentTemplatesData from '../../../data/treatmentTemplates.json';
 import './TreatmentTemplatesPanel.css';
 import { Input } from '../../ui/macos';
-import { useTranslation } from '../../../i18n/adapter';
+import { useTranslation } from '../../../i18n/useTranslation';
 
 /**
  * Category metadata
  */
-const CATEGORY_META = {
-    medications: { icon: '💊', label: 'Медикаменты' },
-    examinations: { icon: '🔬', label: 'Обследования' },
-    labs: { icon: '🧪', label: 'Анализы' },
-    followup: { icon: '📅', label: 'Контроль' },
-};
+const getCategoryMeta = (t) => ({
+    medications: { icon: '💊', label: t('misc.ttp_cat_medications') },
+    examinations: { icon: '🔬', label: t('misc.ttp_cat_examinations') },
+    labs: { icon: '🧪', label: t('misc.ttp_cat_labs') },
+    followup: { icon: '📅', label: t('misc.ttp_cat_followup') },
+});
 
 /**
  * Merge strategy: APPEND_WITH_SEPARATOR
@@ -48,7 +48,7 @@ export function TreatmentTemplatesButton({ onClick, disabled = false }) {
             type="button"
             className="treatment-templates-btn"
             onClick={onClick}
-            title="Открыть шаблоны"
+            title={t('misc.ttp_otkryt_shablony')}
         >
             📋 Шаблоны
         </button>
@@ -72,6 +72,7 @@ export function TreatmentTemplatesPanel({
     onClose,
     isOpen = false,
 }) {
+    const { t } = useTranslation();
     const [activeCategory, setActiveCategory] = useState('medications');
     const [searchQuery, setSearchQuery] = useState('');
     const [previewTemplate, setPreviewTemplate] = useState(null);
@@ -131,7 +132,7 @@ export function TreatmentTemplatesPanel({
                 className="treatment-templates-backdrop"
                 role="button"
                 tabIndex={0}
-                aria-label="Закрыть панель шаблонов лечения"
+                aria-label={t('misc.ttp_zakryt_panel_shablonov_leche')}
                 onClick={handleClose}
                 onKeyDown={(event) => handleActivationKeyDown(event, handleClose)} />
 
@@ -149,8 +150,8 @@ export function TreatmentTemplatesPanel({
                 <div className="treatment-templates-search">
                     <Input
                         type="text"
-                        aria-label="Поиск шаблона лечения"
-                        placeholder="Поиск шаблона..."
+                        aria-label={t('misc.ttp_poisk_shablona_lecheniya')}
+                        placeholder={t('misc.ttp_poisk_shablona')}
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         autoFocus
@@ -159,7 +160,7 @@ export function TreatmentTemplatesPanel({
 
                 {/* Categories */}
                 <div className="treatment-templates-categories">
-                    {Object.entries(CATEGORY_META).map(([key, meta]) => (
+                    {Object.entries(getCategoryMeta(t)).map(([key, meta]) => (
                         <button
                             key={key}
                             className={`treatment-templates-category ${activeCategory === key ? 'treatment-templates-category--active' : ''}`}
@@ -199,7 +200,7 @@ export function TreatmentTemplatesPanel({
                                 <button
                                     className="treatment-templates-insert-btn"
                                     onClick={() => handleInsert(template)}
-                                    title="Вставить в поле"
+                                    title={t('misc.ttp_vstavit_v_pole')}
                                 >
                                     ➕ Вставить
                                 </button>

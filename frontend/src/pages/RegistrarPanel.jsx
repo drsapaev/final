@@ -23,10 +23,10 @@ import notify from '../services/notify';
 import RoleNotificationCenter from '../components/notifications/RoleNotificationCenter';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../components/common/ConfirmDialog';
-// QW-06 fix: translations extracted to separate file (was 50+ inline keys).
-import { getRegistrarTranslator } from './registrarTranslations';
-// STRAT#30: useTranslation adapter for confirm/notify i18n (react-i18next compatible).
-import { useTranslation } from '../i18n/adapter';
+// Unified i18n: single useTranslation hook for all UI strings (registrarPanel.*)
+// and confirm/notify strings (registrar.*). Replaces the legacy split between
+// getRegistrarTranslator (flat keys) and adapter (namespaced keys).
+import { useTranslation } from '../i18n/useTranslation';
 // Decomp 2: hotkeys extracted to useRegistrarHotkeys hook
 import { useRegistrarHotkeys } from './registrar/useRegistrarHotkeys';
 // Decomp 3: reschedule helpers extracted to useRegistrarReschedule hook
@@ -260,20 +260,27 @@ const RegistrarPanel = () => {
     resolveRescheduleVisitId,
     removeRescheduledAppointmentFromView,
   } = useRegistrarReschedule({ setAppointments });
-  const [doctors, setDoctors] = useState([]);const [services, setServices] = useState({});const [showCalendar, setShowCalendar] = useState(false);const [historyDate, setHistoryDate] = useState(getLocalDateString());const [tempDateInput, setTempDateInput] = useState(getLocalDateString());const language = useMemo(() => localStorage.getItem('language') || localStorage.getItem('app_language') || 'ru', []); // Выбор врача остаётся явным: URL-параметр или ручной выбор в очереди
-  // QW-06 fix: translations moved to ./registrarTranslations.js (was 50+ inline keys).
-  // EN translations added (previously missing — EN users saw RU fallback).
-  // Full migration to locales/{ru,uz,en}.js deferred until useTranslation.jsx
-  // is refactored to use centralized locale files (see audit §8, Direction 3).
-  const t = useMemo(() => getRegistrarTranslator(language), [language]);
-  // STRAT#30: useTranslation adapter for confirm/notify i18n.
-  // 't' from getRegistrarTranslator handles UI labels (tabs, statuses).
-  // 'tI18n' from useTranslation handles confirm dialogs and notify messages
-  // via the centralized labTranslations dictionary's registrar.* namespace.
-  // When react-i18next is adopted, both will merge into a single t().
-  const { t: tI18n } = useTranslation();
-  const currentWorklistLabel = t(REGISTRAR_TAB_LABEL_KEYS[activeTab] || 'tabs_appointments');
-  const statusFilterLabel = statusFilter ? t(REGISTRAR_STATUS_LABEL_KEYS[statusFilter] || statusFilter) : null;
+  const [doctors, setDoctors] = useState([]);const [services, setServices] = useState({});const [showCalendar, setShowCalendar] = useState(false);const [historyDate, setHistoryDate] = useState(getLocalDateString());const [tempDateInput, setTempDateInput] = useState(getLocalDateString()); // Выбор врача остаётся явным: URL-параметр или ручной выбор в очереди
+  // Unified i18n hook: single source of truth for all translations.
+  // - registrarPanel.* — flat UI keys (tabs, statuses, headings, buttons)
+  // - registrar.*      — confirm dialog titles/messages + notify messages
+  // Language is read from react-i18next state (not localStorage directly).
+  // Reading `language` from the i18n instance is safe: useTranslation()
+  // subscribes to languageChanged events and triggers a re-render, so
+  // i18n.language is always current when this component renders.
+  const { t: tI18n, language } = useTranslation();
+  // Normalize language for legacy components that expect 'uz' not 'uz-Latn'
+  const legacyLanguage = language?.startsWith('uz') ? 'uz' : language?.split('-')[0] || 'ru';
+  // Backward-compat wrapper: WelcomeView and QueueView receive `t` as a prop
+  // and call t('key') for registrarPanel.* flat keys. Wrap tI18n to accept
+  // flat keys and route them to the registrarPanel namespace.
+  // Also handles 'misc.*' and 'registrar.*' namespaced keys passed through.
+  const t = (key) => {
+    if (key.includes('.')) return tI18n(key);
+    return tI18n('registrarPanel.' + key);
+  };
+  const currentWorklistLabel = tI18n('registrarPanel.' + (REGISTRAR_TAB_LABEL_KEYS[activeTab] || 'tabs_appointments'));
+  const statusFilterLabel = statusFilter ? tI18n('registrarPanel.' + (REGISTRAR_STATUS_LABEL_KEYS[statusFilter] || statusFilter)) : null;
   const { theme, getSpacing, getFontSize, getColor } = useTheme();
   // Адаптивные цвета из централизованной системы темизации
   // DS-2 fix: replaced --color-* variables with --mac-* canonical tokens
@@ -387,7 +394,7 @@ const RegistrarPanel = () => {
               appointment_id: fullEntry.appointment_id || entry.appointment_id || null,
               queue_entry_id: fullEntry.queue_entry_id || entry.queue_entry_id || null,
               patient_id: fullEntry.patient_id || entry.patient_id,
-              patient_fio: fullEntry.patient_fio ?? fullEntry.patient_name ?? entry.patient_fio ?? entry.patient_name ?? 'Неизвестный пациент',
+              patient_fio: fullEntry.patient_fio ?? fullEntry.patient_name ?? entry.patient_fio ?? entry.patient_name ?? tI18n('registrarPanel.rp_unknown_patient'),
               patient_birth_year: fullEntry.patient_birth_year ?? fullEntry.birth_year ?? entry.patient_birth_year ?? entry.birth_year ?? null,
               patient_phone: fullEntry.patient_phone ?? fullEntry.phone ?? entry.patient_phone ?? entry.phone ?? '',
               patient_gender: normalizePatientGender(fullEntry) ?? normalizePatientGender(entry),
@@ -498,7 +505,7 @@ const RegistrarPanel = () => {
         }
       } else {
         logger.warn('⚠️ Получены некорректные данные от сервера:', data);
-        throw new Error('Некорректные данные от сервера');
+        throw new Error(tI18n('registrarPanel.rp_err_invalid_data'));
       }
 
       if (appointmentsData.length > 0) {
@@ -1196,7 +1203,7 @@ const RegistrarPanel = () => {
       return sorted.map((entry) => ({
         ...entry,
         // Нормализуем поля для совместимости с EnhancedAppointmentsTable
-        patient_fio: entry.patient_fio || entry.patient_name || 'Неизвестный пациент',
+        patient_fio: entry.patient_fio || entry.patient_name || tI18n('registrarPanel.rp_unknown_patient'),
         queue_number: entry.number || entry.queue_number,
         queue_numbers: entry.queue_numbers || [{
           number: entry.number,
@@ -1379,7 +1386,7 @@ const RegistrarPanel = () => {
         setForceMajeureModal({
           open: true,
           specialistId: row.doctor_id || row.specialist_id || null,
-          specialistName: row.doctor_name || row.specialist_name || 'Все специалисты'
+          specialistName: row.doctor_name || row.specialist_name || tI18n('registrarPanel.rp_all_specialists')
         });
         break;
       default:
@@ -1393,7 +1400,7 @@ const RegistrarPanel = () => {
       className="registrar-page-root"
       data-breakpoint={isMobile ? 'mobile' : isTablet ? 'tablet' : 'desktop'}
       role="main"
-      aria-label="Панель регистратора">
+      aria-label={tI18n('registrarPanel.rp_aria_panel')}>
       {/* Skip to content link for screen readers */}
       <a
         href="#main-content"
@@ -1405,12 +1412,12 @@ const RegistrarPanel = () => {
           e.target.style.left = '-9999px';
         }}>
 
-        Перейти к основному содержимому
+        {tI18n('registrarPanel.rp_skip_to_content')}
       </a>
 
       {/* R-03 fix: breadcrumb навигация для wayfinding.
           Показывает текущую view, выбранное отделение, поисковый запрос. */}
-      <nav aria-label="Навигация" className="registrar-breadcrumb-nav">
+      <nav aria-label={tI18n('registrarPanel.rp_aria_breadcrumb_nav')} className="registrar-breadcrumb-nav">
         <button
           type="button"
           onClick={() => {
@@ -1425,7 +1432,7 @@ const RegistrarPanel = () => {
           }}
           className="registrar-breadcrumb-link"
         >
-          Регистратура
+          {tI18n('registrarPanel.rp_breadcrumb_root')}
         </button>
         {activeTab && (
           <>
@@ -1436,13 +1443,13 @@ const RegistrarPanel = () => {
         {searchQuery && (
           <>
             <Icon name="chevron.right" size="small" className="registrar-breadcrumb-separator" aria-hidden="true" />
-            <span>Поиск: «{searchQuery}»</span>
+            <span>{tI18n('registrarPanel.rp_breadcrumb_search', { query: searchQuery })}</span>
           </>
         )}
         {showWizard && (
           <>
             <Icon name="chevron.right" size="small" className="registrar-breadcrumb-separator" aria-hidden="true" />
-            <span>{wizardEditMode ? 'Редактирование' : 'Новая запись'}</span>
+            <span>{wizardEditMode ? tI18n('registrarPanel.rp_breadcrumb_edit') : tI18n('registrarPanel.rp_breadcrumb_new')}</span>
           </>
         )}
       </nav>
@@ -1456,7 +1463,7 @@ const RegistrarPanel = () => {
           onProfilesLoaded={setQueueProfiles} // ⭐ SSOT: Store profiles for filtering
           departmentStats={departmentStats}
           theme={theme}
-          language={language}
+          language={legacyLanguage}
           dynamicDepartments={dynamicDepartments} />
 
         </div>
@@ -1470,7 +1477,7 @@ const RegistrarPanel = () => {
         {currentView === 'welcome' && (
           <WelcomeView
             t={t}
-            language={language}
+            language={legacyLanguage}
             theme={theme}
             textColor={textColor}
             appointments={appointments}
@@ -1522,7 +1529,7 @@ const RegistrarPanel = () => {
             getSpacing={getSpacing}
             getFontSize={getFontSize}
             getColor={getColor}
-            language={language}
+            language={legacyLanguage}
             theme={theme}
             doctors={doctors}
           />
@@ -1543,20 +1550,20 @@ const RegistrarPanel = () => {
 
               <div
                 className="registrar-workflow-header"
-                aria-label="Сводка рабочего списка регистратуры">
+                aria-label={tI18n('registrarPanel.rp_aria_worklist_summary')}>
                 <div className="registrar-worklist-container">
                   <div className="registrar-worklist-meta">
-                    Регистратура
+                    {tI18n('registrarPanel.rp_worklist_root')}
                   </div>
                   <h2 className="registrar-workflow-title">
-                    Рабочий список: {currentWorklistLabel}
+                    {tI18n('registrarPanel.rp_worklist_title', { label: currentWorklistLabel })}
                   </h2>
                   <p className="registrar-workflow-meta">
                     {showCalendar ?
                     // PR-13: use formatRegistrarDate to avoid browser-local timezone issues
                     // historyDate is YYYY-MM-DD (Tashkent), parse as Tashkent midnight
-                    formatRegistrarDate(`${historyDate}T00:00:00+05:00`, language === 'ru' ? 'ru-RU' : 'uz-UZ') :
-                    t('today')} · {filteredAppointments.length} {t('tabs_appointments')}
+                    formatRegistrarDate(`${historyDate}T00:00:00+05:00`, language?.startsWith('ru') ? 'ru-RU' : 'uz-UZ') :
+                    tI18n('registrarPanel.today')} · {filteredAppointments.length} {tI18n('registrarPanel.tabs_appointments')}
                   </p>
                 </div>
 
@@ -1564,11 +1571,11 @@ const RegistrarPanel = () => {
                   {statusFilterLabel &&
                   <Badge variant="warning" className="registrar-inline-flex-tight">
                       <Icon name="magnifyingglass" size="small" />
-                      Фильтр: {statusFilterLabel}
+                      {tI18n('registrarPanel.rp_worklist_filter', { label: statusFilterLabel })}
                     </Badge>
                   }
                   <Badge variant={appointmentsLoading ? 'info' : 'secondary'}>
-                    {appointmentsLoading ? t('loading') : `${filteredAppointments.length} ${t('tabs_appointments')}`}
+                    {appointmentsLoading ? tI18n('registrarPanel.loading') : `${filteredAppointments.length} ${tI18n('registrarPanel.tabs_appointments')}`}
                   </Badge>
                   <Button
                   variant="primary"
@@ -1578,10 +1585,10 @@ const RegistrarPanel = () => {
                     setWizardInitialData(null);
                     setShowWizard(true);
                   }}
-                  aria-label="Создать новую запись из рабочего списка регистратора"
+                  aria-label={tI18n('registrarPanel.rp_aria_new_appointment')}
                   className="registrar-inline-flex registrar-inline-flex-shrink">
                     <Icon name="plus" size="small" style={{ color: 'white' }} />
-                    {t('new_appointment')}
+                    {tI18n('registrarPanel.new_appointment')}
                   </Button>
                 </div>
               </div>
@@ -1598,19 +1605,19 @@ const RegistrarPanel = () => {
                     <Icon name="doc.text" size="large" />
                   </div>
                   <h3 className="registrar-empty-heading registrar-empty-heading-text">
-                    Очередь пуста
+                    {tI18n('registrarPanel.rp_empty_queue_title')}
                   </h3>
                   <p className="registrar-empty-desc-text registrar-empty-desc-fixed">
                     {activeTab ?
-                `Сегодня нет записей в отделении ${activeTab === 'cardio' ? 'Кардиология' : activeTab === 'derma' ? 'Дерматология' : activeTab === 'dental' ? 'Стоматология' : activeTab === 'lab' ? 'Лаборатория' : activeTab}` :
-                'Сегодня пока нет записей'}
+                tI18n('registrarPanel.rp_empty_queue_dept', { dept: activeTab === 'cardio' ? tI18n('registrarPanel.rp_dept_cardio') : activeTab === 'derma' ? tI18n('registrarPanel.rp_dept_derma') : activeTab === 'dental' ? tI18n('registrarPanel.rp_dept_dental') : activeTab === 'lab' ? tI18n('registrarPanel.rp_dept_lab') : activeTab }) :
+                tI18n('registrarPanel.rp_empty_queue_general')}
                   </p>
                   <Button
                 variant="primary"
                 onClick={() => setShowWizard(true)}
                 className="registrar-btn-cta">
 
-                    <Icon name="plus" size="small" style={{ marginRight: 'var(--mac-spacing-2)' }} />Создать первую запись
+                    <Icon name="plus" size="small" style={{ marginRight: 'var(--mac-spacing-2)' }} />{tI18n('registrarPanel.rp_empty_queue_cta')}
                   </Button>
                 </div> :
             filteredAppointments.length === 0 ?
@@ -1620,10 +1627,10 @@ const RegistrarPanel = () => {
                     <Icon name="magnifyingglass" size="large" />
                   </div>
                   <h3 className="registrar-empty-heading registrar-empty-heading-text">
-                    {t('empty_table')}
+                    {tI18n('registrarPanel.empty_table')}
                   </h3>
                   <p className="registrar-empty-desc-text registrar-empty-desc-fixed">
-                    Попробуйте изменить фильтры или выбрать другую дату.
+                    {tI18n('registrarPanel.rp_empty_filter_desc')}
                   </p>
                 </div> :
 
@@ -1631,7 +1638,7 @@ const RegistrarPanel = () => {
               data={filteredAppointments}
               loading={appointmentsLoading}
               theme={theme}
-              language={language}
+              language={legacyLanguage}
               outerBorder={false}
               services={services}
               showCheckboxes={false} // UX Audit R-4.7: bulk-action UI удалён (QW-01 fix),
@@ -1738,11 +1745,11 @@ const RegistrarPanel = () => {
                     {paginationInfo.loadingMore ?
                 <>
                         <div className="registrar-spinner" />
-                        Загрузка...
+                        {tI18n('registrarPanel.rp_loading_more')}
                       </> :
 
                 <>
-                        <Icon name="arrow.up.arrow.down" size="small" style={{ marginRight: 'var(--mac-spacing-2)' }} />Загрузить еще
+                        <Icon name="arrow.up.arrow.down" size="small" style={{ marginRight: 'var(--mac-spacing-2)' }} />{tI18n('registrarPanel.rp_load_more')}
                       </>
                 }
                   </button>
@@ -1761,19 +1768,19 @@ const RegistrarPanel = () => {
       <ModernDialog
         isOpen={recordPreviewDialog.open}
         onClose={() => setRecordPreviewDialog({ open: false, row: null })}
-        title="Просмотр записи"
+        title={tI18n('registrarPanel.rp_preview_title')}
         maxWidth="36rem"
         dialogStyle={{
           backgroundColor: 'var(--mac-bg-primary)'
         }}
         actions={[
           {
-            label: 'Закрыть',
+            label: tI18n('registrarPanel.rp_preview_close'),
             variant: 'secondary',
             onClick: () => setRecordPreviewDialog({ open: false, row: null })
           },
           {
-            label: 'Редактировать',
+            label: tI18n('registrarPanel.rp_preview_edit'),
             variant: 'primary',
             onClick: () => {
               const row = recordPreviewDialog.row;
@@ -1785,16 +1792,16 @@ const RegistrarPanel = () => {
         {recordPreviewDialog.row && (
           <div className="registrar-grid-gap-md" style={{ color: 'var(--mac-text-primary)' }}>
             {[
-              ['Пациент', recordPreviewDialog.row.patient_fio || recordPreviewDialog.row.patient_name],
-              ['Телефон', recordPreviewDialog.row.patient_phone || recordPreviewDialog.row.phone],
-              ['Год рождения', recordPreviewDialog.row.patient_birth_year || recordPreviewDialog.row.birth_year],
-              ['Пол', normalizePatientGender(recordPreviewDialog.row)],
-              ['Отделение', recordPreviewDialog.row.queue_name || recordPreviewDialog.row.department || recordPreviewDialog.row.specialty],
-              ['Услуги', formatPreviewList(recordPreviewDialog.row.services || recordPreviewDialog.row.service_details)],
-              ['Очередь', formatPreviewList(recordPreviewDialog.row.queue_numbers)],
-              ['Статус', recordPreviewDialog.row.status || recordPreviewDialog.row.canonical_status],
-              ['Оплата', recordPreviewDialog.row.payment_status || recordPreviewDialog.row.payment_type],
-              ['Сумма', recordPreviewDialog.row.cost]
+              [tI18n('registrarPanel.rp_field_patient'), recordPreviewDialog.row.patient_fio || recordPreviewDialog.row.patient_name],
+              [tI18n('registrarPanel.rp_field_phone'), recordPreviewDialog.row.patient_phone || recordPreviewDialog.row.phone],
+              [tI18n('registrarPanel.rp_field_birth_year'), recordPreviewDialog.row.patient_birth_year || recordPreviewDialog.row.birth_year],
+              [tI18n('registrarPanel.rp_field_gender'), normalizePatientGender(recordPreviewDialog.row)],
+              [tI18n('registrarPanel.rp_field_department'), recordPreviewDialog.row.queue_name || recordPreviewDialog.row.department || recordPreviewDialog.row.specialty],
+              [tI18n('registrarPanel.rp_field_services'), formatPreviewList(recordPreviewDialog.row.services || recordPreviewDialog.row.service_details)],
+              [tI18n('registrarPanel.rp_field_queue'), formatPreviewList(recordPreviewDialog.row.queue_numbers)],
+              [tI18n('registrarPanel.rp_field_status'), recordPreviewDialog.row.status || recordPreviewDialog.row.canonical_status],
+              [tI18n('registrarPanel.rp_field_payment'), recordPreviewDialog.row.payment_status || recordPreviewDialog.row.payment_type],
+              [tI18n('registrarPanel.rp_field_amount'), recordPreviewDialog.row.cost]
             ].filter(([, value]) => value !== null && value !== undefined && value !== '').map(([label, value]) => (
               <div
                 key={label}
@@ -1894,7 +1901,7 @@ const RegistrarPanel = () => {
           logger.info('Printing:', { printerName, docType, docData });
 
           if (docType !== 'ticket') {
-            throw new Error(`Неподдерживаемый тип документа: ${docType}`);
+            throw new Error(tI18n('registrarPanel.rp_err_unsupported_doc_type', { docType }));
           }
 
           const result = await printPanelTicketInBrowserAsync(docData);
@@ -1903,10 +1910,10 @@ const RegistrarPanel = () => {
           }
 
           if (!result?.opened) {
-            throw new Error('Браузер заблокировал окно печати. Разрешите всплывающие окна для приложения и повторите печать.');
+            throw new Error(tI18n('registrarPanel.rp_err_print_blocked'));
           }
 
-          throw result?.error || new Error('Не удалось подготовить талон к печати. Проверьте данные записи и повторите попытку.');
+          throw result?.error || new Error(tI18n('registrarPanel.rp_err_print_prepare'));
         }} />
 
 
@@ -1944,8 +1951,8 @@ const RegistrarPanel = () => {
             setWizardInitialData(null); // ✨ Сброс данных
 
             const message = wasEditMode ?
-              'Запись успешно обновлена!' :
-              'Запись успешно создана!';
+              tI18n('registrarPanel.rp_notify_appointment_updated') :
+              tI18n('registrarPanel.rp_notify_appointment_created');
             notify.success(message);
 
             // Open payment/print dialog immediately — user can act while data refreshes
@@ -1989,14 +1996,14 @@ const RegistrarPanel = () => {
       <ModernDialog
         isOpen={showSlotsModal}
         onClose={() => setShowSlotsModal(false)}
-        title={`📅 ${t('available_slots')}`}
+        title={`📅 ${tI18n('registrarPanel.available_slots')}`}
         maxWidth="32rem"
         dialogStyle={{
           backgroundColor: 'var(--mac-bg-primary)'
         }}
         actions={[
           {
-            label: '🌅 ' + t('tomorrow'),
+            label: '🌅 ' + tI18n('registrarPanel.tomorrow'),
             variant: 'primary',
             onClick: async () => {
               if (!rescheduleData) return;
@@ -2030,12 +2037,12 @@ const RegistrarPanel = () => {
                 loadAppointments({ source: 'reschedule_tomorrow' });
               } catch (e) {
                 logger.error('Ошибка переноса на завтра:', e);
-                notify.error(getErrorMessage(e, 'Не удалось перенести запись. Проверьте соединение и попробуйте снова.'));
+                notify.error(getErrorMessage(e, tI18n('registrarPanel.rp_err_reschedule_failed')));
               }
             }
           },
           {
-            label: t('select_date'),
+            label: tI18n('registrarPanel.select_date'),
             variant: 'secondary',
             // QW-02 fix: previously called window.prompt('Введите дату переноса (YYYY-MM-DD):', currentVal)
             // — a jarring native browser dialog that blocks the tab, has no date picker,
@@ -2076,8 +2083,8 @@ const RegistrarPanel = () => {
               const ok = await confirm({
                 title: tI18n('registrar.postpone_date_title'),
                 message: timeStr
-                  ? `Перенести запись пациента на ${dateStr} в ${timeStr}?`
-                  : `Перенести запись пациента на ${dateStr}?`,
+                  ? tI18n('registrarPanel.rp_confirm_reschedule_datetime', { date: dateStr, time: timeStr })
+                  : tI18n('registrarPanel.rp_confirm_reschedule_date', { date: dateStr }),
                 confirmLabel: tI18n('registrar.postpone_date_confirm'),
                 cancelLabel: tI18n('registrar.cancel'),
                 intent: 'primary',
@@ -2101,7 +2108,7 @@ const RegistrarPanel = () => {
                 loadAppointments({ source: 'reschedule_date' });
               } catch (e) {
                 logger.error('Ошибка переноса на дату:', e);
-                notify.error(getErrorMessage(e, 'Не удалось перенести запись. Проверьте соединение и попробуйте снова.'));
+                notify.error(getErrorMessage(e, tI18n('registrarPanel.rp_err_reschedule_failed')));
               }
             }
           }
@@ -2114,10 +2121,10 @@ const RegistrarPanel = () => {
               </div>
               <div>
                 <div className="registrar-reschedule-title registrar-reschedule-title-text">
-                  Перенос записи
+                  {tI18n('registrarPanel.rp_reschedule_title')}
                 </div>
                 <div className="registrar-reschedule-desc registrar-reschedule-desc-text">
-                  Выберите быстрый перенос на завтра или укажите другую дату.
+                  {tI18n('registrarPanel.rp_reschedule_desc')}
                 </div>
               </div>
             </div>
@@ -2127,31 +2134,31 @@ const RegistrarPanel = () => {
               min=today prevents selecting past dates natively in the picker. */}
           <div className="registrar-reschedule-card registrar-reschedule-card-neutral">
             <label htmlFor="reschedule-custom-date" className="registrar-reschedule-label registrar-reschedule-label-text">
-              Дата переноса
+              {tI18n('registrarPanel.rp_reschedule_date_label')}
             </label>
             <Input
               id="reschedule-custom-date"
               type="date"
               value={customRescheduleDate}
               min={getLocalDateString()}
-              aria-label="Дата переноса записи"
+              aria-label={tI18n('registrarPanel.rp_aria_reschedule_date')}
               onChange={(e) => setCustomRescheduleDate(e.target.value)}
               className="registrar-reschedule-input registrar-reschedule-input-themed"
             />
             {/* R-27 fix: optional time picker (HH:MM) */}
             <label htmlFor="reschedule-custom-time" className="registrar-reschedule-label registrar-reschedule-label-block">
-              Время переноса (необязательно)
+              {tI18n('registrarPanel.rp_reschedule_time_label')}
             </label>
             <Input
               id="reschedule-custom-time"
               type="time"
               value={customRescheduleTime}
-              aria-label="Время переноса записи"
+              aria-label={tI18n('registrarPanel.rp_aria_reschedule_time')}
               onChange={(e) => setCustomRescheduleTime(e.target.value)}
               className="registrar-reschedule-input registrar-reschedule-input-themed"
             />
             <div className="registrar-reschedule-hint registrar-reschedule-hint-text">
-              Выберите дату и нажмите «{t('select_date')}». Время необязательно — если не указано, сохранится текущее.
+              {tI18n('registrarPanel.rp_reschedule_hint', { btn: tI18n('registrarPanel.select_date') })}
             </div>
           </div>
         </div>
@@ -2189,7 +2196,7 @@ const RegistrarPanel = () => {
         specialistName={forceMajeureModal.specialistName}
         onSuccess={(action, result) => {
           logger.info('[RegistrarPanel] Force majeure action completed:', action, result);
-          notify.success(action === 'transfer' ? 'Записи перенесены на завтра' : 'Записи отменены с возвратом');
+          notify.success(action === 'transfer' ? tI18n('registrarPanel.rp_notify_force_majeure_transfer') : tI18n('registrarPanel.rp_notify_force_majeure_cancel'));
           loadAppointments({ source: 'force_majeure' });
         }} />
 

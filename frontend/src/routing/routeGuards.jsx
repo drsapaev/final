@@ -10,6 +10,7 @@ import {
   isInternalDemoEnabled,
   normalizeRole,
 } from './routeSelectors.js';
+import { useTranslation } from '../i18n/useTranslation';
 
 function isSameAuthState(prev, next) {
   return prev.token === next.token &&
@@ -58,6 +59,7 @@ export function resolveSetupRedirect(pathname, initialized) {
 }
 
 export function RouteAccessBoundary({ route, children }) {
+  const { t } = useTranslation();
   const [state, setState] = useState(() => auth.getState());
   const [isChecking, setIsChecking] = useState(() => Boolean(auth.getToken()) && route?.auth !== 'public');
   const location = useLocation();
@@ -201,8 +203,8 @@ export function UnauthorizedPage() {
   return (
     <SystemRoutePage
       code="401"
-      title="Требуется вход"
-      description="Войдите в систему, чтобы открыть этот раздел."
+      title={t('misc.rg_trebuetsya_vhod')}
+      description={t('misc.rg_voydite_v_sistemu_chtoby_otk')}
     />
   );
 }
@@ -211,8 +213,8 @@ export function ForbiddenPage() {
   return (
     <SystemRoutePage
       code="403"
-      title="Доступ запрещён"
-      description="У вашей учётной записи нет прав для этого раздела."
+      title={t('misc.rg_dostup_zapreschyon')}
+      description={t('misc.rg_u_vashey_uchyotnoy_zapisi_ne')}
     />
   );
 }
@@ -221,8 +223,8 @@ export function NotFoundPage() {
   return (
     <SystemRoutePage
       code="404"
-      title="Страница не найдена"
-      description="Запрошенный маршрут не входит в контракт приложения клиники."
+      title={t('misc.rg_stranitsa_ne_naydena')}
+      description={t('misc.rg_zaproshennyy_marshrut_ne_vho')}
     />
   );
 }

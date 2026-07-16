@@ -6,7 +6,7 @@ import { useState, useEffect, useRef } from 'react';
 import { MessageCircle } from 'lucide-react';
 import { useChat } from '../../hooks/useChat';
 import ChatWindow from './ChatWindow';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 /**
  * Кнопка открытия чата с бейджем непрочитанных сообщений

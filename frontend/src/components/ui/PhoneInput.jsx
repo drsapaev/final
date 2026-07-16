@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { Input } from '../ui/macos';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 /**
  * Современный компонент для ввода телефона с маской
  * Заменяет react-input-mask для избежания findDOMNode warnings

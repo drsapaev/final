@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 import { useState } from 'react';
 import {
   Card, CardContent, Typography, Alert, Badge, Button,
@@ -12,12 +12,13 @@ const AISuggestions = ({
   suggestions = [],
   type = 'icd10',
   onSelect,
-  title = 'AI Подсказки',
+  title = t('misc.as_ai_podskazki'),
   showConfidence = true,
   maxHeight = 400,
   clinicalRecommendations = null,
   fallbackProvider = null
 }) => {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(true);
   const [copiedId, setCopiedId] = useState(null);
 
@@ -60,10 +61,10 @@ const AISuggestions = ({
 
   const getRelevanceVariant = (relevance) => {
     switch ((relevance || '').toLowerCase()) {
-      case 'высокая':
+      case t('misc.as_vysokaya'):
       case 'high':
         return 'success';
-      case 'средняя':
+      case t('misc.as_srednyaya'):
       case 'medium':
         return 'warning';
       default:
@@ -85,7 +86,7 @@ const AISuggestions = ({
           </div>
         }
         {!suggestions || suggestions.length === 0 ?
-        <Alert severity="info">Нет подсказок МКБ-10</Alert> :
+        <Alert severity="info">{t('misc.as_net_podskazok_mkb_10')}</Alert> :
 
         <div style={{ maxHeight, overflow: 'auto' }}>
             {suggestions.map((item, index) =>
@@ -105,7 +106,7 @@ const AISuggestions = ({
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Button variant="outline" onClick={() => onSelect && onSelect(item)}>Выбрать</Button>
+                  <Button variant="outline" onClick={() => onSelect && onSelect(item)}>{t('misc.as_vybrat')}</Button>
                   <Button variant="outline" onClick={() => handleCopy(`${item.code} - ${item.name || item.description}`, index)}>
                     {copiedId === index ? <Check style={{ width: 14, height: 14, marginRight: 6 }} /> : <Copy style={{ width: 14, height: 14, marginRight: 6 }} />}
                     Копировать
@@ -121,7 +122,7 @@ const AISuggestions = ({
 
   const renderGenericSuggestions = () => {
     if (!suggestions || suggestions.length === 0) {
-      return <Alert severity="info">Нет подсказок</Alert>;
+      return <Alert severity="info">{t('misc.as_net_podskazok')}</Alert>;
     }
     return (
       <div style={{ maxHeight, overflow: 'auto', padding: 8, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -137,7 +138,7 @@ const AISuggestions = ({
             </span>
             <button
               onClick={() => handleCopy(typeof item === 'string' ? item : item.label || item.name || JSON.stringify(item), index)}
-              aria-label="Копировать подсказку AI"
+              aria-label={t('misc.as_kopirovat_podskazku_ai')}
               style={{ marginLeft: 6, border: 'none', background: 'transparent', cursor: 'pointer' }}>
               {copiedId === index ? <Check style={{ width: 14, height: 14 }} /> : <Copy style={{ width: 14, height: 14 }} />}
             </button>

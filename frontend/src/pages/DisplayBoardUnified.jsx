@@ -24,7 +24,7 @@ import logger from '../utils/logger';
 import PropTypes from 'prop-types';
 import { formatRegistrarTime } from '../utils/dateUtils';
 import './displayboard.css';
-import { useTranslation } from '../i18n/adapter';
+import { useTranslation } from '../i18n/useTranslation';
 
 const DEFAULT_BOARD_STATS = { last_ticket: 0, waiting: 0, serving: 0, done: 0 };
 
@@ -65,6 +65,7 @@ export default function DisplayBoardUnified({
   boardId = 'main_board'
 }) {void
   useTheme();
+  const { t } = useTranslation();
 
   // Параметры из URL или пропсов
   // PR #1910 bugfix: department destructured as departmentProp, но использовался
@@ -164,7 +165,7 @@ export default function DisplayBoardUnified({
 
 
           // Игнорируем ошибки localStorage
-        }}} catch (e) {setErr(e?.message || 'Ошибка загрузки'); // fallback из кэша
+        }}} catch (e) {setErr(e?.message || t('misc.dbu_err_load')); // fallback из кэша
       try {const raw = localStorage.getItem('board.state');if (raw) {const cached = JSON.parse(raw);if (cached && typeof cached === 'object') {
             setStats(extractBoardStats(cached));
             setBoard({
@@ -313,7 +314,7 @@ export default function DisplayBoardUnified({
       if (boardSettings.voiceEnabled) {
         // QUEUE-AUDIT-28 P0-9: PHI removed — patient name no longer spoken aloud.
         // Раньше speechSynthesis произносил "Lastname F." в публичном зале ожидания.
-        const text = `Пациент номер ${message.data.number}, пройдите в кабинет ${message.data.cabinet || 'врача'}`;
+        const text = t('misc.dbu_voice_patient_call', { number: message.data.number, cabinet: message.data.cabinet || t('misc.dbu_voice_default_cabinet') });
         playVoiceAnnouncement(text);
       }
     } catch (error) {
@@ -481,11 +482,11 @@ export default function DisplayBoardUnified({
   // Получение текста статуса (новое)
   const getStatusText = (status) => {
     const texts = {
-      'waiting': 'Ожидает',
-      'called': 'Вызван',
-      'serving': 'На приеме',
-      'completed': 'Завершен',
-      'cancelled': 'Отменен'
+      'waiting': t('misc.dbu_status_waiting'),
+      'called': t('misc.dbu_status_called'),
+      'serving': t('misc.dbu_status_serving'),
+      'completed': t('misc.dbu_status_completed'),
+      'cancelled': t('misc.dbu_status_cancelled')
     };
     return texts[status] || status;
   };
@@ -567,7 +568,7 @@ export default function DisplayBoardUnified({
           <div className="displayboard-flex-center-8">
             {connected ? <Wifi size={20} color="var(--mac-success)" /> : <WifiOff size={20} color="#dc3545" />}
             <span className="displayboard-conn-status">
-              {connected ? 'Подключено' : 'Отключено'}
+              {connected ? t('misc.dbu_conn_connected') : t('misc.dbu_conn_disconnected')}
             </span>
           </div>
 
@@ -584,8 +585,8 @@ export default function DisplayBoardUnified({
             <button
               onClick={toggleFullscreen}
               className="displayboard-btn"
-              title="Полноэкранный режим"
-              aria-label={document.fullscreenElement ? 'Выйти из полноэкранного режима' : 'Включить полноэкранный режим'}>
+              title={t('misc.dbu_title_fullscreen')}
+              aria-label={document.fullscreenElement ? t('misc.dbu_aria_exit_fullscreen') : t('misc.dbu_aria_enter_fullscreen')}>
               
               {document.fullscreenElement ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
             </button>
@@ -593,8 +594,8 @@ export default function DisplayBoardUnified({
             <button
               onClick={toggleSound}
               className="displayboard-btn"
-              title={boardSettings.soundEnabled ? 'Выключить звук' : 'Включить звук'}
-              aria-label={boardSettings.soundEnabled ? 'Выключить звук' : 'Включить звук'}>
+              title={boardSettings.soundEnabled ? t('misc.dbu_title_sound_off') : t('misc.dbu_title_sound_on')}
+              aria-label={boardSettings.soundEnabled ? t('misc.dbu_title_sound_off') : t('misc.dbu_title_sound_on')}>
               
               {boardSettings.soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
             </button>
@@ -602,8 +603,8 @@ export default function DisplayBoardUnified({
             <button
               onClick={toggleContrast}
               className="displayboard-btn"
-              title="Контрастный режим"
-              aria-label={boardSettings.contrastMode ? 'Выключить контрастный режим' : 'Включить контрастный режим'}>
+              title={t('misc.dbu_title_contrast')}
+              aria-label={boardSettings.contrastMode ? t('misc.dbu_aria_contrast_off') : t('misc.dbu_aria_contrast_on')}>
               
               {boardSettings.contrastMode ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
@@ -611,7 +612,7 @@ export default function DisplayBoardUnified({
             <button
               onClick={toggleLanguage}
               className="displayboard-btn"
-              title="Переключить язык">
+              title={t('misc.dbu_title_switch_lang')}>
               
               <Globe size={16} />
               {boardSettings.language.toUpperCase()}
@@ -623,19 +624,19 @@ export default function DisplayBoardUnified({
       {/* Статусные баннеры */}
       {!online &&
       <div className="displayboard-banner displayboard-banner--info">
-          Нет соединения. Показаны данные из кэша.
+          {t('misc.dbu_offline_banner')}
         </div>
       }
 
       {board.is_closed &&
       <div className="displayboard-banner displayboard-banner--danger">
-          {t('closed', boardSettings.language)}
+          {tBoard('closed', boardSettings.language)}
         </div>
       }
 
       {!board.is_closed && board.is_paused &&
       <div className="displayboard-banner displayboard-banner--warning">
-          {t('paused', boardSettings.language)}
+          {tBoard('paused', boardSettings.language)}
         </div>
       }
 
@@ -662,7 +663,7 @@ export default function DisplayBoardUnified({
         <div>
             <Monitor size={64} className="displayboard-no-call-icon" />
             <div className="displayboard-no-call-title">
-              {t('now_serving', boardSettings.language)}
+              {tBoard('now_serving', boardSettings.language)}
             </div>
             <div className="displayboard-no-call-ticket">
               {stats.last_ticket || 0}
@@ -710,14 +711,14 @@ export default function DisplayBoardUnified({
 
             <div className="displayboard-queue-time">
               {entry.status === 'called' && entry.called_at ?
-            `Вызван: ${formatTime(entry.called_at)}` :
+            t('misc.dbu_queue_called_at', { time: formatTime(entry.called_at) }) :
 
-            `Записан: ${formatTime(entry.created_at)}`
+            t('misc.dbu_queue_created_at', { time: formatTime(entry.created_at) })
             }
             </div>
 
             <div className="displayboard-queue-source">
-              {entry.source === 'online' ? '📱 Онлайн' : '🏥 Регистратура'}
+              {entry.source === 'online' ? t('misc.dbu_source_online') : t('misc.dbu_source_reception')}
             </div>
           </div>
         )}
@@ -727,13 +728,13 @@ export default function DisplayBoardUnified({
       {windows && windows.length > 0 &&
       <div className="displayboard-windows-wrap">
           <h3 className="displayboard-windows-title">
-            Окна
+            {t('misc.dbu_windows_title')}
           </h3>
           <div className="displayboard-windows-grid">
             {windows.map((w, i) =>
           <div key={i} className="displayboard-window-card">
                 <div className="displayboard-window-label">
-                  Окно {w.window}
+                  {t('misc.dbu_window_label', { window: w.window })}
                 </div>
                 <div className="displayboard-window-ticket">
                   {w.ticket || '—'}
@@ -755,42 +756,42 @@ export default function DisplayBoardUnified({
           <div className="displayboard-stat-value-lg">
             {queueData.length}
           </div>
-          <div className="displayboard-stat-label">Всего в очереди</div>
+          <div className="displayboard-stat-label">{t('misc.dbu_stat_total')}</div>
         </div>
 
         <div className="displayboard-stat-card">
           <div className="displayboard-stat-value-lg">
             {queueData.filter((e) => e.status === 'waiting').length}
           </div>
-          <div className="displayboard-stat-label">Ожидают</div>
+          <div className="displayboard-stat-label">{t('misc.dbu_stat_waiting')}</div>
         </div>
 
         <div className="displayboard-stat-card">
           <div className="displayboard-stat-value-md">
             {formatRegistrarTime(new Date().toISOString())}
           </div>
-          <div className="displayboard-stat-label">Текущее время</div>
+          <div className="displayboard-stat-label">{t('misc.dbu_stat_current_time')}</div>
         </div>
 
         <div className="displayboard-stat-card">
           <div className="displayboard-stat-value-md">
             {stats.waiting}
           </div>
-          <div className="displayboard-stat-label">Ожидают (старая)</div>
+          <div className="displayboard-stat-label">{t('misc.dbu_stat_waiting_legacy')}</div>
         </div>
 
         <div className="displayboard-stat-card">
           <div className="displayboard-stat-value-md">
             {stats.serving}
           </div>
-          <div className="displayboard-stat-label">Принимаются</div>
+          <div className="displayboard-stat-label">{t('misc.dbu_stat_serving')}</div>
         </div>
 
         <div className="displayboard-stat-card">
           <div className="displayboard-stat-value-md">
             {stats.done}
           </div>
-          <div className="displayboard-stat-label">Готово</div>
+          <div className="displayboard-stat-label">{t('misc.dbu_stat_done')}</div>
         </div>
       </div>
 
@@ -798,7 +799,7 @@ export default function DisplayBoardUnified({
       {(getAnnouncement(board, boardSettings.language) || announcement) &&
       <div className="displayboard-bottom-announcement">
           <div className="displayboard-bottom-announcement-text">
-            {getAnnouncement(board, boardSettings.language) || announcement || 'Добро пожаловать! Пожалуйста, ожидайте своей очереди.'}
+            {getAnnouncement(board, boardSettings.language) || announcement || t('misc.dbu_welcome')}
           </div>
         </div>
       }
@@ -843,7 +844,7 @@ function timeNow() {
   String(d.getSeconds()).padStart(2, '0');
 }
 
-function t(key, lang = 'ru') {
+function tBoard(key, lang = 'ru') {
   const translations = {
     ru: {
       'now_serving': 'Сейчас обслуживается',

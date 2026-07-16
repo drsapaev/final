@@ -29,7 +29,7 @@ import { LANDING_COPY, buildGlassStyle } from './landingContent';
 import { BRAND } from '../config/brand';
 import './Landing.css';
 import PropTypes from 'prop-types';
-import { useTranslation } from '../hooks/useTranslation';
+import { useTranslation } from '../i18n/useTranslation';
 
 const FEATURE_VISUALS = [
   { icon: FileText, accent: 'var(--mac-accent-blue)' },

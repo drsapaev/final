@@ -23,7 +23,7 @@ import {
   approvePriceOverride,
 } from '../../api/registrar';
 import logger from '../../utils/logger';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const PRICE_OVERRIDE_ACTION_CAN_FIELD = {
   approve: 'can_approve',
@@ -54,6 +54,7 @@ const hasBackendPriceOverrideAction = (override, action) => {
  * Компонент для одобрения/отклонения изменений цен врачами
  */
 const PriceOverrideApproval = () => {
+  const { t } = useTranslation();
   useTheme();
   const [priceOverrides, setPriceOverrides] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -72,7 +73,7 @@ const PriceOverrideApproval = () => {
       setPriceOverrides(data);
     } catch (error) {
       logger.error('Error loading price overrides:', error);
-      toast.error('Ошибка загрузки изменений цен');
+      toast.error(t('misc.poa_oshibka_zagruzki_izmeneniy_t'));
     } finally {
       setLoading(false);
     }
@@ -103,7 +104,7 @@ const PriceOverrideApproval = () => {
     } catch (error) {
       logger.error('Error processing approval:', error);
       // Axios errors: detail лежит в error.response.data.detail.
-      const detail = error?.response?.data?.detail || error?.message || 'Ошибка обработки запроса';
+      const detail = error?.response?.data?.detail || error?.message || t('misc.poa_oshibka_obrabotki_zaprosa');
       toast.error(detail);
     } finally {
       setIsProcessing(false);
@@ -134,20 +135,20 @@ const PriceOverrideApproval = () => {
 
   const getStatusText = (status) => {
     switch (status) {
-      case 'pending':return 'Ожидает одобрения';
-      case 'approved':return 'Одобрено';
-      case 'rejected':return 'Отклонено';
+      case 'pending':return t('misc.poa_ozhidaet_odobreniya');
+      case 'approved':return t('misc.poa_odobreno');
+      case 'rejected':return t('misc.poa_otkloneno');
       default:return status;
     }
   };
 
   const getSpecialtyText = (specialty) => {
     switch (specialty) {
-      case 'dermatology':return 'Дерматология';
-      case 'cosmetology':return 'Косметология';
-      case 'stomatology':return 'Стоматология';
-      case 'dental':return 'Стоматология';
-      case 'cardiology':return 'Кардиология';
+      case 'dermatology':return t('misc.poa_dermatologiya');
+      case 'cosmetology':return t('misc.poa_kosmetologiya');
+      case 'stomatology':return t('misc.poa_stomatologiya');
+      case 'dental':return t('misc.poa_stomatologiya');
+      case 'cardiology':return t('misc.poa_kardiologiya');
       default:return specialty;
     }
   };
@@ -174,10 +175,10 @@ const PriceOverrideApproval = () => {
               onChange={(e) => setStatusFilter(e.target.value)}
               className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
               
-              <option value="pending">Ожидают одобрения</option>
-              <option value="approved">Одобренные</option>
-              <option value="rejected">Отклоненные</option>
-              <option value="all">Все</option>
+              <option value="pending">{t('misc.poa_ozhidayut_odobreniya')}</option>
+              <option value="approved">{t('misc.poa_odobrennye')}</option>
+              <option value="rejected">{t('misc.poa_otklonennye')}</option>
+              <option value="all">{t('misc.poa_vse')}</option>
             </select>
           </div>
           
@@ -197,12 +198,12 @@ const PriceOverrideApproval = () => {
       {loading ?
       <div className="text-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto" />
-          <p className="text-gray-500 mt-2">Загрузка...</p>
+          <p className="text-gray-500 mt-2">{t('misc.poa_zagruzka')}</p>
         </div> :
       priceOverrides.length === 0 ?
       <div className="text-center py-8">
           <AlertCircle size={48} className="text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-500">Изменений цен не найдено</p>
+          <p className="text-gray-500">{t('misc.poa_izmeneniy_tsen_ne_naydeno')}</p>
         </div> :
 
       <div className="grid gap-4">
@@ -238,7 +239,7 @@ const PriceOverrideApproval = () => {
                   </label>
                   <div className="flex items-center gap-2">
                     <User size={16} className="text-gray-400" />
-                    <span className="text-sm">{override.patient_name || 'Не указан'}</span>
+                    <span className="text-sm">{override.patient_name || t('misc.poa_ne_ukazan')}</span>
                   </div>
                 </div>
                 
@@ -356,12 +357,12 @@ const PriceOverrideApproval = () => {
                 </label>
                 <textarea
                 id="price-override-rejection-reason"
-                aria-label="Причина отклонения изменения цены"
+                aria-label={t('misc.poa_prichina_otkloneniya_izmenen')}
                 value={rejectionReason}
                 onChange={(e) => setRejectionReason(e.target.value)}
                 rows={3}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                placeholder="Укажите причину отклонения..." />
+                placeholder={t('misc.poa_ukazhite_prichinu_otkloneniy')} />
               
               </div>
               

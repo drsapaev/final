@@ -22,42 +22,42 @@ import { createPortal } from 'react-dom';
 import { Search, ArrowRight, Clock } from 'lucide-react';
 import { getCanonicalRoutes, isRouteAccessibleToProfile } from '../../routing/routeSelectors';
 import { Input } from '../ui/macos';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const MAX_RESULTS = 8;
 const MAX_RECENT = 5;
 const RECENT_KEY = 'cmd_palette_recent';
 
 // Quick actions available in the palette (not routes, but shortcuts)
-const QUICK_ACTIONS = [
+const getQuickActions = (t) => [
   {
     id: 'action-new-appointment',
-    label: 'Новая запись',
-    description: 'Открыть мастер создания записи',
+    label: t('misc.cpqa_new_appointment_label'),
+    description: t('misc.cpqa_new_appointment_desc'),
     icon: 'plus',
-    keywords: ['запись', 'новая', 'создать', 'appointment', 'new'],
+    keywords: [t('misc.cpqa_kw_zapis'), t('misc.cpqa_kw_new'), t('misc.cpqa_kw_create'), 'appointment', 'new'],
     action: 'navigate',
     target: '/registrar?action=new',
-    section: 'Действия',
+    section: t('misc.cpqa_section_actions'),
   },
   {
     id: 'action-search-patient',
-    label: 'Поиск пациента',
-    description: 'Открыть форму поиска пациента',
+    label: t('misc.cpqa_search_patient_label'),
+    description: t('misc.cpqa_search_patient_desc'),
     icon: 'search',
-    keywords: ['пациент', 'поиск', 'find', 'patient', 'search'],
+    keywords: [t('misc.cpqa_kw_patient'), t('misc.cpqa_kw_search'), 'find', 'patient', 'search'],
     action: 'navigate',
     target: '/clinical/search',
-    section: 'Действия',
+    section: t('misc.cpqa_section_actions'),
   },
   {
     id: 'action-back',
-    label: 'Назад',
-    description: 'Вернуться на предыдущую страницу',
+    label: t('misc.cpqa_back_label'),
+    description: t('misc.cpqa_back_desc'),
     icon: 'arrow.left',
-    keywords: ['назад', 'back', 'previous'],
+    keywords: [t('misc.cpqa_kw_back'), 'back', 'previous'],
     action: 'back',
-    section: 'Действия',
+    section: t('misc.cpqa_section_actions'),
   },
 ];
 
@@ -127,6 +127,7 @@ function scoreResult(query, item) {
 }
 
 export function CommandPalette({ profile, navigate }) {
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -150,7 +151,7 @@ export function CommandPalette({ profile, navigate }) {
       description: route.nav?.section || route.group || '',
       path: route.path,
       icon: route.nav?.icon,
-      section: route.nav?.section || 'Маршруты',
+      section: route.nav?.section || t('misc.cp_marshruty'),
       keywords: [route.id, route.path, route.title],
       action: 'navigate',
       target: route.path,
@@ -158,7 +159,7 @@ export function CommandPalette({ profile, navigate }) {
 
     // Filter quick actions by role
     const roleNorm = (profile?.role || '').toLowerCase();
-    const actionItems = QUICK_ACTIONS.filter(action => {
+    const actionItems = getQuickActions(t).filter(action => {
       if (action.id === 'action-new-appointment') {
         return roleNorm === 'admin' || roleNorm === 'registrar';
       }
@@ -289,7 +290,7 @@ export function CommandPalette({ profile, navigate }) {
       role="button"
       tabIndex={-1}
       onKeyDown={(e) => { if (e.key === 'Escape') setIsOpen(false); }}
-      aria-label="Закрыть панель команд"
+      aria-label={t('misc.cp_zakryt_panel_komand')}
     >
       <div
         role="dialog"
@@ -324,7 +325,7 @@ export function CommandPalette({ profile, navigate }) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Поиск маршрута или действия..."
+            placeholder={t('misc.cp_poisk_marshruta_ili_deystviy')}
             aria-label="Search commands"
             style={{
               flex: 1,

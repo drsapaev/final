@@ -3,7 +3,7 @@ import { useEffect, useRef } from 'react';
 import { Copy, Reply, Trash } from 'lucide-react';
 import './MessageContextMenu.css';
 import PropTypes from 'prop-types';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const MessageContextMenu = ({ x, y, message, onBlur, onAction, isOwn }) => {
   const { t } = useTranslation();

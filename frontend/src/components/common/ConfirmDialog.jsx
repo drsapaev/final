@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 /**
  * Shared ConfirmDialog component + useConfirm hook.
  *
@@ -91,6 +91,7 @@ export function ConfirmDialog({
   const isConfirmDisabled = requireText !== null && typedText !== requireText;
 
   const handleConfirm = () => {
+    const { t } = useTranslation();
     onConfirm?.();
     onClose?.();
   };

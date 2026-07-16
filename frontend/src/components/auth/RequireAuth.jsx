@@ -4,7 +4,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useRoleAccess } from '../common/RoleGuard';
 import { Loading } from '../common/Loading';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 /**
  * Компонент для проверки аутентификации и ролевого доступа

@@ -10,7 +10,7 @@ import UserExportManager from './UserExportManager';
 import GroupPermissionsManager from './GroupPermissionsManager';
 // P-025 fix: wrap child panels in ErrorBoundary to catch unexpected render errors.
 import ErrorBoundary from '../common/ErrorBoundary';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const TAB_ICONS = {
   Users,
@@ -43,10 +43,10 @@ const UnifiedUserManagement = () => {
   }, [section]);
 
   const tabs = [
-  { id: 'management', label: 'Пользователи', icon: 'Users' },
-  { id: 'transfer', label: 'Передача данных', icon: 'Database' },
-  { id: 'export', label: 'Экспорт', icon: 'Download' },
-  { id: 'permissions', label: 'Разрешения', icon: 'Shield' }];
+  { id: 'management', label: t('admin2.uum_tab_users'), icon: 'Users' },
+  { id: 'transfer', label: t('admin2.uum_tab_transfer'), icon: 'Database' },
+  { id: 'export', label: t('admin2.uum_tab_export'), icon: 'Download' },
+  { id: 'permissions', label: t('admin2.uum_tab_permissions'), icon: 'Shield' }];
 
 
   const renderContent = () => {

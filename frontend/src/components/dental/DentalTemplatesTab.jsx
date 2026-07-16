@@ -6,26 +6,27 @@ import PropTypes from 'prop-types';
 import { Card, Button } from '../ui/macos';
 import { FileText } from 'lucide-react';
 import ProtocolTemplates from './ProtocolTemplates';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 export function DentalTemplatesTab({
   onManageTemplates,
   templates = [],
   onApplyTemplate,
 }) {
+  const { t } = useTranslation();
   return (
     <div className="dental-flex-col dental-gap-24">
       <Card padding="lg">
         <div className="dental-flex-between-16">
           <div>
-            <h3 className="dental-text-primary">Шаблоны протоколов</h3>
+            <h3 className="dental-text-primary">{t('dental.dental_dtt_title')}</h3>
             <p className="dental-text-desc dental-text-secondary">
-              Стандартные протоколы для быстрого создания протоколов визитов
+              {t('dental.dental_dtt_subtitle')}
             </p>
           </div>
           <Button onClick={onManageTemplates} className="dental-flex dental-gap-8">
             <FileText className="dental-icon-16" />
-            Управление шаблонами
+            {t('dental.dental_dtt_btn_manage')}
           </Button>
         </div>
 
@@ -35,7 +36,7 @@ export function DentalTemplatesTab({
               <div key={template.id} className="dental-protocol-card-flex">
                 <div className="dental-text-primary">{template.name}</div>
                 <div className="dental-text-desc dental-text-secondary">
-                  {template.category} - {template.estimatedTime || '—'} мин
+                  {t('dental.dental_dtt_template_meta', { category: template.category, time: template.estimatedTime || '—' })}
                 </div>
                 {template.description && (
                   <div className="dental-text-desc dental-text-secondary">
@@ -46,14 +47,14 @@ export function DentalTemplatesTab({
                   variant="outline"
                   onClick={() => onApplyTemplate(template)}
                   className="dental-align-self-start dental-mt-8">
-                  Применить
+                  {t('dental.dental_dtt_btn_apply')}
                 </Button>
               </div>
             ))}
           </div>
         ) : (
           <div className="dental-text-center dental-p-48 dental-text-secondary">
-            Шаблоны протоколов будут доступны в следующей версии. Используйте вкладку «Протоколы визитов» для создания протокола вручную.
+            {t('dental.dental_dtt_empty')}
           </div>
         )}
       </Card>

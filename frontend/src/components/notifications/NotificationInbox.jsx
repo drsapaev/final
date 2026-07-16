@@ -12,7 +12,7 @@ import {
   Input } from '../ui/macos';
 import { useNotificationCenter } from '../../contexts/NotificationCenterContext';
 import logger from '../../utils/logger';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const STATUS_FILTER_OPTIONS = [
   { value: 'all', label: '\u0412\u0441\u0435' },
@@ -131,6 +131,7 @@ function navigateToNotificationTarget(target) {
 }
 
 export default function NotificationInbox({ userRole, onClose }) {
+  const { t } = useTranslation();
   const {
     getNotificationsByRole,
     markAsRead,
@@ -230,7 +231,7 @@ export default function NotificationInbox({ userRole, onClose }) {
   return (
     <div
       role="dialog"
-      aria-label="Центр уведомлений"
+      aria-label={t('misc.ni_tsentr_uvedomleniy')}
       style={{
         position: 'absolute',
         top: 52,
@@ -258,7 +259,7 @@ export default function NotificationInbox({ userRole, onClose }) {
         }}
       >
         <div>
-          <strong style={{ display: 'block' }}>Уведомления</strong>
+          <strong style={{ display: 'block' }}>{t('misc.ni_uvedomleniya')}</strong>
           <span style={{ fontSize: 12, color: 'var(--mac-text-tertiary)' }}>
             {userRole || 'all'} · {unreadCount} unread
           </span>
@@ -274,7 +275,7 @@ export default function NotificationInbox({ userRole, onClose }) {
             fontSize: 18,
             lineHeight: 1
           }}
-          aria-label="Закрыть центр уведомлений"
+          aria-label={t('misc.ni_zakryt_tsentr_uvedomleniy')}
         >
           ✕
         </button>
@@ -295,10 +296,10 @@ export default function NotificationInbox({ userRole, onClose }) {
           <Search size={16} />
           <Input
             type="search"
-            aria-label="Поиск по уведомлениям"
+            aria-label={t('misc.ni_poisk_po_uvedomleniyam')}
             value={searchText}
             onChange={(event) => setSearchText(event.target.value)}
-            placeholder="Поиск по уведомлениям"
+            placeholder={t('misc.ni_poisk_po_uvedomleniyam')}
             style={{
               flex: 1,
               border: 'none',
@@ -322,7 +323,7 @@ export default function NotificationInbox({ userRole, onClose }) {
               cursor: 'pointer'
             }}
           >
-            {showUnreadOnly ? 'Все уведомления' : 'Только непрочитанные'}
+            {showUnreadOnly ? t('misc.ni_vse_uvedomleniya') : t('misc.ni_tolko_neprochitannye')}
           </button>
 
           <Select
@@ -388,7 +389,7 @@ export default function NotificationInbox({ userRole, onClose }) {
                     gap: 8,
                     cursor: 'pointer'
                   }}
-                  aria-label={`Открыть уведомление: ${item.title}`}
+                  aria-label={t('misc.ni_otkryt_uvedomlenie_item_titl', { title: item.title })}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>

@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 /**
  * DepartmentManagement Component
  * Управление отделениями, вкладками и интеграциями очередей/услуг
@@ -92,13 +92,13 @@ const DEFAULT_INTEGRATION_OPTIONS = {
   service_currency: 'UZS'
 };
 
-const CATEGORY_OPTIONS = [
-{ value: '', label: 'Категория (авто)' },
-{ value: 'K', label: 'Кардиология (K)' },
-{ value: 'D', label: 'Дерматология (D)' },
-{ value: 'S', label: 'Стоматология (S)' },
-{ value: 'L', label: 'Лаборатория (L)' },
-{ value: 'O', label: 'Процедуры (O)' }];
+const getCategoryOptions = (t) => [
+{ value: '', label: t('admin2.dept_cat_auto') },
+{ value: 'K', label: t('admin2.dept_cat_cardio') },
+{ value: 'D', label: t('admin2.dept_cat_derm') },
+{ value: 'S', label: t('admin2.dept_cat_dental') },
+{ value: 'L', label: t('admin2.dept_cat_lab') },
+{ value: 'O', label: t('admin2.dept_cat_proc') }];
 
 
 
@@ -107,15 +107,15 @@ const CATEGORY_OPTIONS = [
 
 
 
-const STATUS_FILTER_OPTIONS = [
-{ value: 'all', label: 'Все статусы' },
-{ value: 'active', label: 'Активные' },
-{ value: 'inactive', label: 'Неактивные' }];
+const getStatusFilterOptions = (t) => [
+{ value: 'all', label: t('admin2.dept_filter_all') },
+{ value: 'active', label: t('admin2.dept_filter_active') },
+{ value: 'inactive', label: t('admin2.dept_filter_inactive') }];
 
-const SORT_OPTIONS = [
-{ value: 'name', label: 'По названию' },
-{ value: 'key', label: 'По ключу' },
-{ value: 'order', label: 'По порядку' }];
+const getSortOptions = (t) => [
+{ value: 'name', label: t('admin2.dept_sort_name') },
+{ value: 'key', label: t('admin2.dept_sort_key') },
+{ value: 'order', label: t('admin2.dept_sort_order') }];
 
 const PAGE_SIZE_OPTIONS = [
 { value: 5, label: '5' },
@@ -124,8 +124,14 @@ const PAGE_SIZE_OPTIONS = [
 { value: 50, label: '50' }];
 
 const DepartmentManagement = () => {
+  const { t } = useTranslation();
   // P-013 fix: shared ConfirmDialog hook (replaces 2 window.confirm() calls).
   const [confirm, confirmDialog] = useConfirm();
+
+  // Reactive label option arrays (depend on current language via t).
+  const categoryOptions = getCategoryOptions(t);
+  const statusFilterOptions = getStatusFilterOptions(t);
+  const sortOptions = getSortOptions(t);
   const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [, setError] = useState(null);
@@ -211,8 +217,8 @@ const DepartmentManagement = () => {
       });
     } catch (err) {
       logger.error('Ошибка загрузки отделений:', err);
-      setError('Не удалось загрузить отделения');
-      toast.error('Не удалось загрузить отделения');
+      setError(t('admin2.dept_load_failed'));
+      toast.error(t('admin2.dept_load_failed'));
     } finally {
       setLoading(false);
     }
@@ -232,14 +238,14 @@ const DepartmentManagement = () => {
     (data, currentId = null) => {
       const errors = {};
       if (!data.name_ru || data.name_ru.trim().length < 2) {
-        errors.name_ru = 'Название обязательно и должно быть длиннее 2 символов';
+        errors.name_ru = t('admin2.dept_err_name_required');
       }
       if (!data.key || data.key.trim().length < 2) {
-        errors.key = 'Ключ обязателен (минимум 2 символа)';
+        errors.key = t('admin2.dept_err_key_required');
       } else {
         const duplicate = departments.find((dept) => dept.key === data.key && dept.id !== currentId);
         if (duplicate) {
-          errors.key = 'Отделение с таким ключом уже существует';
+          errors.key = t('admin2.dept_err_key_duplicate');
         }
       }
       return errors;
@@ -255,7 +261,7 @@ const DepartmentManagement = () => {
     const errors = validateDepartment(formData);
     if (Object.keys(errors).length > 0) {
       setValidationErrors(errors);
-      toast.error('Исправьте ошибки в форме');
+      toast.error(t('admin2.dept_err_fix_form'));
       return;
     }
     setValidationErrors({});
@@ -267,7 +273,7 @@ const DepartmentManagement = () => {
         integration: sanitizeIntegrationPayload(integrationForm)
       };
       await api.post('/admin/departments', payload);
-      toast.success('Отделение создано и синхронизировано');
+      toast.success(t('admin2.dept_created_synced'));
       setShowAddForm(false);
       setFormData(DEFAULT_FORM);
       setIntegrationForm(DEFAULT_INTEGRATION_OPTIONS);
@@ -284,7 +290,7 @@ const DepartmentManagement = () => {
       broadcastDepartmentsUpdate();
     } catch (err) {
       logger.error('Ошибка создания отделения:', err);
-      toast.error(err.response?.data?.detail || 'Не удалось создать отделение');
+      toast.error(err.response?.data?.detail || t('admin2.dept_create_failed'));
     }
   };
 
@@ -310,12 +316,12 @@ const DepartmentManagement = () => {
     const errors = validateDepartment(formData, editingDepartment.id);
     if (Object.keys(errors).length > 0) {
       setValidationErrors(errors);
-      toast.error('Исправьте ошибки в форме');
+      toast.error(t('admin2.dept_err_fix_form'));
       return;
     }
     try {
       await api.put(`/admin/departments/${editingDepartment.id}`, formData);
-      toast.success('Отделение обновлено');
+      toast.success(t('admin2.dept_updated'));
 
       // PR-20: Removed frontend POST /services call (same as create handler).
       // Backend already handles default service via _ensure_department_integrations.
@@ -327,7 +333,7 @@ const DepartmentManagement = () => {
       broadcastDepartmentsUpdate();
     } catch (err) {
       logger.error('Ошибка обновления отделения:', err);
-      toast.error(err.response?.data?.detail || 'Не удалось обновить отделение');
+      toast.error(err.response?.data?.detail || t('admin2.dept_update_failed'));
     }
   };
 
@@ -335,12 +341,12 @@ const DepartmentManagement = () => {
   const handleToggleActive = async (dept, newActive) => {
     try {
       await api.put(`/admin/departments/${dept.id}`, { active: newActive });
-      toast.success(`Отделение ${newActive ? 'активировано' : 'деактивировано'}`);
+      toast.success(newActive ? t('admin2.dept_activated') : t('admin2.dept_deactivated'));
       await loadDepartments();
       broadcastDepartmentsUpdate();
     } catch (err) {
       logger.error('Ошибка обновления статуса:', err);
-      toast.error(err.response?.data?.detail || 'Не удалось обновить статус');
+      toast.error(err.response?.data?.detail || t('admin2.dept_status_update_failed'));
     }
   };
 
@@ -352,7 +358,7 @@ const DepartmentManagement = () => {
       broadcastDepartmentsUpdate();
     } catch (err) {
       logger.error('Ошибка обновления порядка:', err);
-      toast.error(err.response?.data?.detail || 'Не удалось обновить порядок');
+      toast.error(err.response?.data?.detail || t('admin2.dept_order_update_failed'));
     }
   };
 
@@ -360,8 +366,8 @@ const DepartmentManagement = () => {
     // P-013 fix: replaced window.confirm() with shared useConfirm hook.
     const ok = await confirm({
       title: t('admin2.delete_department_title'),
-      message: 'Удалить отделение?',
-      description: 'Это действие необратимо. Все связанные сервисы будут отвязаны.',
+      message: t('admin2.dept_delete_confirm_msg'),
+      description: t('admin2.dept_delete_confirm_desc'),
       confirmLabel: t('admin2.delete_confirm'),
       cancelLabel: t('admin2.cancel'),
       intent: 'danger',
@@ -369,12 +375,12 @@ const DepartmentManagement = () => {
     if (!ok) return;
     try {
       await api.delete(`/admin/departments/${id}`);
-      toast.success('Отделение удалено');
+      toast.success(t('admin2.dept_deleted'));
       await loadDepartments();
       broadcastDepartmentsUpdate();
     } catch (err) {
       logger.error('Ошибка удаления отделения:', err);
-      toast.error(err.response?.data?.detail || 'Не удалось удалить отделение');
+      toast.error(err.response?.data?.detail || t('admin2.dept_delete_failed'));
     }
   };
 
@@ -479,10 +485,10 @@ const DepartmentManagement = () => {
       link.click();
       document.body.removeChild(link);
 
-      toast.success('Отделения успешно экспортированы');
+      toast.success(t('admin2.dept_export_success'));
     } catch (error) {
       logger.error('Ошибка экспорта:', error);
-      toast.error('Ошибка при экспорте отделений');
+      toast.error(t('admin2.dept_export_failed'));
     }
   };
 
@@ -496,7 +502,7 @@ const DepartmentManagement = () => {
       const lines = text.split('\n').filter((line) => line.trim());
 
       if (lines.length < 2) {
-        toast.error('CSV файл должен содержать заголовки и данные');
+        toast.error(t('admin2.dept_csv_empty'));
         return;
       }
 
@@ -506,7 +512,7 @@ const DepartmentManagement = () => {
       // Проверка обязательных заголовков
       const missingHeaders = requiredHeaders.filter((h) => !headers.includes(h));
       if (missingHeaders.length > 0) {
-        toast.error(`Отсутствуют обязательные столбцы: ${missingHeaders.join(', ')}`);
+        toast.error(t('admin2.dept_csv_missing_cols', { cols: missingHeaders.join(', ') }));
         return;
       }
 
@@ -535,24 +541,24 @@ const DepartmentManagement = () => {
           // Валидация импортируемых данных
           const validationErrors = validateDepartment(dept, false);
           if (Object.keys(validationErrors).length > 0) {
-            errors.push(`Строка ${i + 1}: ${Object.values(validationErrors).join(', ')}`);
+            errors.push(t('admin2.dept_csv_row_errors', { row: i + 1, errors: Object.values(validationErrors).join(', ') }));
             continue;
           }
 
           importedDepartments.push(dept);
         } catch {
-          errors.push(`Строка ${i + 1}: Ошибка парсинга данных`);
+          errors.push(t('admin2.dept_csv_row_parse_error', { row: i + 1 }));
         }
       }
 
       if (errors.length > 0) {
-        toast.error(`Найдены ошибки в ${errors.length} строках. Проверьте данные и попробуйте снова.`);
+        toast.error(t('admin2.dept_csv_errors_found', { count: errors.length }));
         logger.error('Ошибки импорта:', errors);
         return;
       }
 
       if (importedDepartments.length === 0) {
-        toast.warning('Нет данных для импорта');
+        toast.warning(t('admin2.dept_no_import_data'));
         return;
       }
 
@@ -568,16 +574,16 @@ const DepartmentManagement = () => {
       });
 
       if (response.ok) {
-        toast.success(`Успешно импортировано ${importedDepartments.length} отделений`);
+        toast.success(t('admin2.dept_import_success', { count: importedDepartments.length }));
         loadDepartments();
       } else {
         const errorData = await response.json();
-        toast.error(errorData.detail || 'Ошибка при импорте отделений');
+        toast.error(errorData.detail || t('admin2.dept_import_failed'));
       }
 
     } catch (error) {
       logger.error('Ошибка импорта:', error);
-      toast.error('Ошибка при чтении файла');
+      toast.error(t('admin2.dept_read_file_failed'));
     }
 
     // Очистка input
@@ -605,15 +611,15 @@ const DepartmentManagement = () => {
 
   const handleBulkDelete = async () => {
     if (selectedDepartments.length === 0) {
-      toast.warning('Выберите отделения для удаления');
+      toast.warning(t('admin2.dept_select_for_delete'));
       return;
     }
 
     // P-013 fix: replaced window.confirm() with shared useConfirm hook.
     const confirmed = await confirm({
       title: t('admin2.bulk_delete_departments_title'),
-      message: `Удалить ${selectedDepartments.length} отделений?`,
-      description: 'Это действие нельзя отменить. Все связанные сервисы будут отвязаны.',
+      message: t('admin2.dept_bulk_delete_msg', { count: selectedDepartments.length }),
+      description: t('admin2.dept_bulk_delete_desc'),
       confirmLabel: t('admin2.delete_all_confirm'),
       cancelLabel: t('admin2.cancel'),
       intent: 'destructive',
@@ -633,24 +639,24 @@ const DepartmentManagement = () => {
       });
 
       if (response.ok) {
-        toast.success(`Удалено ${selectedDepartments.length} отделений`);
+        toast.success(t('admin2.dept_bulk_deleted', { count: selectedDepartments.length }));
         setSelectedDepartments([]);
         setSelectAll(false);
         loadDepartments();
       } else {
         const errorData = await response.json().catch(() => ({}));
         const errorMessage = errorData.detail || errorData.message || `HTTP ${response.status}: ${response.statusText}`;
-        toast.error(`Ошибка при удалении: ${errorMessage}`);
+        toast.error(t('admin2.dept_bulk_delete_error', { error: errorMessage }));
       }
     } catch (error) {
       logger.error('Ошибка массового удаления:', error);
-      toast.error('Ошибка при удалении отделений');
+      toast.error(t('admin2.dept_bulk_delete_failed'));
     }
   };
 
   const handleBulkActivate = async (activate) => {
     if (selectedDepartments.length === 0) {
-      toast.warning('Выберите отделения');
+      toast.warning(t('admin2.dept_select_departments'));
       return;
     }
 
@@ -669,18 +675,18 @@ const DepartmentManagement = () => {
       });
 
       if (response.ok) {
-        toast.success(`${selectedDepartments.length} отделений ${activate ? 'активированы' : 'деактивированы'}`);
+        toast.success(activate ? t('admin2.dept_bulk_activated', { count: selectedDepartments.length }) : t('admin2.dept_bulk_deactivated', { count: selectedDepartments.length }));
         setSelectedDepartments([]);
         setSelectAll(false);
         loadDepartments();
       } else {
         const errorData = await response.json().catch(() => ({}));
         const errorMessage = errorData.detail || errorData.message || `HTTP ${response.status}: ${response.statusText}`;
-        toast.error(`Ошибка при ${activate ? 'активации' : 'деактивации'}: ${errorMessage}`);
+        toast.error(activate ? t('admin2.dept_bulk_activate_error_on', { error: errorMessage }) : t('admin2.dept_bulk_activate_error_off', { error: errorMessage }));
       }
     } catch (error) {
       logger.error('Ошибка массовой активации:', error);
-      toast.error(`Ошибка при ${activate ? 'активации' : 'деактивации'} отделений`);
+      toast.error(activate ? t('admin2.dept_bulk_activate_failed_on') : t('admin2.dept_bulk_activate_failed_off'));
     }
   };
 
@@ -698,7 +704,7 @@ const DepartmentManagement = () => {
       <MacOSCard>
                 <div className="admin-loading-p-40-center">
                     <div className="spinner admin-spinner-mb-16"></div>
-                    <p className="text-[var(--mac-text-secondary)]">Загрузка отделений...</p>
+                    <p className="text-[var(--mac-text-secondary)]">{t('admin2.dept_loading')}</p>
                 </div>
             </MacOSCard>);
 
@@ -714,7 +720,7 @@ const DepartmentManagement = () => {
                             {departmentStats.total}
                         </div>
                         <div className="admin-stat-label">
-                            Всего отделений
+                            {t('admin2.dept_stat_total')}
                         </div>
                     </div>
                 </MacOSCard>
@@ -725,7 +731,7 @@ const DepartmentManagement = () => {
                             {departmentStats.active}
                         </div>
                         <div className="admin-stat-label">
-                            Активных
+                            {t('admin2.dept_stat_active')}
                         </div>
                     </div>
                 </MacOSCard>
@@ -736,7 +742,7 @@ const DepartmentManagement = () => {
                             {departmentStats.inactive}
                         </div>
                         <div className="admin-stat-label">
-                            Неактивных
+                            {t('admin2.dept_stat_inactive')}
                         </div>
                     </div>
                 </MacOSCard>
@@ -747,7 +753,7 @@ const DepartmentManagement = () => {
                             {departmentStats.withDoctors}
                         </div>
                         <div className="admin-stat-label">
-                            С врачами
+                            {t('admin2.dept_stat_with_doctors')}
                         </div>
                     </div>
                 </MacOSCard>
@@ -757,7 +763,7 @@ const DepartmentManagement = () => {
                 <div className="p-6">
                     <div className="admin-flex-between-mb-24">
                         <h2 className="admin-title-20">
-                            Управление отделениями
+                            {t('admin2.dept_title')}
                         </h2>
                         <div className="admin-flex-gap-8">
                             <Button
@@ -766,17 +772,17 @@ const DepartmentManagement = () => {
                 onClick={() => setShowAddForm(!showAddForm)}>
                 
                                 <Plus size={16} className="mr-2" />
-                                Добавить отделение
+                                {t('admin2.dept_add_btn')}
                             </Button>
 
                             <Button
                 variant="secondary"
                 size="default"
                 onClick={handleExport}
-                title="Экспортировать отделения в CSV">
+                title={t('admin2.dept_export_title')}>
                 
                                 <Download size={16} className="mr-2" />
-                                Экспорт
+                                {t('admin2.dept_export_btn')}
                             </Button>
 
                             <label className="admin-position-relative">
@@ -785,10 +791,10 @@ const DepartmentManagement = () => {
                   size="default"
                   as="span"
                   className="admin-cursor-pointer"
-                  title="Импортировать отделения из CSV">
+                  title={t('admin2.dept_import_title')}>
                   
                                     <Upload size={16} className="mr-2" />
-                                    Импорт
+                                    {t('admin2.dept_import_btn')}
                                 </Button>
                                 <input
                   type="file"
@@ -806,7 +812,7 @@ const DepartmentManagement = () => {
                         <div className="admin-flex-search-row">
                             <Search size={16} className="text-[var(--mac-text-secondary)]" />
                             <Input
-                placeholder="Поиск по названию или ключу..."
+                placeholder={t('admin2.dept_search_placeholder')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="admin-flex-1" />
@@ -815,20 +821,20 @@ const DepartmentManagement = () => {
                         <Select
               value={statusFilter}
               onChange={(value) => setStatusFilter(value)}
-              options={STATUS_FILTER_OPTIONS}
+              options={statusFilterOptions}
               className="admin-min-w-120" />
 
                         <Select
               value={sortBy}
               onChange={(value) => setSortBy(value)}
-              options={SORT_OPTIONS}
+              options={sortOptions}
               className="admin-min-w-140" />
 
                         <Button
               variant="secondary"
               size="sm"
               onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-              title={sortOrder === 'asc' ? 'По возрастанию' : 'По убыванию'}>
+              title={sortOrder === 'asc' ? t('admin2.dept_sort_asc') : t('admin2.dept_sort_desc')}>
               
                             {sortOrder === 'asc' ? '↑' : '↓'}
                         </Button>
@@ -837,12 +843,12 @@ const DepartmentManagement = () => {
                     {showAddForm &&
           <div className="admin-form-panel-tertiary-mb-24">
                             <h3 className="admin-title-16-mb-16">
-                                Новое отделение
+                                {t('admin2.dept_new_title')}
                             </h3>
                             <div className="admin-grid-2col">
                                 <div>
                                     <Input
-                  placeholder="Название (русский)"
+                  placeholder={t('admin2.dept_name_ru_ph')}
                   value={formData.name_ru}
                   onChange={(e) => setFormData({ ...formData, name_ru: e.target.value })}
                   className={validationErrors.name_ru ? 'admin-input-error' : undefined} />
@@ -855,7 +861,7 @@ const DepartmentManagement = () => {
                                 </div>
                                 <div>
                                     <Input
-                  placeholder="Название (узбекский)"
+                  placeholder={t('admin2.dept_name_uz_ph')}
                   value={formData.name_uz}
                   onChange={(e) => setFormData({ ...formData, name_uz: e.target.value })}
                   className={validationErrors.name_uz ? 'admin-input-error' : undefined} />
@@ -868,7 +874,7 @@ const DepartmentManagement = () => {
                                 </div>
                                 <div>
                                     <Input
-                  placeholder="Ключ (например, cardio)"
+                  placeholder={t('admin2.dept_key_ph')}
                   value={formData.key}
                   onChange={(e) => setFormData({ ...formData, key: e.target.value })}
                   className={`admin-grid-col-1${validationErrors.key ? ' admin-input-error' : ''}`} />
@@ -882,7 +888,7 @@ const DepartmentManagement = () => {
                                 <div>
                                     <Input
                   type="number"
-                  placeholder="Порядок отображения"
+                  placeholder={t('admin2.dept_order_ph')}
                   value={formData.display_order}
                   onChange={(e) => setFormData({ ...formData, display_order: parseInt(e.target.value) })}
                   className={`admin-grid-col-2${validationErrors.display_order ? ' admin-input-error' : ''}`} />
@@ -894,7 +900,7 @@ const DepartmentManagement = () => {
                 }
                                 </div>
                                 <div className="admin-grid-span-all">
-                                    <Input value={formData.icon} onChange={(e) => setFormData({ ...formData, icon: e.target.value })} placeholder="Имя иконки (например: Package, Heart, Stethoscope)" />
+                                    <Input value={formData.icon} onChange={(e) => setFormData({ ...formData, icon: e.target.value })} placeholder={t('admin2.dept_icon_ph')} />
                 
                                     {validationErrors.icon &&
                 <div className="admin-error-text-mt">
@@ -910,12 +916,12 @@ const DepartmentManagement = () => {
                   className="admin-grid-col-1" />
                 
                                     <label className="admin-label-hint">
-                                        Цвет вкладки
+                                        {t('admin2.dept_tab_color_label')}
                                     </label>
                                 </div>
                                 <div className="admin-grid-span-all">
                                     <Textarea
-                  placeholder="Описание отделения (опционально)"
+                  placeholder={t('admin2.dept_desc_ph')}
                   value={formData.description || ''}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   rows={3}
@@ -932,14 +938,14 @@ const DepartmentManagement = () => {
                             {/* ✅ НОВОЕ: Секция настройки маппинга услуг */}
                             <div className="admin-form-panel-secondary">
                                 <h4 className="admin-title-16-mb-16">
-                                    Настройка услуг для вкладки
+                                    {t('admin2.dept_service_settings_title')}
                                 </h4>
 
                                 <div className="mb-4">
                                     <Checkbox
                   checked={serviceMapping.create_service}
                   onChange={(e) => setServiceMapping({ ...serviceMapping, create_service: e.target.checked })}
-                  label="Создать новую услугу при создании отделения" />
+                  label={t('admin2.dept_create_service_label')} />
                 
                                 </div>
 
@@ -947,7 +953,7 @@ const DepartmentManagement = () => {
               <div className="admin-grid-2col">
                                         <div>
                                             <Input
-                    placeholder="Название услуги"
+                    placeholder={t('admin2.dept_service_name_ph')}
                     value={serviceMapping.service_name}
                     onChange={(e) => setServiceMapping({ ...serviceMapping, service_name: e.target.value })} />
                   
@@ -956,11 +962,11 @@ const DepartmentManagement = () => {
                                             <Select
                     value={serviceMapping.service_category_code}
                     onChange={(value) => setServiceMapping({ ...serviceMapping, service_category_code: value })}
-                    options={CATEGORY_OPTIONS} />
+                    options={categoryOptions} />
                                         </div>
                                         <div>
                                             <Input
-                    placeholder="Код услуги (например, K01, L01)"
+                    placeholder={t('admin2.dept_service_code_ph')}
                     value={serviceMapping.service_code_pattern}
                     onChange={(e) => setServiceMapping({ ...serviceMapping, service_code_pattern: e.target.value.toUpperCase() })} />
                   
@@ -968,19 +974,19 @@ const DepartmentManagement = () => {
                                         <div>
                                             <Input
                     type="number"
-                    placeholder="Цена услуги"
+                    placeholder={t('admin2.dept_service_price_ph')}
                     value={serviceMapping.service_price}
                     onChange={(e) => setServiceMapping({ ...serviceMapping, service_price: e.target.value })} />
                   
                                         </div>
                                         <div className="admin-grid-span-all">
                                             <Input
-                    placeholder="Queue tag (опционально, например: ecg, cardiology_common)"
+                    placeholder={t('admin2.dept_queue_tag_ph')}
                     value={serviceMapping.queue_tag}
                     onChange={(e) => setServiceMapping({ ...serviceMapping, queue_tag: e.target.value })} />
                   
                                             <div className="admin-hint-text-12-secondary-mt-4">
-                                                Услуги с department_key=&quot;{formData.key || '...'}&quot; будут отображаться в этой вкладке мастера регистрации
+                                                {t('admin2.dept_service_mapping_hint', { key: formData.key || '...' })}
                                             </div>
                                         </div>
                                     </div>
@@ -988,7 +994,7 @@ const DepartmentManagement = () => {
 
                                 {!serviceMapping.create_service &&
               <div className="admin-hint-box-tertiary">
-                                        💡 Для отображения услуг в этой вкладке мастера регистрации, убедитесь, что услуги имеют <code>department_key=&quot;{formData.key || '...'}&quot;</code> или соответствующий <code>category_code</code>.
+                                        {t('admin2.dept_service_mapping_hint_box_prefix')}<code>department_key=&quot;{formData.key || '...'}&quot;</code>{t('admin2.dept_service_mapping_hint_box_middle')}<code>category_code</code>.
                                     </div>
               }
                             </div>
@@ -996,7 +1002,7 @@ const DepartmentManagement = () => {
                             <div className="admin-flex-gap-12-mt-16">
                                 <Button variant="primary" onClick={handleAddDepartment}>
                                     <Save size={16} className="mr-2" />
-                                    Сохранить
+                                    {t('admin2.dept_save_btn')}
                                 </Button>
                                 <Button variant="secondary" onClick={() => {
                 setShowAddForm(false);
@@ -1004,7 +1010,7 @@ const DepartmentManagement = () => {
                 setServiceMapping(DEFAULT_SERVICE_MAPPING);
               }}>
                                     <X size={16} className="mr-2" />
-                                    Отмена
+                                    {t('admin2.dept_cancel_btn')}
                                 </Button>
                             </div>
                         </div>
@@ -1014,7 +1020,7 @@ const DepartmentManagement = () => {
                     {selectedDepartments.length > 0 &&
           <div className="admin-bulk-action-bar">
                             <span className="admin-selected-count">
-                                Выбрано: {selectedDepartments.length}
+                                {t('admin2.dept_selected_count', { count: selectedDepartments.length })}
                             </span>
 
                             <Button
@@ -1023,7 +1029,7 @@ const DepartmentManagement = () => {
               onClick={handleBulkDelete}>
               
                                 <Trash2 size={14} className="admin-mr-6" />
-                                Удалить
+                                {t('admin2.dept_delete_btn')}
                             </Button>
 
                             <Button
@@ -1032,7 +1038,7 @@ const DepartmentManagement = () => {
               onClick={() => handleBulkActivate(true)}>
               
                                 <CheckCircle size={14} className="admin-mr-6" />
-                                Активировать
+                                {t('admin2.dept_activate_btn')}
                             </Button>
 
                             <Button
@@ -1041,7 +1047,7 @@ const DepartmentManagement = () => {
               onClick={() => handleBulkActivate(false)}>
               
                                 <XCircle size={14} className="admin-mr-6" />
-                                Деактивировать
+                                {t('admin2.dept_deactivate_btn')}
                             </Button>
 
                             <Button
@@ -1053,7 +1059,7 @@ const DepartmentManagement = () => {
               }}>
               
                                 <X size={14} className="admin-mr-6" />
-                                Очистить
+                                {t('admin2.dept_clear_btn')}
                             </Button>
                         </div>
           }
@@ -1071,22 +1077,22 @@ const DepartmentManagement = () => {
                     
                                     </th>
                                     <th className="admin-th-w-60">
-                                        Иконка
+                                        {t('admin2.dept_col_icon')}
                                     </th>
                                     <th className="admin-th">
-                                        Название
+                                        {t('admin2.dept_col_name')}
                                     </th>
                                     <th className="admin-th-w-120">
-                                        Ключ
+                                        {t('admin2.dept_col_key')}
                                     </th>
                                     <th className="admin-th-w-100">
-                                        Порядок
+                                        {t('admin2.dept_col_order')}
                                     </th>
                                     <th className="admin-th-center">
-                                        Статус
+                                        {t('admin2.dept_col_status')}
                                     </th>
                                     <th className="admin-th-right">
-                                        Действия
+                                        {t('admin2.dept_col_actions')}
                                     </th>
                                 </tr>
                             </thead>
@@ -1152,7 +1158,7 @@ const DepartmentManagement = () => {
                             variant="secondary"
                             aria-label={`Edit department ${dept.name_ru || dept.name || dept.key}`}
                             onClick={() => openEditModal(dept)}
-                            title="Редактировать отделение">
+                            title={t('admin2.dept_edit_title')}>
                             
                                                         <Edit2 size={16} />
                                                     </Button>
@@ -1161,7 +1167,7 @@ const DepartmentManagement = () => {
                             variant="danger"
                             aria-label={`Delete department ${dept.name_ru || dept.name || dept.key}`}
                             onClick={() => handleDeleteDepartment(dept.id)}
-                            title="Удалить отделение">
+                            title={t('admin2.dept_delete_action_title')}>
                             
                                                         <Trash2 size={16} />
                                                     </Button>
@@ -1177,13 +1183,13 @@ const DepartmentManagement = () => {
 
                     {departments.length === 0 &&
           <div className="admin-empty-p-40-center-secondary">
-                            <p>Нет отделений. Добавьте первое отделение.</p>
+                            <p>{t('admin2.dept_empty')}</p>
                         </div>
           }
 
                     {departments.length > 0 && filteredDepartments.length === 0 &&
           <div className="admin-empty-p-40-center-secondary">
-                            <p>По вашему запросу ничего не найдено.</p>
+                            <p>{t('admin2.dept_no_results')}</p>
                         </div>
           }
 
@@ -1197,7 +1203,7 @@ const DepartmentManagement = () => {
             
                             <div className="flex items-center justify-center gap-2">
                                 <span className="admin-text-14-secondary">
-                                    Показывать:
+                                    {t('admin2.dept_showing')}
                                 </span>
                                 <Select
                 value={itemsPerPage}
@@ -1208,7 +1214,7 @@ const DepartmentManagement = () => {
                 options={PAGE_SIZE_OPTIONS}
                 className="admin-w-70" />
                                 <span className="admin-text-14-secondary">
-                                    из {totalItems}
+                                    {t('admin2.dept_of_total', { total: totalItems })}
                                 </span>
                             </div>
                         </div>
@@ -1226,14 +1232,14 @@ const DepartmentManagement = () => {
           setServiceMapping(DEFAULT_SERVICE_MAPPING);
           clearValidationErrors();
         }}
-        title="Редактирование отделения"
+        title={t('admin2.dept_edit_modal_title')}
         size="large">
         
                 <div className="admin-grid-2col">
                     <div>
                         <Input
-              label="Название (русский)"
-              placeholder="Название (русский)"
+              label={t('admin2.dept_name_ru_ph')}
+              placeholder={t('admin2.dept_name_ru_ph')}
               value={formData.name_ru}
               onChange={(e) => setFormData({ ...formData, name_ru: e.target.value })}
               className={validationErrors.name_ru ? 'admin-input-error' : undefined} />
@@ -1246,8 +1252,8 @@ const DepartmentManagement = () => {
                     </div>
                     <div>
                         <Input
-              label="Название (узбекский)"
-              placeholder="Название (узбекский)"
+              label={t('admin2.dept_name_uz_ph')}
+              placeholder={t('admin2.dept_name_uz_ph')}
               value={formData.name_uz}
               onChange={(e) => setFormData({ ...formData, name_uz: e.target.value })}
               className={validationErrors.name_uz ? 'admin-input-error' : undefined} />
@@ -1260,8 +1266,8 @@ const DepartmentManagement = () => {
                     </div>
                     <div>
                         <Input
-              label="Ключ"
-              placeholder="Ключ (например, cardio)"
+              label={t('admin2.dept_key_label')}
+              placeholder={t('admin2.dept_key_ph')}
               value={formData.key}
               onChange={(e) => setFormData({ ...formData, key: e.target.value })}
               className={`admin-grid-col-1${validationErrors.key ? ' admin-input-error' : ''}`} />
@@ -1274,9 +1280,9 @@ const DepartmentManagement = () => {
                     </div>
                     <div>
                         <Input
-              label="Порядок отображения"
+              label={t('admin2.dept_order_ph')}
               type="number"
-              placeholder="Порядок отображения"
+              placeholder={t('admin2.dept_order_ph')}
               value={formData.display_order}
               onChange={(e) => setFormData({ ...formData, display_order: parseInt(e.target.value) })}
               className={`admin-grid-col-2${validationErrors.display_order ? ' admin-input-error' : ''}`} />
@@ -1288,7 +1294,7 @@ const DepartmentManagement = () => {
             }
                     </div>
                     <div className="admin-grid-span-all">
-                        <Input value={formData.icon} onChange={(e) => setFormData({ ...formData, icon: e.target.value })} placeholder="Имя иконки (например: Package, Heart, Stethoscope)" />
+                        <Input value={formData.icon} onChange={(e) => setFormData({ ...formData, icon: e.target.value })} placeholder={t('admin2.dept_icon_ph')} />
             
                         {validationErrors.icon &&
             <div className="admin-error-text-mt">
@@ -1298,7 +1304,7 @@ const DepartmentManagement = () => {
                     </div>
                     <div>
                         <Input
-              label="Цвет"
+              label={t('admin2.dept_color_label')}
               type="color"
               value={formData.color}
               onChange={(e) => setFormData({ ...formData, color: e.target.value })}
@@ -1307,8 +1313,8 @@ const DepartmentManagement = () => {
                     </div>
                     <div className="admin-grid-span-all">
                         <Textarea
-              label="Описание"
-              placeholder="Описание отделения (опционально)"
+              label={t('admin2.dept_desc_label')}
+              placeholder={t('admin2.dept_desc_ph')}
               value={formData.description || ''}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               rows={4}
@@ -1325,14 +1331,14 @@ const DepartmentManagement = () => {
                 {/* ✅ НОВОЕ: Секция настройки маппинга услуг в модальном окне */}
                 <div className="admin-form-panel-secondary">
                     <h4 className="admin-title-16-mb-16">
-                        Настройка услуг для вкладки
+                        {t('admin2.dept_service_settings_title')}
                     </h4>
 
                     <div className="mb-4">
                         <Checkbox
               checked={serviceMapping.create_service}
               onChange={(e) => setServiceMapping({ ...serviceMapping, create_service: e.target.checked })}
-              label="Создать новую услугу" />
+              label={t('admin2.dept_create_service_short')} />
             
                     </div>
 
@@ -1340,47 +1346,47 @@ const DepartmentManagement = () => {
           <div className="admin-grid-2col">
                             <div>
                                 <Input
-                label="Название услуги"
-                placeholder="Название услуги"
+                label={t('admin2.dept_service_name_label')}
+                placeholder={t('admin2.dept_service_name_label')}
                 value={serviceMapping.service_name}
                 onChange={(e) => setServiceMapping({ ...serviceMapping, service_name: e.target.value })} />
               
                             </div>
                             <div>
                                 <label className="admin-label-block-md">
-                                    Категория услуги
+                                    {t('admin2.dept_service_cat_label')}
                                 </label>
                                 <Select
                 value={serviceMapping.service_category_code}
                 onChange={(value) => setServiceMapping({ ...serviceMapping, service_category_code: value })}
-                options={CATEGORY_OPTIONS} />
+                options={categoryOptions} />
                             </div>
                             <div>
                                 <Input
-                label="Код услуги"
-                placeholder="Код услуги (например, K01, L01)"
+                label={t('admin2.dept_service_code_label')}
+                placeholder={t('admin2.dept_service_code_ph')}
                 value={serviceMapping.service_code_pattern}
                 onChange={(e) => setServiceMapping({ ...serviceMapping, service_code_pattern: e.target.value.toUpperCase() })} />
               
                             </div>
                             <div>
                                 <Input
-                label="Цена услуги"
+                label={t('admin2.dept_service_price_label')}
                 type="number"
-                placeholder="Цена услуги"
+                placeholder={t('admin2.dept_service_price_label')}
                 value={serviceMapping.service_price}
                 onChange={(e) => setServiceMapping({ ...serviceMapping, service_price: e.target.value })} />
               
                             </div>
                             <div className="admin-grid-span-all">
                                 <Input
-                label="Queue tag (опционально)"
-                placeholder="Queue tag (например: ecg, cardiology_common)"
+                label={t('admin2.dept_queue_tag_label')}
+                placeholder={t('admin2.dept_queue_tag_ph_modal')}
                 value={serviceMapping.queue_tag}
                 onChange={(e) => setServiceMapping({ ...serviceMapping, queue_tag: e.target.value })} />
               
                                 <div className="admin-hint-text-12-secondary-mt-4">
-                                    Услуги с department_key=&quot;{formData.key || '...'}&quot; будут отображаться в этой вкладке мастера регистрации
+                                    {t('admin2.dept_service_mapping_hint', { key: formData.key || '...' })}
                                 </div>
                             </div>
                         </div>
@@ -1388,7 +1394,7 @@ const DepartmentManagement = () => {
 
                     {!serviceMapping.create_service &&
           <div className="admin-hint-box-tertiary">
-                            💡 Для отображения услуг в этой вкладке мастера регистрации, убедитесь, что услуги имеют <code>department_key=&quot;{formData.key || '...'}&quot;</code> или соответствующий <code>category_code</code>.
+                            {t('admin2.dept_service_mapping_hint_box_prefix')}<code>department_key=&quot;{formData.key || '...'}&quot;</code>{t('admin2.dept_service_mapping_hint_box_middle')}<code>category_code</code>.
                         </div>
           }
                 </div>
@@ -1404,14 +1410,14 @@ const DepartmentManagement = () => {
               clearValidationErrors();
             }}>
             
-                        Отмена
+                        {t('admin2.dept_cancel_btn')}
                     </Button>
                     <Button
             variant="primary"
             onClick={handleUpdateDepartment}>
             
                         <Save size={16} className="mr-2" />
-                        Сохранить изменения
+                        {t('admin2.dept_save_changes_btn')}
                     </Button>
                 </div>
             </Modal>

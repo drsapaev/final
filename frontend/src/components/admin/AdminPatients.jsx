@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 import { Edit, Plus, RefreshCw, Search, Trash2, Users } from 'lucide-react';
 import PropTypes from 'prop-types';
 
@@ -20,23 +20,35 @@ import logger from '../../utils/logger';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
 
-const genderOptions = [
-  { value: '', label: 'Все полы' },
-  { value: 'male', label: 'Мужской' },
-  { value: 'female', label: 'Женский' },
+const GENDER_OPTION_KEYS = [
+  { value: '', labelKey: 'admin2.ap_gender_all' },
+  { value: 'male', labelKey: 'admin2.ap_gender_male' },
+  { value: 'female', labelKey: 'admin2.ap_gender_female' },
 ];
 
-const ageOptions = [
-  { value: '', label: 'Все возрасты' },
-  { value: '0-18', label: '0-18 лет' },
-  { value: '19-35', label: '19-35 лет' },
-  { value: '36-50', label: '36-50 лет' },
-  { value: '51-65', label: '51-65 лет' },
-  { value: '65+', label: '65+ лет' },
+const getGenderOptions = (t) =>
+  GENDER_OPTION_KEYS.map(({ value, labelKey }) => ({
+    value,
+    label: t(labelKey),
+  }));
+
+const AGE_OPTION_KEYS = [
+  { value: '', labelKey: 'admin2.ap_age_all' },
+  { value: '0-18', labelKey: 'admin2.ap_age_0_18' },
+  { value: '19-35', labelKey: 'admin2.ap_age_19_35' },
+  { value: '36-50', labelKey: 'admin2.ap_age_36_50' },
+  { value: '51-65', labelKey: 'admin2.ap_age_51_65' },
+  { value: '65+', labelKey: 'admin2.ap_age_65_plus' },
 ];
 
-const bloodTypeOptions = [
-  { value: '', label: 'Все группы крови' },
+const getAgeOptions = (t) =>
+  AGE_OPTION_KEYS.map(({ value, labelKey }) => ({
+    value,
+    label: t(labelKey),
+  }));
+
+const BLOOD_TYPE_OPTION_VALUES = [
+  { value: '', labelKey: 'admin2.ap_blood_type_all' },
   { value: 'A+', label: 'A+' },
   { value: 'A-', label: 'A-' },
   { value: 'B+', label: 'B+' },
@@ -47,50 +59,60 @@ const bloodTypeOptions = [
   { value: 'O-', label: 'O-' },
 ];
 
-const getPatientName = (patient) =>
-  [patient.lastName, patient.firstName, patient.middleName].filter(Boolean).join(' ') || 'Пациент без имени';
+const getBloodTypeOptions = (t) =>
+  BLOOD_TYPE_OPTION_VALUES.map((opt) => ({
+    value: opt.value,
+    label: opt.labelKey ? t(opt.labelKey) : opt.label,
+  }));
 
-const getPatientInitials = (patient) =>
+const getPatientName = (patient, t) =>
+  [patient.lastName, patient.firstName, patient.middleName].filter(Boolean).join(' ') || t('admin2.ap_patient_no_name');
+
+const getPatientInitials = (patient, t) =>
   [patient.firstName, patient.lastName]
     .filter(Boolean)
     .map((part) => part[0])
     .join('')
     .toUpperCase()
-    .slice(0, 2) || 'П';
+    .slice(0, 2) || t('admin2.ap_initial_fallback');
 
-const getGenderLabel = (gender) => {
+const getGenderLabel = (gender, t) => {
   const genderMap = {
-    male: 'Мужской',
-    female: 'Женский',
+    male: t('admin2.ap_gender_male'),
+    female: t('admin2.ap_gender_female'),
   };
-  return genderMap[gender] || 'Не указано';
+  return genderMap[gender] || t('admin2.ap_not_specified');
 };
 
-const formatDate = (value) => {
+const formatDate = (value, t) => {
   if (!value) {
-    return 'Нет визитов';
+    return t('admin2.ap_no_visits');
   }
 
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) {
-    return 'Нет визитов';
+    return t('admin2.ap_no_visits');
   }
 
   return parsed.toLocaleDateString('ru-RU');
 };
 
-const formatAge = (patient, calculateAge) => {
+const formatAge = (patient, calculateAge, t) => {
   if (!patient.birthDate) {
-    return 'Не указано';
+    return t('admin2.ap_not_specified');
   }
 
   const age = calculateAge(patient.birthDate);
-  return Number.isFinite(age) && age >= 0 ? `${age} лет` : 'Не указано';
+  return Number.isFinite(age) && age >= 0 ? t('admin2.ap_age_years', { age }) : t('admin2.ap_not_specified');
 };
 
 const AdminPatients = () => {
+  const { t } = useTranslation();
   // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
   const [confirm, confirmDialog] = useConfirm();
+  const genderOptions = getGenderOptions(t);
+  const ageOptions = getAgeOptions(t);
+  const bloodTypeOptions = getBloodTypeOptions(t);
   const {
     patients,
     loading,
@@ -122,12 +144,12 @@ const AdminPatients = () => {
   };
 
   const handleDeletePatient = async (patient) => {
-    const patientName = getPatientName(patient);
+    const patientName = getPatientName(patient, t);
     // P-013 fix: replaced window.confirm() with shared useConfirm hook.
     const ok = await confirm({
       title: t('admin.delete_patient_title'),
-      message: `Удалить пациента «${patientName}»?`,
-      description: 'Это действие необратимо. Все связанные записи будут помечены как удалённые.',
+      message: t('admin2.ap_delete_patient_message', { name: patientName }),
+      description: t('admin2.ap_delete_patient_description'),
       confirmLabel: t('admin.delete_confirm'),
       cancelLabel: t('admin.cancel'),
       intent: 'danger',
@@ -176,16 +198,16 @@ const AdminPatients = () => {
             <h2
               className="admin-title-20"
             >
-              Управление пациентами
+              {t('admin2.ap_page_title')}
             </h2>
             <p
               className="admin-patients-subtitle"
             >
-              Карточки пациентов, контакты и базовые демографические данные.
+              {t('admin2.ap_page_subtitle')}
             </p>
           </div>
           <Button onClick={handleCreatePatient} startIcon={<Plus size={16} />}>
-            Добавить пациента
+            {t('admin2.ap_add_patient_btn')}
           </Button>
         </div>
 
@@ -194,32 +216,32 @@ const AdminPatients = () => {
         >
           <Input
             type="text"
-            placeholder="Поиск пациентов..."
+            placeholder={t('admin2.ap_search_placeholder')}
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
             icon={Search}
             iconPosition="left"
-            aria-label="Поиск пациентов"
+            aria-label={t('admin2.ap_search_aria')}
           />
           <Select
             value={filterGender}
             onChange={setFilterGender}
             options={genderOptions}
             size="large"
-            aria-label="Фильтр по полу"
+            aria-label={t('admin2.ap_filter_gender_aria')}
           />
           <Select
             value={filterAgeRange}
             onChange={setFilterAgeRange}
             options={ageOptions}
             size="large"
-            aria-label="Фильтр по возрасту"
+            aria-label={t('admin2.ap_filter_age_aria')}
           />
           {/* UX Audit Admin #2.9: blood type filter перемещён в раскрытие.
               Редкий фильтр не должен занимать 25% фильтр-грида. */}
           <details style={{ marginTop: '4px' }}>
             <summary style={{ cursor: 'pointer', fontSize: '13px', color: 'var(--mac-accent-blue, #007aff)', userSelect: 'none' }}>
-              Расширенные фильтры {filterBloodType ? `(${filterBloodType})` : ''}
+              {t('admin2.ap_advanced_filters')} {filterBloodType ? `(${filterBloodType})` : ''}
             </summary>
             <div style={{ marginTop: '8px' }}>
               <Select
@@ -227,7 +249,7 @@ const AdminPatients = () => {
                 onChange={setFilterBloodType}
                 options={bloodTypeOptions}
                 size="large"
-                aria-label="Фильтр по группе крови"
+                aria-label={t('admin2.ap_filter_blood_type_aria')}
               />
             </div>
           </details>
@@ -238,8 +260,8 @@ const AdminPatients = () => {
           <div style={{ marginBottom: '12px' }}>
             <Button variant="ghost" size="sm" onClick={() => {
               setSearchTerm(''); setFilterGender(''); setFilterAgeRange(''); setFilterBloodType('');
-            }} aria-label="Сбросить все фильтры">
-              ✕ Сбросить фильтры
+            }} aria-label={t('admin2.ap_reset_filters_aria')}>
+              {t('admin2.ap_reset_filters_btn')}
             </Button>
           </div>
         )}
@@ -250,51 +272,51 @@ const AdminPatients = () => {
           ) : error ? (
             <MacOSEmptyState
               icon={RefreshCw}
-              title="Ошибка загрузки пациентов"
-              description="Не удалось загрузить список пациентов. Проверьте соединение и попробуйте снова."
+              title={t('admin2.ap_load_error_title')}
+              description={t('admin2.ap_load_error_desc')}
               action={
                 <Button onClick={refresh} startIcon={<RefreshCw size={16} />}>
-                  Обновить
+                  {t('admin2.ap_refresh_btn')}
                 </Button>
               }
             />
           ) : patients.length === 0 ? (
             <MacOSEmptyState
               icon={Users}
-              title="Пациенты не найдены"
+              title={t('admin2.ap_empty_title')}
               description={
                 filtersActive
-                  ? 'Попробуйте изменить параметры поиска.'
-                  : 'В системе пока нет пациентов.'
+                  ? t('admin2.ap_empty_desc_filtered')
+                  : t('admin2.ap_empty_desc_initial')
               }
               action={
                 <Button onClick={handleCreatePatient} startIcon={<Plus size={16} />}>
-                  Добавить первого пациента
+                  {t('admin2.ap_add_first_patient_btn')}
                 </Button>
               }
             />
           ) : (
             <div className="admin-table-wrapper">
-            <table className="admin-w-100pct-bc-collapse" aria-label="Таблица пациентов">
+            <table className="admin-w-100pct-bc-collapse" aria-label={t('admin2.ap_table_aria')}>
               <thead>
                 <tr
                   className="admin-patients-thead-row"
                 >
-                  <th scope="col" className="admin-patients-th">Пациент</th>
-                  <th scope="col" className="admin-patients-th">Возраст</th>
-                  <th scope="col" className="admin-patients-th">Пол</th>
-                  <th scope="col" className="admin-patients-th">Телефон</th>
-                  <th scope="col" className="admin-patients-th">Группа крови</th>
-                  <th scope="col" className="admin-patients-th">Последний визит</th>
-                  <th scope="col" className="admin-patients-th">Визиты</th>
-                  <th scope="col" className="admin-patients-th">Действия</th>
+                  <th scope="col" className="admin-patients-th">{t('admin2.ap_col_patient')}</th>
+                  <th scope="col" className="admin-patients-th">{t('admin2.ap_col_age')}</th>
+                  <th scope="col" className="admin-patients-th">{t('admin2.ap_col_gender')}</th>
+                  <th scope="col" className="admin-patients-th">{t('admin2.ap_col_phone')}</th>
+                  <th scope="col" className="admin-patients-th">{t('admin2.ap_col_blood_type')}</th>
+                  <th scope="col" className="admin-patients-th">{t('admin2.ap_col_last_visit')}</th>
+                  <th scope="col" className="admin-patients-th">{t('admin2.ap_col_visits')}</th>
+                  <th scope="col" className="admin-patients-th">{t('admin2.col_actions')}</th>
                 </tr>
               </thead>
               <tbody>
                 {/* UX Audit Admin #1.5: indicator for 200-row cap. */}
                 {patients.length > 200 && (
                   <tr><td colSpan="7" style={{ textAlign: 'center', padding: '8px', fontSize: '13px', color: 'var(--mac-text-secondary)' }}>
-                    Показано 1–200 из {patients.length}. Уточните поиск, чтобы увидеть остальные.
+                    {t('admin2.ap_cap_message', { count: patients.length })}
                   </td></tr>
                 )}
                 {/* PR-41 / High-17: cap rendered rows to 200 to avoid rendering
@@ -308,7 +330,7 @@ const AdminPatients = () => {
                     className="admin-patients-tbody-row"
                     >
                     <td
-                      aria-label={`Пациент ${getPatientName(patient)}`}
+                      aria-label={t('admin2.ap_patient_aria', { name: getPatientName(patient, t) })}
                       className="admin-p-12-16"
                     >
                       <div className="admin-flex-center-12">
@@ -316,18 +338,18 @@ const AdminPatients = () => {
                           aria-hidden="true"
                           className="admin-patients-avatar"
                         >
-                          {getPatientInitials(patient)}
+                          {getPatientInitials(patient, t)}
                         </div>
                         <div>
                           <p
                             className="admin-patients-name"
                           >
-                            {getPatientName(patient)}
+                            {getPatientName(patient, t)}
                           </p>
                           <p
                             className="admin-patients-email"
                           >
-                            {patient.email || 'Email не указан'}
+                            {patient.email || t('admin2.ap_email_not_specified')}
                           </p>
                           {patient.address ? (
                             <p
@@ -339,34 +361,34 @@ const AdminPatients = () => {
                         </div>
                       </div>
                     </td>
-                    <td className="admin-patients-td">{formatAge(patient, calculateAge)}</td>
+                    <td className="admin-patients-td">{formatAge(patient, calculateAge, t)}</td>
                     <td className="admin-p-12-16">
                       <Badge variant={patient.gender === 'male' ? 'info' : 'success'}>
-                        {getGenderLabel(patient.gender)}
+                        {getGenderLabel(patient.gender, t)}
                       </Badge>
                     </td>
-                    <td className="admin-patients-td">{patient.phone || 'Не указан'}</td>
+                    <td className="admin-patients-td">{patient.phone || t('admin2.ap_phone_not_specified')}</td>
                     <td className="admin-p-12-16">
                       {patient.bloodType ? (
                         <Badge variant="warning">{patient.bloodType}</Badge>
                       ) : (
                         <span className="admin-text-sm-tertiary">
-                          Не указано
+                          {t('admin2.ap_not_specified')}
                         </span>
                       )}
                     </td>
-                    <td className="admin-patients-td">{formatDate(patient.lastVisit)}</td>
-                    <td className="admin-patients-td">{patient.visitsCount || 0} визитов</td>
+                    <td className="admin-patients-td">{formatDate(patient.lastVisit, t)}</td>
+                    <td className="admin-patients-td">{t('admin2.ap_visits_count', { count: patient.visitsCount || 0 })}</td>
                     <td
-                      aria-label={`Действия для пациента ${getPatientName(patient)}`}
+                      aria-label={t('admin2.ap_actions_aria', { name: getPatientName(patient, t) })}
                       className="admin-p-12-16"
                     >
                       <div className="flex items-center justify-center gap-2">
-                        <IconButton label="Редактировать пациента" onClick={() => handleEditPatient(patient)}>
+                        <IconButton label={t('admin2.ap_edit_aria')} onClick={() => handleEditPatient(patient)}>
                           <Edit size={16} />
                         </IconButton>
                         <IconButton
-                          label="Удалить пациента"
+                          label={t('admin2.ap_delete_aria')}
                           tone="danger"
                           onClick={() => handleDeletePatient(patient)}
                         >

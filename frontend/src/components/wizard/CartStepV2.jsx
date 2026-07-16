@@ -18,7 +18,7 @@ import { normalizeCategoryCode } from '../../utils/serviceCodeUtils';
 import { MIXED_REPEAT_WARNING, categories } from './wizardUtils';
 // UX Audit R-3.3: largest inline style blocks migrated to CSS classes.
 import './CartStepV2.css';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const CartStepV2 = ({
   cart,
@@ -38,6 +38,7 @@ const CartStepV2 = ({
   onApplyRepeatSuggestion,
   repeatSuggestionSummary
 }) => {
+  const { t } = useTranslation();
   // Local state removed - lifted to AppointmentWizardV2
 
   // Categories are now defined globally at the top of the file
@@ -63,7 +64,7 @@ const CartStepV2 = ({
     // Edit mode loads every service, but category tabs still filter what is displayed.
     return filtered.filter((service) => {
       const normalizedCategory = service.category_code ? normalizeCategoryCode(service.category_code) : 'other';
-      const isConsultation = service.name.toLowerCase().includes('консультация');
+      const isConsultation = service.name.toLowerCase().includes(t('misc.csv_konsultatsiya'));
 
       // ✅ Проверка на ЭКГ, ЭхоКГ и рентгенографию по service_code и названию
       const serviceCode = service.service_code ? String(service.service_code).toUpperCase() : '';
@@ -71,16 +72,16 @@ const CartStepV2 = ({
 
       const isECG = serviceCode === 'K10' ||
       serviceCode.includes('ECG') ||
-      serviceName.includes('экг');
+      serviceName.includes(t('misc.csv_ekg'));
 
       const isEchoCG = serviceCode === 'K11' ||
       serviceCode.includes('ECHO') ||
-      serviceName.includes('эхокг') ||
-      serviceName.includes('эхо-кг');
+      serviceName.includes(t('misc.csv_ehokg')) ||
+      serviceName.includes(t('misc.csv_eho_kg'));
 
       // ✅ Рентгенография зубов: S-коды (стоматология) + название содержит "рентген"
       const isDentalXRay = serviceCode.startsWith('S') && serviceCode.match(/^S\d+$/) && (
-      serviceName.includes('рентген') || serviceName.includes('рентгено') || serviceName.includes('x-ray') || serviceName.includes('xray') || serviceName.includes('рентгенография'));
+      serviceName.includes(t('misc.csv_rentgen')) || serviceName.includes(t('misc.csv_rentgeno')) || serviceName.includes('x-ray') || serviceName.includes('xray') || serviceName.includes(t('misc.csv_rentgenografiya')));
 
       switch (activeCategory) {
         case 'specialists':
@@ -173,7 +174,7 @@ const CartStepV2 = ({
       doctor.user?.username ||
       doctor.full_name ||
       doctor.name ||
-      `Врач #${doctor.id}`
+      t('misc.csv_vrach_doctor_id', { id: doctor.id })
     );
   }, []);
 
@@ -275,7 +276,7 @@ const CartStepV2 = ({
 
             {consultationRows.map((row) => {
             const isEligible = Boolean(row.eligibility?.eligible);
-            const reason = row.eligibility?.reason || 'Проверка недоступна';
+            const reason = row.eligibility?.reason || t('misc.csv_proverka_nedostupna');
             const discount = Number(row.eligibility?.repeat_discount_percent || 0);
             return (
               <div key={row.itemId} className="cart-step-v2__consultation-row">
@@ -284,17 +285,17 @@ const CartStepV2 = ({
                       {row.serviceName}
                     </div>
                     <div className="cart-step-v2__consultation-doctor">
-                      {row.doctorName ? `Врач: ${row.doctorName}` : 'Врач не выбран'}
+                      {row.doctorName ? t('misc.csv_vrach_row_doctorname', { doctorName: row.doctorName }) : t('misc.csv_vrach_ne_vybran')}
                     </div>
                   </div>
                   {/* QW-10 fix: wrapped repeat-eligibility badge in Tooltip with explanation. */}
                   {/* Previously only had native title={reason} — users didn't know WHAT the badge meant. */}
                   <Tooltip
                     content={isRepeatEligibilityLoading && !row.eligibility ?
-                      'Проверяем историю визитов пациента, чтобы определить право на повторную скидку.' :
+                      t('misc.csv_proveryaem_istoriyu_vizitov_') :
                       isEligible ?
-                      `Этому пациенту положена повторная консультация со скидкой ${discount}%. Основание: ${reason}` :
-                      `Повторная скидка недоступна. Причина: ${reason}`
+                      t('misc.csv_etomu_patsientu_polozhena_po', { discount: discount, reason: reason }) :
+                      t('misc.csv_povtornaya_skidka_nedostupna', { reason: reason })
                     }
                     position="top"
                     delay={300}>
@@ -313,10 +314,10 @@ const CartStepV2 = ({
                   '1px solid color-mix(in srgb, var(--mac-warning), transparent 70%)'
                 }}>
                     {isRepeatEligibilityLoading && !row.eligibility ?
-                  'Проверка...' :
+                  t('misc.csv_proverka') :
                   isEligible ?
-                  `Доступна повторная скидка ${discount}%` :
-                  `Повторная скидка недоступна (${reason})`}
+                  t('misc.csv_dostupna_povtornaya_skidka_d', { discount: discount }) :
+                  t('misc.csv_povtornaya_skidka_nedostupna_2', { reason: reason })}
                   </div>
                   </Tooltip>
                 </div>);
@@ -331,7 +332,7 @@ const CartStepV2 = ({
           const doctorGroups = new Map();
           cart.items.forEach((item) => {
             const docId = item.doctor_id || 'no_doctor';
-            const docName = item.doctor_name || (item.doctor_id ? `Врач #${item.doctor_id}` : 'Без врача');
+            const docName = item.doctor_name || (item.doctor_id ? t('misc.csv_vrach_item_doctor_id', { doctor_id: item.doctor_id }) : t('misc.csv_bez_vracha'));
             if (!doctorGroups.has(docId)) {
               doctorGroups.set(docId, { id: docId, name: docName, items: [] });
             }
@@ -367,7 +368,7 @@ const CartStepV2 = ({
         }}>
             {cart.items.map((item) => {
             // ✅ SSOT: Используем единую функцию для получения названия услуги
-            const displayName = getServiceName ? getServiceName(item) : item.service_name || 'Неизвестная услуга';
+            const displayName = getServiceName ? getServiceName(item) : item.service_name || t('misc.csv_neizvestnaya_usluga');
             const service = servicesData?.find((s) => s.id === item.service_id);
             const requiresDoctor = Boolean(service?.requires_doctor || service?.is_consultation);
 
@@ -462,10 +463,10 @@ const CartStepV2 = ({
                       color: 'var(--mac-text-primary)'
                     }}>
 
-                        <option value="">Выберите врача</option>
+                        <option value="">{t('misc.csv_vyberite_vracha')}</option>
                         {doctorOptions.map((doctor, index) =>
                     <option key={`${doctor.id ?? 'doctor'}-${doctor.specialty ?? ''}-${index}`} value={doctor.id}>
-                            {getDoctorDisplayName(doctor)}{doctor.specialty ? ` · ${doctor.specialty}` : ''}{doctor.cabinet ? ` · каб. ${doctor.cabinet}` : ''}
+                            {getDoctorDisplayName(doctor)}{doctor.specialty ? ` · ${doctor.specialty}` : t('misc.csv_doctor_cabinet_kab_doctor_ca')}
                           </option>)}
                       </select>
                       {filteredDoctors.length === 0 && normalizedDoctorsData.length > 0 && (

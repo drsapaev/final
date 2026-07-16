@@ -18,7 +18,7 @@
 import PropTypes from 'prop-types';
 import { TestTube, Plus, Save } from 'lucide-react';
 import { Button, Textarea, Badge, MacOSCard } from '../ui/macos';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 /**
  * @param {Object} props
@@ -53,6 +53,7 @@ export function BloodTestsTab({
   getFontSize,
   getSpacing,
 }) {
+  const { t } = useTranslation();
   // Helper: compute average of a field across all blood tests
   const avg = (key) => {
     const nums = bloodTests
@@ -65,9 +66,9 @@ export function BloodTestsTab({
 
   // Stats items
   const statItems = [
-    { label: 'Средний общий холестерин', value: avg('cholesterol_total'), unit: 'мг/дл' },
-    { label: 'Средний LDL', value: avg('cholesterol_ldl'), unit: 'мг/дл', critical: isLdlCritical(avg('cholesterol_ldl')) },
-    { label: 'Средняя глюкоза', value: avg('glucose'), unit: 'мг/дл' },
+    { label: t('cardio.cardio_blood_stat_avg_cholesterol'), value: avg('cholesterol_total'), unit: t('cardio.cardio_blood_unit_mgdl') },
+    { label: t('cardio.cardio_blood_stat_avg_ldl'), value: avg('cholesterol_ldl'), unit: t('cardio.cardio_blood_unit_mgdl'), critical: isLdlCritical(avg('cholesterol_ldl')) },
+    { label: t('cardio.cardio_blood_stat_avg_glucose'), value: avg('glucose'), unit: t('cardio.cardio_blood_unit_mgdl') },
   ];
 
   // Helper: render a form input with range validation
@@ -114,12 +115,10 @@ export function BloodTestsTab({
         <TestTube size={18} style={{ color: 'var(--mac-warning)', flexShrink: 0, marginTop: '2px' }} />
         <div>
           <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-warning)' }}>
-            Ручной ввод анализов — устаревший режим
+            {t('cardio.cardio_blood_notice_title')}
           </div>
           <div style={{ fontSize: '13px', color: 'var(--mac-text-secondary)', marginTop: '4px' }}>
-            Для новых анализов используйте раздел «Результаты анализов» в карте приёма (EMR) —
-            кнопка «Заказать анализы» отправляет заказ напрямую в лабораторию.
-            Исторические данные остаются доступны ниже.
+            {t('cardio.cardio_blood_notice_desc')}
           </div>
         </div>
       </div>
@@ -129,11 +128,11 @@ export function BloodTestsTab({
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: getSpacing('lg') }}>
           <h3 style={{ display: 'flex', alignItems: 'center', fontSize: getFontSize('lg'), fontWeight: '500', color: getColor('text') }}>
             <TestTube size={20} style={{ marginRight: getSpacing('sm'), color: getColor('secondary', 600) }} />
-            Анализы крови (история)
+            {t('cardio.cardio_blood_history_title')}
           </h3>
-          <Button onClick={onNewTest} title="Ручной ввод — используйте только если лаборатория недоступна">
+          <Button onClick={onNewTest} title={t('cardio.cardio_blood_manual_input_title')}>
             <Plus size={16} className="cardio-icon-mr" />
-            Ручной ввод
+            {t('cardio.cardio_blood_manual_input')}
           </Button>
         </div>
 
@@ -168,22 +167,22 @@ export function BloodTestsTab({
             {bloodTests.map((test) => (
               <div key={test.id} style={{ padding: getSpacing('lg'), border: `1px solid ${getColor('border')}`, backgroundColor: getColor('surface'), borderRadius: '8px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: getSpacing('sm') }}>
-                  <h4 style={{ fontSize: getFontSize('base'), fontWeight: '500', color: getColor('text') }}>Анализ #{test.id}</h4>
+                  <h4 style={{ fontSize: getFontSize('base'), fontWeight: '500', color: getColor('text') }}>{t('cardio.cardio_blood_test_title', { id: test.id })}</h4>
                   <Badge variant="info">{test.test_date}</Badge>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: getSpacing('lg'), fontSize: getFontSize('sm'), color: getColor('textSecondary'), marginBottom: getSpacing('sm') }}>
-                  <div>Холестерин: {test.cholesterol_total} мг/дл</div>
+                  <div>{t('cardio.cardio_blood_cholesterol', { value: test.cholesterol_total })}</div>
                   <div>HDL: {test.cholesterol_hdl}</div>
                   <div style={isLdlCritical(test.cholesterol_ldl) ? { color: 'var(--mac-error)', fontWeight: '600' } : undefined}>
                     LDL: {test.cholesterol_ldl}
-                    {isLdlCritical(test.cholesterol_ldl) && <span style={{ marginLeft: '4px', fontSize: getFontSize('xs') }}>критический</span>}
+                    {isLdlCritical(test.cholesterol_ldl) && <span style={{ marginLeft: '4px', fontSize: getFontSize('xs') }}>{t('cardio.cardio_blood_critical')}</span>}
                   </div>
-                  <div>Триглицериды: {test.triglycerides}</div>
+                  <div>{t('cardio.cardio_blood_triglycerides', { value: test.triglycerides })}</div>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: getSpacing('lg'), fontSize: getFontSize('sm'), color: getColor('textSecondary') }}>
-                  <div>Глюкоза: {test.glucose} мг/дл</div>
-                  <div>CRP: {test.crp} мг/л</div>
-                  <div>Тропонин: {test.troponin} нг/мл</div>
+                  <div>{t('cardio.cardio_blood_glucose', { value: test.glucose })}</div>
+                  <div>{t('cardio.cardio_blood_crp', { value: test.crp })}</div>
+                  <div>{t('cardio.cardio_blood_troponin', { value: test.troponin })}</div>
                 </div>
                 {test.interpretation && (
                   <div style={{ marginTop: getSpacing('sm'), padding: getSpacing('sm'), background: getColor('surfaceSecondary'), borderRadius: '4px', fontSize: getFontSize('sm'), color: getColor('textSecondary') }}>
@@ -196,9 +195,9 @@ export function BloodTestsTab({
         ) : (
           <div style={{ textAlign: 'center', padding: getSpacing('xl'), color: getColor('textSecondary') }}>
             <TestTube size={48} style={{ opacity: 0.3, marginBottom: getSpacing('md') }} />
-            <div style={{ fontSize: getFontSize('base') }}>Нет данных анализов</div>
+            <div style={{ fontSize: getFontSize('base') }}>{t('cardio.cardio_blood_empty_title')}</div>
             <div style={{ fontSize: getFontSize('sm'), marginTop: getSpacing('xs') }}>
-              Нажмите «Новый анализ» для создания записи
+              {t('cardio.cardio_blood_empty_desc')}
             </div>
           </div>
         )}
@@ -208,29 +207,29 @@ export function BloodTestsTab({
       {showFormOpen && (
         <MacOSCard className="cardio-card-padded">
           <h3 style={{ fontSize: getFontSize('lg'), fontWeight: '500', marginBottom: getSpacing('lg'), color: getColor('text') }}>
-            Новый анализ крови
+            {t('cardio.cardio_blood_form_title')}
           </h3>
           <form onSubmit={onSubmit} style={{ display: 'flex', flexDirection: 'column', gap: getSpacing('lg') }}>
             <div className="grid grid-cols-1 md:grid-cols-3" style={{ gap: getSpacing('lg') }}>
               <div>
-                <label className="cardio-form-label">Дата анализа *</label>
+                <label className="cardio-form-label">{t('cardio.cardio_blood_date_label')}</label>
                 <input
                   type="date"
                   required
-                  aria-label="Дата анализа"
+                  aria-label={t('cardio.cardio_blood_date_aria')}
                   value={bloodTestForm.test_date}
                   onChange={(e) => setBloodTestForm({ ...bloodTestForm, test_date: e.target.value })}
                   className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white cardio-input-themed"
                   style={{ border: `1px solid ${getColor('border')}`, backgroundColor: getColor('surface'), color: getColor('text') }}
                 />
               </div>
-              {renderField('cholesterol_total', 'Общий холестерин (мг/дл)', '<200', 'Общий холестерин')}
-              {renderField('cholesterol_hdl', 'HDL холестерин (мг/дл)', '>40', 'Холестерин HDL')}
+              {renderField('cholesterol_total', t('cardio.cardio_blood_total_ch_label'), t('cardio.cardio_blood_ph_total_ch'), t('cardio.cardio_blood_total_ch_label'))}
+              {renderField('cholesterol_hdl', t('cardio.cardio_blood_hdl_label'), t('cardio.cardio_blood_ph_hdl'), t('cardio.cardio_blood_hdl_label'))}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3" style={{ gap: getSpacing('lg') }}>
               <div>
-                <label className="cardio-form-label">LDL холестерин (мг/дл)</label>
+                <label className="cardio-form-label">{t('cardio.cardio_blood_ldl_label')}</label>
                 <input
                   type="number"
                   aria-label="LDL cholesterol"
@@ -242,29 +241,29 @@ export function BloodTestsTab({
                     backgroundColor: isLdlCritical(bloodTestForm.cholesterol_ldl) ? 'var(--mac-error-bg)' : getColor('surface'),
                     color: isLdlCritical(bloodTestForm.cholesterol_ldl) ? 'var(--mac-error)' : getColor('text'),
                   }}
-                  placeholder="<100"
+                  placeholder={t('cardio.cardio_blood_ph_ldl')}
                 />
                 {isLdlCritical(bloodTestForm.cholesterol_ldl) && (
                   <div role="alert" style={{ marginTop: '4px', fontSize: getFontSize('xs'), color: 'var(--mac-error)', fontWeight: '500' }}>
-                    LDL превышает порог {settings?.ldlThreshold ?? 100} мг/дл — рекомендуется интенсивная терапия статинами.
+                    {t('cardio.cardio_blood_ldl_warning', { threshold: settings?.ldlThreshold ?? 100 })}
                   </div>
                 )}
               </div>
-              {renderField('triglycerides', 'Триглицериды (мг/дл)', '<150', 'Триглицериды')}
-              {renderField('glucose', 'Глюкоза (мг/дл)', '70-100', 'Глюкоза')}
+              {renderField('triglycerides', t('cardio.cardio_blood_triglycerides_label'), t('cardio.cardio_blood_ph_triglycerides'), t('cardio.cardio_blood_triglycerides_label'))}
+              {renderField('glucose', t('cardio.cardio_blood_glucose_label'), t('cardio.cardio_blood_ph_glucose'), t('cardio.cardio_blood_glucose_label'))}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2" style={{ gap: getSpacing('lg') }}>
-              {renderField('crp', 'CRP (мг/л)', '<3.0', 'CRP')}
-              {renderField('troponin', 'Тропонин (нг/мл)', '<0.04', 'Тропонин')}
+              {renderField('crp', t('cardio.cardio_blood_crp_label'), t('cardio.cardio_blood_ph_crp'), 'CRP')}
+              {renderField('troponin', t('cardio.cardio_blood_troponin_label'), t('cardio.cardio_blood_ph_troponin'), t('cardio.cardio_blood_troponin_label'))}
             </div>
 
             <div>
-              <label className="cardio-form-label">Интерпретация</label>
+              <label className="cardio-form-label">{t('cardio.cardio_blood_interpretation_label')}</label>
               <Textarea
                 value={bloodTestForm.interpretation}
                 onChange={(e) => setBloodTestForm({ ...bloodTestForm, interpretation: e.target.value })}
-                placeholder="Интерпретация результатов анализов"
+                placeholder={t('cardio.cardio_blood_ph_interpretation')}
                 rows={4}
               />
             </div>
@@ -278,11 +277,11 @@ export function BloodTestsTab({
                   setBloodTestForm(getEmptyBloodTestForm());
                 }}
               >
-                Отмена
+                {t('cardio.cardio_blood_cancel')}
               </Button>
               <Button type="submit">
                 <Save size={16} className="cardio-icon-mr" />
-                Сохранить анализ
+                {t('cardio.cardio_blood_save')}
               </Button>
             </div>
           </form>

@@ -12,7 +12,7 @@ import PaymentWidget from '../components/payment/PaymentWidget';
 import { getApiOrigin, setToken, getToken } from '../api/client';
 
 import logger from '../utils/logger';
-import { useTranslation } from '../i18n/adapter';
+import { useTranslation } from '../i18n/useTranslation';
 
 const pageStyle = {
   maxWidth: 1180,
@@ -112,7 +112,7 @@ const PaymentTest = () => {
     visitId: 1,
     amount: 150000,
     currency: 'UZS',
-    description: 'Тестовая оплата медицинских услуг'
+    description: t('misc.pt_testovaya_oplata_meditsinski')
   });
   const [result, setResult] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -136,7 +136,7 @@ const PaymentTest = () => {
     setResult({
       type: 'success',
       data: paymentData,
-      message: 'Платеж успешно обработан!'
+      message: t('misc.pt_platezh_uspeshno_obrabotan')
     });
     setShowWidget(false);
   };
@@ -154,7 +154,7 @@ const PaymentTest = () => {
     setShowWidget(false);
     setResult({
       type: 'info',
-      message: 'Платеж отменен пользователем'
+      message: t('misc.pt_platezh_otmenen_polzovatelem')
     });
   };
 
@@ -260,11 +260,11 @@ const PaymentTest = () => {
                       onClick={() => {
                         // P2 warning: setToken(null) globally resets auth — only use in test context
   // This is a test page, so it's acceptable, but add a confirm dialog
-  if (window.confirm('Это сбросит авторизацию. Продолжить?')) {
+  if (window.confirm(t('misc.pt_eto_sbrosit_avtorizatsiyu_pr'))) {
     setToken(null);
   }
                         setIsAuthenticated(false);
-                        setResult({ type: 'info', message: 'Авторизация сброшена' });
+                        setResult({ type: 'info', message: t('misc.pt_avtorizatsiya_sbroshena') });
                       }}
                       style={fullWidthButtonStyle}
                     >
@@ -281,7 +281,7 @@ const PaymentTest = () => {
                   style={fullWidthButtonStyle}
                 >
                   <CreditCard size={18} aria-hidden="true" />
-                  {showWidget ? 'Тест запущен...' : isAuthenticated ? 'Запустить тест' : 'Требуется авторизация'}
+                  {showWidget ? t('misc.pt_test_zapuschen') : isAuthenticated ? t('misc.pt_zapustit_test') : t('misc.pt_trebuetsya_avtorizatsiya')}
                 </Button>
               </div>
             </CardContent>
@@ -351,17 +351,17 @@ const PaymentTest = () => {
           <div style={statsGridStyle}>
             <div style={statItemStyle}>
               <Typography variant="h4" color="primary">3</Typography>
-              <Typography variant="body2" color="textSecondary">Провайдера</Typography>
+              <Typography variant="body2" color="textSecondary">{t('misc.pt_provaydera')}</Typography>
             </div>
 
             <div style={statItemStyle}>
               <Typography variant="h4" color="success">2</Typography>
-              <Typography variant="body2" color="textSecondary">Валюты</Typography>
+              <Typography variant="body2" color="textSecondary">{t('misc.pt_valyuty')}</Typography>
             </div>
 
             <div style={statItemStyle}>
               <Typography variant="h4" color="warning">100%</Typography>
-              <Typography variant="body2" color="textSecondary">Готовность</Typography>
+              <Typography variant="body2" color="textSecondary">{t('misc.pt_gotovnost')}</Typography>
             </div>
 
             <div style={statItemStyle}>
@@ -372,7 +372,7 @@ const PaymentTest = () => {
 
           <Alert severity="info" style={{ marginTop: 16 }}>
             <Typography variant="body2">
-              <strong>Поддерживаемые провайдеры:</strong> Click (UZS), Payme (UZS), Kaspi (KZT)
+              <strong>{t('misc.pt_podderzhivaemye_provaydery')}</strong> Click (UZS), Payme (UZS), Kaspi (KZT)
               <br />
               <strong>Backend:</strong> {getApiOrigin()}
               <br />

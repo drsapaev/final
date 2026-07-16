@@ -9,7 +9,7 @@ import { Camera } from 'lucide-react';
 import PhotoUploader from './PhotoUploader';
 import SkinAnalysis from './SkinAnalysis';
 import PhotoComparison from './PhotoComparison';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 export function DermaPhotosTab({
   hasPatient,
@@ -19,13 +19,14 @@ export function DermaPhotosTab({
   onPhotoUpdate,
   onGoToAppointments,
 }) {
+  const { t } = useTranslation();
   if (!hasPatient) {
     return (
       <MacOSEmptyState
         icon={Camera}
-        title="Выберите пациента"
-        description="Откройте прием из очереди или списка записей для работы с фото"
-        action={<Button variant="outline" onClick={onGoToAppointments} style={{ marginTop: 'var(--mac-spacing-4)' }}>Перейти к записям</Button>}
+        title={t('derma.derma_photos_select_patient_title')}
+        description={t('derma.derma_photos_select_patient_desc')}
+        action={<Button variant="outline" onClick={onGoToAppointments} style={{ marginTop: 'var(--mac-spacing-4)' }}>{t('derma.derma_photos_go_to_appointments')}</Button>}
       />
     );
   }
@@ -34,7 +35,7 @@ export function DermaPhotosTab({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-6)' }}>
       <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
         <h3 style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-semibold)', marginBottom: 'var(--mac-spacing-5)', color: 'var(--mac-text-primary)' }}>
-          Загрузка фото
+          {t('derma.derma_photos_upload_title')}
         </h3>
         <PhotoUploader
           visitId={currentAppointment?.visit_id}
@@ -45,7 +46,7 @@ export function DermaPhotosTab({
 
       <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
         <h3 style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-semibold)', marginBottom: 'var(--mac-spacing-5)', color: 'var(--mac-text-primary)' }}>
-          AI анализ кожи
+          {t('derma.derma_photos_ai_title')}
         </h3>
         <SkinAnalysis
           photos={photoData}
@@ -59,7 +60,7 @@ export function DermaPhotosTab({
 
       <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
         <h3 style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-semibold)', marginBottom: 'var(--mac-spacing-5)', color: 'var(--mac-text-primary)' }}>
-          Сравнение «до» и «после»
+          {t('derma.derma_photos_compare_title')}
         </h3>
         <PhotoComparison
           beforePhoto={photoData.before?.[0]}

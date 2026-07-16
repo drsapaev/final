@@ -9,7 +9,7 @@
 
 import PropTypes from 'prop-types';
 import AIAssistant from '../ai/AIAssistant';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 /**
  * @param {Object} props

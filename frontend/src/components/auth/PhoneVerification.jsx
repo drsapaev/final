@@ -15,7 +15,7 @@ import { toast } from 'react-toastify';
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
 import { useSafeInput } from '../../hooks/useSafeInput';  // PR-39 / P0-5: sanitizer wired to form
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 const PhoneVerification = ({
   phone,
   purpose = 'verification',
@@ -103,7 +103,7 @@ const PhoneVerification = ({
 
   const sendVerificationCode = async () => {
     if (!currentPhone || !validatePhone(currentPhone)) {
-      toast.error('Введите корректный номер телефона в формате +998XXXXXXXXX');
+      toast.error(t('misc.pv_vvedite_korrektnyy_nomer_tel'));
       return;
     }
 
@@ -124,17 +124,17 @@ const PhoneVerification = ({
         setCodeSent(true);
         setTimeLeft(response.data.expires_in_minutes * 60);
         setAttemptsLeft(3);
-        toast.success('Код верификации отправлен на ваш номер');
+        toast.success(t('misc.pv_kod_verifikatsii_otpravlen_n'));
       }
     } catch (error) {
       logger.error('Error sending verification code:', error);
       
       if (error.response?.status === 429) {
-        toast.error('Слишком частые запросы. Попробуйте позже.');
+        toast.error(t('misc.pv_slishkom_chastye_zaprosy_pop'));
       } else if (error.response?.status === 502) {
-        toast.error('Ошибка отправки SMS. Проверьте номер телефона.');
+        toast.error(t('misc.pv_oshibka_otpravki_sms_provert'));
       } else {
-        toast.error('Ошибка отправки кода верификации');
+        toast.error(t('misc.pv_oshibka_otpravki_koda_verifi'));
       }
     } finally {
       setLoading(false);
@@ -143,7 +143,7 @@ const PhoneVerification = ({
 
   const verifyCode = async () => {
     if (!verificationCode || verificationCode.length !== 6) {
-      toast.error('Введите 6-значный код');
+      toast.error(t('misc.pv_vvedite_6_znachnyy_kod'));
       return;
     }
 
@@ -156,7 +156,7 @@ const PhoneVerification = ({
       });
 
       if (response.data.success) {
-        toast.success('Номер телефона успешно подтвержден!');
+        toast.success(t('misc.pv_nomer_telefona_uspeshno_podt'));
         if (onVerified) {
           onVerified({
             phone: currentPhone,
@@ -170,19 +170,19 @@ const PhoneVerification = ({
       const errorData = error.response?.data?.detail;
       
       if (error.response?.status === 404) {
-        toast.error('Код не найден или истек');
+        toast.error(t('misc.pv_kod_ne_nayden_ili_istek'));
         setCodeSent(false);
       } else if (error.response?.status === 410) {
-        toast.error('Код истек. Запросите новый код');
+        toast.error(t('misc.pv_kod_istek_zaprosite_novyy_ko'));
         setCodeSent(false);
       } else if (error.response?.status === 429) {
-        toast.error('Превышено количество попыток');
+        toast.error(t('misc.pv_prevysheno_kolichestvo_popyt'));
         setCodeSent(false);
       } else if (errorData?.attempts_left !== undefined) {
         setAttemptsLeft(errorData.attempts_left);
-        toast.error(`Неверный код. Осталось попыток: ${errorData.attempts_left}`);
+        toast.error(t('misc.pv_nevernyy_kod_ostalos_popytok', { attempts_left: errorData.attempts_left }));
       } else {
-        toast.error('Ошибка проверки кода');
+        toast.error(t('misc.pv_oshibka_proverki_koda'));
       }
     } finally {
       setLoading(false);
@@ -236,7 +236,7 @@ const PhoneVerification = ({
         {/* Ввод номера телефона */}
         {(showPhoneInput || !phone) && (
           <div className="space-y-2">
-            <Label htmlFor="phone">Номер телефона</Label>
+            <Label htmlFor="phone">{t('misc.pv_nomer_telefona')}</Label>
             <div className="relative">
               <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
@@ -273,8 +273,8 @@ const PhoneVerification = ({
             onClick={sendVerificationCode}
             disabled={loading || !currentPhone || !validatePhone(currentPhone)}
             type="button"
-            title={loading ? 'Отправляется код подтверждения' : 'Отправить код подтверждения'}
-            aria-label={loading ? 'Отправляется код подтверждения' : 'Отправить код подтверждения'}
+            title={loading ? t('misc.pv_otpravlyaetsya_kod_podtverzh') : t('misc.pv_otpravit_kod_podtverzhdeniya')}
+            aria-label={loading ? t('misc.pv_otpravlyaetsya_kod_podtverzh') : t('misc.pv_otpravit_kod_podtverzhdeniya')}
             className="w-full"
           >
             {loading ? (
@@ -295,7 +295,7 @@ const PhoneVerification = ({
         {codeSent && (
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="code">Код верификации</Label>
+              <Label htmlFor="code">{t('misc.pv_kod_verifikatsii')}</Label>
               <Input
                 id="code"
                 type="text"
@@ -315,7 +315,7 @@ const PhoneVerification = ({
               <div className="flex items-center gap-1">
                 <Clock className="h-4 w-4" />
                 <span>
-                  {timeLeft > 0 ? `Код действителен: ${formatTime(timeLeft)}` : 'Код истек'}
+                  {timeLeft > 0 ? t('misc.pv_kod_deystvitelen_formattime_', { timeLeft: formatTime(timeLeft) }) : t('misc.pv_kod_istek')}
                 </span>
               </div>
               <div className="flex items-center gap-1">
@@ -331,7 +331,7 @@ const PhoneVerification = ({
                 disabled={loading || !verificationCode || verificationCode.length !== 6 || timeLeft === 0}
                 className="flex-1"
               >
-                {loading ? 'Проверка...' : 'Подтвердить'}
+                {loading ? t('misc.pv_proverka') : t('misc.pv_podtverdit')}
               </Button>
               
               <Button
@@ -340,7 +340,7 @@ const PhoneVerification = ({
                 disabled={loading}
                 className="flex-1"
               >
-                {timeLeft > 0 ? 'Отменить' : 'Повторить'}
+                {timeLeft > 0 ? t('misc.pv_otmenit') : t('misc.pv_povtorit')}
               </Button>
             </div>
           </div>

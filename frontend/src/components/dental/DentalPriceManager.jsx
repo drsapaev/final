@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect, useCallback } from 'react';
 import {
   DollarSign,
@@ -33,6 +33,7 @@ const DentalPriceManager = ({
   onClose
 }) => {
   useTheme();
+  const { t } = useTranslation();
   const [finalPrice, setFinalPrice] = useState('');
   const [reason, setReason] = useState('');
   const [details, setDetails] = useState('');
@@ -42,14 +43,14 @@ const DentalPriceManager = ({
 
   // Предустановленные причины для стоматологических процедур
   const dentalReasons = [
-  'Дополнительные манипуляции',
-  'Сложность случая',
-  'Использование премиум материалов',
-  'Увеличенное время лечения',
-  'Комплексное лечение',
-  'Экстренное вмешательство',
-  'Дополнительная анестезия',
-  'Повторное лечение'];
+    t('dental.dental_dpm_reason_extra_manipulations'),
+    t('dental.dental_dpm_reason_case_complexity'),
+    t('dental.dental_dpm_reason_premium_materials'),
+    t('dental.dental_dpm_reason_extended_time'),
+    t('dental.dental_dpm_reason_complex_treatment'),
+    t('dental.dental_dpm_reason_emergency'),
+    t('dental.dental_dpm_reason_extra_anesthesia'),
+    t('dental.dental_dpm_reason_retreatment')];
 
   const loadPriceOverrides = useCallback(async () => {
     setLoadingOverrides(true);
@@ -113,7 +114,7 @@ const DentalPriceManager = ({
       }
     } catch (error) {
       logger.error('Error setting price:', error);
-      notify.error(error?.response?.data?.detail || 'Ошибка указания цены');
+      notify.error(error?.response?.data?.detail || t('dental.dental_dpm_error_set_price'));
     } finally {
       setIsLoading(false);
     }
@@ -143,9 +144,9 @@ const DentalPriceManager = ({
 
   const getStatusText = (status) => {
     switch (status) {
-      case 'pending':return 'Ожидает подтверждения';
-      case 'approved':return 'Подтверждено';
-      case 'rejected':return 'Отклонено';
+      case 'pending':return t('dental.dental_dpm_status_pending');
+      case 'approved':return t('dental.dental_dpm_status_approved');
+      case 'rejected':return t('dental.dental_dpm_status_rejected');
       default:return status;
     }
   };
@@ -160,15 +161,15 @@ const DentalPriceManager = ({
           <div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
               <Stethoscope size={20} className="mr-2 text-blue-600" />
-              Указание цены после лечения
+              {t('dental.dental_dpm_header_title')}
             </h3>
             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-              {serviceName} • Плановая цена: {formatPrice(originalPrice)}
+              {t('dental.dental_dpm_header_subtitle', { serviceName, price: formatPrice(originalPrice) })}
             </p>
           </div>
           <button
             onClick={onClose}
-            aria-label={`Закрыть указание цены для услуги ${serviceName}`}
+            aria-label={t('dental.dental_dpm_aria_close', { serviceName })}
             className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
             
             <X size={24} />
@@ -182,29 +183,29 @@ const DentalPriceManager = ({
             <div className="flex items-center mb-2">
               <CheckSquare size={16} className="text-blue-600 mr-2" />
               <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                Лечение завершено
+                {t('dental.dental_dpm_treatment_done')}
               </span>
             </div>
             <p className="text-sm text-blue-800 dark:text-blue-200">
-              Укажите итоговую стоимость лечения с учетом проведенных процедур
+              {t('dental.dental_dpm_treatment_done_hint')}
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label htmlFor="dental-final-price" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Итоговая стоимость (UZS)
+                {t('dental.dental_dpm_label_final_price')}
               </label>
               <div className="relative">
                 <DollarSign size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                 <Input
                   id="dental-final-price"
                   type="text"
-                  aria-label="Итоговая цена"
+                  aria-label={t('dental.dental_dpm_aria_final_price')}
                   value={finalPrice}
                   onChange={(e) => setFinalPrice(e.target.value)}
                   className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                  placeholder="Например: 150000"
+                  placeholder={t('dental.dental_dpm_placeholder_price')}
                   inputMode="numeric" />
                 
               </div>
@@ -212,47 +213,47 @@ const DentalPriceManager = ({
 
             <div>
               <label htmlFor="dental-price-reason" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Обоснование цены
+                {t('dental.dental_dpm_label_reason')}
               </label>
               <select
                 id="dental-price-reason"
-                aria-label="Причина изменения цены"
+                aria-label={t('dental.dental_dpm_aria_reason')}
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white mb-2">
                 
-                <option value="">Выберите причину</option>
+                <option value="">{t('dental.dental_dpm_select_reason')}</option>
                 {dentalReasons.map((reasonText, index) =>
                 <option key={index} value={reasonText}>{reasonText}</option>
                 )}
-                <option value="custom">Другая причина</option>
+                <option value="custom">{t('dental.dental_dpm_option_custom')}</option>
               </select>
               
               {reason === 'custom' &&
               <Input
                 id="dental-custom-price-reason"
                 type="text"
-                aria-label="Другая причина изменения цены"
+                aria-label={t('dental.dental_dpm_aria_custom_reason')}
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                placeholder="Введите причину" />
+                placeholder={t('dental.dental_dpm_placeholder_custom_reason')} />
 
               }
             </div>
 
             <div>
               <label htmlFor="dental-treatment-details" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Детали лечения (необязательно)
+                {t('dental.dental_dpm_label_details')}
               </label>
               <textarea
                 id="dental-treatment-details"
-                aria-label="Детали лечения"
+                aria-label={t('dental.dental_dpm_aria_details')}
                 value={details}
                 onChange={(e) => setDetails(e.target.value)}
                 rows={3}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                placeholder="Подробности о проведенном лечении..." />
+                placeholder={t('dental.dental_dpm_placeholder_details')} />
               
             </div>
 
@@ -266,7 +267,7 @@ const DentalPriceManager = ({
 
               <Save size={16} className="mr-2" />
               }
-              {isLoading ? 'Отправка...' : 'Отправить в регистратуру'}
+              {isLoading ? t('dental.dental_dpm_btn_submit_loading') : t('dental.dental_dpm_btn_submit')}
             </button>
           </form>
 
@@ -274,7 +275,7 @@ const DentalPriceManager = ({
           <div>
             <h4 className="text-md font-medium text-gray-900 dark:text-white mb-3 flex items-center">
               <FileText size={16} className="mr-2" />
-              История указанных цен
+              {t('dental.dental_dpm_history_title')}
             </h4>
             
             {loadingOverrides ?
@@ -283,7 +284,7 @@ const DentalPriceManager = ({
               </div> :
             priceOverrides.length === 0 ?
             <p className="text-gray-500 dark:text-gray-400 text-sm">
-                Цены пока не указывались
+                {t('dental.dental_dpm_history_empty')}
               </p> :
 
             <div className="space-y-3">
@@ -306,23 +307,23 @@ const DentalPriceManager = ({
                     
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
-                        <span className="text-gray-600 dark:text-gray-400">Плановая:</span>
+                        <span className="text-gray-600 dark:text-gray-400">{t('dental.dental_dpm_history_planned')}</span>
                         <span className="ml-2 font-medium">{formatPrice(override.original_price)}</span>
                       </div>
                       <div>
-                        <span className="text-gray-600 dark:text-gray-400">Итоговая:</span>
+                        <span className="text-gray-600 dark:text-gray-400">{t('dental.dental_dpm_history_final')}</span>
                         <span className="ml-2 font-medium text-blue-600">{formatPrice(override.new_price)}</span>
                       </div>
                     </div>
                     
                     <div className="mt-2">
-                      <span className="text-gray-600 dark:text-gray-400 text-sm">Обоснование:</span>
+                      <span className="text-gray-600 dark:text-gray-400 text-sm">{t('dental.dental_dpm_history_reason')}</span>
                       <span className="ml-2 text-sm">{override.reason}</span>
                     </div>
                     
                     {override.details &&
                 <div className="mt-1">
-                        <span className="text-gray-600 dark:text-gray-400 text-sm">Детали:</span>
+                        <span className="text-gray-600 dark:text-gray-400 text-sm">{t('dental.dental_dpm_history_details')}</span>
                         <span className="ml-2 text-sm">{override.details}</span>
                       </div>
                 }

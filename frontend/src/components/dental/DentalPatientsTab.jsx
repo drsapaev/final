@@ -7,7 +7,7 @@ import { Card, Button } from '../ui/macos';
 import { Scissors, FileText, Eye } from 'lucide-react';
 // P0 fix: 'Tooth' is not exported by lucide-react. Use Stethoscope as alias (matches DentistPanelUnified.jsx:42).
 import { Stethoscope as Tooth } from 'lucide-react';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 export function DentalPatientsTab({
   patients = [],
@@ -16,11 +16,12 @@ export function DentalPatientsTab({
   onTreatment,
   onProsthetic,
 }) {
+  const { t } = useTranslation();
   if (patients.length === 0) {
     return (
       <Card padding="lg">
         <div className="dental-text-center dental-p-48 dental-text-secondary">
-          Нет пациентов
+          {t('dental.dental_dpt_empty')}
         </div>
       </Card>
     );
@@ -47,36 +48,36 @@ export function DentalPatientsTab({
               <Button
                 size="sm"
                 variant="outline"
-                aria-label={`Просмотр пациента ${patient.name || patient.id}`}
+                aria-label={t('dental.dental_dpt_aria_view', { name: patient.name || patient.id })}
                 onClick={() => onSelectPatient(patient)}
-                title="Просмотр"
+                title={t('dental.dental_dpt_title_view')}
                 className="dental-p-8px">
                 <Eye aria-hidden="true" className="dental-icon-16" />
               </Button>
               <Button
                 size="sm"
                 variant="outline"
-                aria-label={`Схема зубов ${patient.name || patient.id}`}
+                aria-label={t('dental.dental_dpt_aria_chart', { name: patient.name || patient.id })}
                 onClick={() => onDentalChart(patient)}
-                title="Схема зубов"
+                title={t('dental.dental_dpt_title_chart')}
                 className="dental-p-8px">
                 <Tooth aria-hidden="true" className="dental-icon-16" />
               </Button>
               <Button
                 size="sm"
                 variant="outline"
-                aria-label={`Лечение ${patient.name || patient.id}`}
+                aria-label={t('dental.dental_dpt_aria_treatment', { name: patient.name || patient.id })}
                 onClick={() => onTreatment(patient)}
-                title="Лечение"
+                title={t('dental.dental_dpt_title_treatment')}
                 className="dental-p-8px">
                 <Scissors aria-hidden="true" className="dental-icon-16" />
               </Button>
               <Button
                 size="sm"
                 variant="outline"
-                aria-label={`Протезирование ${patient.name || patient.id}`}
+                aria-label={t('dental.dental_dpt_aria_prosthetic', { name: patient.name || patient.id })}
                 onClick={() => onProsthetic(patient)}
-                title="Протезирование"
+                title={t('dental.dental_dpt_title_prosthetic')}
                 className="dental-p-8px">
                 <FileText aria-hidden="true" className="dental-icon-16" />
               </Button>

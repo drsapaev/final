@@ -1,6 +1,6 @@
 import PropTypes from 'prop-types';
 import { signerFieldLabels } from './config';
-import { useTranslation } from '../../../i18n/adapter';
+import { useTranslation } from '../../../i18n/useTranslation';
 
 /**
  * L-H-6 fix: SignersTab выделен в отдельный файл (~25 строк).

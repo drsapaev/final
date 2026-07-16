@@ -67,13 +67,11 @@ describe('DentistPanel safety guards contract (C-1, C-2, C-3)', () => {
       'const handleCompleteVisit',
     );
 
-    // K04 — diseases of pulp and periapical tissues (pulpitis, periodontitis)
-    expect(block).toContain('\'K04\':');
-    expect(block).toContain('пульпит');
-
-    // K10 — diseases of jaws (osteomyelitis, abscess, cyst)
-    expect(block).toContain('\'K10\':');
-    expect(block).toContain('остеомиелит');
+    // i18n-unification: CRITICAL_ICD10_CODES is now an array of code strings,
+    // labels are in i18n locale files (dental.dental_panel_critical_K04/K10)
+    expect(block).toContain("'K04'");
+    expect(block).toContain("'K10'");
+    expect(block).toContain('dental_panel_critical_');
   });
 
   it('C-3: getCriticalDiagnosisWarning matches ICD-10 codes by prefix', () => {
@@ -86,7 +84,8 @@ describe('DentistPanel safety guards contract (C-1, C-2, C-3)', () => {
 
     // Must use prefix matching so K04.0 / K04.9 / K049 all match K04.
     expect(block).toContain('.startsWith(prefix)');
-    expect(block).toContain('return { code: prefix, label, fullCode: code };');
+    // i18n-unification: label is now loaded via tI18n()
+    expect(block).toContain('label: tI18n(');
     expect(block).toContain('return null;');
   });
 
@@ -105,8 +104,9 @@ describe('DentistPanel safety guards contract (C-1, C-2, C-3)', () => {
     // Must branch into danger-intent confirm when criticalWarning is truthy.
     expect(completeBlock).toContain('if (criticalWarning) {');
     expect(completeBlock).toContain('intent: \'danger\'');
-    expect(completeBlock).toContain('\'Подтверждаю диагноз\'');
-    expect(completeBlock).toContain('\'Отмена — проверить диагноз\'');
+    // i18n-unification: confirm labels now use tI18n()
+    expect(completeBlock).toContain("tI18n('dental.dental_panel_critical_confirm')");
+    expect(completeBlock).toContain("tI18n('dental.dental_panel_critical_cancel')");
 
     // Must fall back to primary-intent confirm for non-critical diagnoses.
     expect(completeBlock).toContain('intent: \'primary\'');

@@ -4,8 +4,10 @@ import './MultipleTicketsPrinter.css';
 import { buildPanelTicketPayload, printPanelTicketInBrowserAsync } from '../../services/panelPrint';
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const MultipleTicketsPrinter = ({ tickets, onClose, onAllPrinted }) => {
+  const { t } = useTranslation();
   const [printedTickets, setPrintedTickets] = useState(new Set());
   const [currentPrinting, setCurrentPrinting] = useState(null);
   const [countdown, setCountdown] = useState(0);
@@ -96,8 +98,8 @@ const MultipleTicketsPrinter = ({ tickets, onClose, onAllPrinted }) => {
               </div>
               
               <div className="ticket-details">
-                <div className="patient-name">{ticket.patient_name || 'Пациент'}</div>
-                {ticket.doctor_name !== 'Без врача' &&
+                <div className="patient-name">{ticket.patient_name || t('misc.mtp_patsient')}</div>
+                {ticket.doctor_name !== t('misc.mtp_bez_vracha') &&
                 <div className="doctor-name">{ticket.doctor_name}</div>
                 }
                 <div className="visit-info">
@@ -109,12 +111,12 @@ const MultipleTicketsPrinter = ({ tickets, onClose, onAllPrinted }) => {
                 {isPrinted ?
                 <div className="printed-status">
                     <CheckCircle size={16} />
-                    <span>Напечатан</span>
+                    <span>{t('misc.mtp_napechatan')}</span>
                   </div> :
                 isPrinting ?
                 <div className="printing-status">
                     <Clock size={16} className="spinning" />
-                    <span>Печать...</span>
+                    <span>{t('misc.mtp_pechat')}</span>
                   </div> :
 
                 <button
@@ -122,7 +124,7 @@ const MultipleTicketsPrinter = ({ tickets, onClose, onAllPrinted }) => {
                   onClick={() => printSingleTicket(ticket)}>
                   
                     <Printer size={16} />
-                    <span>Печать</span>
+                    <span>{t('misc.mtp_pechat_2')}</span>
                   </button>
                 }
               </div>
@@ -135,7 +137,7 @@ const MultipleTicketsPrinter = ({ tickets, onClose, onAllPrinted }) => {
         {allPrinted ?
         <div className="all-printed">
             <CheckCircle size={20} />
-            <span>Все талоны напечатаны</span>
+            <span>{t('misc.mtp_vse_talony_napechatany')}</span>
           </div> :
 
         <div className="print-all-section">

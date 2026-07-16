@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect } from 'react';
 import logger from '../../utils/logger';
 import {
@@ -32,6 +32,7 @@ const DiagnosisForm = ({
   onSave,
   onClose
 }) => {
+  const { t } = useTranslation();
   const [formData, setFormData] = useState({
     // Основные данные
     diagnosisDate: new Date().toISOString().split('T')[0],
@@ -141,52 +142,52 @@ const DiagnosisForm = ({
 
   // Вкладки
   const tabs = [
-  { id: 'tooth-diagnoses', label: 'Диагнозы по зубам', icon: Stethoscope },
-  { id: 'general-diagnoses', label: 'Общие диагнозы', icon: FileText },
-  { id: 'treatment-plan', label: 'План лечения', icon: Calendar },
-  { id: 'prescriptions', label: 'Рецепты', icon: Pill },
-  { id: 'referrals', label: 'Направления', icon: Send }];
+  { id: 'tooth-diagnoses', label: t('dental.dental_df_tab_tooth_diagnoses'), icon: Stethoscope },
+  { id: 'general-diagnoses', label: t('dental.dental_df_tab_general_diagnoses'), icon: FileText },
+  { id: 'treatment-plan', label: t('dental.dental_df_tab_treatment_plan'), icon: Calendar },
+  { id: 'prescriptions', label: t('dental.dental_df_tab_prescriptions'), icon: Pill },
+  { id: 'referrals', label: t('dental.dental_df_tab_referrals'), icon: Send }];
 
 
   // Стандартные диагнозы по зубам
   const standardToothDiagnoses = [
-  'Кариес',
-  'Пульпит',
-  'Периодонтит',
-  'Периапикальный абсцесс',
-  'Травма зуба',
-  'Стираемость',
-  'Эрозия',
-  'Гипоплазия',
-  'Флюороз',
-  'Зубной камень',
-  'Гингивит',
-  'Пародонтит',
-  'Подвижность зуба',
-  'Резорбция корня',
-  'Киста',
-  'Гранулема',
-  'Норма'];
+  { value: t('misc.df_karies'), label: t('dental.dental_df_dx_caries') },
+  { value: t('misc.df_pulpit'), label: t('dental.dental_df_dx_pulpitis') },
+  { value: t('misc.df_periodontit'), label: t('dental.dental_df_dx_periodontitis') },
+  { value: t('misc.df_periapikalnyy_abstsess'), label: t('dental.dental_df_dx_periapical_abscess') },
+  { value: t('misc.df_travma_zuba'), label: t('dental.dental_df_dx_tooth_trauma') },
+  { value: t('misc.df_stiraemost'), label: t('dental.dental_df_dx_attrition') },
+  { value: t('misc.df_eroziya'), label: t('dental.dental_df_dx_erosion') },
+  { value: t('misc.df_gipoplaziya'), label: t('dental.dental_df_dx_hypoplasia') },
+  { value: t('misc.df_flyuoroz'), label: t('dental.dental_df_dx_fluorosis') },
+  { value: t('misc.df_zubnoy_kamen'), label: t('dental.dental_df_dx_calculus') },
+  { value: t('misc.df_gingivit'), label: t('dental.dental_df_dx_gingivitis') },
+  { value: t('misc.df_parodontit'), label: t('dental.dental_df_dx_marginal_periodontitis') },
+  { value: t('misc.df_podvizhnost_zuba'), label: t('dental.dental_df_dx_tooth_mobility') },
+  { value: t('misc.df_rezorbtsiya_kornya'), label: t('dental.dental_df_dx_root_resorption') },
+  { value: t('misc.df_kista'), label: t('dental.dental_df_dx_cyst') },
+  { value: t('misc.df_granulema'), label: t('dental.dental_df_dx_granuloma') },
+  { value: t('misc.df_norma'), label: t('dental.dental_df_dx_normal') }];
 
 
   // Рендер диагнозов по зубам
   const renderToothDiagnoses = () =>
   <div className="space-y-6">
       <div className="bg-blue-50 p-4 rounded-lg">
-        <h3 className="text-lg font-semibold mb-2">Диагнозы по зубам</h3>
+        <h3 className="text-lg font-semibold mb-2">{t('dental.dental_df_tab_tooth_diagnoses')}</h3>
         <p className="text-sm text-gray-600">
-          Укажите диагноз для каждого зуба, требующего лечения
+          {t('dental.dental_df_section_tooth_subtitle')}
         </p>
       </div>
       
       {/* Верхняя челюсть */}
       <div>
-        <h4 className="font-semibold mb-3 text-gray-700">Верхняя челюсть</h4>
+        <h4 className="font-semibold mb-3 text-gray-700">{t('dental.dental_df_upper_jaw')}</h4>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28].map((toothId) =>
         <div key={toothId} className="border rounded-lg p-3">
               <div className="flex items-center justify-between mb-2">
-                <span className="font-medium text-sm">Зуб {toothId}</span>
+                <span className="font-medium text-sm">{t('dental.dental_df_tooth_label', { toothId })}</span>
                 <div className="w-3 h-3 rounded-full bg-gray-200"></div>
               </div>
               <select
@@ -195,9 +196,9 @@ const DiagnosisForm = ({
             disabled={!isEditing}
             className="w-full text-xs px-2 py-1 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100">
             
-                <option value="">Выберите диагноз</option>
+                <option value="">{t('dental.dental_df_select_diagnosis')}</option>
                 {standardToothDiagnoses.map((diagnosis) =>
-            <option key={diagnosis} value={diagnosis}>{diagnosis}</option>
+            <option key={diagnosis.value} value={diagnosis.value}>{diagnosis.label}</option>
             )}
               </select>
             </div>
@@ -207,12 +208,12 @@ const DiagnosisForm = ({
       
       {/* Нижняя челюсть */}
       <div>
-        <h4 className="font-semibold mb-3 text-gray-700">Нижняя челюсть</h4>
+        <h4 className="font-semibold mb-3 text-gray-700">{t('dental.dental_df_lower_jaw')}</h4>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38].map((toothId) =>
         <div key={toothId} className="border rounded-lg p-3">
               <div className="flex items-center justify-between mb-2">
-                <span className="font-medium text-sm">Зуб {toothId}</span>
+                <span className="font-medium text-sm">{t('dental.dental_df_tooth_label', { toothId })}</span>
                 <div className="w-3 h-3 rounded-full bg-gray-200"></div>
               </div>
               <select
@@ -221,9 +222,9 @@ const DiagnosisForm = ({
             disabled={!isEditing}
             className="w-full text-xs px-2 py-1 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100">
             
-                <option value="">Выберите диагноз</option>
+                <option value="">{t('dental.dental_df_select_diagnosis')}</option>
                 {standardToothDiagnoses.map((diagnosis) =>
-            <option key={diagnosis} value={diagnosis}>{diagnosis}</option>
+            <option key={diagnosis.value} value={diagnosis.value}>{diagnosis.label}</option>
             )}
               </select>
             </div>
@@ -237,9 +238,9 @@ const DiagnosisForm = ({
   const renderGeneralDiagnoses = () =>
   <div className="space-y-6">
       <div className="bg-green-50 p-4 rounded-lg">
-        <h3 className="text-lg font-semibold mb-2">Общие диагнозы</h3>
+        <h3 className="text-lg font-semibold mb-2">{t('dental.dental_df_tab_general_diagnoses')}</h3>
         <p className="text-sm text-gray-600">
-          Системные диагнозы, влияющие на стоматологическое лечение
+          {t('dental.dental_df_section_general_subtitle')}
         </p>
       </div>
       
@@ -248,7 +249,7 @@ const DiagnosisForm = ({
       <div key={index} className="flex items-center gap-3 p-3 border rounded-lg">
             <input
           type="text"
-          aria-label={`Общий диагноз ${index + 1}`}
+          aria-label={t('dental.dental_df_aria_general_diagnosis', { index: index + 1 })}
           value={diagnosis}
           onChange={(e) => {
             const newDiagnoses = [...formData.generalDiagnoses];
@@ -257,12 +258,12 @@ const DiagnosisForm = ({
           }}
           disabled={!isEditing}
           className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-          placeholder="Введите диагноз" />
+          placeholder={t('dental.dental_df_ph_enter_diagnosis')} />
         
             {isEditing &&
         <button
           onClick={() => handleArrayRemove('generalDiagnoses', index)}
-          aria-label={`Удалить общий диагноз ${index + 1}`}
+          aria-label={t('dental.dental_df_aria_remove_general_diagnosis', { index: index + 1 })}
           className="text-red-500 hover:text-red-700">
           
                 <Trash2 className="h-4 w-4" />
@@ -277,7 +278,7 @@ const DiagnosisForm = ({
         className="flex items-center gap-2 w-full p-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-blue-500 hover:text-blue-600">
         
             <Plus className="h-4 w-4" />
-            Добавить диагноз
+            {t('dental.dental_df_btn_add_diagnosis')}
           </button>
       }
       </div>
@@ -288,9 +289,9 @@ const DiagnosisForm = ({
   const renderTreatmentPlan = () =>
   <div className="space-y-6">
       <div className="bg-yellow-50 p-4 rounded-lg">
-        <h3 className="text-lg font-semibold mb-2">План лечения</h3>
+        <h3 className="text-lg font-semibold mb-2">{t('dental.dental_df_tab_treatment_plan')}</h3>
         <p className="text-sm text-gray-600">
-          Поэтапное планирование стоматологического лечения
+          {t('dental.dental_df_section_treatment_subtitle')}
         </p>
       </div>
       
@@ -298,14 +299,14 @@ const DiagnosisForm = ({
       <div>
         <h4 className="font-semibold mb-3 text-red-600 flex items-center gap-2">
           <AlertCircle className="h-4 w-4" />
-          Немедленные меры
+          {t('dental.dental_df_immediate_title')}
         </h4>
         <div className="space-y-2">
           {formData.treatmentPlan.immediate.map((item, index) =>
         <div key={index} className="flex items-center gap-3 p-3 bg-red-50 border border-red-200 rounded-lg">
               <input
             type="text"
-            aria-label={`Срочная мера лечения ${index + 1}`}
+            aria-label={t('dental.dental_df_aria_immediate_item', { index: index + 1 })}
             value={item}
             onChange={(e) => {
               const newItems = [...formData.treatmentPlan.immediate];
@@ -314,12 +315,12 @@ const DiagnosisForm = ({
             }}
             disabled={!isEditing}
             className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-            placeholder="Срочные меры (например: обезболивание, дренирование)" />
+            placeholder={t('dental.dental_df_ph_immediate')} />
           
               {isEditing &&
           <button
             onClick={() => handleArrayRemove('treatmentPlan.immediate', index)}
-            aria-label={`Удалить срочную меру лечения ${index + 1}`}
+            aria-label={t('dental.dental_df_aria_remove_immediate', { index: index + 1 })}
             className="text-red-500 hover:text-red-700">
             
                   <Trash2 className="h-4 w-4" />
@@ -333,7 +334,7 @@ const DiagnosisForm = ({
           className="flex items-center gap-2 w-full p-3 border-2 border-dashed border-red-300 rounded-lg text-red-600 hover:border-red-500">
           
               <Plus className="h-4 w-4" />
-              Добавить срочную меру
+              {t('dental.dental_df_btn_add_immediate')}
             </button>
         }
         </div>
@@ -343,14 +344,14 @@ const DiagnosisForm = ({
       <div>
         <h4 className="font-semibold mb-3 text-orange-600 flex items-center gap-2">
           <Clock className="h-4 w-4" />
-          Краткосрочный план (1-3 месяца)
+          {t('dental.dental_df_short_term_title')}
         </h4>
         <div className="space-y-2">
           {formData.treatmentPlan.shortTerm.map((item, index) =>
         <div key={index} className="flex items-center gap-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
               <input
             type="text"
-            aria-label={`Краткосрочная процедура ${index + 1}`}
+            aria-label={t('dental.dental_df_aria_short_term_item', { index: index + 1 })}
             value={item}
             onChange={(e) => {
               const newItems = [...formData.treatmentPlan.shortTerm];
@@ -359,12 +360,12 @@ const DiagnosisForm = ({
             }}
             disabled={!isEditing}
             className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-            placeholder="Краткосрочные процедуры (например: лечение кариеса, чистка)" />
+            placeholder={t('dental.dental_df_ph_short_term')} />
           
               {isEditing &&
           <button
             onClick={() => handleArrayRemove('treatmentPlan.shortTerm', index)}
-            aria-label={`Удалить краткосрочную процедуру ${index + 1}`}
+            aria-label={t('dental.dental_df_aria_remove_short_term', { index: index + 1 })}
             className="text-red-500 hover:text-red-700">
             
                   <Trash2 className="h-4 w-4" />
@@ -378,7 +379,7 @@ const DiagnosisForm = ({
           className="flex items-center gap-2 w-full p-3 border-2 border-dashed border-orange-300 rounded-lg text-orange-600 hover:border-orange-500">
           
               <Plus className="h-4 w-4" />
-              Добавить краткосрочную процедуру
+              {t('dental.dental_df_btn_add_short_term')}
             </button>
         }
         </div>
@@ -388,14 +389,14 @@ const DiagnosisForm = ({
       <div>
         <h4 className="font-semibold mb-3 text-blue-600 flex items-center gap-2">
           <Calendar className="h-4 w-4" />
-          Долгосрочный план (3+ месяцев)
+          {t('dental.dental_df_long_term_title')}
         </h4>
         <div className="space-y-2">
           {formData.treatmentPlan.longTerm.map((item, index) =>
         <div key={index} className="flex items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
               <input
             type="text"
-            aria-label={`Долгосрочная процедура ${index + 1}`}
+            aria-label={t('dental.dental_df_aria_long_term_item', { index: index + 1 })}
             value={item}
             onChange={(e) => {
               const newItems = [...formData.treatmentPlan.longTerm];
@@ -404,12 +405,12 @@ const DiagnosisForm = ({
             }}
             disabled={!isEditing}
             className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-            placeholder="Долгосрочные процедуры (например: протезирование, имплантация)" />
+            placeholder={t('dental.dental_df_ph_long_term')} />
           
               {isEditing &&
           <button
             onClick={() => handleArrayRemove('treatmentPlan.longTerm', index)}
-            aria-label={`Удалить долгосрочную процедуру ${index + 1}`}
+            aria-label={t('dental.dental_df_aria_remove_long_term', { index: index + 1 })}
             className="text-red-500 hover:text-red-700">
             
                   <Trash2 className="h-4 w-4" />
@@ -423,7 +424,7 @@ const DiagnosisForm = ({
           className="flex items-center gap-2 w-full p-3 border-2 border-dashed border-blue-300 rounded-lg text-blue-600 hover:border-blue-500">
           
               <Plus className="h-4 w-4" />
-              Добавить долгосрочную процедуру
+              {t('dental.dental_df_btn_add_long_term')}
             </button>
         }
         </div>
@@ -435,9 +436,9 @@ const DiagnosisForm = ({
   const renderPrescriptions = () =>
   <div className="space-y-6">
       <div className="bg-purple-50 p-4 rounded-lg">
-        <h3 className="text-lg font-semibold mb-2">Рецепты</h3>
+        <h3 className="text-lg font-semibold mb-2">{t('dental.dental_df_tab_prescriptions')}</h3>
         <p className="text-sm text-gray-600">
-          Назначение лекарственных препаратов
+          {t('dental.dental_df_section_prescriptions_subtitle')}
         </p>
       </div>
       
@@ -447,11 +448,11 @@ const DiagnosisForm = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Название препарата
+                  {t('dental.dental_df_label_medication')}
                 </label>
                 <input
               type="text"
-              aria-label={`Название препарата ${index + 1}`}
+              aria-label={t('dental.dental_df_aria_medication', { index: index + 1 })}
               value={prescription.medication || ''}
               onChange={(e) => {
                 const newPrescriptions = [...formData.prescriptions];
@@ -460,17 +461,17 @@ const DiagnosisForm = ({
               }}
               disabled={!isEditing}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-              placeholder="Название лекарства" />
+              placeholder={t('dental.dental_df_ph_medication')} />
             
               </div>
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Дозировка
+                  {t('dental.dental_df_label_dosage')}
                 </label>
                 <input
               type="text"
-              aria-label={`Дозировка препарата ${index + 1}`}
+              aria-label={t('dental.dental_df_aria_dosage', { index: index + 1 })}
               value={prescription.dosage || ''}
               onChange={(e) => {
                 const newPrescriptions = [...formData.prescriptions];
@@ -479,17 +480,17 @@ const DiagnosisForm = ({
               }}
               disabled={!isEditing}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-              placeholder="Например: 500мг" />
+              placeholder={t('dental.dental_df_ph_dosage')} />
             
               </div>
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Способ применения
+                  {t('dental.dental_df_label_administration')}
                 </label>
                 <input
               type="text"
-              aria-label={`Способ применения препарата ${index + 1}`}
+              aria-label={t('dental.dental_df_aria_administration', { index: index + 1 })}
               value={prescription.administration || ''}
               onChange={(e) => {
                 const newPrescriptions = [...formData.prescriptions];
@@ -498,17 +499,17 @@ const DiagnosisForm = ({
               }}
               disabled={!isEditing}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-              placeholder="Например: 3 раза в день после еды" />
+              placeholder={t('dental.dental_df_ph_administration')} />
             
               </div>
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Продолжительность
+                  {t('dental.dental_df_label_duration')}
                 </label>
                 <input
               type="text"
-              aria-label={`Продолжительность приема препарата ${index + 1}`}
+              aria-label={t('dental.dental_df_aria_duration', { index: index + 1 })}
               value={prescription.duration || ''}
               onChange={(e) => {
                 const newPrescriptions = [...formData.prescriptions];
@@ -517,14 +518,14 @@ const DiagnosisForm = ({
               }}
               disabled={!isEditing}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-              placeholder="Например: 7 дней" />
+              placeholder={t('dental.dental_df_ph_duration')} />
             
               </div>
             </div>
             
             <div className="flex items-center justify-between">
               <textarea
-            aria-label={`Дополнительные указания к рецепту ${index + 1}`}
+            aria-label={t('dental.dental_df_aria_prescription_notes', { index: index + 1 })}
             value={prescription.notes || ''}
             onChange={(e) => {
               const newPrescriptions = [...formData.prescriptions];
@@ -534,12 +535,12 @@ const DiagnosisForm = ({
             disabled={!isEditing}
             rows={2}
             className="flex-1 mr-3 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-            placeholder="Дополнительные указания" />
+            placeholder={t('dental.dental_df_ph_additional_instructions')} />
           
               {isEditing &&
           <button
             onClick={() => handleArrayRemove('prescriptions', index)}
-            aria-label={`Удалить рецепт ${index + 1}`}
+            aria-label={t('dental.dental_df_aria_remove_prescription', { index: index + 1 })}
             className="text-red-500 hover:text-red-700">
             
                   <Trash2 className="h-4 w-4" />
@@ -561,7 +562,7 @@ const DiagnosisForm = ({
         className="flex items-center gap-2 w-full p-4 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-blue-500 hover:text-blue-600">
         
             <Plus className="h-4 w-4" />
-            Добавить рецепт
+            {t('dental.dental_df_btn_add_prescription')}
           </button>
       }
       </div>
@@ -572,9 +573,9 @@ const DiagnosisForm = ({
   const renderReferrals = () =>
   <div className="space-y-6">
       <div className="bg-indigo-50 p-4 rounded-lg">
-        <h3 className="text-lg font-semibold mb-2">Направления</h3>
+        <h3 className="text-lg font-semibold mb-2">{t('dental.dental_df_tab_referrals')}</h3>
         <p className="text-sm text-gray-600">
-          Направления к другим специалистам
+          {t('dental.dental_df_section_referrals_subtitle')}
         </p>
       </div>
       
@@ -584,7 +585,7 @@ const DiagnosisForm = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Специалист
+                  {t('dental.dental_df_label_specialist')}
                 </label>
                 <select
               value={referral.specialist || ''}
@@ -596,23 +597,23 @@ const DiagnosisForm = ({
               disabled={!isEditing}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100">
               
-                  <option value="">Выберите специалиста</option>
-                  <option value="orthodontist">Ортодонт</option>
-                  <option value="oral_surgeon">Челюстно-лицевой хирург</option>
-                  <option value="periodontist">Пародонтолог</option>
-                  <option value="endodontist">Эндодонтист</option>
-                  <option value="prosthodontist">Ортопед</option>
-                  <option value="radiologist">Рентгенолог</option>
-                  <option value="therapist">Терапевт</option>
-                  <option value="cardiologist">Кардиолог</option>
-                  <option value="endocrinologist">Эндокринолог</option>
-                  <option value="other">Другой</option>
+                  <option value="">{t('dental.dental_df_select_specialist')}</option>
+                  <option value="orthodontist">{t('dental.dental_df_specialist_orthodontist')}</option>
+                  <option value="oral_surgeon">{t('dental.dental_df_specialist_oral_surgeon')}</option>
+                  <option value="periodontist">{t('dental.dental_df_specialist_periodontist')}</option>
+                  <option value="endodontist">{t('dental.dental_df_specialist_endodontist')}</option>
+                  <option value="prosthodontist">{t('dental.dental_df_specialist_prosthodontist')}</option>
+                  <option value="radiologist">{t('dental.dental_df_specialist_radiologist')}</option>
+                  <option value="therapist">{t('dental.dental_df_specialist_therapist')}</option>
+                  <option value="cardiologist">{t('dental.dental_df_specialist_cardiologist')}</option>
+                  <option value="endocrinologist">{t('dental.dental_df_specialist_endocrinologist')}</option>
+                  <option value="other">{t('dental.dental_df_specialist_other')}</option>
                 </select>
               </div>
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Приоритет
+                  {t('dental.dental_df_label_priority')}
                 </label>
                 <select
               value={referral.priority || ''}
@@ -624,21 +625,21 @@ const DiagnosisForm = ({
               disabled={!isEditing}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100">
               
-                  <option value="">Выберите приоритет</option>
-                  <option value="urgent">Срочно</option>
-                  <option value="high">Высокий</option>
-                  <option value="medium">Средний</option>
-                  <option value="low">Низкий</option>
+                  <option value="">{t('dental.dental_df_select_priority')}</option>
+                  <option value="urgent">{t('dental.dental_df_priority_urgent')}</option>
+                  <option value="high">{t('dental.dental_df_priority_high')}</option>
+                  <option value="medium">{t('dental.dental_df_priority_medium')}</option>
+                  <option value="low">{t('dental.dental_df_priority_low')}</option>
                 </select>
               </div>
             </div>
             
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Причина направления
+                {t('dental.dental_df_label_referral_reason')}
               </label>
               <textarea
-            aria-label={`Причина направления ${index + 1}`}
+            aria-label={t('dental.dental_df_aria_referral_reason', { index: index + 1 })}
             value={referral.reason || ''}
             onChange={(e) => {
               const newReferrals = [...formData.referrals];
@@ -648,14 +649,14 @@ const DiagnosisForm = ({
             disabled={!isEditing}
             rows={3}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-            placeholder="Опишите причину направления" />
+            placeholder={t('dental.dental_df_ph_referral_reason')} />
           
             </div>
             
             <div className="flex items-center justify-between">
               <input
             type="text"
-            aria-label={`Дополнительные указания к направлению ${index + 1}`}
+            aria-label={t('dental.dental_df_aria_referral_notes', { index: index + 1 })}
             value={referral.notes || ''}
             onChange={(e) => {
               const newReferrals = [...formData.referrals];
@@ -664,12 +665,12 @@ const DiagnosisForm = ({
             }}
             disabled={!isEditing}
             className="flex-1 mr-3 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-            placeholder="Дополнительные указания" />
+            placeholder={t('dental.dental_df_ph_additional_instructions')} />
           
               {isEditing &&
           <button
             onClick={() => handleArrayRemove('referrals', index)}
-            aria-label={`Удалить направление ${index + 1}`}
+            aria-label={t('dental.dental_df_aria_remove_referral', { index: index + 1 })}
             className="text-red-500 hover:text-red-700">
             
                   <Trash2 className="h-4 w-4" />
@@ -690,7 +691,7 @@ const DiagnosisForm = ({
         className="flex items-center gap-2 w-full p-4 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-blue-500 hover:text-blue-600">
         
             <Plus className="h-4 w-4" />
-            Добавить направление
+            {t('dental.dental_df_btn_add_referral')}
           </button>
       }
       </div>
@@ -722,10 +723,10 @@ const DiagnosisForm = ({
         <div className="flex items-center justify-between p-6 border-b">
           <div>
             <h2 className="text-xl font-semibold">
-              Диагнозы и назначения: {patientName}
+              {t('dental.dental_df_title', { name: patientName })}
             </h2>
             <p className="text-gray-600 text-sm">
-              {formData.diagnosisDate} | {isEditing ? 'Режим редактирования' : 'Просмотр данных'}
+              {formData.diagnosisDate} | {isEditing ? t('dental.dental_df_mode_edit') : t('dental.dental_df_mode_view')}
             </p>
           </div>
           
@@ -736,7 +737,7 @@ const DiagnosisForm = ({
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
               
                 <Edit className="h-4 w-4" />
-                Редактировать
+                {t('dental.dental_df_btn_edit')}
               </button> :
 
             <>
@@ -745,7 +746,7 @@ const DiagnosisForm = ({
                 className="flex items-center gap-2 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600">
                 
                   <X className="h-4 w-4" />
-                  Отмена
+                  {t('dental.dental_df_btn_cancel')}
                 </button>
                 <button
                 onClick={handleSave}
@@ -753,13 +754,13 @@ const DiagnosisForm = ({
                 className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50">
                 
                   <Save className="h-4 w-4" />
-                  {loading ? 'Сохранение...' : 'Сохранить'}
+                  {loading ? t('dental.dental_df_btn_saving') : t('dental.dental_df_btn_save')}
                 </button>
               </>
             }
             <button
               onClick={onClose}
-              aria-label="Закрыть форму диагнозов и назначений"
+              aria-label={t('dental.dental_df_aria_close')}
               className="p-2 text-gray-500 hover:text-gray-700">
               
               <X className="h-5 w-5" />

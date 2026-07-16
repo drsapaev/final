@@ -14,7 +14,7 @@ import { COLOR_SCHEMES } from '../../theme/colorScheme.js';
 import { getCanonicalRouteById, getEffectiveRouteByPath, getRoleHomeRoute } from '../../routing/routeSelectors.js';
 
 import logger from '../../utils/logger';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const landingRoute = getCanonicalRouteById('landing')?.path || '/';
 const loginRoute = getCanonicalRouteById('login')?.path || '/login';
@@ -160,8 +160,8 @@ export default function HeaderNew() {
   const navItems = useMemo(() => {
     const items = [];
     if (roleNormalized !== 'admin') {
-      if (roleNormalized === 'registrar') items.push({ to: getRoleHomeRoute('cashier'), label: 'Кассир', icon: 'creditcard' });
-      if (roleNormalized === 'cashier') items.push({ to: getRoleHomeRoute('cashier'), label: 'Касса', icon: 'creditcard' });
+      if (roleNormalized === 'registrar') items.push({ to: getRoleHomeRoute('cashier'), label: t('legacy.hn_nav_cashier_role'), icon: 'creditcard' });
+      if (roleNormalized === 'cashier') items.push({ to: getRoleHomeRoute('cashier'), label: t('legacy.hn_nav_cashier_home'), icon: 'creditcard' });
     }
     return items;
   }, [roleNormalized]);
@@ -212,8 +212,8 @@ export default function HeaderNew() {
       variant="ghost"
       size="sm"
       onClick={handleBack}
-      title="Назад"
-      aria-label="Назад"
+      title={t('legacy.hn_back_title')}
+      aria-label={t('legacy.hn_back_title')}
       style={{
         color: 'var(--mac-text-primary)',
         display: 'flex',
@@ -231,7 +231,7 @@ export default function HeaderNew() {
     variant="ghost"
     size="sm"
     onClick={() => navigate(landingRoute)}
-    title="На главную"
+    title={t('legacy.hn_brand_title')}
     style={{
       color: 'var(--mac-text-primary)',
       fontWeight: 'var(--mac-font-weight-bold)',
@@ -243,7 +243,7 @@ export default function HeaderNew() {
     }}>
 
       <Icon name="stethoscope" size="default" style={{ color: 'var(--mac-accent-blue)' }} />
-      <span className="hdr-hide-xs">Управление клиникой</span>
+      <span className="hdr-hide-xs">{t('legacy.hn_brand_text')}</span>
     </Button>;
 
 
@@ -280,29 +280,29 @@ export default function HeaderNew() {
           <Button
         variant="outline"
         size="small"
-        title="Главная"
+        title={t('legacy.hn_registrar_home_title')}
         onClick={() => navigate('/registrar/welcome')}
         className="hdr-hide-md"
         style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)', flexShrink: 0, color: theme === 'dark' ? 'color-mix(in srgb, white, transparent 10%)' : undefined }}>
 
             <Icon name="house" size="small" style={{ color: theme === 'dark' ? 'rgba(255,255,255,0.85)' : undefined }} />
-            <span className="hdr-hide-md">Главная</span>
+            <span className="hdr-hide-md">{t('legacy.hn_registrar_home_title')}</span>
           </Button>
           <Button
         variant="outline"
         size="small"
-        title="Онлайн‑записи"
+        title={t('legacy.hn_online_queue_title')}
         onClick={() => navigate('/registrar/queue')}
         className="hdr-hide-xs"
         style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)', flexShrink: 0, color: theme === 'dark' ? 'color-mix(in srgb, white, transparent 10%)' : undefined }}>
 
             <Icon name="bell" size="small" style={{ color: theme === 'dark' ? 'rgba(255,255,255,0.85)' : 'var(--mac-text-primary)' }} />
-            <span className="hdr-hide-sm">Онлайн‑записи</span>
+            <span className="hdr-hide-sm">{t('legacy.hn_online_queue_title')}</span>
           </Button>
           <Button
         variant="primary"
         size="small"
-        title="Новая запись"
+        title={t('legacy.hn_new_appointment_title')}
         onClick={() => {
           // P-008 fix: previously dispatched a CustomEvent('openAppointmentWizard')
           // that only RegistrarPanel listens to — making the button a silent no-op on
@@ -319,7 +319,7 @@ export default function HeaderNew() {
         style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)', flexShrink: 0 }}>
 
             <Icon name="plus" size="small" style={{ color: 'white' }} />
-            <span className="hdr-hide-md">Новая запись</span>
+            <span className="hdr-hide-md">{t('legacy.hn_new_appointment_title')}</span>
           </Button>
         </>
     }
@@ -341,8 +341,8 @@ export default function HeaderNew() {
       <select
         value={lang}
         onChange={(e) => changeLang(e.target.value)}
-        aria-label="Выбрать язык"
-        title="Выбрать язык"
+        aria-label={t('legacy.hn_select_language')}
+        title={t('legacy.hn_select_language')}
         style={{
           fontSize: 'var(--mac-font-size-sm)',
           fontWeight: 'var(--mac-font-weight-semibold)',
@@ -381,8 +381,8 @@ export default function HeaderNew() {
             variant="ghost"
             size="small"
             onClick={() => navigate(getRoleHomeRoute(roleNormalized) || '/')}
-            title="Уведомления"
-            aria-label="Уведомления"
+            title={t('legacy.hn_notifications_title')}
+            aria-label={t('legacy.hn_notifications_title')}
             style={{
               width: '36px',
               height: '36px',
@@ -426,8 +426,8 @@ export default function HeaderNew() {
             }
             setShowThemeMenu((v) => !v);
           }}
-          title="Выбрать тему"
-          aria-label="Выбрать тему"
+          title={t('legacy.hn_select_theme')}
+          aria-label={t('legacy.hn_select_theme')}
             style={{
               width: '36px',
             height: '36px',
@@ -514,8 +514,8 @@ export default function HeaderNew() {
             variant="outline"
             size="small"
             onClick={() => setShowProfileMenu((v) => !v)}
-            title="Профиль пользователя"
-            aria-label="Профиль пользователя"
+            title={t('legacy.hn_profile_title')}
+            aria-label={t('legacy.hn_profile_title')}
             aria-haspopup="menu"
             aria-expanded={showProfileMenu}
             className="hdr-hide-sm"
@@ -527,7 +527,7 @@ export default function HeaderNew() {
             }}>
             <Icon name="person" size="small" style={{ color: 'var(--mac-text-primary)' }} />
             <span style={{ fontWeight: 'var(--mac-font-weight-semibold)' }}>
-              {user.full_name || user.username || 'Профиль'}
+              {user.full_name || user.username || t('legacy.hn_profile_fallback')}
             </span>
           </Button>
           {showProfileMenu && (
@@ -538,12 +538,12 @@ export default function HeaderNew() {
                 onKeyDown={(e) => { if (e.key === 'Escape') setShowProfileMenu(false); }}
                 role="button"
                 tabIndex={-1}
-                aria-label="Закрыть меню профиля"
+                aria-label={t('legacy.hn_close_profile_menu')}
                 style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 99 }}
               />
               <div
                 role="menu"
-                aria-label="Меню профиля"
+                aria-label={t('legacy.hn_profile_menu')}
                 style={{
                   position: 'absolute',
                   top: '100%',
@@ -575,7 +575,7 @@ export default function HeaderNew() {
                     gap: '8px',
                   }}>
                   <Icon name="person" size="small" />
-                  Профиль
+                  {t('legacy.hn_profile_menu_item')}
                 </button>
                 <button
                   type="button"
@@ -597,7 +597,7 @@ export default function HeaderNew() {
                     gap: '8px',
                   }}>
                   <Icon name="arrow.right.square" size="small" />
-                  Выйти
+                  {t('legacy.hn_logout')}
                 </button>
               </div>
             </>
@@ -616,7 +616,7 @@ export default function HeaderNew() {
             flex: '0 0 auto'
           }}>
           <Icon name="person" size="small" style={{ color: 'white' }} />
-          <span>Войти</span>
+          <span>{t('legacy.hn_login')}</span>
         </Button>
       )}
     </div>;
@@ -636,8 +636,8 @@ export default function HeaderNew() {
             brittle and conflicted with GlobalSearchBar's own ⌘K handler. */}
         <button
           type="button"
-          title="Открыть командную палитру (Cmd+K / Ctrl+K)"
-          aria-label="Открыть командную палитру"
+          title={t('legacy.hn_command_palette_title')}
+          aria-label={t('legacy.hn_command_palette_aria')}
           onClick={() => {
             // PR-50: dispatch a custom event instead of a synthetic KeyboardEvent
             document.dispatchEvent(new CustomEvent('open-command-palette'));

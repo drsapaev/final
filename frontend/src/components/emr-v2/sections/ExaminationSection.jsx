@@ -15,7 +15,7 @@ import { useDoctorPhrases } from '../../../hooks/useDoctorPhrases';
 import { DoctorTemplatesPanel, DoctorTemplatesButton } from '../DoctorTemplatesPanel';
 import { useDoctorSectionTemplates } from '../../../hooks/useDoctorSectionTemplates';
 import logger from '../../../utils/logger';
-import { useTranslation } from '../../../i18n/adapter';
+import { useTranslation } from '../../../i18n/useTranslation';
 
 /**
  * ExaminationSection Component

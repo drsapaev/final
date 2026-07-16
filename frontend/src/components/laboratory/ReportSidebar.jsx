@@ -6,7 +6,7 @@ import PropTypes from 'prop-types';
 // Теперь sidebar — единая точка для supplementary content.
 import LabReportHistoryPanel from './LabReportHistoryPanel';
 import LabReportAIAnalysis from './LabReportAIAnalysis';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 /**
  * STRAT#25: ReportSidebar — supplementary content panel for lab report workbench.

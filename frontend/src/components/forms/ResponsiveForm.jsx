@@ -1,7 +1,7 @@
 import PropTypes from 'prop-types';
 import { useBreakpoint } from '../../hooks/useEnhancedMediaQuery';
 import { Input } from '../ui/macos';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 
 const ResponsiveForm = ({

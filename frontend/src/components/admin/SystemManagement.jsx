@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect } from 'react';
 import {
   Server,
@@ -42,6 +42,7 @@ import logger from '../../utils/logger';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
 const SystemManagement = () => {
+  const { t } = useTranslation();
   // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
   const [confirm, confirmDialog] = useConfirm();
   const [activeTab, setActiveTab] = useState('monitoring');
@@ -116,15 +117,15 @@ const SystemManagement = () => {
     try {
       const { status } = await api.post('/system/monitoring/collect');
       if (status === 200 || status === 202) {
-        toast.success('Метрики собраны');
+        toast.success(t('admin2.sm_metrics_collected'));
         loadSystemMetrics();
         loadSystemHealth();
       } else {
-        toast.error('Ошибка сбора метрик');
+        toast.error(t('admin2.sm_metrics_collect_error'));
       }
     } catch (error) {
       logger.error('Ошибка сбора метрик:', error);
-      toast.error('Ошибка сбора метрик');
+      toast.error(t('admin2.sm_metrics_collect_error'));
     }
   };
 
@@ -144,14 +145,14 @@ const SystemManagement = () => {
     try {
       const response = await api.post('/system/backup/create', backupForm);
       if (response.data?.success) {
-        toast.success('Бэкап создается...');
+        toast.success(t('admin2.sm_backup_creating'));
         setTimeout(() => loadBackups(), 2000); // Обновляем список через 2 секунды
       } else {
-        toast.error(response.data?.error || 'Ошибка создания бэкапа');
+        toast.error(response.data?.error || t('admin2.sm_backup_create_error'));
       }
     } catch (error) {
       logger.error('Ошибка создания бэкапа:', error);
-      toast.error(error.response?.data?.detail || 'Ошибка создания бэкапа');
+      toast.error(error.response?.data?.detail || t('admin2.sm_backup_create_error'));
     } finally {
       setLoading(false);
     }
@@ -161,8 +162,8 @@ const SystemManagement = () => {
     // P-013 fix: replaced window.confirm() with shared useConfirm hook.
     const ok = await confirm({
       title: t('admin2.delete_backup_title'),
-      message: `Удалить бэкап ${backupName}?`,
-      description: 'Это действие необратимо.',
+      message: t('admin2.sm_delete_backup_message', { name: backupName }),
+      description: t('admin2.sm_delete_backup_desc'),
       confirmLabel: t('admin2.delete_confirm'),
       cancelLabel: t('admin2.cancel'),
       intent: 'danger',
@@ -174,14 +175,14 @@ const SystemManagement = () => {
     try {
       const response = await api.delete(`/system/backup/${backupName}`);
       if (response.data?.success) {
-        toast.success('Бэкап удален');
+        toast.success(t('admin2.sm_backup_deleted'));
         loadBackups();
       } else {
-        toast.error(response.data?.error || 'Ошибка удаления бэкапа');
+        toast.error(response.data?.error || t('admin2.sm_backup_delete_error'));
       }
     } catch (error) {
       logger.error('Ошибка удаления бэкапа:', error);
-      toast.error('Ошибка удаления бэкапа');
+      toast.error(t('admin2.sm_backup_delete_error'));
     }
   };
 
@@ -223,8 +224,14 @@ const SystemManagement = () => {
   };
 
   // UX Audit Admin #2.4: русские лейблы для severity (consistency с AdminDashboard).
-  const SEVERITY_LABELS = { critical: 'Критический', warning: 'Предупреждение', info: 'Информация' };
-  const getSeverityLabel = (s) => SEVERITY_LABELS[s] || 'Информация';
+  const getSeverityLabel = (s) => {
+    const map = {
+      critical: t('admin2.sm_severity_critical'),
+      warning: t('admin2.sm_severity_warning'),
+      info: t('admin2.sm_severity_info'),
+    };
+    return map[s] || t('admin2.sm_severity_info');
+  };
 
   // ===================== РЕНДЕРИНГ =====================
 
@@ -235,7 +242,7 @@ const SystemManagement = () => {
         <div className="admin-flex-between-mb-16">
           <h3 className="admin-h3-icon-m0">
             <Activity className="w-5 h-5" />
-            Состояние системы
+            {t('admin2.sm_system_state')}
           </h3>
           <Button
           onClick={collectMetricsNow}
@@ -243,7 +250,7 @@ const SystemManagement = () => {
           size="sm">
 
             <RefreshCw className="w-4 h-4 mr-2" />
-            Обновить
+            {t('admin2.sm_refresh')}
           </Button>
         </div>
 
@@ -254,7 +261,7 @@ const SystemManagement = () => {
                 {systemHealth.overall_status?.toUpperCase()}
               </div>
               <div className="admin-text-sm-secondary">
-                Общий статус
+                {t('admin2.sm_overall_status')}
               </div>
             </div>
             
@@ -292,11 +299,11 @@ const SystemManagement = () => {
             </div>
             <div className="flex flex-col gap-2">
               <div className="admin-text-sm-primary">
-                Ядер: {systemMetrics.cpu?.count}
+                {t('admin2.sm_cores', { count: systemMetrics.cpu?.count })}
             </div>
               {systemMetrics.cpu?.frequency &&
           <div className="admin-text-sm-primary">
-                  Частота: {systemMetrics.cpu.frequency.toFixed(0)} MHz
+                  {t('admin2.sm_frequency', { freq: systemMetrics.cpu.frequency.toFixed(0) })}
                 </div>
           }
             </div>
@@ -307,7 +314,7 @@ const SystemManagement = () => {
             <div className="admin-flex-between-mb-16">
               <h4 className="admin-metric-h4">
                 <MemoryStick className="w-4 h-4" />
-                Память
+                {t('admin2.sm_memory')}
               </h4>
               <Badge variant={systemMetrics.memory?.usage_percent > 85 ? 'error' : 'success'}>
                 {systemMetrics.memory?.usage_percent?.toFixed(1)}%
@@ -315,13 +322,13 @@ const SystemManagement = () => {
             </div>
             <div className="flex flex-col gap-2">
               <div className="admin-text-sm-primary">
-                Всего: {formatBytes(systemMetrics.memory?.total)}
+                {t('admin2.sm_total')} {formatBytes(systemMetrics.memory?.total)}
               </div>
               <div className="admin-text-sm-primary">
-                Используется: {formatBytes(systemMetrics.memory?.used)}
+                {t('admin2.sm_used')} {formatBytes(systemMetrics.memory?.used)}
               </div>
               <div className="admin-text-sm-primary">
-                Доступно: {formatBytes(systemMetrics.memory?.available)}
+                {t('admin2.sm_available')} {formatBytes(systemMetrics.memory?.available)}
             </div>
             </div>
           </MacOSCard>
@@ -331,7 +338,7 @@ const SystemManagement = () => {
             <div className="admin-flex-between-mb-16">
               <h4 className="admin-metric-h4">
                 <HardDrive className="w-4 h-4" />
-                Диск
+                {t('admin2.sm_disk')}
               </h4>
               <Badge variant={systemMetrics.disk?.usage_percent > 90 ? 'error' : 'success'}>
                 {systemMetrics.disk?.usage_percent?.toFixed(1)}%
@@ -339,13 +346,13 @@ const SystemManagement = () => {
             </div>
             <div className="flex flex-col gap-2">
               <div className="admin-text-sm-primary">
-                Всего: {formatBytes(systemMetrics.disk?.total)}
+                {t('admin2.sm_total')} {formatBytes(systemMetrics.disk?.total)}
               </div>
               <div className="admin-text-sm-primary">
-                Используется: {formatBytes(systemMetrics.disk?.used)}
+                {t('admin2.sm_used')} {formatBytes(systemMetrics.disk?.used)}
               </div>
               <div className="admin-text-sm-primary">
-                Свободно: {formatBytes(systemMetrics.disk?.free)}
+                {t('admin2.sm_free')} {formatBytes(systemMetrics.disk?.free)}
             </div>
             </div>
           </MacOSCard>
@@ -356,26 +363,26 @@ const SystemManagement = () => {
       <MacOSCard className="p-6">
         <h3 className="admin-h3-icon-mb-16">
           <AlertTriangle className="w-5 h-5" />
-          Последние алерты
+          {t('admin2.sm_recent_alerts')}
         </h3>
         
         {alerts.length === 0 ?
       <MacOSEmptyState
         icon={CheckCircle}
-        title="Нет активных алертов"
-        description="Система работает стабильно"
+        title={t('admin2.sm_no_active_alerts')}
+        description={t('admin2.sm_system_stable')}
         iconStyle={{ width: '48px', height: '48px', color: 'var(--mac-success)' }} /> :
       <>
       {/* UX Audit Admin #4.8: alerts counter + show all button. */}
       {alerts.length > 0 && (
         <div className="admin-sysmgmt-hint">
-          Показано {Math.min(alertsLimit, alerts.length)} из {alerts.length}
+          {t('admin2.sm_alerts_shown', { shown: Math.min(alertsLimit, alerts.length), total: alerts.length })}
           {alerts.length > alertsLimit && (
             <button
               type="button"
               onClick={() => setAlertsLimit(50)}
               className="admin-sysmgmt-link-btn">
-              Показать все
+              {t('admin2.sm_show_all')}
             </button>
           )}
         </div>
@@ -409,21 +416,21 @@ const SystemManagement = () => {
       <MacOSCard className="p-6">
         <h3 className="admin-h3-icon-mb-16">
           <Database className="w-5 h-5" />
-          Создание бэкапа
+          {t('admin2.sm_create_backup_title')}
         </h3>
         
         <div className="admin-grid-auto-200-mb-16">
           <div>
             <label className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">
-              Тип бэкапа
+              {t('admin2.sm_backup_type')}
             </label>
             <Select
             value={backupForm.backup_type}
             onChange={(value) => setBackupForm((prev) => ({ ...prev, backup_type: value }))}
             options={[
-            { value: 'database', label: 'База данных' },
-            { value: 'full', label: 'Полный бэкап' },
-            { value: 'configuration', label: 'Конфигурация' }]
+            { value: 'database', label: t('admin2.sm_backup_type_database') },
+            { value: 'full', label: t('admin2.sm_backup_type_full') },
+            { value: 'configuration', label: t('admin2.sm_backup_type_configuration') }]
             }
             size="large"
             className="w-full" />
@@ -437,7 +444,7 @@ const SystemManagement = () => {
               onChange={(checked) => setBackupForm((prev) => ({ ...prev, include_files: checked }))}
               className="mr-2" />
 
-              Включить файлы
+              {t('admin2.sm_include_files')}
             </label>
           </div>
 
@@ -452,7 +459,7 @@ const SystemManagement = () => {
 
             <Download className="w-4 h-4 mr-2" />
             }
-              Создать бэкап
+              {t('admin2.sm_btn_create_backup')}
             </Button>
           </div>
         </div>
@@ -463,7 +470,7 @@ const SystemManagement = () => {
         <div className="admin-flex-between-mb-16">
           <h3 className="admin-h3-icon-m0">
             <Shield className="w-5 h-5" />
-            Список бэкапов
+            {t('admin2.sm_backups_list')}
           </h3>
           <Button
           onClick={loadBackups}
@@ -471,25 +478,25 @@ const SystemManagement = () => {
           size="sm">
 
             <RefreshCw className="w-4 h-4 mr-2" />
-            Обновить
+            {t('admin2.sm_refresh')}
           </Button>
         </div>
 
         {backups.length === 0 ?
       <MacOSEmptyState
         icon={Database}
-        title="Бэкапы не найдены"
-        description="Создайте первый бэкап системы"
+        title={t('admin2.sm_no_backups')}
+        description={t('admin2.sm_no_backups_desc')}
         iconStyle={{ width: '48px', height: '48px', color: 'var(--mac-text-tertiary)' }} /> :
 
 
       <Table
         columns={[
-        { key: 'name', label: 'Название' },
-        { key: 'type', label: 'Тип' },
-        { key: 'size', label: 'Размер' },
-        { key: 'created_at', label: 'Создан' },
-        { key: 'actions', label: 'Действия' }]
+        { key: 'name', label: t('admin2.sm_col_name') },
+        { key: 'type', label: t('admin2.sm_col_type') },
+        { key: 'size', label: t('admin2.sm_col_size') },
+        { key: 'created_at', label: t('admin2.sm_col_created') },
+        { key: 'actions', label: t('admin2.sm_col_actions') }]
         }
         data={backups.map((backup) => ({
           ...backup,
@@ -529,8 +536,8 @@ const SystemManagement = () => {
         emptyState={
         <MacOSEmptyState
           icon={Database}
-          title="Бэкапы не найдены"
-          description="Создайте первый бэкап системы" />
+          title={t('admin2.sm_no_backups')}
+          description={t('admin2.sm_no_backups_desc')} />
 
         } />
 
@@ -544,13 +551,13 @@ const SystemManagement = () => {
       <MacOSCard className="p-6">
         <h3 className="admin-h3-icon-mb-16">
           <Settings className="w-5 h-5" />
-          Настройки мониторинга
+          {t('admin2.sm_monitoring_settings')}
         </h3>
         
         <div className="admin-grid-auto-300-24">
           <div>
             <h4 className="admin-settings-h4">
-              Пороговые значения
+              {t('admin2.sm_thresholds')}
             </h4>
             <div className="flex flex-col gap-3">
               <div>
@@ -568,7 +575,7 @@ const SystemManagement = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2 mb-1">
-                  Память (%)
+                  {t('admin2.sm_memory_percent')}
                 </label>
                 <Input
                 type="number"
@@ -581,7 +588,7 @@ const SystemManagement = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2 mb-1">
-                  Диск (%)
+                  {t('admin2.sm_disk_percent')}
                 </label>
                 <Input
                 type="number"
@@ -597,34 +604,34 @@ const SystemManagement = () => {
           
           <div>
             <h4 className="admin-settings-h4">
-              Автоматизация
+              {t('admin2.sm_automation')}
             </h4>
             <div className="flex flex-col gap-3">
               <div className="admin-automation-row">
                 <div>
                   <div className="admin-text-med-primary-block">
-                    Автоматические бэкапы
+                    {t('admin2.sm_auto_backups')}
                   </div>
                   <div className="admin-text-sm-secondary">
-                    Ежедневно в 02:00
+                    {t('admin2.sm_daily_at_2')}
                   </div>
                 </div>
                 <Button size="sm" variant="outline">
-                  Настроить
+                  {t('admin2.sm_configure')}
                 </Button>
               </div>
               
               <div className="admin-automation-row">
                 <div>
                   <div className="admin-text-med-primary-block">
-                    Уведомления
+                    {t('admin2.sm_notifications')}
                   </div>
                   <div className="admin-text-sm-secondary">
-                    Email при критических алертах
+                    {t('admin2.sm_email_critical_alerts')}
                   </div>
                 </div>
                 <Button size="sm" variant="outline">
-                  Настроить
+                  {t('admin2.sm_configure')}
                 </Button>
               </div>
             </div>
@@ -633,7 +640,7 @@ const SystemManagement = () => {
         
         <div className="mt-6">
           <Button>
-            Сохранить настройки
+            {t('admin2.sm_save_settings')}
           </Button>
         </div>
       </MacOSCard>
@@ -647,10 +654,10 @@ const SystemManagement = () => {
           <Server className="admin-icon-32-accent" />
           <div>
             <h1 className="admin-text-2xl admin-text-semi text-[var(--mac-text-primary)] admin-m-0">
-              Управление системой
+              {t('admin2.sm_title')}
             </h1>
             <p className="admin-page-subtitle">
-              Мониторинг, бэкапы и системные настройки
+              {t('admin2.sm_subtitle')}
             </p>
           </div>
         </div>
@@ -669,7 +676,7 @@ const SystemManagement = () => {
           with ClinicManagement. Different API prevents immediate migration. */}
       <div className="admin-tab-bar-simple">
           {[
-        { id: 'monitoring', label: 'Мониторинг', icon: Activity },
+        { id: 'monitoring', label: t('admin2.sm_tab_monitoring'), icon: Activity },
         // UX Audit Admin #3.2: backups-tab удалён — дублирует BackupManagement
         // компонент в ClinicManagement. SystemManagement фокусируется на мониторинге.
         ].map((tab) => {

@@ -37,7 +37,7 @@ import { getErrorMessage } from '../utils/errorHandler';
 import logger from '../utils/logger';
 import notify from '../services/notify';
 // STRAT#32: useTranslation adapter for confirm/notify i18n.
-import { useTranslation } from '../i18n/adapter';
+import { useTranslation } from '../i18n/useTranslation';
 // QW-10 (UX audit): shared ConfirmDialog hook used before completing a visit.
 import { useConfirm } from '../components/common/ConfirmDialog';
 import RoleNotificationCenter from '../components/notifications/RoleNotificationCenter';
@@ -255,13 +255,13 @@ const MacOSCardiologistPanelUnified = () => {
   // LDL uses the configurable settings.ldlThreshold as its upper "critical"
   // marker; the hard physiological ceiling is 1000 mg/dL.
   const FIELD_RANGES = useRef({
-    cholesterol_total: { min: 50, max: 1000, unit: 'мг/дл', label: 'Общий холестерин' },
-    cholesterol_hdl: { min: 5, max: 200, unit: 'мг/дл', label: 'HDL' },
-    cholesterol_ldl: { min: 5, max: 1000, unit: 'мг/дл', label: 'LDL' },
-    triglycerides: { min: 10, max: 2000, unit: 'мг/дл', label: 'Триглицериды' },
-    glucose: { min: 20, max: 1000, unit: 'мг/дл', label: 'Глюкоза' },
-    crp: { min: 0, max: 500, unit: 'мг/л', label: 'CRP' },
-    troponin: { min: 0, max: 100, unit: 'нг/мл', label: 'Тропонин' },
+    cholesterol_total: { min: 50, max: 1000, unit: tI18n('cardio.cardio_panel_unit_mgdl'), label: tI18n('cardio.cardio_panel_field_cholesterol_total_label') },
+    cholesterol_hdl: { min: 5, max: 200, unit: tI18n('cardio.cardio_panel_unit_mgdl'), label: 'HDL' },
+    cholesterol_ldl: { min: 5, max: 1000, unit: tI18n('cardio.cardio_panel_unit_mgdl'), label: 'LDL' },
+    triglycerides: { min: 10, max: 2000, unit: tI18n('cardio.cardio_panel_unit_mgdl'), label: tI18n('cardio.cardio_panel_field_triglycerides_label') },
+    glucose: { min: 20, max: 1000, unit: tI18n('cardio.cardio_panel_unit_mgdl'), label: tI18n('cardio.cardio_panel_field_glucose_label') },
+    crp: { min: 0, max: 500, unit: tI18n('cardio.cardio_panel_unit_mgl'), label: 'CRP' },
+    troponin: { min: 0, max: 100, unit: tI18n('cardio.cardio_panel_unit_ngml'), label: tI18n('cardio.cardio_panel_field_troponin_label') },
   }).current;
 
   const getFieldRangeWarning = useCallback(
@@ -275,13 +275,13 @@ const MacOSCardiologistPanelUnified = () => {
       if (parsed < range.min) {
         return {
           valid: false,
-          message: `${range.label} ${parsed} ${range.unit} ниже физиологического минимума (${range.min}). Проверьте значение.`,
+          message: tI18n('cardio.cardio_panel_range_below_min', { label: range.label, value: parsed, unit: range.unit, min: range.min }),
         };
       }
       if (parsed > range.max) {
         return {
           valid: false,
-          message: `${range.label} ${parsed} ${range.unit} превышает физиологический максимум (${range.max}). Проверьте значение.`,
+          message: tI18n('cardio.cardio_panel_range_above_max', { label: range.label, value: parsed, unit: range.unit, max: range.max }),
         };
       }
       return { valid: true, message: null };
@@ -296,12 +296,12 @@ const MacOSCardiologistPanelUnified = () => {
   // therapy. The doctor must explicitly confirm when one of these codes
   // is present.
   const CRITICAL_ICD10_CODES = useRef({
-    'I21': 'Острый инфаркт миокарда',
-    'I22': 'Повторный инфаркт миокарда',
-    'I46': 'Остановка сердца',
-    'I50': 'Сердечная недостаточность',
-    'I71': 'Аневризма и расслоение аорты',
-    'R57': 'Шок (включая кардиогенный)',
+    'I21': tI18n('cardio.cardio_panel_critical_icd_I21'),
+    'I22': tI18n('cardio.cardio_panel_critical_icd_I22'),
+    'I46': tI18n('cardio.cardio_panel_critical_icd_I46'),
+    'I50': tI18n('cardio.cardio_panel_critical_icd_I50'),
+    'I71': tI18n('cardio.cardio_panel_critical_icd_I71'),
+    'R57': tI18n('cardio.cardio_panel_critical_icd_R57'),
   }).current;
 
   const getCriticalDiagnosisWarning = useCallback(
@@ -402,7 +402,7 @@ const MacOSCardiologistPanelUnified = () => {
 
       setPatientFiles(Array.from(mergedFiles.values()));
     } catch (error) {
-      notify.error(getErrorMessage(error, 'Не удалось обновить данные пациента. Проверьте соединение и попробуйте снова.'));
+      notify.error(getErrorMessage(error, tI18n('cardio.cardio_panel_patient_data_update_failed')));
     }
   }, [getSelectedPatientContext]);
 
@@ -476,7 +476,7 @@ const MacOSCardiologistPanelUnified = () => {
           setServices(servicesData);
         }
       } catch (error) {
-      notify.error(getErrorMessage(error, 'Не удалось загрузить список услуг. Проверьте соединение и попробуйте снова.'));
+      notify.error(getErrorMessage(error, tI18n('cardio.cardio_panel_services_load_failed')));
       }
     };
 
@@ -523,9 +523,9 @@ const MacOSCardiologistPanelUnified = () => {
         specialty: prev?.specialty || 'cardiology'
       }));
       setActiveTab('patients');
-      notify.info(`Загружен пациент: ${patientName}. Выберите визит с каноническим visit_id.`);
+      notify.info(tI18n('cardio.cardio_panel_patient_loaded_info', { name: patientName }));
     } catch (error) {
-      notify.error(getErrorMessage(error, 'Не удалось загрузить пациента. Проверьте соединение и попробуйте снова.'));
+      notify.error(getErrorMessage(error, tI18n('cardio.cardio_panel_patient_load_failed')));
     }
   }, [patientIdFromUrl, visitIdFromUrl, selectedPatient, setSelectedPatient, setActiveTab]);
 
@@ -654,10 +654,10 @@ const MacOSCardiologistPanelUnified = () => {
                   patient_birth_year: entry.patient_birth_year || '',
                   address: entry.address || '',
                   visit_type:
-                    entry.discount_mode === 'repeat' ? 'Повторный' :
-                    entry.discount_mode === 'benefit' ? 'Льготный' :
+                    entry.discount_mode === 'repeat' ? tI18n('cardio.cardio_panel_visit_type_repeat') :
+                    entry.discount_mode === 'benefit' ? tI18n('cardio.cardio_panel_visit_type_benefit') :
                     entry.discount_mode === 'all_free' ? 'All Free' :
-                    'Платный',
+                    tI18n('cardio.cardio_panel_visit_type_paid'),
                   discount_mode: entry.discount_mode || 'none',
                   services: entry.services || [],
                   service_codes: entry.service_codes || [],
@@ -677,7 +677,7 @@ const MacOSCardiologistPanelUnified = () => {
                   canonical_status: entry.canonical_status ?? null,
                   queue_status: entry.queue_status ?? null,
                   queue_position: entry.queue_position,
-                  doctor: entry.doctor_name || 'Врач',
+                  doctor: entry.doctor_name || tI18n('cardio.cardio_panel_doctor_fallback'),
                   specialty: queue.specialty,
                   ...adaptTimeFields(entry, data),
                   status: entry.status ?? null,
@@ -735,7 +735,7 @@ const MacOSCardiologistPanelUnified = () => {
         setAppointments(enrichedAppointmentsData);
       }
     } catch (error) {
-      notify.error(getErrorMessage(error, 'Не удалось загрузить записи кардиолога. Проверьте соединение и попробуйте снова.'));
+      notify.error(getErrorMessage(error, tI18n('cardio.cardio_panel_appointments_load_failed')));
     } finally {
       setAppointmentsLoading(false);
     }
@@ -792,7 +792,7 @@ const MacOSCardiologistPanelUnified = () => {
         return await response.json();
       }
     } catch (error) {
-      notify.error(getErrorMessage(error, 'Не удалось загрузить данные пациента. Проверьте соединение и попробуйте снова.'));
+      notify.error(getErrorMessage(error, tI18n('cardio.cardio_panel_patient_data_load_failed')));
     }
     return null;
   }, []);
@@ -869,7 +869,7 @@ const MacOSCardiologistPanelUnified = () => {
     } catch (error) {
       const partialPatient = createPartialPatientFromRow(row);
       setEditPatientModal({ open: true, patient: partialPatient, loading: false });
-      notify.error(getErrorMessage(error, 'Не удалось загрузить карточку пациента. Проверьте соединение и попробуйте снова.'));
+      notify.error(getErrorMessage(error, tI18n('cardio.cardio_panel_patient_card_load_failed')));
     }
   }, [fetchPatientData, transformPatientData, createPartialPatientFromRow]);
 
@@ -921,7 +921,7 @@ const MacOSCardiologistPanelUnified = () => {
     const ok = await confirm({
       title: tI18n('cardio.cancel_appointment_title'),
       message: tI18n('cardio.cancel_appointment_message', { name: (row?.patient_fio || row?.patient_name || '').trim() }),
-      description: 'Запись будет помечена как отменённая. Пациент получит уведомление, если включено.',
+      description: tI18n('cardio.cardio_panel_appointment_cancel_description'),
       confirmLabel: tI18n('cardio.cancel_appointment_confirm'),
       cancelLabel: tI18n('cardio.cancel_appointment_cancel'),
       intent: 'warning',
@@ -950,7 +950,7 @@ const MacOSCardiologistPanelUnified = () => {
       loadMacOSCardiologyAppointments(true);
     } catch (error) {
       logger.error('[Cardiology] Ошибка отмены записи:', error);
-      notify.error(error?.message || 'Не удалось отменить запись. Проверьте соединение и попробуйте снова.');
+      notify.error(error?.message || tI18n('cardio.cardio_panel_appointment_cancel_failed'));
     } finally {
       setLoading(false);
     }
@@ -1018,10 +1018,10 @@ const MacOSCardiologistPanelUnified = () => {
 
           if (response.ok) {
             await loadMacOSCardiologyAppointments();
-            notify.success(`Пациент ${row.patient_fio} вызван`);
+            notify.success(tI18n('cardio.cardio_panel_patient_called', { name: row.patient_fio }));
           }
         } catch (error) {
-          notify.error(getErrorMessage(error, 'Не удалось вызвать пациента. Проверьте соединение и попробуйте снова.'));
+          notify.error(getErrorMessage(error, tI18n('cardio.cardio_panel_call_patient_failed')));
         }
         break;
       case 'payment':
@@ -1036,11 +1036,11 @@ const MacOSCardiologistPanelUnified = () => {
       case 'print':
         try {
           const printResult = await printPanelTicket(row, {
-            specialtyName: 'Кардиология'
+            specialtyName: tI18n('cardio.cardio_panel_specialty_name')
           });
-          notify.success(printResult?.message || `Талон для ${row.patient_fio} отправлен на печать`);
+          notify.success(printResult?.message || tI18n('cardio.cardio_panel_ticket_printed', { name: row.patient_fio }));
         } catch (error) {
-          notify.error(getErrorMessage(error, 'Не удалось отправить талон на печать'));
+          notify.error(getErrorMessage(error, tI18n('cardio.cardio_panel_ticket_print_failed')));
         }
         break;
       case 'complete':{
@@ -1076,7 +1076,7 @@ const MacOSCardiologistPanelUnified = () => {
             // Переходим на вкладку visit для завершения
             goToTab('visit');
           } catch (error) {
-            notify.error(getErrorMessage(error, 'Не удалось завершить приём. Проверьте соединение и попробуйте снова.'));
+            notify.error(getErrorMessage(error, tI18n('cardio.cardio_panel_complete_visit_failed')));
           }
           break;
         }
@@ -1133,8 +1133,7 @@ const MacOSCardiologistPanelUnified = () => {
       const critical = getCriticalDiagnosisWarning(suggestion);
       if (critical) {
         notify.warning(
-          `Критический диагноз: ${critical.label} (${critical.fullCode}). ` +
-          'Потребуется подтверждение при завершении приёма.'
+          tI18n('cardio.cardio_panel_critical_diagnosis_warning', { label: critical.label, fullCode: critical.fullCode })
         );
       }
     } else if (type === 'diagnosis') {
@@ -1167,43 +1166,37 @@ const MacOSCardiologistPanelUnified = () => {
     let confirmOptions;
     if (criticalWarning) {
       confirmOptions = {
-        title: `Критический диагноз: ${criticalWarning.label} (${criticalWarning.code})`,
+        title: tI18n('cardio.cardio_panel_critical_diagnosis_title', { label: criticalWarning.label, code: criticalWarning.code }),
         message:
-          `Код МКБ-10 ${criticalWarning.fullCode} соответствует критическому диагнозу: ` +
-          `"${criticalWarning.label}". Подтвердите, что диагноз установлен корректно. ` +
-          'Ошибочный диагноз может привести к ненужному агрессивному лечению ' +
-          '(тромболизис, коронарография, интенсивная терапия).',
+          tI18n('cardio.cardio_panel_critical_diagnosis_message', { fullCode: criticalWarning.fullCode, label: criticalWarning.label }),
         description:
-          'После завершения приёма EMR будет сохранена с этим диагнозом. ' +
-          'Изменение диагноза после подписания возможно только через поправку (amend).',
-        confirmLabel: 'Подтверждаю диагноз',
-        cancelLabel: 'Отмена — проверить диагноз',
+          tI18n('cardio.cardio_panel_critical_diagnosis_description'),
+        confirmLabel: tI18n('cardio.cardio_panel_critical_diagnosis_confirm'),
+        cancelLabel: tI18n('cardio.cardio_panel_critical_diagnosis_cancel'),
         intent: 'danger',
       };
     } else if (missingCritical) {
       confirmOptions = {
-        title: 'Завершить приём без диагноза?',
+        title: tI18n('cardio.cardio_panel_complete_without_diagnosis_title'),
         message: hasDiagnosis
-          ? 'Не заполнена жалоба пациента.'
+          ? tI18n('cardio.cardio_panel_missing_complaint_message')
           : hasComplaint
-            ? 'Не заполнен диагноз. Рекомендуется указать диагноз перед завершением приёма.'
-            : 'Не заполнены жалоба и диагноз. Рекомендуется заполнить их перед завершением.',
+            ? tI18n('cardio.cardio_panel_missing_diagnosis_message')
+            : tI18n('cardio.cardio_panel_missing_both_message'),
         description:
-          'После завершения приёма EMR будет сохранена в текущем состоянии. ' +
-          'Дополнить карту можно будет через поправку (amend).',
-        confirmLabel: 'Завершить всё равно',
-        cancelLabel: 'Вернуться к заполнению',
+          tI18n('cardio.cardio_panel_missing_critical_description'),
+        confirmLabel: tI18n('cardio.cardio_panel_complete_anyway_confirm'),
+        cancelLabel: tI18n('cardio.cardio_panel_back_to_filling_cancel'),
         intent: 'warning',
       };
     } else {
       confirmOptions = {
-        title: 'Завершить приём?',
-        message: 'Приём будет сохранён, и система автоматически вызовет следующего пациента.',
+        title: tI18n('cardio.cardio_panel_complete_visit_title'),
+        message: tI18n('cardio.cardio_panel_complete_visit_message'),
         description:
-          'Перед завершением убедитесь, что диагноз, лечение и рекомендации заполнены корректно. ' +
-          'После подписания EMR изменения возможны только через поправку.',
-        confirmLabel: 'Завершить приём',
-        cancelLabel: 'Отмена',
+          tI18n('cardio.cardio_panel_complete_visit_description'),
+        confirmLabel: tI18n('cardio.cardio_panel_complete_visit_confirm'),
+        cancelLabel: tI18n('cardio.cardio_panel_complete_visit_cancel'),
         intent: 'primary',
       };
     }
@@ -1268,17 +1261,17 @@ const MacOSCardiologistPanelUnified = () => {
       try {
         const next = await queueService.callNextWaiting(SPECIALTY_KEYS.CARDIOLOGY);
         if (next?.success) {
-          notify.success(`Вызван следующий пациент №${next.entry.number}`);
+          notify.success(tI18n('cardio.cardio_panel_next_patient_called', { number: next.entry.number }));
         }
       } catch (err) {
         notify.warning(getErrorMessage(
           err,
-          'Следующий пациент не вызван автоматически. Проверьте соединение и попробуйте снова.'
+          tI18n('cardio.cardio_panel_next_patient_call_failed')
         ));
       }
 
     } catch (error) {
-      notify.error(getErrorMessage(error, 'Не удалось завершить действие. Проверьте соединение и попробуйте снова.'));
+      notify.error(getErrorMessage(error, tI18n('cardio.cardio_panel_action_failed')));
     } finally {
       setLoading(false);
     }
@@ -1350,9 +1343,9 @@ const MacOSCardiologistPanelUnified = () => {
       }
 
       // Other 4xx — surface the backend detail if available
-      const errorPayload = await response.json().catch(() => ({ detail: 'Ошибка при загрузке EMR' }));
+      const errorPayload = await response.json().catch(() => ({ detail: tI18n('cardio.cardio_panel_emr_load_error_short') }));
       logger.warn('[Cardiology] loadEMR: client error', { visitId, status: response.status, errorPayload });
-      notify.error(getErrorMessage(errorPayload, 'Не удалось загрузить EMR. Проверьте соединение и попробуйте снова.'));
+      notify.error(getErrorMessage(errorPayload, tI18n('cardio.cardio_panel_emr_load_failed')));
       setEmr(null);
       return null;
     } catch (error) {
@@ -1363,7 +1356,7 @@ const MacOSCardiologistPanelUnified = () => {
         return null;
       }
       logger.error('[Cardiology] loadEMR: network error', { visitId, error: error?.message || error });
-      notify.error(getErrorMessage(error, 'Не удалось загрузить EMR. Проверьте соединение и попробуйте снова.'));
+      notify.error(getErrorMessage(error, tI18n('cardio.cardio_panel_emr_load_failed')));
       return null;
     }
   };
@@ -1473,7 +1466,7 @@ const MacOSCardiologistPanelUnified = () => {
     try {
       await handleSaveVisit();
     } catch (error) {
-      notify.error(getErrorMessage(error, 'Не удалось завершить приём через EMR. Проверьте соединение и попробуйте снова.'));
+      notify.error(getErrorMessage(error, tI18n('cardio.cardio_panel_complete_visit_emr_failed')));
     }
   };
 
@@ -1520,9 +1513,9 @@ const MacOSCardiologistPanelUnified = () => {
       }
 
       const errorData = await response.json().catch(() => ({}));
-      notify.error(getErrorMessage(errorData?.detail || errorData?.message || '', 'Не удалось сохранить анализ. Проверьте соединение и попробуйте снова.'));
+      notify.error(getErrorMessage(errorData?.detail || errorData?.message || '', tI18n('cardio.cardio_panel_blood_test_save_failed')));
     } catch (error) {
-      notify.error(getErrorMessage(error, 'Не удалось сохранить анализ. Проверьте соединение и попробуйте снова.'));
+      notify.error(getErrorMessage(error, tI18n('cardio.cardio_panel_blood_test_save_failed')));
     }
   };
 
@@ -1569,7 +1562,7 @@ const MacOSCardiologistPanelUnified = () => {
       });
 
       if (!response.ok) {
-        throw new Error('Не удалось скачать файл');
+        throw new Error(tI18n('cardio.cardio_panel_download_failed_short'));
       }
 
       const blob = await response.blob();
@@ -1582,7 +1575,7 @@ const MacOSCardiologistPanelUnified = () => {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      notify.error(getErrorMessage(error, 'Не удалось скачать файл. Проверьте соединение и попробуйте снова.'));
+      notify.error(getErrorMessage(error, tI18n('cardio.cardio_panel_download_failed')));
     }
   };
 
@@ -1598,7 +1591,7 @@ const MacOSCardiologistPanelUnified = () => {
       });
 
       if (!response.ok) {
-        throw new Error('Предпросмотр недоступен');
+        throw new Error(tI18n('cardio.cardio_panel_preview_unavailable_short'));
       }
 
       const blob = await response.blob();
@@ -1606,10 +1599,10 @@ const MacOSCardiologistPanelUnified = () => {
       window.setTimeout(() => window.URL.revokeObjectURL(url), 60_000);
       const previewWindow = window.open(url, '_blank', 'noopener,noreferrer');
       if (!previewWindow) {
-        throw new Error('Браузер заблокировал окно предпросмотра');
+        throw new Error(tI18n('cardio.cardio_panel_preview_blocked_short'));
       }
     } catch (error) {
-      notify.error(getErrorMessage(error, 'Не удалось открыть файл. Проверьте соединение и попробуйте снова.'));
+      notify.error(getErrorMessage(error, tI18n('cardio.cardio_panel_open_file_failed')));
     }
   };
 
@@ -1617,23 +1610,23 @@ const MacOSCardiologistPanelUnified = () => {
     ...bloodTests.map((test) => ({
       id: `blood-${test.id}`,
       kind: 'labs',
-      title: `Анализ крови — ${test.test_date || '—'}`,
-      subtitle: `Хол: ${test.cholesterol_total || '—'}; LDL: ${test.cholesterol_ldl || '—'}; Глюкоза: ${test.glucose || '—'}`,
+      title: tI18n('cardio.cardio_panel_blood_test_title', { date: test.test_date || '—' }),
+      subtitle: tI18n('cardio.cardio_panel_blood_test_subtitle', { total: test.cholesterol_total || '—', ldl: test.cholesterol_ldl || '—', glucose: test.glucose || '—' }),
       timestamp: test.test_date || test.created_at || test.updated_at,
       badgeVariant: 'secondary',
-      meta: test.interpretation || `Тест #${test.id}`,
+      meta: test.interpretation || tI18n('cardio.cardio_panel_blood_test_meta', { id: test.id }),
     })),
     ...ecgResults.map((result) => ({
       id: `ecg-${result.id || result.ecg_date}`,
       kind: 'ecg',
-      title: `ЭКГ — ${result.ecg_date || '—'}`,
-      subtitle: `Ритм: ${result.rhythm || '—'}, ЧСС: ${result.heart_rate || '—'}`,
+      title: tI18n('cardio.cardio_panel_ecg_title', { date: result.ecg_date || '—' }),
+      subtitle: tI18n('cardio.cardio_panel_ecg_subtitle', { rhythm: result.rhythm || '—', heart_rate: result.heart_rate || '—' }),
       timestamp: result.ecg_date || result.created_at || result.updated_at,
       badgeVariant: 'success',
-      meta: result.source || `Запись #${result.id || '—'}`,
+      meta: result.source || tI18n('cardio.cardio_panel_ecg_meta', { id: result.id || '—' }),
     })),
     ...patientFiles.map((file) => {
-      const fileLabel = file.title || file.original_filename || file.filename || file.name || `Файл #${file.id}`;
+      const fileLabel = file.title || file.original_filename || file.filename || file.name || tI18n('cardio.cardio_panel_file_label', { id: file.id });
       const tags = Array.isArray(file.tags) && file.tags.length > 0 ? file.tags.join(', ') : '';
       const fileType = file.file_type || file.mime_type || file.type || 'attachment';
 
@@ -1655,10 +1648,10 @@ const MacOSCardiologistPanelUnified = () => {
     : historyEntries.filter((entry) => entry.kind === historyFilter);
 
   const historyFilterOptions = [
-    { value: 'all', label: 'Все', count: historyEntries.length },
-    { value: 'ecg', label: 'ЭКГ', count: ecgResults.length },
-    { value: 'labs', label: 'Анализы', count: bloodTests.length },
-    { value: 'attachments', label: 'Вложения', count: patientFiles.length },
+    { value: 'all', label: tI18n('cardio.cardio_panel_filter_all'), count: historyEntries.length },
+    { value: 'ecg', label: tI18n('cardio.cardio_panel_filter_ecg'), count: ecgResults.length },
+    { value: 'labs', label: tI18n('cardio.cardio_panel_filter_labs'), count: bloodTests.length },
+    { value: 'attachments', label: tI18n('cardio.cardio_panel_filter_attachments'), count: patientFiles.length },
   ];
 
   const selectedPatientLabel = selectedPatient?.patient_name
@@ -1668,25 +1661,25 @@ const MacOSCardiologistPanelUnified = () => {
   const appointmentSummaryItems = [
     {
       key: 'total',
-      label: 'Всего',
+      label: tI18n('cardio.cardio_panel_summary_total'),
       value: appointments.length,
       variant: 'info'
     },
     {
       key: 'waiting',
-      label: 'Ожидают',
+      label: tI18n('cardio.cardio_panel_summary_waiting'),
       value: countAppointmentsByStatuses(appointments, CARDIOLOGY_WAITING_STATUSES),
       variant: 'warning'
     },
     {
       key: 'called',
-      label: 'Вызваны',
+      label: tI18n('cardio.cardio_panel_summary_called'),
       value: countAppointmentsByStatuses(appointments, CARDIOLOGY_CALLED_STATUSES),
       variant: 'primary'
     },
     {
       key: 'completed',
-      label: 'Приняты',
+      label: tI18n('cardio.cardio_panel_summary_completed'),
       value: countAppointmentsByStatuses(appointments, CARDIOLOGY_COMPLETED_STATUSES),
       variant: 'success'
     }
@@ -1755,9 +1748,9 @@ const MacOSCardiologistPanelUnified = () => {
           {showForm.open && showForm.type === 'ecg' && (
             <MacOSCard className="cardio-p-6">
               <div className="cardio-flex-between" style={{ marginBottom: 16 }}>
-                <h3 style={{ margin: 0 }}>Добавить запись ЭКГ</h3>
+                <h3 style={{ margin: 0 }}>{tI18n('cardio.cardio_panel_add_ecg_title')}</h3>
                 <Button variant="outline" size="sm" onClick={() => setShowForm({ open: false })}>
-                  Закрыть
+                  {tI18n('cardio.cardio_panel_close')}
                 </Button>
               </div>
               <BloodTestsTab
@@ -1904,18 +1897,17 @@ const MacOSCardiologistPanelUnified = () => {
         {sessionWarning && (
           <div
             role="alertdialog"
-            aria-label="Предупреждение об истечении сессии"
+            aria-label={tI18n('cardio.cardio_panel_session_warning_aria')}
             className="cardio-modal-overlay"
           >
             <div
               className="cardio-modal-card"
             >
               <h3 className="cardio-modal-heading">
-                Сессия скоро истечёт
+                {tI18n('cardio.cardio_panel_session_warning_title')}
               </h3>
               <p className="cardio-modal-text">
-                Ваша сессия истекает. Несохранённые данные (жалобы, диагноз, лечение)
-                могут быть потеряны. Сохраните текущий приём или продлите сессию.
+                {tI18n('cardio.cardio_panel_session_warning_text')}
               </p>
               <div className="cardio-modal-actions">
                 <Button
@@ -1926,7 +1918,7 @@ const MacOSCardiologistPanelUnified = () => {
                     // session is still expiring after dismissal.
                   }}
                 >
-                  Позже
+                  {tI18n('cardio.cardio_panel_session_warning_later')}
                 </Button>
                 <Button
                   onClick={() => {
@@ -1938,7 +1930,7 @@ const MacOSCardiologistPanelUnified = () => {
                     loadMacOSCardiologyAppointments?.();
                   }}
                 >
-                  Продлить сессию
+                  {tI18n('cardio.cardio_panel_session_warning_extend')}
                 </Button>
               </div>
             </div>
@@ -1949,26 +1941,26 @@ const MacOSCardiologistPanelUnified = () => {
         <button
           onClick={() => setSettingsOpen(true)}
           className="cardio-settings-fab"
-          aria-label="Открыть настройки">
+          aria-label={tI18n('cardio.cardio_panel_settings_open_aria')}>
 
           <Icon name="gear" size={18} />
         </button>
         {(activeTab === 'visit' || activeTab === 'blood') && settingsOpen &&
         <MacOSCard className="cardio-settings-card">
-            <h3 className="cardio-settings-title">Настройки кардиолога</h3>
+            <h3 className="cardio-settings-title">{tI18n('cardio.cardio_panel_settings_title')}</h3>
             <div className="cardio-flex-col">
               <label className="flex items-center cardio-settings-label">
                 <Checkbox
                 checked={settings.showEcgEchoTogether}
                 onChange={(e) => setSettings({ ...settings, showEcgEchoTogether: e.target.checked })} />
 
-                Показывать ЭКГ и ЭхоКГ вместе
+                {tI18n('cardio.cardio_panel_settings_show_ecg_echo')}
               </label>
               <div>
-                <div className="text-sm cardio-ldl-label">Порог LDL (мг/дл)</div>
+                <div className="text-sm cardio-ldl-label">{tI18n('cardio.cardio_panel_settings_ldl_threshold')}</div>
                 <Input
                 type="number"
-                aria-label="Порог LDL (мг/дл)"
+                aria-label={tI18n('cardio.cardio_panel_settings_ldl_threshold_aria')}
                 value={settings.ldlThreshold}
                 onChange={(e) => setSettings({ ...settings, ldlThreshold: Number(e.target.value) })}
                 className="cardio-settings-input" />
@@ -1976,7 +1968,7 @@ const MacOSCardiologistPanelUnified = () => {
               </div>
             </div>
             <div className="flex justify-end cardio-settings-actions">
-              <Button variant="outline" onClick={() => setSettingsOpen(false)}>Закрыть</Button>
+              <Button variant="outline" onClick={() => setSettingsOpen(false)}>{tI18n('cardio.cardio_panel_close')}</Button>
               <Button onClick={() => {
                 // P-016 (UX audit): settings are already persisted to
                 // localStorage on every change via useLocalStorage. The
@@ -1984,7 +1976,7 @@ const MacOSCardiologistPanelUnified = () => {
                 // the values are stored.
                 notify.success(tI18n('cardio.settings_saved'));
                 setSettingsOpen(false);
-              }}><Icon name="square.and.arrow.down" size={16} className="cardio-icon-mr" />Сохранить</Button>
+              }}><Icon name="square.and.arrow.down" size={16} className="cardio-icon-mr" />{tI18n('cardio.cardio_panel_save')}</Button>
             </div>
           </MacOSCard>
         }

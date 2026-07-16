@@ -18,7 +18,7 @@ import {
 
 'lucide-react';
 import PropTypes from 'prop-types';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 /**
  * Компонент для экспорта аналитических данных
@@ -40,54 +40,56 @@ const DataExporter = ({
   const [exportStatus, setExportStatus] = useState(null);
   const [showAdvancedPanel, setShowAdvancedPanel] = useState(showAdvanced);
 
+  const { t } = useTranslation();
+
   const formatOptions = [
   {
     id: 'json',
     label: 'JSON',
     icon: FileText,
-    description: 'Структурированные данные',
+    description: t('misc.de_format_json_desc'),
     color: 'blue'
   },
   {
     id: 'csv',
     label: 'CSV',
     icon: FileSpreadsheet,
-    description: 'Табличные данные',
+    description: t('misc.de_format_csv_desc'),
     color: 'green'
   },
   {
     id: 'xlsx',
     label: 'Excel',
     icon: FileSpreadsheet,
-    description: 'Расширенная таблица',
+    description: t('misc.de_format_xlsx_desc'),
     color: 'green'
   },
   {
     id: 'pdf',
     label: 'PDF',
     icon: FileImage,
-    description: 'Документ с графиками',
+    description: t('misc.de_format_pdf_desc'),
     color: 'red'
   }];
 
 
   const dataOptions = [
-  { id: 'all', label: 'Все данные', description: 'Полный набор аналитики' },
-  { id: 'kpi', label: 'KPI метрики', description: 'Ключевые показатели' },
-  { id: 'revenue', label: 'Доходы', description: 'Финансовая аналитика' },
-  { id: 'patients', label: 'Пациенты', description: 'Данные о пациентах' },
-  { id: 'appointments', label: 'Записи', description: 'Расписание и записи' },
-  { id: 'doctors', label: 'Врачи', description: 'Производительность врачей' }];
+  { id: 'all', label: t('misc.de_data_all_label'), description: t('misc.de_data_all_desc') },
+  { id: 'kpi', label: t('misc.de_data_kpi_label'), description: t('misc.de_data_kpi_desc') },
+  { id: 'revenue', label: t('misc.de_data_revenue_label'), description: t('misc.de_data_revenue_desc') },
+  { id: 'patients', label: t('misc.de_data_patients_label'), description: t('misc.de_data_patients_desc') },
+  { id: 'appointments', label: t('misc.de_data_appointments_label'), description: t('misc.de_data_appointments_desc') },
+  { id: 'doctors', label: t('misc.de_data_doctors_label'), description: t('misc.de_data_doctors_desc') }];
 
 
   const handleExport = async () => {
     if (!data) {
-      setExportStatus({ type: 'error', message: 'Нет данных для экспорта' });
+      setExportStatus({ type: 'error', message: t('misc.de_no_data') });
       return;
     }
 
     setIsExporting(true);
-    setExportStatus({ type: 'info', message: 'Подготовка данных...' });
+    setExportStatus({ type: 'info', message: t('misc.de_preparing') });
 
     try {
       const exportConfig = {
@@ -104,18 +106,18 @@ const DataExporter = ({
       if (result.success) {
         setExportStatus({
           type: 'success',
-          message: `Данные успешно экспортированы в формате ${selectedFormat.toUpperCase()}`
+          message: t('misc.de_export_success', { format: selectedFormat.toUpperCase() })
         });
       } else {
         setExportStatus({
           type: 'error',
-          message: result.error || 'Ошибка при экспорте данных'
+          message: result.error || t('misc.de_export_error')
         });
       }
     } catch {
       setExportStatus({
         type: 'error',
-        message: 'Произошла ошибка при экспорте'
+        message: t('misc.de_export_failed')
       });
     } finally {
       setIsExporting(false);
@@ -163,9 +165,9 @@ const DataExporter = ({
         {/* Заголовок */}
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-semibold">Экспорт данных</h3>
+            <h3 className="text-lg font-semibold">{t('misc.de_title')}</h3>
             <p className="text-sm text-gray-600">
-              Выберите формат и настройки для экспорта аналитики
+              {t('misc.de_subtitle')}
             </p>
           </div>
           <div className="flex items-center space-x-2">
@@ -175,7 +177,7 @@ const DataExporter = ({
               onClick={() => setShowAdvancedPanel((prev) => !prev)}>
 
               <Settings className="w-4 h-4 mr-2" />
-              Настройки
+              {t('misc.de_settings_button')}
             </Button>
           </div>
         </div>
@@ -183,7 +185,7 @@ const DataExporter = ({
         {/* Форматы экспорта */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-3">
-            Формат экспорта
+            {t('misc.de_format_label')}
           </label>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {formatOptions.
@@ -211,7 +213,7 @@ const DataExporter = ({
         {/* Тип данных */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-3">
-            Данные для экспорта
+            {t('misc.de_data_label')}
           </label>
           <select
             value={selectedData}
@@ -229,7 +231,7 @@ const DataExporter = ({
         {/* Дополнительные настройки */}
         {showAdvancedPanel &&
         <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
-            <h4 className="font-medium text-gray-900">Дополнительные настройки</h4>
+            <h4 className="font-medium text-gray-900">{t('misc.de_advanced_title')}</h4>
             
             <div className="space-y-3">
               <label className="flex items-center space-x-3">
@@ -237,8 +239,8 @@ const DataExporter = ({
                 className="rounded" />
               
                 <div>
-                  <span className="text-sm font-medium">Включить графики</span>
-                  <p className="text-xs text-gray-600">Добавить визуализации в экспорт</p>
+                  <span className="text-sm font-medium">{t('misc.de_include_charts')}</span>
+                  <p className="text-xs text-gray-600">{t('misc.de_include_charts_desc')}</p>
                 </div>
               </label>
 
@@ -247,8 +249,8 @@ const DataExporter = ({
                 className="rounded" />
               
                 <div>
-                  <span className="text-sm font-medium">Включить исходные данные</span>
-                  <p className="text-xs text-gray-600">Добавить необработанные данные</p>
+                  <span className="text-sm font-medium">{t('misc.de_include_raw')}</span>
+                  <p className="text-xs text-gray-600">{t('misc.de_include_raw_desc')}</p>
                 </div>
               </label>
 
@@ -257,8 +259,8 @@ const DataExporter = ({
                 className="rounded" />
               
                 <div>
-                  <span className="text-sm font-medium">Отправить по email</span>
-                  <p className="text-xs text-gray-600">Получить файл на почту</p>
+                  <span className="text-sm font-medium">{t('misc.de_send_email')}</span>
+                  <p className="text-xs text-gray-600">{t('misc.de_send_email_desc')}</p>
                 </div>
               </label>
 
@@ -269,7 +271,7 @@ const DataExporter = ({
                 aria-label="Export email address"
                 value={emailAddress}
                 onChange={(e) => setEmailAddress(e.target.value)}
-                placeholder="Введите email адрес"
+                placeholder={t('misc.de_email_placeholder')}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               
                 </div>
@@ -291,7 +293,7 @@ const DataExporter = ({
         {/* Кнопка экспорта */}
         <div className="flex items-center justify-between pt-4 border-t border-gray-200">
           <div className="text-sm text-gray-600">
-            {isExporting ? 'Экспорт в процессе...' : 'Готово к экспорту'}
+            {isExporting ? t('misc.de_exporting') : t('misc.de_ready')}
           </div>
           <Button
             onClick={handleExport}
@@ -304,7 +306,7 @@ const DataExporter = ({
             <Download className="w-4 h-4" />
             }
             <span>
-              {isExporting ? 'Экспорт...' : `Экспорт в ${selectedFormat.toUpperCase()}`}
+              {isExporting ? t('misc.de_export_button') : t('misc.de_export_to', { format: selectedFormat.toUpperCase() })}
             </span>
           </Button>
         </div>

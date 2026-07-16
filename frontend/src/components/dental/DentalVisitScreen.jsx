@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 /**
  * DentalVisitScreen — Phase 4+ minimalist visit screen for dentistry.
  *
@@ -106,6 +106,7 @@ const saveEMR = async (visitId, data, rowVersion, isDraft = true) => {
 // =============================================================================
 
 const PatientHeader = ({ patient, onCompleteVisit, loading }) => {
+  const { t } = useTranslation();
   const patientName =
     patient?.patient_name ||
     patient?.name ||
@@ -127,7 +128,7 @@ const PatientHeader = ({ patient, onCompleteVisit, loading }) => {
         <Stethoscope size={24} aria-hidden="true" style={{ color: 'var(--mac-accent-blue)' }} />
         <div style={{ minWidth: 0 }}>
           <Typography variant="h6" style={{ margin: 0, fontWeight: 600 }}>
-            Приём: {patientName}
+            {t('dental.dental_dvs_header_title', { name: patientName })}
           </Typography>
           {patientInfo && (
             <Typography variant="body2" color="textSecondary" style={{ margin: 0 }}>
@@ -140,9 +141,9 @@ const PatientHeader = ({ patient, onCompleteVisit, loading }) => {
         variant="primary"
         onClick={onCompleteVisit}
         disabled={loading}
-        aria-label="Завершить приём и вызвать следующего пациента">
+        aria-label={t('dental.dental_dvs_aria_complete')}>
         <CheckCircle size={16} style={{ marginRight: 6 }} aria-hidden="true" />
-        {loading ? 'Сохранение...' : 'Завершить визит'}
+        {loading ? t('dental.dental_dvs_saving') : t('dental.dental_dvs_complete_visit')}
       </Button>
     </div>
   );
@@ -154,26 +155,29 @@ PatientHeader.propTypes = {
   loading: PropTypes.bool,
 };
 
-const AnamnesisSection = ({ value, onChange, disabled }) => (
-  <div style={{ marginBottom: 16 }}>
-    <Label htmlFor="dental-anamnesis" style={{ display: 'block', marginBottom: 6 }}>
-      Жалобы и анамнез
-    </Label>
-    <Textarea
-      id="dental-anamnesis"
-      aria-label="Жалобы и анамнез пациента"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder="Напр.: Боль в зубе 16 при накусывании, 3 дня. Ранее — лечение кариеса."
-      minRows={2}
-      disabled={disabled}
-      style={{ width: '100%', boxSizing: 'border-box' }}
-    />
-    <Typography variant="caption" color="textSecondary" style={{ marginTop: 4, display: 'block' }}>
-      1-2 строки достаточно. Детальный анамнез — в EMRContainerV2 (вкладка «Протоколы визитов»).
-    </Typography>
-  </div>
-);
+const AnamnesisSection = ({ value, onChange, disabled }) => {
+  const { t } = useTranslation();
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <Label htmlFor="dental-anamnesis" style={{ display: 'block', marginBottom: 6 }}>
+        {t('dental.dental_dvs_anamnesis_label')}
+      </Label>
+      <Textarea
+        id="dental-anamnesis"
+        aria-label={t('dental.dental_dvs_anamnesis_aria')}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={t('dental.dental_dvs_anamnesis_placeholder')}
+        minRows={2}
+        disabled={disabled}
+        style={{ width: '100%', boxSizing: 'border-box' }}
+      />
+      <Typography variant="caption" color="textSecondary" style={{ marginTop: 4, display: 'block' }}>
+        {t('dental.dental_dvs_anamnesis_hint')}
+      </Typography>
+    </div>
+  );
+};
 
 AnamnesisSection.propTypes = {
   value: PropTypes.string,
@@ -182,11 +186,12 @@ AnamnesisSection.propTypes = {
 };
 
 const ToothSummary = ({ toothStatus }) => {
+  const { t } = useTranslation();
   const teeth = Object.entries(toothStatus || {});
   if (teeth.length === 0) {
     return (
       <Typography variant="body2" color="textSecondary" style={{ fontStyle: 'italic' }}>
-        Зубы не отмечены. Кликните на зуб в схеме выше.
+        {t('dental.dental_dvs_no_teeth')}
       </Typography>
     );
   }
@@ -209,7 +214,7 @@ const ToothSummary = ({ toothStatus }) => {
               padding: '4px 8px',
               fontSize: 12,
             }}
-            title={`Зуб ${toothNum} — ${getToothName(toothNum)}: ${label}${procedures.length > 0 ? ` (${procedures.map(p => p.name).join(', ')})` : ''}`}>
+            title={`${t('dental.dental_dvs_tooth_label')} ${toothNum} — ${getToothName(toothNum)}: ${label}${procedures.length > 0 ? ` (${procedures.map(p => p.name).join(', ')})` : ''}`}>
             {toothNum}: {label}
             {procedures.length > 0 && ` · ${procedures.length}℅`}
           </Badge>
@@ -223,57 +228,60 @@ ToothSummary.propTypes = {
   toothStatus: PropTypes.object,
 };
 
-const DiagnosisSection = ({ diagnosis, icd10, onDiagnosisChange, onIcd10Change, onAISuggestion, disabled }) => (
-  <div style={{ display: 'grid', gridTemplateColumns: '1fr 200px', gap: 12, marginBottom: 16 }}>
-    <div>
-      <Label htmlFor="dental-diagnosis" style={{ display: 'block', marginBottom: 6 }}>
-        Диагноз
-      </Label>
-      <Input
-        id="dental-diagnosis"
-        aria-label="Диагноз"
-        value={diagnosis}
-        onChange={(e) => onDiagnosisChange(e.target.value)}
-        placeholder="Напр.: Кариес дентина зуба 16"
-        disabled={disabled}
-        style={{ width: '100%', boxSizing: 'border-box' }}
-      />
+const DiagnosisSection = ({ diagnosis, icd10, onDiagnosisChange, onIcd10Change, onAISuggestion, disabled }) => {
+  const { t } = useTranslation();
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 200px', gap: 12, marginBottom: 16 }}>
+      <div>
+        <Label htmlFor="dental-diagnosis" style={{ display: 'block', marginBottom: 6 }}>
+          {t('dental.dental_dvs_diagnosis_label')}
+        </Label>
+        <Input
+          id="dental-diagnosis"
+          aria-label={t('dental.dental_dvs_diagnosis_aria')}
+          value={diagnosis}
+          onChange={(e) => onDiagnosisChange(e.target.value)}
+          placeholder={t('dental.dental_dvs_diagnosis_placeholder')}
+          disabled={disabled}
+          style={{ width: '100%', boxSizing: 'border-box' }}
+        />
+      </div>
+      <div>
+        <Label htmlFor="dental-icd10" style={{ display: 'block', marginBottom: 6 }}>
+          {t('dental.dental_dvs_icd10_label')}
+        </Label>
+        <Input
+          id="dental-icd10"
+          aria-label={t('dental.dental_dvs_icd10_aria')}
+          value={icd10}
+          onChange={(e) => onIcd10Change(e.target.value)}
+          placeholder="K02.1"
+          disabled={disabled}
+          style={{ width: '100%', boxSizing: 'border-box' }}
+        />
+      </div>
+      <div style={{ gridColumn: '1 / -1' }}>
+        <Button
+          variant="outline"
+          size="small"
+          onClick={() => document.getElementById('dental-ai-suggest-icd10')?.click()}
+          disabled={disabled}
+          aria-label={t('dental.dental_dvs_aria_ai_icd10')}>
+          <Brain size={14} style={{ marginRight: 6 }} aria-hidden="true" />
+          {t('dental.dental_dvs_ai_btn')}
+        </Button>
+        <button
+          id="dental-ai-suggest-icd10"
+          style={{ display: 'none' }}
+          onClick={onAISuggestion}
+          aria-hidden="true"
+          aria-label="AI suggest ICD-10 trigger"
+          tabIndex={-1}
+        />
+      </div>
     </div>
-    <div>
-      <Label htmlFor="dental-icd10" style={{ display: 'block', marginBottom: 6 }}>
-        МКБ-10
-      </Label>
-      <Input
-        id="dental-icd10"
-        aria-label="Код МКБ-10"
-        value={icd10}
-        onChange={(e) => onIcd10Change(e.target.value)}
-        placeholder="K02.1"
-        disabled={disabled}
-        style={{ width: '100%', boxSizing: 'border-box' }}
-      />
-    </div>
-    <div style={{ gridColumn: '1 / -1' }}>
-      <Button
-        variant="outline"
-        size="small"
-        onClick={() => document.getElementById('dental-ai-suggest-icd10')?.click()}
-        disabled={disabled}
-        aria-label="AI-подбор кода МКБ-10 по жалобе">
-        <Brain size={14} style={{ marginRight: 6 }} aria-hidden="true" />
-        AI: подобрать МКБ-10
-      </Button>
-      <button
-        id="dental-ai-suggest-icd10"
-        style={{ display: 'none' }}
-        onClick={onAISuggestion}
-        aria-hidden="true"
-        aria-label="AI suggest ICD-10 trigger"
-        tabIndex={-1}
-      />
-    </div>
-  </div>
-);
+  );
+};
 
 DiagnosisSection.propTypes = {
   diagnosis: PropTypes.string,
@@ -285,6 +293,7 @@ DiagnosisSection.propTypes = {
 };
 
 const CollapsibleExtras = ({ hygieneIndices, onHygieneChange, disabled }) => {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
 
   return (
@@ -293,7 +302,7 @@ const CollapsibleExtras = ({ hygieneIndices, onHygieneChange, disabled }) => {
         type="button"
         onClick={() => setOpen(!open)}
         aria-expanded={open}
-        aria-label="Развернуть дополнительные поля: гигиена, пародонт, прикус, рентген"
+        aria-label={t('dental.dental_dvs_aria_extras')}
         style={{
           width: '100%',
           padding: '10px 14px',
@@ -307,13 +316,13 @@ const CollapsibleExtras = ({ hygieneIndices, onHygieneChange, disabled }) => {
           fontSize: 14,
           fontWeight: 500,
         }}>
-        <span>Дополнительно (Гигиена / Пародонт / Прикус / Рентген)</span>
+        <span>{t('dental.dental_dvs_extras_label')}</span>
         {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
       </button>
       {open && (
         <div style={{ padding: '0 14px 14px' }}>
           <Typography variant="caption" color="textSecondary" style={{ display: 'block', marginBottom: 8 }}>
-            Заполняется по желанию. По умолчанию свернуто, чтобы не мешать рутинному приёму.
+            {t('dental.dental_dvs_extras_hint')}
           </Typography>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
             <div>
@@ -321,7 +330,7 @@ const CollapsibleExtras = ({ hygieneIndices, onHygieneChange, disabled }) => {
               <Input
                 id="dental-ohis"
                 type="number"
-                aria-label="OHIS индекс гигиены"
+                aria-label={t('dental.dental_dvs_aria_ohis')}
                 value={hygieneIndices?.ohis || ''}
                 onChange={(e) => onHygieneChange('ohis', e.target.value)}
                 placeholder="0.0 - 6.0"
@@ -334,7 +343,7 @@ const CollapsibleExtras = ({ hygieneIndices, onHygieneChange, disabled }) => {
               <Input
                 id="dental-pli"
                 type="number"
-                aria-label="PLI индекс налёта"
+                aria-label={t('dental.dental_dvs_aria_pli')}
                 value={hygieneIndices?.pli || ''}
                 onChange={(e) => onHygieneChange('pli', e.target.value)}
                 placeholder="0.0 - 3.0"
@@ -347,7 +356,7 @@ const CollapsibleExtras = ({ hygieneIndices, onHygieneChange, disabled }) => {
               <Input
                 id="dental-cpi"
                 type="number"
-                aria-label="CPI пародонтальный индекс"
+                aria-label={t('dental.dental_dvs_aria_cpi')}
                 value={hygieneIndices?.cpi || ''}
                 onChange={(e) => onHygieneChange('cpi', e.target.value)}
                 placeholder="0 - 4"
@@ -356,11 +365,11 @@ const CollapsibleExtras = ({ hygieneIndices, onHygieneChange, disabled }) => {
               />
             </div>
             <div>
-              <Label htmlFor="dental-bleeding" style={{ display: 'block', marginBottom: 4 }}>Кровоточивость %</Label>
+              <Label htmlFor="dental-bleeding" style={{ display: 'block', marginBottom: 4 }}>{t('dental.dental_dvs_bleeding_label')}</Label>
               <Input
                 id="dental-bleeding"
                 type="number"
-                aria-label="Индекс кровоточивости"
+                aria-label={t('dental.dental_dvs_aria_bleeding')}
                 value={hygieneIndices?.bleeding || ''}
                 onChange={(e) => onHygieneChange('bleeding', e.target.value)}
                 placeholder="0 - 100"
@@ -370,7 +379,7 @@ const CollapsibleExtras = ({ hygieneIndices, onHygieneChange, disabled }) => {
             </div>
           </div>
           <Typography variant="caption" color="textSecondary" style={{ display: 'block', marginTop: 10 }}>
-            Пародонтальные карманы, прикус и рентген — в EMRContainerV2 (вкладка «Протоколы визитов»).
+            {t('dental.dental_dvs_extras_footer')}
           </Typography>
         </div>
       )}
@@ -385,13 +394,14 @@ CollapsibleExtras.propTypes = {
 };
 
 const VisitHistory = ({ history, loading }) => {
+  const { t } = useTranslation();
   if (loading) {
     return <Skeleton style={{ height: 80, borderRadius: 8 }} />;
   }
   if (!history || history.length === 0) {
     return (
       <Typography variant="body2" color="textSecondary" style={{ fontStyle: 'italic' }}>
-        Нет предыдущих визитов.
+        {t('dental.dental_dvs_no_history')}
       </Typography>
     );
   }
@@ -411,7 +421,7 @@ const VisitHistory = ({ history, loading }) => {
               {visit.date || visit.created_at || '—'}
             </Typography>
             {visit.icd10_code && (
-              <Badge variant="primary" size="small">МКБ-10: {visit.icd10_code}</Badge>
+              <Badge variant="primary" size="small">{t('dental.dental_dvs_icd10_label')}: {visit.icd10_code}</Badge>
             )}
           </div>
           {visit.diagnosis && (
@@ -421,7 +431,7 @@ const VisitHistory = ({ history, loading }) => {
           )}
           {visit.complaints && (
             <Typography variant="caption" color="textSecondary" style={{ marginTop: 2, display: 'block' }}>
-              Жалобы: {visit.complaints}
+              {t('dental.dental_dvs_history_complaints', { text: visit.complaints })}
             </Typography>
           )}
         </div>
@@ -440,21 +450,21 @@ VisitHistory.propTypes = {
 // =============================================================================
 
 const AISuggestionDialog = ({ open, onClose, onApply, anamnesis }) => {
+  const { t } = useTranslation();
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>
         <Box display="flex" alignItems="center" gap={1}>
           <Brain size={18} aria-hidden="true" />
-          AI-подбор МКБ-10
+          {t('dental.dental_dvs_ai_dialog_title')}
         </Box>
       </DialogTitle>
       <DialogContent>
         <Typography variant="body2" color="textSecondary" style={{ marginBottom: 12 }}>
-          AI анализирует жалобу/анамнез и предлагает подходящие коды МКБ-10.
-          Нажмите «Добавить» рядом с кодом, чтобы вставить его в форму.
+          {t('dental.dental_dvs_ai_dialog_hint')}
         </Typography>
         <Alert severity="info" style={{ marginBottom: 12 }}>
-          AI формирует только черновик. Финальное медицинское решение должен подтвердить врач.
+          {t('dental.dental_dvs_ai_dialog_alert')}
         </Alert>
         <AIAssistant
           analysisType="icd10"
@@ -470,12 +480,12 @@ const AISuggestionDialog = ({ open, onClose, onApply, anamnesis }) => {
               onClose();
             }
           }}
-          title="AI: коды МКБ-10 по жалобе"
+          title={t('dental.dental_dvs_ai_assistant_title')}
           expanded
         />
       </DialogContent>
       <DialogActions>
-        <Button variant="outline" onClick={onClose}>Закрыть</Button>
+        <Button variant="outline" onClick={onClose}>{t('dental.dental_dvs_close')}</Button>
       </DialogActions>
     </Dialog>
   );
@@ -497,6 +507,7 @@ const DentalVisitScreen = ({
   onCompleteVisit,
   loading: parentLoading,
 }) => {
+  const { t } = useTranslation();
   const [emrData, setEmrData] = useState(EMPTY_EMR_DATA);
   const [rowVersion, setRowVersion] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -544,7 +555,7 @@ const DentalVisitScreen = ({
     } finally {
       setLoading(false);
     }
-  }, [visitId]);
+  }, [visitId, t]);
 
   // Load patient history
   const loadHistory = useCallback(async () => {
@@ -629,8 +640,8 @@ const DentalVisitScreen = ({
     });
     setToothModalOpen(false);
     setSelectedTooth(null);
-    notify.success(`Зуб ${toothNumber} сохранён`);
-  }, [emrData.specialty_data, updateSpecialtyData]);
+    notify.success(t('dental.dental_dvs_tooth_saved', { toothNumber }));
+  }, [emrData.specialty_data, updateSpecialtyData, t]);
 
   // AI suggestion apply → writes to icd10_code field
   const handleAISuggestion = useCallback(() => {
@@ -639,8 +650,8 @@ const DentalVisitScreen = ({
 
   const applyAISuggestion = useCallback((icd10Code) => {
     updateField('icd10_code', icd10Code);
-    notify.success(`Код МКБ-10 добавлен: ${icd10Code}`);
-  }, [updateField]);
+    notify.success(t('dental.dental_dvs_icd10_added', { code: icd10Code }));
+  }, [updateField, t]);
 
   const isLoading = loading || parentLoading;
   const toothStatus = emrData.specialty_data?.tooth_status || {};
@@ -682,7 +693,7 @@ const DentalVisitScreen = ({
             {/* Tooth chart — основная рабочая область */}
             <div style={{ marginBottom: 16 }}>
               <Label style={{ display: 'block', marginBottom: 6 }}>
-                Схема зубов
+                {t('dental.dental_dvs_chart_label')}
               </Label>
               <TeethChart
                 initialData={toothStatus}
@@ -705,7 +716,7 @@ const DentalVisitScreen = ({
             {/* Visit history — read-only */}
             <div style={{ marginTop: 24, paddingTop: 16, borderTop: '1px solid var(--mac-border)' }}>
               <Typography variant="subtitle1" style={{ marginBottom: 12, fontWeight: 600 }}>
-                История визитов пациента
+                {t('dental.dental_dvs_history_title')}
               </Typography>
               <VisitHistory history={history} loading={historyLoading} />
             </div>

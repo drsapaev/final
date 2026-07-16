@@ -1,5 +1,5 @@
 import { Suspense, lazy } from 'react';
-import { useTranslation } from '../i18n/adapter';
+import { useTranslation } from '../i18n/useTranslation';
 // Динамический импорт для уменьшения размера основного бандла
 const MacOSDemo = lazy(() => import('../components/examples/MacOSDemo'));
 

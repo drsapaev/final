@@ -15,7 +15,7 @@ import {
   CheckCircle } from
 'lucide-react';
 import PropTypes from 'prop-types';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 /**
  * Компонент для красивого отображения клинических рекомендаций AI

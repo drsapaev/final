@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import auth, { setProfile } from '../../stores/auth.js';
 import { getVisibleRoutesForShell, isInternalDemoEnabled } from '../../routing/routeSelectors.js';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 export default function Nav() {
   const { t } = useTranslation();

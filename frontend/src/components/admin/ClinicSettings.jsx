@@ -31,7 +31,7 @@ import {
   Textarea,
   Checkbox,
 } from '../ui/macos';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const ClinicSettings = () => {
   const { t } = useTranslation();
@@ -55,10 +55,10 @@ const ClinicSettings = () => {
 
   // Список часовых поясов
   const timezones = [
-    { value: 'Asia/Tashkent', label: 'Ташкент (UTC+5)' },
-    { value: 'Asia/Almaty', label: 'Алматы (UTC+6)' },
-    { value: 'Europe/Moscow', label: 'Москва (UTC+3)' },
-    { value: 'Asia/Dubai', label: 'Дубай (UTC+4)' },
+    { value: 'Asia/Tashkent', label: t('admin2.cset_tz_tashkent') },
+    { value: 'Asia/Almaty', label: t('admin2.cset_tz_almaty') },
+    { value: 'Europe/Moscow', label: t('admin2.cset_tz_moscow') },
+    { value: 'Asia/Dubai', label: t('admin2.cset_tz_dubai') },
     { value: 'UTC', label: 'UTC (UTC+0)' }
   ];
 
@@ -82,7 +82,7 @@ const ClinicSettings = () => {
       setSettings(prev => ({ ...prev, ...settingsObj }));
     } catch (error) {
       logger.error('Ошибка загрузки настроек:', error);
-      setMessage({ type: 'error', text: 'Ошибка загрузки настроек' });
+      setMessage({ type: 'error', text: t('admin2.cset_err_load') });
     } finally {
       setLoading(false);
     }
@@ -99,7 +99,7 @@ const ClinicSettings = () => {
       setTicketPrintSettings({ ...TICKET_PRINT_SETTINGS_DEFAULTS, ...data });
     } catch (error) {
       logger.error('Ошибка загрузки настроек печати талонов:', error);
-      setTicketPrintMessage({ type: 'error', text: 'Ошибка загрузки настроек печати талонов' });
+      setTicketPrintMessage({ type: 'error', text: t('admin2.cset_err_load_print') });
       setTicketPrintSettings({ ...TICKET_PRINT_SETTINGS_DEFAULTS });
     } finally {
       setTicketPrintLoading(false);
@@ -115,13 +115,13 @@ const ClinicSettings = () => {
     if (file) {
       // Проверяем тип файла
       if (!file.type.startsWith('image/')) {
-        setMessage({ type: 'error', text: 'Выберите файл изображения' });
+        setMessage({ type: 'error', text: t('admin2.cset_err_logo_type') });
         return;
       }
 
       // Проверяем размер (макс 5MB)
       if (file.size > 5 * 1024 * 1024) {
-        setMessage({ type: 'error', text: 'Размер файла не должен превышать 5MB' });
+        setMessage({ type: 'error', text: t('admin2.cset_err_logo_size') });
         return;
       }
 
@@ -177,7 +177,7 @@ const ClinicSettings = () => {
         settings: settingsToSave
       });
 
-      setMessage({ type: 'success', text: 'Настройки успешно сохранены' });
+      setMessage({ type: 'success', text: t('admin2.cset_success_save') });
       setLogoFile(null);
       setLogoPreview(null);
 
@@ -187,7 +187,7 @@ const ClinicSettings = () => {
       }
     } catch (error) {
       logger.error('Ошибка сохранения:', error);
-      setMessage({ type: 'error', text: 'Ошибка сохранения настроек' });
+      setMessage({ type: 'error', text: t('admin2.cset_err_save') });
     } finally {
       setSaving(false);
     }
@@ -199,10 +199,10 @@ const ClinicSettings = () => {
       setTicketPrintMessage({ type: '', text: '' });
       const savedSettings = await saveTicketPrintSettings(ticketPrintSettings);
       setTicketPrintSettings({ ...TICKET_PRINT_SETTINGS_DEFAULTS, ...savedSettings });
-      setTicketPrintMessage({ type: 'success', text: 'Настройки печати талонов сохранены' });
+      setTicketPrintMessage({ type: 'success', text: t('admin2.cset_success_save_print') });
     } catch (error) {
       logger.error('Ошибка сохранения настроек печати талонов:', error);
-      setTicketPrintMessage({ type: 'error', text: 'Ошибка сохранения настроек печати талонов' });
+      setTicketPrintMessage({ type: 'error', text: t('admin2.cset_err_save_print') });
     } finally {
       setTicketPrintSaving(false);
     }
@@ -220,7 +220,7 @@ const ClinicSettings = () => {
           <div className="admin-flex-ai-center-jc-center-gap-12">
             <RefreshCw className="admin-w-32-h-32-blue-anim-spin1slinearinfinite" />
             <span className="admin-lg-secondary-med">
-              Загрузка настроек...
+              {t('admin2.cset_loading')}
             </span>
           </div>
         </MacOSCard>
@@ -236,10 +236,10 @@ const ClinicSettings = () => {
           <div>
             <h2 className="admin-2xl-semi-primary-m-008px0-flex-ai-center-gap-12">
               <Building2 className="admin-w-32-h-32-blue" />
-              Настройки клиники
+              {t('admin2.cset_title')}
             </h2>
             <p className="admin-secondary-sm-m-0">
-              Основная информация о медицинском учреждении
+              {t('admin2.cset_subtitle')}
             </p>
           </div>
 
@@ -251,7 +251,7 @@ const ClinicSettings = () => {
               className="admin-flex-ai-center-gap-8-p-8px16"
             >
               <RefreshCw className="w-4 h-4" />
-              Обновить
+              {t('admin2.cset_btn_refresh')}
             </Button>
             <Button
               onClick={saveSettings}
@@ -263,7 +263,7 @@ const ClinicSettings = () => {
               ) : (
                 <Save className="w-4 h-4" />
               )}
-              Сохранить
+              {t('admin2.cset_btn_save')}
             </Button>
           </div>
         </div>
@@ -289,19 +289,19 @@ const ClinicSettings = () => {
           <MacOSCard className="p-6">
             <h3 className="admin-lg-semi-primary-mb-16-flex-ai-center-gap-8">
               <Building2 className="admin-w-20-h-20-blue" />
-              Основная информация
+              {t('admin2.cset_h_basic')}
             </h3>
 
             <div className="flex flex-col gap-4">
               <div>
                 <label className="admin-block-sm-med-primary-mb-8">
-                  Название клиники
+                  {t('admin2.cset_label_name')}
                 </label>
                 <Input
                   type="text"
                   value={settings.clinic_name || ''}
                   onChange={(e) => handleInputChange('clinic_name', e.target.value)}
-                  placeholder="Название медицинского учреждения"
+                  placeholder={t('admin2.cset_ph_name')}
                   className="w-full"
                 />
               </div>
@@ -309,13 +309,13 @@ const ClinicSettings = () => {
               <div>
                 <label className="admin-sm-med-primary-mb-8-flex-ai-center-gap-4">
                   <MapPin className="w-4 h-4" />
-                  Адрес
+                  {t('admin2.cset_label_address')}
                 </label>
                 <Textarea
                   value={settings.address || ''}
                   onChange={(e) => handleInputChange('address', e.target.value)}
                   rows={2}
-                  placeholder="Полный адрес клиники"
+                  placeholder={t('admin2.cset_ph_address')}
                   className="w-full"
                 />
               </div>
@@ -323,7 +323,7 @@ const ClinicSettings = () => {
               <div>
                 <label className="admin-sm-med-primary-mb-8-flex-ai-center-gap-4">
                   <Phone className="w-4 h-4" />
-                  Телефон
+                  {t('admin2.cset_label_phone')}
                 </label>
                 <Input
                   type="tel"
@@ -354,17 +354,17 @@ const ClinicSettings = () => {
           <MacOSCard className="p-6">
             <h3 className="admin-lg-semi-primary-mb-16-flex-ai-center-gap-8">
               <Globe className="admin-w-20-h-20-success" />
-              Системные настройки
+              {t('admin2.cset_h_system')}
             </h3>
 
             <div className="flex flex-col gap-4">
               <div>
                 <label className="admin-sm-med-primary-mb-8-flex-ai-center-gap-4">
                   <Clock className="w-4 h-4" />
-                  Часовой пояс
+                  {t('admin2.cset_label_timezone')}
                 </label>
                 <Select
-                  aria-label="Часовой пояс клиники"
+                  aria-label={t('admin2.cset_aria_timezone')}
                   value={settings.timezone || 'Asia/Tashkent'}
                   onChange={(value) => handleInputChange('timezone', value)}
                   options={timezones}
@@ -372,7 +372,7 @@ const ClinicSettings = () => {
                   className="w-full"
                 />
                 <p className="admin-xs-tertiary-mt-4-m-4px000">
-                  Используется для расписания и онлайн-очереди
+                  {t('admin2.cset_hint_timezone')}
                 </p>
               </div>
 
@@ -380,7 +380,7 @@ const ClinicSettings = () => {
               <div>
                 <label className="admin-sm-med-primary-mb-8-flex-ai-center-gap-4">
                   <Image className="w-4 h-4" />
-                  Логотип клиники
+                  {t('admin2.cset_label_logo')}
                 </label>
 
                 {/* Текущий логотип */}
@@ -389,7 +389,7 @@ const ClinicSettings = () => {
                     <div className="admin-w-128-h-80-bd-2dashedvar-mac-border-radius-var--mac-radius-md-flex-ai-cent-5f1cf18b">
                       <img
                         src={logoPreview || settings.logo_url}
-                        alt="Логотип клиники"
+                        alt={t('admin2.cset_alt_logo')}
                         className="admin-maxw-100pct-maxh-100pct-of-contain"
                       />
                     </div>
@@ -399,7 +399,7 @@ const ClinicSettings = () => {
                         onClick={resetLogo}
                         className="admin-mt-8-p-4px8-xs"
                       >
-                        Отменить
+                        {t('admin2.cset_btn_cancel')}
                       </Button>
                     )}
                   </div>
@@ -409,7 +409,7 @@ const ClinicSettings = () => {
                 <div className="admin-flex-ai-center">
                   <input
                     type="file"
-                    aria-label="Загрузить логотип клиники"
+                    aria-label={t('admin2.cset_aria_logo_upload')}
                     accept="image/*"
                     onChange={handleLogoSelect}
                     className="admin-none"
@@ -428,11 +428,11 @@ const ClinicSettings = () => {
                     }}
                   >
                     <Upload className="w-4 h-4 mr-2" />
-                    Выбрать файл
+                    {t('admin2.cset_btn_choose_file')}
                   </label>
                 </div>
                 <p className="admin-xs-tertiary-mt-4-m-4px000">
-                  Поддерживаются форматы: JPG, PNG, GIF. Максимальный размер: 5MB
+                  {t('admin2.cset_hint_logo')}
                 </p>
               </div>
             </div>
@@ -444,13 +444,13 @@ const ClinicSettings = () => {
             <div>
               <h3 className="admin-lg-semi-primary-m-008px0-flex-ai-center-gap-8">
                 <Printer className="admin-w-20-h-20-blue" />
-                Печать талонов
+                {t('admin2.cset_h_print')}
               </h3>
               <p className="admin-secondary-sm-m-0-maxw-720">
-                Настройте, какие поля будут видны на печатном талоне. Эти параметры применяются и к регистратуре, и к панелям специалистов.
+                {t('admin2.cset_print_desc')}
               </p>
               <p className="admin-tertiary-xs-m-8px000-maxw-720">
-                Поле «Кабинет» управляет только видимостью. Само значение берётся из связанного врача и сегодняшней очереди, а не задаётся в настройках печати.
+                {t('admin2.cset_print_cabinet_note')}
               </p>
             </div>
 
@@ -462,7 +462,7 @@ const ClinicSettings = () => {
                 className="admin-flex-ai-center-gap-8-p-8px16"
               >
                 <RefreshCw className="w-4 h-4" />
-                Обновить
+                {t('admin2.cset_btn_refresh')}
               </Button>
               <Button
                 onClick={saveTicketPrintSettingsHandler}
@@ -474,7 +474,7 @@ const ClinicSettings = () => {
                 ) : (
                   <Save className="w-4 h-4" />
                 )}
-                Сохранить
+                {t('admin2.cset_btn_save')}
               </Button>
             </div>
           </div>
@@ -497,7 +497,7 @@ const ClinicSettings = () => {
           {ticketPrintLoading ? (
             <div className="admin-flex-ai-center-jc-center-gap-12-p-24px0-secondary">
               <RefreshCw className="admin-w-24-h-24-anim-spin1slinearinfinite" />
-              <span>Загрузка настроек печати талонов...</span>
+              <span>{t('admin2.cset_loading_print')}</span>
             </div>
           ) : (
             <div className="admin-grid-gtc-rauto-fitcminmax280pxc1fr-gap-12">

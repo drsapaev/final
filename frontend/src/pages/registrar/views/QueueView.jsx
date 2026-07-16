@@ -22,9 +22,9 @@ import { Card, CardHeader, CardContent } from '../../../components/ui/macos';
 import { AnimatedTransition } from '../../../components/ui';
 import ModernQueueManager from '../../../components/queue/ModernQueueManager';
 import { getLocalDateString } from '../../../utils/dateUtils';
-import { getRegistrarTranslator } from '../../registrarTranslations';
 import logger from '../../../utils/logger';
-import { useTranslation } from '../../../i18n/adapter';
+// i18n-unification: use unified useTranslation instead of getRegistrarTranslator
+import { useTranslation } from '../../../i18n/useTranslation';
 
 const QueueView = React.memo(({
   searchParams,
@@ -38,8 +38,9 @@ const QueueView = React.memo(({
   doctors,
 }) => {
   // UX Audit R-3.8: используем t() для локализации заголовка и подзаголовка.
-  // Раньше: хардкод русского «Онлайн-очередь» / «Управление онлайн-записью...».
-  const t = getRegistrarTranslator(language);
+  // i18n-unification: t() now routes flat keys to registrarPanel.* namespace.
+  const { t: tI18n } = useTranslation();
+  const t = (key) => tI18n('registrarPanel.' + key);
   return (
     <AnimatedTransition type="fade" delay={100}>
       <Card variant="default" style={{ margin: `0 ${getSpacing('xl')} ${getSpacing('xl')} ${getSpacing('xl')}` }}>

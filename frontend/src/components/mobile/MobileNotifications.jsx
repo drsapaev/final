@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 import { api } from '../../api/client';
 import { useState, useEffect, useCallback } from 'react';
 import { Bell, BellOff, Settings, Check } from 'lucide-react';
@@ -11,6 +11,7 @@ import { notify } from '../../services/notify.js';
  * Компонент для управления мобильными уведомлениями
  */
 const MobileNotifications = () => {
+  const { t } = useTranslation();
   const [notifications, setNotifications] = useState([]);
   const [permission, setPermission] = useState('default');
   const [loading, setLoading] = useState(false);

@@ -19,6 +19,7 @@ import { Card, Button, Badge,
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
 import PropTypes from 'prop-types';
+import { useTranslation } from '../../i18n/useTranslation';
 /**
  * Управление контентом для табло
  * Основа: passport.md стр. 2571-3324
@@ -27,6 +28,7 @@ const DisplayContentManager = ({
   boardId,
   className = ''
 }) => {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState('banners');
   const [content, setContent] = useState({
     banners: [],
@@ -38,10 +40,10 @@ const DisplayContentManager = ({
   const [uploadDialog, setUploadDialog] = useState({ open: false, type: '' });
 
   const contentTabs = [
-  { id: 'banners', label: 'Баннеры', icon: Image, color: 'text-blue-600' },
-  { id: 'announcements', label: 'Объявления', icon: FileText, color: 'text-green-600' },
-  { id: 'videos', label: 'Видео', icon: Video, color: 'text-purple-600' },
-  { id: 'themes', label: 'Темы', icon: Monitor, color: 'text-gray-600' }];
+  { id: 'banners', label: t('misc.dcm_tab_banners'), icon: Image, color: 'text-blue-600' },
+  { id: 'announcements', label: t('misc.dcm_tab_announcements'), icon: FileText, color: 'text-green-600' },
+  { id: 'videos', label: t('misc.dcm_tab_videos'), icon: Video, color: 'text-purple-600' },
+  { id: 'themes', label: t('misc.dcm_tab_themes'), icon: Monitor, color: 'text-gray-600' }];
 
   const loadContent = useCallback(async () => {
     try {
@@ -107,10 +109,10 @@ const DisplayContentManager = ({
   const renderBannersTab = () =>
   <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h3 className="text-lg font-medium">Баннеры и изображения</h3>
+        <h3 className="text-lg font-medium">{t('misc.dcm_banners_title')}</h3>
         <Button onClick={() => setUploadDialog({ open: true, type: 'banner' })}>
           <Plus size={16} className="mr-2" />
-          Добавить баннер
+          {t('misc.dcm_add_banner')}
         </Button>
       </div>
 
@@ -133,31 +135,31 @@ const DisplayContentManager = ({
               <div className="text-xs text-gray-500 mb-2">{banner.description}</div>
               <div className="flex justify-between items-center">
                 <Badge variant={banner.active ? 'success' : 'secondary'} size="sm">
-                  {banner.active ? 'Активен' : 'Неактивен'}
+                  {banner.active ? t('misc.dcm_active') : t('misc.dcm_inactive')}
                 </Badge>
                 <div className="flex space-x-1">
                   <Button
                     size="sm"
                     variant="outline"
                     type="button"
-                    title={`Просмотреть баннер: ${banner.title}`}
-                    aria-label={`Просмотреть баннер: ${banner.title}`}>
+                    title={t('misc.dcm_view_banner', { title: banner.title })}
+                    aria-label={t('misc.dcm_view_banner', { title: banner.title })}>
                     <Eye aria-hidden="true" size={12} />
                   </Button>
                   <Button
                     size="sm"
                     variant="outline"
                     type="button"
-                    title={`Редактировать баннер: ${banner.title}`}
-                    aria-label={`Редактировать баннер: ${banner.title}`}>
+                    title={t('misc.dcm_edit_banner', { title: banner.title })}
+                    aria-label={t('misc.dcm_edit_banner', { title: banner.title })}>
                     <Edit aria-hidden="true" size={12} />
                   </Button>
                   <Button
                 size="sm"
                 variant="outline"
                 type="button"
-                title={`Удалить баннер: ${banner.title}`}
-                aria-label={`Удалить баннер: ${banner.title}`}
+                title={t('misc.dcm_delete_banner', { title: banner.title })}
+                aria-label={t('misc.dcm_delete_banner', { title: banner.title })}
                 onClick={() => handleDeleteContent(banner.id, 'banner')}>
 
                     <Trash2 aria-hidden="true" size={12} />
@@ -174,10 +176,10 @@ const DisplayContentManager = ({
   const renderAnnouncementsTab = () =>
   <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h3 className="text-lg font-medium">Текстовые объявления</h3>
+        <h3 className="text-lg font-medium">{t('misc.dcm_announcements_title')}</h3>
         <Button onClick={() => setUploadDialog({ open: true, type: 'announcement' })}>
           <Plus size={16} className="mr-2" />
-          Добавить объявление
+          {t('misc.dcm_add_announcement')}
         </Button>
       </div>
 
@@ -196,11 +198,11 @@ const DisplayContentManager = ({
                 }
                 size="sm">
                 
-                    {announcement.priority === 'high' ? 'Важное' :
-                announcement.priority === 'medium' ? 'Среднее' : 'Обычное'}
+                    {announcement.priority === 'high' ? t('misc.dcm_priority_high') :
+                announcement.priority === 'medium' ? t('misc.dcm_priority_medium') : t('misc.dcm_priority_normal')}
                   </Badge>
                   <span className="text-xs text-gray-500">
-                    Создано: {new Date(announcement.created_at).toLocaleDateString('ru-RU')}
+                    {t('misc.dcm_created')} {new Date(announcement.created_at).toLocaleDateString('ru-RU')}
                   </span>
                 </div>
               </div>
@@ -209,16 +211,16 @@ const DisplayContentManager = ({
                   size="sm"
                   variant="outline"
                   type="button"
-                  title={`Редактировать объявление: ${announcement.title}`}
-                  aria-label={`Редактировать объявление: ${announcement.title}`}>
+                  title={t('misc.dcm_edit_announcement', { title: announcement.title })}
+                  aria-label={t('misc.dcm_edit_announcement', { title: announcement.title })}>
                   <Edit aria-hidden="true" size={14} />
                 </Button>
                 <Button
               size="sm"
               variant="outline"
               type="button"
-              title={`Удалить объявление: ${announcement.title}`}
-              aria-label={`Удалить объявление: ${announcement.title}`}
+              title={t('misc.dcm_delete_announcement', { title: announcement.title })}
+              aria-label={t('misc.dcm_delete_announcement', { title: announcement.title })}
               onClick={() => handleDeleteContent(announcement.id, 'announcement')}>
 
                   <Trash2 aria-hidden="true" size={14} />
@@ -234,10 +236,10 @@ const DisplayContentManager = ({
   const renderVideosTab = () =>
   <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h3 className="text-lg font-medium">Видео контент</h3>
+        <h3 className="text-lg font-medium">{t('misc.dcm_videos_title')}</h3>
         <Button onClick={() => setUploadDialog({ open: true, type: 'video' })}>
           <Plus size={16} className="mr-2" />
-          Добавить видео
+          {t('misc.dcm_add_video')}
         </Button>
       </div>
 
@@ -261,35 +263,35 @@ const DisplayContentManager = ({
             <div className="p-3">
               <div className="font-medium text-sm mb-1">{video.title}</div>
               <div className="text-xs text-gray-500 mb-2">
-                Длительность: {video.duration || 'Не указано'}
+                {t('misc.dcm_duration')} {video.duration || t('misc.dcm_not_specified')}
               </div>
               <div className="flex justify-between items-center">
                 <Badge variant={video.active ? 'success' : 'secondary'} size="sm">
-                  {video.active ? 'Показывается' : 'Неактивен'}
+                  {video.active ? t('misc.dcm_showing') : t('misc.dcm_inactive')}
                 </Badge>
                 <div className="flex space-x-1">
                   <Button
                     size="sm"
                     variant="outline"
                     type="button"
-                    title={`Воспроизвести видео: ${video.title}`}
-                    aria-label={`Воспроизвести видео: ${video.title}`}>
+                    title={t('misc.dcm_play_video', { title: video.title })}
+                    aria-label={t('misc.dcm_play_video', { title: video.title })}>
                     <Play aria-hidden="true" size={12} />
                   </Button>
                   <Button
                     size="sm"
                     variant="outline"
                     type="button"
-                    title={`Редактировать видео: ${video.title}`}
-                    aria-label={`Редактировать видео: ${video.title}`}>
+                    title={t('misc.dcm_edit_video', { title: video.title })}
+                    aria-label={t('misc.dcm_edit_video', { title: video.title })}>
                     <Edit aria-hidden="true" size={12} />
                   </Button>
                   <Button
                 size="sm"
                 variant="outline"
                 type="button"
-                title={`Удалить видео: ${video.title}`}
-                aria-label={`Удалить видео: ${video.title}`}
+                title={t('misc.dcm_delete_video', { title: video.title })}
+                aria-label={t('misc.dcm_delete_video', { title: video.title })}
                 onClick={() => handleDeleteContent(video.id, 'video')}>
 
                     <Trash2 aria-hidden="true" size={12} />
@@ -305,22 +307,22 @@ const DisplayContentManager = ({
 
   const renderThemesTab = () =>
   <div className="space-y-4">
-      <h3 className="text-lg font-medium">Темы оформления</h3>
+      <h3 className="text-lg font-medium">{t('misc.dcm_themes_title')}</h3>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {[
-      { id: 'light', name: 'Светлая', preview: 'var(--mac-bg-secondary)' },
-      { id: 'dark', name: 'Темная', preview: '#1a202c' },
-      { id: 'medical', name: 'Медицинская', preview: '#f0fff4' }].
+      { id: 'light', name: t('misc.dcm_theme_light'), preview: 'var(--mac-bg-secondary)' },
+      { id: 'dark', name: t('misc.dcm_theme_dark'), preview: '#1a202c' },
+      { id: 'medical', name: t('misc.dcm_theme_medical'), preview: '#f0fff4' }].
       map((theme) =>
       <Card key={theme.id} className="cursor-pointer hover:shadow-lg transition-shadow">
             <div
           className="h-24 rounded-t-lg"
           style={{ background: theme.preview }} />
-        
+
             <div className="p-3">
               <div className="font-medium">{theme.name}</div>
-              <div className="text-sm text-gray-500">Тема {theme.id}</div>
+              <div className="text-sm text-gray-500">{t('misc.dcm_theme_label', { id: theme.id })}</div>
             </div>
           </Card>
       )}
@@ -332,9 +334,9 @@ const DisplayContentManager = ({
     <div className={`space-y-6 ${className}`}>
       {/* Заголовок */}
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">Управление контентом табло</h2>
+        <h2 className="text-xl font-semibold">{t('misc.dcm_title')}</h2>
         <Badge variant="info">
-          Табло: {boardId}
+          {t('misc.dcm_board', { id: boardId })}
         </Badge>
       </div>
 
@@ -374,27 +376,27 @@ const DisplayContentManager = ({
           <Card className="w-full max-w-md mx-4">
             <div className="p-6">
               <h3 className="text-lg font-medium mb-4">
-                Загрузить {uploadDialog.type === 'banner' ? 'баннер' :
-              uploadDialog.type === 'video' ? 'видео' : 'контент'}
+                {t('misc.dcm_upload')} {uploadDialog.type === 'banner' ? t('misc.dcm_type_banner') :
+              uploadDialog.type === 'video' ? t('misc.dcm_type_video') : t('misc.dcm_type_content')}
               </h3>
 
               <div className="space-y-4">
                 <div>
                   <label htmlFor="display-content-title" className="block text-sm font-medium text-gray-700 mb-2">
-                    Название:
+                    {t('misc.dcm_name_label')}
                   </label>
                   <Input
                   id="display-content-title"
                   type="text"
                   aria-label="Display content title"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Введите название..." />
+                  placeholder={t('misc.dcm_name_placeholder')} />
                 
                 </div>
 
                 <div>
                   <label htmlFor="display-content-file" className="block text-sm font-medium text-gray-700 mb-2">
-                    Файл:
+                    {t('misc.dcm_file_label')}
                   </label>
                   <input
                   id="display-content-file"
@@ -413,12 +415,12 @@ const DisplayContentManager = ({
                 <Button
                 variant="outline"
                 onClick={() => setUploadDialog({ open: false, type: '' })}>
-                
-                  Отменить
+
+                  {t('misc.dcm_cancel')}
                 </Button>
                 <Button onClick={() => {/* Логика загрузки */}}>
                   <Upload size={16} className="mr-2" />
-                  Загрузить
+                  {t('misc.dcm_upload_btn')}
                 </Button>
               </div>
             </div>

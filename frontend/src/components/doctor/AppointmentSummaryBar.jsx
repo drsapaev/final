@@ -3,7 +3,7 @@ import { RefreshCw } from 'lucide-react';
 import {
   Badge, Button,
 } from '../ui/macos';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const summaryBarStyle = {
   display: 'flex',

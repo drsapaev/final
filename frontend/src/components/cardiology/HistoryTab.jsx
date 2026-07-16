@@ -15,7 +15,7 @@ import PropTypes from 'prop-types';
 import { Calendar, Eye, Download, FileText } from 'lucide-react';
 import { Button, Badge, MacOSCard, MacOSEmptyState } from '../ui/macos';
 import { formatRegistrarDate } from '../../utils/dateUtils';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 /**
  * @param {Object} props
@@ -46,15 +46,16 @@ export function HistoryTab({
   getFontSize,
   getSpacing,
 }) {
+  const { t } = useTranslation();
   // Empty state: no patient selected
   if (!selectedPatient) {
     return (
       <MacOSCard style={{ padding: getSpacing('xl'), textAlign: 'center' }}>
         <Calendar size={48} style={{ margin: '0 auto 16px', color: getColor('textSecondary') }} />
         <h3 style={{ fontSize: getFontSize('lg'), fontWeight: 'var(--mac-font-weight-medium)', marginBottom: getSpacing('sm'), color: getColor('text') }}>
-          История
+          {t('cardio.cardio_hist_empty_title')}
         </h3>
-        <p className="cardio-text-secondary">Выберите пациента в очереди или из записей</p>
+        <p className="cardio-text-secondary">{t('cardio.cardio_hist_empty_desc')}</p>
       </MacOSCard>
     );
   }
@@ -85,7 +86,7 @@ export function HistoryTab({
               marginBottom: getSpacing('xs'),
               color: getColor('text'),
             }}>
-              Хронология записей пациента
+              {t('cardio.cardio_hist_timeline_title')}
             </h3>
             <p className="cardio-text-secondary">{selectedPatientLabel}</p>
           </div>
@@ -118,8 +119,8 @@ export function HistoryTab({
         {filteredHistoryEntries.length === 0 ? (
           <MacOSEmptyState
             type="calendar"
-            title="История пуста"
-            description="Для выбранного фильтра пока нет записей"
+            title={t('cardio.cardio_hist_filter_empty_title')}
+            description={t('cardio.cardio_hist_filter_empty_desc')}
           />
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: getSpacing('md') }}>
@@ -150,7 +151,7 @@ export function HistoryTab({
                       {entry.title}
                     </div>
                     <Badge variant={entry.badgeVariant || 'info'}>
-                      {entry.kind === 'ecg' ? 'ЭКГ' : entry.kind === 'labs' ? 'Анализ' : 'Файл'}
+                      {entry.kind === 'ecg' ? t('cardio.cardio_hist_badge_ecg') : entry.kind === 'labs' ? t('cardio.cardio_hist_badge_labs') : t('cardio.cardio_hist_badge_attachments')}
                     </Badge>
                   </div>
                   <div style={{ fontSize: getFontSize('sm'), color: getColor('textSecondary'), marginTop: '2px' }}>
@@ -171,7 +172,7 @@ export function HistoryTab({
                           onClick={() => previewPatientFile(entry.file)}
                           style={{ padding: '4px 10px', fontSize: getFontSize('xs') }}
                         >
-                          <Eye size={12} className="cardio-icon-mr" /> Просмотр
+                          <Eye size={12} className="cardio-icon-mr" /> {t('cardio.cardio_hist_view')}
                         </Button>
                       )}
                       <Button
@@ -179,7 +180,7 @@ export function HistoryTab({
                         onClick={() => downloadPatientFile(entry.file)}
                         style={{ padding: '4px 10px', fontSize: getFontSize('xs') }}
                       >
-                        <Download size={12} className="cardio-icon-mr" /> Скачать
+                        <Download size={12} className="cardio-icon-mr" /> {t('cardio.cardio_hist_download')}
                       </Button>
                     </div>
                   )}

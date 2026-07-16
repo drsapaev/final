@@ -1,4 +1,4 @@
-import { t } from '../i18n/adapter';
+import { useTranslation } from '../i18n/useTranslation';
 import { useState, useEffect } from 'react';
 import { api } from '../api/client';
 import logger from '../utils/logger';
@@ -20,6 +20,7 @@ import {
 'lucide-react';
 
 const TwoFactorSettings = () => {
+  const { t } = useTranslation();
   // P-013 fix: shared ConfirmDialog hook (replaces 2 native confirm() calls).
   const [confirm, confirmDialog] = useConfirm();
   const [loading, setLoading] = useState(false);
@@ -41,7 +42,7 @@ const TwoFactorSettings = () => {
       const response = await api.get('/2fa/status');
       setStatus(response);
     } catch {
-      setError('Ошибка загрузки статуса 2FA');
+      setError(t('misc.tfs_load_status_error'));
     }
   };
 
@@ -60,15 +61,15 @@ const TwoFactorSettings = () => {
       setBackupCodes(response.backup_codes || []);
       setShowBackupCodes(true);
     } catch {
-      setError('Ошибка загрузки backup кодов');
+      setError(t('misc.tfs_load_backup_codes_error'));
     }
   };
 
   const handleDisable2FA = async () => {
-    const password = prompt('Введите пароль для отключения 2FA:');
+    const password = prompt(t('misc.tfs_disable_password_prompt'));
     if (!password) return;
 
-    const totpCode = prompt('Введите код из приложения аутентификатора:');
+    const totpCode = prompt(t('misc.tfs_disable_totp_prompt'));
     if (!totpCode) return;
 
     setLoading(true);
@@ -81,13 +82,13 @@ const TwoFactorSettings = () => {
       });
 
       if (response.success) {
-        setSuccess('2FA успешно отключена');
+        setSuccess(t('misc.tfs_disable_success'));
         loadStatus();
       } else {
-        setError('Неверный пароль или код');
+        setError(t('misc.tfs_disable_invalid'));
       }
     } catch (err) {
-      setError(err.response?.data?.detail || 'Ошибка отключения 2FA');
+      setError(err.response?.data?.detail || t('misc.tfs_disable_error'));
     } finally {
       setLoading(false);
     }
@@ -96,10 +97,10 @@ const TwoFactorSettings = () => {
   const handleRegenerateBackupCodes = async () => {
     // P-013 fix: replaced native confirm() with shared useConfirm hook.
     const ok = await confirm({
-      title: 'Перегенерация backup-кодов',
-      message: 'Перегенерировать backup-коды?',
-      description: 'Старые коды станут недействительными.',
-      confirmLabel: 'Перегенерировать',
+      title: t('misc.tfs_regenerate_title'),
+      message: t('misc.tfs_regenerate_message'),
+      description: t('misc.tfs_regenerate_description'),
+      confirmLabel: t('misc.tfs_regenerate_confirm'),
       cancelLabel: t('misc.cancel'),
       intent: 'warning',
     });
@@ -114,9 +115,9 @@ const TwoFactorSettings = () => {
       const response = await api.post('/2fa/backup-codes/regenerate');
       setBackupCodes(response.backup_codes || []);
       setShowBackupCodes(true);
-      setSuccess('Backup коды перегенерированы');
+      setSuccess(t('misc.tfs_regenerate_success'));
     } catch (err) {
-      setError(err.response?.data?.detail || 'Ошибка перегенерации кодов');
+      setError(err.response?.data?.detail || t('misc.tfs_regenerate_error'));
     } finally {
       setLoading(false);
     }
@@ -125,10 +126,10 @@ const TwoFactorSettings = () => {
   const handleUntrustDevice = async (deviceId) => {
     // P-013 fix: replaced native confirm() with shared useConfirm hook.
     const ok = await confirm({
-      title: 'Отзыв доверия',
-      message: 'Отозвать доверие к этому устройству?',
-      description: 'При следующем входе потребуется повторная 2FA-верификация.',
-      confirmLabel: 'Отозвать',
+      title: t('misc.tfs_untrust_title'),
+      message: t('misc.tfs_untrust_message'),
+      description: t('misc.tfs_untrust_description'),
+      confirmLabel: t('misc.tfs_untrust_confirm'),
       cancelLabel: t('misc.cancel'),
       intent: 'warning',
     });
@@ -138,10 +139,10 @@ const TwoFactorSettings = () => {
 
     try {
       await api.delete(`/2fa/devices/${deviceId}`);
-      setSuccess('Доверие к устройству отозвано');
+      setSuccess(t('misc.tfs_untrust_success'));
       loadDevices();
     } catch (err) {
-      setError(err.response?.data?.detail || 'Ошибка отзыва доверия');
+      setError(err.response?.data?.detail || t('misc.tfs_untrust_error'));
     }
   };
 
@@ -186,10 +187,10 @@ const TwoFactorSettings = () => {
           gap: 'var(--mac-spacing-3)'
         }}>
           <Shield size={32} />
-          Двухфакторная аутентификация
+          {t('misc.tfs_page_title')}
         </h1>
         <p style={{ color: 'var(--text-secondary)', margin: 0 }}>
-          Управление настройками безопасности вашего аккаунта
+          {t('misc.tfs_page_subtitle')}
         </p>
       </div>
 
@@ -241,7 +242,7 @@ const TwoFactorSettings = () => {
           marginBottom: 'var(--mac-spacing-4)'
         }}>
           <h3 style={{ margin: 0, color: 'var(--text-primary)' }}>
-            Статус 2FA
+            {t('misc.tfs_status_title')}
           </h3>
           <div style={{
             padding: '4px 12px',
@@ -251,7 +252,7 @@ const TwoFactorSettings = () => {
             fontSize: 'var(--mac-font-size-xs)',
             fontWeight: 'var(--mac-font-weight-medium)'
           }}>
-            {status.enabled ? 'Включена' : 'Отключена'}
+            {status.enabled ? t('misc.tfs_status_enabled') : t('misc.tfs_status_disabled')}
           </div>
         </div>
 
@@ -266,28 +267,28 @@ const TwoFactorSettings = () => {
               TOTP
             </div>
             <div style={{ color: 'var(--text-primary)', fontWeight: 'var(--mac-font-weight-medium)' }}>
-              {status.totp_verified ? 'Настроен' : 'Не настроен'}
+              {status.totp_verified ? t('misc.tfs_totp_configured') : t('misc.tfs_totp_not_configured')}
             </div>
           </div>
           <div>
             <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--mac-font-size-base)', marginBottom: 'var(--mac-spacing-1)' }}>
-              Backup коды
+              {t('misc.tfs_backup_codes_label')}
             </div>
             <div style={{ color: 'var(--text-primary)', fontWeight: 'var(--mac-font-weight-medium)' }}>
-              {status.backup_codes_count} осталось
+              {t('misc.tfs_backup_codes_remaining', { count: status.backup_codes_count })}
             </div>
           </div>
           <div>
             <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--mac-font-size-base)', marginBottom: 'var(--mac-spacing-1)' }}>
-              Восстановление
+              {t('misc.tfs_recovery_label')}
             </div>
             <div style={{ color: 'var(--text-primary)', fontWeight: 'var(--mac-font-weight-medium)' }}>
-              {status.recovery_enabled ? 'Настроено' : 'Не настроено'}
+              {status.recovery_enabled ? t('misc.tfs_recovery_configured') : t('misc.tfs_recovery_not_configured')}
             </div>
           </div>
           <div>
             <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--mac-font-size-base)', marginBottom: 'var(--mac-spacing-1)' }}>
-              Доверенные устройства
+              {t('misc.tfs_trusted_devices_label')}
             </div>
             <div style={{ color: 'var(--text-primary)', fontWeight: 'var(--mac-font-weight-medium)' }}>
               {status.trusted_devices_count}
@@ -297,7 +298,7 @@ const TwoFactorSettings = () => {
 
         {status.last_used &&
         <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--mac-font-size-xs)' }}>
-            Последнее использование: {new Date(status.last_used).toLocaleString()}
+            {t('misc.tfs_last_used', { date: new Date(status.last_used).toLocaleString() })}
           </div>
         }
       </div>
@@ -317,7 +318,7 @@ const TwoFactorSettings = () => {
           marginBottom: 'var(--mac-spacing-4)'
         }}>
             <h3 style={{ margin: 0, color: 'var(--text-primary)' }}>
-              Backup коды
+              {t('misc.tfs_backup_codes_title')}
             </h3>
             <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)' }}>
               <button
@@ -336,7 +337,7 @@ const TwoFactorSettings = () => {
               }}>
               
                 <Eye size={12} />
-                Показать
+                {t('misc.tfs_show_button')}
               </button>
               <button
               onClick={handleRegenerateBackupCodes}
@@ -355,7 +356,7 @@ const TwoFactorSettings = () => {
               }}>
               
                 <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
-                Перегенерировать
+                {t('misc.tfs_regenerate_button')}
               </button>
             </div>
           </div>
@@ -391,7 +392,7 @@ const TwoFactorSettings = () => {
                     </code>
                     <button
                 onClick={() => copyToClipboard(code, `code-${index}`)}
-                aria-label={`Скопировать резервный код ${index + 1}`}
+                aria-label={t('misc.tfs_copy_code_aria', { index: index + 1 })}
                 style={{
                   padding: 'var(--mac-spacing-1)',
                   background: 'transparent',
@@ -425,8 +426,8 @@ const TwoFactorSettings = () => {
               fontSize: 'var(--mac-font-size-xs)'
             }}>
                   <AlertCircle size={16} />
-                  <span style={{ fontWeight: 'var(--mac-font-weight-medium)' }}>Важно:</span>
-                  <span>Сохраните эти коды в безопасном месте. Каждый код можно использовать только один раз.</span>
+                  <span style={{ fontWeight: 'var(--mac-font-weight-medium)' }}>{t('misc.tfs_important_label')}</span>
+                  <span>{t('misc.tfs_backup_warning')}</span>
                 </div>
                 <button
               onClick={downloadBackupCodes}
@@ -444,7 +445,7 @@ const TwoFactorSettings = () => {
               }}>
               
                   <Download size={12} />
-                  Скачать
+                  {t('misc.tfs_download_button')}
                 </button>
               </div>
             </div>
@@ -461,7 +462,7 @@ const TwoFactorSettings = () => {
         marginBottom: 'var(--mac-spacing-6)'
       }}>
           <h3 style={{ margin: '0 0 16px 0', color: 'var(--text-primary)' }}>
-            Доверенные устройства
+            {t('misc.tfs_trusted_devices_title')}
           </h3>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-3)' }}>
@@ -498,8 +499,8 @@ const TwoFactorSettings = () => {
                 color: 'var(--text-secondary)'
               }}>
                     {device.last_used ?
-                `Последнее использование: ${new Date(device.last_used).toLocaleString()}` :
-                'Никогда не использовалось'
+                t('misc.tfs_device_last_used', { date: new Date(device.last_used).toLocaleString() }) :
+                t('misc.tfs_device_never_used')
                 }
                   </div>
                 </div>
@@ -520,7 +521,7 @@ const TwoFactorSettings = () => {
               }}>
               
                   <Trash2 size={12} />
-                  Отозвать
+                  {t('misc.tfs_revoke_button')}
                 </button>
               </div>
           )}
@@ -535,7 +536,7 @@ const TwoFactorSettings = () => {
         borderRadius: 'var(--mac-radius-lg)'
       }}>
         <h3 style={{ margin: '0 0 16px 0', color: 'var(--text-primary)' }}>
-          Действия
+          {t('misc.tfs_actions_title')}
         </h3>
         
         <div style={{ display: 'flex', gap: 'var(--mac-spacing-3)', flexWrap: 'wrap' }}>
@@ -557,7 +558,7 @@ const TwoFactorSettings = () => {
             }}>
             
               <Shield size={16} />
-              Настроить 2FA
+              {t('misc.tfs_setup_button')}
             </button> :
 
           <button
@@ -578,7 +579,7 @@ const TwoFactorSettings = () => {
             }}>
             
               <Trash2 size={16} />
-              {loading ? 'Отключение...' : 'Отключить 2FA'}
+              {loading ? t('misc.tfs_disabling') : t('misc.tfs_disable_button')}
             </button>
           }
         </div>

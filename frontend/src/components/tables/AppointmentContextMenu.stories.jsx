@@ -4,7 +4,7 @@
  * UX Audit R-2.7: visual testing for context menu with force_majeure tooltip.
  */
 import AppointmentContextMenu from './AppointmentContextMenu';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 export default {
   title: 'Tables/AppointmentContextMenu',

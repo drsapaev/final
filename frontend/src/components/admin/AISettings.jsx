@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import {
@@ -30,6 +30,7 @@ import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import { notify } from '../../services/notify.js';
 const AISettings = () => {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [providers, setProviders] = useState([]);
   const [systemSettings, setSystemSettings] = useState({});
@@ -44,7 +45,7 @@ const AISettings = () => {
   const providerConfigs = {
     openai: {
       displayName: 'OpenAI GPT',
-      description: 'GPT-4, GPT-3.5 для текста и изображений',
+      description: t('admin2.ais_desc_openai'),
       defaultModel: 'gpt-4',
       capabilities: ['text', 'vision'],
       color: 'bg-green-500',
@@ -52,7 +53,7 @@ const AISettings = () => {
     },
     gemini: {
       displayName: 'Google Gemini',
-      description: 'Gemini Pro для текста и мультимодальных задач',
+      description: t('admin2.ais_desc_gemini'),
       defaultModel: 'gemini-pro',
       capabilities: ['text', 'vision'],
       color: 'bg-blue-500',
@@ -60,7 +61,7 @@ const AISettings = () => {
     },
     deepseek: {
       displayName: 'DeepSeek',
-      description: 'Экономичная альтернатива для текстовых задач',
+      description: t('admin2.ais_desc_deepseek'),
       defaultModel: 'deepseek-chat',
       capabilities: ['text'],
       color: 'bg-purple-500',
@@ -68,7 +69,7 @@ const AISettings = () => {
     },
     grok: {
       displayName: 'xAI Grok',
-      description: 'Grok от xAI для разговорных задач',
+      description: t('admin2.ais_desc_grok'),
       defaultModel: 'grok-beta',
       capabilities: ['text'],
       color: 'bg-orange-500',
@@ -105,7 +106,7 @@ const AISettings = () => {
 
     } catch (error) {
       logger.error('Ошибка загрузки AI данных:', error);
-      setMessage({ type: 'error', text: 'Ошибка загрузки AI данных' });
+      setMessage({ type: 'error', text: t('admin2.ais_load_error') });
     } finally {
       setLoading(false);
     }
@@ -121,14 +122,14 @@ const AISettings = () => {
 
       setMessage({
         type: 'success',
-        text: editingProvider ? 'Провайдер обновлен' : 'Провайдер создан'
+        text: editingProvider ? t('admin2.ais_provider_updated') : t('admin2.ais_provider_created')
       });
       setEditingProvider(null);
       setShowAddForm(false);
       await loadData();
     } catch (error) {
       logger.error('Ошибка сохранения:', error);
-      setMessage({ type: 'error', text: error.response?.data?.detail || error.message || 'Ошибка сохранения провайдера' });
+      setMessage({ type: 'error', text: error.response?.data?.detail || error.message || t('admin2.ais_provider_save_error') });
     }
   };
 
@@ -137,12 +138,12 @@ const AISettings = () => {
       setTestResults((prev) => ({ ...prev, [providerId]: { testing: true } }));
 
       const response = await api.post(`/admin/ai/providers/${providerId}/test`, {
-        test_prompt: 'Проверка подключения AI провайдера',
+        test_prompt: t('admin2.ais_test_prompt'),
         task_type: 'text'
       });
 
       setTestResults((prev) => ({ ...prev, [providerId]: response.data }));
-      setMessage({ type: 'success', text: 'Тест провайдера выполнен успешно' });
+      setMessage({ type: 'success', text: t('admin2.ais_test_success') });
     } catch (error) {
       logger.error('Ошибка тестирования:', error);
       setTestResults((prev) => ({
@@ -152,7 +153,7 @@ const AISettings = () => {
           error_message: error.message
         }
       }));
-      setMessage({ type: 'error', text: 'Ошибка тестирования провайдера' });
+      setMessage({ type: 'error', text: t('admin2.ais_test_error') });
     }
   };
 
@@ -168,7 +169,7 @@ const AISettings = () => {
       <MacOSCard className="admin-p-32">
         <div className="admin-flex-center-justify">
           <RefreshCw className="admin-icon-20-spin-mr-8" />
-          <span className="text-[var(--mac-text-primary)]">Загрузка AI настроек...</span>
+          <span className="text-[var(--mac-text-primary)]">{t('admin2.ais_loading')}</span>
         </div>
       </MacOSCard>);
 
@@ -180,21 +181,21 @@ const AISettings = () => {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="admin-text-2xl admin-text-semi text-[var(--mac-text-primary)] admin-m-0 mb-1">
-            Настройки AI
+            {t('admin2.ais_title')}
           </h2>
           <p className="admin-text-sm-secondary admin-m-0">
-            Управление AI провайдерами и шаблонами
+            {t('admin2.ais_subtitle')}
           </p>
         </div>
         
         <div className="admin-flex-gap-12">
           <Button variant="outline" onClick={loadData} disabled={loading}>
             <RefreshCw className="w-4 h-4 mr-2" />
-            Обновить
+            {t('admin2.ais_refresh')}
           </Button>
           <Button onClick={() => setShowAddForm(true)}>
             <Plus className="w-4 h-4 mr-2" />
-            Добавить провайдера
+            {t('admin2.ais_add_provider')}
           </Button>
         </div>
       </div>
@@ -223,7 +224,7 @@ const AISettings = () => {
               {stats.total_requests}
             </div>
             <div className="admin-text-sm-secondary">
-              Всего запросов
+              {t('admin2.ais_stat_total_requests')}
             </div>
           </MacOSCard>
           <MacOSCard className="admin-loading-p-24-center">
@@ -231,7 +232,7 @@ const AISettings = () => {
               {stats.successful_requests}
             </div>
             <div className="admin-text-sm-secondary">
-              Успешных
+              {t('admin2.ais_stat_successful')}
             </div>
           </MacOSCard>
           <MacOSCard className="admin-loading-p-24-center">
@@ -239,7 +240,7 @@ const AISettings = () => {
               {Math.round(stats.cache_hit_rate)}%
             </div>
             <div className="admin-text-sm-secondary">
-              Кэш
+              {t('admin2.ais_stat_cache')}
             </div>
           </MacOSCard>
           <MacOSCard className="admin-loading-p-24-center">
@@ -247,7 +248,7 @@ const AISettings = () => {
               {stats.total_tokens_used}
             </div>
             <div className="admin-text-sm-secondary">
-              Токенов
+              {t('admin2.ais_stat_tokens')}
             </div>
           </MacOSCard>
         </div>
@@ -276,10 +277,10 @@ const AISettings = () => {
                 
                 <div className="admin-flex-gap-8">
                   {provider.is_default &&
-                  <Badge variant="success">По умолчанию</Badge>
+                  <Badge variant="success">{t('admin2.ais_default')}</Badge>
                   }
                   <Badge variant={provider.active ? 'success' : 'secondary'}>
-                    {provider.active ? 'Активен' : 'Неактивен'}
+                    {provider.active ? t('admin2.ais_active') : t('admin2.ais_inactive')}
                   </Badge>
                 </div>
               </div>
@@ -287,28 +288,28 @@ const AISettings = () => {
               {/* Настройки провайдера */}
               <div className="admin-flex-col-12-sm">
                 <div className="flex items-center justify-between">
-                  <span className="text-[var(--mac-text-secondary)]">Модель:</span>
+                  <span className="text-[var(--mac-text-secondary)]">{t('admin2.ais_model_colon')}</span>
                   <span className="admin-text-med-primary">{provider.model || '—'}</span>
                 </div>
                 
                 <div className="flex items-center justify-between">
-                  <span className="text-[var(--mac-text-secondary)]">Температура:</span>
+                  <span className="text-[var(--mac-text-secondary)]">{t('admin2.ais_temperature_colon')}</span>
                   <span className="admin-text-med-primary">{provider.temperature}</span>
                 </div>
                 
                 <div className="flex items-center justify-between">
-                  <span className="text-[var(--mac-text-secondary)]">Макс. токенов:</span>
+                  <span className="text-[var(--mac-text-secondary)]">{t('admin2.ais_max_tokens_colon')}</span>
                   <span className="admin-text-med-primary">{provider.max_tokens}</span>
                 </div>
 
                 {/* API ключ */}
                 <div className="flex items-center justify-between">
-                  <span className="text-[var(--mac-text-secondary)]">API ключ:</span>
+                  <span className="text-[var(--mac-text-secondary)]">{t('admin2.ais_api_key_colon')}</span>
                   <div className="flex items-center justify-center gap-2">
                     <span className="admin-text-xs text-[var(--mac-text-primary)] admin-font-mono">
                       {showApiKeys[provider.id] ?
-                      provider.api_key || '***не установлен***' :
-                      '***скрыт***'
+                      provider.api_key || t('admin2.ais_api_key_not_set') :
+                      t('admin2.ais_api_key_hidden')
                       }
                     </span>
                     <Button
@@ -326,7 +327,7 @@ const AISettings = () => {
                 {/* Возможности */}
                 {provider.capabilities &&
                 <div className="flex items-center justify-between">
-                    <span className="text-[var(--mac-text-secondary)]">Возможности:</span>
+                    <span className="text-[var(--mac-text-secondary)]">{t('admin2.ais_capabilities_colon')}</span>
                     <div className="admin-flex-gap-4">
                       {provider.capabilities.map((cap) =>
                     <Badge key={cap} variant="outline" className="admin-text-xs">
@@ -348,24 +349,24 @@ const AISettings = () => {
                     {testResult.testing ?
                   <div className="flex items-center justify-center">
                         <RefreshCw className="admin-icon-14-spin-mr-8" />
-                        Тестирование...
+                        {t('admin2.ais_testing')}
                       </div> :
                   testResult.success ?
                   <div>
                         <div className="flex items-center justify-center text-[var(--mac-success)] mb-1">
                           <CheckCircle className="admin-icon-14-mr-8" />
-                          Тест пройден успешно
+                          {t('admin2.ais_test_passed')}
                         </div>
                         <div className="admin-text-xs admin-flex-col-4">
-                          <div className="text-[var(--mac-text-primary)]">Время ответа: {testResult.response_time_ms}мс</div>
-                          <div className="text-[var(--mac-text-primary)]">Токенов: {testResult.tokens_used}</div>
+                          <div className="text-[var(--mac-text-primary)]">{t('admin2.ais_response_time', { time: testResult.response_time_ms })}</div>
+                          <div className="text-[var(--mac-text-primary)]">{t('admin2.ais_tokens_used', { count: testResult.tokens_used })}</div>
                         </div>
                       </div> :
 
                   <div className="text-[var(--mac-error)]">
                         <div className="flex items-center justify-center mb-1">
                           <AlertCircle className="admin-icon-14-mr-8" />
-                          Ошибка тестирования
+                          {t('admin2.ais_test_error_short')}
                         </div>
                         <div className="admin-text-xs">{testResult.error_message}</div>
                       </div>
@@ -383,7 +384,7 @@ const AISettings = () => {
                   className="admin-flex-1">
                   
                   <Edit className="admin-icon-14-mr-8" />
-                  Настроить
+                  {t('admin2.ais_configure')}
                 </Button>
                 <Button
                   type="button"
@@ -404,14 +405,14 @@ const AISettings = () => {
         <MacOSCard className="p-6 text-center admin-card-dashed">
           <Brain className="admin-icon-48-mx-auto-mb-16-tertiary" />
           <h3 className="admin-heading-lg admin-text-med text-[var(--mac-text-primary)] admin-m-0 mb-2">
-            Добавить AI провайдера
+            {t('admin2.ais_add_ai_provider')}
           </h3>
           <p className="text-[var(--mac-text-secondary)] mb-4 admin-m-0">
-            Настройте новый AI провайдер для использования в системе
+            {t('admin2.ais_add_ai_provider_desc')}
           </p>
           <Button onClick={() => setShowAddForm(true)}>
             <Plus className="w-4 h-4 mr-2" />
-            Добавить
+            {t('admin2.ais_add')}
           </Button>
         </MacOSCard>
       </div>
@@ -420,7 +421,7 @@ const AISettings = () => {
       <MacOSCard className="p-6">
         <h3 className="admin-heading-lg admin-text-med text-[var(--mac-text-primary)] admin-m-0 mb-4 flex items-center justify-center">
           <Settings className="admin-icon-20-mr-8-blue" />
-          Системные настройки AI
+          {t('admin2.ais_system_settings_title')}
         </h3>
         
         <SystemSettingsForm
@@ -450,6 +451,7 @@ const AISettings = () => {
 
 // Компонент формы провайдера
 const ProviderForm = ({ provider, providerConfigs, onSave, onCancel }) => {
+  const { t } = useTranslation();
   const [formData, setFormData] = useState({
     name: provider?.name || '',
     display_name: provider?.display_name || '',
@@ -490,14 +492,14 @@ const ProviderForm = ({ provider, providerConfigs, onSave, onCancel }) => {
   return (
     <MacOSCard className="p-6">
       <h3 className="admin-heading-lg admin-text-med text-[var(--mac-text-primary)] admin-m-0 mb-4">
-        {provider ? 'Редактирование провайдера' : 'Добавление AI провайдера'}
+        {provider ? t('admin2.ais_edit_provider') : t('admin2.ais_adding_ai_provider')}
       </h3>
       
       {/* Быстрые пресеты */}
       {!provider &&
       <div className="mb-6">
           <label className="admin-text-sm-med-primary admin-label-block-md">
-            Быстрые настройки:
+            {t('admin2.ais_quick_settings')}
           </label>
           <div className="admin-flex-gap-8-wrap">
             {Object.entries(providerConfigs).map(([key, config]) =>
@@ -518,7 +520,7 @@ const ProviderForm = ({ provider, providerConfigs, onSave, onCancel }) => {
         <div className="admin-grid-auto-300">
           <div>
             <label className="admin-text-sm-med-primary admin-label-block-md">
-              Имя провайдера *
+              {t('admin2.ais_provider_name')}
             </label>
             <Input
               type="text"
@@ -532,7 +534,7 @@ const ProviderForm = ({ provider, providerConfigs, onSave, onCancel }) => {
 
           <div>
             <label className="admin-text-sm-med-primary admin-label-block-md">
-              Отображаемое имя *
+              {t('admin2.ais_display_name')}
             </label>
             <Input
               type="text"
@@ -547,7 +549,7 @@ const ProviderForm = ({ provider, providerConfigs, onSave, onCancel }) => {
           <div>
             <label className="admin-text-sm-med-primary admin-label-block-md">
               <Key className="admin-icon-16-inline-mr-4" />
-              API ключ
+              {t('admin2.ais_api_key')}
             </label>
             <Input
               type="password"
@@ -560,7 +562,7 @@ const ProviderForm = ({ provider, providerConfigs, onSave, onCancel }) => {
 
           <div>
             <label className="admin-text-sm-med-primary admin-label-block-md">
-              Модель
+              {t('admin2.ais_model')}
             </label>
             <Input
               type="text"
@@ -573,7 +575,7 @@ const ProviderForm = ({ provider, providerConfigs, onSave, onCancel }) => {
 
           <div>
             <label className="admin-text-sm-med-primary admin-label-block-md">
-              Температура
+              {t('admin2.ais_temperature')}
             </label>
             <Input
               type="number"
@@ -588,7 +590,7 @@ const ProviderForm = ({ provider, providerConfigs, onSave, onCancel }) => {
 
           <div>
             <label className="admin-text-sm-med-primary admin-label-block-md">
-              Макс. токенов
+              {t('admin2.ais_max_tokens')}
             </label>
             <Input
               type="number"
@@ -608,7 +610,7 @@ const ProviderForm = ({ provider, providerConfigs, onSave, onCancel }) => {
               onChange={(checked) => setFormData((prev) => ({ ...prev, active: checked }))}
               className="mr-2" />
             
-            <span className="admin-text-sm-med-primary">Активен</span>
+            <span className="admin-text-sm-med-primary">{t('admin2.ais_active')}</span>
           </label>
           
           <label className="flex items-center justify-center">
@@ -617,18 +619,18 @@ const ProviderForm = ({ provider, providerConfigs, onSave, onCancel }) => {
               onChange={(checked) => setFormData((prev) => ({ ...prev, is_default: checked }))}
               className="mr-2" />
             
-            <span className="admin-text-sm-med-primary">По умолчанию</span>
+            <span className="admin-text-sm-med-primary">{t('admin2.ais_default')}</span>
           </label>
         </div>
 
         <div className="admin-flex-end-12">
           <Button type="button" variant="outline" onClick={onCancel}>
             <X className="w-4 h-4 mr-2" />
-            Отменить
+            {t('admin2.ais_cancel')}
           </Button>
           <Button type="submit">
             <Save className="w-4 h-4 mr-2" />
-            Сохранить
+            {t('admin2.ais_save')}
           </Button>
         </div>
       </form>
@@ -638,6 +640,7 @@ const ProviderForm = ({ provider, providerConfigs, onSave, onCancel }) => {
 
 // Компонент системных настроек
 const SystemSettingsForm = ({ settings, onSave }) => {
+  const { t } = useTranslation();
   const [formData, setFormData] = useState(settings);
 
   useEffect(() => {
@@ -654,7 +657,7 @@ const SystemSettingsForm = ({ settings, onSave }) => {
               onChange={(checked) => setFormData((prev) => ({ ...prev, enabled: checked }))}
               className="mr-2" />
             
-            <span className="admin-text-sm-med-primary">AI система включена</span>
+            <span className="admin-text-sm-med-primary">{t('admin2.ais_system_enabled')}</span>
           </label>
         </div>
 
@@ -665,7 +668,7 @@ const SystemSettingsForm = ({ settings, onSave }) => {
               onChange={(checked) => setFormData((prev) => ({ ...prev, cache_enabled: checked }))}
               className="mr-2" />
             
-            <span className="admin-text-sm-med-primary">Кэширование включено</span>
+            <span className="admin-text-sm-med-primary">{t('admin2.ais_cache_enabled')}</span>
           </label>
         </div>
 
@@ -676,7 +679,7 @@ const SystemSettingsForm = ({ settings, onSave }) => {
               onChange={(checked) => setFormData((prev) => ({ ...prev, require_consent_for_files: checked }))}
               className="mr-2" />
             
-            <span className="admin-text-sm-med-primary">Требовать согласие для файлов</span>
+            <span className="admin-text-sm-med-primary">{t('admin2.ais_require_consent_files')}</span>
           </label>
         </div>
 
@@ -687,7 +690,7 @@ const SystemSettingsForm = ({ settings, onSave }) => {
               onChange={(checked) => setFormData((prev) => ({ ...prev, anonymize_data: checked }))}
               className="mr-2" />
             
-            <span className="admin-text-sm-med-primary">Анонимизировать данные</span>
+            <span className="admin-text-sm-med-primary">{t('admin2.ais_anonymize_data')}</span>
           </label>
         </div>
       </div>
@@ -695,7 +698,7 @@ const SystemSettingsForm = ({ settings, onSave }) => {
       <div className="admin-flex-justify-end">
         <Button onClick={() => onSave(formData)}>
           <Save className="w-4 h-4 mr-2" />
-          Сохранить настройки
+          {t('admin2.ais_save_settings')}
         </Button>
       </div>
     </div>);

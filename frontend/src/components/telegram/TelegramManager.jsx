@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { Card, Button,
   Input } from '../ui/macos';
 import tokenManager from '../../utils/tokenManager';
+import { useTranslation } from '../../i18n/useTranslation';
 import {
   MessageSquare,
   Settings,
@@ -42,6 +43,7 @@ import {
  * Полное управление ботом, шаблонами и уведомлениями
  */
 const TelegramManager = () => {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -73,7 +75,7 @@ const TelegramManager = () => {
       const data = await response.json();
       setBotStatus(data);
     } catch {
-      setError('Ошибка загрузки статуса бота');
+      setError(t('misc.tm_err_load_bot_status'));
     }
   };
 
@@ -87,7 +89,7 @@ const TelegramManager = () => {
       const data = await response.json();
       setSettings(data);
     } catch {
-      setError('Ошибка загрузки настроек');
+      setError(t('misc.tm_err_load_settings'));
     }
   };
 
@@ -101,7 +103,7 @@ const TelegramManager = () => {
       const data = await response.json();
       setTemplates(data);
     } catch {
-      setError('Ошибка загрузки шаблонов');
+      setError(t('misc.tm_err_load_templates'));
     }
   };
 
@@ -115,7 +117,7 @@ const TelegramManager = () => {
       const data = await response.json();
       setUsers(data.users || []);
     } catch {
-      setError('Ошибка загрузки пользователей');
+      setError(t('misc.tm_err_load_users'));
     }
   };
 
@@ -129,7 +131,7 @@ const TelegramManager = () => {
       const data = await response.json();
       setStats(data);
     } catch {
-      setError('Ошибка загрузки статистики');
+      setError(t('misc.tm_err_load_stats'));
     }
   };
 
@@ -148,13 +150,13 @@ const TelegramManager = () => {
       const data = await response.json();
 
       if (response.ok) {
-        setSuccess('Подключение к боту успешно');
+        setSuccess(t('misc.tm_success_bot_connected'));
         loadBotStatus();
       } else {
-        setError(data.detail || 'Ошибка подключения к боту');
+        setError(data.detail || t('misc.tm_err_bot_connection'));
       }
     } catch {
-      setError('Ошибка подключения к боту');
+      setError(t('misc.tm_err_bot_connection'));
     } finally {
       setLoading(false);
     }
@@ -162,7 +164,7 @@ const TelegramManager = () => {
 
   const sendTestMessage = async () => {
     if (!testChatId || !testMessage) {
-      setError('Введите chat ID и сообщение');
+      setError(t('misc.tm_err_test_required'));
       return;
     }
 
@@ -185,15 +187,15 @@ const TelegramManager = () => {
       const data = await response.json();
 
       if (response.ok) {
-        setSuccess('Тестовое сообщение отправлено');
+        setSuccess(t('misc.tm_success_test_sent'));
         setShowTestModal(false);
         setTestMessage('');
         setTestChatId('');
       } else {
-        setError(data.detail || 'Ошибка отправки сообщения');
+        setError(data.detail || t('misc.tm_err_send_message'));
       }
     } catch {
-      setError('Ошибка отправки сообщения');
+      setError(t('misc.tm_err_send_message'));
     } finally {
       setLoading(false);
     }
@@ -216,13 +218,13 @@ const TelegramManager = () => {
       const data = await response.json();
 
       if (response.ok) {
-        setSuccess('Настройки обновлены');
+        setSuccess(t('misc.tm_success_settings_saved'));
         loadSettings();
       } else {
-        setError(data.detail || 'Ошибка обновления настроек');
+        setError(data.detail || t('misc.tm_err_save_settings'));
       }
     } catch {
-      setError('Ошибка обновления настроек');
+      setError(t('misc.tm_err_save_settings'));
     } finally {
       setLoading(false);
     }
@@ -245,13 +247,13 @@ const TelegramManager = () => {
       const data = await response.json();
 
       if (response.ok) {
-        setSuccess('Webhook установлен успешно');
+        setSuccess(t('misc.tm_success_webhook_set'));
         loadBotStatus();
       } else {
-        setError(data.detail || 'Ошибка установки webhook');
+        setError(data.detail || t('misc.tm_err_webhook_set'));
       }
     } catch {
-      setError('Ошибка установки webhook');
+      setError(t('misc.tm_err_webhook_set'));
     } finally {
       setLoading(false);
     }
@@ -272,10 +274,10 @@ const TelegramManager = () => {
 
   const getStatusLabel = (status) => {
     switch (status) {
-      case 'active':return 'Активен';
-      case 'inactive':return 'Неактивен';
-      case 'error':return 'Ошибка';
-      default:return 'Неизвестно';
+      case 'active':return t('misc.tm_status_active');
+      case 'inactive':return t('misc.tm_status_inactive');
+      case 'error':return t('misc.tm_status_error');
+      default:return t('misc.tm_status_unknown');
     }
   };
 
@@ -286,7 +288,7 @@ const TelegramManager = () => {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center space-x-3">
             <Bot className="w-6 h-6 text-blue-600" />
-            <h3 className="text-lg font-semibold">Статус Telegram бота</h3>
+            <h3 className="text-lg font-semibold">{t('misc.tm_title_bot_status')}</h3>
           </div>
           <div className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(botStatus?.active ? 'active' : 'inactive')}`}>
             {getStatusLabel(botStatus?.active ? 'active' : 'inactive')}
@@ -298,18 +300,18 @@ const TelegramManager = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="text-center p-4 bg-blue-50 rounded-lg">
                 <Users className="w-8 h-8 text-blue-600 mx-auto mb-2" />
-                <div className="text-sm font-medium text-blue-800">Пользователи</div>
-                <div className="text-xs text-blue-600">{botStatus.stats?.total_users || 0} всего</div>
+                <div className="text-sm font-medium text-blue-800">{t('misc.tm_metric_users')}</div>
+                <div className="text-xs text-blue-600">{t('misc.tm_metric_users_total', { count: botStatus.stats?.total_users || 0 })}</div>
               </div>
               <div className="text-center p-4 bg-green-50 rounded-lg">
                 <Activity className="w-8 h-8 text-green-600 mx-auto mb-2" />
-                <div className="text-sm font-medium text-green-800">Активные</div>
-                <div className="text-xs text-green-600">{botStatus.stats?.active_users || 0} пользователей</div>
+                <div className="text-sm font-medium text-green-800">{t('misc.tm_metric_active')}</div>
+                <div className="text-xs text-green-600">{t('misc.tm_metric_active_users', { count: botStatus.stats?.active_users || 0 })}</div>
               </div>
               <div className="text-center p-4 bg-purple-50 rounded-lg">
                 <FileText className="w-8 h-8 text-purple-600 mx-auto mb-2" />
-                <div className="text-sm font-medium text-purple-800">Шаблоны</div>
-                <div className="text-xs text-purple-600">{botStatus.stats?.templates || 0} шаблонов</div>
+                <div className="text-sm font-medium text-purple-800">{t('misc.tm_metric_templates')}</div>
+                <div className="text-xs text-purple-600">{t('misc.tm_metric_templates_count', { count: botStatus.stats?.templates || 0 })}</div>
               </div>
             </div>
 
@@ -321,7 +323,7 @@ const TelegramManager = () => {
             disabled={loading}>
             
                 <RefreshCw className="w-4 h-4 mr-2" />
-                Проверить подключение
+                {t('misc.tm_btn_check_connection')}
               </Button>
               <Button
             onClick={() => setShowTestModal(true)}
@@ -329,7 +331,7 @@ const TelegramManager = () => {
             size="sm">
             
                 <TestTube className="w-4 h-4 mr-2" />
-                Отправить тест
+                {t('misc.tm_btn_send_test')}
               </Button>
             </div>
           </div> :
@@ -337,16 +339,16 @@ const TelegramManager = () => {
       <div className="text-center py-8">
             <Bot className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h4 className="text-lg font-medium text-gray-900 mb-2">
-              Telegram бот не настроен
+              {t('misc.tm_title_bot_not_configured')}
             </h4>
             <p className="text-gray-600 mb-4">
-              Настройте бота для отправки уведомлений пациентам
+              {t('misc.tm_desc_configure_bot')}
             </p>
             <Button
           onClick={() => setActiveTab('settings')}>
           
               <Settings className="w-4 h-4 mr-2" />
-              Настроить бота
+              {t('misc.tm_btn_configure_bot')}
             </Button>
           </div>
       }
@@ -355,23 +357,23 @@ const TelegramManager = () => {
       {/* Статистика */}
       {stats &&
     <Card className="p-6">
-          <h3 className="text-lg font-semibold mb-4">Статистика за последние 30 дней</h3>
+          <h3 className="text-lg font-semibold mb-4">{t('misc.tm_title_stats_30_days')}</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="text-center">
               <div className="text-2xl font-bold text-blue-600">{stats.messages_sent || 0}</div>
-              <div className="text-sm text-gray-600">Отправлено</div>
+              <div className="text-sm text-gray-600">{t('misc.tm_stat_sent')}</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-green-600">{stats.messages_delivered || 0}</div>
-              <div className="text-sm text-gray-600">Доставлено</div>
+              <div className="text-sm text-gray-600">{t('misc.tm_stat_delivered')}</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-red-600">{stats.messages_failed || 0}</div>
-              <div className="text-sm text-gray-600">Ошибок</div>
+              <div className="text-sm text-gray-600">{t('misc.tm_stat_errors')}</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-purple-600">{stats.total_users || 0}</div>
-              <div className="text-sm text-gray-600">Пользователей</div>
+              <div className="text-sm text-gray-600">{t('misc.tm_stat_users_count')}</div>
             </div>
           </div>
         </Card>
@@ -382,12 +384,12 @@ const TelegramManager = () => {
   const renderSettings = () =>
   <div className="space-y-6">
       <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Настройки бота</h3>
+        <h3 className="text-lg font-semibold mb-4">{t('misc.tm_title_settings')}</h3>
 
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Токен бота
+              {t('misc.tm_label_bot_token')}
             </label>
             <div className="flex space-x-2">
               <Input
@@ -408,13 +410,13 @@ const TelegramManager = () => {
               </Button>
             </div>
             <p className="text-xs text-gray-500 mt-1">
-              Получите токен у @BotFather в Telegram
+              {t('misc.tm_hint_bot_token')}
             </p>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Webhook URL
+              {t('misc.tm_label_webhook_url')}
             </label>
             <Input
             type="url"
@@ -425,37 +427,37 @@ const TelegramManager = () => {
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
           
             <p className="text-xs text-gray-500 mt-1">
-              URL для получения обновлений от Telegram
+              {t('misc.tm_hint_webhook_url')}
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Уведомления включены
+                {t('misc.tm_label_notifications_enabled')}
               </label>
               <select
               value={settings.notifications_enabled ? 'true' : 'false'}
               onChange={(e) => setSettings({ ...settings, notifications_enabled: e.target.value === 'true' })}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
               
-                <option value="true">Включены</option>
-                <option value="false">Отключены</option>
+                <option value="true">{t('misc.tm_opt_notifications_on')}</option>
+                <option value="false">{t('misc.tm_opt_notifications_off')}</option>
               </select>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Язык по умолчанию
+                {t('misc.tm_label_default_language')}
               </label>
               <select
               value={settings.default_language || 'ru'}
               onChange={(e) => setSettings({ ...settings, default_language: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
               
-                <option value="ru">Русский</option>
-                <option value="uz">Узбекский</option>
-                <option value="en">Английский</option>
+                <option value="ru">{t('misc.tm_opt_lang_ru')}</option>
+                <option value="uz">{t('misc.tm_opt_lang_uz')}</option>
+                <option value="en">{t('misc.tm_opt_lang_en')}</option>
               </select>
             </div>
           </div>
@@ -466,7 +468,7 @@ const TelegramManager = () => {
             disabled={loading}>
             
               <Save className="w-4 h-4 mr-2" />
-              Сохранить настройки
+              {t('misc.tm_btn_save_settings')}
             </Button>
             <Button
             onClick={testBotConnection}
@@ -474,7 +476,7 @@ const TelegramManager = () => {
             disabled={loading}>
             
               <TestTube className="w-4 h-4 mr-2" />
-              Проверить бота
+              {t('misc.tm_btn_check_bot')}
             </Button>
             <Button
             onClick={() => setWebhook(settings.webhook_url)}
@@ -482,7 +484,7 @@ const TelegramManager = () => {
             disabled={loading}>
             
               <Globe className="w-4 h-4 mr-2" />
-              Установить webhook
+              {t('misc.tm_btn_set_webhook')}
             </Button>
           </div>
         </div>
@@ -493,7 +495,7 @@ const TelegramManager = () => {
   const renderTemplates = () =>
   <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Шаблоны сообщений</h3>
+        <h3 className="text-lg font-semibold">{t('misc.tm_title_templates')}</h3>
         <Button
         onClick={loadTemplates}
         variant="outline"
@@ -501,7 +503,7 @@ const TelegramManager = () => {
         disabled={loading}>
         
           <RefreshCw className="w-4 h-4 mr-2" />
-          Обновить
+          {t('misc.tm_btn_refresh')}
         </Button>
       </div>
 
@@ -518,10 +520,10 @@ const TelegramManager = () => {
               </Button>
             </div>
             <p className="text-sm text-gray-600 mb-3">
-              {template.subject || 'Без темы'}
+              {template.subject || t('misc.tm_no_subject')}
             </p>
             <div className="text-xs text-gray-500">
-              {template.message_text?.length || 0} символов
+              {t('misc.tm_chars_count', { count: template.message_text?.length || 0 })}
             </div>
           </Card>
       )}
@@ -532,7 +534,7 @@ const TelegramManager = () => {
   const renderUsers = () =>
   <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Пользователи бота</h3>
+        <h3 className="text-lg font-semibold">{t('misc.tm_title_bot_users')}</h3>
         <Button
         onClick={loadUsers}
         variant="outline"
@@ -540,7 +542,7 @@ const TelegramManager = () => {
         disabled={loading}>
         
           <RefreshCw className="w-4 h-4 mr-2" />
-          Обновить
+          {t('misc.tm_btn_refresh')}
         </Button>
       </div>
 
@@ -548,10 +550,10 @@ const TelegramManager = () => {
     <Card className="p-8 text-center">
           <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
           <h4 className="text-lg font-medium text-gray-900 mb-2">
-            Нет пользователей
+            {t('misc.tm_title_no_users')}
           </h4>
           <p className="text-gray-600">
-            Пользователи появятся здесь после регистрации в боте
+            {t('misc.tm_desc_no_users')}
           </p>
         </Card> :
 
@@ -570,7 +572,7 @@ const TelegramManager = () => {
                       {user.first_name} {user.last_name}
                     </div>
                     <div className="text-sm text-gray-600">
-                      @{user.username || 'без username'}
+                      @{user.username || t('misc.tm_no_username')}
                     </div>
                     <div className="text-xs text-gray-500">
                       ID: {user.chat_id} • {user.language_code?.toUpperCase()}
@@ -580,7 +582,7 @@ const TelegramManager = () => {
                 <div className="flex items-center space-x-2">
                   <span className={`text-xs px-2 py-1 rounded-full ${user.active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`
             }>
-                    {user.active ? 'Активен' : 'Неактивен'}
+                    {user.active ? t('misc.tm_status_active') : t('misc.tm_status_inactive')}
                   </span>
                   <Button
                   variant="ghost"
@@ -602,8 +604,8 @@ const TelegramManager = () => {
       {/* Заголовок */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold">Telegram интеграция</h2>
-          <p className="text-gray-600">Управление ботом и уведомлениями</p>
+          <h2 className="text-2xl font-bold">{t('misc.tm_title_integration')}</h2>
+          <p className="text-gray-600">{t('misc.tm_subtitle_integration')}</p>
         </div>
         <div className="flex items-center space-x-2">
           <Button
@@ -613,7 +615,7 @@ const TelegramManager = () => {
             disabled={loading}>
             
             <RefreshCw className="w-4 h-4 mr-2" />
-            Обновить
+            {t('misc.tm_btn_refresh')}
           </Button>
         </div>
       </div>
@@ -622,10 +624,10 @@ const TelegramManager = () => {
       <div className="border-b border-gray-200">
         <nav className="flex space-x-8">
           {[
-          { id: 'overview', label: 'Обзор', icon: Bot },
-          { id: 'settings', label: 'Настройки', icon: Settings },
-          { id: 'templates', label: 'Шаблоны', icon: FileText },
-          { id: 'users', label: 'Пользователи', icon: Users }].
+          { id: 'overview', label: t('misc.tm_tab_overview'), icon: Bot },
+          { id: 'settings', label: t('misc.tm_tab_settings'), icon: Settings },
+          { id: 'templates', label: t('misc.tm_tab_templates'), icon: FileText },
+          { id: 'users', label: t('misc.tm_tab_users'), icon: Users }].
           map((tab) =>
           <button
             key={tab.id}
@@ -671,7 +673,7 @@ const TelegramManager = () => {
       {showTestModal &&
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg max-w-md w-full mx-4 p-6">
-            <h3 className="text-lg font-semibold mb-4">Отправить тестовое сообщение</h3>
+            <h3 className="text-lg font-semibold mb-4">{t('misc.tm_title_test_modal')}</h3>
 
             <div className="space-y-4">
               <div>
@@ -690,13 +692,13 @@ const TelegramManager = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Сообщение
+                  {t('misc.tm_label_message')}
                 </label>
                 <textarea
                 aria-label="Telegram test message"
                 value={testMessage}
                 onChange={(e) => setTestMessage(e.target.value)}
-                placeholder="Введите тестовое сообщение..."
+                placeholder={t('misc.tm_placeholder_test_message')}
                 rows={4}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
               
@@ -708,14 +710,14 @@ const TelegramManager = () => {
               onClick={() => setShowTestModal(false)}
               variant="outline">
               
-                Отмена
+                {t('misc.tm_btn_cancel')}
               </Button>
               <Button
               onClick={sendTestMessage}
               disabled={loading}>
               
                 <Send className="w-4 h-4 mr-2" />
-                Отправить
+                {t('misc.tm_btn_send')}
               </Button>
             </div>
           </div>

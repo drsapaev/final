@@ -1,11 +1,11 @@
 /**
  * PhraseSuggestions - Contextual phrase suggestions
- * 
+ *
  * IDE-like "snippets" behavior:
  * - User starts typing
  * - System suggests clinical formulations
  * - Click to insert (checkboxes)
- * 
+ *
  * RULES:
  * - NO auto-insert
  * - Click only (checkbox)
@@ -16,68 +16,73 @@ import { useState, useMemo, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import './PhraseSuggestions.css';
 import { Checkbox } from '../../ui/macos';
-import { useTranslation } from '../../../i18n/adapter';
+import { useTranslation } from '../../../i18n/useTranslation';
 
 /**
- * Common clinical phrases by field
+ * Common clinical phrases by field.
+ * Keys are translation keys (misc.ph_*) — the actual phrase text is
+ * resolved at render time via t().
+ * The outer key (e.g. 'pain') is a Russian keyword used to match
+ * user input; it's matched against the user-typed text (which is also
+ * in Russian for the medical workflow), so it stays as a literal.
  */
 const PHRASE_DATABASE = {
     complaints: {
-        pain: [
-            'Боль давящего характера',
-            'Боль с иррадиацией в левую руку',
-            'Боль усиливается при физической нагрузке',
-            'Боль в покое',
-            'Боль связана с приемом пищи',
+        'боль': [
+            'ph_complaint_pain_pressing',
+            'ph_complaint_pain_radiation_left_arm',
+            'ph_complaint_pain_exertion',
+            'ph_complaint_pain_rest',
+            'ph_complaint_pain_food',
         ],
-        головн: [
-            'Головная боль пульсирующего характера',
-            'Головная боль в височной области',
-            'Головная боль с тошнотой',
-            'Головная боль после стресса',
+        'головн': [
+            'ph_complaint_headache_pulsating',
+            'ph_complaint_headache_temporal',
+            'ph_complaint_headache_nausea',
+            'ph_complaint_headache_stress',
         ],
-        давлен: [
-            'Повышение АД до 180/100 мм рт.ст.',
-            'Эпизодическое повышение АД',
-            'Повышение АД с головной болью',
+        'давлен': [
+            'ph_complaint_bp_high',
+            'ph_complaint_bp_episodic',
+            'ph_complaint_bp_headache',
         ],
-        одышк: [
-            'Одышка при физической нагрузке',
-            'Одышка в покое',
-            'Одышка при ходьбе на 100 м',
-            'Пароксизмальная ночная одышка',
+        'одышк': [
+            'ph_complaint_dyspnea_exertion',
+            'ph_complaint_dyspnea_rest',
+            'ph_complaint_dyspnea_walking',
+            'ph_complaint_dyspnea_paroxysmal',
         ],
     },
     examination: {
         'ад': [
-            'АД 120/80 мм рт.ст.',
-            'АД 130/85 мм рт.ст.',
-            'АД 140/90 мм рт.ст.',
-            'АД 150/95 мм рт.ст.',
-            'АД 160/100 мм рт.ст.',
+            'ph_exam_bp_120_80',
+            'ph_exam_bp_130_85',
+            'ph_exam_bp_140_90',
+            'ph_exam_bp_150_95',
+            'ph_exam_bp_160_100',
         ],
-        пульс: [
-            'Пульс 72 уд/мин, ритмичный',
-            'Пульс 80 уд/мин, ритмичный',
-            'Пульс 90 уд/мин, ритмичный',
-            'Пульс нерегулярный',
+        'пульс': [
+            'ph_exam_pulse_72',
+            'ph_exam_pulse_80',
+            'ph_exam_pulse_90',
+            'ph_exam_pulse_irregular',
         ],
-        кожн: [
-            'Кожные покровы обычной окраски',
-            'Кожные покровы бледные',
-            'Кожные покровы влажные',
+        'кожн': [
+            'ph_exam_skin_normal',
+            'ph_exam_skin_pale',
+            'ph_exam_skin_moist',
         ],
     },
     diagnosis: {
-        гипертен: [
-            'Артериальная гипертензия I стадии, риск ССО 2',
-            'Артериальная гипертензия II стадии, риск ССО 3',
-            'Артериальная гипертензия III стадии, риск ССО 4',
+        'гипертен': [
+            'ph_dx_ht_stage1_risk2',
+            'ph_dx_ht_stage2_risk3',
+            'ph_dx_ht_stage3_risk4',
         ],
-        ибс: [
-            'ИБС: стенокардия напряжения II ФК',
-            'ИБС: стенокардия напряжения III ФК',
-            'ИБС: постинфарктный кардиосклероз',
+        'ибс': [
+            'ph_dx_ihd_angina_fc2',
+            'ph_dx_ihd_angina_fc3',
+            'ph_dx_ihd_post_infarct',
         ],
     },
 };
@@ -85,30 +90,32 @@ const PHRASE_DATABASE = {
 /**
  * Find matching phrases based on input
  */
-function findMatchingPhrases(text, fieldName, maxResults = 5) {
+function findMatchingPhrases(text, fieldName, t, maxResults = 5) {
     if (!text || text.length < 3) return [];
 
     const fieldPhrases = PHRASE_DATABASE[fieldName] || {};
     const words = text.toLowerCase().split(/\s+/);
     const matches = [];
 
-    for (const [keyword, phrases] of Object.entries(fieldPhrases)) {
+    for (const [keyword, phraseKeys] of Object.entries(fieldPhrases)) {
         const keywordLower = keyword.toLowerCase();
         if (words.some(word => keywordLower.includes(word) || word.includes(keywordLower))) {
-            for (const phrase of phrases) {
-                if (!text.includes(phrase)) {  // Don't suggest what's already there
-                    matches.push(phrase);
+            for (const key of phraseKeys) {
+                const phraseText = t(`misc.${key}`);
+                // Don't suggest what's already in the text
+                if (!text.includes(phraseText)) {
+                    matches.push({ key, text: phraseText });
                 }
             }
         }
     }
 
-    return [...new Set(matches)].slice(0, maxResults);
+    return [...new Map(matches.map(m => [m.key, m])).values()].slice(0, maxResults);
 }
 
 /**
  * PhraseSuggestions Component
- * 
+ *
  * @param {Object} props
  * @param {string} props.currentText - Current field text
  * @param {string} props.fieldName - Field name ('complaints', 'examination', etc.)
@@ -123,21 +130,22 @@ export function PhraseSuggestions({
     disabled = false,
     isOpen = true,
 }) {
+    const { t } = useTranslation();
     const [selectedPhrases, setSelectedPhrases] = useState(new Set());
 
     // Find matching phrases
     const phrases = useMemo(() => {
-        return findMatchingPhrases(currentText, fieldName);
-    }, [currentText, fieldName]);
+        return findMatchingPhrases(currentText, fieldName, t);
+    }, [currentText, fieldName, t]);
 
     // Toggle phrase selection
-    const togglePhrase = useCallback((phrase) => {
+    const togglePhrase = useCallback((key) => {
         setSelectedPhrases(prev => {
             const next = new Set(prev);
-            if (next.has(phrase)) {
-                next.delete(phrase);
+            if (next.has(key)) {
+                next.delete(key);
             } else {
-                next.add(phrase);
+                next.add(key);
             }
             return next;
         });
@@ -147,10 +155,13 @@ export function PhraseSuggestions({
     const handleInsert = useCallback(() => {
         if (selectedPhrases.size === 0) return;
 
-        const phrasesToInsert = Array.from(selectedPhrases).join('\n');
+        const phrasesToInsert = phrases
+            .filter(p => selectedPhrases.has(p.key))
+            .map(p => p.text)
+            .join('\n');
         onInsert?.(phrasesToInsert);
         setSelectedPhrases(new Set());
-    }, [selectedPhrases, onInsert]);
+    }, [selectedPhrases, onInsert, phrases]);
 
     if (!isOpen || phrases.length === 0) return null;
 
@@ -158,21 +169,21 @@ export function PhraseSuggestions({
         <div className="phrase-suggestions">
             <div className="phrase-suggestions__header">
                 <span className="phrase-suggestions__icon">📝</span>
-                <span>Клинические формулировки</span>
+                <span>{t('misc.ph_clinical_phrases')}</span>
             </div>
 
             <div className="phrase-suggestions__list">
-                {phrases.map((phrase, idx) => {
-                    const isSelected = selectedPhrases.has(phrase);
+                {phrases.map((phrase) => {
+                    const isSelected = selectedPhrases.has(phrase.key);
                     return (
                         <label
-                            key={idx}
+                            key={phrase.key}
                             className={`phrase-suggestions__item ${isSelected ? 'phrase-suggestions__item--selected' : ''}`}
                         >
-                            <Checkbox aria-label={`Выбрать клиническую формулировку: ${phrase}`} checked={isSelected} onChange={() => togglePhrase(phrase)}
+                            <Checkbox aria-label={t('misc.ph_select_phrase', { phrase: phrase.text })} checked={isSelected} onChange={() => togglePhrase(phrase.key)}
                                 disabled={disabled}
                             />
-                            <span className="phrase-suggestions__text">{phrase}</span>
+                            <span className="phrase-suggestions__text">{phrase.text}</span>
                         </label>
                     );
                 })}
@@ -184,12 +195,12 @@ export function PhraseSuggestions({
                     onClick={handleInsert}
                     disabled={disabled}
                 >
-                    ➕ Вставить ({selectedPhrases.size})
+                    ➕ {t('misc.ph_insert', { count: selectedPhrases.size })}
                 </button>
             )}
 
             <div className="phrase-suggestions__footer">
-                Выберите и нажмите «Вставить»
+                {t('misc.ph_footer')}
             </div>
         </div>
     );

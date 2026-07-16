@@ -29,7 +29,7 @@ import {
   formatRegistrarTime,
   getRegistrarTimestampDisplay,
 } from '../../utils/dateUtils';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const QUEUE_ACTION_ALIASES = {
   call: ['call'],
@@ -56,6 +56,7 @@ const DoctorQueuePanel = ({
   onPatientSelect,
   className = ''
 }) => {
+  const { t } = useTranslation();
   // Проверяем демо-режим в самом начале (в демо не скрываем компонент, а показываем моковые данные)
   const isDemoMode = import.meta.env.MODE === 'development' && window.location.hostname === 'localhost';
 
@@ -70,17 +71,17 @@ const DoctorQueuePanel = ({
   // Previously: waiting=info, called=warning (different from DoctorPanel).
   // Now: waiting=warning, called=primary (matches DoctorPanel).
   const statusConfig = {
-    waiting: { label: 'Ожидает', color: 'warning', icon: Clock },
-    called: { label: 'Вызван', color: 'primary', icon: Play },
-    in_progress: { label: 'На приеме', color: 'info', icon: Activity },
-    served: { label: 'Принят', color: 'success', icon: CheckCircle }
+    waiting: { label: t('misc.dqp_ozhidaet'), color: 'warning', icon: Clock },
+    called: { label: t('misc.dqp_vyzvan'), color: 'primary', icon: Play },
+    in_progress: { label: t('misc.dqp_na_prieme'), color: 'info', icon: Activity },
+    served: { label: t('misc.dqp_prinyat'), color: 'success', icon: CheckCircle }
   };
 
   // Источники записи
   const sourceConfig = {
     // UX Audit Doctor M-23: emoji → text labels (lucide icons need import refactor).
-    online: { label: 'Онлайн', icon: '📱' },
-    desk: { label: 'Регистратура', icon: '🏥' },
+    online: { label: t('misc.dqp_onlayn'), icon: '📱' },
+    desk: { label: t('misc.dqp_registratura'), icon: '🏥' },
     telegram: { label: 'Telegram', icon: '💬' }
   };
 
@@ -122,7 +123,7 @@ const DoctorQueuePanel = ({
         {
           id: 1,
           number: 'A001',
-          patient_name: 'Иван Иванов',
+          patient_name: t('misc.dqp_ivan_ivanov'),
           status: 'waiting',
           available_actions: ['call', 'no_show'],
           can_call: true,
@@ -135,7 +136,7 @@ const DoctorQueuePanel = ({
         {
           id: 2,
           number: 'A002',
-          patient_name: 'Мария Петрова',
+          patient_name: t('misc.dqp_mariya_petrova'),
           status: 'waiting',
           available_actions: ['call', 'no_show'],
           can_call: true,
@@ -222,7 +223,7 @@ const DoctorQueuePanel = ({
       }
     } catch (error) {
       logger.error('Ошибка загрузки очереди:', error);
-      setMessage({ type: 'error', text: 'Ошибка загрузки очереди' });
+      setMessage({ type: 'error', text: t('misc.dqp_oshibka_zagruzki_ocheredi') });
     } finally {
       setLoading(false);
     }
@@ -232,7 +233,7 @@ const DoctorQueuePanel = ({
   const handleCallPatient = async (entryId) => {
     // В демо-режиме имитируем вызов
     if (isDemoMode) {
-      setMessage({ type: 'success', text: 'Пациент вызван (демо)' });
+      setMessage({ type: 'success', text: t('misc.dqp_patsient_vyzvan_demo') });
       setQueueData((prev) => ({
         ...prev,
         entries: prev.entries.map((e) => e.id === entryId ? { ...e, status: 'called', called_at: new Date().toISOString() } : e)
@@ -268,7 +269,7 @@ const DoctorQueuePanel = ({
   const handleStartVisit = async (entryId) => {
     // В демо-режиме имитируем старт приема
     if (isDemoMode) {
-      setMessage({ type: 'success', text: 'Прием начат (демо)' });
+      setMessage({ type: 'success', text: t('misc.dqp_priem_nachat_demo') });
       setQueueData((prev) => ({
         ...prev,
         entries: prev.entries.map((e) => e.id === entryId ? { ...e, status: 'in_progress' } : e)
@@ -304,7 +305,7 @@ const DoctorQueuePanel = ({
   const handleCompleteVisit = async (entryId) => {
     // В демо-режиме имитируем завершение приема
     if (isDemoMode) {
-      setMessage({ type: 'success', text: 'Прием завершен (демо)' });
+      setMessage({ type: 'success', text: t('misc.dqp_priem_zavershen_demo') });
       setQueueData((prev) => ({
         ...prev,
         entries: prev.entries.map((e) => e.id === entryId ? { ...e, status: 'served' } : e),
@@ -356,8 +357,8 @@ const DoctorQueuePanel = ({
     return (
       <MacOSEmptyState
         type="users"
-        title="Очередь не создана"
-        description="Очередь будет создана когда регистратура добавит первого пациента" />);
+        title={t('misc.dqp_ochered_ne_sozdana')}
+        description={t('misc.dqp_ochered_budet_sozdana_kogda_')} />);
 
 
   }
@@ -368,7 +369,7 @@ const DoctorQueuePanel = ({
       {message.text &&
       <Alert
         type={message.type === 'success' ? 'success' : 'error'}
-        title={message.type === 'success' ? 'Успешно' : 'Ошибка'}
+        title={message.type === 'success' ? t('misc.dqp_uspeshno') : t('misc.dqp_oshibka')}
         description={message.text}
         onClose={() => setMessage({ type: '', text: '' })} />
 
@@ -421,7 +422,7 @@ const DoctorQueuePanel = ({
               Статус очереди:
             </div>
             <Badge variant={queueData.opened_at ? 'success' : 'warning'}>
-              {queueData.opened_at ? 'Открыта' : 'Не открыта'}
+              {queueData.opened_at ? t('misc.dqp_otkryta') : t('misc.dqp_ne_otkryta')}
             </Badge>
           </div>
         </div>
@@ -530,8 +531,8 @@ const DoctorQueuePanel = ({
           {queueData.entries.length === 0 ?
           <MacOSEmptyState
             type="users"
-            title="Пациентов в очереди нет"
-            description="Ожидайте поступления новых пациентов от регистратуры" /> :
+            title={t('misc.dqp_patsientov_v_ocheredi_net')}
+            description={t('misc.dqp_ozhidayte_postupleniya_novyh')} /> :
 
 
           queueData.entries.map((entry) => {
@@ -548,7 +549,7 @@ const DoctorQueuePanel = ({
                 key={entry.id}
                 role="button"
                 tabIndex={0}
-                aria-label={`Выбрать пациента ${entry.patient_name || entry.number} из очереди`}
+                aria-label={t('misc.dqp_vybrat_patsienta_entry_patie', { number: entry.patient_name || entry.number })}
                 style={{
                   padding: 'var(--mac-spacing-4)',
                   cursor: 'pointer',

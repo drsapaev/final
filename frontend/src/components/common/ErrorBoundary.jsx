@@ -4,7 +4,7 @@ import React from 'react';
 import { Button } from '../ui/macos';
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 /**
  * Error Boundary компонент для перехвата и обработки ошибок React
  */

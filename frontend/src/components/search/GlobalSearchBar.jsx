@@ -11,6 +11,7 @@ import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
 import { getCanonicalRouteById, getRoleHomeRoute } from '../../routing/routeSelectors.js';
 import { Input } from '../ui/macos';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const patientSearchRouteByRole = {
   registrar: getRoleHomeRoute('registrar'),
@@ -45,6 +46,7 @@ function useDebounce(value, delay) {
 }
 
 export default function GlobalSearchBar({ className = '' }) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const inputRef = useRef(null);
   const containerRef = useRef(null);
@@ -226,12 +228,12 @@ export default function GlobalSearchBar({ className = '' }) {
   const listboxId = 'global-search-results';
   const activeOptionId = selectedIndex >= 0 ? `global-search-option-${selectedIndex}` : undefined;
   const searchStatus = isLoading
-    ? 'Поиск...'
+    ? t('misc.gsb_poisk')
     : query.length < 2
-      ? 'Начните ввод, минимум 2 символа'
+      ? t('misc.gsb_nachnite_vvod_minimum_2_simv')
       : hasResults
-        ? 'Результаты поиска доступны'
-        : 'Ничего не найдено';
+        ? t('misc.gsb_rezultaty_poiska_dostupny')
+        : t('misc.gsb_nichego_ne_naydeno');
 
   const handleResultItemKeyDown = (event, onActivate) => {
     if (event.key === 'Enter' || event.key === ' ') {
@@ -379,8 +381,8 @@ export default function GlobalSearchBar({ className = '' }) {
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => setIsOpen(true)}
           onKeyDown={handleKeyDown}
-          placeholder="Поиск пациентов, визитов..."
-          aria-label="Глобальный поиск пациентов, визитов и анализов"
+          placeholder={t('misc.gsb_poisk_patsientov_vizitov')}
+          aria-label={t('misc.gsb_globalnyy_poisk_patsientov_v')}
           role="combobox"
           aria-autocomplete="list"
           aria-expanded={isOpen}
@@ -396,19 +398,19 @@ export default function GlobalSearchBar({ className = '' }) {
         <div
           id={listboxId}
           role="listbox"
-          aria-label="Результаты глобального поиска"
+          aria-label={t('misc.gsb_rezultaty_globalnogo_poiska')}
           style={styles.dropdown}
           ref={dropdownRef}>
                     {isLoading &&
-          <div style={styles.loading}>Поиск...</div>
+          <div style={styles.loading}>{t('misc.gsb_poisk_2')}</div>
           }
 
                     {!isLoading && query.length < 2 &&
-          <div style={styles.noResults}>Начните ввод (минимум 2 символа)</div>
+          <div style={styles.noResults}>{t('misc.gsb_nachnite_vvod_minimum_2_simv_2')}</div>
           }
 
                     {!isLoading && !hasResults && query.length >= 2 &&
-          <div style={styles.noResults}>Ничего не найдено</div>
+          <div style={styles.noResults}>{t('misc.gsb_nichego_ne_naydeno_2')}</div>
           }
 
                     {!isLoading && hasResults &&
@@ -416,7 +418,7 @@ export default function GlobalSearchBar({ className = '' }) {
                             {/* Patients */}
                             {results.patients.length > 0 &&
             <div style={styles.section}>
-                                    <div style={styles.sectionTitle}>Пациенты</div>
+                                    <div style={styles.sectionTitle}>{t('misc.gsb_patsienty')}</div>
                                     {results.patients.map((p) => {
                 flatIndex++;
                 const itemIndex = flatIndex;
@@ -451,7 +453,7 @@ export default function GlobalSearchBar({ className = '' }) {
                             {/* Visits */}
                             {results.visits.length > 0 &&
             <div style={styles.section}>
-                                    <div style={styles.sectionTitle}>Визиты</div>
+                                    <div style={styles.sectionTitle}>{t('misc.gsb_vizity')}</div>
                                     {results.visits.map((v) => {
                 flatIndex++;
                 const itemIndex = flatIndex;
@@ -471,10 +473,10 @@ export default function GlobalSearchBar({ className = '' }) {
                                                 <span style={styles.itemIcon}>📋</span>
                                                 <div style={styles.itemContent}>
                                                     <div style={styles.itemTitle}>
-                                                        {v.patient_name || `Визит #${v.id}`}
+                                                        {v.patient_name || t('misc.gsb_vizit_v_id', { id: v.id })}
                                                     </div>
                                                     <div style={styles.itemSubtitle}>
-                                                        {v.planned_date} • {v.status || 'нет статуса'}
+                                                        {v.planned_date} • {v.status || t('misc.gsb_net_statusa')}
                                                     </div>
                                                 </div>
                                             </div>);
@@ -486,7 +488,7 @@ export default function GlobalSearchBar({ className = '' }) {
                             {/* Lab Results */}
                             {results.labResults.length > 0 &&
             <div style={{ ...styles.section, borderBottom: 'none' }}>
-                                    <div style={styles.sectionTitle}>Анализы</div>
+                                    <div style={styles.sectionTitle}>{t('misc.gsb_analizy')}</div>
                                     {results.labResults.map((l) => {
                 flatIndex++;
                 const itemIndex = flatIndex;
@@ -507,10 +509,10 @@ export default function GlobalSearchBar({ className = '' }) {
                                                 <span style={styles.itemIcon}>{statusIcon}</span>
                                                 <div style={styles.itemContent}>
                                                     <div style={styles.itemTitle}>
-                                                        {l.patient_name || `Заказ #${l.id}`}
+                                                        {l.patient_name || t('misc.gsb_zakaz_l_id', { id: l.id })}
                                                     </div>
                                                     <div style={styles.itemSubtitle}>
-                                                        {l.test_type || 'Лабораторный анализ'} • {l.status}
+                                                        {l.test_type || t('misc.gsb_laboratornyy_analiz')} • {l.status}
                                                     </div>
                                                 </div>
                                             </div>);

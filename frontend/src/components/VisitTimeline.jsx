@@ -1,4 +1,4 @@
-import { t } from '../i18n/adapter';
+import { useTranslation } from '../i18n/useTranslation';
 import { CheckCircle, Clock, AlertCircle, CreditCard, User, FileText, Pill } from 'lucide-react';
 import PropTypes from 'prop-types';
 import { Card, Badge } from './ui/macos';
@@ -10,11 +10,12 @@ import {
 } from '../constants/appointmentStatus';
 
 const VisitTimeline = ({ appointment, emr, prescription }) => {
+  const { t } = useTranslation();
   const timelineSteps = [
     {
       id: 'appointment',
       title: t('final.timeline_appointment_created'),
-      description: 'Пациент записан на прием',
+      description: t('misc.vt_patsient_zapisan_na_priem'),
       icon: Clock,
       status: 'completed',
       completedAt: appointment?.created_at
@@ -22,7 +23,7 @@ const VisitTimeline = ({ appointment, emr, prescription }) => {
     {
       id: 'payment',
       title: t('final.timeline_payment'),
-      description: 'Ожидание оплаты записи',
+      description: t('misc.vt_ozhidanie_oplaty_zapisi'),
       icon: CreditCard,
       status: appointment?.status === APPOINTMENT_STATUS.PENDING ? 'current' : 
               appointment?.status === APPOINTMENT_STATUS.PAID || 
@@ -33,7 +34,7 @@ const VisitTimeline = ({ appointment, emr, prescription }) => {
     {
       id: 'visit',
       title: t('final.timeline_doctor_visit'),
-      description: 'Начало приема',
+      description: t('misc.vt_nachalo_priema'),
       icon: User,
       status: appointment?.status === APPOINTMENT_STATUS.IN_VISIT ? 'current' :
               appointment?.status === APPOINTMENT_STATUS.COMPLETED ? 'completed' : 'pending',
@@ -42,7 +43,7 @@ const VisitTimeline = ({ appointment, emr, prescription }) => {
     {
       id: 'emr',
       title: t('final.timeline_emr'),
-      description: 'Электронная медицинская карта',
+      description: t('misc.vt_elektronnaya_meditsinskaya_k'),
       icon: FileText,
       status: emr && !emr.isDraft ? 'completed' :
               emr && emr.isDraft ? 'current' : 'pending',
@@ -51,7 +52,7 @@ const VisitTimeline = ({ appointment, emr, prescription }) => {
     {
       id: 'prescription',
       title: t('final.timeline_prescription'),
-      description: 'Назначение препаратов',
+      description: t('misc.vt_naznachenie_preparatov'),
       icon: Pill,
       status: prescription && !prescription.isDraft ? 'completed' :
               prescription && prescription.isDraft ? 'current' : 'pending',
@@ -92,7 +93,7 @@ const VisitTimeline = ({ appointment, emr, prescription }) => {
   return (
     <Card className="p-6">
       <div className="flex items-center justify-between mb-6">
-        <h3 className="text-lg font-semibold">Прогресс визита</h3>
+        <h3 className="text-lg font-semibold">{t('misc.vt_progress_vizita')}</h3>
         <div className="flex items-center gap-2">
           <div className="text-sm text-gray-600">{Math.round(progress)}%</div>
           <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
@@ -129,8 +130,8 @@ const VisitTimeline = ({ appointment, emr, prescription }) => {
                     }
                     size="sm"
                   >
-                    {step.status === 'completed' ? 'Готово' :
-                     step.status === 'current' ? 'В процессе' : 'Ожидание'}
+                    {step.status === 'completed' ? t('misc.vt_gotovo') :
+                     step.status === 'current' ? t('misc.vt_v_protsesse') : t('misc.vt_ozhidanie')}
                   </Badge>
                 </div>
                 
@@ -151,9 +152,9 @@ const VisitTimeline = ({ appointment, emr, prescription }) => {
       <div className="mt-6 p-4 bg-gray-50 rounded-lg">
         <div className="flex items-center justify-between">
           <div>
-            <div className="font-medium">Текущий статус</div>
+            <div className="font-medium">{t('misc.vt_tekuschiy_status')}</div>
             <div className="text-sm text-gray-600">
-              {STATUS_LABELS[appointment?.status] || 'Неизвестно'}
+              {STATUS_LABELS[appointment?.status] || t('misc.vt_neizvestno')}
             </div>
           </div>
           <Badge variant={STATUS_COLORS[appointment?.status]}>
@@ -167,18 +168,18 @@ const VisitTimeline = ({ appointment, emr, prescription }) => {
         <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
           <div className="flex items-center gap-2 mb-2">
             <AlertCircle className="w-4 h-4 text-blue-600" />
-            <div className="font-medium text-blue-900">Следующий шаг</div>
+            <div className="font-medium text-blue-900">{t('misc.vt_sleduyuschiy_shag')}</div>
           </div>
           <div className="text-sm text-blue-700">
             {appointment?.status === APPOINTMENT_STATUS.PENDING && 
-              'Ожидается оплата записи для начала приема'}
+              t('misc.vt_ozhidaetsya_oplata_zapisi_dl')}
             {appointment?.status === APPOINTMENT_STATUS.PAID && 
-              'Можно начать прием у врача'}
+              t('misc.vt_mozhno_nachat_priem_u_vracha')}
             {appointment?.status === APPOINTMENT_STATUS.IN_VISIT && 
-              (!emr ? 'Создайте ЭМК для записи приема' :
-               emr.isDraft ? 'Сохраните ЭМК для завершения приема' :
-               !prescription ? 'Оформите рецепт (опционально)' :
-               'Прием готов к завершению')}
+              (!emr ? t('misc.vt_sozdayte_emk_dlya_zapisi_pri') :
+               emr.isDraft ? t('misc.vt_sohranite_emk_dlya_zavershen') :
+               !prescription ? t('misc.vt_oformite_retsept_optsionalno') :
+               t('misc.vt_priem_gotov_k_zaversheniyu'))}
           </div>
         </div>
       )}

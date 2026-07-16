@@ -128,7 +128,7 @@ describe('Doctor panels SSOT contract', () => {
     // new canonical tab name.
     const cardiologySource = cardiology + '\n' + cardiologyVisitTab;
     expect(cardiologySource).toContain('activeTab === \'visit\'');
-    expect(cardiologySource).toContain('title="Выберите визит"');
+    expect(cardiologySource).toContain('cardio_visit_empty_title');
     // Must redirect to a tab that exists in the sidebar (patients or appointments alias).
     expect(
       cardiologySource.includes('goToTab(\'patients\')') ||
@@ -136,7 +136,7 @@ describe('Doctor panels SSOT contract', () => {
     ).toBe(true);
 
     expect(dermatology).toContain('activeTab === \'visit\' && !currentAppointment && !selectedPatient');
-    expect(dermatology).toContain('title="Выберите визит"');
+    expect(dermatology).toContain('derma_panel_select_visit_title');
     expect(
       dermatology.includes('handleTabChange(\'patients\')') ||
       dermatology.includes('handleTabChange(\'appointments\')')

@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect, useCallback } from 'react';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
@@ -46,10 +46,10 @@ const ICON_MAP = {
 };
 
 const TIMEZONE_OPTIONS = [
-  { value: 'Asia/Tashkent', label: '\u0422\u0430\u0448\u043a\u0435\u043d\u0442 (UTC+5)' },
-  { value: 'Asia/Almaty', label: '\u0410\u043b\u043c\u0430\u0442\u044b (UTC+6)' },
-  { value: 'Europe/Moscow', label: '\u041c\u043e\u0441\u043a\u0432\u0430 (UTC+3)' },
-  { value: 'Asia/Dubai', label: '\u0414\u0443\u0431\u0430\u0439 (UTC+4)' }
+  { value: 'Asia/Tashkent', labelKey: 'admin2.qs_tz_tashkent' },
+  { value: 'Asia/Almaty', labelKey: 'admin2.qs_tz_almaty' },
+  { value: 'Europe/Moscow', labelKey: 'admin2.qs_tz_moscow' },
+  { value: 'Asia/Dubai', labelKey: 'admin2.qs_tz_dubai' }
 ];
 
 const normalizeNumber = (value, fallback) => {
@@ -63,8 +63,8 @@ const getNumberSetting = (collection, key, fallback) => (
 
 const normalizeText = (value) => String(value || '').trim().toLowerCase();
 
-const getDoctorDisplayName = (doctor) => (
-  doctor?.user?.full_name || doctor?.user?.username || `Врач #${doctor?.id || '—'}`
+const getDoctorDisplayName = (doctor, t) => (
+  doctor?.user?.full_name || doctor?.user?.username || t('admin2.qs_doctor_fallback', { id: doctor?.id || '—' })
 );
 
 const pickCanonicalDoctorForSpecialty = (doctorsList, specialtyKey) => {
@@ -101,6 +101,7 @@ const pickCanonicalDoctorForSpecialty = (doctorsList, specialtyKey) => {
 };
 
 const QueueSettings = () => {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -165,7 +166,7 @@ const QueueSettings = () => {
       });
     } catch (error) {
       logger.error('Ошибка загрузки настроек очередей:', error);
-      setMessage({ type: 'error', text: 'Ошибка загрузки настроек очередей' });
+      setMessage({ type: 'error', text: t('admin2.qs_load_error') });
     } finally {
       setLoading(false);
     }
@@ -197,7 +198,7 @@ const QueueSettings = () => {
       setSettings(response.data.settings);
     } catch (error) {
       logger.error('Ошибка сохранения:', error);
-      setMessage({ type: 'error', text: 'Ошибка сохранения настроек очередей' });
+      setMessage({ type: 'error', text: t('admin2.qs_save_error') });
     } finally {
       setSaving(false);
     }
@@ -213,7 +214,7 @@ const QueueSettings = () => {
       const doctorId = doctor?.id;
 
       if (!doctorId) {
-        setMessage({ type: 'error', text: `Врач для специальности "${specialty}" не найден` });
+        setMessage({ type: 'error', text: t('admin2.qs_doctor_not_found', { specialty }) });
         setTesting(false);
         return;
       }
@@ -226,20 +227,20 @@ const QueueSettings = () => {
       setTestResult({
         ...(response.data.test_data || {}),
         selected_doctor_id: doctor.id,
-        selected_doctor_name: getDoctorDisplayName(doctor),
-        selected_doctor_cabinet: doctor.cabinet || 'Не указан',
+        selected_doctor_name: getDoctorDisplayName(doctor, t),
+        selected_doctor_cabinet: doctor.cabinet || t('admin2.qs_not_specified'),
         matched_doctors_count: candidates.length,
       });
       setMessage({
         type: 'success',
         text:
           candidates.length > 1
-            ? `Тест выполнен: использован врач "${getDoctorDisplayName(doctor)}" из ${candidates.length} кандидатов`
-            : 'Тест очереди выполнен успешно',
+            ? t('admin2.qs_test_done_multi', { doctor: getDoctorDisplayName(doctor, t), count: candidates.length })
+            : t('admin2.qs_test_done'),
       });
     } catch (error) {
       logger.error('Ошибка тестирования:', error);
-      setMessage({ type: 'error', text: 'Ошибка тестирования очереди' });
+      setMessage({ type: 'error', text: t('admin2.qs_test_error') });
     } finally {
       setTesting(false);
     }
@@ -252,7 +253,7 @@ const QueueSettings = () => {
           <div className="admin-flex-center-justify admin-gap-12">
             <RefreshCw className="admin-icon-32-blue-spin" />
             <span className="admin-span-lg-secondary-med">
-              Загрузка настроек очередей...
+              {t('admin2.qs_loading')}
             </span>
           </div>
         </MacOSCard>
@@ -268,10 +269,10 @@ const QueueSettings = () => {
           <div>
             <h2 className="admin-h1-2xl-semi-primary-mb-8-flex">
               <Clock className="admin-icon-32-blue" />
-              Настройки очередей
+              {t('admin2.qs_title')}
             </h2>
             <p className="admin-p-sm-secondary-m0">
-              Управление онлайн-очередью и стартовыми номерами
+              {t('admin2.qs_subtitle')}
             </p>
           </div>
 
@@ -283,7 +284,7 @@ const QueueSettings = () => {
               className="admin-action-btn">
               
               <RefreshCw className="w-4 h-4" />
-              Обновить
+              {t('admin2.qs_refresh')}
             </Button>
             <Button
               onClick={saveSettings}
@@ -295,7 +296,7 @@ const QueueSettings = () => {
 
               <Save className="w-4 h-4" />
               }
-              Сохранить
+              {t('admin2.qs_save')}
             </Button>
           </div>
         </div>
@@ -341,19 +342,19 @@ const QueueSettings = () => {
               />
               <div>
                 <div className="admin-span-sm-semi-primary">
-                  Режим разработки (Dev Mode)
+                  {t('admin2.qs_dev_mode_title')}
                 </div>
                 <div className="admin-text-xs-secondary">
                   {settings.dev_mode_enabled ?
-                  '⚠️ Временные ограничения QR отключены!' :
-                  'Отключает проверку времени для QR-регистрации'
+                  t('admin2.qs_dev_mode_on') :
+                  t('admin2.qs_dev_mode_off')
                   }
                 </div>
               </div>
             </div>
             <button
               onClick={() => handleSettingChange('dev_mode_enabled', !settings.dev_mode_enabled)}
-              aria-label={settings.dev_mode_enabled ? 'Отключить режим разработки очереди' : 'Включить режим разработки очереди'}
+              aria-label={settings.dev_mode_enabled ? t('admin2.qs_dev_mode_disable') : t('admin2.qs_dev_mode_enable')}
               className="admin-dev-mode-btn"
               style={{
                 '--admin-btn-bg': settings.dev_mode_enabled ? 'var(--mac-error)' : 'var(--mac-bg-tertiary)',
@@ -363,12 +364,12 @@ const QueueSettings = () => {
               {settings.dev_mode_enabled ?
               <>
                   <ToggleRight className="w-4.5 h-4.5" />
-                  Включён
+                  {t('admin2.qs_enabled')}
                 </> :
 
               <>
                   <ToggleLeft className="w-4.5 h-4.5" />
-                  Выключен
+                  {t('admin2.qs_disabled')}
                 </>
               }
             </button>
@@ -381,14 +382,14 @@ const QueueSettings = () => {
           <MacOSCard className="p-6">
             <h3 className="admin-h3-lg-semi-primary-mb-16-flex">
               <Settings className="admin-icon-20-blue" />
-              Общие настройки
+              {t('admin2.qs_general')}
             </h3>
 
             <div className="flex flex-col gap-4">
               <div>
                 <label className="admin-label-flex-center-4-sm-med-primary-mb-8">
                   <Clock className="w-4 h-4" />
-                  Час начала онлайн-очереди
+                  {t('admin2.qs_start_hour')}
                 </label>
                 <Select
                   value={Number(settings.queue_start_hour)}
@@ -400,13 +401,13 @@ const QueueSettings = () => {
                   className="w-full"></Select>
                 
                 <p className="admin-p-xs-tertiary-mt-4">
-                  С этого времени доступна онлайн-запись через QR-код
+                  {t('admin2.qs_start_hour_hint')}
                 </p>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">
-                  Время автозакрытия
+                  {t('admin2.qs_auto_close')}
                 </label>
                 <Input
                   type="time"
@@ -415,18 +416,18 @@ const QueueSettings = () => {
                   className="w-full" />
                 
                 <p className="admin-p-xs-tertiary-mt-4">
-                  Автоматическое закрытие онлайн-записи (опционально)
+                  {t('admin2.qs_auto_close_hint')}
                 </p>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">
-                  Часовой пояс
+                  {t('admin2.qs_timezone')}
                 </label>
                 <Select
                   value={settings.timezone}
                   onChange={(value) => handleSettingChange('timezone', value)}
-                  options={TIMEZONE_OPTIONS}
+                  options={TIMEZONE_OPTIONS.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
                   className="w-full"></Select>
                 
               </div>
@@ -437,12 +438,12 @@ const QueueSettings = () => {
           <MacOSCard className="p-6">
             <h3 className="admin-h3-lg-semi-primary-mb-16-flex">
               <TestTube className="admin-icon-20-success" />
-              Тестирование очереди
+              {t('admin2.qs_testing')}
             </h3>
 
             <div className="flex flex-col gap-4">
               <p className="admin-p-sm-secondary-m0">
-                Протестируйте генерацию QR-кода для каждой специальности
+                {t('admin2.qs_testing_hint')}
               </p>
 
               {specialties.map((specialty) =>
@@ -478,18 +479,18 @@ const QueueSettings = () => {
               {testResult &&
               <MacOSCard className="admin-card-success-p-16">
                   <h4 className="admin-h4-med-success-mb-8">
-                    Результат тестирования:
+                    {t('admin2.qs_result_title')}
                   </h4>
                   <div className="admin-div-xs-success-flex-col-4">
-                    <div><strong>Токен:</strong> <code className="admin-code-success-xs">{testResult.token?.slice(0, 8)}...</code></div>
-                    <div><strong>Врач:</strong> {testResult.selected_doctor_name || '—'}</div>
-                    <div><strong>Специальность:</strong> {testResult.doctor_specialty}</div>
-                    <div><strong>Врач ID:</strong> {testResult.selected_doctor_id || testResult.doctor_id}</div>
-                    <div><strong>Кабинет:</strong> {testResult.doctor_cabinet}</div>
-                    <div><strong>Выбранный кабинет:</strong> {testResult.selected_doctor_cabinet || '—'}</div>
-                    <div><strong>Стартовый номер:</strong> {testResult.start_number}</div>
-                    <div><strong>Лимит в день:</strong> {testResult.max_per_day}</div>
-                    <div><strong>Кандидатов:</strong> {testResult.matched_doctors_count ?? 0}</div>
+                    <div><strong>{t('admin2.qs_label_token')}</strong> <code className="admin-code-success-xs">{testResult.token?.slice(0, 8)}...</code></div>
+                    <div><strong>{t('admin2.qs_label_doctor')}</strong> {testResult.selected_doctor_name || '—'}</div>
+                    <div><strong>{t('admin2.qs_label_specialty')}</strong> {testResult.doctor_specialty}</div>
+                    <div><strong>{t('admin2.qs_label_doctor_id')}</strong> {testResult.selected_doctor_id || testResult.doctor_id}</div>
+                    <div><strong>{t('admin2.qs_label_cabinet')}</strong> {testResult.doctor_cabinet}</div>
+                    <div><strong>{t('admin2.qs_label_selected_cabinet')}</strong> {testResult.selected_doctor_cabinet || '—'}</div>
+                    <div><strong>{t('admin2.qs_label_start_number')}</strong> {testResult.start_number}</div>
+                    <div><strong>{t('admin2.qs_label_max_per_day')}</strong> {testResult.max_per_day}</div>
+                    <div><strong>{t('admin2.qs_label_candidates')}</strong> {testResult.matched_doctors_count ?? 0}</div>
                     <div><strong>QR URL:</strong> <code className="admin-code-success-xs">{testResult.qr_url}</code></div>
                   </div>
                 </MacOSCard>
@@ -511,7 +512,7 @@ const QueueSettings = () => {
                 <div>
                   <label className="admin-label-flex-center-4-sm-med-primary-mb-8">
                     <Hash className="w-4 h-4" />
-                    Стартовый номер
+                    {t('admin2.qs_label_start_number_short')}
                 </label>
                   <Input
                   type="number"
@@ -522,14 +523,14 @@ const QueueSettings = () => {
                   className="w-full" />
                 
                   <p className="admin-p-xs-tertiary-mt-4">
-                    С какого номера начинается онлайн-очередь
+                    {t('admin2.qs_start_number_hint')}
                   </p>
                 </div>
 
                 <div>
                   <label className="admin-label-flex-center-4-sm-med-primary-mb-8">
                     <Users className="w-4 h-4" />
-                    Лимит в день
+                    {t('admin2.qs_label_max_per_day_short')}
                 </label>
                   <Input
                   type="number"
@@ -540,14 +541,14 @@ const QueueSettings = () => {
                   className="w-full" />
                 
                   <p className="admin-p-xs-tertiary-mt-4">
-                    Максимум онлайн-записей в день
+                    {t('admin2.qs_max_per_day_hint')}
                   </p>
                 </div>
 
                 {/* Текущие настройки */}
                 <div className="admin-section-divider-pt-16-border-top">
                   <div className="admin-flex-between-sm">
-                    <span className="text-[var(--mac-text-secondary)]">Диапазон номеров:</span>
+                    <span className="text-[var(--mac-text-secondary)]">{t('admin2.qs_range_label')}</span>
                     <div className="admin-range-badge">
                       {getNumberSetting(settings.start_numbers, specialty.key, 1)} - {getNumberSetting(settings.start_numbers, specialty.key, 1) + getNumberSetting(settings.max_per_day, specialty.key, 1) - 1}
                     </div>
@@ -562,14 +563,14 @@ const QueueSettings = () => {
         <MacOSCard className="admin-card-info-p-24">
           <h3 className="admin-h3-lg-semi-info-mb-12-flex">
             <QrCode className="w-5 h-5" />
-            Как работает онлайн-очередь
+            {t('admin2.qs_info_title')}
           </h3>
           <div className="admin-div-sm-info-flex-col-8">
-            <p className="admin-m-0">• Пациенты сканируют QR-код с {settings.queue_start_hour}:00 до открытия приема</p>
-            <p className="admin-m-0">• Каждый телефон/Telegram может получить только один номер в день</p>
-            <p className="admin-m-0">• При повторном запросе возвращается тот же номер</p>
-            <p className="admin-m-0">• Кнопка &quot;Открыть прием&quot; в регистратуре закрывает онлайн-набор</p>
-            <p className="admin-m-0">• Стартовые номера позволяют избежать конфликтов между специалистами</p>
+            <p className="admin-m-0">{t('admin2.qs_info_1', { hour: settings.queue_start_hour })}</p>
+            <p className="admin-m-0">{t('admin2.qs_info_2')}</p>
+            <p className="admin-m-0">{t('admin2.qs_info_3')}</p>
+            <p className="admin-m-0">{t('admin2.qs_info_4')}</p>
+            <p className="admin-m-0">{t('admin2.qs_info_5')}</p>
           </div>
         </MacOSCard>
       </MacOSCard>

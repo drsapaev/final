@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import ModernDialog from '../dialogs/ModernDialog';
@@ -59,41 +59,23 @@ const ModernQueueManager = ({
   // Возвращает [confirm, dialog]; dialog должен быть отрендерен в JSX.
   const [confirm, confirmDialog] = useConfirm();
 
-  // Переводы
-  const t = {
-    ru: {
-      title: 'Управление онлайн-очередью',
-      generateQr: 'Генерировать QR код',
-      refreshQueue: 'Обновить очередь',
-      openReception: 'Открыть прием',
-      receptionOpen: 'Прием открыт',
-      autoRefresh: 'Автообновление',
-      statistics: 'Статистика',
-      currentQueue: 'Текущая очередь',
-      totalEntries: 'Всего записей',
-      waiting: 'Ожидают',
-      completed: 'Завершено',
-      available: 'Свободно',
-      selectDoctor: 'Выберите врача',
-      // UX Audit Stage 3 (Queue issue 7.1): добавлен перевод для loading-состояния.
-      // Раньше был хардкод в unicode-escape: '\u0417\u0430\u0433\u0440\u0443\u0437\u043a\u0430...'
-      loadingDoctors: 'Загрузка специалистов...',
-      queueEmpty: 'Очередь пуста',
-      queueNotFound: 'Очередь не найдена',
-      patient: 'Пациент',
-      phone: 'Телефон',
-      time: 'Время',
-      status: 'Статус',
-      actions: 'Действия',
-      call: 'Вызвать',
-      called: 'Вызван',
-      cancel: 'Отмена',
-      download: 'Скачать',
-      print: 'Печать',
-      clinicQr: 'Общий QR клиники',
-      doctorQr: 'QR для специалиста'
-    }
-  }[language] || {};
+  // i18next translation function.
+  const { t } = useTranslation();
+
+  // Compatibility object passed to <QueueTable t={...} /> — QueueTable still
+  // expects an object with named keys (selectDoctor, patient, phone, etc.),
+  // so we wrap the i18next t() calls into that shape here.
+  const queueTableT = useMemo(() => ({
+    selectDoctor: t('misc.mqm_select_doctor'),
+    patient: t('misc.mqm_patient'),
+    phone: t('misc.mqm_phone'),
+    time: t('misc.mqm_time'),
+    status: t('misc.mqm_status'),
+    actions: t('misc.mqm_actions'),
+    called: t('misc.mqm_called'),
+    queueEmpty: t('misc.mqm_queue_empty'),
+    queueNotFound: t('misc.mqm_queue_not_found'),
+  }), [t]);
 
   // Загрузка данных очереди
   const loadQueue = useCallback(async () => {
@@ -167,7 +149,7 @@ const ModernQueueManager = ({
   // Генерация QR кода для одного специалиста
   const generateQR = async () => {
     if (!effectiveDoctor || !effectiveDate) {
-      toast.error('Выберите врача и дату');
+      toast.error(t('misc.mqm_select_doctor_and_date'));
       return;
     }
 
@@ -183,25 +165,25 @@ const ModernQueueManager = ({
         specialistName: doctor?.full_name || doctor?.name
       });
       setShowQrDialog(true);
-      toast.success('QR код сгенерирован');
+      toast.success(t('misc.mqm_qr_generated'));
     } catch (error) {
-      toast.error(error.message || 'Ошибка генерации QR кода');
+      toast.error(error.message || t('misc.mqm_qr_gen_error'));
     }
   };
 
   // Генерация общего QR кода клиники
   const generateClinicQR = async () => {
     if (!effectiveDate) {
-      toast.error('Выберите дату');
+      toast.error(t('misc.mqm_select_date'));
       return;
     }
 
     try {
       await generateClinicQRCode({ targetDate: effectiveDate });
       setShowQrDialog(true);
-      toast.success('Общий QR код клиники сгенерирован');
+      toast.success(t('misc.mqm_clinic_qr_generated'));
     } catch (error) {
-      toast.error(error.message || 'Ошибка генерации общего QR кода');
+      toast.error(error.message || t('misc.mqm_clinic_qr_gen_error'));
     }
   };
 
@@ -211,25 +193,23 @@ const ModernQueueManager = ({
   // Раньше выполнялось без подтверждения.
   const openReception = async () => {
     if (!effectiveDoctor) {
-      toast.error('Выберите врача');
+      toast.error(t('misc.mqm_select_doctor_only'));
       return;
     }
 
     if (queueData?.is_open) {
-      toast.info('Прием уже открыт');
+      toast.info(t('misc.mqm_reception_already_open'));
       return;
     }
 
     // Confirmation: открытие приёма закрывает онлайн-запись для новых пациентов.
     // UX Audit Registrar #2: window.confirm() → useConfirm hook.
-    const doctorName = doctors.find((d) => String(d.id) === String(effectiveDoctor))?.full_name || 'выбранного врача';
+    const doctorName = doctors.find((d) => String(d.id) === String(effectiveDoctor))?.full_name || t('misc.mqm_selected_doctor_default');
     const confirmed = await confirm({
-      title: 'Открыть приём',
-      message: `Открыть приём для «${doctorName}»?`,
-      description:
-        'После открытия приёма онлайн-запись через QR будет закрыта — ' +
-        'новые пациенты не смогут записаться онлайн.',
-      confirmLabel: 'Открыть приём',
+      title: t('misc.mqm_confirm_open_title'),
+      message: t('misc.mqm_confirm_open_message', { doctorName }),
+      description: t('misc.mqm_confirm_open_desc'),
+      confirmLabel: t('misc.mqm_confirm_open_label'),
       cancelLabel: t('misc.cancel'),
       intent: 'warning',
     });
@@ -243,36 +223,35 @@ const ModernQueueManager = ({
         targetDate: effectiveDate
       });
 
-      toast.success(result?.message || 'Прием открыт. Онлайн-набор закрыт.');
+      toast.success(result?.message || t('misc.mqm_reception_opened'));
       await loadQueue();
 
       if (onQueueUpdate) {
         onQueueUpdate();
       }
     } catch (error) {
-      toast.error(error.message || 'Ошибка открытия приема');
+      toast.error(error.message || t('misc.mqm_reception_open_error'));
     }
   };
 
   // UX Audit Registrar #7: Закрытие приёма (открывает онлайн-запись обратно).
   const closeReception = async () => {
     if (!effectiveDoctor) {
-      toast.error('Выберите врача');
+      toast.error(t('misc.mqm_select_doctor_only'));
       return;
     }
 
     if (!queueData?.is_open) {
-      toast.info('Приём уже закрыт');
+      toast.info(t('misc.mqm_reception_already_closed'));
       return;
     }
 
     // UX Audit Registrar #2: window.confirm() → useConfirm hook.
     const confirmed = await confirm({
-      title: 'Закрыть приём',
-      message: 'Закрыть приём?',
-      description:
-        'Онлайн-запись через QR будет открыта — новые пациенты смогут записаться онлайн.',
-      confirmLabel: 'Закрыть приём',
+      title: t('misc.mqm_confirm_close_title'),
+      message: t('misc.mqm_confirm_close_message'),
+      description: t('misc.mqm_confirm_close_desc'),
+      confirmLabel: t('misc.mqm_confirm_close_label'),
       cancelLabel: t('misc.cancel'),
       intent: 'primary',
     });
@@ -286,21 +265,21 @@ const ModernQueueManager = ({
         targetDate: effectiveDate
       });
 
-      toast.success(result?.message || 'Приём закрыт. Онлайн-запись открыта.');
+      toast.success(result?.message || t('misc.mqm_reception_closed'));
       await loadQueue();
 
       if (onQueueUpdate) {
         onQueueUpdate();
       }
     } catch (error) {
-      toast.error(error.message || 'Ошибка закрытия приема');
+      toast.error(error.message || t('misc.mqm_reception_close_error'));
     }
   };
 
   // Вызов пациента
   const callPatient = async () => {
     if (!effectiveDoctor) {
-      toast.error('Выберите врача');
+      toast.error(t('misc.mqm_select_doctor_only'));
       return;
     }
 
@@ -312,21 +291,21 @@ const ModernQueueManager = ({
 
       if (result?.success && result?.patient) {
         toast.success(
-          `Вызван пациент: ${result.patient.name} (№${result.patient.number})`
+          t('misc.mqm_patient_called', { name: result.patient.name, number: result.patient.number })
         );
       } else {
-        toast.info(result?.message || 'Нет пациентов в очереди');
+        toast.info(result?.message || t('misc.mqm_no_patients'));
       }
 
       await loadQueue();
     } catch (error) {
-      toast.error(error.message || 'Ошибка вызова пациента');
+      toast.error(error.message || t('misc.mqm_call_patient_error'));
     }
   };
 
   const downloadQR = () => {
     if (!qrData) {
-      toast.error('QR данные недоступны');
+      toast.error(t('misc.mqm_qr_unavailable'));
       return;
     }
 
@@ -335,9 +314,9 @@ const ModernQueueManager = ({
       link.download = `qr-queue-${qrData.day}-${qrData.specialist_name.replace(/\s+/g, '_')}.png`;
       link.href = qrData.qr_code_base64;
       link.click();
-      toast.success('QR код скачан');
+      toast.success(t('misc.mqm_qr_downloaded'));
     } else {
-      toast.error('QR изображение недоступно');
+      toast.error(t('misc.mqm_qr_image_unavailable'));
     }
   };
 
@@ -347,9 +326,9 @@ const ModernQueueManager = ({
     return specialists.
     filter((d) => d.id !== undefined && d.id !== null).
     map((d) => {
-      const doctorName = d.doctor_name || d.full_name || d.user?.full_name || d.name || `Врач #${d.id}`;
+      const doctorName = d.doctor_name || d.full_name || d.user?.full_name || d.name || t('misc.mqm_doctor_number', { id: d.id });
       const specialtyLabel = d.specialty_display || d.specialty || '';
-      const cabinetInfo = d.cabinet ? ` (Каб. ${d.cabinet})` : '';
+      const cabinetInfo = d.cabinet ? t('misc.mqm_cabinet_info', { cabinet: d.cabinet }) : '';
       return {
         id: d.id,
         label: `${doctorName}${specialtyLabel ? ` • ${specialtyLabel}` : ''}${cabinetInfo}`,
@@ -357,7 +336,7 @@ const ModernQueueManager = ({
       };
     }).
     sort((a, b) => a.label.localeCompare(b.label));
-  }, [specialists]);
+  }, [specialists, t]);
 
   return (
     <div className="modern-queue-manager">
@@ -370,7 +349,7 @@ const ModernQueueManager = ({
             </div>
             <div>
               <div className="mqm-stat-value">{statistics.total_entries}</div>
-              <div className="mqm-stat-label">{t.totalEntries}</div>
+              <div className="mqm-stat-label">{t('misc.mqm_total_entries')}</div>
             </div>
           </div>
 
@@ -380,7 +359,7 @@ const ModernQueueManager = ({
             </div>
             <div>
               <div className="mqm-stat-value">{statistics.waiting}</div>
-              <div className="mqm-stat-label">{t.waiting}</div>
+              <div className="mqm-stat-label">{t('misc.mqm_waiting')}</div>
             </div>
           </div>
 
@@ -390,7 +369,7 @@ const ModernQueueManager = ({
             </div>
             <div>
               <div className="mqm-stat-value">{statistics.completed}</div>
-              <div className="mqm-stat-label">{t.completed}</div>
+              <div className="mqm-stat-label">{t('misc.mqm_completed')}</div>
             </div>
           </div>
         </div>
@@ -400,18 +379,18 @@ const ModernQueueManager = ({
       <div className="mqm-card mqm-controls-card">
         <div className="mqm-controls-header">
           <h3 className="mqm-title">
-            {t.title}
+            {t('misc.mqm_title')}
           </h3>
 
           <div className="mqm-controls-grid">
             <div className="mqm-input-group">
               <label className="mqm-label" htmlFor="modern-queue-date">
-                Дата
+                {t('misc.mqm_label_date')}
               </label>
               <Input
                 id="modern-queue-date"
                 type="date"
-                aria-label="Дата очереди"
+                aria-label={t('misc.mqm_aria_queue_date')}
                 value={effectiveDate}
                 // UX Audit Stage 3 (Queue issue 7.1):
                 // Min удален, чтобы можно было смотреть историю и текущий день в любое время.
@@ -431,11 +410,11 @@ const ModernQueueManager = ({
 
             <div className="mqm-input-group">
               <label className="mqm-label" htmlFor="modern-queue-doctor">
-                Врач
+                {t('misc.mqm_label_doctor')}
               </label>
               <Select
                 id="modern-queue-doctor"
-                aria-label={t.selectDoctor}
+                aria-label={t('misc.mqm_select_doctor')}
                 value={effectiveDoctor === '' ? '' : String(effectiveDoctor)}
                 onChange={(newDoctor) => {
                   setInternalDoctor(newDoctor);
@@ -447,7 +426,7 @@ const ModernQueueManager = ({
                   // UX Audit Stage 3 (Queue issue 7.1):
                   // Заменены unicode-escape '\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435...'
                   // на читаемые t.selectDoctor / t.loadingDoctors.
-                  { value: '', label: doctorOptions.length > 0 ? t.selectDoctor : t.loadingDoctors },
+                  { value: '', label: doctorOptions.length > 0 ? t('misc.mqm_select_doctor') : t('misc.mqm_loading_doctors') },
                   ...doctorOptions.map((opt) => ({
                     value: String(opt.id),
                     label: opt.label
@@ -463,10 +442,10 @@ const ModernQueueManager = ({
                 onClick={generateQR}
                 disabled={!effectiveDoctor || loading}
                 className="mqm-button-icon"
-                title="Генерировать QR для выбранного специалиста">
+                title={t('misc.mqm_title_gen_doctor_qr')}>
 
                 <QrCode size={16} color="white" aria-hidden="true" />
-                {t.doctorQr}
+                {t('misc.mqm_doctor_qr')}
               </Button>
 
               <Button
@@ -475,10 +454,10 @@ const ModernQueueManager = ({
                 onClick={generateClinicQR}
                 disabled={loading}
                 className="mqm-button-icon"
-                title="Генерировать общий QR код для всех специалистов клиники">
+                title={t('misc.mqm_title_gen_clinic_qr')}>
 
                 <Building2 size={16} className="mqm-icon-primary" aria-hidden="true" />
-                {t.clinicQr}
+                {t('misc.mqm_clinic_qr')}
               </Button>
             </div>
 
@@ -493,14 +472,14 @@ const ModernQueueManager = ({
                   disabled={isDisabled}
                   title={
                   !effectiveDoctor ?
-                  'Выберите врача' :
+                  t('misc.mqm_select_doctor_only') :
                   queueData?.is_open ?
-                  'Прием уже открыт' :
-                  'Открыть прием и закрыть онлайн-запись'
+                  t('misc.mqm_reception_already_open') :
+                  t('misc.mqm_title_open_reception')
                   }>
 
                   <CheckCircle size={16} color="white" aria-hidden="true" />
-                  {t.openReception}
+                  {t('misc.mqm_open_reception')}
                 </Button>);
 
             })()}
@@ -515,10 +494,10 @@ const ModernQueueManager = ({
                 className="mqm-reception-btn"
                 onClick={closeReception}
                 disabled={loading}
-                title="Закрыть приём и открыть онлайн-запись"
+                title={t('misc.mqm_title_close_reception')}
               >
                 <X size={16} aria-hidden="true" />
-                Закрыть приём
+                {t('misc.mqm_btn_close_reception')}
               </Button>
             )}
 
@@ -531,7 +510,7 @@ const ModernQueueManager = ({
                 className="mqm-button-icon">
 
                 <Settings size={16} className="mqm-icon-primary" aria-hidden="true" />
-                {t.refreshQueue}
+                {t('misc.mqm_refresh_queue')}
               </Button>
 
               <Button
@@ -542,15 +521,15 @@ const ModernQueueManager = ({
                 className="mqm-button-icon"
                 title="Backend call-next command">
                 <Bell size={16} color="white" aria-hidden="true" />
-                {t.call}
+                {t('misc.mqm_call')}
               </Button>
 
               <button
                 type="button"
                 className="mqm-auto-refresh-toggle"
                 onClick={() => setAutoRefresh(!autoRefresh)}
-                aria-label={autoRefresh ? 'Отключить автообновление очереди' : 'Включить автообновление очереди'}
-                title={autoRefresh ? 'Автообновление включено' : 'Автообновление выключено'}>
+                aria-label={autoRefresh ? t('misc.mqm_aria_auto_refresh_off') : t('misc.mqm_aria_auto_refresh_on')}
+                title={autoRefresh ? t('misc.mqm_title_auto_refresh_on') : t('misc.mqm_title_auto_refresh_off')}>
 
                 <RefreshCw
                   size={20}
@@ -568,16 +547,16 @@ const ModernQueueManager = ({
                 <span
                   className="mqm-ws-indicator"
                   aria-label={
-                    wsState === 'connected' ? 'WebSocket подключён — мгновенные обновления' :
-                    wsState === 'reconnecting' ? 'WebSocket переподключение...' :
-                    wsState === 'connecting' ? 'WebSocket подключение...' :
-                    'WebSocket отключён — работает polling 60с'
+                    wsState === 'connected' ? t('misc.mqm_ws_aria_connected') :
+                    wsState === 'reconnecting' ? t('misc.mqm_ws_aria_reconnecting') :
+                    wsState === 'connecting' ? t('misc.mqm_ws_aria_connecting') :
+                    t('misc.mqm_ws_aria_disconnected')
                   }
                   title={
-                    wsState === 'connected' ? 'WebSocket: подключён (мгновенные обновления)' :
-                    wsState === 'reconnecting' ? 'WebSocket: переподключение...' :
-                    wsState === 'connecting' ? 'WebSocket: подключение...' :
-                    'WebSocket: отключён (fallback на polling 60с)'
+                    wsState === 'connected' ? t('misc.mqm_ws_title_connected') :
+                    wsState === 'reconnecting' ? t('misc.mqm_ws_title_reconnecting') :
+                    wsState === 'connecting' ? t('misc.mqm_ws_title_connecting') :
+                    t('misc.mqm_ws_title_disconnected')
                   }
                   style={{
                     display: 'inline-flex',
@@ -603,7 +582,7 @@ const ModernQueueManager = ({
                   />
                   {/* PR-24: simplified WebSocket indicator — dot only, no dev jargon */}
                   <span style={{ fontSize: '11px', color: 'var(--mac-text-tertiary)' }}>
-                    {wsState === 'connected' ? 'Авто-обновление' : wsState === 'reconnecting' || wsState === 'connecting' ? 'Переподключение...' : 'Обновление по таймеру'}
+                    {wsState === 'connected' ? t('misc.mqm_ws_label_auto') : wsState === 'reconnecting' || wsState === 'connecting' ? t('misc.mqm_ws_label_reconnecting') : t('misc.mqm_ws_label_polling')}
                   </span>
                 </span>
               )}
@@ -617,11 +596,11 @@ const ModernQueueManager = ({
         <CardContent className="mqm-card-content-padded">
           <div className="mqm-queue-header">
             <h3 className="mqm-title">
-              {t.currentQueue}
+              {t('misc.mqm_current_queue')}
             </h3>
             {queueData &&
             <Badge variant={queueData.is_open ? 'success' : 'secondary'}>
-                {queueData.is_open ? t.receptionOpen : queueData.online_start_time ? `Откроется в ${queueData.online_start_time}` : 'Откроется'}
+                {queueData.is_open ? t('misc.mqm_reception_open') : queueData.online_start_time ? t('misc.mqm_will_open_at', { time: queueData.online_start_time }) : t('misc.mqm_will_open')}
               </Badge>
             }
           </div>
@@ -631,7 +610,7 @@ const ModernQueueManager = ({
             effectiveDoctor={effectiveDoctor}
             onGenerateQR={generateQR}
             loading={loading}
-            t={t} />
+            t={queueTableT} />
 
         </CardContent>
       </div>
@@ -640,7 +619,7 @@ const ModernQueueManager = ({
       <ModernDialog
         isOpen={showQrDialog}
         onClose={() => setShowQrDialog(false)}
-        title={qrData?.is_clinic_wide ? 'Общий QR код клиники' : 'QR код для записи'}
+        title={qrData?.is_clinic_wide ? t('misc.mqm_dialog_title_clinic_qr') : t('misc.mqm_dialog_title_doctor_qr')}
         maxWidth="32rem"
         maxHeight="calc(100dvh - 2rem)"
         dialogClassName="mqm-qr-dialog"
@@ -654,12 +633,12 @@ const ModernQueueManager = ({
             {qrData?.is_clinic_wide ?
             <Badge variant="primary" className="mqm-qr-badge">
                 <Building2 size={14} className="mqm-icon-margin-right-6px" aria-hidden="true" />
-                Общий QR код клиники
+                {t('misc.mqm_badge_clinic_qr')}
               </Badge> :
 
             <Badge variant="success" className="mqm-qr-badge">
                 <User size={14} className="mqm-icon-margin-right-6px" aria-hidden="true" />
-                QR код специалиста
+                {t('misc.mqm_badge_doctor_qr')}
               </Badge>
             }
           </div>
@@ -667,20 +646,20 @@ const ModernQueueManager = ({
           {/* Информация о враче/отделении */}
           <div className="mqm-qr-info-card">
             <div className="mqm-qr-info-row">
-              <span className="mqm-qr-label">Специалист:</span>
+              <span className="mqm-qr-label">{t('misc.mqm_label_specialist')}</span>
               <span className="mqm-qr-value highlight">
-                {qrData?.specialist_name || (qrData?.is_clinic_wide ? 'Все специалисты' : 'Не указан')}
+                {qrData?.specialist_name || (qrData?.is_clinic_wide ? t('misc.mqm_value_all_specialists') : t('misc.mqm_value_not_specified'))}
               </span>
             </div>
             <div className="mqm-qr-info-row">
-              <span className="mqm-qr-label">Отделение:</span>
+              <span className="mqm-qr-label">{t('misc.mqm_label_department')}</span>
               <span className="mqm-qr-value">
-                {qrData?.department_name || (qrData?.is_clinic_wide ? 'Клиника' : qrData?.department)}
+                {qrData?.department_name || (qrData?.is_clinic_wide ? t('misc.mqm_value_clinic') : qrData?.department)}
               </span>
             </div>
             {qrData?.target_date &&
             <div className="mqm-qr-info-row">
-                <span className="mqm-qr-label">Дата приема:</span>
+                <span className="mqm-qr-label">{t('misc.mqm_label_appointment_date')}</span>
                 <span className="mqm-qr-value">
                   {new Date(qrData.target_date).toLocaleDateString('ru-RU', {
                   day: 'numeric',
@@ -711,7 +690,7 @@ const ModernQueueManager = ({
 
             <div className="mqm-qr-loading">
                 <div className="mqm-spinner"></div>
-                <span>Генерация QR кода...</span>
+                <span>{t('misc.mqm_qr_generating')}</span>
               </div>
             }
           </div>
@@ -719,13 +698,13 @@ const ModernQueueManager = ({
           {/* Инструкция и срок действия */}
           <div className="mqm-qr-footer-info">
             <p className="mqm-qr-instruction">
-              Отсканируйте камеру телефона для записи в очередь
+              {t('misc.mqm_qr_instruction')}
             </p>
             <p className="mqm-qr-expiry">
               <Clock size={14} className="mqm-icon-margin-right-1" aria-hidden="true" />
-              Действует до: {qrData?.expires_at ? new Date(qrData.expires_at).toLocaleString('ru-RU', {
-                day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
-              }) : '—'}
+              {qrData?.expires_at
+                ? t('misc.mqm_qr_valid_until', { time: new Date(qrData.expires_at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) })
+                : t('misc.mqm_qr_valid_until_empty')}
             </p>
           </div>
 
@@ -737,14 +716,14 @@ const ModernQueueManager = ({
               className="mqm-qr-action-btn">
 
               <ArrowDownCircle size={14} className="mqm-icon-margin-right-2" aria-hidden="true" />
-              {t.download}
+              {t('misc.mqm_download')}
             </Button>
             <Button
               variant="secondary"
               onClick={() => setShowQrDialog(false)}
               className="mqm-qr-action-btn">
 
-              {t.close || 'Закрыть'}
+              {t('misc.mqm_close')}
             </Button>
           </div>
         </div>

@@ -22,7 +22,7 @@ import PrescriptionEditor from './PrescriptionEditor';
 import { useDoctorPhrases } from '../../../hooks/useDoctorPhrases';
 import { useDoctorTreatmentTemplates } from '../../../hooks/useDoctorTreatmentTemplates';
 import logger from '../../../utils/logger';
-import { useTranslation } from '../../../i18n/adapter';
+import { useTranslation } from '../../../i18n/useTranslation';
 
 /**
  * TreatmentSection Component
@@ -57,6 +57,7 @@ export function TreatmentSection({
   experimentalGhostMode = false,
   onTelemetry
 }) {
+  const { t } = useTranslation();
   const [showTemplates, setShowTemplates] = useState(false);
   const [showMyExperience, setShowMyExperience] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState(null);
@@ -128,7 +129,7 @@ export function TreatmentSection({
 
   return (
     <EMRSection
-      title="Лечение"
+      title={t('misc.ts_lechenie')}
       icon="💊"
       disabled={disabled}
       defaultOpen={defaultOpen}
@@ -141,8 +142,8 @@ export function TreatmentSection({
           disabled={disabled || myExpLoading}
           className="btn btn-my-experience"
           title={hasMyExperience ?
-          `Мой опыт${icd10Code ? ` по ${icd10Code}` : ''}` :
-          'Нет сохранённых шаблонов'
+            t('misc.ts_moy_opyt_icd10code', { code: icd10Code }) :
+            t('misc.ts_net_sohranyonnyh_shablonov')
           }
           style={{
             display: 'inline-flex',
@@ -180,7 +181,7 @@ export function TreatmentSection({
             <EMRSmartFieldV2
         value={value}
         onChange={onChange}
-        placeholder="План лечения, назначения..."
+        placeholder={t('misc.ts_plan_lecheniya_naznacheniya')}
         multiline
         rows={4}
         disabled={disabled}
@@ -248,7 +249,7 @@ export function TreatmentSection({
                         {myExperienceTemplates.length === 0 ?
           <p style={{ color: 'var(--mac-text-secondary)', textAlign: 'center', padding: 'var(--mac-spacing-5)' }}>
                                 Нет сохранённых шаблонов для этого диагноза.<br />
-                                <small>Они появятся после подписания EMR с этим кодом.</small>
+                                <small>{t('misc.ts_oni_poyavyatsya_posle_podpis')}</small>
                             </p> :
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-2)' }}>
@@ -274,8 +275,8 @@ export function TreatmentSection({
                   unpinTemplate(t.id) :
                   pinTemplate(t.id);
                 }}
-                aria-label={`${t.is_pinned ? 'Открепить' : 'Закрепить'} шаблон лечения`}
-                title={t.is_pinned ? 'Открепить' : 'Закрепить (макс 3)'}
+                aria-label={t('misc.ts_t_is_pinned_otkrepit_zakrepi', { is_pinned: t.is_pinned ? 'Открепить' : 'Закрепить' })}
+                title={t.is_pinned ? t('misc.ts_otkrepit') : t('misc.ts_zakrepit_maks_3')}
                 style={{
                   padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
                   background: 'transparent',
@@ -296,8 +297,8 @@ export function TreatmentSection({
                   setEditingTemplate(t);
                   setEditText(t.treatment_text);
                 }}
-                aria-label="Редактировать шаблон лечения"
-                title="Редактировать"
+                aria-label={t('misc.ts_redaktirovat_shablon_lecheni')}
+                title={t('misc.ts_redaktirovat')}
                 style={{
                   padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
                   background: 'transparent',
@@ -344,20 +345,20 @@ export function TreatmentSection({
                                                 {/* Frequency badge - no aggressive numbers */}
                                                 {t.frequency_label && !t.is_stale &&
                   <span
-                    className={`badge ${t.frequency_label === 'часто' ? 'badge--frequent' : 'badge--rare'}`}
+                    className={t('misc.ts_badge_t_frequency_label_chas', { rare: t.frequency_label === 'часто' ? 'badge--frequent' : 'badge--rare' })}
                     style={{
                       padding: '2px 6px',
                       borderRadius: 'var(--radius-full, 9999px)',
                       fontSize: 'var(--mac-font-size-xs)',
-                      background: t.frequency_label === 'часто' ?
+                      background: t.frequency_label === t('misc.ts_chasto') ?
                       'var(--accent-success-muted, rgba(34, 197, 94, 0.15))' :
                       'var(--surface-input, #252540)',
-                      color: t.frequency_label === 'часто' ?
+                      color: t.frequency_label === t('misc.ts_chasto') ?
                       'var(--accent-success, #22c55e)' :
                       'var(--text-muted, #6b7280)'
                     }}>
                     
-                                                        {t.frequency_label === 'часто' ? 'часто' : 'редко'}
+                                                        {t.frequency_label === t('misc.ts_chasto') ? t('misc.ts_chasto') : t('misc.ts_redko')}
                                                     </span>
                   }
                                                 <span>
@@ -411,7 +412,7 @@ export function TreatmentSection({
         }}
         role="button"
         tabIndex={0}
-        aria-label="Закрыть окно редактирования шаблона лечения"
+        aria-label={t('misc.ts_zakryt_okno_redaktirovaniya_')}
         onClick={() => setEditingTemplate(null)}
         onKeyDown={(event) => {
           if (event.key === 'Enter' || event.key === ' ') {
@@ -434,7 +435,7 @@ export function TreatmentSection({
                             ✏️ Редактировать шаблон
                         </h3>
                         <textarea
-            aria-label="Текст шаблона лечения"
+            aria-label={t('misc.ts_tekst_shablona_lecheniya')}
             value={editText}
             onChange={(e) => setEditText(e.target.value)}
             style={{

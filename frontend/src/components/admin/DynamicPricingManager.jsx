@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import {
@@ -42,24 +42,42 @@ import { useConfirm } from '../common/ConfirmDialog';
 // API base URL with fallback for development
 void getApiOrigin();
 
-const PRICING_RULE_TYPE_LABELS = {
-  time_based: 'По времени',
-  volume_based: 'По объему',
-  seasonal: 'Сезонное',
-  loyalty: 'Лояльность',
-  package: 'Пакетное',
-  dynamic: 'Динамическое'
+// Module-level rule-type key-suffix map; resolved to translated labels via
+// getRuleTypeLabel(ruleType, t) factory (DI pattern — see ServiceCatalog).
+const PRICING_RULE_TYPE_KEYS = {
+  time_based: 'dp_rule_type_time_based',
+  volume_based: 'dp_rule_type_volume_based',
+  seasonal: 'dp_rule_type_seasonal',
+  loyalty: 'dp_rule_type_loyalty',
+  package: 'dp_rule_type_package',
+  dynamic: 'dp_rule_type_dynamic'
 };
 
-const PRICING_RULE_TYPE_OPTIONS = Object.entries(PRICING_RULE_TYPE_LABELS)
-  .map(([value, label]) => ({ value, label }));
+const getRuleTypeLabel = (ruleType, t) => {
+  const key = PRICING_RULE_TYPE_KEYS[normalizePricingEnumValue(ruleType)];
+  return key ? t(`admin2.${key}`) : ruleType;
+};
 
-const DISCOUNT_TYPE_OPTIONS = [
-  { value: 'percentage', label: 'Процентная' },
-  { value: 'fixed_amount', label: 'Фиксированная сумма' },
-  { value: 'buy_x_get_y', label: 'Купи X получи Y' },
-  { value: 'tiered', label: 'Ступенчатая' }
+const getRuleTypeOptions = (t) =>
+  Object.entries(PRICING_RULE_TYPE_KEYS).map(([value, key]) => ({
+    value,
+    label: t(`admin2.${key}`)
+  }));
+
+// Module-level discount-type key-suffix map; resolved to translated labels via
+// getDiscountTypeOptions(t) factory (DI pattern).
+const DISCOUNT_TYPE_KEYS = [
+  { value: 'percentage', key: 'dp_discount_type_percentage' },
+  { value: 'fixed_amount', key: 'dp_discount_type_fixed_amount' },
+  { value: 'buy_x_get_y', key: 'dp_discount_type_buy_x_get_y' },
+  { value: 'tiered', key: 'dp_discount_type_tiered' }
 ];
+
+const getDiscountTypeOptions = (t) =>
+  DISCOUNT_TYPE_KEYS.map(({ value, key }) => ({
+    value,
+    label: t(`admin2.${key}`)
+  }));
 
 const normalizePricingEnumValue = (value) =>
   typeof value === 'string' ? value.toLowerCase() : value;
@@ -88,12 +106,13 @@ const toggleServiceId = (selectedIds, serviceId) => {
 };
 
 const ServiceChecklist = ({ services = [], value = [], onChange }) => {
+  const { t } = useTranslation();
   const selectedIds = getSelectedServiceIds(value);
 
   if (!services.length) {
     return (
       <div className="admin-checklist-empty">
-        {'\u0423\u0441\u043b\u0443\u0433\u0438 \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u044b'}
+        {t('admin2.dp_no_services')}
       </div>
     );
   }
@@ -102,8 +121,8 @@ const ServiceChecklist = ({ services = [], value = [], onChange }) => {
     <div role="group" className="admin-checklist-container">
       <div className="admin-checklist-header">
         {selectedIds.length
-          ? `${selectedIds.length} ${'\u0432\u044b\u0431\u0440\u0430\u043d\u043e'}`
-          : '\u041d\u0435 \u0432\u044b\u0431\u0440\u0430\u043d\u043e'}
+          ? t('admin2.dp_selected_count', { count: selectedIds.length })
+          : t('admin2.dp_not_selected')}
       </div>
       {services.map((service) => {
         const serviceId = normalizeServiceId(service.id);
@@ -166,6 +185,7 @@ const buildPricingRulePayload = (form) =>
   );
 
 const DynamicPricingManager = () => {
+  const { t } = useTranslation();
   // P-013 fix: shared ConfirmDialog hook (replaces 2 native confirm() calls).
   const [confirm, confirmDialog] = useConfirm();
   const [activeTab, setActiveTab] = useState('rules');
@@ -253,11 +273,11 @@ const DynamicPricingManager = () => {
       }
     } catch (error) {
       logger.error('Ошибка загрузки данных:', error);
-      toast.error('Ошибка загрузки данных');
+      toast.error(t('admin2.dp_load_error'));
     } finally {
       setLoading(false);
     }
-  }, [activeTab]);
+  }, [activeTab, t]);
 
   useEffect(() => {
     loadData();
@@ -266,7 +286,7 @@ const DynamicPricingManager = () => {
   const handleCreateRule = async () => {
     try {
       await api.post('/dynamic-pricing/pricing-rules', buildPricingRulePayload(ruleForm));
-      toast.success('Правило создано успешно');
+      toast.success(t('admin2.dp_rule_create_success'));
       setShowCreateRule(false);
       setRuleForm({
         name: '',
@@ -289,14 +309,14 @@ const DynamicPricingManager = () => {
       loadData();
     } catch (error) {
       logger.error('Ошибка создания правила:', error);
-      toast.error(error.response?.data?.detail || 'Ошибка создания правила');
+      toast.error(error.response?.data?.detail || t('admin2.dp_rule_create_error'));
     }
   };
 
   const handleCreatePackage = async () => {
     try {
       await api.post('/dynamic-pricing/service-packages', packageForm);
-      toast.success('Пакет создан успешно');
+      toast.success(t('admin2.dp_package_create_success'));
       setShowCreatePackage(false);
       setPackageForm({
         name: '',
@@ -311,18 +331,18 @@ const DynamicPricingManager = () => {
       loadData();
     } catch (error) {
       logger.error('Ошибка создания пакета:', error);
-      toast.error(error.response?.data?.detail || 'Ошибка создания пакета');
+      toast.error(error.response?.data?.detail || t('admin2.dp_package_create_error'));
     }
   };
 
   const handleToggleRule = async (ruleId, isActive) => {
     try {
       await api.put(`/dynamic-pricing/pricing-rules/${ruleId}`, { is_active: !isActive });
-      toast.success(isActive ? 'Правило деактивировано' : 'Правило активировано');
+      toast.success(isActive ? t('admin2.dp_rule_deactivated') : t('admin2.dp_rule_activated'));
       loadData();
     } catch (error) {
       logger.error('Ошибка изменения статуса правила:', error);
-      toast.error('Ошибка изменения статуса правила');
+      toast.error(t('admin2.dp_rule_status_error'));
     }
   };
 
@@ -330,8 +350,8 @@ const DynamicPricingManager = () => {
     // P-013 fix: replaced native confirm() with shared useConfirm hook.
     const ok = await confirm({
       title: t('admin2.delete_rule_title'),
-      message: 'Удалить это правило?',
-      description: 'Это действие необратимо.',
+      message: t('admin2.dp_delete_rule_message'),
+      description: t('admin2.dp_action_irreversible'),
       confirmLabel: t('admin2.delete_confirm'),
       cancelLabel: t('admin2.cancel'),
       intent: 'danger',
@@ -340,11 +360,11 @@ const DynamicPricingManager = () => {
 
     try {
       await api.delete(`/dynamic-pricing/pricing-rules/${ruleId}`);
-      toast.success('Правило удалено');
+      toast.success(t('admin2.dp_rule_deleted'));
       loadData();
     } catch (error) {
       logger.error('Ошибка удаления правила:', error);
-      toast.error('Ошибка удаления правила');
+      toast.error(t('admin2.dp_rule_delete_error'));
     }
   };
 
@@ -352,8 +372,8 @@ const DynamicPricingManager = () => {
     // P-013 fix: replaced native confirm() with shared useConfirm hook.
     const ok = await confirm({
       title: t('admin2.delete_package_title'),
-      message: 'Удалить этот пакет?',
-      description: 'Это действие необратимо.',
+      message: t('admin2.dp_delete_package_message'),
+      description: t('admin2.dp_action_irreversible'),
       confirmLabel: t('admin2.delete_confirm'),
       cancelLabel: t('admin2.cancel'),
       intent: 'danger',
@@ -362,21 +382,21 @@ const DynamicPricingManager = () => {
 
     try {
       await api.delete(`/dynamic-pricing/service-packages/${packageId}`);
-      toast.success('Пакет удален');
+      toast.success(t('admin2.dp_package_deleted'));
       loadData();
     } catch (error) {
       logger.error('Ошибка удаления пакета:', error);
-      toast.error('Ошибка удаления пакета');
+      toast.error(t('admin2.dp_package_delete_error'));
     }
   };
 
   const handleUpdateDynamicPrices = async () => {
     try {
       const response = await api.post('/dynamic-pricing/update-dynamic-prices');
-      toast.success(`Обновлено цен: ${response.data.updated_count} из ${response.data.total_services}`);
+      toast.success(t('admin2.dp_prices_updated', { updated: response.data.updated_count, total: response.data.total_services }));
     } catch (error) {
       logger.error('Ошибка обновления цен:', error);
-      toast.error('Ошибка обновления цен');
+      toast.error(t('admin2.dp_prices_update_error'));
     }
   };
 
@@ -386,10 +406,10 @@ const DynamicPricingManager = () => {
       <div className="flex items-center justify-between">
         <div>
           <h3 className="admin-section-h3">
-            Правила ценообразования
+            {t('admin2.dp_rules_title')}
           </h3>
           <p className="admin-section-desc">
-            Управление автоматическими скидками и правилами
+            {t('admin2.dp_rules_desc')}
           </p>
         </div>
         <div className="admin-flex-gap-8">
@@ -399,14 +419,14 @@ const DynamicPricingManager = () => {
           className="flex items-center justify-center gap-2">
           
             <TrendingUp size={16} />
-            Обновить цены
+            {t('admin2.dp_update_prices_btn')}
           </Button>
           <Button
           onClick={() => setShowCreateRule(true)}
           className="flex items-center justify-center gap-2">
           
             <Plus size={16} />
-            Создать правило
+            {t('admin2.dp_create_rule_btn')}
           </Button>
         </div>
       </div>
@@ -416,12 +436,12 @@ const DynamicPricingManager = () => {
         {pricingRules.length === 0 ?
       <MacOSEmptyState
         type="rule"
-        title="Правила не найдены"
-        description="В системе пока нет созданных правил ценообразования"
+        title={t('admin2.dp_rules_empty_title')}
+        description={t('admin2.dp_rules_empty_desc')}
         action={
         <Button onClick={() => setShowCreateRule(true)}>
                 <Plus size={16} className="mr-2" />
-                Создать первое правило
+                {t('admin2.dp_create_first_rule_btn')}
               </Button>
         } /> :
 
@@ -435,10 +455,10 @@ const DynamicPricingManager = () => {
                       {rule.name}
                     </h4>
                     <Badge variant={rule.is_active ? 'success' : 'secondary'}>
-                      {rule.is_active ? 'Активно' : 'Неактивно'}
+                      {rule.is_active ? t('admin2.dp_rule_active') : t('admin2.dp_rule_inactive')}
                     </Badge>
                   <Badge variant="outline">
-                      {PRICING_RULE_TYPE_LABELS[normalizePricingEnumValue(rule.rule_type)] || rule.rule_type}
+                      {getRuleTypeLabel(rule.rule_type, t)}
                     </Badge>
                   </div>
 
@@ -449,16 +469,16 @@ const DynamicPricingManager = () => {
                   <div className="admin-stats-row-info">
                     <span className="admin-flex-center-4">
                       <Percent size={12} />
-                      {normalizePricingEnumValue(rule.discount_type) === 'percentage' ? `${rule.discount_value}%` : `${rule.discount_value} сум`}
+                      {normalizePricingEnumValue(rule.discount_type) === 'percentage' ? t('admin2.dp_value_percent', { value: rule.discount_value }) : t('admin2.dp_value_currency', { value: rule.discount_value, currency: t('admin2.dp_currency') })}
                     </span>
                     <span className="admin-flex-center-4">
                       <Users size={12} />
-                      Использований: {rule.current_uses || 0}
+                      {t('admin2.dp_uses_count', { count: rule.current_uses || 0 })}
                       {rule.max_uses && ` / ${rule.max_uses}`}
                     </span>
                     <span className="admin-flex-center-4">
                       <BarChart3 size={12} />
-                      Приоритет: {rule.priority}
+                      {t('admin2.dp_priority_value', { priority: rule.priority })}
                     </span>
                   </div>
 
@@ -475,9 +495,9 @@ const DynamicPricingManager = () => {
               variant="outline"
               onClick={() => handleToggleRule(rule.id, rule.is_active)}
               className="admin-icon-btn-32"
-              title={rule.is_active ? 'Приостановить правило' : 'Активировать правило'}
+              title={rule.is_active ? t('admin2.dp_pause_rule_title') : t('admin2.dp_activate_rule_title')}
               type="button"
-              aria-label={`${rule.is_active ? 'Приостановить' : 'Активировать'} правило ${rule.name || rule.id}`}>
+              aria-label={rule.is_active ? t('admin2.dp_pause_rule_aria', { name: rule.name || rule.id }) : t('admin2.dp_activate_rule_aria', { name: rule.name || rule.id })}>
 
                     {rule.is_active ? <Pause aria-hidden="true" size={16} /> : <Play aria-hidden="true" size={16} />}
                   </Button>
@@ -485,9 +505,9 @@ const DynamicPricingManager = () => {
               variant="outline"
               onClick={() => setEditingRule(rule)}
               className="admin-icon-btn-32"
-              title="Редактировать правило"
+              title={t('admin2.dp_edit_rule_title')}
               type="button"
-              aria-label={`Редактировать правило ${rule.name || rule.id}`}>
+              aria-label={t('admin2.dp_edit_rule_aria', { name: rule.name || rule.id })}>
 
                     <Edit aria-hidden="true" size={16} />
                   </Button>
@@ -495,9 +515,9 @@ const DynamicPricingManager = () => {
               variant="outline"
               onClick={() => handleDeleteRule(rule.id)}
               className="admin-icon-btn-32"
-              title="Удалить правило"
+              title={t('admin2.dp_delete_rule_title_btn')}
               type="button"
-              aria-label={`Удалить правило ${rule.name || rule.id}`}>
+              aria-label={t('admin2.dp_delete_rule_aria', { name: rule.name || rule.id })}>
 
                     <Trash2 aria-hidden="true" size={16} />
                   </Button>
@@ -513,14 +533,14 @@ const DynamicPricingManager = () => {
     <MacOSCard className="p-6">
           <div className="admin-card-header-between">
             <h4 className="admin-section-h3-m0">
-              Создать правило ценообразования
+              {t('admin2.dp_create_rule_form_title')}
             </h4>
             <Button
               variant="outline"
               onClick={() => setShowCreateRule(false)}
               type="button"
-              title="Закрыть форму создания правила"
-              aria-label="Закрыть форму создания правила">
+              title={t('admin2.dp_close_rule_form')}
+              aria-label={t('admin2.dp_close_rule_form')}>
               <X aria-hidden="true" size={16} />
             </Button>
           </div>
@@ -528,40 +548,40 @@ const DynamicPricingManager = () => {
           <div className="admin-grid-form-2col">
             <div>
               <label className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">
-                Название
+                {t('admin2.dp_label_name')}
               </label>
               <Input
             value={ruleForm.name}
             onChange={(e) => setRuleForm({ ...ruleForm, name: e.target.value })}
-            placeholder="Название правила" />
+            placeholder={t('admin2.dp_rule_name_ph')} />
           
             </div>
 
             <div>
               <label className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">
-                Тип правила
+                {t('admin2.dp_label_rule_type')}
               </label>
               <Select
             value={ruleForm.rule_type}
             onChange={(value) => setRuleForm({ ...ruleForm, rule_type: value })}
-            options={PRICING_RULE_TYPE_OPTIONS}
+            options={getRuleTypeOptions(t)}
             size="large" />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">
-                Тип скидки
+                {t('admin2.dp_label_discount_type')}
               </label>
               <Select
             value={ruleForm.discount_type}
             onChange={(value) => setRuleForm({ ...ruleForm, discount_type: value })}
-            options={DISCOUNT_TYPE_OPTIONS}
+            options={getDiscountTypeOptions(t)}
             size="large" />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">
-                Размер скидки
+                {t('admin2.dp_label_discount_value')}
               </label>
               <Input
             type="number"
@@ -573,7 +593,7 @@ const DynamicPricingManager = () => {
 
             <div>
               <label className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">
-                Время начала
+                {t('admin2.dp_label_start_time')}
               </label>
               <Input
             type="time"
@@ -584,7 +604,7 @@ const DynamicPricingManager = () => {
 
             <div>
               <label className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">
-                Время окончания
+                {t('admin2.dp_label_end_time')}
               </label>
               <Input
             type="time"
@@ -595,7 +615,7 @@ const DynamicPricingManager = () => {
 
             <div>
               <label className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">
-                Минимальное количество
+                {t('admin2.dp_label_min_quantity')}
               </label>
               <Input
             type="number"
@@ -607,7 +627,7 @@ const DynamicPricingManager = () => {
 
             <div>
               <label className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">
-                Приоритет
+                {t('admin2.dp_label_priority')}
               </label>
               <Input
             type="number"
@@ -619,18 +639,18 @@ const DynamicPricingManager = () => {
 
             <div className="admin-grid-span-2">
               <label className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">
-                Описание
+                {t('admin2.dp_label_description')}
               </label>
               <Textarea
             value={ruleForm.description}
             onChange={(e) => setRuleForm({ ...ruleForm, description: e.target.value })}
-            placeholder="Описание правила" />
+            placeholder={t('admin2.dp_rule_description_ph')} />
           
             </div>
 
             <div className="admin-grid-span-2">
               <label className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">
-                Услуги
+                {t('admin2.dp_label_services')}
               </label>
               <ServiceChecklist
             services={services}
@@ -642,11 +662,11 @@ const DynamicPricingManager = () => {
 
           <div className="admin-form-actions-end-8">
             <Button variant="outline" onClick={() => setShowCreateRule(false)}>
-              Отмена
+              {t('admin2.dp_cancel_btn')}
             </Button>
             <Button onClick={handleCreateRule}>
               <Save size={16} className="mr-2" />
-              Создать
+              {t('admin2.dp_create_btn')}
             </Button>
           </div>
         </MacOSCard>
@@ -660,10 +680,10 @@ const DynamicPricingManager = () => {
       <div className="flex items-center justify-between">
         <div>
           <h3 className="admin-section-h3">
-            Пакеты услуг
+            {t('admin2.dp_packages_title')}
           </h3>
           <p className="admin-section-desc">
-            Управление комплексными предложениями
+            {t('admin2.dp_packages_desc')}
           </p>
         </div>
         <Button
@@ -671,7 +691,7 @@ const DynamicPricingManager = () => {
         className="flex items-center justify-center gap-2">
         
           <Plus size={16} />
-          Создать пакет
+          {t('admin2.dp_create_package_btn')}
         </Button>
       </div>
 
@@ -680,12 +700,12 @@ const DynamicPricingManager = () => {
         {servicePackages.length === 0 ?
       <MacOSEmptyState
         type="package"
-        title="Пакеты не найдены"
-        description="В системе пока нет созданных пакетов услуг"
+        title={t('admin2.dp_packages_empty_title')}
+        description={t('admin2.dp_packages_empty_desc')}
         action={
         <Button onClick={() => setShowCreatePackage(true)}>
                 <Plus size={16} className="mr-2" />
-                Создать первый пакет
+                {t('admin2.dp_create_first_package_btn')}
               </Button>
         } /> :
 
@@ -699,7 +719,7 @@ const DynamicPricingManager = () => {
                       {pkg.name}
                     </h4>
                     <Badge variant={pkg.is_active ? 'success' : 'secondary'}>
-                      {pkg.is_active ? 'Активен' : 'Неактивен'}
+                      {pkg.is_active ? t('admin2.dp_package_active') : t('admin2.dp_package_inactive')}
                     </Badge>
                   </div>
 
@@ -710,20 +730,20 @@ const DynamicPricingManager = () => {
                   <div className="admin-flex-center-16-sm">
                     <span className="admin-price-savings">
                       <DollarSign size={12} />
-                      {pkg.package_price} сум
+                      {t('admin2.dp_value_currency', { value: pkg.package_price, currency: t('admin2.dp_currency') })}
                     </span>
                     {pkg.original_price &&
               <span className="admin-price-strike">
-                        {pkg.original_price} сум
+                        {t('admin2.dp_value_currency', { value: pkg.original_price, currency: t('admin2.dp_currency') })}
                       </span>
               }
                     {pkg.savings_percentage &&
               <Badge variant="success">
-                        Экономия {pkg.savings_percentage.toFixed(0)}%
+                        {t('admin2.dp_savings_badge', { percent: pkg.savings_percentage.toFixed(0) })}
                       </Badge>
               }
                     <span className="text-[var(--mac-text-secondary)]">
-                      Покупок: {pkg.current_purchases || 0}
+                      {t('admin2.dp_purchases_count', { count: pkg.current_purchases || 0 })}
                       {pkg.max_purchases && ` / ${pkg.max_purchases}`}
                     </span>
                   </div>
@@ -742,9 +762,9 @@ const DynamicPricingManager = () => {
               variant="outline"
               onClick={() => setEditingPackage(pkg)}
               className="admin-icon-btn-32"
-              title="Редактировать пакет"
+              title={t('admin2.dp_edit_package_title')}
               type="button"
-              aria-label={`Редактировать пакет ${pkg.name || pkg.id}`}>
+              aria-label={t('admin2.dp_edit_package_aria', { name: pkg.name || pkg.id })}>
 
                     <Edit aria-hidden="true" size={16} />
                   </Button>
@@ -752,9 +772,9 @@ const DynamicPricingManager = () => {
               variant="outline"
               onClick={() => handleDeletePackage(pkg.id)}
               className="admin-icon-btn-32"
-              title="Удалить пакет"
+              title={t('admin2.dp_delete_package_title_btn')}
               type="button"
-              aria-label={`Удалить пакет ${pkg.name || pkg.id}`}>
+              aria-label={t('admin2.dp_delete_package_aria', { name: pkg.name || pkg.id })}>
 
                     <Trash2 aria-hidden="true" size={16} />
                   </Button>
@@ -770,14 +790,14 @@ const DynamicPricingManager = () => {
     <MacOSCard className="p-6">
           <div className="admin-card-header-between">
             <h4 className="admin-section-h3-m0">
-              Создать пакет услуг
+              {t('admin2.dp_create_package_form_title')}
             </h4>
             <Button
               variant="outline"
               onClick={() => setShowCreatePackage(false)}
               type="button"
-              title="Закрыть форму создания пакета"
-              aria-label="Закрыть форму создания пакета">
+              title={t('admin2.dp_close_package_form')}
+              aria-label={t('admin2.dp_close_package_form')}>
               <X aria-hidden="true" size={16} />
             </Button>
           </div>
@@ -785,18 +805,18 @@ const DynamicPricingManager = () => {
           <div className="admin-grid-form-2col">
             <div>
               <label className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">
-                Название
+                {t('admin2.dp_label_name')}
               </label>
               <Input
             value={packageForm.name}
             onChange={(e) => setPackageForm({ ...packageForm, name: e.target.value })}
-            placeholder="Название пакета" />
+            placeholder={t('admin2.dp_package_name_ph')} />
           
             </div>
 
             <div>
               <label className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">
-                Цена пакета
+                {t('admin2.dp_label_package_price')}
               </label>
               <Input
             type="number"
@@ -808,7 +828,7 @@ const DynamicPricingManager = () => {
 
             <div>
               <label className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">
-                Действует с
+                {t('admin2.dp_label_valid_from')}
               </label>
               <Input
             type="datetime-local"
@@ -819,7 +839,7 @@ const DynamicPricingManager = () => {
 
             <div>
               <label className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">
-                Действует до
+                {t('admin2.dp_label_valid_to')}
               </label>
               <Input
             type="datetime-local"
@@ -830,18 +850,18 @@ const DynamicPricingManager = () => {
 
             <div className="admin-grid-span-2">
               <label className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">
-                Описание
+                {t('admin2.dp_label_description')}
               </label>
               <Textarea
             value={packageForm.description}
             onChange={(e) => setPackageForm({ ...packageForm, description: e.target.value })}
-            placeholder="Описание пакета" />
+            placeholder={t('admin2.dp_package_description_ph')} />
           
             </div>
 
             <div className="admin-grid-span-2">
               <label className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">
-                Услуги в пакете
+                {t('admin2.dp_label_package_services')}
               </label>
               <ServiceChecklist
             services={services}
@@ -853,11 +873,11 @@ const DynamicPricingManager = () => {
 
           <div className="admin-form-actions-end-8">
             <Button variant="outline" onClick={() => setShowCreatePackage(false)}>
-              Отмена
+              {t('admin2.dp_cancel_btn')}
             </Button>
             <Button onClick={handleCreatePackage}>
               <Save size={16} className="mr-2" />
-              Создать
+              {t('admin2.dp_create_btn')}
             </Button>
           </div>
         </MacOSCard>
@@ -869,10 +889,10 @@ const DynamicPricingManager = () => {
   <div className="flex flex-col gap-6">
       <div>
         <h3 className="admin-section-h3">
-          Аналитика ценообразования
+          {t('admin2.dp_analytics_title')}
         </h3>
         <p className="admin-section-desc">
-          Статистика применения правил и пакетов
+          {t('admin2.dp_analytics_desc')}
         </p>
       </div>
 
@@ -882,15 +902,17 @@ const DynamicPricingManager = () => {
             <div className="admin-card-title-badges">
               <TrendingUp size={20} color="var(--mac-accent)" />
               <h4 className="admin-rule-header">
-                Общая экономия
+                {t('admin2.dp_analytics_total_savings')}
               </h4>
             </div>
             <div className="admin-stats-value-success">
-              {analytics.summary?.total_savings?.toLocaleString() || 0} сум
+              {t('admin2.dp_value_currency', { value: analytics.summary?.total_savings?.toLocaleString() || 0, currency: t('admin2.dp_currency') })}
             </div>
             <p className="admin-stats-label">
-              За период {analytics.period?.start_date && new Date(analytics.period.start_date).toLocaleDateString()} -
-              {analytics.period?.end_date && new Date(analytics.period.end_date).toLocaleDateString()}
+              {t('admin2.dp_analytics_period', {
+                start: analytics.period?.start_date ? new Date(analytics.period.start_date).toLocaleDateString() : '',
+                end: analytics.period?.end_date ? new Date(analytics.period.end_date).toLocaleDateString() : ''
+              })}
             </p>
           </MacOSCard>
 
@@ -898,14 +920,14 @@ const DynamicPricingManager = () => {
             <div className="admin-card-title-badges">
               <Settings size={20} color="var(--mac-purple)" />
               <h4 className="admin-rule-header">
-                Активные правила
+                {t('admin2.dp_analytics_active_rules')}
               </h4>
             </div>
             <div className="admin-stats-value-primary">
               {analytics.summary?.active_rules_count || 0}
             </div>
             <p className="admin-stats-label">
-              Правил ценообразования
+              {t('admin2.dp_analytics_active_rules_sub')}
             </p>
           </MacOSCard>
 
@@ -913,29 +935,29 @@ const DynamicPricingManager = () => {
             <div className="admin-card-title-badges">
               <Package size={20} color="var(--mac-orange)" />
               <h4 className="admin-rule-header">
-                Активные пакеты
+                {t('admin2.dp_analytics_active_packages')}
               </h4>
             </div>
             <div className="admin-stats-value-primary">
               {analytics.summary?.active_packages_count || 0}
             </div>
             <p className="admin-stats-label">
-              Пакетов услуг
+              {t('admin2.dp_analytics_active_packages_sub')}
             </p>
           </MacOSCard>
         </div> :
 
     <MacOSEmptyState
       type="analytics"
-      title="Аналитика недоступна"
-      description="Данные аналитики еще не загружены или отсутствуют" />
+      title={t('admin2.dp_analytics_empty_title')}
+      description={t('admin2.dp_analytics_empty_desc')} />
 
     }
 
       {analytics?.rules_statistics &&
     <MacOSCard className="p-4">
           <h4 className="admin-rule-header mb-4">
-            Статистика правил
+            {t('admin2.dp_analytics_rules_stats')}
           </h4>
           <div className="flex flex-col gap-2">
             {analytics.rules_statistics.map((rule, index) =>
@@ -945,10 +967,10 @@ const DynamicPricingManager = () => {
                 </span>
                 <div className="admin-flex-center-16-sm">
                   <span className="text-[var(--mac-text-secondary)]">
-                    Использований: {rule.uses}
+                    {t('admin2.dp_uses_count', { count: rule.uses })}
                   </span>
                   <span className="text-[var(--mac-success)]">
-                    Экономия: {rule.total_savings?.toLocaleString() || 0} сум
+                    {t('admin2.dp_savings_value', { value: rule.total_savings?.toLocaleString() || 0, currency: t('admin2.dp_currency') })}
                   </span>
                 </div>
               </div>
@@ -960,7 +982,7 @@ const DynamicPricingManager = () => {
       {analytics?.packages_statistics &&
     <MacOSCard className="p-4">
           <h4 className="admin-rule-header mb-4">
-            Статистика пакетов
+            {t('admin2.dp_analytics_packages_stats')}
           </h4>
           <div className="flex flex-col gap-2">
             {analytics.packages_statistics.map((pkg, index) =>
@@ -970,10 +992,10 @@ const DynamicPricingManager = () => {
                 </span>
                 <div className="admin-flex-center-16-sm">
                   <span className="text-[var(--mac-text-secondary)]">
-                    Покупок: {pkg.purchases}
+                    {t('admin2.dp_purchases_count', { count: pkg.purchases })}
                   </span>
                   <span className="text-[var(--mac-success)]">
-                    Экономия: {pkg.total_savings?.toLocaleString() || 0} сум
+                    {t('admin2.dp_savings_value', { value: pkg.total_savings?.toLocaleString() || 0, currency: t('admin2.dp_currency') })}
                   </span>
                 </div>
               </div>
@@ -985,9 +1007,9 @@ const DynamicPricingManager = () => {
 
 
   const tabs = [
-  { id: 'rules', label: 'Правила', icon: Settings },
-  { id: 'packages', label: 'Пакеты', icon: Package },
-  { id: 'analytics', label: 'Аналитика', icon: BarChart3 }];
+  { id: 'rules', label: t('admin2.dp_tab_rules'), icon: Settings },
+  { id: 'packages', label: t('admin2.dp_tab_packages'), icon: Package },
+  { id: 'analytics', label: t('admin2.dp_tab_analytics'), icon: BarChart3 }];
 
 
   return (
@@ -996,10 +1018,10 @@ const DynamicPricingManager = () => {
         <Package size={24} color="var(--mac-accent)" />
         <div>
           <h2 className="admin-page-title">
-            Динамическое ценообразование
+            {t('admin2.dp_page_title')}
           </h2>
           <p className="admin-page-subtitle">
-            Управление правилами ценообразования, пакетами услуг и динамическими ценами
+            {t('admin2.dp_page_subtitle')}
           </p>
         </div>
       </div>

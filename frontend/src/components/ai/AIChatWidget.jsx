@@ -9,7 +9,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useAIChat } from '../../hooks/useAIChat';
 import './AIChatWidget.css';
 import PropTypes from 'prop-types';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 /**
  * AI Chat Widget Component
@@ -28,6 +28,7 @@ const AIChatWidget = ({
   minimized: initialMinimized = true,
   position = 'bottom-right'
 }) => {
+  const { t } = useTranslation();
   const [minimized, setMinimized] = useState(initialMinimized);
   const [inputValue, setInputValue] = useState('');
   const messagesEndRef = useRef(null);
@@ -128,7 +129,7 @@ const AIChatWidget = ({
       <button
         className={`chat-widget-fab ${position}`}
         onClick={() => setMinimized(false)}
-        title="Открыть AI чат">
+        title={t('misc.acw_otkryt_ai_chat')}>
         
                 <span className="fab-icon">💬</span>
                 <span className="fab-label">AI</span>
@@ -146,7 +147,7 @@ const AIChatWidget = ({
                     <span className="header-title">AI Ассистент</span>
                     {useWebSocket &&
           <span className={`connection-status ${connected ? 'online' : 'offline'}`}>
-                            {connected ? '● онлайн' : '○ оффлайн'}
+                            {connected ? t('misc.acw_onlayn') : t('misc.acw_offlayn')}
                         </span>
           }
                 </div>
@@ -154,14 +155,14 @@ const AIChatWidget = ({
                     <button
             className="header-btn"
             onClick={() => createSession()}
-            title="Новый чат">
+            title={t('misc.acw_novyy_chat')}>
             
                         ➕
                     </button>
                     <button
             className="header-btn"
             onClick={() => setMinimized(true)}
-            title="Свернуть">
+            title={t('misc.acw_svernut')}>
             
                         ➖
                     </button>
@@ -173,7 +174,7 @@ const AIChatWidget = ({
                 {messages.length === 0 ?
         <div className="empty-state">
                         <div className="empty-icon">💡</div>
-                        <div className="empty-title">Задайте вопрос AI</div>
+                        <div className="empty-title">{t('misc.acw_zadayte_vopros_ai')}</div>
                         <div className="empty-hint">
                             AI поможет с анализом симптомов, подбором кодов МКБ-10,
                             интерпретацией анализов и другими медицинскими вопросами.
@@ -202,18 +203,18 @@ const AIChatWidget = ({
             <form className="chat-widget-input" onSubmit={handleSubmit}>
                 <textarea
           ref={inputRef}
-          aria-label="Сообщение для AI чата"
+          aria-label={t('misc.acw_soobschenie_dlya_ai_chata')}
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Введите сообщение..."
+          placeholder={t('misc.acw_vvedite_soobschenie')}
           disabled={loading || streaming}
           rows={1} />
         
                 <button
           type="submit"
           disabled={!inputValue.trim() || loading || streaming}
-          title="Отправить">
+          title={t('misc.acw_otpravit')}>
           
                     {loading || streaming ?
           <span className="spinner">⏳</span> :

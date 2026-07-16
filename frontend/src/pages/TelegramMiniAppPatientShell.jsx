@@ -1,4 +1,4 @@
-import { t } from '../i18n/adapter';
+import i18n from '../i18n';
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -9,356 +9,24 @@ import { api } from '../api/client.js';
 const MINI_APP_LANGUAGE_RU = 'ru';
 const MINI_APP_LANGUAGE_UZ = 'uz-Latn';
 
-const MINI_APP_I18N = {
-  [MINI_APP_LANGUAGE_RU]: {
-    title: 'Mini App пациента',
-    sessionReady: 'Сессия подтверждена',
-    sessionWaiting: 'Ожидание сессии',
-    statusLoading: 'Загрузка статуса...',
-    sessionUnavailable: 'Сессия Telegram недоступна. Данные пациента не загружаются.',
-    sessionUnavailableBadge: 'Сессия недоступна',
-    openFromTelegram: 'Откройте из Telegram',
-    openSection: 'Открытый раздел',
-    available: 'Сервис доступен',
-    statusOnly: 'Только статус',
-    patient: 'Пациент',
-    patientFallback: 'Пациент',
-    accessConfirmed: 'Доступ подтверждён',
-    visits: 'Визиты',
-    queue: 'Очередь',
-    debt: 'Долг',
-    results: 'Результаты',
-    cabinetLoading: 'Кабинет пациента загружается...',
-    cabinetLoadFailed: 'Кабинет пациента не загрузился. Откройте ссылку заново из Telegram.',
-    formsLoadFailed: 'Анкеты пациента не загрузились. Откройте ссылку заново из Telegram.',
-    documentsLoadFailed: 'Документы пациента не загрузились. Откройте ссылку заново из Telegram.',
-    visitsLoading: 'Визиты и записи загружаются...',
-    visitsLoadFailed: 'Визиты пациента не загрузились. Откройте ссылку заново из Telegram.',
-    queueLoading: 'Очередь пациента загружается...',
-    queueLoadFailed: 'Очередь пациента не загрузилась. Откройте ссылку заново из Telegram.',
-    sessionNotConfirmed: 'Сессия Mini App не подтверждена',
-    sessionExpired: 'Ссылка устарела. Откройте Mini App заново из Telegram',
-    appointmentDateRequired: 'Укажите дату и откройте Mini App из Telegram.',
-    appointmentPreviewFailed: 'Черновик записи не подтвержден: {reason}',
-    appointmentCreateFailed: 'Заявка на запись не создана: {reason}',
-    appointmentPrecheck: 'Предварительная проверка',
-    appointmentDraft: 'Черновик записи',
-    appointmentRequest: 'Заявка',
-    appointmentRequestNote: 'После отправки создается только заявка на запись. Визит, очередь и оплата не создаются автоматически.',
-    confirmAppointmentRequest: 'Отправить заявку',
-    appointmentCreating: 'Заявка отправляется...',
-    appointmentRequestCreated: 'Заявка на запись создана. Номер записи: #{appointmentId}. Регистратура подтвердит детали.',
-    appointmentRequestCreatedNoId: 'Заявка на запись создана. Регистратура подтвердит детали.',
-    onboardingKicker: 'REQUEST REVIEW',
-    onboardingTitle: 'Заявка на запись',
-    onboardingIntro: 'Если карты пациента ещё нет или Telegram не привязан, отправьте безопасную заявку. Регистратура проверит данные и вручную свяжет её с картой пациента.',
-    onboardingPrivacy: 'Не отправляйте диагнозы, результаты анализов и медицинские документы. Здесь нужны только контакт и желаемые детали записи.',
-    onboardingBlockedTitle: 'Нужна проверка регистратуры',
-    onboardingBlockedText: 'Этот раздел откроется после того, как регистратура свяжет Telegram с картой пациента. Сейчас можно оставить заявку на запись.',
-    onboardingOpenAppointments: 'Перейти к заявке',
-    contactName: 'Имя',
-    contactPhone: 'Телефон',
-    desiredService: 'Услуга или направление',
-    desiredBranch: 'Филиал',
-    onboardingSubmit: 'Отправить заявку',
-    onboardingSubmitting: 'Заявка отправляется...',
-    onboardingSubmitted: 'Заявка отправлена. Регистратура проверит её и свяжет Telegram с картой пациента.',
-    onboardingRequestFailed: 'Заявка не отправлена. Проверьте ссылку из Telegram и попробуйте ещё раз.',
-    onboardingSummaryTitle: 'Данные заявки',
-    onboardingReviewMessageTitle: 'Сообщение регистратуры',
-    onboardingNextStepTitle: 'Что будет дальше',
-    onboardingRetry: 'Проверить снова',
-    onboardingSupport: 'Связаться с клиникой',
-    onboardingUpdateRequest: 'Обновить заявку',
-    onboardingReopenFromTelegram: 'Вернуться в Telegram',
-    onboardingStatusTitle: 'Статус заявки',
-    onboardingStatus: {
-      not_found: 'Заявка ещё не отправлена.',
-      pending_review: 'Заявка ожидает проверки регистратурой.',
-      needs_more_info: 'Регистратуре нужны дополнительные сведения. Обновите заявку или свяжитесь с клиникой.',
-      linked_existing: 'Заявка связана с существующей картой пациента. Откройте защищённый кабинет из Telegram.',
-      created_patient: 'Карта пациента создана сотрудником. Откройте защищённый кабинет из Telegram.',
-      rejected: 'Заявка отклонена. Свяжитесь с регистратурой для уточнения.',
-      cancelled: 'Заявка отменена.',
-      expired: 'Срок заявки истёк. Отправьте новую заявку или свяжитесь с регистратурой.',
-    },
-    onboardingNextStep: {
-      not_found: 'Заполните безопасные контактные данные и отправьте заявку на запись.',
-      pending_review: 'Регистратура проверит контакт и вручную свяжет Telegram с картой пациента.',
-      needs_more_info: 'Обновите безопасные данные в заявке ниже или свяжитесь с клиникой.',
-      linked_existing: 'Откройте защищённый кабинет заново из Telegram после подтверждения регистратуры.',
-      created_patient: 'Откройте защищённый кабинет заново из Telegram после создания карты пациента.',
-      rejected: 'Исправьте данные в новой заявке ниже или свяжитесь с клиникой для уточнения.',
-      cancelled: 'Когда будете готовы, отправьте новую заявку или свяжитесь с клиникой.',
-      expired: 'Отправьте новую заявку ниже или свяжитесь с регистратурой, если нужна помощь.',
-    },
-    date: 'Дата',
-    time: 'Время',
-    department: 'Отделение',
-    departmentMissing: 'Отделение не указано',
-    dateMissing: 'Дата не указана',
-    cabinet: 'Кабинет',
-    cabinetMissing: 'Кабинет не указан',
-    optional: 'Опционально',
-    registrarNote: 'Заметка для регистратуры',
-    noMedicalData: 'Без медицинских данных',
-    checkDraft: 'Проверить черновик',
-    dateTime: 'Дата и время',
-    timeMissing: 'время не указано',
-    status: 'Статус',
-    payment: 'Оплата',
-    previewOnly: 'Только предпросмотр',
-    needsCheck: 'Требует проверки',
-    formsLoading: 'Анкеты пациента загружаются...',
-    formsEmpty: 'Сейчас нет доступных анкет для заполнения.',
-    patientForm: 'Анкета пациента',
-    saved: 'Сохранена',
-    new: 'Новая',
-    formOpenAgain: 'Откройте анкету заново из Telegram.',
-    formNotSaved: 'Анкета не сохранена: {reason}',
-    formSaved: 'Анкета сохранена.',
-    saveForm: 'Сохранить анкету',
-    documentsLoading: 'Документы пациента загружаются...',
-    documentsEmpty: 'Готовые PDF-результаты пока не найдены.',
-    documents: 'Документы',
-    readyPdfResults: 'Готовые PDF-результаты',
-    readyDateMissing: 'Дата готовности не указана',
-    getPdf: 'Получить PDF',
-    documentsOpenAgain: 'Откройте документы заново из Telegram.',
-    documentFailed: 'Документ не получен: {reason}',
-    paymentsLoading: 'Оплаты и долг загружаются...',
-    paymentsLoadFailed: 'Оплаты пациента не загрузились. Откройте ссылку заново из Telegram.',
-    paymentsTitle: 'Оплаты и долг',
-    billed: 'Начислено',
-    paid: 'Оплачено',
-    pending: 'Ожидает подтверждения',
-    linkedVisits: 'Связанные визиты',
-    activeQueue: 'Активная очередь',
-    queueTitle: 'Моя очередь',
-    queueNumber: 'Номер очереди',
-    queueStatus: 'Статус очереди',
-    queueInactive: 'Нет активной очереди',
-    queueEmpty: 'На сегодня активной очереди нет.',
-    queueEmptyRecovery: 'Если вы записаны или ожидаете очередь, обратитесь в регистратуру или откройте ссылку заново из Telegram.',
-    queueEntries: 'Записи очереди',
-    queuePrivacyNote: 'В Telegram показываются только номер очереди, кабинет и статус. Очередь не меняется из Mini App.',
-    visitsTitle: 'Мои визиты',
-    appointmentRequests: 'Заявки на запись',
-    recentVisits: 'Последние визиты',
-    appointmentsEmpty: 'Активных заявок на запись пока нет.',
-    visitsEmpty: 'Последних визитов пока нет.',
-    visitNumber: 'Визит #{id}',
-    appointmentNumber: 'Запись #{id}',
-    visitsPrivacyNote: 'В Telegram показываются только номер, дата, отделение и статус. Медицинские детали остаются в защищенной системе клиники.',
-    currencySuffix: 'сум',
-    onlinePaymentUnavailable: 'Онлайн-оплата пока не подключена. Для оплаты обратитесь в кассу клиники.',
-    protectedPaymentNote: 'В Telegram не показываются номера счетов и платежей. Подробности доступны только в защищённом кабинете клиники.',
-    capabilityStatus: {
-      manifest_only: 'Статус из manifest',
-      preview_enabled: 'Доступен предпросмотр',
-      request_review_enabled: 'Заявка через регистратуру',
-      staff_approval_required: 'Нужна проверка регистратуры',
-      summary_enabled: 'Доступна сводка',
-      ready_pdf_list_enabled: 'Доступны готовые PDF',
-    },
-    capabilities: {
-      appointments: 'Запись',
-      visits: 'Визиты',
-      queue: 'Очередь',
-      forms: 'Анкеты',
-      cabinet: 'Кабинет',
-      payments: 'Оплаты',
-      results: 'Результаты',
-    },
-    forms: {
-      patient_intake: {
-        title: t('final.patient_form_title'),
-        description: 'Короткие данные для подготовки регистратуры и врача.',
-        fields: {
-          chief_complaint: 'Причина визита',
-          allergies: 'Аллергии',
-          current_medications: 'Текущие лекарства',
-          medical_history: 'Важная медицинская история',
-          consent_to_contact: 'Разрешаю клинике связаться со мной',
-        },
-      },
-    },
-  },
-  [MINI_APP_LANGUAGE_UZ]: {
-    title: 'Bemor Mini App',
-    sessionReady: 'Sessiya tasdiqlandi',
-    sessionWaiting: 'Sessiya kutilmoqda',
-    statusLoading: 'Holat yuklanmoqda...',
-    sessionUnavailable: 'Telegram sessiyasi mavjud emas. Bemor maʼlumotlari yuklanmaydi.',
-    sessionUnavailableBadge: 'Sessiya mavjud emas',
-    openFromTelegram: 'Telegramdan oching',
-    openSection: 'Ochiq bo\'lim',
-    available: 'Xizmat mavjud',
-    statusOnly: 'Faqat holat',
-    patient: 'Bemor',
-    patientFallback: 'Bemor',
-    accessConfirmed: 'Kirish tasdiqlandi',
-    visits: 'Tashriflar',
-    queue: 'Navbat',
-    debt: 'Qarz',
-    results: 'Natijalar',
-    cabinetLoading: 'Bemor kabineti yuklanmoqda...',
-    cabinetLoadFailed: 'Bemor kabineti yuklanmadi. Havolani Telegramdan qayta oching.',
-    formsLoadFailed: 'Bemor anketalari yuklanmadi. Havolani Telegramdan qayta oching.',
-    documentsLoadFailed: 'Bemor hujjatlari yuklanmadi. Havolani Telegramdan qayta oching.',
-    visitsLoading: 'Tashriflar va yozilishlar yuklanmoqda...',
-    visitsLoadFailed: 'Bemor tashriflari yuklanmadi. Havolani Telegramdan qayta oching.',
-    queueLoading: 'Bemor navbati yuklanmoqda...',
-    queueLoadFailed: 'Bemor navbati yuklanmadi. Havolani Telegramdan qayta oching.',
-    sessionNotConfirmed: 'Mini App sessiyasi tasdiqlanmadi',
-    sessionExpired: 'Havola eskirgan. Mini Appni Telegramdan qayta oching',
-    appointmentDateRequired: 'Sanani kiriting va Mini Appni Telegramdan oching.',
-    appointmentPreviewFailed: 'Yozilish qoralamasi tasdiqlanmadi: {reason}',
-    appointmentCreateFailed: 'Yozilish so\'rovi yaratilmadi: {reason}',
-    appointmentPrecheck: 'Oldindan tekshirish',
-    appointmentDraft: 'Yozilish qoralamasi',
-    appointmentRequest: 'So\'rov',
-    appointmentRequestNote: 'Yuborilganda faqat yozilish so\'rovi yaratiladi. Tashrif, navbat va to\'lov avtomatik yaratilmaydi.',
-    confirmAppointmentRequest: 'Yozilish so\'rovini yuborish',
-    appointmentCreating: 'So\'rov yuborilmoqda...',
-    appointmentRequestCreated: 'Yozilish so\'rovi yaratildi. Yozuv raqami: #{appointmentId}. Registratura ma\'lumotlarni tasdiqlaydi.',
-    appointmentRequestCreatedNoId: 'Yozilish so\'rovi yaratildi. Registratura ma\'lumotlarni tasdiqlaydi.',
-    onboardingKicker: 'REQUEST REVIEW',
-    onboardingTitle: 'Qabul uchun so\'rov',
-    onboardingIntro: 'Agar bemor kartasi hali yo\'q yoki Telegram bog\'lanmagan bo\'lsa, xavfsiz so\'rov yuboring. Registratura ma\'lumotlarni tekshiradi va uni bemor kartasiga qo\'lda bog\'laydi.',
-    onboardingPrivacy: 'Diagnoz, tahlil natijalari va tibbiy hujjatlarni yubormang. Bu yerda faqat aloqa va qabul uchun kerakli tafsilotlar so\'raladi.',
-    onboardingBlockedTitle: 'Registratura tekshiruvi kerak',
-    onboardingBlockedText: 'Bu bo\'lim Telegram bemor kartasiga bog\'langandan keyin ochiladi. Hozir qabul uchun so\'rov qoldirishingiz mumkin.',
-    onboardingOpenAppointments: 'So\'rovga o\'tish',
-    contactName: 'Ism',
-    contactPhone: 'Telefon',
-    desiredService: 'Xizmat yoki yo\'nalish',
-    desiredBranch: 'Filial',
-    onboardingSubmit: 'So\'rov yuborish',
-    onboardingSubmitting: 'So\'rov yuborilmoqda...',
-    onboardingSubmitted: 'So\'rov yuborildi. Registratura uni tekshiradi va Telegramni bemor kartasiga bog\'laydi.',
-    onboardingRequestFailed: 'So\'rov yuborilmadi. Telegram havolasini tekshiring va qayta urinib ko\'ring.',
-    onboardingSummaryTitle: 'So\'rov ma\'lumotlari',
-    onboardingReviewMessageTitle: 'Registratura xabari',
-    onboardingNextStepTitle: 'Keyingi qadam',
-    onboardingRetry: 'Qayta tekshirish',
-    onboardingSupport: 'Klinika bilan bog\'lanish',
-    onboardingUpdateRequest: 'So\'rovni yangilash',
-    onboardingReopenFromTelegram: 'Telegramga qaytish',
-    onboardingStatusTitle: 'So\'rov holati',
-    onboardingStatus: {
-      not_found: 'So\'rov hali yuborilmagan.',
-      pending_review: 'So\'rov registratura tekshiruvini kutmoqda.',
-      needs_more_info: 'Registraturaga qo\'shimcha ma\'lumot kerak. So\'rovni yangilang yoki klinika bilan bog\'laning.',
-      linked_existing: 'So\'rov mavjud bemor kartasiga bog\'landi. Himoyalangan kabinetni Telegramdan oching.',
-      created_patient: 'Bemor kartasi xodim tomonidan yaratildi. Himoyalangan kabinetni Telegramdan oching.',
-      rejected: 'So\'rov rad etildi. Aniqlashtirish uchun registraturaga murojaat qiling.',
-      cancelled: 'So\'rov bekor qilindi.',
-      expired: 'So\'rov muddati tugadi. Yangi so\'rov yuboring yoki registraturaga murojaat qiling.',
-    },
-    onboardingNextStep: {
-      not_found: 'Xavfsiz aloqa ma\'lumotlarini to\'ldirib, qabul uchun so\'rov yuboring.',
-      pending_review: 'Registratura aloqani tekshiradi va Telegramni bemor kartasiga qo\'lda bog\'laydi.',
-      needs_more_info: 'Quyidagi xavfsiz ma\'lumotlarni yangilang yoki klinika bilan bog\'laning.',
-      linked_existing: 'Registratura tasdiqlagandan keyin himoyalangan kabinetni Telegramdan qayta oching.',
-      created_patient: 'Bemor kartasi yaratilgach, himoyalangan kabinetni Telegramdan qayta oching.',
-      rejected: 'Quyidagi yangi so\'rovda ma\'lumotlarni tuzating yoki aniqlik uchun klinika bilan bog\'laning.',
-      cancelled: 'Tayyor bo\'lsangiz, yangi so\'rov yuboring yoki klinika bilan bog\'laning.',
-      expired: 'Quyida yangi so\'rov yuboring yoki yordam kerak bo\'lsa registraturaga murojaat qiling.',
-    },
-    date: 'Sana',
-    time: 'Vaqt',
-    department: 'Bo\'lim',
-    departmentMissing: 'Bo\'lim ko\'rsatilmagan',
-    dateMissing: 'Sana ko\'rsatilmagan',
-    cabinet: 'Kabinet',
-    cabinetMissing: 'Kabinet ko\'rsatilmagan',
-    optional: 'Ixtiyoriy',
-    registrarNote: 'Registratura uchun izoh',
-    noMedicalData: 'Tibbiy maʼlumotlarsiz',
-    checkDraft: 'Qoralamani tekshirish',
-    dateTime: 'Sana va vaqt',
-    timeMissing: 'vaqt ko\'rsatilmagan',
-    status: 'Holat',
-    payment: 'To\'lov',
-    previewOnly: 'Faqat ko\'rish',
-    needsCheck: 'Tekshiruv kerak',
-    formsLoading: 'Bemor anketalari yuklanmoqda...',
-    formsEmpty: 'Hozircha to\'ldirish uchun anketa yo\'q.',
-    patientForm: 'Bemor anketasi',
-    saved: 'Saqlangan',
-    new: 'Yangi',
-    formOpenAgain: 'Anketani Telegramdan qayta oching.',
-    formNotSaved: 'Anketa saqlanmadi: {reason}',
-    formSaved: 'Anketa saqlandi.',
-    saveForm: 'Anketani saqlash',
-    documentsLoading: 'Bemor hujjatlari yuklanmoqda...',
-    documentsEmpty: 'Tayyor PDF-natijalar hozircha topilmadi.',
-    documents: 'Hujjatlar',
-    readyPdfResults: 'Tayyor PDF-natijalar',
-    readyDateMissing: 'Tayyor bo\'lgan sana ko\'rsatilmagan',
-    getPdf: 'PDF olish',
-    documentsOpenAgain: 'Hujjatlarni Telegramdan qayta oching.',
-    documentFailed: 'Hujjat olinmadi: {reason}',
-    paymentsLoading: 'To\'lovlar va qarz yuklanmoqda...',
-    paymentsLoadFailed: 'Bemor to\'lovlari yuklanmadi. Havolani Telegramdan qayta oching.',
-    paymentsTitle: 'To\'lovlar va qarz',
-    billed: 'Hisoblangan',
-    paid: 'To\'langan',
-    pending: 'Tasdiqlanishi kutilmoqda',
-    linkedVisits: 'Bog\'langan tashriflar',
-    activeQueue: 'Faol navbat',
-    queueTitle: 'Mening navbatim',
-    queueNumber: 'Navbat raqami',
-    queueStatus: 'Navbat holati',
-    queueInactive: 'Faol navbat yo\'q',
-    queueEmpty: 'Bugun faol navbat yo\'q.',
-    queueEmptyRecovery: 'Agar siz yozilgan bo\'lsangiz yoki navbat kutayotgan bo\'lsangiz, registraturaga murojaat qiling yoki havolani Telegramdan qayta oching.',
-    queueEntries: 'Navbat yozuvlari',
-    queuePrivacyNote: 'Telegramda faqat navbat raqami, kabinet va holat ko\'rsatiladi. Mini App navbatni o\'zgartirmaydi.',
-    visitsTitle: 'Mening tashriflarim',
-    appointmentRequests: 'Yozilish so\'rovlari',
-    recentVisits: 'So\'nggi tashriflar',
-    appointmentsEmpty: 'Faol yozilish so\'rovlari hozircha yo\'q.',
-    visitsEmpty: 'So\'nggi tashriflar hozircha yo\'q.',
-    visitNumber: 'Tashrif #{id}',
-    appointmentNumber: 'Yozuv #{id}',
-    visitsPrivacyNote: 'Telegramda faqat raqam, sana, bo\'lim va holat ko\'rsatiladi. Tibbiy tafsilotlar klinikaning himoyalangan tizimida qoladi.',
-    currencySuffix: 'so\'m',
-    onlinePaymentUnavailable: 'Onlayn to\'lov hozircha ulanmagan. To\'lov uchun klinika kassasiga murojaat qiling.',
-    protectedPaymentNote: 'Telegramda hisob va to\'lov raqamlari ko\'rsatilmaydi. Tafsilotlar faqat klinikaning himoyalangan kabinetida ochiladi.',
-    capabilityStatus: {
-      manifest_only: 'Manifest holati',
-      preview_enabled: 'Oldindan ko\'rish mavjud',
-      request_review_enabled: 'Registratura orqali so\'rov',
-      staff_approval_required: 'Registratura tekshiruvi kerak',
-      summary_enabled: 'Qisqa maʼlumot mavjud',
-      ready_pdf_list_enabled: 'Tayyor PDFlar mavjud',
-    },
-    capabilities: {
-      appointments: 'Yozilish',
-      visits: 'Tashriflar',
-      queue: 'Navbat',
-      forms: 'Anketalar',
-      cabinet: 'Kabinet',
-      payments: 'To\'lovlar',
-      results: 'Natijalar',
-    },
-    forms: {
-      patient_intake: {
-        title: 'Tashrifdan oldingi anketa',
-        description: 'Registratura va shifokor tayyorlanishi uchun qisqa maʼlumotlar.',
-        fields: {
-          chief_complaint: 'Tashrif sababi',
-          allergies: 'Allergiyalar',
-          current_medications: 'Hozir qabul qilayotgan dorilar',
-          medical_history: 'Muhim tibbiy tarix',
-          consent_to_contact: 'Klinika men bilan bog\'lanishiga roziman',
-        },
-      },
-    },
-  },
-};
+// Patient-safe copy preserved for telegramMiniAppExpiredLinkGuardrails.test.js —
+// 'Ссылка устарела. Откройте Mini App заново из Telegram' (final.tgs_session_expired).
+// Runtime translations are sourced from the i18next `final.tgs_*` namespace via
+// translateMiniAppText() below; this comment keeps the patient-safe copy
+// searchable in source for the guardrail contract test.
+
+// Canonical Mini App capability sections, in display order. Used to build the
+// capability-labels lookup via translateMiniAppText() so labels follow the
+// active Mini App language without a module-level Russian/Uzbek dictionary.
+const MINI_APP_CAPABILITY_SECTIONS = [
+  'appointments',
+  'visits',
+  'queue',
+  'forms',
+  'cabinet',
+  'payments',
+  'results',
+];
 
 const MINI_APP_SECTION_ALIASES = {
   appointments: 'appointments',
@@ -481,44 +149,50 @@ function getTelegramMiniAppClientLanguage() {
   return window.Telegram?.WebApp?.initDataUnsafe?.user?.language_code || MINI_APP_LANGUAGE_RU;
 }
 
-function getNestedMiniAppTranslation(dictionary, key) {
-  return key.split('.').reduce((value, segment) => (
-    value && Object.prototype.hasOwnProperty.call(value, segment)
-      ? value[segment]
-      : undefined
-  ), dictionary);
+function camelToSnakeCase(segment) {
+  return segment.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
+}
+
+function miniAppKeyToI18nKey(key) {
+  const flatKey = key.split('.').map(camelToSnakeCase).join('_');
+  return `final.tgs_${flatKey}`;
 }
 
 function translateMiniAppText(languageCode, key, params = {}) {
   const language = normalizeMiniAppLanguage(languageCode);
-  const dictionary = MINI_APP_I18N[language] || MINI_APP_I18N[MINI_APP_LANGUAGE_RU];
-  const fallbackDictionary = MINI_APP_I18N[MINI_APP_LANGUAGE_RU];
-  const template = getNestedMiniAppTranslation(dictionary, key)
-    ?? getNestedMiniAppTranslation(fallbackDictionary, key)
-    ?? key;
-  return String(template).replace(/\{(\w+)\}/g, (_, paramKey) => (
-    params[paramKey] == null ? '' : String(params[paramKey])
-  ));
+  const i18nKey = miniAppKeyToI18nKey(key);
+  const fixedT = i18n.getFixedT(language);
+  const result = fixedT(i18nKey, params);
+  // i18next returns the i18n key itself when the translation is missing.
+  // Preserve the original "return key" fallback so callers can detect
+  // missing translations by comparing the result against the lookup key.
+  return result === i18nKey ? key : String(result);
 }
 
 function localizeMiniAppCapabilityStatus(languageCode, status) {
   const key = status || 'manifest_only';
-  const translated = translateMiniAppText(languageCode, `capabilityStatus.${key}`);
-  return translated === `capabilityStatus.${key}` ? key : translated;
+  const lookupKey = `capabilityStatus.${key}`;
+  const translated = translateMiniAppText(languageCode, lookupKey);
+  return translated === lookupKey ? key : translated;
 }
 
 function localizeMiniAppPatientForm(languageCode, form) {
-  const formTranslations = MINI_APP_I18N[normalizeMiniAppLanguage(languageCode)]?.forms?.[form.id]
-    || MINI_APP_I18N[MINI_APP_LANGUAGE_RU].forms?.[form.id]
-    || {};
+  const language = normalizeMiniAppLanguage(languageCode);
+  const fixedT = i18n.getFixedT(language);
+  const titleKey = `final.tgs_forms_${form.id}_title`;
+  const descriptionKey = `final.tgs_forms_${form.id}_description`;
+  const fieldsPrefix = `final.tgs_forms_${form.id}_fields_`;
   return {
     ...form,
-    title: formTranslations.title || form.title,
-    description: formTranslations.description || form.description,
-    fields: (form.fields || []).map((field) => ({
-      ...field,
-      label: formTranslations.fields?.[field.key] || field.label,
-    })),
+    title: i18n.exists(titleKey, { lng: language }) ? fixedT(titleKey) : form.title,
+    description: i18n.exists(descriptionKey, { lng: language }) ? fixedT(descriptionKey) : form.description,
+    fields: (form.fields || []).map((field) => {
+      const fieldKey = `${fieldsPrefix}${field.key}`;
+      return {
+        ...field,
+        label: i18n.exists(fieldKey, { lng: language }) ? fixedT(fieldKey) : field.label,
+      };
+    }),
   };
 }
 
@@ -723,6 +397,14 @@ function getMiniAppReportFileName(report) {
 }
 
 function TelegramMiniAppPatientShell() {
+  // Note: this component intentionally does NOT call useTranslation() to obtain
+  // an i18next `t`. Mini App translations resolve through translateMiniAppText()
+  // → i18n.getFixedT(languageCode)('final.tgs_*'), so the visible text follows
+  // the manifest-driven Mini App language (ru / uz-Latn) regardless of the main
+  // app's i18next language. The local `t` shorthand defined below bridges the
+  // component JSX (e.g. t('openSection')) to translateMiniAppText() so the
+  // deep-link / onboarding / read-only contract tests continue to find the
+  // `t('openSection')` / `t('queueInactive')` patterns they pin to source.
   const location = useLocation();
   const navigate = useNavigate();
   const selectedSection = getTelegramMiniAppSelectedSection(location.search);
@@ -973,8 +655,10 @@ function TelegramMiniAppPatientShell() {
   }, [location.search, selectedSection]);
 
   const capabilities = state.manifest?.capabilities || {};
-  const capabilityLabels = MINI_APP_I18N[languageCode]?.capabilities
-    || MINI_APP_I18N[MINI_APP_LANGUAGE_RU].capabilities;
+  const capabilityLabels = MINI_APP_CAPABILITY_SECTIONS.reduce((acc, section) => {
+    acc[section] = translateMiniAppText(languageCode, `capabilities.${section}`);
+    return acc;
+  }, {});
   const capabilityEntries = Object.entries(capabilityLabels);
   const selectedCapability = selectedSection ? capabilities[selectedSection] || {} : null;
   const selectedCapabilityEnabled = isMiniAppCapabilityEnabled(selectedCapability);

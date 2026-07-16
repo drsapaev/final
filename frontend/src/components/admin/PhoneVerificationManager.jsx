@@ -25,7 +25,7 @@ import { api } from '../../api/client';
 import { toast } from 'react-toastify';
 
 import logger from '../../utils/logger';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 const PhoneVerificationManager = () => {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
@@ -49,7 +49,7 @@ const PhoneVerificationManager = () => {
       setStatistics(response.data.statistics);
     } catch (error) {
       logger.error('Error loading verification statistics:', error);
-      toast.error('Ошибка загрузки статистики верификации');
+      toast.error(t('admin2.pvm_err_load_stat'));
     } finally {
       setLoading(false);
     }
@@ -57,7 +57,7 @@ const PhoneVerificationManager = () => {
 
   const sendAdminCode = async () => {
     if (!adminForm.phone.trim()) {
-      toast.error('Введите номер телефона');
+      toast.error(t('admin2.pvm_err_phone_required'));
       return;
     }
 
@@ -79,7 +79,7 @@ const PhoneVerificationManager = () => {
       const response = await api.post('/phone-verification/admin/send-code', null, { params });
 
       if (response.data.success) {
-        toast.success(`Код отправлен на ${adminForm.phone}`);
+        toast.success(t('admin2.pvm_code_sent', { phone: adminForm.phone }));
         setAdminForm({
           phone: '',
           purpose: 'verification',
@@ -90,7 +90,7 @@ const PhoneVerificationManager = () => {
       }
     } catch (error) {
       logger.error('Error sending admin verification code:', error);
-      toast.error('Ошибка отправки кода верификации');
+      toast.error(t('admin2.pvm_err_send_code'));
     } finally {
       setLoading(false);
     }
@@ -115,7 +115,7 @@ const PhoneVerificationManager = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="admin-sm-secondary-m-008px0">
-                Активные коды
+                {t('admin2.pvm_active_codes')}
               </p>
               <p className="admin-2xl-bold-primary-m-0">
                 {statistics?.total_active_codes || 0}
@@ -129,7 +129,7 @@ const PhoneVerificationManager = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="admin-sm-secondary-m-008px0">
-                Подтверждено
+                {t('admin2.pvm_verified')}
               </p>
               <p className="admin-2xl-bold-success-m-0">
                 {statistics?.verified_codes || 0}
@@ -143,7 +143,7 @@ const PhoneVerificationManager = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="admin-sm-secondary-m-008px0">
-                Ожидают
+                {t('admin2.pvm_pending')}
               </p>
               <p className="admin-2xl-bold-warning-m-0">
                 {statistics?.pending_codes || 0}
@@ -157,7 +157,7 @@ const PhoneVerificationManager = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="admin-sm-secondary-m-008px0">
-                Истекают скоро
+                {t('admin2.pvm_expiring_soon')}
               </p>
               <p className="admin-2xl-bold-error-m-0">
                 {statistics?.expiring_soon || 0}
@@ -172,7 +172,7 @@ const PhoneVerificationManager = () => {
       <MacOSCard className="p-6">
         <h3 className="admin-lg-med-primary-m-0016px0-flex-ai-center-gap-8">
           <BarChart3 className="w-5 h-5" />
-          Статистика по целям верификации
+          {t('admin2.pvm_purpose_stats_title')}
         </h3>
         <div className="admin-grid-gtc-rauto-fitcminmax250pxc1fr-gap-16">
           {statistics?.by_purpose && Object.entries(statistics.by_purpose).map(([purpose, count]) =>
@@ -182,10 +182,10 @@ const PhoneVerificationManager = () => {
                   {purpose}
                 </p>
                 <p className="admin-xs-secondary-m-0">
-                  {purpose === 'verification' && 'Подтверждение номера'}
-                  {purpose === 'password_reset' && 'Сброс пароля'}
-                  {purpose === 'phone_change' && 'Смена номера'}
-                  {purpose === 'registration' && 'Регистрация'}
+                  {purpose === 'verification' && t('admin2.pvm_purpose_verification')}
+                  {purpose === 'password_reset' && t('admin2.pvm_purpose_password_reset')}
+                  {purpose === 'phone_change' && t('admin2.pvm_purpose_phone_change')}
+                  {purpose === 'registration' && t('admin2.pvm_purpose_registration')}
                 </p>
               </div>
               <Badge variant="outline">{count}</Badge>
@@ -198,7 +198,7 @@ const PhoneVerificationManager = () => {
       <MacOSCard className="p-6">
         <h3 className="admin-lg-med-primary-m-0016px0-flex-ai-center-gap-8">
           <Send className="w-5 h-5" />
-          Статистика по SMS провайдерам
+          {t('admin2.pvm_provider_stats_title')}
         </h3>
         <div className="admin-grid-gtc-rauto-fitcminmax200pxc1fr-gap-16">
           {statistics?.by_provider && Object.entries(statistics.by_provider).map(([provider, count]) =>
@@ -221,12 +221,12 @@ const PhoneVerificationManager = () => {
       <MacOSCard className="p-6">
         <h3 className="admin-lg-med-primary-m-0016px0-flex-ai-center-gap-8">
           <Send className="w-5 h-5" />
-          Отправка кода администратором
+          {t('admin2.pvm_admin_send_title')}
         </h3>
         <div className="flex flex-col gap-4">
           <div>
             <label className="admin-block-sm-med-primary-mb-8">
-              Номер телефона
+              {t('admin2.pvm_label_phone')}
             </label>
             <Input
             type="tel"
@@ -239,16 +239,16 @@ const PhoneVerificationManager = () => {
 
           <div>
             <label className="admin-block-sm-med-primary-mb-8">
-              Цель верификации
+              {t('admin2.pvm_label_purpose')}
             </label>
             <Select
             value={adminForm.purpose}
             onChange={(value) => setAdminForm((prev) => ({ ...prev, purpose: value }))}
             options={[
-            { value: 'verification', label: 'Подтверждение номера' },
-            { value: 'password_reset', label: 'Сброс пароля' },
-            { value: 'phone_change', label: 'Смена номера' },
-            { value: 'registration', label: 'Регистрация' }]
+            { value: 'verification', label: t('admin2.pvm_purpose_verification') },
+            { value: 'password_reset', label: t('admin2.pvm_purpose_password_reset') },
+            { value: 'phone_change', label: t('admin2.pvm_purpose_phone_change') },
+            { value: 'registration', label: t('admin2.pvm_purpose_registration') }]
             }
             size="large"
             className="w-full" />
@@ -257,16 +257,16 @@ const PhoneVerificationManager = () => {
 
           <div>
             <label className="admin-block-sm-med-primary-mb-8">
-              SMS провайдер (опционально)
+              {t('admin2.pvm_label_provider')}
             </label>
             <Select
             value={adminForm.provider}
             onChange={(value) => setAdminForm((prev) => ({ ...prev, provider: value }))}
             options={[
-            { value: '', label: 'По умолчанию' },
+            { value: '', label: t('admin2.pvm_provider_default') },
             { value: 'eskiz', label: 'Eskiz' },
             { value: 'playmobile', label: 'PlayMobile' },
-            { value: 'mock', label: 'Mock (тест)' }]
+            { value: 'mock', label: t('admin2.pvm_provider_mock') }]
             }
             size="large"
             className="w-full" />
@@ -275,16 +275,16 @@ const PhoneVerificationManager = () => {
 
           <div>
             <label className="admin-block-sm-med-primary-mb-8">
-              Кастомное сообщение (опционально)
+              {t('admin2.pvm_label_message')}
             </label>
             <Textarea
             value={adminForm.message}
             onChange={(e) => setAdminForm((prev) => ({ ...prev, message: e.target.value }))}
-            placeholder="Ваш код подтверждения: {code}. Код действителен 5 минут."
+            placeholder={t('admin2.pvm_ph_message')}
             className="admin-minh-80-w-100pct" />
           
             <p className="admin-xs-secondary-m-4px000">
-              Используйте {'{code}'} для вставки кода верификации
+              {t('admin2.pvm_hint_message')}
             </p>
           </div>
 
@@ -297,12 +297,12 @@ const PhoneVerificationManager = () => {
             {loading ?
           <>
                 <RefreshCw className="admin-w-16-h-16-mr-8-anim-spin1slinearinfinite" />
-                Отправка...
+                {t('admin2.pvm_sending')}
               </> :
 
           <>
                 <Send className="w-4 h-4 mr-2" />
-                Отправить код
+                {t('admin2.pvm_send_btn')}
               </>
           }
           </Button>
@@ -316,56 +316,56 @@ const PhoneVerificationManager = () => {
       <MacOSCard className="p-6">
         <h3 className="admin-lg-med-primary-m-0016px0-flex-ai-center-gap-8">
           <Settings className="w-5 h-5" />
-          Настройки верификации
+          {t('admin2.pvm_settings_title')}
         </h3>
         <div className="flex flex-col gap-4">
           {statistics?.settings &&
         <div className="admin-grid-gtc-rauto-fitcminmax200pxc1fr-gap-16">
               <div className="admin-p-16-bd-1solidvar-mac-border-radius-var--mac-radius-md-bg-bg-secondary">
                 <p className="admin-med-sm-primary-m-008px0">
-                  Длина кода
+                  {t('admin2.pvm_code_length')}
                 </p>
                 <p className="admin-2xl-bold-blue-m-004px0">
                   {statistics.settings.code_length}
                 </p>
                 <p className="admin-xs-secondary-m-0">
-                  цифр
+                  {t('admin2.pvm_digits')}
                 </p>
               </div>
 
               <div className="admin-p-16-bd-1solidvar-mac-border-radius-var--mac-radius-md-bg-bg-secondary">
                 <p className="admin-med-sm-primary-m-008px0">
-                  Время жизни кода
+                  {t('admin2.pvm_ttl')}
                 </p>
                 <p className="admin-2xl-bold-success-m-004px0">
                   {statistics.settings.ttl_minutes}
                 </p>
                 <p className="admin-xs-secondary-m-0">
-                  минут
+                  {t('admin2.pvm_minutes')}
                 </p>
               </div>
 
               <div className="admin-p-16-bd-1solidvar-mac-border-radius-var--mac-radius-md-bg-bg-secondary">
                 <p className="admin-med-sm-primary-m-008px0">
-                  Максимум попыток
+                  {t('admin2.pvm_max_attempts')}
                 </p>
                 <p className="admin-2xl-bold-warning-m-004px0">
                   {statistics.settings.max_attempts}
                 </p>
                 <p className="admin-xs-secondary-m-0">
-                  попыток
+                  {t('admin2.pvm_attempts')}
                 </p>
               </div>
 
               <div className="admin-p-16-bd-1solidvar-mac-border-radius-var--mac-radius-md-bg-bg-secondary">
                 <p className="admin-med-sm-primary-m-008px0">
-                  Лимит частоты
+                  {t('admin2.pvm_rate_limit')}
                 </p>
                 <p className="admin-2xl-bold-error-m-004px0">
                   {statistics.settings.rate_limit_minutes}
                 </p>
                 <p className="admin-xs-secondary-m-0">
-                  минут
+                  {t('admin2.pvm_minutes')}
                 </p>
               </div>
             </div>
@@ -373,13 +373,13 @@ const PhoneVerificationManager = () => {
 
           <div className="admin-p-16-bg-info-bg-bd-1solidvar-mac-info-border-radius-var--mac-radius-md">
             <h4 className="admin-med-info-sm-m-008px0">
-              Информация
+              {t('admin2.pvm_info_title')}
             </h4>
             <ul className="admin-xs-info-m-0-pl-16-flex-col-gap-4">
-              <li>• Коды верификации хранятся в памяти сервера</li>
-              <li>• Для production рекомендуется использовать Redis</li>
-              <li>• Истекшие коды автоматически удаляются</li>
-              <li>• Лимит частоты предотвращает спам</li>
+              <li>{t('admin2.pvm_info_codes_stored')}</li>
+              <li>{t('admin2.pvm_info_redis')}</li>
+              <li>{t('admin2.pvm_info_expired')}</li>
+              <li>{t('admin2.pvm_info_rate_limit')}</li>
             </ul>
           </div>
         </div>
@@ -388,9 +388,9 @@ const PhoneVerificationManager = () => {
 
 
   const tabs = [
-  { id: 'overview', label: 'Обзор', icon: BarChart3 },
-  { id: 'admin-tools', label: 'Инструменты', icon: Send },
-  { id: 'settings', label: 'Настройки', icon: Settings }];
+  { id: 'overview', label: t('admin2.pvm_tab_overview'), icon: BarChart3 },
+  { id: 'admin-tools', label: t('admin2.pvm_tab_tools'), icon: Send },
+  { id: 'settings', label: t('admin2.pvm_tab_settings'), icon: Settings }];
 
 
   return (
@@ -401,17 +401,17 @@ const PhoneVerificationManager = () => {
           <Phone className="admin-w-32-h-32-blue" />
           <div>
             <h1 className="admin-2xl-semi-primary-m-0">
-              Верификация телефонов
+              {t('admin2.pvm_title')}
             </h1>
             <p className="admin-secondary-sm-m-0">
-              Управление SMS верификацией
+              {t('admin2.pvm_subtitle')}
             </p>
           </div>
         </div>
         
         <Button onClick={loadStatistics} disabled={loading} variant="outline">
           <RefreshCw className="admin-w-16-h-16-mr-8" style={{ '--admin-animation': loading ? 'spin 1s linear infinite' : 'none' }} />
-          Обновить
+          {t('admin2.pvm_refresh')}
         </Button>
       </div>
 

@@ -22,7 +22,7 @@ describe('Admin components STRAT#36 — i18n migration', () => {
     const source = fs.readFileSync(path.join(ROOT, file), 'utf8');
     
     it(`${name} imports t from i18n adapter`, () => {
-      expect(source).toContain("from '../../i18n/adapter'");
+      expect(source).toContain("from '../../i18n/useTranslation'");
     });
     
     it(`${name} uses t() for confirm dialog`, () => {

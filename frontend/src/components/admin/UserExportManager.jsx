@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect } from 'react';
 import {
   Users,
@@ -27,6 +27,7 @@ import logger from '../../utils/logger';
 // P-013 fix: shared ConfirmDialog hook replacing native confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
 const UserExportManager = () => {
+  const { t } = useTranslation();
   // P-013 fix: shared ConfirmDialog hook (replaces 1 native confirm() call).
   const [confirm, confirmDialog] = useConfirm();
   // Состояние
@@ -54,29 +55,29 @@ const UserExportManager = () => {
   // Доступные поля для экспорта
   const availableFields = [
   { value: 'id', label: 'ID' },
-  { value: 'username', label: 'Имя пользователя' },
+  { value: 'username', label: t('admin2.ue_field_username') },
   { value: 'email', label: 'Email' },
-  { value: 'role', label: 'Роль' },
-  { value: 'is_active', label: 'Активен' },
-  { value: 'created_at', label: 'Дата создания' },
-  { value: 'updated_at', label: 'Дата обновления' },
-  { value: 'last_login', label: 'Последний вход' },
-  { value: 'full_name', label: 'ФИО' },
-  { value: 'phone', label: 'Телефон' },
-  { value: 'birth_date', label: 'Дата рождения' },
-  { value: 'gender', label: 'Пол' },
-  { value: 'address', label: 'Адрес' }];
+  { value: 'role', label: t('admin2.ue_field_role') },
+  { value: 'is_active', label: t('admin2.ue_field_active') },
+  { value: 'created_at', label: t('admin2.ue_field_created_at') },
+  { value: 'updated_at', label: t('admin2.ue_field_updated_at') },
+  { value: 'last_login', label: t('admin2.ue_field_last_login') },
+  { value: 'full_name', label: t('admin2.ue_field_full_name') },
+  { value: 'phone', label: t('admin2.ue_field_phone') },
+  { value: 'birth_date', label: t('admin2.ue_field_birth_date') },
+  { value: 'gender', label: t('admin2.ue_field_gender') },
+  { value: 'address', label: t('admin2.ue_field_address') }];
 
 
   // Роли пользователей
   const userRoles = [
-  { value: '', label: 'Все роли' },
-  { value: 'Admin', label: 'Администратор' },
-  { value: 'Doctor', label: 'Врач' },
-  { value: 'Registrar', label: 'Регистратор' },
-  { value: 'Patient', label: 'Пациент' },
-  { value: 'Cashier', label: 'Кассир' },
-  { value: 'Lab', label: 'Лаборант' }];
+  { value: '', label: t('admin2.ue_role_all') },
+  { value: 'Admin', label: t('admin2.ue_role_admin') },
+  { value: 'Doctor', label: t('admin2.ue_role_doctor') },
+  { value: 'Registrar', label: t('admin2.ue_role_registrar') },
+  { value: 'Patient', label: t('admin2.ue_role_patient') },
+  { value: 'Cashier', label: t('admin2.ue_role_cashier') },
+  { value: 'Lab', label: t('admin2.ue_role_lab') }];
 
 
   // Загрузка данных
@@ -93,7 +94,7 @@ const UserExportManager = () => {
       setExportFiles(response.data.files || []);
     } catch (error) {
       logger.error('Ошибка загрузки файлов экспорта:', error);
-      toast.error('Ошибка загрузки файлов экспорта');
+      toast.error(t('admin2.ue_load_error_toast'));
     } finally {
       setLoading(false);
     }
@@ -132,7 +133,7 @@ const UserExportManager = () => {
       }
     } catch (error) {
       logger.error('Ошибка экспорта:', error);
-      toast.error(error.response?.data?.detail || 'Ошибка экспорта пользователей');
+      toast.error(error.response?.data?.detail || t('admin2.ue_export_error_fallback'));
     } finally {
       setLoading(false);
     }
@@ -154,10 +155,10 @@ const UserExportManager = () => {
       link.remove();
       window.URL.revokeObjectURL(url);
 
-      toast.success(`Файл ${filename} скачан`);
+      toast.success(t('admin2.ue_download_success', { filename }));
     } catch (error) {
       logger.error('Ошибка скачивания:', error);
-      toast.error('Ошибка скачивания файла');
+      toast.error(t('admin2.ue_download_error_toast'));
     }
   };
 
@@ -165,8 +166,8 @@ const UserExportManager = () => {
     // P-013 fix: replaced native confirm() with shared useConfirm hook.
     const ok = await confirm({
       title: t('admin2.delete_file_title'),
-      message: `Удалить файл ${filename}?`,
-      description: 'Это действие необратимо.',
+      message: t('admin2.ue_delete_file_message', { filename }),
+      description: t('admin2.ue_delete_description'),
       confirmLabel: t('admin2.delete_confirm'),
       cancelLabel: t('admin2.cancel'),
       intent: 'danger',
@@ -175,11 +176,11 @@ const UserExportManager = () => {
 
     try {
       await api.delete(`/users/users/export/files/${filename}`);
-      toast.success(`Файл ${filename} удален`);
+      toast.success(t('admin2.ue_delete_success_toast', { filename }));
       loadExportFiles();
     } catch (error) {
       logger.error('Ошибка удаления:', error);
-      toast.error('Ошибка удаления файла');
+      toast.error(t('admin2.ue_delete_error_toast'));
     }
   };
 
@@ -236,13 +237,13 @@ const UserExportManager = () => {
       <MacOSCard className="admin-p-24">
         <h3 className="admin-m-0-0-24px-0-d-flex-ai-center-gap-8-fs-lg-fw-med-primary">
           <Settings className="admin-icon-20" />
-          Настройки экспорта
+          {t('admin2.ue_settings_title')}
         </h3>
 
         {/* Формат экспорта */}
         <div className="admin-mb-16">
           <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
-            Формат файла:
+            {t('admin2.ue_label_format')}
           </label>
           <Select
           value={exportForm.format}
@@ -261,7 +262,7 @@ const UserExportManager = () => {
         {/* Поля для экспорта */}
         <div className="admin-mb-16">
           <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
-            Поля для экспорта (оставьте пустым для всех полей):
+            {t('admin2.ue_label_fields')}
           </label>
           <div className="admin-d-grid-gtc-repeat-auto-fill-min-gap-8-mt-8-maxh-200-ovy-auto-p-12-bd-1px-solid-var-mac-bo-radius-var-mac-radius-sm-bgc-bg-secondary">
             {availableFields.map((field) =>
@@ -286,7 +287,7 @@ const UserExportManager = () => {
         {/* Дополнительные данные */}
         <div className="admin-mb-16">
           <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
-            Дополнительные данные:
+            {t('admin2.ue_label_extra_data')}
           </label>
           <div className="admin-d-flex-fd-column-gap-8-mt-8">
             <label className="admin-d-flex-ai-center-gap-8-cur-pointer-fs-sm-primary">
@@ -295,7 +296,7 @@ const UserExportManager = () => {
               onChange={(checked) => setExportForm((prev) => ({ ...prev, include_profile: checked }))}
               className="admin-mr-8" />
 
-              <span>Включить профили пользователей</span>
+              <span>{t('admin2.ue_include_profile')}</span>
             </label>
             <label className="admin-d-flex-ai-center-gap-8-cur-pointer-fs-sm-primary">
               <Checkbox
@@ -303,7 +304,7 @@ const UserExportManager = () => {
               onChange={(checked) => setExportForm((prev) => ({ ...prev, include_preferences: checked }))}
               className="admin-mr-8" />
 
-              <span>Включить настройки пользователей</span>
+              <span>{t('admin2.ue_include_preferences')}</span>
             </label>
             <label className="admin-d-flex-ai-center-gap-8-cur-pointer-fs-sm-primary">
               <Checkbox
@@ -311,7 +312,7 @@ const UserExportManager = () => {
               onChange={(checked) => setExportForm((prev) => ({ ...prev, include_audit_logs: checked }))}
               className="admin-mr-8" />
 
-              <span>Включить журнал аудита</span>
+              <span>{t('admin2.ue_include_audit_logs')}</span>
             </label>
           </div>
         </div>
@@ -321,16 +322,16 @@ const UserExportManager = () => {
       <MacOSCard className="admin-p-24">
         <h3 className="admin-m-0-0-24px-0-d-flex-ai-center-gap-8-fs-lg-fw-med-primary">
           <Filter className="admin-icon-20" />
-          Фильтры
+          {t('admin2.ue_filters_title')}
         </h3>
 
         <div className="admin-flex-col-16">
           <div>
             <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
-              Имя пользователя:
+              {t('admin2.ue_label_username')}
             </label>
             <Input
-            placeholder="Поиск по имени пользователя"
+            placeholder={t('admin2.ue_placeholder_username')}
             value={exportForm.filters.username}
             onChange={(e) => setExportForm((prev) => ({
               ...prev,
@@ -345,7 +346,7 @@ const UserExportManager = () => {
               Email:
             </label>
             <Input
-            placeholder="Поиск по email"
+            placeholder={t('admin2.ue_placeholder_email')}
             value={exportForm.filters.email}
             onChange={(e) => setExportForm((prev) => ({
               ...prev,
@@ -357,7 +358,7 @@ const UserExportManager = () => {
 
           <div>
             <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
-              Роль:
+              {t('admin2.ue_label_role')}
             </label>
             <Select
             value={exportForm.filters.role}
@@ -373,7 +374,7 @@ const UserExportManager = () => {
 
           <div>
             <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
-              Статус:
+              {t('admin2.ue_label_status')}
             </label>
             <Select
             value={exportForm.filters.is_active === null ? '' : exportForm.filters.is_active.toString()}
@@ -385,9 +386,9 @@ const UserExportManager = () => {
               }
             }))}
             options={[
-            { value: '', label: 'Все пользователи' },
-            { value: 'true', label: 'Только активные' },
-            { value: 'false', label: 'Только неактивные' }]
+            { value: '', label: t('admin2.ue_status_all') },
+            { value: 'true', label: t('admin2.ue_status_active_only') },
+            { value: 'false', label: t('admin2.ue_status_inactive_only') }]
             }
             size="large"
             className="admin-w-full" />
@@ -396,7 +397,7 @@ const UserExportManager = () => {
 
           <div>
             <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
-              Дата создания (от):
+              {t('admin2.ue_label_created_from')}
             </label>
             <Input
             type="date"
@@ -411,7 +412,7 @@ const UserExportManager = () => {
 
           <div>
             <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">
-              Дата создания (до):
+              {t('admin2.ue_label_created_to')}
             </label>
             <Input
             type="date"
@@ -437,12 +438,12 @@ const UserExportManager = () => {
             {loading ?
           <>
                 <RefreshCw className="admin-w-16-h-16-anim-spin-1s-linear-infin" />
-                Экспорт...
+                {t('admin2.ue_exporting_btn')}
               </> :
 
           <>
                 <Download className="admin-icon-16" />
-                Запустить экспорт
+                {t('admin2.ue_start_export_btn')}
               </>
           }
           </Button>
@@ -456,11 +457,11 @@ const UserExportManager = () => {
       <div className="admin-d-flex-jc-between-ai-center-mb-24">
         <h3 className="admin-m-0-d-flex-ai-center-gap-8-fs-lg-fw-med-primary">
           <FileText className="admin-icon-20" />
-          Файлы экспорта
+          {t('admin2.ue_files_title')}
         </h3>
         <Button onClick={loadExportFiles} disabled={loading}>
           <RefreshCw className="admin-icon-16" />
-          Обновить
+          {t('admin2.ue_refresh_btn')}
         </Button>
       </div>
 
@@ -473,8 +474,8 @@ const UserExportManager = () => {
     exportFiles.length === 0 ?
     <div className="admin-ta-center-p-32-secondary-fs-sm">
           <FileText className="admin-w-48-h-48-mb-16-tertiary" />
-          <p className="admin-m-0">Нет файлов экспорта</p>
-          <p className="admin-m-8px-0-0-0">Создайте экспорт на вкладке «Экспорт»</p>
+          <p className="admin-m-0">{t('admin2.ue_no_files_title')}</p>
+          <p className="admin-m-8px-0-0-0">{t('admin2.ue_no_files_hint')}</p>
         </div> :
 
     <div className="admin-flex-col-8">
@@ -490,8 +491,8 @@ const UserExportManager = () => {
                     {file.filename}
                   </div>
                   <div className="admin-fs-xs-secondary">
-                    Размер: {formatFileSize(file.size)} | 
-                    Создан: {new Date(file.created_at).toLocaleString('ru-RU')}
+                    {t('admin2.ue_size_label')}{formatFileSize(file.size)} | 
+                    {t('admin2.ue_created_label')}{new Date(file.created_at).toLocaleString('ru-RU')}
                   </div>
                 </div>
               </div>
@@ -502,7 +503,7 @@ const UserExportManager = () => {
             onClick={() => handleDownload(file.filename)}>
 
                   <Download className="admin-icon-14" />
-                  Скачать
+                  {t('admin2.ue_download_btn')}
                 </Button>
                 <Button
             size="sm"
@@ -510,7 +511,7 @@ const UserExportManager = () => {
             onClick={() => handleDeleteFile(file.filename)}>
 
                   <Trash2 className="admin-icon-14" />
-                  Удалить
+                  {t('admin2.ue_delete_btn')}
                 </Button>
               </div>
             </div>
@@ -525,17 +526,17 @@ const UserExportManager = () => {
       <div className="admin-mb-24">
         <h1 className="admin-m-0-fs-2xl-fw-semi-primary-d-flex-ai-center-gap-12">
           <Users className="admin-w-32-h-32" />
-          Экспорт пользователей
+          {t('admin2.ue_page_title')}
         </h1>
         <p className="admin-m-8px-0-0-0-secondary-fs-sm">
-          Экспорт данных пользователей в различных форматах
+          {t('admin2.ue_page_subtitle')}
         </p>
       </div>
 
       {/* Табы */}
       <div className="admin-maxw-100pct-ovx-auto-pb-6-mb-24-scrollba-thin">
         <SegmentedControl
-          aria-label="Разделы экспорта пользователей"
+          aria-label={t('admin2.ue_tabs_aria')}
           value={activeTab}
           onChange={setActiveTab}
           options={[
@@ -544,7 +545,7 @@ const UserExportManager = () => {
               label: (
                 <span className="admin-d-inline-flex-ai-center-gap-8">
                   <Download size={14} aria-hidden="true" />
-                  Экспорт
+                  {t('admin2.ue_tab_export')}
                 </span>
               )
             },
@@ -553,7 +554,7 @@ const UserExportManager = () => {
               label: (
                 <span className="admin-d-inline-flex-ai-center-gap-8">
                   <FileText size={14} aria-hidden="true" />
-                  Файлы ({exportFiles.length})
+                  {t('admin2.ue_tab_files', { count: exportFiles.length })}
                 </span>
               )
             }

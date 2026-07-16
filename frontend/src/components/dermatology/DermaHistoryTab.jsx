@@ -5,7 +5,7 @@
 import PropTypes from 'prop-types';
 import { Calendar } from 'lucide-react';
 import { MacOSCard, Badge } from '../ui/macos';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 export function DermaHistoryTab({
   skinExaminations = [],

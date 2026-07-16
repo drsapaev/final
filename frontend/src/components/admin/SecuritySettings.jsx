@@ -27,13 +27,14 @@ import {
   MacOSCard,
 } from '../ui/macos';
 import PropTypes from 'prop-types';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const SecuritySettings = ({
   settings = {},
   onSave,
   loading = false
 }) => {
+  const { t } = useTranslation();
   const [formData, setFormData] = useState({
     // Пароль
     currentPassword: '',
@@ -97,23 +98,23 @@ const SecuritySettings = ({
     const newErrors = {};
 
     if (!formData.currentPassword) {
-      newErrors.currentPassword = 'Текущий пароль обязателен';
+      newErrors.currentPassword = t('admin2.ss_err_current_required');
     }
 
     if (!formData.newPassword) {
-      newErrors.newPassword = 'Новый пароль обязателен';
+      newErrors.newPassword = t('admin2.ss_err_new_required');
     } else if (formData.newPassword.length < formData.passwordMinLength) {
-      newErrors.newPassword = `Пароль должен содержать минимум ${formData.passwordMinLength} символов`;
+      newErrors.newPassword = t('admin2.ss_err_new_min_length', { min: formData.passwordMinLength });
     } else if (formData.passwordRequireUppercase && !/[A-Z]/.test(formData.newPassword)) {
-      newErrors.newPassword = 'Пароль должен содержать заглавные буквы';
+      newErrors.newPassword = t('admin2.ss_err_new_uppercase');
     } else if (formData.passwordRequireNumbers && !/\d/.test(formData.newPassword)) {
-      newErrors.newPassword = 'Пароль должен содержать цифры';
+      newErrors.newPassword = t('admin2.ss_err_new_numbers');
     } else if (formData.passwordRequireSymbols && !/[!@#$%^&*(),.?":{}|<>]/.test(formData.newPassword)) {
-      newErrors.newPassword = 'Пароль должен содержать специальные символы';
+      newErrors.newPassword = t('admin2.ss_err_new_symbols');
     }
 
     if (formData.newPassword !== formData.confirmPassword) {
-      newErrors.confirmPassword = 'Пароли не совпадают';
+      newErrors.confirmPassword = t('admin2.ss_err_confirm_mismatch');
     }
 
     setErrors(newErrors);
@@ -182,9 +183,9 @@ const SecuritySettings = ({
 
   const getStatusLabel = (status) => {
     const labelMap = {
-      success: 'Успешно',
-      failed: 'Ошибка',
-      blocked: 'Заблокировано'
+      success: t('admin2.ss_status_success'),
+      failed: t('admin2.ss_status_failed'),
+      blocked: t('admin2.ss_status_blocked')
     };
     return labelMap[status] || status;
   };
@@ -194,11 +195,11 @@ const SecuritySettings = ({
   };
 
   const tabs = [
-  { id: 'password', label: 'Пароль', icon: Lock },
+  { id: 'password', label: t('admin2.ss_tab_password'), icon: Lock },
   { id: 'two-factor', label: '2FA', icon: Shield },
-  { id: 'sessions', label: 'Сессии', icon: User },
-  { id: 'security', label: 'Политики', icon: Key }, // Sprint 5: was 'Безопасность' (tautology inside SecuritySettings)
-  { id: 'audit', label: 'Аудит', icon: Clock }];
+  { id: 'sessions', label: t('admin2.ss_tab_sessions'), icon: User },
+  { id: 'security', label: t('admin2.ss_tab_policies'), icon: Key }, // Sprint 5: was 'Безопасность' (tautology inside SecuritySettings)
+  { id: 'audit', label: t('admin2.ss_tab_audit'), icon: Clock }];
 
 
   return (
@@ -225,19 +226,19 @@ const SecuritySettings = ({
         {activeTab === 'password' &&
         <MacOSCard className="p-6">
             <h3 className="admin-lg-semi-mb-20-primary">
-              Смена пароля
+              {t('admin2.ss_title_change_password')}
             </h3>
             <div className="flex flex-col gap-4">
               <div>
                 <label className="admin-block-sm-med-mb-8-primary">
-                  Текущий пароль *
+                  {t('admin2.ss_label_current_password')}
                 </label>
                 <div className="admin-pos-relative">
                   <Input
                   type={showPasswords.current ? 'text' : 'password'}
                   value={formData.currentPassword}
                   onChange={(e) => handleChange('currentPassword', e.target.value)}
-                  placeholder="Введите текущий пароль"
+                  placeholder={t('admin2.ss_ph_current_password')}
                   autoComplete="current-password"
                   className="admin-pl-40-pr-40" />
                 
@@ -245,7 +246,7 @@ const SecuritySettings = ({
                   <button
                   type="button"
                   onClick={() => togglePasswordVisibility('current')}
-                  aria-label={showPasswords.current ? 'Скрыть текущий пароль' : 'Показать текущий пароль'}
+                  aria-label={showPasswords.current ? t('admin2.ss_aria_hide_current') : t('admin2.ss_aria_show_current')}
                   className="admin-pos-absolute-right-12-top-50pct-transform-translateY-50-background-785252--35889c36">
                   
                     {showPasswords.current ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -261,14 +262,14 @@ const SecuritySettings = ({
 
               <div>
                 <label className="admin-block-sm-med-mb-8-primary">
-                  Новый пароль *
+                  {t('admin2.ss_label_new_password')}
                 </label>
                 <div className="admin-pos-relative">
                   <Input
                   type={showPasswords.new ? 'text' : 'password'}
                   value={formData.newPassword}
                   onChange={(e) => handleChange('newPassword', e.target.value)}
-                  placeholder="Введите новый пароль"
+                  placeholder={t('admin2.ss_ph_new_password')}
                   autoComplete="new-password"
                   className="admin-pl-40-pr-40" />
                 
@@ -276,7 +277,7 @@ const SecuritySettings = ({
                   <button
                   type="button"
                   onClick={() => togglePasswordVisibility('new')}
-                  aria-label={showPasswords.new ? 'Скрыть новый пароль' : 'Показать новый пароль'}
+                  aria-label={showPasswords.new ? t('admin2.ss_aria_hide_new') : t('admin2.ss_aria_show_new')}
                   className="admin-pos-absolute-right-12-top-50pct-transform-translateY-50-background-785252--35889c36">
                   
                     {showPasswords.new ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -292,14 +293,14 @@ const SecuritySettings = ({
 
               <div>
                 <label className="admin-block-sm-med-mb-8-primary">
-                  Подтвердите новый пароль *
+                  {t('admin2.ss_label_confirm_password')}
                 </label>
                 <div className="admin-pos-relative">
                   <Input
                   type={showPasswords.confirm ? 'text' : 'password'}
                   value={formData.confirmPassword}
                   onChange={(e) => handleChange('confirmPassword', e.target.value)}
-                  placeholder="Подтвердите новый пароль"
+                  placeholder={t('admin2.ss_ph_confirm_password')}
                   autoComplete="new-password"
                   className="admin-pl-40-pr-40" />
                 
@@ -307,7 +308,7 @@ const SecuritySettings = ({
                   <button
                   type="button"
                   onClick={() => togglePasswordVisibility('confirm')}
-                  aria-label={showPasswords.confirm ? 'Скрыть подтверждение пароля' : 'Показать подтверждение пароля'}
+                  aria-label={showPasswords.confirm ? t('admin2.ss_aria_hide_confirm') : t('admin2.ss_aria_show_confirm')}
                   className="admin-pos-absolute-right-12-top-50pct-transform-translateY-50-background-785252--35889c36">
                   
                     {showPasswords.confirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -328,16 +329,16 @@ const SecuritySettings = ({
         {activeTab === 'two-factor' &&
         <MacOSCard className="p-6">
             <h3 className="admin-lg-semi-mb-20-primary">
-              Двухфакторная аутентификация
+              {t('admin2.ss_title_2fa')}
             </h3>
             <div className="flex flex-col gap-4">
               <div className="admin-flex-ai-center-jc-between-p-16-radius-var--mac-radius-md-bd-1solidvar-mac--d38da58b">
                 <div>
                   <h4 className="admin-base-med-primary-mb-4">
-                    Включить 2FA
+                    {t('admin2.ss_2fa_enable_title')}
                   </h4>
                   <p className="admin-sm-secondary-m-0">
-                    Дополнительная защита вашего аккаунта
+                    {t('admin2.ss_2fa_enable_desc')}
                   </p>
                 </div>
                 <Checkbox
@@ -349,7 +350,7 @@ const SecuritySettings = ({
               {formData.twoFactorEnabled &&
             <div>
                   <label className="admin-block-sm-med-mb-8-primary">
-                    Метод аутентификации
+                    {t('admin2.ss_label_2fa_method')}
                   </label>
                   <Select
                 value={formData.twoFactorMethod}
@@ -357,9 +358,9 @@ const SecuritySettings = ({
                 options={[
                 { value: 'sms', label: 'SMS' },
                 { value: 'email', label: 'Email' },
-                { value: 'app', label: '\u041f\u0440\u0438\u043b\u043e\u0436\u0435\u043d\u0438\u0435-\u0430\u0443\u0442\u0435\u043d\u0442\u0438\u0444\u0438\u043a\u0430\u0442\u043e\u0440' }]
+                { value: 'app', label: t('admin2.ss_2fa_method_app') }]
                 }
-                placeholder={'\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u043c\u0435\u0442\u043e\u0434'}></Select>
+                placeholder={t('admin2.ss_ph_2fa_method')}></Select>
               
                 </div>
             }
@@ -372,7 +373,7 @@ const SecuritySettings = ({
         <MacOSCard className="p-6">
             <div className="admin-flex-ai-center-jc-between-mb-20">
               <h3 className="admin-lg-semi-primary-m-0">
-                Активные сессии
+                {t('admin2.ss_title_sessions')}
               </h3>
               <Button
               variant="outline"
@@ -381,14 +382,14 @@ const SecuritySettings = ({
               size="sm">
               
                 <Trash2 className="w-4 h-4 mr-2" />
-                Завершить все остальные
+                {t('admin2.ss_btn_terminate_all_others')}
               </Button>
             </div>
 
             <div className="flex flex-col gap-3">
               {activeSessions.length === 0 &&
               <p className="admin-sm-secondary-m-0">
-                Нет backend-данных об активных сессиях.
+                {t('admin2.ss_sessions_empty')}
               </p>
               }
               {activeSessions.map((session) =>
@@ -401,14 +402,14 @@ const SecuritySettings = ({
                       <p className="admin-base-med-primary-m-0-flex-ai-center-gap-8">
                         {session.device}
                         {session.current &&
-                    <Badge variant="success" size="sm">Текущая</Badge>
+                    <Badge variant="success" size="sm">{t('admin2.ss_session_current_badge')}</Badge>
                     }
                       </p>
                       <p className="admin-sm-secondary-m-4px000">
                         {session.location} • {session.ip}
                       </p>
                       <p className="admin-xs-tertiary-m-4px000">
-                        Последняя активность: {formatDateTime(session.lastActive)}
+                        {t('admin2.ss_session_last_activity', { datetime: formatDateTime(session.lastActive) })}
                       </p>
                     </div>
                   </div>
@@ -435,12 +436,12 @@ const SecuritySettings = ({
         {activeTab === 'security' &&
         <MacOSCard className="p-6">
             <h3 className="admin-lg-semi-mb-20-primary">
-              Настройки безопасности
+              {t('admin2.ss_title_security_settings')}
             </h3>
             <div className="admin-grid-gtc-rauto-fitcminmax200pxc1fr-gap-16-mb-24">
               <div>
                 <label className="admin-block-sm-med-mb-8-primary">
-                  Минимальная длина пароля
+                  {t('admin2.ss_label_password_min_length')}
                 </label>
                 <Input
                 type="number"
@@ -453,7 +454,7 @@ const SecuritySettings = ({
 
               <div>
                 <label className="admin-block-sm-med-mb-8-primary">
-                  Срок действия пароля (дни)
+                  {t('admin2.ss_label_password_expiry_days')}
                 </label>
                 <Input
                 type="number"
@@ -466,7 +467,7 @@ const SecuritySettings = ({
 
               <div>
                 <label className="admin-block-sm-med-mb-8-primary">
-                  Максимум попыток входа
+                  {t('admin2.ss_label_max_login_attempts')}
                 </label>
                 <Input
                 type="number"
@@ -479,7 +480,7 @@ const SecuritySettings = ({
 
               <div>
                 <label className="admin-block-sm-med-mb-8-primary">
-                  Время блокировки (минуты)
+                  {t('admin2.ss_label_lockout_duration')}
                 </label>
                 <Input
                 type="number"
@@ -495,25 +496,25 @@ const SecuritySettings = ({
               <Checkbox
               checked={formData.passwordRequireUppercase}
               onChange={(checked) => handleChange('passwordRequireUppercase', checked)}
-              label="Требовать заглавные буквы в пароле" />
+              label={t('admin2.ss_label_require_uppercase')} />
             
 
               <Checkbox
               checked={formData.passwordRequireNumbers}
               onChange={(checked) => handleChange('passwordRequireNumbers', checked)}
-              label="Требовать цифры в пароле" />
+              label={t('admin2.ss_label_require_numbers')} />
             
 
               <Checkbox
               checked={formData.passwordRequireSymbols}
               onChange={(checked) => handleChange('passwordRequireSymbols', checked)}
-              label="Требовать специальные символы в пароле" />
+              label={t('admin2.ss_label_require_symbols')} />
             
 
               <Checkbox
               checked={formData.blockSuspiciousIPs}
               onChange={(checked) => handleChange('blockSuspiciousIPs', checked)}
-              label="Блокировать подозрительные IP адреса" />
+              label={t('admin2.ss_label_block_suspicious_ips')} />
             
             </div>
           </MacOSCard>
@@ -523,13 +524,13 @@ const SecuritySettings = ({
         {activeTab === 'audit' &&
         <MacOSCard className="p-6">
             <h3 className="admin-lg-semi-mb-20-primary">
-              Логи безопасности
+              {t('admin2.ss_title_audit_logs')}
             </h3>
 
             <div className="flex flex-col gap-3">
               {securityLogs.length === 0 &&
               <p className="admin-sm-secondary-m-0">
-                Нет backend-данных о событиях безопасности.
+                {t('admin2.ss_audit_logs_empty')}
               </p>
               }
               {securityLogs.map((log) => {
@@ -572,7 +573,7 @@ const SecuritySettings = ({
         {/* Кнопки действий */}
         <div className="admin-flex-ai-center-jc-between-pt-24-bordertop-6787ca">
           <div className="text-sm text-[var(--mac-text-secondary)]">
-            Настройки безопасности сохраняются после нажатия «Сохранить»
+            {t('admin2.ss_save_hint')}
           </div>
 
           <div className="admin-flex-center-12">
@@ -586,7 +587,7 @@ const SecuritySettings = ({
               disabled={isSubmitting}>
               
               <RefreshCw className="w-4 h-4 mr-2" />
-              Сбросить
+              {t('admin2.ss_btn_reset')}
             </Button>
 
             <Button
@@ -595,7 +596,7 @@ const SecuritySettings = ({
               loading={isSubmitting}>
               
               <Save className="w-4 h-4 mr-2" />
-              Сохранить настройки
+              {t('admin2.ss_btn_save')}
             </Button>
           </div>
         </div>

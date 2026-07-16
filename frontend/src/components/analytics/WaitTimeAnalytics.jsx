@@ -30,7 +30,7 @@ import { api } from '../../api/client';
 import './WaitTimeAnalytics.css';
 
 import logger from '../../utils/logger';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 const WaitTimeAnalytics = () => {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState('overview');
@@ -66,11 +66,11 @@ const WaitTimeAnalytics = () => {
       setAnalytics(response.data);
     } catch (error) {
       logger.error('Ошибка загрузки аналитики времени ожидания:', error);
-      toast.error('Ошибка загрузки аналитики');
+      toast.error(t('misc.wta_error_load_analytics'));
     } finally {
       setLoading(false);
     }
-  }, [dateRange.endDate, dateRange.startDate, filters.department, filters.doctorId]);
+  }, [dateRange.endDate, dateRange.startDate, filters.department, filters.doctorId, t]);
 
   const loadRealTimeEstimates = useCallback(async () => {
     try {
@@ -96,11 +96,11 @@ const WaitTimeAnalytics = () => {
       setServiceAnalytics(response.data);
     } catch (error) {
       logger.error('Ошибка загрузки аналитики по услугам:', error);
-      toast.error('Ошибка загрузки аналитики по услугам');
+      toast.error(t('misc.wta_error_load_service_analytics'));
     } finally {
       setLoading(false);
     }
-  }, [dateRange.endDate, dateRange.startDate]);
+  }, [dateRange.endDate, dateRange.startDate, t]);
 
   const loadSummary = useCallback(async () => {
     try {
@@ -128,11 +128,11 @@ const WaitTimeAnalytics = () => {
       setHeatmapData(response.data);
     } catch (error) {
       logger.error('Ошибка загрузки тепловой карты:', error);
-      toast.error('Ошибка загрузки тепловой карты');
+      toast.error(t('misc.wta_error_load_heatmap'));
     } finally {
       setLoading(false);
     }
-  }, [dateRange.endDate, dateRange.startDate, filters.department]);
+  }, [dateRange.endDate, dateRange.startDate, filters.department, t]);
 
   useEffect(() => {
     loadAnalytics();
@@ -167,11 +167,11 @@ const WaitTimeAnalytics = () => {
 
   const formatTime = (minutes) => {
     if (minutes < 60) {
-      return `${Math.round(minutes)} мин`;
+      return t('misc.wta_time_minutes', { minutes: Math.round(minutes) });
     }
     const hours = Math.floor(minutes / 60);
     const mins = Math.round(minutes % 60);
-    return `${hours}ч ${mins}м`;
+    return t('misc.wta_time_hours_minutes', { hours, mins });
   };
 
   const getPerformanceColor = (rating) => {
@@ -193,7 +193,7 @@ const WaitTimeAnalytics = () => {
           <div className="wta-section-header">
             <h3 className="wta-h3">
               <Activity style={{ width: '20px', height: '20px' }} />
-              Сводка за последние {summary.period_days} дней
+              {t('misc.wta_summary_title', { days: summary.period_days })}
             </h3>
             <Badge
           variant="secondary"
@@ -208,28 +208,28 @@ const WaitTimeAnalytics = () => {
 
           <div className="wta-stat-grid">
             <MacOSStatCard
-          title="Среднее время ожидания"
+          title={t('misc.wta_stat_avg_wait_time')}
           value={formatTime(summary.average_wait_time_minutes)}
           icon={Clock}
           color="var(--mac-info)" />
         
 
             <MacOSStatCard
-          title="Медианное время"
+          title={t('misc.wta_stat_median_time')}
           value={formatTime(summary.median_wait_time_minutes)}
           icon={Activity}
           color="var(--mac-success)" />
         
 
             <MacOSStatCard
-          title="Проанализировано записей"
+          title={t('misc.wta_stat_analyzed_entries')}
           value={summary.total_analyzed_entries.toString()}
           icon={BarChart3}
           color="var(--mac-accent-purple)" />
         
 
             <MacOSStatCard
-          title="Тренд"
+          title={t('misc.wta_stat_trend')}
           value={`${Math.abs(summary.trend_change_percent)}%`}
           icon={summary.trend_change_percent > 0 ? TrendingUp : TrendingDown}
           color={summary.trend_change_percent > 0 ? 'var(--mac-error)' : 'var(--mac-success)'} />
@@ -239,7 +239,7 @@ const WaitTimeAnalytics = () => {
           {summary.top_recommendations && summary.top_recommendations.length > 0 &&
       <div className="wta-mt-4">
               <h4 className="wta-h4">
-                Рекомендации
+                {t('misc.wta_recommendations')}
               </h4>
               <div className="wta-recommendations-list">
                 {summary.top_recommendations.map((recommendation, index) =>
@@ -265,18 +265,18 @@ const WaitTimeAnalytics = () => {
           <div className="wta-section-header">
             <h3 className="wta-h3">
               <Zap style={{ width: '20px', height: '20px' }} />
-              Текущие оценки времени ожидания
+              {t('misc.wta_realtime_title')}
             </h3>
             <div className="wta-dept-median">
-              Обновлено: {new Date(realTimeEstimates.timestamp).toLocaleTimeString()}
+              {t('misc.wta_updated')} {new Date(realTimeEstimates.timestamp).toLocaleTimeString()}
             </div>
           </div>
 
           {Object.keys(realTimeEstimates.queues).length === 0 ?
       <MacOSEmptyState
         icon={Clock}
-        title="Нет активных очередей"
-        description="В данный момент нет активных очередей для отображения" /> :
+        title={t('misc.wta_empty_queues_title')}
+        description={t('misc.wta_empty_queues_desc')} /> :
 
 
       <div className="wta-grid-gap">
@@ -292,11 +292,11 @@ const WaitTimeAnalytics = () => {
                     <div className="wta-queue-stats">
                       <span className="wta-queue-stat">
                         <Users style={{ width: '14px', height: '14px' }} />
-                        {queue.current_queue_length} в очереди
+                        {t('misc.wta_in_queue', { count: queue.current_queue_length })}
                       </span>
                       <span className="wta-queue-stat">
                         <Clock style={{ width: '14px', height: '14px' }} />
-                        ~{formatTime(queue.average_service_time)} на пациента
+                        {t('misc.wta_per_patient', { time: formatTime(queue.average_service_time) })}
                       </span>
                     </div>
                   </div>
@@ -312,7 +312,7 @@ const WaitTimeAnalytics = () => {
               fontSize: 'var(--mac-font-size-xs)',
               color: 'var(--mac-text-tertiary)'
             }}>
-                      Уверенность: {Math.round(queue.confidence_level * 100)}%
+                      {t('misc.wta_confidence', { pct: Math.round(queue.confidence_level * 100) })}
                     </div>
                   </div>
                 </div>
@@ -323,9 +323,9 @@ const WaitTimeAnalytics = () => {
           {realTimeEstimates.summary && Object.keys(realTimeEstimates.queues).length > 0 &&
       <div className="wta-summary-box">
               <div className="wta-summary-row">
-                <span className="wta-recommendation-text-default">Минимальное ожидание: <strong>{formatTime(realTimeEstimates.summary.shortest_wait)}</strong></span>
-                <span className="wta-recommendation-text-default">Среднее ожидание: <strong>{formatTime(realTimeEstimates.summary.average_wait)}</strong></span>
-                <span className="wta-recommendation-text-default">Максимальное ожидание: <strong>{formatTime(realTimeEstimates.summary.longest_wait)}</strong></span>
+                <span className="wta-recommendation-text-default">{t('misc.wta_min_wait')} <strong>{formatTime(realTimeEstimates.summary.shortest_wait)}</strong></span>
+                <span className="wta-recommendation-text-default">{t('misc.wta_avg_wait')} <strong>{formatTime(realTimeEstimates.summary.average_wait)}</strong></span>
+                <span className="wta-recommendation-text-default">{t('misc.wta_max_wait')} <strong>{formatTime(realTimeEstimates.summary.longest_wait)}</strong></span>
               </div>
             </div>
       }
@@ -346,40 +346,40 @@ const WaitTimeAnalytics = () => {
           <MacOSCard className="wta-card-padded">
             <h3 className="wta-h3-mb16">
               <BarChart3 style={{ width: '20px', height: '20px' }} />
-              Детальная статистика ({analytics.period.start_date} - {analytics.period.end_date})
+              {t('misc.wta_detailed_stats_title', { start: analytics.period.start_date, end: analytics.period.end_date })}
             </h3>
 
             <div className="wta-stat-grid-sm">
               <MacOSStatCard
-            title="Среднее"
+            title={t('misc.wta_stat_average')}
             value={formatTime(analytics.overall_stats.average_minutes)}
             icon={Clock}
             color="var(--mac-info)" />
           
 
               <MacOSStatCard
-            title="Медиана"
+            title={t('misc.wta_stat_median')}
             value={formatTime(analytics.overall_stats.median_minutes)}
             icon={Activity}
             color="var(--mac-success)" />
           
 
               <MacOSStatCard
-            title="Минимум"
+            title={t('misc.wta_stat_min')}
             value={formatTime(analytics.overall_stats.min_minutes)}
             icon={TrendingDown}
             color="var(--mac-warning)" />
           
 
               <MacOSStatCard
-            title="Максимум"
+            title={t('misc.wta_stat_max')}
             value={formatTime(analytics.overall_stats.max_minutes)}
             icon={TrendingUp}
             color="var(--mac-error)" />
           
 
               <MacOSStatCard
-            title="90-й процентиль"
+            title={t('misc.wta_stat_90th_percentile')}
             value={formatTime(analytics.overall_stats.percentile_90)}
             icon={BarChart3}
             color="var(--mac-accent-purple)" />
@@ -391,7 +391,7 @@ const WaitTimeAnalytics = () => {
           {Object.keys(analytics.department_breakdown).length > 0 &&
       <MacOSCard className="wta-card-padded">
               <h3 className="wta-h3-mb16-no-icon">
-                По отделениям
+                {t('misc.wta_by_departments')}
               </h3>
               <div className="wta-grid-gap">
                 {Object.entries(analytics.department_breakdown).map(([dept, stats]) =>
@@ -404,7 +404,7 @@ const WaitTimeAnalytics = () => {
                         {dept}
                       </div>
                       <div className="wta-dept-count">
-                        {stats.count} записей
+                        {t('misc.wta_entries', { count: stats.count })}
                       </div>
                     </div>
                     <div className="wta-queue-right">
@@ -412,7 +412,7 @@ const WaitTimeAnalytics = () => {
                         {formatTime(stats.average_minutes)}
                       </div>
                       <div className="wta-dept-median">
-                        медиана: {formatTime(stats.median_minutes)}
+                        {t('misc.wta_median_label')} {formatTime(stats.median_minutes)}
                       </div>
                     </div>
                   </div>
@@ -425,7 +425,7 @@ const WaitTimeAnalytics = () => {
           {analytics.recommendations && analytics.recommendations.length > 0 &&
       <MacOSCard className="wta-card-padded">
               <h3 className="wta-h3-mb16-no-icon">
-                Рекомендации по улучшению
+                {t('misc.wta_improvement_recommendations')}
               </h3>
               <div className="wta-recommendations-list-gap2">
                 {analytics.recommendations.map((recommendation, index) =>
@@ -446,8 +446,8 @@ const WaitTimeAnalytics = () => {
 
     <MacOSEmptyState
       icon={BarChart3}
-      title="Нет данных для детального анализа"
-      description="Примените фильтры и загрузите данные для отображения детальной статистики" />
+      title={t('misc.wta_empty_detailed_title')}
+      description={t('misc.wta_empty_detailed_desc')} />
 
     }
     </div>;
@@ -457,7 +457,7 @@ const WaitTimeAnalytics = () => {
   <div className="wta-tab-content">
       <div className="wta-section-header-no-mb">
         <h3 className="wta-h3-mb16-no-icon">
-          Аналитика по услугам
+          {t('misc.wta_services_title')}
         </h3>
         <Button
         onClick={loadServiceAnalytics}
@@ -466,7 +466,7 @@ const WaitTimeAnalytics = () => {
         className="wta-action-btn">
         
           {loading ? <RefreshCw style={{ width: '16px', height: '16px' }} /> : <Eye style={{ width: '16px', height: '16px' }} />}
-          Загрузить
+          {t('misc.wta_load_btn')}
         </Button>
       </div>
 
@@ -488,14 +488,14 @@ const WaitTimeAnalytics = () => {
                       {data.service_name}
                     </div>
                     <div className="wta-dept-count">
-                      Код: {serviceCode} • {data.total_visits} визитов
+                      {t('misc.wta_service_code_visits', { code: serviceCode, visits: data.total_visits })}
                     </div>
                   </div>
                   {data.service_efficiency &&
             <Badge
               variant={data.service_efficiency.efficiency_score > 80 ? 'success' : 'warning'}>
               
-                      {data.service_efficiency.efficiency_score}% эффективность
+                      {t('misc.wta_efficiency', { pct: data.service_efficiency.efficiency_score })}
                     </Badge>
             }
                 </div>
@@ -503,7 +503,7 @@ const WaitTimeAnalytics = () => {
                 {data.wait_time_stats &&
           <div className="wta-stat-grid-xs">
                     <MacOSStatCard
-              title="Среднее"
+              title={t('misc.wta_stat_average')}
               value={formatTime(data.wait_time_stats.average_minutes)}
               icon={Clock}
               color="var(--mac-info)"
@@ -511,7 +511,7 @@ const WaitTimeAnalytics = () => {
             
 
                     <MacOSStatCard
-              title="Медиана"
+              title={t('misc.wta_stat_median')}
               value={formatTime(data.wait_time_stats.median_minutes)}
               icon={Activity}
               color="var(--mac-success)"
@@ -519,7 +519,7 @@ const WaitTimeAnalytics = () => {
             
 
                     <MacOSStatCard
-              title="Анализ"
+              title={t('misc.wta_stat_analysis')}
               value={data.analyzed_visits.toString()}
               icon={BarChart3}
               color="var(--mac-accent-purple)"
@@ -534,8 +534,8 @@ const WaitTimeAnalytics = () => {
 
     <MacOSEmptyState
       icon={Users}
-      title="Нет данных по услугам"
-      description="Нажмите 'Загрузить' или переключитесь на эту вкладку для автоматической загрузки данных по услугам" />
+      title={t('misc.wta_empty_services_title')}
+      description={t('misc.wta_empty_services_desc')} />
 
     }
     </div>;
@@ -545,7 +545,7 @@ const WaitTimeAnalytics = () => {
   <div className="wta-tab-content">
       <div className="wta-section-header-no-mb">
         <h3 className="wta-h3-mb16-no-icon">
-          Тепловая карта времени ожидания
+          {t('misc.wta_heatmap_title')}
         </h3>
         <Button
         onClick={loadHeatmap}
@@ -554,7 +554,7 @@ const WaitTimeAnalytics = () => {
         className="wta-action-btn">
         
           {loading ? <RefreshCw style={{ width: '16px', height: '16px' }} /> : <BarChart3 style={{ width: '16px', height: '16px' }} />}
-          Загрузить
+          {t('misc.wta_load_btn')}
         </Button>
       </div>
 
@@ -566,10 +566,10 @@ const WaitTimeAnalytics = () => {
     <MacOSCard className="wta-card-padded">
           <div className="wta-mb-4">
             <h4 className="wta-h4">
-              Время ожидания по часам дня
+              {t('misc.wta_wait_by_hour')}
             </h4>
             <div className="wta-dept-count">
-              Период: {heatmapData.period.start_date} - {heatmapData.period.end_date}
+              {t('misc.wta_period', { start: heatmapData.period.start_date, end: heatmapData.period.end_date })}
             </div>
           </div>
 
@@ -593,7 +593,7 @@ const WaitTimeAnalytics = () => {
                   {formatTime(hourData.average_wait_minutes)}
                 </div>
                 <div style={{ fontSize: 'var(--mac-font-size-xs)', opacity: 0.8 }}>
-                  {hourData.patient_count} пац.
+                  {t('misc.wta_patients_short', { count: hourData.patient_count })}
                 </div>
               </div>
         )}
@@ -608,27 +608,27 @@ const WaitTimeAnalytics = () => {
         justifyContent: 'space-between',
         fontSize: 'var(--mac-font-size-sm)'
       }}>
-              <span className="wta-recommendation-text-default">Пиковый час: <strong>{heatmapData.summary.peak_hour}:00</strong></span>
-              <span className="wta-recommendation-text-default">Лучший час: <strong>{heatmapData.summary.best_hour}:00</strong></span>
-              <span className="wta-recommendation-text-default">Самый загруженный: <strong>{heatmapData.summary.busiest_hour}:00</strong></span>
+              <span className="wta-recommendation-text-default">{t('misc.wta_peak_hour')} <strong>{heatmapData.summary.peak_hour}:00</strong></span>
+              <span className="wta-recommendation-text-default">{t('misc.wta_best_hour')} <strong>{heatmapData.summary.best_hour}:00</strong></span>
+              <span className="wta-recommendation-text-default">{t('misc.wta_busiest_hour')} <strong>{heatmapData.summary.busiest_hour}:00</strong></span>
             </div>
       }
         </MacOSCard> :
 
     <MacOSEmptyState
       icon={Calendar}
-      title="Нет данных тепловой карты"
-      description="Нажмите 'Загрузить' или переключитесь на эту вкладку для автоматической загрузки данных тепловой карты" />
+      title={t('misc.wta_empty_heatmap_title')}
+      description={t('misc.wta_empty_heatmap_desc')} />
 
     }
     </div>;
 
 
   const tabs = [
-  { id: 'overview', label: 'Обзор', icon: Activity },
-  { id: 'detailed', label: 'Детально', icon: BarChart3 },
-  { id: 'services', label: 'По услугам', icon: Users },
-  { id: 'heatmap', label: 'Тепловая карта', icon: Calendar }];
+  { id: 'overview', label: t('misc.wta_tab_overview'), icon: Activity },
+  { id: 'detailed', label: t('misc.wta_tab_detailed'), icon: BarChart3 },
+  { id: 'services', label: t('misc.wta_tab_services'), icon: Users },
+  { id: 'heatmap', label: t('misc.wta_tab_heatmap'), icon: Calendar }];
 
 
   return (
@@ -638,10 +638,10 @@ const WaitTimeAnalytics = () => {
         <Clock style={{ width: '32px', height: '32px', color: 'var(--mac-accent-blue)' }} />
         <div>
           <h1 className="wta-h1">
-            Аналитика времени ожидания
+            {t('misc.wta_page_title')}
           </h1>
           <p className="wta-h1-subtitle">
-            Анализ времени ожидания пациентов и оптимизация очередей
+            {t('misc.wta_page_subtitle')}
           </p>
         </div>
       </div>
@@ -651,7 +651,7 @@ const WaitTimeAnalytics = () => {
         <div className="wta-stat-grid">
           <div>
             <label className="wta-filter-label">
-              Начальная дата
+              {t('misc.wta_start_date')}
             </label>
             <Input
               type="date"
@@ -661,7 +661,7 @@ const WaitTimeAnalytics = () => {
           </div>
           <div>
             <label className="wta-filter-label">
-              Конечная дата
+              {t('misc.wta_end_date')}
             </label>
             <Input
               type="date"
@@ -671,10 +671,10 @@ const WaitTimeAnalytics = () => {
           </div>
           <div>
             <label className="wta-filter-label">
-              Отделение
+              {t('misc.wta_department')}
             </label>
             <Input
-              placeholder="Фильтр по отделению"
+              placeholder={t('misc.wta_filter_department')}
               value={filters.department}
               onChange={(e) => setFilters({ ...filters, department: e.target.value })} />
             
@@ -691,7 +691,7 @@ const WaitTimeAnalytics = () => {
               }}>
               
               {loading ? <RefreshCw style={{ width: '16px', height: '16px' }} /> : <Filter style={{ width: '16px', height: '16px' }} />}
-              Применить
+              {t('misc.wta_apply')}
             </Button>
           </div>
         </div>

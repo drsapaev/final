@@ -4,6 +4,7 @@ import { Pill, Plus, X, Save, Printer, AlertCircle, CheckCircle } from 'lucide-r
 import { Card, Button, Badge,
   Input } from './ui/macos';
 import logger from '../utils/logger';
+import { useTranslation } from '../i18n/useTranslation';
 const createEmptyPrescription = () => ({
   medications: [], // Список препаратов
   instructions: '', // Общие инструкции
@@ -21,6 +22,7 @@ const PrescriptionSystem = ({
   onSave,
   onPrint
 }) => {
+  const { t } = useTranslation();
   const [prescription, setPrescription] = useState(() => createEmptyPrescription());
 
   const [isSaving, setIsSaving] = useState(false);
@@ -129,17 +131,17 @@ const PrescriptionSystem = ({
   const prescriptionEligible = canCreatePrescription === true;
   const canEdit = prescriptionEligible;
   const prescriptionEligibilityLabel = prescriptionEligible
-    ? 'Рецепт доступен'
-    : 'Рецепт недоступен';
+    ? t('misc.ps_available')
+    : t('misc.ps_unavailable');
 
   if (!emr && !prescriptionEligible) {
     return (
       <Card className="p-6">
         <div className="text-center py-8">
           <AlertCircle className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold mb-2">Сначала создайте ЭМК</h3>
+          <h3 className="text-lg font-semibold mb-2">{t('misc.ps_create_emr_first')}</h3>
           <p className="text-gray-600">
-            Рецепт можно оформить только после сохранения ЭМК
+            {t('misc.ps_create_emr_first_desc')}
           </p>
         </div>
       </Card>);
@@ -151,9 +153,9 @@ const PrescriptionSystem = ({
       <Card className="p-6">
         <div className="text-center py-8">
           <AlertCircle className="w-12 h-12 text-orange-500 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold mb-2">ЭМК не сохранена</h3>
+          <h3 className="text-lg font-semibold mb-2">{t('misc.ps_emr_not_saved')}</h3>
           <p className="text-gray-600">
-            Сохраните ЭМК перед оформлением рецепта
+            {t('misc.ps_emr_not_saved_desc')}
           </p>
         </div>
       </Card>);
@@ -168,7 +170,7 @@ const PrescriptionSystem = ({
           <div className="flex items-center gap-3">
             <Pill className="w-6 h-6 text-green-600" />
             <div>
-              <h2 className="text-xl font-semibold">Рецепт</h2>
+              <h2 className="text-xl font-semibold">{t('misc.ps_title')}</h2>
               <p className="text-gray-500">
                 {appointment?.patient_name} • {appointment?.specialist}
               </p>
@@ -180,23 +182,23 @@ const PrescriptionSystem = ({
           
           <div className="flex items-center gap-3">
             <Badge variant={prescriptionEligible ? 'success' : 'warning'}>
-              {prescriptionEligible ? 'Доступен' : 'Недоступен'}
+              {prescriptionEligible ? t('misc.ps_available_short') : t('misc.ps_unavailable_short')}
             </Badge>
             {prescription.isDraft ?
-            <Badge variant="warning">Черновик</Badge> :
+            <Badge variant="warning">{t('misc.ps_draft')}</Badge> :
 
             <Badge variant="success">
                 <CheckCircle className="w-4 h-4 mr-1" />
-                Сохранено
+                {t('misc.ps_saved')}
               </Badge>
             }
-            
+
             {prescription.printedAt &&
-            <Badge variant="info">Напечатан</Badge>
+            <Badge variant="info">{t('misc.ps_printed')}</Badge>
             }
-            
+
             {hasUnsavedChanges &&
-            <Badge variant="info">Есть изменения</Badge>
+            <Badge variant="info">{t('misc.ps_has_changes')}</Badge>
             }
           </div>
         </div>
@@ -205,34 +207,34 @@ const PrescriptionSystem = ({
       {/* Список препаратов */}
       <Card className="p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold">Назначенные препараты</h3>
+          <h3 className="text-lg font-semibold">{t('misc.ps_medications_title')}</h3>
           <Button
             size="sm"
             onClick={handleMedicationAdd}
             disabled={!canEdit}>
-            
+
             <Plus className="w-4 h-4 mr-2" />
-            Добавить препарат
+            {t('misc.ps_add_medication')}
           </Button>
         </div>
 
         {prescription.medications.length === 0 ?
         <div className="text-center py-8 text-gray-500">
-            Препараты не назначены
+            {t('misc.ps_no_medications')}
           </div> :
 
         <div className="space-y-4">
             {prescription.medications.map((medication, index) =>
           <div key={medication.id} className="p-4 border border-gray-200 rounded-lg">
                 <div className="flex items-center justify-between mb-3">
-                  <h4 className="font-medium">Препарат #{index + 1}</h4>
+                  <h4 className="font-medium">{t('misc.ps_medication_n', { n: index + 1 })}</h4>
                   <Button
                 size="sm"
                 variant="danger"
                 onClick={() => handleMedicationRemove(medication.id)}
                 type="button"
-                title={`Удалить препарат ${index + 1}`}
-                aria-label={`Удалить препарат ${index + 1}`}
+                title={t('misc.ps_remove_medication', { n: index + 1 })}
+                aria-label={t('misc.ps_remove_medication', { n: index + 1 })}
                 disabled={!canEdit}>
                 
                     <X aria-hidden="true" className="w-4 h-4" />
@@ -241,59 +243,59 @@ const PrescriptionSystem = ({
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-sm font-medium mb-1">Название препарата</label>
+                    <label className="block text-sm font-medium mb-1">{t('misc.ps_med_name')}</label>
                     <Input
                   type="text"
                   aria-label={`Medication ${index + 1} name`}
                   value={medication.name}
                   onChange={(e) => handleMedicationChange(medication.id, 'name', e.target.value)}
-                  placeholder="Например: Амоксициллин"
+                  placeholder={t('misc.ps_med_name_ph')}
                   className="w-full p-2 border border-gray-300 rounded"
                   disabled={!canEdit} />
                 
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium mb-1">Дозировка</label>
+                    <label className="block text-sm font-medium mb-1">{t('misc.ps_med_dosage')}</label>
                     <Input
                   type="text"
                   aria-label={`Medication ${index + 1} dosage`}
                   value={medication.dosage}
                   onChange={(e) => handleMedicationChange(medication.id, 'dosage', e.target.value)}
-                  placeholder="Например: 500мг"
+                  placeholder={t('misc.ps_med_dosage_ph')}
                   className="w-full p-2 border border-gray-300 rounded"
                   disabled={!canEdit} />
                 
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium mb-1">Кратность</label>
+                    <label className="block text-sm font-medium mb-1">{t('misc.ps_med_frequency')}</label>
                     <Input
                   type="text"
                   aria-label={`Medication ${index + 1} frequency`}
                   value={medication.frequency}
                   onChange={(e) => handleMedicationChange(medication.id, 'frequency', e.target.value)}
-                  placeholder="Например: 3 раза в день"
+                  placeholder={t('misc.ps_med_frequency_ph')}
                   className="w-full p-2 border border-gray-300 rounded"
                   disabled={!canEdit} />
                 
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium mb-1">Продолжительность</label>
+                    <label className="block text-sm font-medium mb-1">{t('misc.ps_med_duration')}</label>
                     <Input
                   type="text"
                   aria-label={`Medication ${index + 1} duration`}
                   value={medication.duration}
                   onChange={(e) => handleMedicationChange(medication.id, 'duration', e.target.value)}
-                  placeholder="Например: 7 дней"
+                  placeholder={t('misc.ps_med_duration_ph')}
                   className="w-full p-2 border border-gray-300 rounded"
                   disabled={!canEdit} />
                 
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium mb-1">Количество</label>
+                    <label className="block text-sm font-medium mb-1">{t('misc.ps_med_quantity')}</label>
                     <Input
                   type="number"
                   aria-label={`Medication ${index + 1} quantity`}
@@ -305,13 +307,13 @@ const PrescriptionSystem = ({
                   </div>
                   
                   <div className="md:col-span-2 lg:col-span-1">
-                    <label className="block text-sm font-medium mb-1">Особые указания</label>
+                    <label className="block text-sm font-medium mb-1">{t('misc.ps_med_special')}</label>
                     <Input
                   type="text"
                   aria-label={`Medication ${index + 1} special instructions`}
                   value={medication.instructions}
                   onChange={(e) => handleMedicationChange(medication.id, 'instructions', e.target.value)}
-                  placeholder="Например: после еды"
+                  placeholder={t('misc.ps_med_special_ph')}
                   className="w-full p-2 border border-gray-300 rounded"
                   disabled={!canEdit} />
                 
@@ -325,12 +327,12 @@ const PrescriptionSystem = ({
 
       {/* Общие инструкции */}
       <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Общие инструкции</h3>
+        <h3 className="text-lg font-semibold mb-4">{t('misc.ps_general_instructions')}</h3>
         <textarea
           aria-label="Prescription general instructions"
           value={prescription.instructions}
           onChange={(e) => handleFieldChange('instructions', e.target.value)}
-          placeholder="Общие рекомендации по приему препаратов..."
+          placeholder={t('misc.ps_general_instructions_ph')}
           className="w-full h-24 p-3 border border-gray-300 rounded-lg resize-none"
           disabled={!canEdit} />
         
@@ -338,12 +340,12 @@ const PrescriptionSystem = ({
 
       {/* Заметки врача */}
       <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Заметки врача</h3>
+        <h3 className="text-lg font-semibold mb-4">{t('misc.ps_doctor_notes')}</h3>
         <textarea
           aria-label="Prescription doctor notes"
           value={prescription.doctorNotes}
           onChange={(e) => handleFieldChange('doctorNotes', e.target.value)}
-          placeholder="Внутренние заметки врача..."
+          placeholder={t('misc.ps_doctor_notes_ph')}
           className="w-full h-20 p-3 border border-gray-300 rounded-lg resize-none"
           disabled={!canEdit} />
         
@@ -351,17 +353,17 @@ const PrescriptionSystem = ({
 
       {/* Предпросмотр рецепта */}
       <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Предпросмотр рецепта</h3>
-        
+        <h3 className="text-lg font-semibold mb-4">{t('misc.ps_preview')}</h3>
+
         <div className="bg-white border-2 border-dashed border-gray-300 p-6 rounded-lg">
           <div className="text-center space-y-4">
-            <div className="font-bold text-lg">РЕЦЕПТ</div>
+            <div className="font-bold text-lg">{t('misc.ps_rx_title')}</div>
             <div className="text-sm">
-              <div>Пациент: {appointment?.patient_name}</div>
-              <div>Дата: {new Date().toLocaleDateString('ru-RU')}</div>
-              <div>Врач: {appointment?.specialist}</div>
+              <div>{t('misc.ps_patient')}: {appointment?.patient_name}</div>
+              <div>{t('misc.ps_date')}: {new Date().toLocaleDateString('ru-RU')}</div>
+              <div>{t('misc.ps_doctor')}: {appointment?.specialist}</div>
             </div>
-            
+
             <div className="border-t pt-4">
               {prescription.medications.map((med, index) =>
               <div key={med.id} className="text-left mb-3">
@@ -369,7 +371,7 @@ const PrescriptionSystem = ({
                     {index + 1}. {med.name} {med.dosage}
                   </div>
                   <div className="text-sm text-gray-600">
-                    {med.frequency} • {med.duration} • {med.quantity} шт.
+                    {med.frequency} • {med.duration} • {med.quantity} {t('misc.ps_pcs')}.
                   </div>
                   {med.instructions &&
                 <div className="text-sm text-gray-500 italic">
@@ -379,16 +381,16 @@ const PrescriptionSystem = ({
                 </div>
               )}
             </div>
-            
+
             {prescription.instructions &&
             <div className="border-t pt-4 text-sm">
-                <div className="font-medium">Инструкции:</div>
+                <div className="font-medium">{t('misc.ps_instructions_label')}</div>
                 <div>{prescription.instructions}</div>
               </div>
             }
-            
+
             <div className="border-t pt-4 text-xs text-gray-500">
-              Подпись врача: _________________
+              {t('misc.ps_doctor_signature')}
             </div>
           </div>
         </div>
@@ -398,25 +400,25 @@ const PrescriptionSystem = ({
       <Card className="p-6">
         <div className="flex items-center justify-between">
           <div className="text-sm text-gray-600">
-            {hasUnsavedChanges && 'Есть несохраненные изменения'}
+            {hasUnsavedChanges && t('misc.ps_unsaved_changes')}
           </div>
-          
+
           <div className="flex gap-3">
             <Button
               onClick={handleSavePrescription}
               disabled={!canEdit || isSaving || prescription.medications.length === 0}>
-              
+
               <Save className="w-4 h-4 mr-2" />
-              {isSaving ? 'Сохранение...' : 'Сохранить рецепт'}
+              {isSaving ? t('misc.ps_saving') : t('misc.ps_save')}
             </Button>
-            
+
             <Button
               variant="outline"
               onClick={handlePrintPrescription}
               disabled={prescription.isDraft || typeof onPrint !== 'function'}>
-              
+
               <Printer className="w-4 h-4 mr-2" />
-              Печать рецепта
+              {t('misc.ps_print')}
             </Button>
           </div>
         </div>

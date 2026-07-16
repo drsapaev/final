@@ -3,7 +3,7 @@ import MedicalCard from './MedicalCard';
 import Icon from '../Icon';
 import { useTheme } from '../../contexts/ThemeContext';
 import PropTypes from 'prop-types';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 /**
  * Карточка метрики для дашборда в стиле MediLab

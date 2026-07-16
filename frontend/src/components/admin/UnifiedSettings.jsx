@@ -15,7 +15,7 @@ import ColorSchemeSelector from './ColorSchemeSelector.jsx';
 import { AccentPicker } from '../ui/macos';
 // P-025 fix: shared loading/error/empty wrapper for Unified* panels.
 import StateWrapper from '../common/StateWrapper.jsx';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const stripPasswordFields = (formData) => {
   const persistedSettings = { ...(formData || {}) };
@@ -37,6 +37,7 @@ const ADMIN_SETTINGS_ROUTE_SECTION_MAP = {
 };
 
 const UnifiedSettings = () => {
+  const { t } = useTranslation();
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const routeSection = ADMIN_SETTINGS_ROUTE_SECTION_MAP[location.pathname.replace(/\/$/, '')];
@@ -65,7 +66,7 @@ const UnifiedSettings = () => {
       // P-025 fix: capture error for StateWrapper. Keep securitySettings
       // as-is (likely {} on first load) so the user can still see the form
       // structure if they retry.
-      setSecurityError(error?.message || 'Не удалось загрузить настройки безопасности. Проверьте соединение с сервером.');
+      setSecurityError(error?.message || t('admin2.us_load_error'));
       setSecuritySettings({});
     } finally {
       setSecurityLoading(false);
@@ -141,8 +142,8 @@ const UnifiedSettings = () => {
             isLoading={securityLoading}
             error={securityError}
             onRetry={() => { void loadSecuritySettings(); }}
-            emptyTitle="Настройки безопасности не загружены"
-            emptyMessage="Нажмите «Повторить», чтобы загрузить настройки безопасности."
+            emptyTitle={t('admin2.us_empty_title')}
+            emptyMessage={t('admin2.us_empty_message')}
           >
             <SecuritySettings
               settings={securitySettings}
@@ -159,21 +160,21 @@ const UnifiedSettings = () => {
             <ColorSchemeSelector />
             <div className="admin-settings-card-accent">
               <div className="admin-settings-section-title">
-                Акцентный цвет
+                {t('admin2.us_accent_color')}
               </div>
               <div className="admin-settings-grid-10">
                 <AccentPicker />
                 <div className="admin-settings-hint-12">
-                  Акцентный цвет влияет на кнопки, focus states и primary states в админ-панели. Он хранится локально в текущем браузере.
+                  {t('admin2.us_accent_hint')}
                 </div>
               </div>
             </div>
             <div className="admin-settings-card-gradient">
               <div className="admin-settings-section-title-mb-0">
-                Логика применения
+                {t('admin2.us_application_logic')}
               </div>
               <div className="admin-settings-hint-13">
-                Цветовая схема задаёт пространство интерфейса: фон, поверхности, header и sidebar. Accent управляет цветом действий и выделений. Theme preference синхронизируется через профиль пользователя, accent остаётся локальной настройкой рабочего места.
+                {t('admin2.us_logic_hint')}
               </div>
             </div>
             {/* UX Audit Admin #2.6: ClinicSettings удалён из default-ветки.

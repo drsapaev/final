@@ -27,26 +27,27 @@ import {
   ArrowUpRight,
   Clock3 } from
 'lucide-react';
-import { useTranslation } from '../i18n/adapter';
+import { useTranslation } from '../i18n/useTranslation';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const TAB_DEFINITIONS = [
-  { id: 'overview', label: 'Обзор', description: 'Сводка ключевых показателей за выбранный период', icon: Activity },
-  { id: 'appointments', label: 'Записи', description: 'Воронка записи, оплат и завершения', icon: Calendar },
-  { id: 'revenue', label: 'Доходы', description: 'Динамика выручки и структура оплат', icon: DollarSign },
-  { id: 'providers', label: 'Провайдеры', description: 'Сравнение платёжных провайдеров', icon: Wallet },
-  { id: 'visualization', label: 'Графики', description: 'Расширенные интерактивные графики', icon: BarChart3 },
-  { id: 'kpi', label: 'KPI', description: 'Операционные метрики и эффективность', icon: Target },
-  { id: 'predictive', label: 'Прогнозы', description: 'Тренды, сценарии и прогнозы', icon: TrendingUp }
+  { id: 'overview', labelKey: 'misc.an_tab_overview', descriptionKey: 'misc.an_tab_overview_desc', icon: Activity },
+  { id: 'appointments', labelKey: 'misc.an_tab_appointments', descriptionKey: 'misc.an_tab_appointments_desc', icon: Calendar },
+  { id: 'revenue', labelKey: 'misc.an_tab_revenue', descriptionKey: 'misc.an_tab_revenue_desc', icon: DollarSign },
+  { id: 'providers', labelKey: 'misc.an_tab_providers', descriptionKey: 'misc.an_tab_providers_desc', icon: Wallet },
+  { id: 'visualization', labelKey: 'misc.an_tab_visualization', descriptionKey: 'misc.an_tab_visualization_desc', icon: BarChart3 },
+  { id: 'kpi', label: 'KPI', descriptionKey: 'misc.an_tab_kpi_desc', icon: Target },
+  { id: 'predictive', labelKey: 'misc.an_tab_predictive', descriptionKey: 'misc.an_tab_predictive_desc', icon: TrendingUp }
 ];
 
-const DEPARTMENT_OPTIONS = [
-{ value: '', label: 'Все отделения' },
-{ value: 'General', label: 'Общее' },
-{ value: 'Cardiology', label: 'Кардиология' },
-{ value: 'Dermatology', label: 'Дерматология' },
-{ value: 'Dentistry', label: 'Стоматология' }];
+const DEPARTMENT_OPTION_KEYS = [
+  { value: '', labelKey: 'misc.an_dept_all' },
+  { value: 'General', labelKey: 'misc.an_dept_general' },
+  { value: 'Cardiology', labelKey: 'misc.an_dept_cardiology' },
+  { value: 'Dermatology', labelKey: 'misc.an_dept_dermatology' },
+  { value: 'Dentistry', labelKey: 'misc.an_dept_dentistry' }
+];
 
 function buildRelativeDateRange(days) {
   const end = new Date();
@@ -226,9 +227,9 @@ AnalyticsStatCard.propTypes = {
   compact: PropTypes.bool,
 };
 
-function AnalyticsComparisonList({ items, format = 'count', accent = 'var(--mac-accent-blue, #2563eb)' }) {
+function AnalyticsComparisonList({ items, format = 'count', accent = 'var(--mac-accent-blue, #2563eb)', t }) {
   if (!items.length) {
-    return <div style={{ color: analyticsTextSecondary }}>Данных пока недостаточно для сравнения.</div>;
+    return <div style={{ color: analyticsTextSecondary }}>{t('misc.an_compare_empty')}</div>;
   }
 
   const maxValue = Math.max(...items.map((item) => Number(item.value) || 0), 1);
@@ -272,11 +273,12 @@ AnalyticsComparisonList.propTypes = {
   items: PropTypes.array,
   format: PropTypes.string,
   accent: PropTypes.string,
+  t: PropTypes.func,
 };
 
-function AnalyticsLineTrend({ items, format = 'count', accent = 'var(--mac-accent-blue, #2563eb)', compact = false }) {
+function AnalyticsLineTrend({ items, format = 'count', accent = 'var(--mac-accent-blue, #2563eb)', compact = false, t }) {
   if (!items.length) {
-    return <div style={{ color: analyticsTextSecondary }}>История для графика пока пуста.</div>;
+    return <div style={{ color: analyticsTextSecondary }}>{t('misc.an_trend_empty')}</div>;
   }
 
   const values = items.map((item) => Number(item.value) || 0);
@@ -331,6 +333,7 @@ AnalyticsLineTrend.propTypes = {
   format: PropTypes.string,
   accent: PropTypes.string,
   compact: PropTypes.bool,
+  t: PropTypes.func,
 };
 
 function AnalyticsEmptyState({ title, description }) {
@@ -355,6 +358,7 @@ AnalyticsEmptyState.propTypes = {
 
 export default function AnalyticsPage() {
   const { getColor, getSpacing } = useTheme();
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [dateRange, setDateRange] = useState(buildRelativeDateRange(30));
   const [department, setDepartment] = useState('');
@@ -370,6 +374,9 @@ export default function AnalyticsPage() {
     predictive: null
   });
   const activeTabMeta = TAB_DEFINITIONS.find((tab) => tab.id === activeTab) || TAB_DEFINITIONS[0];
+  const activeTabLabel = activeTabMeta.label !== undefined ? activeTabMeta.label : t(activeTabMeta.labelKey);
+  const activeTabDescription = t(activeTabMeta.descriptionKey);
+  const departmentOptions = DEPARTMENT_OPTION_KEYS.map((opt) => ({ value: opt.value, label: t(opt.labelKey) }));
   const activePreset = getActivePreset(dateRange.start, dateRange.end);
 
   useEffect(() => {
@@ -500,38 +507,38 @@ export default function AnalyticsPage() {
 
   const renderOverviewTab = () => {
     if (!data.overview) {
-      return <AnalyticsEmptyState title="Нет обзорных данных" description="Попробуй обновить диапазон или перезагрузить аналитический срез." />;
+      return <AnalyticsEmptyState title={t('misc.an_overview_empty_title')} description={t('misc.an_overview_empty_desc')} />;
     }
 
     const { today = {}, month = {} } = data.overview || {};
 
     const metrics = [
     {
-      label: 'Визиты сегодня',
+      label: t('misc.an_overview_metric_visits_today'),
       value: today?.visits?.total_visits || 0,
-      helper: 'Сегодня',
+      helper: t('misc.an_overview_helper_today'),
       accent: 'var(--mac-accent-blue, #2563eb)',
       icon: <Calendar size={18} />
     },
     {
-      label: 'Доходы сегодня',
+      label: t('misc.an_overview_metric_revenue_today'),
       value: today?.revenue?.total_revenue || 0,
-      helper: 'Касса',
+      helper: t('misc.an_overview_helper_register'),
       accent: 'var(--mac-success)',
       format: 'revenue',
       icon: <DollarSign size={18} />
     },
     {
-      label: 'Пациенты за период',
+      label: t('misc.an_overview_metric_patients_period'),
       value: month?.patients?.total_patients || 0,
-      helper: 'База',
+      helper: t('misc.an_overview_helper_base'),
       accent: 'var(--mac-accent-purple)',
       icon: <Users size={18} />
     },
     {
-      label: 'Конверсия завершения',
+      label: t('misc.an_overview_metric_completion'),
       value: month?.visits?.completion_rate || 0,
-      helper: 'Эффективность',
+      helper: t('misc.an_overview_helper_efficiency'),
       accent: 'var(--mac-warning)',
       format: 'percentage',
       icon: <TrendingUp size={18} />
@@ -555,18 +562,18 @@ export default function AnalyticsPage() {
           gap: '18px'
         }}>
           <AnalyticsSectionCard
-            title="Ритм визитов"
-            subtitle="Быстрый обзор нагрузки по дням недели."
+            title={t('misc.an_overview_section_visits_title')}
+            subtitle={t('misc.an_overview_section_visits_subtitle')}
             compact={isCompactLayout}
           >
-            <AnalyticsLineTrend items={visitTrend} accent="var(--mac-accent-blue, #2563eb)" compact={isCompactLayout} />
+            <AnalyticsLineTrend items={visitTrend} accent="var(--mac-accent-blue, #2563eb)" compact={isCompactLayout} t={t} />
           </AnalyticsSectionCard>
           <AnalyticsSectionCard
-            title="Доход по отделениям"
-            subtitle="Сразу видно, какие отделения тянут выручку."
+            title={t('misc.an_overview_section_dept_revenue_title')}
+            subtitle={t('misc.an_overview_section_dept_revenue_subtitle')}
             compact={isCompactLayout}
           >
-            <AnalyticsComparisonList items={departmentRevenue} format="revenue" accent="var(--mac-success)" />
+            <AnalyticsComparisonList items={departmentRevenue} format="revenue" accent="var(--mac-success)" t={t} />
           </AnalyticsSectionCard>
         </div>
       </div>);
@@ -575,7 +582,7 @@ export default function AnalyticsPage() {
 
   const renderAppointmentsTab = () => {
     if (!data.appointments) {
-      return <AnalyticsEmptyState title="Нет данных по записям" description="Этот блок появится, когда backend вернёт воронку записи и статусы." />;
+      return <AnalyticsEmptyState title={t('misc.an_appt_empty_title')} description={t('misc.an_appt_empty_desc')} />;
     }
 
     const {
@@ -586,30 +593,30 @@ export default function AnalyticsPage() {
 
     const metrics = [
     {
-      label: 'Всего записей',
+      label: t('misc.an_appt_metric_total'),
       value: summary.total_appointments || 0,
-      helper: 'Поток',
+      helper: t('misc.an_appt_helper_flow'),
       accent: 'var(--mac-accent-blue, #2563eb)',
       icon: <Calendar size={18} />
     },
     {
-      label: 'Оплачено',
+      label: t('misc.an_appt_metric_paid'),
       value: summary.paid_appointments || 0,
-      helper: 'Оплата',
+      helper: t('misc.an_appt_helper_payment'),
       accent: 'var(--mac-success)',
       icon: <DollarSign size={18} />
     },
     {
-      label: 'Завершено',
+      label: t('misc.an_appt_metric_completed'),
       value: summary.completed_appointments || 0,
-      helper: 'Финал',
+      helper: t('misc.an_appt_helper_final'),
       accent: 'var(--mac-accent-purple)',
       icon: <Activity size={18} />
     },
     {
-      label: 'Общая конверсия',
+      label: t('misc.an_appt_metric_conversion'),
       value: conversion_rates.overall_conversion || 0,
-      helper: 'Воронка',
+      helper: t('misc.an_appt_helper_funnel'),
       accent: 'var(--mac-warning)',
       format: 'percentage',
       icon: <TrendingUp size={18} />
@@ -620,9 +627,9 @@ export default function AnalyticsPage() {
       value: count
     }));
     const funnel = [
-    { label: 'Запись -> Оплата', value: conversion_rates.pending_to_paid || 0 },
-    { label: 'Оплата -> Завершение', value: conversion_rates.paid_to_completed || 0 },
-    { label: 'Итоговая конверсия', value: conversion_rates.overall_conversion || 0 }];
+    { label: t('misc.an_appt_funnel_book_to_paid'), value: conversion_rates.pending_to_paid || 0 },
+    { label: t('misc.an_appt_funnel_paid_to_completed'), value: conversion_rates.paid_to_completed || 0 },
+    { label: t('misc.an_appt_funnel_total_conversion'), value: conversion_rates.overall_conversion || 0 }];
 
 
     return (
@@ -634,18 +641,18 @@ export default function AnalyticsPage() {
           gap: '18px'
         }}>
           <AnalyticsSectionCard
-            title="Статусы записей"
-            subtitle="Что происходит с записями в текущем окне."
+            title={t('misc.an_appt_section_statuses_title')}
+            subtitle={t('misc.an_appt_section_statuses_subtitle')}
             compact={isCompactLayout}
           >
-            <AnalyticsComparisonList items={statuses} accent="var(--mac-accent-blue, #2563eb)" />
+            <AnalyticsComparisonList items={statuses} accent="var(--mac-accent-blue, #2563eb)" t={t} />
           </AnalyticsSectionCard>
           <AnalyticsSectionCard
-            title="Качество воронки"
-            subtitle="Где путь пациента сужается сильнее всего."
+            title={t('misc.an_appt_section_funnel_title')}
+            subtitle={t('misc.an_appt_section_funnel_subtitle')}
             compact={isCompactLayout}
           >
-            <AnalyticsComparisonList items={funnel} format="percentage" accent="var(--mac-warning)" />
+            <AnalyticsComparisonList items={funnel} format="percentage" accent="var(--mac-warning)" t={t} />
           </AnalyticsSectionCard>
         </div>
       </div>);
@@ -654,7 +661,7 @@ export default function AnalyticsPage() {
 
   const renderRevenueTab = () => {
     if (!data.revenue) {
-      return <AnalyticsEmptyState title="Нет данных по доходам" description="Попробуй другой диапазон или обновление среза." />;
+      return <AnalyticsEmptyState title={t('misc.an_rev_empty_title')} description={t('misc.an_rev_empty_desc')} />;
     }
 
     const {
@@ -667,24 +674,24 @@ export default function AnalyticsPage() {
 
     const metrics = [
     {
-      label: 'Общий доход',
+      label: t('misc.an_rev_metric_total'),
       value: total_revenue,
-      helper: 'Сумма',
+      helper: t('misc.an_rev_helper_amount'),
       accent: 'var(--mac-success)',
       format: 'revenue',
       icon: <DollarSign size={18} />
     },
     {
-      label: 'Транзакций',
+      label: t('misc.an_rev_metric_transactions'),
       value: total_transactions,
-      helper: 'Платежи',
+      helper: t('misc.an_rev_helper_payments'),
       accent: 'var(--mac-accent-blue, #2563eb)',
       icon: <Activity size={18} />
     },
     {
-      label: 'Средний чек',
+      label: t('misc.an_rev_metric_avg_check'),
       value: average_transaction,
-      helper: 'Среднее',
+      helper: t('misc.an_rev_helper_average'),
       accent: 'var(--mac-accent-purple)',
       format: 'revenue',
       icon: <ArrowUpRight size={18} />
@@ -712,18 +719,18 @@ export default function AnalyticsPage() {
           gap: '18px'
         }}>
           <AnalyticsSectionCard
-            title="Доход по дням"
-            subtitle="Насколько ровно идёт денежный поток."
+            title={t('misc.an_rev_section_daily_title')}
+            subtitle={t('misc.an_rev_section_daily_subtitle')}
             compact={isCompactLayout}
           >
-            <AnalyticsLineTrend items={dailyTrend} format="revenue" accent="var(--mac-success)" compact={isCompactLayout} />
+            <AnalyticsLineTrend items={dailyTrend} format="revenue" accent="var(--mac-success)" compact={isCompactLayout} t={t} />
           </AnalyticsSectionCard>
           <AnalyticsSectionCard
-            title="Доход по провайдерам"
-            subtitle="Какие платёжные каналы приносят больше."
+            title={t('misc.an_rev_section_providers_title')}
+            subtitle={t('misc.an_rev_section_providers_subtitle')}
             compact={isCompactLayout}
           >
-            <AnalyticsComparisonList items={providerRevenue} format="revenue" accent="#7c3aed" />
+            <AnalyticsComparisonList items={providerRevenue} format="revenue" accent="#7c3aed" t={t} />
           </AnalyticsSectionCard>
         </div>
       </div>);
@@ -732,49 +739,49 @@ export default function AnalyticsPage() {
 
   const renderProvidersTab = () => {
     if (!data.providers) {
-      return <AnalyticsEmptyState title="Нет данных по провайдерам" description="Провайдеры появятся здесь после успешной загрузки аналитики платежей." />;
+      return <AnalyticsEmptyState title={t('misc.an_prov_empty_title')} description={t('misc.an_prov_empty_desc')} />;
     }
 
     const { summary = {}, providers = {} } = data.providers || {};
 
     const metrics = [
     {
-      label: 'Активных провайдеров',
+      label: t('misc.an_prov_metric_active'),
       value: summary.active_providers || 0,
-      helper: 'Каналы',
+      helper: t('misc.an_prov_helper_channels'),
       accent: 'var(--mac-accent-blue, #2563eb)',
       icon: <Building2 size={18} />
     },
     {
-      label: 'Всего транзакций',
+      label: t('misc.an_prov_metric_transactions'),
       value: summary.total_transactions || 0,
-      helper: 'Операции',
+      helper: t('misc.an_prov_helper_operations'),
       accent: 'var(--mac-success)',
       icon: <Activity size={18} />
     },
     {
-      label: 'Общий доход',
+      label: t('misc.an_prov_metric_total'),
       value: summary.total_revenue || 0,
-      helper: 'Выручка',
+      helper: t('misc.an_prov_helper_revenue'),
       accent: 'var(--mac-accent-purple)',
       format: 'revenue',
       icon: <DollarSign size={18} />
     },
     {
-      label: 'Комиссия',
+      label: t('misc.an_prov_metric_commission'),
       value: summary.total_commission || 0,
-      helper: 'Издержки',
+      helper: t('misc.an_prov_helper_costs'),
       accent: 'var(--mac-warning)',
       format: 'revenue',
       icon: <Wallet size={18} />
     }];
 
     const providerAmount = normalizePairs(providers, (_, stats) => ({
-      label: stats?.name || 'Без названия',
+      label: stats?.name || t('misc.an_prov_no_name'),
       value: stats?.total_amount || 0
     }));
     const providerSuccess = normalizePairs(providers, (_, stats) => ({
-      label: stats?.name || 'Без названия',
+      label: stats?.name || t('misc.an_prov_no_name'),
       value: stats?.success_rate || 0
     }));
 
@@ -788,18 +795,18 @@ export default function AnalyticsPage() {
           gap: '18px'
         }}>
           <AnalyticsSectionCard
-            title="Доходность провайдеров"
-            subtitle="Сравнение по выручке без визуального шума."
+            title={t('misc.an_prov_section_yield_title')}
+            subtitle={t('misc.an_prov_section_yield_subtitle')}
             compact={isCompactLayout}
           >
-            <AnalyticsComparisonList items={providerAmount} format="revenue" accent="var(--mac-accent-blue, #2563eb)" />
+            <AnalyticsComparisonList items={providerAmount} format="revenue" accent="var(--mac-accent-blue, #2563eb)" t={t} />
           </AnalyticsSectionCard>
           <AnalyticsSectionCard
-            title="Успешность операций"
-            subtitle="Где меньше отказов и стабильнее обработка."
+            title={t('misc.an_prov_section_success_title')}
+            subtitle={t('misc.an_prov_section_success_subtitle')}
             compact={isCompactLayout}
           >
-            <AnalyticsComparisonList items={providerSuccess} format="percentage" accent="var(--mac-success)" />
+            <AnalyticsComparisonList items={providerSuccess} format="percentage" accent="var(--mac-success)" t={t} />
           </AnalyticsSectionCard>
         </div>
       </div>);
@@ -818,17 +825,17 @@ export default function AnalyticsPage() {
         return renderProvidersTab();
       case 'visualization':
         return (
-          <AnalyticsSectionCard title="Глубокая визуализация" subtitle="Расширенные интерактивные графики для детального разбора." compact={isCompactLayout}>
+          <AnalyticsSectionCard title={t('misc.an_viz_section_title')} subtitle={t('misc.an_viz_section_subtitle')} compact={isCompactLayout}>
             <AdvancedCharts
               data={data.visualization}
               loading={loading}
               onRefresh={() => loadAnalytics('visualization')}
               onExport={() => exportData('json')}
-              title="Интерактивные графики аналитики" />
+              title={t('misc.an_viz_advanced_charts_title')} />
           </AnalyticsSectionCard>);
       case 'kpi':
         return (
-          <AnalyticsSectionCard title="KPI-панель" subtitle="Управленческие метрики и сравнения без смешения с обзорным экраном." compact={isCompactLayout}>
+          <AnalyticsSectionCard title={t('misc.an_kpi_section_title')} subtitle={t('misc.an_kpi_section_subtitle')} compact={isCompactLayout}>
             <KPIMetrics
               data={data.kpi}
               loading={loading}
@@ -837,7 +844,7 @@ export default function AnalyticsPage() {
           </AnalyticsSectionCard>);
       case 'predictive':
         return (
-          <AnalyticsSectionCard title="Прогнозная аналитика" subtitle="Будущие тренды и сценарии на основе текущих данных." compact={isCompactLayout}>
+          <AnalyticsSectionCard title={t('misc.an_pred_section_title')} subtitle={t('misc.an_pred_section_subtitle')} compact={isCompactLayout}>
             <PredictiveAnalytics
               data={data.predictive}
               loading={loading}
@@ -881,7 +888,7 @@ export default function AnalyticsPage() {
               width: isCompactLayout ? 'fit-content' : 'auto'
             }}>
               <BarChart3 size={14} />
-              Админ / аналитика
+              {t('misc.an_header_badge')}
             </div>
             <h1 style={{
               fontSize: isCompactLayout ? '26px' : '32px',
@@ -890,10 +897,10 @@ export default function AnalyticsPage() {
               color: getColor('primary', 900),
               margin: 0
             }}>
-              Аналитика
+              {t('misc.an_header_title')}
             </h1>
             <p style={{ margin: '10px 0 0 0', fontSize: isCompactLayout ? '14px' : '15px', lineHeight: 1.65, color: analyticsTextSecondary }}>
-              Быстрый обзор вынесен отдельно, а здесь собраны подробные разрезы по записям, выручке, провайдерам и прогнозам.
+              {t('misc.an_header_description')}
             </p>
           </div>
           <Button
@@ -907,7 +914,7 @@ export default function AnalyticsPage() {
               width: isCompactLayout ? '100%' : 'auto',
               justifyContent: 'center'
             }}>
-            Экспорт JSON
+            {t('misc.an_header_export_btn')}
           </Button>
         </div>
       </section>
@@ -933,10 +940,10 @@ export default function AnalyticsPage() {
         }}>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: 'var(--mac-font-size-xs)', fontWeight: 'var(--mac-font-weight-bold)', letterSpacing: '0.08em', textTransform: 'uppercase', color: analyticsTextSecondary, marginBottom: 'var(--mac-spacing-2)' }}>
-              Период и разрез
+              {t('misc.an_filter_section_label')}
             </div>
             <div style={{ fontSize: isCompactLayout ? '15px' : '16px', fontWeight: 'var(--mac-font-weight-bold)', color: analyticsTextPrimary }}>
-              {activeTabMeta.label}: {activeTabMeta.description}
+              {activeTabLabel}: {activeTabDescription}
             </div>
           </div>
           <div style={{
@@ -959,12 +966,12 @@ export default function AnalyticsPage() {
 
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
           <SegmentedControl
-            aria-label="Быстрый диапазон аналитики"
+            aria-label={t('misc.an_filter_quick_range_aria')}
             value={activePreset || ''}
             onChange={(days) => setQuickRange(Number(days))}
             options={[7, 30, 90].map((days) => ({
               value: days,
-              label: `${days} дней`
+              label: t('misc.an_filter_days', { days })
             }))}
             size="large"
             style={{
@@ -986,8 +993,8 @@ export default function AnalyticsPage() {
           <div style={{ flex: isCompactLayout ? '1 1 100%' : '1 1 220px', width: isCompactLayout ? '100%' : 'auto' }}>
             <Input
               type="date"
-              label="Начало периода"
-              aria-label="Дата начала периода"
+              label={t('misc.an_filter_start_label')}
+              aria-label={t('misc.an_filter_start_aria')}
               value={dateRange.start}
               onChange={(e) => setDateRange((prev) => ({ ...prev, start: e.target.value }))}
               style={{
@@ -1001,8 +1008,8 @@ export default function AnalyticsPage() {
           <div style={{ flex: isCompactLayout ? '1 1 100%' : '1 1 220px', width: isCompactLayout ? '100%' : 'auto' }}>
             <Input
               type="date"
-              label="Конец периода"
-              aria-label="Дата окончания периода"
+              label={t('misc.an_filter_end_label')}
+              aria-label={t('misc.an_filter_end_aria')}
               value={dateRange.end}
               onChange={(e) => setDateRange((prev) => ({ ...prev, end: e.target.value }))}
               style={{
@@ -1015,10 +1022,10 @@ export default function AnalyticsPage() {
 
           <div style={{ flex: isCompactLayout ? '1 1 100%' : '1 1 220px', width: isCompactLayout ? '100%' : 'auto' }}>
             <Select
-              label="Отделение"
+              label={t('misc.an_filter_department_label')}
               value={department}
               onChange={setDepartment}
-              options={DEPARTMENT_OPTIONS}
+              options={departmentOptions}
               size="large"
               style={{
                 width: '100%'
@@ -1037,7 +1044,7 @@ export default function AnalyticsPage() {
               flex: isCompactLayout ? '1 1 100%' : '0 0 auto',
               width: isCompactLayout ? '100%' : 'auto'
             }}>
-            {loading ? 'Обновляем...' : 'Обновить'}
+            {loading ? t('misc.an_filter_refreshing_btn') : t('misc.an_filter_refresh_btn')}
           </Button>
         </div>
       </section>
@@ -1074,7 +1081,7 @@ export default function AnalyticsPage() {
                   whiteSpace: 'nowrap',
                   flex: isCompactLayout ? '0 0 auto' : 'none'
                 }}>
-                {tab.label}
+                {tab.label !== undefined ? tab.label : t(tab.labelKey)}
               </Button>);
           })}
         </div>
@@ -1083,7 +1090,7 @@ export default function AnalyticsPage() {
       {loading ?
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: isCompactLayout ? '160px' : '200px', color: analyticsTextSecondary }}>
           <RefreshCw size={24} style={{ animation: 'mac-spin 1s linear infinite' }} />
-          <span style={{ marginLeft: 'var(--mac-spacing-3)' }}>Подготавливаем аналитический срез...</span>
+          <span style={{ marginLeft: 'var(--mac-spacing-3)' }}>{t('misc.an_loading_msg')}</span>
         </div> :
       renderCurrentTab()
       }

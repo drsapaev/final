@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect, useCallback } from 'react';
 import {
   Plus,
@@ -44,6 +44,7 @@ import logger from '../../utils/logger';
 // P-013 fix: shared ConfirmDialog hook replacing native confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
 const WebhookManager = () => {
+  const { t } = useTranslation();
   // P-013 fix: shared ConfirmDialog hook (replaces 1 native confirm() call).
   const [confirm, confirmDialog] = useConfirm();
   const [activeTab, setActiveTab] = useState('webhooks');
@@ -68,9 +69,9 @@ const WebhookManager = () => {
       setWebhooks(data.items || data || []);
     } catch (error) {
       logger.error('Ошибка загрузки webhook\'ов:', error);
-      toast.error('Ошибка загрузки webhook\'ов');
+      toast.error(t('admin2.wh_load_error'));
     }
-  }, []);
+  }, [t]);
 
   const loadSystemStats = useCallback(async () => {
     try {
@@ -107,22 +108,22 @@ const WebhookManager = () => {
   const handleActivateWebhook = async (webhookId) => {
     try {
       await api.post(`/webhooks/${webhookId}/activate`);
-      toast.success('Webhook активирован');
+      toast.success(t('admin2.wh_activated'));
       loadWebhooks();
     } catch (error) {
       logger.error('Ошибка активации:', error);
-      toast.error(error.response?.data?.detail || 'Ошибка активации webhook\'а');
+      toast.error(error.response?.data?.detail || t('admin2.wh_activate_error'));
     }
   };
 
   const handleDeactivateWebhook = async (webhookId) => {
     try {
       await api.post(`/webhooks/${webhookId}/deactivate`);
-      toast.success('Webhook деактивирован');
+      toast.success(t('admin2.wh_deactivated'));
       loadWebhooks();
     } catch (error) {
       logger.error('Ошибка деактивации:', error);
-      toast.error(error.response?.data?.detail || 'Ошибка деактивации webhook\'а');
+      toast.error(error.response?.data?.detail || t('admin2.wh_deactivate_error'));
     }
   };
 
@@ -149,8 +150,8 @@ const WebhookManager = () => {
     // P-013 fix: replaced native confirm() with shared useConfirm hook.
     const ok = await confirm({
       title: t('admin2.delete_webhook_title'),
-      message: 'Удалить этот webhook?',
-      description: 'Это действие необратимо. Связанные вызовы останутся в журнале.',
+      message: t('admin2.wh_delete_message'),
+      description: t('admin2.wh_delete_description'),
       confirmLabel: t('admin2.delete_confirm'),
       cancelLabel: t('admin2.cancel'),
       intent: 'danger',
@@ -161,11 +162,11 @@ const WebhookManager = () => {
 
     try {
       await api.delete(`/webhooks/${webhookId}`);
-      toast.success('Webhook удален');
+      toast.success(t('admin2.wh_deleted'));
       loadWebhooks();
     } catch (error) {
       logger.error('Ошибка удаления:', error);
-      toast.error(error.response?.data?.detail || 'Ошибка удаления webhook\'а');
+      toast.error(error.response?.data?.detail || t('admin2.wh_delete_error'));
     }
   };
 
@@ -181,16 +182,16 @@ const WebhookManager = () => {
   // Получение статуса badge
   const getStatusBadge = (status, isActive) => {
     if (!isActive) {
-      return <Badge variant="secondary">Неактивен</Badge>;
+      return <Badge variant="secondary">{t('admin2.wh_status_inactive')}</Badge>;
     }
 
     switch (status) {
       case 'active':
-        return <Badge variant="success">Активен</Badge>;
+        return <Badge variant="success">{t('admin2.wh_status_active')}</Badge>;
       case 'suspended':
-        return <Badge variant="warning">Приостановлен</Badge>;
+        return <Badge variant="warning">{t('admin2.wh_status_suspended')}</Badge>;
       case 'failed':
-        return <Badge variant="error">Ошибка</Badge>;
+        return <Badge variant="error">{t('admin2.wh_status_failed')}</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
@@ -199,13 +200,13 @@ const WebhookManager = () => {
   const getCallStatusBadge = (status) => {
     switch (status) {
       case 'success':
-        return <Badge variant="success">Успех</Badge>;
+        return <Badge variant="success">{t('admin2.wh_call_status_success')}</Badge>;
       case 'failed':
-        return <Badge variant="error">Ошибка</Badge>;
+        return <Badge variant="error">{t('admin2.wh_call_status_failed')}</Badge>;
       case 'pending':
-        return <Badge variant="secondary">Ожидание</Badge>;
+        return <Badge variant="secondary">{t('admin2.wh_call_status_pending')}</Badge>;
       case 'retrying':
-        return <Badge variant="warning">Повтор</Badge>;
+        return <Badge variant="warning">{t('admin2.wh_call_status_retrying')}</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
@@ -230,12 +231,12 @@ const WebhookManager = () => {
       {/* Заголовок */}
       <div className="admin-flex-jc-between-ai-center">
         <div>
-          <h1 className="admin-2xl-bold-primary-m-0">Управление webhook-ами</h1>
-          <p className="admin-secondary-base-m-4px000">Настройка и мониторинг внешних интеграций</p>
+          <h1 className="admin-2xl-bold-primary-m-0">{t('admin2.wh_page_title')}</h1>
+          <p className="admin-secondary-base-m-4px000">{t('admin2.wh_page_subtitle')}</p>
         </div>
         <Button onClick={() => setShowCreateModal(true)} className="flex items-center justify-center gap-2">
           <Plus className="w-4 h-4" />
-          Создать Webhook
+          {t('admin2.wh_create_btn')}
         </Button>
       </div>
 
@@ -243,28 +244,28 @@ const WebhookManager = () => {
       {stats &&
       <div className="admin-grid-gtc-rauto-fitcminmax200pxc1fr-gap-16">
           <MacOSStatCard
-          title="Всего Webhook'ов"
+          title={t('admin2.wh_stat_total')}
           value={stats.total_webhooks}
           icon={Globe}
           color="blue" />
 
           
           <MacOSStatCard
-          title="Активных"
+          title={t('admin2.wh_stat_active')}
           value={stats.active_webhooks}
           icon={CheckCircle}
           color="green" />
 
           
           <MacOSStatCard
-          title="Вызовов за 24ч"
+          title={t('admin2.wh_stat_calls_24h')}
           value={stats.recent_24h.total_calls}
           icon={Activity}
           color="orange" />
 
           
           <MacOSStatCard
-          title="Успешность"
+          title={t('admin2.wh_stat_success_rate')}
           value={`${stats.recent_24h.success_rate.toFixed(1)}%`}
           icon={Zap}
           color="blue" />
@@ -277,9 +278,9 @@ const WebhookManager = () => {
         value={activeTab}
         onChange={setActiveTab}
         options={[
-        { value: 'webhooks', label: <span className="admin-inline-flex-ai-center-gap-6"><Globe className="w-3.5 h-3.5" />Webhook&apos;{'\u0438'}</span> },
-        { value: 'calls', label: <span className="admin-inline-flex-ai-center-gap-6"><Activity className="w-3.5 h-3.5" />{'\u0412\u044b\u0437\u043e\u0432\u044b'}</span> },
-        { value: 'events', label: <span className="admin-inline-flex-ai-center-gap-6"><Clock className="w-3.5 h-3.5" />{'\u0421\u043e\u0431\u044b\u0442\u0438\u044f'}</span> }]
+        { value: 'webhooks', label: <span className="admin-inline-flex-ai-center-gap-6"><Globe className="w-3.5 h-3.5" />{t('admin2.wh_tab_webhooks')}</span> },
+        { value: 'calls', label: <span className="admin-inline-flex-ai-center-gap-6"><Activity className="w-3.5 h-3.5" />{t('admin2.wh_tab_calls')}</span> },
+        { value: 'events', label: <span className="admin-inline-flex-ai-center-gap-6"><Clock className="w-3.5 h-3.5" />{t('admin2.wh_tab_events')}</span> }]
         }
         size="large"
         className="admin-wrap-rgap-4" />
@@ -293,11 +294,11 @@ const WebhookManager = () => {
             <div className="admin-grid-gtc-rauto-fitcminmax200pxc1fr-gap-16">
               <div>
                 <label className="admin-block-sm-med-primary-mb-4">
-                  Поиск
+                  {t('admin2.wh_search_label')}
                 </label>
                 <Input
                 type="text"
-                placeholder="Название или URL..."
+                placeholder={t('admin2.wh_search_ph')}
                 value={filters.search}
                 onChange={(e) => setFilters({ ...filters, search: e.target.value })}
                 icon={Search}
@@ -307,34 +308,34 @@ const WebhookManager = () => {
               
               <div>
                 <label className="admin-block-sm-med-primary-mb-4">
-                  Статус
+                  {t('admin2.wh_status_label')}
                 </label>
                 <Select
                 value={filters.status}
                 onChange={(value) => setFilters({ ...filters, status: value })}
                 options={[
-                { value: '', label: '\u0412\u0441\u0435 \u0441\u0442\u0430\u0442\u0443\u0441\u044b' },
-                { value: 'active', label: '\u0410\u043a\u0442\u0438\u0432\u0435\u043d' },
-                { value: 'inactive', label: '\u041d\u0435\u0430\u043a\u0442\u0438\u0432\u0435\u043d' },
-                { value: 'suspended', label: '\u041f\u0440\u0438\u043e\u0441\u0442\u0430\u043d\u043e\u0432\u043b\u0435\u043d' },
-                { value: 'failed', label: '\u041e\u0448\u0438\u0431\u043a\u0430' }]
+                { value: '', label: t('admin2.wh_status_all') },
+                { value: 'active', label: t('admin2.wh_status_active') },
+                { value: 'inactive', label: t('admin2.wh_status_inactive') },
+                { value: 'suspended', label: t('admin2.wh_status_suspended') },
+                { value: 'failed', label: t('admin2.wh_status_failed') }]
                 }></Select>
 
               </div>
               
               <div>
                 <label className="admin-block-sm-med-primary-mb-4">
-                  Тип события
+                  {t('admin2.wh_event_type_label')}
                 </label>
                 <Select
                 value={filters.event_type}
                 onChange={(value) => setFilters({ ...filters, event_type: value })}
                 options={[
-                { value: '', label: '\u0412\u0441\u0435 \u0441\u043e\u0431\u044b\u0442\u0438\u044f' },
-                { value: 'patient.created', label: '\u041f\u0430\u0446\u0438\u0435\u043d\u0442 \u0441\u043e\u0437\u0434\u0430\u043d' },
-                { value: 'appointment.created', label: '\u0417\u0430\u043f\u0438\u0441\u044c \u0441\u043e\u0437\u0434\u0430\u043d\u0430' },
-                { value: 'visit.completed', label: '\u0412\u0438\u0437\u0438\u0442 \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043d' },
-                { value: 'payment.completed', label: '\u041f\u043b\u0430\u0442\u0435\u0436 \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043d' }]
+                { value: '', label: t('admin2.wh_events_all') },
+                { value: 'patient.created', label: t('admin2.wh_event_patient_created') },
+                { value: 'appointment.created', label: t('admin2.wh_event_appointment_created') },
+                { value: 'visit.completed', label: t('admin2.wh_event_visit_completed') },
+                { value: 'payment.completed', label: t('admin2.wh_event_payment_completed') }]
                 }></Select>
 
               </div>
@@ -345,7 +346,7 @@ const WebhookManager = () => {
                 variant="outline"
                 className="w-full">
 
-                  Сбросить
+                  {t('admin2.wh_reset_filters')}
                 </Button>
               </div>
             </div>
@@ -377,11 +378,11 @@ const WebhookManager = () => {
                       </span>
                       <span className="flex items-center justify-center admin-gap-4">
                         <Activity className="w-4 h-4" />
-                        {webhook.total_calls} вызовов
+                        {t('admin2.wh_calls_count', { count: webhook.total_calls })}
                       </span>
                       <span className="flex items-center justify-center admin-gap-4">
                         <CheckCircle className="w-4 h-4" />
-                        {(webhook.successful_calls / webhook.total_calls * 100 || 0).toFixed(1)}% успешных
+                        {t('admin2.wh_success_rate', { rate: (webhook.successful_calls / webhook.total_calls * 100 || 0).toFixed(1) })}
                       </span>
                     </div>
                     
@@ -399,8 +400,8 @@ const WebhookManager = () => {
                   size="sm"
                   variant="outline"
                   type="button"
-                  title="Просмотреть вызовы webhook"
-                  aria-label={`Просмотреть вызовы webhook ${webhook.name || webhook.id}`}
+                  title={t('admin2.wh_view_calls_title')}
+                  aria-label={t('admin2.wh_view_calls_aria', { name: webhook.name || webhook.id })}
                   onClick={() => {
                     setSelectedWebhook(webhook);
                     loadWebhookCalls(webhook.id);
@@ -413,8 +414,8 @@ const WebhookManager = () => {
                   size="sm"
                   variant="outline"
                   type="button"
-                  title="Протестировать webhook"
-                  aria-label={`Протестировать webhook ${webhook.name || webhook.id}`}
+                  title={t('admin2.wh_test_webhook_title')}
+                  aria-label={t('admin2.wh_test_webhook_aria', { name: webhook.name || webhook.id })}
                   onClick={() => {
                     setSelectedWebhook(webhook);
                     setShowTestModal(true);
@@ -427,8 +428,8 @@ const WebhookManager = () => {
                   size="sm"
                   variant="outline"
                   type="button"
-                  title="Редактировать webhook"
-                  aria-label={`Редактировать webhook ${webhook.name || webhook.id}`}
+                  title={t('admin2.wh_edit_webhook_title')}
+                  aria-label={t('admin2.wh_edit_webhook_aria', { name: webhook.name || webhook.id })}
                   onClick={() => {
                     setSelectedWebhook(webhook);
                     setShowEditModal(true);
@@ -442,8 +443,8 @@ const WebhookManager = () => {
                   size="sm"
                   variant="outline"
                   type="button"
-                  title="Приостановить webhook"
-                  aria-label={`Приостановить webhook ${webhook.name || webhook.id}`}
+                  title={t('admin2.wh_pause_webhook_title')}
+                  aria-label={t('admin2.wh_pause_webhook_aria', { name: webhook.name || webhook.id })}
                   onClick={() => handleDeactivateWebhook(webhook.id)}>
 
                         <Pause aria-hidden="true" className="w-4 h-4" />
@@ -453,8 +454,8 @@ const WebhookManager = () => {
                   size="sm"
                   variant="outline"
                   type="button"
-                  title="Активировать webhook"
-                  aria-label={`Активировать webhook ${webhook.name || webhook.id}`}
+                  title={t('admin2.wh_activate_webhook_title')}
+                  aria-label={t('admin2.wh_activate_webhook_aria', { name: webhook.name || webhook.id })}
                   onClick={() => handleActivateWebhook(webhook.id)}>
 
                         <Play aria-hidden="true" className="w-4 h-4" />
@@ -465,8 +466,8 @@ const WebhookManager = () => {
                   size="sm"
                   variant="outline"
                   type="button"
-                  title="Удалить webhook"
-                  aria-label={`Удалить webhook ${webhook.name || webhook.id}`}
+                  title={t('admin2.wh_delete_webhook_title')}
+                  aria-label={t('admin2.wh_delete_webhook_aria', { name: webhook.name || webhook.id })}
                   onClick={() => handleDeleteWebhook(webhook.id)}
                   className="admin-error">
 
@@ -481,16 +482,16 @@ const WebhookManager = () => {
           {filteredWebhooks.length === 0 &&
         <MacOSEmptyState
           icon={Globe}
-          title="Webhook'и не найдены"
+          title={t('admin2.wh_empty_title')}
           description={
           webhooks.length === 0 ?
-          'Создайте первый webhook для начала работы с внешними интеграциями' :
-          'Попробуйте изменить фильтры поиска'
+          t('admin2.wh_empty_desc_no_webhooks') :
+          t('admin2.wh_empty_desc_filtered')
           }
           action={
           webhooks.length === 0 ?
           <Button onClick={() => setShowCreateModal(true)}>
-                  Создать Webhook
+                  {t('admin2.wh_create_btn')}
                   </Button> :
           null
           }
@@ -504,7 +505,7 @@ const WebhookManager = () => {
       <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <h2 className="admin-lg-semi-primary-m-0">
-              Все вызовы webhook-ов
+              {t('admin2.wh_calls_page_title')}
             </h2>
             <Button
             onClick={() => {
@@ -515,7 +516,7 @@ const WebhookManager = () => {
             size="sm">
 
               <RefreshCw className="w-4 h-4 mr-2" />
-              Обновить
+              {t('admin2.wh_refresh_btn')}
             </Button>
           </div>
 
@@ -524,7 +525,7 @@ const WebhookManager = () => {
             <div className="admin-grid-gtc-rauto-fitcminmax200pxc1fr-gap-16">
               <div>
                 <label className="admin-block-sm-med-primary-mb-4">
-                  Webhook
+                  {t('admin2.wh_webhook_label')}
                 </label>
                 <Select
                 value={selectedWebhook?.id ? String(selectedWebhook.id) : ''}
@@ -534,7 +535,7 @@ const WebhookManager = () => {
                   if (webhook) loadWebhookCalls(webhook.id);
                 }}
                 options={[
-                { value: '', label: '\u0412\u0441\u0435 webhook\'\u0438' },
+                { value: '', label: t('admin2.wh_all_webhooks') },
                 ...webhooks.map((webhook) => ({ value: String(webhook.id), label: webhook.name }))]
                 }></Select>
 
@@ -542,17 +543,17 @@ const WebhookManager = () => {
               
               <div>
                 <label className="admin-block-sm-med-primary-mb-4">
-                  Статус вызова
+                  {t('admin2.wh_call_status_label')}
                 </label>
                 <Select
                 value={filters.call_status || ''}
                 onChange={(value) => setFilters({ ...filters, call_status: value })}
                 options={[
-                { value: '', label: '\u0412\u0441\u0435 \u0441\u0442\u0430\u0442\u0443\u0441\u044b' },
-                { value: 'success', label: '\u0423\u0441\u043f\u0435\u0448\u043d\u044b\u0435' },
-                { value: 'failed', label: '\u041e\u0448\u0438\u0431\u043a\u0438' },
-                { value: 'pending', label: '\u041e\u0436\u0438\u0434\u0430\u043d\u0438\u0435' },
-                { value: 'retrying', label: '\u041f\u043e\u0432\u0442\u043e\u0440' }]
+                { value: '', label: t('admin2.wh_status_all') },
+                { value: 'success', label: t('admin2.wh_call_filter_success') },
+                { value: 'failed', label: t('admin2.wh_call_filter_failed') },
+                { value: 'pending', label: t('admin2.wh_call_status_pending') },
+                { value: 'retrying', label: t('admin2.wh_call_status_retrying') }]
                 }></Select>
 
               </div>
@@ -590,7 +591,7 @@ const WebhookManager = () => {
                       {call.duration_ms &&
                   <span>{call.duration_ms}ms</span>
                   }
-                      <span>Попытка {call.attempt_number}/{call.max_attempts}</span>
+                      <span>{t('admin2.wh_attempt', { current: call.attempt_number, max: call.max_attempts })}</span>
                     </div>
                     
                     {call.error_message &&
@@ -607,8 +608,8 @@ const WebhookManager = () => {
           {calls.length === 0 &&
         <MacOSEmptyState
           icon={Activity}
-          title="Вызовы не найдены"
-          description={selectedWebhook ? 'Для этого webhook\'а еще не было вызовов' : 'Выберите webhook для просмотра его вызовов'}
+          title={t('admin2.wh_calls_empty_title')}
+          description={selectedWebhook ? t('admin2.wh_calls_empty_desc_with_webhook') : t('admin2.wh_calls_empty_desc_no_webhook')}
           iconStyle={{ width: '48px', height: '48px', color: 'var(--mac-text-tertiary)' }} />
 
         }
@@ -619,7 +620,7 @@ const WebhookManager = () => {
       <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <h2 className="admin-lg-semi-primary-m-0">
-              Типы событий
+              {t('admin2.wh_events_page_title')}
             </h2>
             <Button
             onClick={() => {
@@ -630,35 +631,35 @@ const WebhookManager = () => {
             size="sm">
 
               <RefreshCw className="w-4 h-4 mr-2" />
-              Обновить
+              {t('admin2.wh_refresh_btn')}
             </Button>
           </div>
 
           {/* Статистика событий */}
           <div className="admin-grid-gtc-rauto-fitcminmax200pxc1fr-gap-16">
             <MacOSStatCard
-            title="Всего типов событий"
+            title={t('admin2.wh_stat_event_types_total')}
             value={new Set(webhooks.flatMap((w) => w.events)).size}
             icon={Clock}
             color="blue" />
 
             
             <MacOSStatCard
-            title="Активных событий"
+            title={t('admin2.wh_stat_active_events')}
             value={webhooks.filter((w) => w.is_active).flatMap((w) => w.events).length}
             icon={CheckCircle}
             color="green" />
 
             
             <MacOSStatCard
-            title="Пациентские события"
+            title={t('admin2.wh_stat_patient_events')}
             value={webhooks.flatMap((w) => w.events).filter((e) => e.includes('patient')).length}
             icon={Users}
             color="orange" />
 
             
             <MacOSStatCard
-            title="Платежные события"
+            title={t('admin2.wh_stat_payment_events')}
             value={webhooks.flatMap((w) => w.events).filter((e) => e.includes('payment')).length}
             icon={CreditCard}
             color="purple" />
@@ -668,64 +669,64 @@ const WebhookManager = () => {
           {/* Список типов событий */}
           <MacOSCard className="p-6">
             <h3 className="admin-lg-semi-primary-m-0016px0">
-              Доступные типы событий
+              {t('admin2.wh_event_types_heading')}
             </h3>
             
             <div className="admin-grid-gtc-rauto-fitcminmax300pxc1fr-gap-16">
               {[
             {
               type: 'patient.created',
-              name: 'Создание пациента',
-              description: 'Отправляется при создании нового пациента',
+              name: t('admin2.wh_event_name_patient_created'),
+              description: t('admin2.wh_event_desc_patient_created'),
               icon: UserPlus,
               color: 'var(--mac-success)'
             },
             {
               type: 'patient.updated',
-              name: 'Обновление пациента',
-              description: 'Отправляется при изменении данных пациента',
+              name: t('admin2.wh_event_name_patient_updated'),
+              description: t('admin2.wh_event_desc_patient_updated'),
               icon: Edit,
               color: 'var(--mac-info)'
             },
             {
               type: 'appointment.created',
-              name: 'Создание записи',
-              description: 'Отправляется при создании новой записи на прием',
+              name: t('admin2.wh_event_name_appointment_created'),
+              description: t('admin2.wh_event_desc_appointment_created'),
               icon: Calendar,
               color: 'var(--mac-accent-blue)'
             },
             {
               type: 'appointment.updated',
-              name: 'Обновление записи',
-              description: 'Отправляется при изменении записи на прием',
+              name: t('admin2.wh_event_name_appointment_updated'),
+              description: t('admin2.wh_event_desc_appointment_updated'),
               icon: Edit,
               color: 'var(--mac-info)'
             },
             {
               type: 'visit.completed',
-              name: 'Завершение визита',
-              description: 'Отправляется при завершении визита пациента',
+              name: t('admin2.wh_event_name_visit_completed'),
+              description: t('admin2.wh_event_desc_visit_completed'),
               icon: CheckCircle,
               color: 'var(--mac-success)'
             },
             {
               type: 'payment.completed',
-              name: 'Завершение платежа',
-              description: 'Отправляется при успешном завершении платежа',
+              name: t('admin2.wh_event_name_payment_completed'),
+              description: t('admin2.wh_event_desc_payment_completed'),
               icon: CreditCard,
               color: 'var(--mac-success)'
             },
             {
               type: 'payment.failed',
-              name: 'Ошибка платежа',
-              description: 'Отправляется при неудачной попытке платежа',
+              name: t('admin2.wh_event_name_payment_failed'),
+              description: t('admin2.wh_event_desc_payment_failed'),
               icon: AlertTriangle,
               color: 'var(--mac-error)'
             },
             {
               type: 'system.maintenance',
-              name: 'Техническое обслуживание',
-              description: 'Отправляется при начале/завершении технических работ',
+              name: t('admin2.wh_event_name_system_maintenance'),
+              description: t('admin2.wh_event_desc_system_maintenance'),
               icon: Settings,
               color: 'var(--mac-warning)'
             }].
@@ -751,11 +752,11 @@ const WebhookManager = () => {
                     
                     <div className="flex items-center justify-between">
                       <span className="admin-xs-tertiary">
-                        {webhookCount} webhook{webhookCount === 1 ? '' : webhookCount < 5 ? 'а' : 'ов'} используют это событие
+                        {t('admin2.wh_webhooks_using_event', { count: webhookCount })}
                       </span>
                       {webhookCount > 0 &&
                     <Badge variant="success" className="admin-xs">
-                          Активно
+                          {t('admin2.wh_active_badge')}
                         </Badge>
                     }
                     </div>
@@ -772,16 +773,16 @@ const WebhookManager = () => {
       <Modal
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
-        title="Создать Webhook"
+        title={t('admin2.wh_create_btn')}
         size="lg">
 
           <div className="p-6">
             <p className="admin-secondary-sm-mb-16">
-              Функционал создания webhook-а будет добавлен в следующей итерации
+              {t('admin2.wh_create_modal_desc')}
             </p>
             <div className="admin-flex-jc-end-gap-8">
               <Button onClick={() => setShowCreateModal(false)}>
-              Закрыть
+              {t('admin2.wh_close_btn')}
               </Button>
             </div>
           </div>

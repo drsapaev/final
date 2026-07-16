@@ -23,7 +23,7 @@ import {
 'lucide-react';
 import PropTypes from 'prop-types';
 import { Input } from '../ui/macos';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 /**
  * Шаблоны протоколов для стоматологической ЭМК
@@ -33,38 +33,39 @@ const ProtocolTemplates = ({
   onSelectTemplate,
   onClose
 }) => {
+  const { t } = useTranslation();
   const [templates, setTemplates] = useState([
   // Шаблоны процедур
   {
     id: 'caries_treatment',
-    name: 'Лечение кариеса',
+    name: t('dental.dental_pt_name_caries_treatment'),
     category: 'procedure',
-    description: 'Стандартный протокол лечения кариеса',
+    description: t('dental.dental_pt_desc_caries_treatment'),
     icon: Scissors,
     color: 'blue',
     steps: [
-    { type: 'procedure', name: 'Осмотр полости рта', duration: 5, required: true },
-    { type: 'procedure', name: 'Анестезия', duration: 10, required: true },
-    { type: 'procedure', name: 'Препарирование кариозной полости', duration: 20, required: true },
-    { type: 'procedure', name: 'Пломбирование', duration: 15, required: true },
-    { type: 'procedure', name: 'Шлифовка и полировка', duration: 10, required: true }],
+    { type: 'procedure', name: t('dental.dental_pt_step_oral_exam'), duration: 5, required: true },
+    { type: 'procedure', name: t('dental.dental_pt_step_anesthesia'), duration: 10, required: true },
+    { type: 'procedure', name: t('dental.dental_pt_step_caries_prep'), duration: 20, required: true },
+    { type: 'procedure', name: t('dental.dental_pt_step_filling'), duration: 15, required: true },
+    { type: 'procedure', name: t('dental.dental_pt_step_polishing'), duration: 10, required: true }],
 
     materials: [
-    { name: 'Композитный материал', quantity: '1 шт', required: true },
-    { name: 'Адгезивная система', quantity: '1 набор', required: true },
-    { name: 'Стоматологическая вата', quantity: '10 шт', required: false }],
+    { name: t('dental.dental_pt_mat_composite'), quantity: t('dental.dental_pt_qty_1pc'), required: true },
+    { name: t('dental.dental_pt_mat_adhesive'), quantity: t('dental.dental_pt_qty_1set'), required: true },
+    { name: t('dental.dental_pt_mat_cotton'), quantity: t('dental.dental_pt_qty_10pc'), required: false }],
 
     anesthesia: [
-    { drug: 'Лидокаин 2%', dose: '1.8 мл', method: 'инфильтрационная', required: true }],
+    { drug: t('dental.dental_pt_drug_lidocaine2'), dose: t('dental.dental_pt_qty_1_8ml'), method: t('dental.dental_pt_method_infiltration'), required: true }],
 
     photos: [
-    { type: 'before', description: 'Фото до лечения', required: true },
-    { type: 'after', description: 'Фото после лечения', required: true }],
+    { type: 'before', description: t('dental.dental_pt_photo_before_treatment'), required: true },
+    { type: 'after', description: t('dental.dental_pt_photo_after_treatment'), required: true }],
 
     prescriptions: [
-    { medication: 'Ибупрофен', dosage: '400мг', instructions: 'При болях 3 раза в день', required: false }],
+    { medication: t('dental.dental_pt_rx_ibuprofen'), dosage: t('dental.dental_pt_rx_dosage_400'), instructions: t('dental.dental_pt_rx_instr_pain_3x'), required: false }],
 
-    tags: ['кариес', 'пломбирование', 'терапия'],
+    tags: [t('dental.dental_pt_tag_caries'), t('dental.dental_pt_tag_filling'), t('dental.dental_pt_tag_therapy')],
     estimatedDuration: 60,
     difficulty: 'medium',
     isDefault: true
@@ -72,40 +73,40 @@ const ProtocolTemplates = ({
 
   {
     id: 'root_canal_treatment',
-    name: 'Эндодонтическое лечение',
+    name: t('dental.dental_pt_name_root_canal'),
     category: 'procedure',
-    description: 'Протокол лечения корневых каналов',
+    description: t('dental.dental_pt_desc_root_canal'),
     icon: Scissors,
     color: 'red',
     steps: [
-    { type: 'procedure', name: 'Диагностика', duration: 10, required: true },
-    { type: 'procedure', name: 'Анестезия', duration: 10, required: true },
-    { type: 'procedure', name: 'Изоляция зуба', duration: 5, required: true },
-    { type: 'procedure', name: 'Препарирование полости доступа', duration: 15, required: true },
-    { type: 'procedure', name: 'Инструментальная обработка каналов', duration: 30, required: true },
-    { type: 'procedure', name: 'Медикаментозная обработка', duration: 10, required: true },
-    { type: 'procedure', name: 'Пломбирование каналов', duration: 20, required: true },
-    { type: 'procedure', name: 'Восстановление коронки', duration: 25, required: true }],
+    { type: 'procedure', name: t('dental.dental_pt_step_diagnostics'), duration: 10, required: true },
+    { type: 'procedure', name: t('dental.dental_pt_step_anesthesia'), duration: 10, required: true },
+    { type: 'procedure', name: t('dental.dental_pt_step_isolation'), duration: 5, required: true },
+    { type: 'procedure', name: t('dental.dental_pt_step_access_prep'), duration: 15, required: true },
+    { type: 'procedure', name: t('dental.dental_pt_step_instrumental'), duration: 30, required: true },
+    { type: 'procedure', name: t('dental.dental_pt_step_medication'), duration: 10, required: true },
+    { type: 'procedure', name: t('dental.dental_pt_step_canal_filling'), duration: 20, required: true },
+    { type: 'procedure', name: t('dental.dental_pt_step_crown_restore'), duration: 25, required: true }],
 
     materials: [
-    { name: 'Эндодонтические файлы', quantity: '1 набор', required: true },
-    { name: 'Гуттаперча', quantity: '1 набор', required: true },
-    { name: 'Эндодонтический цемент', quantity: '1 шт', required: true },
-    { name: 'Антисептик', quantity: '10 мл', required: true }],
+    { name: t('dental.dental_pt_mat_endo_files'), quantity: t('dental.dental_pt_qty_1set'), required: true },
+    { name: t('dental.dental_pt_mat_gutta_percha'), quantity: t('dental.dental_pt_qty_1set'), required: true },
+    { name: t('dental.dental_pt_mat_endo_cement'), quantity: t('dental.dental_pt_qty_1pc'), required: true },
+    { name: t('dental.dental_pt_mat_antiseptic'), quantity: t('dental.dental_pt_qty_10ml'), required: true }],
 
     anesthesia: [
-    { drug: 'Лидокаин 2%', dose: '2.0 мл', method: 'проводниковая', required: true }],
+    { drug: t('dental.dental_pt_drug_lidocaine2'), dose: t('dental.dental_pt_qty_2ml'), method: t('dental.dental_pt_method_conduction'), required: true }],
 
     photos: [
-    { type: 'before', description: 'Фото до лечения', required: true },
-    { type: 'during', description: 'Фото во время лечения', required: false },
-    { type: 'after', description: 'Фото после лечения', required: true }],
+    { type: 'before', description: t('dental.dental_pt_photo_before_treatment'), required: true },
+    { type: 'during', description: t('dental.dental_pt_photo_during_treatment'), required: false },
+    { type: 'after', description: t('dental.dental_pt_photo_after_treatment'), required: true }],
 
     prescriptions: [
-    { medication: 'Амоксициллин', dosage: '500мг', instructions: '3 раза в день 7 дней', required: true },
-    { medication: 'Ибупрофен', dosage: '400мг', instructions: 'При болях', required: false }],
+    { medication: t('dental.dental_pt_rx_amoxicillin'), dosage: t('dental.dental_pt_rx_dosage_500'), instructions: t('dental.dental_pt_rx_instr_3x_7d'), required: true },
+    { medication: t('dental.dental_pt_rx_ibuprofen'), dosage: t('dental.dental_pt_rx_dosage_400'), instructions: t('dental.dental_pt_rx_instr_pain'), required: false }],
 
-    tags: ['эндодонтия', 'корневые каналы', 'пульпит'],
+    tags: [t('dental.dental_pt_tag_endo'), t('dental.dental_pt_tag_canals'), t('dental.dental_pt_tag_pulpitis')],
     estimatedDuration: 120,
     difficulty: 'high',
     isDefault: true
@@ -113,38 +114,38 @@ const ProtocolTemplates = ({
 
   {
     id: 'tooth_extraction',
-    name: 'Удаление зуба',
+    name: t('dental.dental_pt_name_tooth_extraction'),
     category: 'surgery',
-    description: 'Протокол удаления зуба',
+    description: t('dental.dental_pt_desc_tooth_extraction'),
     icon: Scissors,
     color: 'red',
     steps: [
-    { type: 'procedure', name: 'Осмотр и диагностика', duration: 10, required: true },
-    { type: 'procedure', name: 'Анестезия', duration: 10, required: true },
-    { type: 'procedure', name: 'Отслоение десны', duration: 5, required: true },
-    { type: 'procedure', name: 'Удаление зуба', duration: 20, required: true },
-    { type: 'procedure', name: 'Кюретаж лунки', duration: 10, required: true },
-    { type: 'procedure', name: 'Наложение швов', duration: 10, required: false },
-    { type: 'procedure', name: 'Наложение тампона', duration: 5, required: true }],
+    { type: 'procedure', name: t('dental.dental_pt_step_exam_diagnosis'), duration: 10, required: true },
+    { type: 'procedure', name: t('dental.dental_pt_step_anesthesia'), duration: 10, required: true },
+    { type: 'procedure', name: t('dental.dental_pt_step_gum_detachment'), duration: 5, required: true },
+    { type: 'procedure', name: t('dental.dental_pt_step_extraction'), duration: 20, required: true },
+    { type: 'procedure', name: t('dental.dental_pt_step_socket_curettage'), duration: 10, required: true },
+    { type: 'procedure', name: t('dental.dental_pt_step_suturing'), duration: 10, required: false },
+    { type: 'procedure', name: t('dental.dental_pt_step_tampon'), duration: 5, required: true }],
 
     materials: [
-    { name: 'Стоматологические щипцы', quantity: '1 набор', required: true },
-    { name: 'Элеваторы', quantity: '1 набор', required: true },
-    { name: 'Шовный материал', quantity: '1 м', required: false },
-    { name: 'Стоматологическая вата', quantity: '20 шт', required: true }],
+    { name: t('dental.dental_pt_mat_forceps'), quantity: t('dental.dental_pt_qty_1set'), required: true },
+    { name: t('dental.dental_pt_mat_elevators'), quantity: t('dental.dental_pt_qty_1set'), required: true },
+    { name: t('dental.dental_pt_mat_suture'), quantity: t('dental.dental_pt_qty_1m'), required: false },
+    { name: t('dental.dental_pt_mat_cotton'), quantity: t('dental.dental_pt_qty_20pc'), required: true }],
 
     anesthesia: [
-    { drug: 'Лидокаин 2%', dose: '2.0 мл', method: 'проводниковая', required: true }],
+    { drug: t('dental.dental_pt_drug_lidocaine2'), dose: t('dental.dental_pt_qty_2ml'), method: t('dental.dental_pt_method_conduction'), required: true }],
 
     photos: [
-    { type: 'before', description: 'Фото до удаления', required: true },
-    { type: 'after', description: 'Фото после удаления', required: true }],
+    { type: 'before', description: t('dental.dental_pt_photo_before_extraction'), required: true },
+    { type: 'after', description: t('dental.dental_pt_photo_after_extraction'), required: true }],
 
     prescriptions: [
-    { medication: 'Амоксициллин', dosage: '500мг', instructions: '3 раза в день 5 дней', required: true },
-    { medication: 'Ибупрофен', dosage: '400мг', instructions: 'При болях', required: true }],
+    { medication: t('dental.dental_pt_rx_amoxicillin'), dosage: t('dental.dental_pt_rx_dosage_500'), instructions: t('dental.dental_pt_rx_instr_3x_5d'), required: true },
+    { medication: t('dental.dental_pt_rx_ibuprofen'), dosage: t('dental.dental_pt_rx_dosage_400'), instructions: t('dental.dental_pt_rx_instr_pain'), required: true }],
 
-    tags: ['удаление', 'хирургия', 'зуб'],
+    tags: [t('dental.dental_pt_tag_extraction'), t('dental.dental_pt_tag_surgery'), t('dental.dental_pt_tag_tooth')],
     estimatedDuration: 60,
     difficulty: 'medium',
     isDefault: true
@@ -152,30 +153,30 @@ const ProtocolTemplates = ({
 
   {
     id: 'professional_hygiene',
-    name: 'Профессиональная гигиена',
+    name: t('dental.dental_pt_name_prof_hygiene'),
     category: 'hygiene',
-    description: 'Протокол профессиональной гигиены полости рта',
+    description: t('dental.dental_pt_desc_prof_hygiene'),
     icon: Scissors,
     color: 'green',
     steps: [
-    { type: 'procedure', name: 'Осмотр полости рта', duration: 10, required: true },
-    { type: 'procedure', name: 'Удаление зубного камня', duration: 30, required: true },
-    { type: 'procedure', name: 'Полировка зубов', duration: 20, required: true },
-    { type: 'procedure', name: 'Фторирование', duration: 10, required: false },
-    { type: 'procedure', name: 'Обучение гигиене', duration: 15, required: true }],
+    { type: 'procedure', name: t('dental.dental_pt_step_oral_exam'), duration: 10, required: true },
+    { type: 'procedure', name: t('dental.dental_pt_step_tartar_removal'), duration: 30, required: true },
+    { type: 'procedure', name: t('dental.dental_pt_step_teeth_polishing'), duration: 20, required: true },
+    { type: 'procedure', name: t('dental.dental_pt_step_fluoridation'), duration: 10, required: false },
+    { type: 'procedure', name: t('dental.dental_pt_step_hygiene_training'), duration: 15, required: true }],
 
     materials: [
-    { name: 'Ультразвуковой скалер', quantity: '1 шт', required: true },
-    { name: 'Полировочные пасты', quantity: '1 набор', required: true },
-    { name: 'Фторсодержащий гель', quantity: '1 шт', required: false }],
+    { name: t('dental.dental_pt_mat_scaler'), quantity: t('dental.dental_pt_qty_1pc'), required: true },
+    { name: t('dental.dental_pt_mat_polish_paste'), quantity: t('dental.dental_pt_qty_1set'), required: true },
+    { name: t('dental.dental_pt_mat_fluoride_gel'), quantity: t('dental.dental_pt_qty_1pc'), required: false }],
 
     anesthesia: [],
     photos: [
-    { type: 'before', description: 'Фото до чистки', required: true },
-    { type: 'after', description: 'Фото после чистки', required: true }],
+    { type: 'before', description: t('dental.dental_pt_photo_before_cleaning'), required: true },
+    { type: 'after', description: t('dental.dental_pt_photo_after_cleaning'), required: true }],
 
     prescriptions: [],
-    tags: ['гигиена', 'чистка', 'профилактика'],
+    tags: [t('dental.dental_pt_tag_hygiene'), t('dental.dental_pt_tag_cleaning'), t('dental.dental_pt_tag_prevention')],
     estimatedDuration: 75,
     difficulty: 'low',
     isDefault: true
@@ -183,35 +184,35 @@ const ProtocolTemplates = ({
 
   {
     id: 'crown_preparation',
-    name: 'Подготовка под коронку',
+    name: t('dental.dental_pt_name_crown_prep'),
     category: 'prosthetics',
-    description: 'Протокол подготовки зуба под коронку',
+    description: t('dental.dental_pt_desc_crown_prep'),
     icon: Scissors,
     color: 'purple',
     steps: [
-    { type: 'procedure', name: 'Осмотр и планирование', duration: 10, required: true },
-    { type: 'procedure', name: 'Анестезия', duration: 10, required: true },
-    { type: 'procedure', name: 'Препарирование зуба', duration: 30, required: true },
-    { type: 'procedure', name: 'Снятие оттисков', duration: 15, required: true },
-    { type: 'procedure', name: 'Изготовление временной коронки', duration: 20, required: true },
-    { type: 'procedure', name: 'Фиксация временной коронки', duration: 10, required: true }],
+    { type: 'procedure', name: t('dental.dental_pt_step_exam_planning'), duration: 10, required: true },
+    { type: 'procedure', name: t('dental.dental_pt_step_anesthesia'), duration: 10, required: true },
+    { type: 'procedure', name: t('dental.dental_pt_step_tooth_prep'), duration: 30, required: true },
+    { type: 'procedure', name: t('dental.dental_pt_step_impressions'), duration: 15, required: true },
+    { type: 'procedure', name: t('dental.dental_pt_step_temp_crown_make'), duration: 20, required: true },
+    { type: 'procedure', name: t('dental.dental_pt_step_temp_crown_fix'), duration: 10, required: true }],
 
     materials: [
-    { name: 'Оттискная масса', quantity: '1 набор', required: true },
-    { name: 'Временный цемент', quantity: '1 шт', required: true },
-    { name: 'Пластмасса для временной коронки', quantity: '1 набор', required: true }],
+    { name: t('dental.dental_pt_mat_impression_mass'), quantity: t('dental.dental_pt_qty_1set'), required: true },
+    { name: t('dental.dental_pt_mat_temp_cement'), quantity: t('dental.dental_pt_qty_1pc'), required: true },
+    { name: t('dental.dental_pt_mat_temp_crown_plastic'), quantity: t('dental.dental_pt_qty_1set'), required: true }],
 
     anesthesia: [
-    { drug: 'Лидокаин 2%', dose: '1.8 мл', method: 'инфильтрационная', required: true }],
+    { drug: t('dental.dental_pt_drug_lidocaine2'), dose: t('dental.dental_pt_qty_1_8ml'), method: t('dental.dental_pt_method_infiltration'), required: true }],
 
     photos: [
-    { type: 'before', description: 'Фото до препарирования', required: true },
-    { type: 'after', description: 'Фото после препарирования', required: true }],
+    { type: 'before', description: t('dental.dental_pt_photo_before_prep'), required: true },
+    { type: 'after', description: t('dental.dental_pt_photo_after_prep'), required: true }],
 
     prescriptions: [
-    { medication: 'Ибупрофен', dosage: '400мг', instructions: 'При болях', required: false }],
+    { medication: t('dental.dental_pt_rx_ibuprofen'), dosage: t('dental.dental_pt_rx_dosage_400'), instructions: t('dental.dental_pt_rx_instr_pain'), required: false }],
 
-    tags: ['протезирование', 'коронка', 'препарирование'],
+    tags: [t('dental.dental_pt_tag_prosthetics'), t('dental.dental_pt_tag_crown'), t('dental.dental_pt_tag_prep')],
     estimatedDuration: 95,
     difficulty: 'high',
     isDefault: true
@@ -240,19 +241,19 @@ const ProtocolTemplates = ({
 
   // Категории шаблонов
   const categories = [
-  { id: 'all', label: 'Все', icon: FileText },
-  { id: 'procedure', label: 'Процедуры', icon: Scissors },
-  { id: 'surgery', label: 'Хирургия', icon: Scissors },
-  { id: 'hygiene', label: 'Гигиена', icon: Scissors },
-  { id: 'prosthetics', label: 'Протезирование', icon: Scissors }];
+  { id: 'all', label: t('dental.dental_pt_cat_all'), icon: FileText },
+  { id: 'procedure', label: t('dental.dental_pt_cat_procedure'), icon: Scissors },
+  { id: 'surgery', label: t('dental.dental_pt_cat_surgery'), icon: Scissors },
+  { id: 'hygiene', label: t('dental.dental_pt_cat_hygiene'), icon: Scissors },
+  { id: 'prosthetics', label: t('dental.dental_pt_cat_prosthetics'), icon: Scissors }];
 
 
   // Уровни сложности
   const difficulties = [
-  { id: 'all', label: 'Все', color: 'gray' },
-  { id: 'low', label: 'Низкая', color: 'green' },
-  { id: 'medium', label: 'Средняя', color: 'yellow' },
-  { id: 'high', label: 'Высокая', color: 'red' }];
+  { id: 'all', label: t('dental.dental_pt_diff_all'), color: 'gray' },
+  { id: 'low', label: t('dental.dental_pt_diff_low'), color: 'green' },
+  { id: 'medium', label: t('dental.dental_pt_diff_medium'), color: 'yellow' },
+  { id: 'high', label: t('dental.dental_pt_diff_high'), color: 'red' }];
 
 
   // Обработчики
@@ -314,7 +315,7 @@ const ProtocolTemplates = ({
     const newTemplate = {
       ...template,
       id: Date.now().toString(),
-      name: `${template.name} (копия)`,
+      name: `${template.name} ${t('dental.dental_pt_copy_suffix')}`,
       isDefault: false
     };
     setTemplates((prev) => [...prev, newTemplate]);
@@ -357,15 +358,15 @@ const ProtocolTemplates = ({
         <div className="flex items-center gap-4 text-sm text-gray-600">
           <div className="flex items-center gap-1">
             <Clock className="h-4 w-4" />
-            {template.estimatedDuration} мин
+            {template.estimatedDuration} {t('dental.dental_pt_unit_min')}
           </div>
           <div className="flex items-center gap-1">
             <Scissors className="h-4 w-4" />
-            {template.steps.length} шагов
+            {template.steps.length} {t('dental.dental_pt_unit_steps')}
           </div>
           <div className="flex items-center gap-1">
             <Pill className="h-4 w-4" />
-            {template.materials.length} материалов
+            {template.materials.length} {t('dental.dental_pt_unit_materials')}
           </div>
         </div>
         
@@ -385,21 +386,21 @@ const ProtocolTemplates = ({
         data-template-id={template.id}
         className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm">
         
-          Использовать
+          {t('dental.dental_pt_btn_use')}
         </button>
         <button
         onClick={() => handleEditTemplate(template)}
         className="px-3 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
-        aria-label={`Редактировать шаблон ${template.name}`}
-        title="Редактировать">
+        aria-label={t('dental.dental_pt_aria_edit_template', { name: template.name })}
+        title={t('dental.dental_pt_btn_edit')}>
         
           <Edit className="h-4 w-4" />
         </button>
         <button
         onClick={() => handleDuplicateTemplate(template)}
         className="px-3 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
-        aria-label={`Дублировать шаблон ${template.name}`}
-        title="Дублировать">
+        aria-label={t('dental.dental_pt_aria_duplicate_template', { name: template.name })}
+        title={t('dental.dental_pt_btn_duplicate')}>
         
           <Copy className="h-4 w-4" />
         </button>
@@ -407,8 +408,8 @@ const ProtocolTemplates = ({
       <button
         onClick={() => handleDeleteTemplate(template.id)}
         className="px-3 py-2 border border-gray-300 text-red-700 rounded-md hover:bg-red-50"
-        aria-label={`Удалить шаблон ${template.name}`}
-        title="Удалить">
+        aria-label={t('dental.dental_pt_aria_delete_template', { name: template.name })}
+        title={t('dental.dental_pt_btn_delete')}>
         
             <Trash2 className="h-4 w-4" />
           </button>
@@ -424,7 +425,7 @@ const ProtocolTemplates = ({
         <h2 className="text-xl font-semibold">{template.name}</h2>
         <button
         onClick={() => setSelectedTemplate(null)}
-        aria-label={`Закрыть просмотр шаблона ${template.name}`}
+        aria-label={t('dental.dental_pt_aria_close_view', { name: template.name })}
         className="p-2 text-gray-500 hover:text-gray-700">
         
           <X className="h-5 w-5" />
@@ -436,7 +437,7 @@ const ProtocolTemplates = ({
         <div>
           <h3 className="font-semibold mb-3 flex items-center gap-2">
             <Scissors className="h-4 w-4" />
-            Шаги процедуры
+            {t('dental.dental_pt_section_steps')}
           </h3>
           <div className="space-y-2">
             {template.steps.map((step, index) =>
@@ -447,7 +448,7 @@ const ProtocolTemplates = ({
                 <div className="flex-1">
                   <div className="font-medium">{step.name}</div>
                   <div className="text-sm text-gray-600">
-                    {step.duration} мин {step.required && <span className="text-red-500">*</span>}
+                    {step.duration} {t('dental.dental_pt_unit_min')} {step.required && <span className="text-red-500">*</span>}
                   </div>
                 </div>
               </div>
@@ -459,7 +460,7 @@ const ProtocolTemplates = ({
         <div>
           <h3 className="font-semibold mb-3 flex items-center gap-2">
             <Pill className="h-4 w-4" />
-            Материалы
+            {t('dental.dental_pt_section_materials')}
           </h3>
           <div className="space-y-2">
             {template.materials.map((material, index) =>
@@ -483,7 +484,7 @@ const ProtocolTemplates = ({
       <div>
             <h3 className="font-semibold mb-3 flex items-center gap-2">
               <Syringe className="h-4 w-4" />
-              Анестезия
+              {t('dental.dental_pt_section_anesthesia')}
             </h3>
             <div className="space-y-2">
               {template.anesthesia.map((anesthesia, index) =>
@@ -503,7 +504,7 @@ const ProtocolTemplates = ({
       <div>
             <h3 className="font-semibold mb-3 flex items-center gap-2">
               <Camera className="h-4 w-4" />
-              Фотофиксация
+              {t('dental.dental_pt_section_photos')}
             </h3>
             <div className="space-y-2">
               {template.photos.map((photo, index) =>
@@ -526,13 +527,13 @@ const ProtocolTemplates = ({
         data-template-id={template.id}
         className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
         
-          Использовать шаблон
+          {t('dental.dental_pt_btn_use_template')}
         </button>
         <button
         onClick={() => handleEditTemplate(template)}
         className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50">
         
-          Редактировать
+          {t('dental.dental_pt_btn_edit')}
         </button>
       </div>
     </div>;
@@ -544,9 +545,9 @@ const ProtocolTemplates = ({
         {/* Заголовок */}
         <div className="flex items-center justify-between p-6 border-b">
           <div>
-            <h2 className="text-xl font-semibold">Шаблоны протоколов</h2>
+            <h2 className="text-xl font-semibold">{t('dental.dental_pt_title')}</h2>
             <p className="text-gray-600 text-sm">
-              {filteredTemplates.length} шаблонов | Выберите шаблон для использования
+              {t('dental.dental_pt_subtitle', { count: filteredTemplates.length })}
             </p>
           </div>
           
@@ -556,11 +557,11 @@ const ProtocolTemplates = ({
               className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">
               
               <Plus className="h-4 w-4" />
-              Создать шаблон
+              {t('dental.dental_pt_btn_create')}
             </button>
             <button
               onClick={onClose}
-              aria-label="Закрыть шаблоны протоколов"
+              aria-label={t('dental.dental_pt_aria_close_modal')}
               className="p-2 text-gray-500 hover:text-gray-700">
               
               <X className="h-5 w-5" />
@@ -577,8 +578,8 @@ const ProtocolTemplates = ({
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
                   type="text"
-                  placeholder="Поиск шаблонов..."
-                  aria-label="Поиск шаблонов протоколов"
+                  placeholder={t('dental.dental_pt_search_placeholder')}
+                  aria-label={t('dental.dental_pt_aria_search')}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
@@ -591,7 +592,7 @@ const ProtocolTemplates = ({
               <select
                 value={filterCategory}
                 onChange={(e) => setFilterCategory(e.target.value)}
-                aria-label="Фильтр шаблонов по категории"
+                aria-label={t('dental.dental_pt_aria_filter_category')}
                 className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                 
                 {categories.map((category) =>
@@ -604,7 +605,7 @@ const ProtocolTemplates = ({
               <select
                 value={filterDifficulty}
                 onChange={(e) => setFilterDifficulty(e.target.value)}
-                aria-label="Фильтр шаблонов по сложности"
+                aria-label={t('dental.dental_pt_aria_filter_difficulty')}
                 className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                 
                 {difficulties.map((difficulty) =>

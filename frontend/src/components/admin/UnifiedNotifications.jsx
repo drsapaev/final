@@ -4,7 +4,7 @@ import FCMManager from './FCMManager';
 import RegistrarNotificationManager from './RegistrarNotificationManager';
 import ErrorBoundary from '../common/ErrorBoundary';
 import { MacOSTab } from '../ui/macos';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 
 const UnifiedNotifications = () => {
@@ -25,7 +25,7 @@ const UnifiedNotifications = () => {
 
   const tabs = [
   { id: 'fcm', label: 'Push (FCM)', icon: 'Bell' },
-  { id: 'registrar', label: 'Регистратор', icon: 'Users' }];
+  { id: 'registrar', label: t('admin2.un_tab_registrar'), icon: 'Users' }];
 
 
   const renderContent = () => {

@@ -1,6 +1,6 @@
 import PropTypes from 'prop-types';
 import { layoutOptions, brandingFieldLabels } from './config';
-import { useTranslation } from '../../../i18n/adapter';
+import { useTranslation } from '../../../i18n/useTranslation';
 
 /**
  * L-H-6 fix: DesignTab выделен в отдельный файл (~50 строк).

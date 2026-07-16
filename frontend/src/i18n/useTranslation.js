@@ -68,3 +68,51 @@ export function useTranslation() {
 }
 
 export default useTranslation;
+
+// Standalone t() — for non-React contexts (tests, module-level constants).
+// Delegates to react-i18next's i18n.t().
+export const t = (key, params) => {
+  if (key === null || key === undefined || typeof key !== 'string') return key;
+  return i18n.t(key, params);
+};
+
+// Standalone tInterpolate() — for backward compat with labTranslations.tInterpolate.
+// Uses single-brace {param} interpolation.
+export function tInterpolate(key, params = {}) {
+  const template = i18n.t(key);
+  if (!params || typeof params !== 'object') return template;
+  return template.replace(/\{(\w+)\}/g, (match, paramName) => {
+    return params[paramName] !== undefined ? String(params[paramName]) : match;
+  });
+}
+
+// Re-export i18n instance for direct access.
+export { i18n };
+
+// TRANSLATIONS — re-export the Russian locale as the "dictionary" for backward compat
+// with tests that import it directly. New code should use t() instead.
+import ru from './locales/ru';
+export { ru as TRANSLATIONS };
+
+/**
+ * TranslationProvider — no-op provider for backward compatibility.
+ *
+ * react-i18next initializes globally via `import './i18n'` in main.jsx,
+ * so no context provider is needed. This component exists only to keep
+ * existing imports working:
+ *   import { TranslationProvider } from '../i18n/useTranslation';
+ *
+ * It simply renders its children — no state, no context.
+ */
+import React from 'react';
+import PropTypes from 'prop-types';
+
+export function TranslationProvider({ children }) {
+  return children;
+}
+
+TranslationProvider.propTypes = {
+  ...(TranslationProvider.propTypes || {}),
+  children: PropTypes.any,
+};
+

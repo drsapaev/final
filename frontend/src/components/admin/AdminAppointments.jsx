@@ -7,7 +7,7 @@ import useDoctors from '../../hooks/useDoctors';
 import usePatients from '../../hooks/usePatients';
 import useModal from '../../hooks/useModal.jsx';
 import notify from '../../services/notify';
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 import {
   Badge,
   Button,
@@ -23,15 +23,15 @@ import logger from '../../utils/logger';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
 
-const statusOptions = [
-  { value: '', label: 'Все статусы' },
-  { value: 'pending', label: 'Ожидает оплаты' },
-  { value: 'confirmed', label: 'Подтверждена' },
-  { value: 'paid', label: 'Оплачена' },
-  { value: 'in_visit', label: 'На приеме' },
-  { value: 'completed', label: 'Завершена' },
-  { value: 'cancelled', label: 'Отменена' },
-  { value: 'no_show', label: 'Не явился' },
+const getStatusOptions = (t) => [
+  { value: '', label: t('admin2.appt_filter_all_statuses') },
+  { value: 'pending', label: t('admin2.appt_status_pending') },
+  { value: 'confirmed', label: t('admin2.appt_status_confirmed') },
+  { value: 'paid', label: t('admin2.appt_status_paid') },
+  { value: 'in_visit', label: t('admin2.appt_status_in_visit') },
+  { value: 'completed', label: t('admin2.appt_status_completed') },
+  { value: 'cancelled', label: t('admin2.appt_status_cancelled') },
+  { value: 'no_show', label: t('admin2.appt_status_no_show') },
 ];
 
 const tableHeaderStyle = {
@@ -48,7 +48,7 @@ const textCellStyle = {
   color: 'var(--mac-text-secondary)',
 };
 
-const getAppointmentPatientDisplayName = (appointment) => {
+const getAppointmentPatientDisplayName = (appointment, t) => {
   const rawName =
     appointment?.patientName ||
     appointment?.patient_name ||
@@ -57,13 +57,13 @@ const getAppointmentPatientDisplayName = (appointment) => {
     appointment?.patient?.name ||
     appointment?.patient?.first_name ||
     appointment?.patient?.last_name ||
-    'Пациент';
+    t('admin2.appt_patient_default');
 
   const normalized = String(rawName).trim();
-  return normalized || 'Пациент';
+  return normalized || t('admin2.appt_patient_default');
 };
 
-const getAppointmentDoctorDisplayName = (appointment) => {
+const getAppointmentDoctorDisplayName = (appointment, t) => {
   const rawName =
     appointment?.doctorName ||
     appointment?.doctor_name ||
@@ -71,10 +71,10 @@ const getAppointmentDoctorDisplayName = (appointment) => {
     appointment?.doctor?.name ||
     appointment?.doctor?.user?.full_name ||
     appointment?.doctor?.user?.username ||
-    'Врач';
+    t('admin2.appt_doctor_default');
 
   const normalized = String(rawName).trim();
-  return normalized || 'Врач';
+  return normalized || t('admin2.appt_doctor_default');
 };
 
 const getAppointmentDoctorSpecialization = (appointment) => {
@@ -89,18 +89,18 @@ const getAppointmentDoctorSpecialization = (appointment) => {
   return String(rawValue).trim();
 };
 
-const getAppointmentStatusLabel = (status) => {
+const getAppointmentStatusLabel = (status, t) => {
   const statusMap = {
-    pending: 'Ожидает оплаты',
-    scheduled: 'Запланирована',
-    confirmed: 'Подтверждена',
-    paid: 'Оплачена',
-    in_visit: 'На приеме',
-    completed: 'Завершена',
-    cancelled: 'Отменена',
-    no_show: 'Не явился',
+    pending: t('admin2.appt_status_pending'),
+    scheduled: t('admin2.appt_status_scheduled'),
+    confirmed: t('admin2.appt_status_confirmed'),
+    paid: t('admin2.appt_status_paid'),
+    in_visit: t('admin2.appt_status_in_visit'),
+    completed: t('admin2.appt_status_completed'),
+    cancelled: t('admin2.appt_status_cancelled'),
+    no_show: t('admin2.appt_status_no_show'),
   };
-  return statusMap[status] || status || 'Не указан';
+  return statusMap[status] || status || t('admin2.appt_status_not_specified');
 };
 
 const getAppointmentStatusVariant = (status) => {
@@ -126,9 +126,9 @@ const getInitials = (value, fallback) =>
     .toUpperCase()
     .slice(0, 2) || fallback;
 
-const formatAppointmentDate = (value) => {
+const formatAppointmentDate = (value, t) => {
   if (!value) {
-    return 'Дата не указана';
+    return t('admin2.appt_date_not_specified');
   }
 
   const parsed = new Date(value);
@@ -139,12 +139,12 @@ const formatAppointmentDate = (value) => {
   return parsed.toLocaleDateString('ru-RU');
 };
 
-const getDoctorOptionLabel = (doctor) => {
-  const name = doctor.user?.full_name || doctor.name || doctor.user?.username || `Врач #${doctor.id}`;
+const getDoctorOptionLabel = (doctor, t) => {
+  const name = doctor.user?.full_name || doctor.name || doctor.user?.username || t('admin2.appt_doctor_with_id', { id: doctor.id });
   const flags = [
-    doctor.active === false ? 'неактивен' : null,
-    doctor.user?.is_active === false ? 'аккаунт неактивен' : null,
-    doctor.cabinet ? `каб. ${doctor.cabinet}` : null,
+    doctor.active === false ? t('admin2.appt_doctor_inactive_flag') : null,
+    doctor.user?.is_active === false ? t('admin2.appt_doctor_account_inactive_flag') : null,
+    doctor.cabinet ? t('admin2.appt_doctor_cabinet_flag', { cabinet: doctor.cabinet }) : null,
   ].filter(Boolean);
 
   return flags.length > 0 ? `${name} • ${flags.join(' • ')}` : name;
@@ -157,6 +157,7 @@ const getDoctorOptionLabel = (doctor) => {
 const AdminAppointments = () => {
   // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
   const [confirm, confirmDialog] = useConfirm();
+  const { t } = useTranslation();
   const { allDoctors } = useDoctors();
   const { patients } = usePatients();
   const {
@@ -185,11 +186,12 @@ const AdminAppointments = () => {
   const todayAppointments = getTodayAppointments();
   const tomorrowAppointments = getTomorrowAppointments();
   const filtersActive = Boolean(searchTerm || filterStatus || filterDate || filterDoctor);
+  const statusOptions = getStatusOptions(t);
   const doctorOptions = [
-    { value: '', label: 'Все врачи' },
+    { value: '', label: t('admin2.appt_filter_all_doctors') },
     ...allDoctors.map((doctor) => ({
       value: String(doctor.id),
-      label: getDoctorOptionLabel(doctor),
+      label: getDoctorOptionLabel(doctor, t),
     })),
   ];
 
@@ -202,13 +204,13 @@ const AdminAppointments = () => {
   };
 
   const handleDeleteAppointment = async (appointment) => {
-    const patientName = getAppointmentPatientDisplayName(appointment);
-    const doctorName = getAppointmentDoctorDisplayName(appointment);
+    const patientName = getAppointmentPatientDisplayName(appointment, t);
+    const doctorName = getAppointmentDoctorDisplayName(appointment, t);
     // P-013 fix: replaced window.confirm() with shared useConfirm hook.
     const ok = await confirm({
       title: t('admin.delete_appointment_title'),
-      message: `Удалить запись «${patientName} — ${doctorName}»?`,
-      description: 'Это действие необратимо. Запись будет удалена из журнала.',
+      message: t('admin2.appt_delete_appointment_message', { patient: patientName, doctor: doctorName }),
+      description: t('admin2.appt_delete_appointment_description'),
       confirmLabel: t('admin.delete_confirm'),
       cancelLabel: t('admin.cancel'),
       intent: 'danger',
@@ -248,10 +250,10 @@ const AdminAppointments = () => {
       <div
         className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16"
       >
-        <MacOSStatCard title="Всего записей" value={appointments.length} icon={Calendar} color="blue" />
-        <MacOSStatCard title="На сегодня" value={todayAppointments.length} icon={Clock} color="green" />
-        <MacOSStatCard title="На завтра" value={tomorrowAppointments.length} icon={Calendar} color="purple" />
-        <MacOSStatCard title="Ожидают" value={statusStats.pending || 0} icon={Clock} color="orange" />
+        <MacOSStatCard title={t('admin2.appt_stat_total')} value={appointments.length} icon={Calendar} color="blue" />
+        <MacOSStatCard title={t('admin2.appt_stat_today')} value={todayAppointments.length} icon={Clock} color="green" />
+        <MacOSStatCard title={t('admin2.appt_stat_tomorrow')} value={tomorrowAppointments.length} icon={Calendar} color="purple" />
+        <MacOSStatCard title={t('admin2.appt_stat_pending')} value={statusStats.pending || 0} icon={Clock} color="orange" />
       </div>
 
       <MacOSCard
@@ -266,16 +268,16 @@ const AdminAppointments = () => {
             <h2
               className="admin-fs-xl-fw-semi-primary-m-0"
             >
-              Управление записями
+              {t('admin2.appt_page_title')}
             </h2>
             <p
               className="admin-m-6px-0-0-secondary-fs-sm"
             >
-              Административный обзор записей, врачей, кабинетов и статусов.
+              {t('admin2.appt_page_subtitle')}
             </p>
           </div>
           <Button onClick={handleCreateAppointment} startIcon={<Plus size={16} />}>
-            Создать запись
+            {t('admin2.appt_create_btn')}
           </Button>
         </div>
 
@@ -284,32 +286,32 @@ const AdminAppointments = () => {
         >
           <Input
             type="text"
-            placeholder="Поиск записей..."
+            placeholder={t('admin2.appt_search_ph')}
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
             icon={Search}
             iconPosition="left"
-            aria-label="Поиск записей"
+            aria-label={t('admin2.appt_search_aria')}
           />
           <Select
             value={filterStatus}
             onChange={setFilterStatus}
             options={statusOptions}
             size="large"
-            aria-label="Фильтр по статусу записи"
+            aria-label={t('admin2.appt_filter_status_aria')}
           />
           <Input
             type="date"
             value={filterDate}
             onChange={(event) => setFilterDate(event.target.value)}
-            aria-label="Фильтр по дате записи"
+            aria-label={t('admin2.appt_filter_date_aria')}
           />
           <Select
             value={filterDoctor}
             onChange={setFilterDoctor}
             options={doctorOptions}
             size="large"
-            aria-label="Фильтр по врачу"
+            aria-label={t('admin2.appt_filter_doctor_aria')}
           />
         </div>
 
@@ -318,8 +320,8 @@ const AdminAppointments = () => {
           <div style={{ marginBottom: '12px' }}>
             <Button variant="ghost" size="sm" onClick={() => {
               setSearchTerm(''); setFilterStatus(''); setFilterDate(''); setFilterDoctor('');
-            }} aria-label="Сбросить все фильтры">
-              ✕ Сбросить фильтры
+            }} aria-label={t('admin2.appt_reset_filters_aria')}>
+              ✕ {t('admin2.appt_reset_filters_btn')}
             </Button>
           </div>
         )}
@@ -327,9 +329,9 @@ const AdminAppointments = () => {
         {/* UX Audit Admin #2.7: quick filter chips для частых статусов. */}
         <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
           {[
-            { value: 'completed', label: 'Завершённые' },
-            { value: 'cancelled', label: 'Отменённые' },
-            { value: 'pending', label: 'Ожидают оплаты' },
+            { value: 'completed', label: t('admin2.appt_chip_completed') },
+            { value: 'cancelled', label: t('admin2.appt_chip_cancelled') },
+            { value: 'pending', label: t('admin2.appt_chip_pending') },
           ].map((chip) => (
             <button
               key={chip.value}
@@ -356,50 +358,50 @@ const AdminAppointments = () => {
           ) : error ? (
             <MacOSEmptyState
               icon={RefreshCw}
-              title="Ошибка загрузки записей"
-              description="Не удалось загрузить список записей. Проверьте соединение и попробуйте снова."
+              title={t('admin2.appt_load_error_title')}
+              description={t('admin2.appt_load_error_desc')}
               action={
                 <Button onClick={refresh} startIcon={<RefreshCw size={16} />}>
-                  Обновить
+                  {t('admin2.appt_refresh_btn')}
                 </Button>
               }
             />
           ) : appointments.length === 0 ? (
             <MacOSEmptyState
               icon={Calendar}
-              title="Записи не найдены"
+              title={t('admin2.appt_empty_title')}
               description={
                 filtersActive
-                  ? 'Попробуйте изменить параметры поиска.'
-                  : 'В системе пока нет записей.'
+                  ? t('admin2.appt_empty_filtered_desc')
+                  : t('admin2.appt_empty_desc')
               }
               action={
                 <Button onClick={handleCreateAppointment} startIcon={<Plus size={16} />}>
-                  Создать первую запись
+                  {t('admin2.appt_create_first_btn')}
                 </Button>
               }
             />
           ) : (
             <div className="admin-table-wrapper">
-            <table className="admin-w-100pct-bc-collapse" aria-label="Таблица записей">
+            <table className="admin-w-100pct-bc-collapse" aria-label={t('admin2.appt_table_aria')}>
               <thead>
                 <tr
                   className="admin-bgc-bg-secondary-bd-b-1px-solid-var-mac-bo"
                 >
-                  <th scope="col" style={tableHeaderStyle}>Пациент</th>
-                  <th scope="col" style={tableHeaderStyle}>Врач</th>
-                  <th scope="col" style={tableHeaderStyle}>Кабинет</th>
-                  <th scope="col" style={tableHeaderStyle}>Дата и время</th>
-                  <th scope="col" style={tableHeaderStyle}>Статус</th>
-                  <th scope="col" style={tableHeaderStyle}>Связность</th>
-                  <th scope="col" style={tableHeaderStyle}>Причина</th>
-                  <th scope="col" style={tableHeaderStyle}>Действия</th>
+                  <th scope="col" style={tableHeaderStyle}>{t('admin2.appt_th_patient')}</th>
+                  <th scope="col" style={tableHeaderStyle}>{t('admin2.appt_th_doctor')}</th>
+                  <th scope="col" style={tableHeaderStyle}>{t('admin2.appt_th_cabinet')}</th>
+                  <th scope="col" style={tableHeaderStyle}>{t('admin2.appt_th_datetime')}</th>
+                  <th scope="col" style={tableHeaderStyle}>{t('admin2.appt_th_status')}</th>
+                  <th scope="col" style={tableHeaderStyle}>{t('admin2.appt_th_integrity')}</th>
+                  <th scope="col" style={tableHeaderStyle}>{t('admin2.appt_th_reason')}</th>
+                  <th scope="col" style={tableHeaderStyle}>{t('admin2.appt_th_actions')}</th>
                 </tr>
               </thead>
               <tbody>
                 {appointments.map((appointment) => {
-                  const patientName = getAppointmentPatientDisplayName(appointment);
-                  const doctorName = getAppointmentDoctorDisplayName(appointment);
+                  const patientName = getAppointmentPatientDisplayName(appointment, t);
+                  const doctorName = getAppointmentDoctorDisplayName(appointment, t);
                   const doctorSpecialization = getAppointmentDoctorSpecialization(appointment);
                   const reason = appointment.reason || '';
 
@@ -408,13 +410,13 @@ const AdminAppointments = () => {
                       key={appointment.id}
                       className="admin-bd-b-1px-solid-var-mac-bo-tr-background-color-var"
                       >
-                      <td aria-label={`Пациент ${patientName}`} className="admin-p-12-16">
+                      <td aria-label={t('admin2.appt_patient_aria', { name: patientName })} className="admin-p-12-16">
                         <div className="admin-flex-center-12">
                           <div
                             aria-hidden="true"
                             className="admin-w-32-h-32-radius-50pct-d-flex-ai-center-jc-center-bg-blue-on-accent-fs-sm-fw-med"
                           >
-                            {getInitials(patientName, 'П')}
+                            {getInitials(patientName, t('admin2.appt_initials_patient'))}
                           </div>
                           <div>
                             <p
@@ -453,10 +455,10 @@ const AdminAppointments = () => {
                             size="sm"
                           >
                             {appointment.doctor?.active === false
-                              ? 'Врач неактивен'
+                              ? t('admin2.appt_doctor_inactive')
                               : appointment.doctor?.user_active === false
-                                ? 'Аккаунт врача неактивен'
-                                : 'Связь активна'}
+                                ? t('admin2.appt_doctor_account_inactive')
+                                : t('admin2.appt_link_active')}
                           </Badge>
                         </div>
                       </td>
@@ -471,29 +473,29 @@ const AdminAppointments = () => {
                         >
                           {/* UX Audit Admin #2.8: унифицированный формат кабинета. */}
                           {appointment.queueCabinet
-                            ? `Источник: очередь (${appointment.queueCabinet})`
+                            ? t('admin2.appt_source_queue', { cabinet: appointment.queueCabinet })
                             : appointment.doctorCabinet
-                              ? `Источник: врач (${appointment.doctorCabinet})`
-                              : 'Кабинет не указан'}
+                              ? t('admin2.appt_source_doctor', { cabinet: appointment.doctorCabinet })
+                              : t('admin2.appt_cabinet_not_specified')}
                         </p>
                       </td>
                       <td style={textCellStyle}>
                         <p className="admin-m-0-fw-med">
-                          {formatAppointmentDate(appointment.appointmentDate)}
+                          {formatAppointmentDate(appointment.appointmentDate, t)}
                         </p>
                         <p className="admin-m-4px-0-0">
-                          {appointment.appointmentTime || 'Время не указано'} ({appointment.duration || 30} мин)
+                          {appointment.appointmentTime || t('admin2.appt_time_not_specified')} ({appointment.duration || 30} {t('admin2.appt_min_short')})
                         </p>
                       </td>
                       <td className="admin-p-12-16">
                         <Badge variant={getAppointmentStatusVariant(appointment.status)}>
-                          {getAppointmentStatusLabel(appointment.status)}
+                          {getAppointmentStatusLabel(appointment.status, t)}
                         </Badge>
                       </td>
                       <td className="admin-p-12-16">
                         {appointment.hasIntegrityWarnings ? (
                           <div className="admin-d-flex-fd-column-gap-4">
-                            <Badge variant="warning">Требует проверки</Badge>
+                            <Badge variant="warning">{t('admin2.appt_requires_check')}</Badge>
                             <p
                               className="admin-fs-xs-secondary-m-0"
                             >
@@ -501,20 +503,20 @@ const AdminAppointments = () => {
                             </p>
                           </div>
                         ) : (
-                          <Badge variant="success">Связано</Badge>
+                          <Badge variant="success">{t('admin2.appt_linked')}</Badge>
                         )}
                       </td>
                       <td style={textCellStyle} title={reason || ''}>
                         {/* UX Audit Admin #1.6: tooltip для обрезанного reason. */}
-                        {reason.length > 50 ? `${reason.substring(0, 50)}...` : reason || 'Не указана'}
+                        {reason.length > 50 ? `${reason.substring(0, 50)}...` : reason || t('admin2.appt_reason_not_specified')}
                       </td>
-                      <td aria-label={`Действия для записи ${patientName} - ${doctorName}`} className="admin-p-12-16">
+                      <td aria-label={t('admin2.appt_actions_aria', { patient: patientName, doctor: doctorName })} className="admin-p-12-16">
                         <div className="flex items-center justify-center gap-2">
-                          <IconButton label="Редактировать запись" onClick={() => handleEditAppointment(appointment)}>
+                          <IconButton label={t('admin2.appt_edit_btn')} onClick={() => handleEditAppointment(appointment)}>
                             <Edit size={16} />
                           </IconButton>
                           <IconButton
-                            label="Удалить запись"
+                            label={t('admin2.appt_delete_btn')}
                             tone="danger"
                             onClick={() => handleDeleteAppointment(appointment)}
                           >

@@ -16,21 +16,21 @@ import PropTypes from 'prop-types';
 import { useState, useCallback } from 'react';
 
 import './CompletenessChecker.css';
-import { useTranslation } from '../../../i18n/adapter';
+import { useTranslation } from '../../../i18n/useTranslation';
 
 /**
  * Field labels
  */
-const FIELD_LABELS = {
-  complaints: 'Жалобы',
-  anamnesis_morbi: 'Анамнез заболевания',
-  anamnesis_vitae: 'Анамнез жизни',
-  examination: 'Осмотр',
-  diagnosis: 'Диагноз',
-  icd10_code: 'Код МКБ-10',
-  treatment: 'Лечение',
-  recommendations: 'Рекомендации'
-};
+const getFieldLabels = (t) => ({
+  complaints: t('misc.cc_field_complaints'),
+  anamnesis_morbi: t('misc.cc_field_anamnesis_morbi'),
+  anamnesis_vitae: t('misc.cc_field_anamnesis_vitae'),
+  examination: t('misc.cc_field_examination'),
+  diagnosis: t('misc.cc_field_diagnosis'),
+  icd10_code: t('misc.cc_field_icd10_code'),
+  treatment: t('misc.cc_field_treatment'),
+  recommendations: t('misc.cc_field_recommendations')
+});
 
 /**
  * CompletenessChecker Component
@@ -45,6 +45,7 @@ export function CompletenessChecker({
   specialty = 'general',
   onFieldClick
 }) {
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [results, setResults] = useState(null);
@@ -64,33 +65,33 @@ export function CompletenessChecker({
 
       // Check required fields
       if (!emrData.complaints?.trim()) {
-        missingFields.push({ field: 'complaints', reason: 'Пустое поле' });
+        missingFields.push({ field: 'complaints', reason: t('misc.cc_reason_empty') });
       }
       if (!emrData.diagnosis?.trim()) {
-        missingFields.push({ field: 'diagnosis', reason: 'Нет диагноза' });
+        missingFields.push({ field: 'diagnosis', reason: t('misc.cc_reason_no_diagnosis') });
       }
       if (emrData.diagnosis && !emrData.icd10_code?.trim()) {
-        missingFields.push({ field: 'icd10_code', reason: 'Код МКБ-10 не указан' });
+        missingFields.push({ field: 'icd10_code', reason: t('misc.cc_reason_no_icd10') });
       }
       if (!emrData.treatment?.trim()) {
-        missingFields.push({ field: 'treatment', reason: 'Нет плана лечения' });
+        missingFields.push({ field: 'treatment', reason: t('misc.cc_reason_no_treatment') });
       }
 
       // Content suggestions
       if (emrData.complaints?.trim() && !emrData.examination?.trim()) {
         suggestions.push({
           field: 'examination',
-          message: 'Рекомендуется добавить данные осмотра'
+          message: t('misc.cc_rekomenduetsya_dobavit_danny')
         });
       }
 
       // Specialty-specific
       if (specialty === 'cardiology') {
         const exam = emrData.examination?.toLowerCase() || '';
-        if (emrData.complaints && !exam.includes('ад') && !exam.includes('давлен')) {
+        if (emrData.complaints && !exam.includes(t('misc.cc_ad')) && !exam.includes(t('misc.cc_davlen'))) {
           suggestions.push({
             field: 'examination',
-            message: 'Для кардиологии: добавьте АД'
+            message: t('misc.cc_dlya_kardiologii_dobavte_ad')
           });
         }
       }
@@ -101,7 +102,7 @@ export function CompletenessChecker({
         isComplete: missingFields.length === 0
       });
     } catch (err) {
-      setError(err.message || 'Ошибка проверки');
+      setError(err.message || t('misc.cc_oshibka_proverki'));
     } finally {
       setIsLoading(false);
     }
@@ -138,7 +139,7 @@ export function CompletenessChecker({
         disabled={isLoading}>
         
                 {isLoading ? '⏳' : results?.isComplete ? '✅' : '🔍'}
-                <span>Проверить полноту</span>
+                <span>{t('misc.cc_proverit_polnotu')}</span>
             </button>
 
             {/* Results panel */}
@@ -185,7 +186,7 @@ export function CompletenessChecker({
                   onClick={() => handleFieldClick(field)}>
                   
                                                         <span className="completeness-checker__item-label">
-                                                            {FIELD_LABELS[field] || field}
+                                                            {getFieldLabels(t)[field] || field}
                                                         </span>
                                                         <span className="completeness-checker__item-reason">
                                                             {reason}
@@ -208,7 +209,7 @@ export function CompletenessChecker({
                   onClick={() => handleFieldClick(field)}>
                   
                                                         <span className="completeness-checker__item-label">
-                                                            {FIELD_LABELS[field] || field}
+                                                            {getFieldLabels(t)[field] || field}
                                                         </span>
                                                         <span className="completeness-checker__item-reason">
                                                             {message}

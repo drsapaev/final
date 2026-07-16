@@ -5,7 +5,7 @@ import {
   AppEmpty, AppError, AppLoading, Button,
 } from '../components/ui/macos';
 import auth from '../stores/auth.js';
-import { useTranslation } from '../i18n/adapter';
+import { useTranslation } from '../i18n/useTranslation';
 
 export default function Health() {
   const { t } = useTranslation();
@@ -33,7 +33,7 @@ export default function Health() {
         setAct(a);
       } catch (e) {
         if (!mounted) return;
-        setErr(e?.data?.detail || e?.message || 'Ошибка загрузки');
+        setErr(e?.data?.detail || e?.message || t('misc.h_oshibka_zagruzki'));
       } finally {
         if (mounted) setLoading(false);
       }
@@ -115,7 +115,7 @@ export default function Health() {
       <main style={styles.main} aria-labelledby="health-page-title">
         <div style={styles.headingRow}>
           <div style={styles.headingCopy}>
-            <h1 id="health-page-title" style={styles.title}>Состояние приложения</h1>
+            <h1 id="health-page-title" style={styles.title}>{t('misc.h_sostoyanie_prilozheniya')}</h1>
             <div style={styles.meta}>
               API base: <code>{getApiBase()}</code>
             </div>
@@ -127,14 +127,14 @@ export default function Health() {
             onClick={refreshStatus}
             disabled={loading}
             loading={loading}
-            aria-label="Обновить состояние приложения">
+            aria-label={t('misc.h_obnovit_sostoyanie_prilozhen')}>
             Обновить
           </Button>
         </div>
 
         {err && (
           <AppError
-            title="Ошибка загрузки"
+            title={t('misc.h_oshibka_zagruzki')}
             description={String(err)}
             action={
               <Button
@@ -144,7 +144,7 @@ export default function Health() {
                 onClick={refreshStatus}
                 disabled={loading}
                 loading={loading}
-                aria-label="Повторить проверку состояния приложения">
+                aria-label={t('misc.h_povtorit_proverku_sostoyaniy')}>
                 Повторить
               </Button>
             }
@@ -156,20 +156,20 @@ export default function Health() {
           <h2 id="health-status-title" style={styles.sectionTitle}>Health</h2>
           {loading ? (
             <AppLoading
-              title="Проверка состояния сервера..."
-              description="Запрашиваем текущий ответ health endpoint."
-              ariaLabel="Проверяем состояние сервера"
+              title={t('misc.h_proverka_sostoyaniya_servera')}
+              description={t('misc.h_zaprashivaem_tekuschiy_otvet')}
+              ariaLabel={t('misc.h_proveryaem_sostoyanie_server')}
               size="sm"
               style={styles.appState}
             />
           ) : health ? (
-            <pre style={styles.pre} aria-label="Ответ health endpoint" tabIndex={0}>
+            <pre style={styles.pre} aria-label={t('misc.h_otvet_health_endpoint')} tabIndex={0}>
               {typeof health === 'string' ? health : JSON.stringify(health, null, 2)}
             </pre>
           ) : (
             <AppEmpty
-              title="Health недоступен"
-              description="Спец-эндпоинт health не обнаружен в OpenAPI. Это нормально."
+              title={t('misc.h_health_nedostupen')}
+              description={t('misc.h_spets_endpoint_health_ne_obn')}
               style={styles.appState}
             />
           )}
@@ -177,23 +177,23 @@ export default function Health() {
 
         {isAdmin && (
           <section style={styles.section} aria-labelledby="activation-status-title" aria-busy={loading}>
-            <h2 id="activation-status-title" style={styles.sectionTitle}>Статус активации</h2>
+            <h2 id="activation-status-title" style={styles.sectionTitle}>{t('misc.h_status_aktivatsii')}</h2>
             {loading ? (
               <AppLoading
-                title="Загрузка статуса..."
-                description="Запрашиваем текущий статус активации для администратора."
-                ariaLabel="Загружаем статус активации"
+                title={t('misc.h_zagruzka_statusa')}
+                description={t('misc.h_zaprashivaem_tekuschiy_statu')}
+                ariaLabel={t('misc.h_zagruzhaem_status_aktivatsii')}
                 size="sm"
                 style={styles.appState}
               />
             ) : act ? (
-              <pre style={styles.pre} aria-label="Ответ activation status endpoint" tabIndex={0}>
+              <pre style={styles.pre} aria-label={t('misc.h_otvet_activation_status_endp')} tabIndex={0}>
                 {typeof act === 'string' ? act : JSON.stringify(act, null, 2)}
               </pre>
             ) : (
               <AppEmpty
-                title="Статус активации недоступен"
-                description="Эндпоинт статуса активации отсутствует в OpenAPI. Всё в порядке."
+                title={t('misc.h_status_aktivatsii_nedostupen')}
+                description={t('misc.h_endpoint_statusa_aktivatsii_')}
                 style={styles.appState}
               />
             )}

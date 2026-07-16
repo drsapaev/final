@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import Landing from '../Landing';
 import { ThemeProvider } from '../../contexts/ThemeContext';
-import { TranslationProvider } from '../../hooks/useTranslation';
+import { TranslationProvider } from '../../i18n/useTranslation';
 import { MacOSThemeProvider } from '../../theme/macosTheme.jsx';
 
 function renderLanding() {

@@ -10,7 +10,7 @@ const translationsSource = fs.readFileSync(path.join(ROOT, 'i18n/locales/ru.js')
 
 describe('DermatologistPanel STRAT#33 — i18n migration', () => {
   it('imports useTranslation from i18n adapter', () => {
-    expect(source).toContain("from '../i18n/adapter'");
+    expect(source).toContain("from '../i18n/useTranslation'");
     expect(source).toContain('useTranslation');
   });
   it('instantiates tI18n via useTranslation()', () => {

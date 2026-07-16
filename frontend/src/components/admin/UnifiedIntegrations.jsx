@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import React from 'react';
 import ErrorBoundary from '../common/ErrorBoundary';
 import { MacOSTab } from '../ui/macos';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 // Lazy-load child panels for bundle optimization
 const LazyWebhookManager = React.lazy(() => import('./WebhookManager'));
@@ -17,12 +17,12 @@ const LazyFileManager = React.lazy(() => import('../files/FileManager'));
 // one tabbed surface. The 5 routes are demoted to nav:false (bookmark-only);
 // this hub is the single sidebar entry under "Система".
 
-const INTEGRATION_TABS = [
-  { id: 'webhooks', label: 'Вебхуки' },
+const INTEGRATION_TABS = (t) => [
+  { id: 'webhooks', label: t('admin2.ui_tab_webhooks') },
   { id: 'graphql', label: 'GraphQL API' },
-  { id: 'cloud-printing', label: 'Облачная печать' },
-  { id: 'medical-equipment', label: 'Медицинское оборудование' },
-  { id: 'files', label: 'Файлы' },
+  { id: 'cloud-printing', label: t('admin2.ui_tab_cloud_printing') },
+  { id: 'medical-equipment', label: t('admin2.ui_tab_medical_equipment') },
+  { id: 'files', label: t('admin2.ui_tab_files') },
 ];
 
 const UnifiedIntegrations = () => {
@@ -60,7 +60,7 @@ const UnifiedIntegrations = () => {
   return (
     <div className="admin-unified-root-no-color">
       <MacOSTab
-        tabs={INTEGRATION_TABS}
+        tabs={INTEGRATION_TABS(t)}
         activeTab={activeTab}
         onTabChange={handleTabChange} />
 
@@ -71,7 +71,7 @@ const UnifiedIntegrations = () => {
         className="admin-unified-content"
       >
         <ErrorBoundary>
-          <React.Suspense fallback={<div className="admin-p-24 admin-text-secondary">Загрузка...</div>}>
+          <React.Suspense fallback={<div className="admin-p-24 admin-text-secondary">{t('admin2.ui_loading')}</div>}>
             {renderContent()}
           </React.Suspense>
         </ErrorBoundary>

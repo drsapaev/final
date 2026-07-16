@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 /**
  * RefundRequestsTable - Table for managing refund requests
  *
@@ -29,12 +29,12 @@ import PropTypes from 'prop-types';
 // UX Audit #3.4: inline-стили перенесены в CSS-классы.
 import './RefundRequestsTable.css';
 
-const REFUND_FILTER_OPTIONS = [
-  { value: 'all', label: 'Все' },
-  { value: 'pending', label: 'Ожидают' },
-  { value: 'approved', label: 'Одобренные' },
-  { value: 'completed', label: 'Завершённые' },
-  { value: 'rejected', label: 'Отклонённые' }
+const getRefundFilterOptions = (t) => [
+  { value: 'all', label: t('misc.rrt_filter_all') },
+  { value: 'pending', label: t('misc.rrt_filter_pending') },
+  { value: 'approved', label: t('misc.rrt_filter_approved') },
+  { value: 'completed', label: t('misc.rrt_filter_completed') },
+  { value: 'rejected', label: t('misc.rrt_filter_rejected') },
 ];
 
 // UX Audit #3.4: inline-стили перенесены в RefundRequestsTable.css.
@@ -68,6 +68,7 @@ const hasBackendRefundAction = (request, action) => {
 };
 
 const RefundRequestsTable = ({ onRefresh }) => {
+  const { t } = useTranslation();
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -150,7 +151,7 @@ const RefundRequestsTable = ({ onRefresh }) => {
   };
 
   // Reject request
-  const handleReject = async (requestId, reason = 'Отклонено кассиром') => {
+  const handleReject = async (requestId, reason = t('misc.rrt_otkloneno_kassirom')) => {
     await processRefundRequest(requestId, 'reject', { rejection_reason: reason });
   };
 
@@ -161,10 +162,10 @@ const RefundRequestsTable = ({ onRefresh }) => {
 
   const getStatusBadge = (status) => {
     const statusConfig = {
-      pending: { variant: 'warning', label: 'Ожидает', icon: Clock },
-      approved: { variant: 'info', label: 'Одобрено', icon: Check },
-      rejected: { variant: 'danger', label: 'Отклонено', icon: X },
-      completed: { variant: 'success', label: 'Возвращено', icon: CheckCircle }
+      pending: { variant: 'warning', label: t('misc.rrt_ozhidaet'), icon: Clock },
+      approved: { variant: 'info', label: t('misc.rrt_odobreno'), icon: Check },
+      rejected: { variant: 'danger', label: t('misc.rrt_otkloneno'), icon: X },
+      completed: { variant: 'success', label: t('misc.rrt_vozvrascheno'), icon: CheckCircle }
     };
 
     const config = statusConfig[status] || { variant: 'default', label: status, icon: Clock };
@@ -180,9 +181,9 @@ const RefundRequestsTable = ({ onRefresh }) => {
 
   const getRefundTypeBadge = (type) => {
     return type === 'deposit' ? (
-      <Badge variant="primary">На депозит</Badge>
+      <Badge variant="primary">{t('misc.rrt_na_depozit')}</Badge>
     ) : (
-      <Badge variant="secondary">На карту</Badge>
+      <Badge variant="secondary">{t('misc.rrt_na_kartu')}</Badge>
     );
   };
 
@@ -205,7 +206,7 @@ const RefundRequestsTable = ({ onRefresh }) => {
       return (
         <span role="status" aria-live="polite" className="refund-inline-cluster">
           <Loader2 size={16} className="animate-spin" aria-hidden="true" />
-          <span className="refund-cell-muted">Обработка</span>
+          <span className="refund-cell-muted">{t('misc.rrt_obrabotka')}</span>
         </span>
       );
     }
@@ -222,8 +223,8 @@ const RefundRequestsTable = ({ onRefresh }) => {
               variant="success"
               size="small"
               onClick={() => handleApprove(request.id)}
-              title="Одобрить"
-              aria-label={`Одобрить заявку на возврат ${request.id}`}
+              title={t('misc.rrt_odobrit')}
+              aria-label={t('misc.rrt_odobrit_zayavku_na_vozvrat_r', { id: request.id })}
             >
               <Check size={14} aria-hidden="true" />
             </Button>
@@ -233,8 +234,8 @@ const RefundRequestsTable = ({ onRefresh }) => {
               variant="danger"
               size="small"
               onClick={() => handleReject(request.id)}
-              title="Отклонить"
-              aria-label={`Отклонить заявку на возврат ${request.id}`}
+              title={t('misc.rrt_otklonit')}
+              aria-label={t('misc.rrt_otklonit_zayavku_na_vozvrat_', { id: request.id })}
             >
               <X size={14} aria-hidden="true" />
             </Button>
@@ -244,7 +245,7 @@ const RefundRequestsTable = ({ onRefresh }) => {
               variant="primary"
               size="small"
               onClick={() => handleComplete(request.id)}
-              aria-label={`Отметить заявку на возврат ${request.id} как выплаченную`}
+              aria-label={t('misc.rrt_otmetit_zayavku_na_vozvrat_r', { id: request.id })}
             >
               <CreditCard size={14} aria-hidden="true" />
               Выплатить
@@ -269,7 +270,7 @@ const RefundRequestsTable = ({ onRefresh }) => {
       render: (_value, request) => (
         <span className="refund-inline-cluster">
           <User size={16} color="var(--mac-text-secondary)" aria-hidden="true" />
-          <span>{request.patient_name || `Пациент #${request.patient_id}`}</span>
+          <span>{request.patient_name || t('misc.rrt_patsient_request_patient_id', { patient_id: request.patient_id })}</span>
         </span>
       )
     },
@@ -332,9 +333,9 @@ const RefundRequestsTable = ({ onRefresh }) => {
             id="refund-request-filter"
             value={filter}
             onChange={setFilter}
-            options={REFUND_FILTER_OPTIONS}
+            options={getRefundFilterOptions(t)}
             size="small"
-            aria-label="Фильтр заявок на возврат"
+            aria-label={t('misc.rrt_filtr_zayavok_na_vozvrat')}
           />
           {/* UX Audit #1.3: дублирующая кнопка «Обновить» убрана.
               Глобальная кнопка «Обновить» в stats-card CashierPanel
@@ -348,7 +349,7 @@ const RefundRequestsTable = ({ onRefresh }) => {
 
       {error && (
         <AppError
-          title="Не удалось загрузить заявки на возврат"
+          title={t('misc.rrt_ne_udalos_zagruzit_zayavki_n')}
           description={error}
           action={
             <Button variant="secondary" size="small" onClick={loadRequests}>
@@ -361,7 +362,7 @@ const RefundRequestsTable = ({ onRefresh }) => {
 
       {loading && (
         <AppLoading
-          title="Загрузка заявок на возврат"
+          title={t('misc.rrt_zagruzka_zayavok_na_vozvrat')}
           size="sm"
           style={{ minHeight: 144 }}
         />
@@ -369,8 +370,8 @@ const RefundRequestsTable = ({ onRefresh }) => {
 
       {!loading && requests.length === 0 && (
         <AppEmpty
-          title="Нет заявок на возврат"
-          description="Когда появятся новые запросы на возврат, они будут показаны здесь."
+          title={t('misc.rrt_net_zayavok_na_vozvrat')}
+          description={t('misc.rrt_kogda_poyavyatsya_novye_zapr')}
           icon={<DollarSign />}
         />
       )}

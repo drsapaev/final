@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { t, tInterpolate, i18n } from '../adapter';
+import { t, tInterpolate, i18n } from '../useTranslation';
 
 /**
  * STRAT#49: Updated tests for react-i18next-backed adapter.
@@ -52,7 +52,7 @@ describe('i18n adapter (STRAT#29 + STRAT#49)', () => {
 
   describe('react-i18next integration', () => {
     it('useTranslation is exported (delegated to react-i18next)', async () => {
-      const mod = await import('../adapter');
+      const mod = await import('../useTranslation');
       expect(mod.useTranslation).toBeDefined();
       expect(typeof mod.useTranslation).toBe('function');
     });

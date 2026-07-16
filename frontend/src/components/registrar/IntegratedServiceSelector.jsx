@@ -20,7 +20,7 @@ import { Card } from '../ui/macos';
 import { fetchRegistrarServices } from '../../api/registrar';
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 /**
  * Интегрированный селектор услуг для регистратуры
  * Использует справочник из админ панели согласно detail.md стр. 112
@@ -32,6 +32,7 @@ const IntegratedServiceSelector = ({
   simple = false,
   onNext
 }) => {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [services, setServices] = useState({});
   const [, setCategories] = useState([]);
@@ -41,43 +42,43 @@ const IntegratedServiceSelector = ({
   // Базовый справочник услуг согласно утвержденному плану
   const DEMO_SERVICES = useMemo(() => ({
     cardiology: [
-    { id: 1, code: 'consultation.cardiology', name: 'Консультация кардиолога', price: 50000, specialty: 'cardiology', group: 'cardiology' },
-    { id: 2, code: 'echo.cardiography', name: 'ЭхоКГ', price: 80000, specialty: 'cardiology', group: 'cardiology' },
-    { id: 3, code: 'ecg', name: 'ЭКГ', price: 25000, specialty: 'cardiology', group: 'cardiology' }],
+    { id: 1, code: 'consultation.cardiology', name: t('misc.iss_srv_consult_cardio'), price: 50000, specialty: 'cardiology', group: 'cardiology' },
+    { id: 2, code: 'echo.cardiography', name: t('misc.iss_srv_echo'), price: 80000, specialty: 'cardiology', group: 'cardiology' },
+    { id: 3, code: 'ecg', name: t('misc.iss_srv_ecg'), price: 25000, specialty: 'cardiology', group: 'cardiology' }],
 
     dermatology: [
-    { id: 4, code: 'consultation.dermatology', name: 'Консультация дерматолога', price: 40000, specialty: 'dermatology', group: 'dermatology' },
-    { id: 5, code: 'derm.skin_diagnostics', name: 'Дерматоскопия', price: 30000, specialty: 'dermatology', group: 'dermatology' }],
+    { id: 4, code: 'consultation.dermatology', name: t('misc.iss_srv_consult_derm'), price: 40000, specialty: 'dermatology', group: 'dermatology' },
+    { id: 5, code: 'derm.skin_diagnostics', name: t('misc.iss_srv_derm_diag'), price: 30000, specialty: 'dermatology', group: 'dermatology' }],
 
     cosmetology: [
-    { id: 6, code: 'cosmetology.botox', name: 'Ботулотоксин', price: 150000, specialty: 'cosmetology', group: 'cosmetology' },
-    { id: 7, code: 'cosmetology.mesotherapy', name: 'Мезотерапия', price: 120000, specialty: 'cosmetology', group: 'cosmetology' },
-    { id: 8, code: 'cosmetology.peel', name: 'Пилинг', price: 40000, specialty: 'cosmetology', group: 'cosmetology' },
-    { id: 9, code: 'cosmetology.laser', name: 'Лазерные процедуры', price: 80000, specialty: 'cosmetology', group: 'cosmetology' }],
+    { id: 6, code: 'cosmetology.botox', name: t('misc.iss_srv_botox'), price: 150000, specialty: 'cosmetology', group: 'cosmetology' },
+    { id: 7, code: 'cosmetology.mesotherapy', name: t('misc.iss_srv_meso'), price: 120000, specialty: 'cosmetology', group: 'cosmetology' },
+    { id: 8, code: 'cosmetology.peel', name: t('misc.iss_srv_peel'), price: 40000, specialty: 'cosmetology', group: 'cosmetology' },
+    { id: 9, code: 'cosmetology.laser', name: t('misc.iss_srv_laser'), price: 80000, specialty: 'cosmetology', group: 'cosmetology' }],
 
     dentistry: [
-    { id: 10, code: 'consultation.dentistry', name: 'Консультация стоматолога', price: 35000, specialty: 'dentistry', group: 'dentistry' }],
+    { id: 10, code: 'consultation.dentistry', name: t('misc.iss_srv_consult_dent'), price: 35000, specialty: 'dentistry', group: 'dentistry' }],
 
     laboratory: [
-    { id: 11, code: 'lab.cbc', name: 'Общий анализ крови', price: 15000, specialty: 'laboratory', group: 'laboratory' },
-    { id: 12, code: 'lab.biochem', name: 'Биохимический анализ крови', price: 25000, specialty: 'laboratory', group: 'laboratory' },
-    { id: 13, code: 'lab.urine', name: 'Общий анализ мочи', price: 10000, specialty: 'laboratory', group: 'laboratory' },
-    { id: 14, code: 'lab.coag', name: 'Коагулограмма', price: 20000, specialty: 'laboratory', group: 'laboratory' },
-    { id: 15, code: 'lab.hormones', name: 'Гормоны', price: 30000, specialty: 'laboratory', group: 'laboratory' },
-    { id: 16, code: 'lab.infection', name: 'Инфекции/серология', price: 25000, specialty: 'laboratory', group: 'laboratory' }],
+    { id: 11, code: 'lab.cbc', name: t('misc.iss_srv_cbc'), price: 15000, specialty: 'laboratory', group: 'laboratory' },
+    { id: 12, code: 'lab.biochem', name: t('misc.iss_srv_biochem'), price: 25000, specialty: 'laboratory', group: 'laboratory' },
+    { id: 13, code: 'lab.urine', name: t('misc.iss_srv_urine'), price: 10000, specialty: 'laboratory', group: 'laboratory' },
+    { id: 14, code: 'lab.coag', name: t('misc.iss_srv_coag'), price: 20000, specialty: 'laboratory', group: 'laboratory' },
+    { id: 15, code: 'lab.hormones', name: t('misc.iss_srv_hormones'), price: 30000, specialty: 'laboratory', group: 'laboratory' },
+    { id: 16, code: 'lab.infection', name: t('misc.iss_srv_infection'), price: 25000, specialty: 'laboratory', group: 'laboratory' }],
 
     other: [
-    { id: 17, code: 'other.general', name: 'Прочие процедуры', price: 20000, specialty: 'other', group: 'other' }]
+    { id: 17, code: 'other.general', name: t('misc.iss_srv_other'), price: 20000, specialty: 'other', group: 'other' }]
 
-  }), []);
+  }), [t]);
 
   const DEMO_CATEGORIES = useMemo(() => [
-  { id: 1, name_ru: 'Кардиология', code: 'cardiology', specialty: 'cardiology' },
-  { id: 2, name_ru: 'Дерматология', code: 'dermatology', specialty: 'dermatology' },
-  { id: 3, name_ru: 'Косметология', code: 'cosmetology', specialty: 'cosmetology' },
-  { id: 4, name_ru: 'Стоматология', code: 'dentistry', specialty: 'dentistry' },
-  { id: 5, name_ru: 'Лаборатория', code: 'laboratory', specialty: 'laboratory' },
-  { id: 6, name_ru: 'Прочее', code: 'other', specialty: 'other' }], []);
+  { id: 1, name_ru: t('misc.iss_cat_cardio'), code: 'cardiology', specialty: 'cardiology' },
+  { id: 2, name_ru: t('misc.iss_cat_derm'), code: 'dermatology', specialty: 'dermatology' },
+  { id: 3, name_ru: t('misc.iss_cat_cosmeto'), code: 'cosmetology', specialty: 'cosmetology' },
+  { id: 4, name_ru: t('misc.iss_cat_dent'), code: 'dentistry', specialty: 'dentistry' },
+  { id: 5, name_ru: t('misc.iss_cat_lab'), code: 'laboratory', specialty: 'laboratory' },
+  { id: 6, name_ru: t('misc.iss_cat_other'), code: 'other', specialty: 'other' }], [t]);
 
 
   // Иконки по специальностям из документации
@@ -101,12 +102,12 @@ const IntegratedServiceSelector = ({
 
   // Названия групп услуг из detail.md
   const groupNames = {
-    cardiology: 'Кардиология',
-    dermatology: 'Дерматология',
-    cosmetology: 'Косметология',
-    dentistry: 'Стоматология',
-    laboratory: 'Лаборатория',
-    other: 'Прочие услуги'
+    cardiology: t('misc.iss_cat_cardio'),
+    dermatology: t('misc.iss_cat_derm'),
+    cosmetology: t('misc.iss_cat_cosmeto'),
+    dentistry: t('misc.iss_cat_dent'),
+    laboratory: t('misc.iss_cat_lab'),
+    other: t('misc.iss_other_services')
   };
 
   const hasLoadedRef = useRef(false);
@@ -170,10 +171,10 @@ const IntegratedServiceSelector = ({
       logger.error('IntegratedServiceSelector: Critical error:', err);
       // Fallback данные уже установлены выше, просто показываем ошибку
       if (retryCount > 0) {
-        setError(`Ошибка загрузки справочника услуг: ${err.message}`);
+        setError(t('misc.iss_err_load', { message: err.message }));
       }
     }
-  }, [retryCount, DEMO_SERVICES, DEMO_CATEGORIES]);
+  }, [retryCount, DEMO_SERVICES, DEMO_CATEGORIES, t]);
 
   useEffect(() => {
     if (hasLoadedRef.current) return;
@@ -234,7 +235,7 @@ const IntegratedServiceSelector = ({
       <div className={`service-selector ${className}`}>
         <div className="flex items-center justify-center p-8">
           <RefreshCw className="w-6 h-6 animate-spin text-blue-600 mr-2" />
-          <span className="text-gray-600">Загрузка справочника услуг...</span>
+          <span className="text-gray-600">{t('misc.iss_loading')}</span>
         </div>
       </div>);
 
@@ -247,22 +248,22 @@ const IntegratedServiceSelector = ({
         <div className="flex items-center justify-between">
           <div className="flex items-center">
             <Package className="w-5 h-5 text-blue-600 mr-2" />
-            <span className="font-medium text-blue-900">Справочник услуг</span>
+            <span className="font-medium text-blue-900">{t('misc.iss_directory')}</span>
           </div>
           <div className="flex items-center space-x-2">
             {error &&
           <div className="flex items-center text-red-600 text-sm">
                 <AlertCircle className="w-4 h-4 mr-1" />
-                <span>Демо-данные</span>
+                <span>{t('misc.iss_demo_data')}</span>
               </div>
           }
             <button
             onClick={handleRetry}
             className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
-            title="Обновить данные">
-            
+            title={t('misc.iss_refresh_title')}>
+
               <RefreshCw className="w-4 h-4 mr-1" />
-              Обновить
+              {t('misc.iss_refresh')}
             </button>
           </div>
         </div>
@@ -272,7 +273,7 @@ const IntegratedServiceSelector = ({
       <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
         <h3 className="text-sm font-semibold text-red-900 mb-3 flex items-center">
           <Heart className="w-4 h-4 mr-2" />
-          Быстрый выбор кардиологии
+          {t('misc.iss_quick_cardio')}
         </h3>
         <div className="flex flex-wrap gap-2">
           {/* ЭКГ тумблер */}
@@ -291,7 +292,7 @@ const IntegratedServiceSelector = ({
               }>
               
                 <Activity className="w-4 h-4 mr-2" />
-                <span className="text-sm font-medium">ЭКГ</span>
+                <span className="text-sm font-medium">{t('misc.iss_srv_ecg')}</span>
                 {isEcgSelected && <CheckCircle className="w-4 h-4 ml-2" />}
               </button>);
 
@@ -313,7 +314,7 @@ const IntegratedServiceSelector = ({
               }>
               
                 <Heart className="w-4 h-4 mr-2" />
-                <span className="text-sm font-medium">ЭхоКГ</span>
+                <span className="text-sm font-medium">{t('misc.iss_srv_echo')}</span>
                 {isEchoSelected && <CheckCircle className="w-4 h-4 ml-2" />}
               </button>);
 
@@ -349,7 +350,7 @@ const IntegratedServiceSelector = ({
                   }
                 }}>
                 
-                  <option value="">Выберите услугу из {groupNames[group] || group}</option>
+                  <option value="">{t('misc.iss_select_service', { group: groupNames[group] || group })}</option>
                   {groupServices.map((service) =>
                 <option key={service.id} value={service.id}>
                       {service.name} - {service.price?.toLocaleString('ru-RU')} сум
@@ -368,7 +369,7 @@ const IntegratedServiceSelector = ({
                     <button
                   onClick={() => handleServiceToggle(service.id, service)}
                   className="text-red-600 hover:text-red-800 p-1"
-                  title="Удалить услугу">
+                  title={t('misc.iss_remove_service')}>
                   
                       ✕
                     </button>
@@ -387,7 +388,7 @@ const IntegratedServiceSelector = ({
             <div className="flex items-center">
               <CheckCircle className="w-5 h-5 text-green-600 mr-2" />
               <span className="font-medium text-green-900">
-                Выбрано услуг: {selectedServices.length}
+                {t('misc.iss_selected_count', { count: selectedServices.length })}
               </span>
             </div>
             <div className="flex items-center gap-3">
@@ -396,7 +397,7 @@ const IntegratedServiceSelector = ({
               </div>
               {simple &&
           <button className="px-4 py-2 rounded bg-blue-600 text-white" onClick={() => onNext?.()}>
-                  Далее →
+                  {t('misc.iss_next')}
                 </button>
           }
             </div>

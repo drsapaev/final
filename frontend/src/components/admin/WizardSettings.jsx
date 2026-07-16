@@ -15,7 +15,7 @@ import { toast } from 'react-toastify';
 import { fetchWizardSettings, saveWizardSettings } from '../../api/adminSettings';
 
 import logger from '../../utils/logger';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 const WizardSettings = () => {
   const { t } = useTranslation();
   const [settings, setSettings] = useState({
@@ -41,14 +41,14 @@ const WizardSettings = () => {
       setHasChanges(false);
     } catch (error) {
       logger.error('Error fetching wizard settings:', error);
-      setError('Не удалось загрузить настройки мастера. Проверьте подключение к серверу.');
+      setError(t('admin2.ws_load_error_desc'));
       // Fallback данные при ошибке
       setSettings({
         use_new_wizard: false,
         updated_at: new Date().toISOString()
       });
       setHasChanges(false);
-      toast.error('Ошибка загрузки настроек мастера');
+      toast.error(t('admin2.ws_load_error_toast'));
     } finally {
       setLoading(false);
     }
@@ -79,11 +79,11 @@ const WizardSettings = () => {
         setSettings(response.settings);
         setHasChanges(false);
       } else {
-        throw new Error(response.message || 'Ошибка сохранения');
+        throw new Error(response.message || t('admin2.ws_save_error_short'));
       }
     } catch (error) {
       logger.error('Error saving wizard settings:', error);
-      toast.error('Ошибка сохранения настроек');
+      toast.error(t('admin2.ws_save_error_toast'));
     } finally {
       setSaving(false);
     }
@@ -95,7 +95,7 @@ const WizardSettings = () => {
           <div className="admin-d-flex-ai-center-gap-8-mb-24">
             <Settings className="admin-w-32-h-32-blue" />
             <h2 className="admin-fs-2xl-fw-semi-primary-m-0">
-              Настройки мастера регистрации
+              {t('admin2.ws_title')}
             </h2>
           </div>
           <Skeleton height="400px" />
@@ -110,17 +110,17 @@ const WizardSettings = () => {
           <div className="admin-d-flex-ai-center-gap-8-mb-24">
             <Settings className="admin-w-32-h-32-blue" />
             <h2 className="admin-fs-2xl-fw-semi-primary-m-0">
-              Настройки мастера регистрации
+              {t('admin2.ws_title')}
             </h2>
           </div>
           <MacOSEmptyState
           icon={AlertCircle}
-          title="Не удалось загрузить настройки"
-          description="Проверьте подключение к серверу и попробуйте обновить страницу"
+          title={t('admin2.ws_load_error_title')}
+          description={t('admin2.ws_load_error_hint')}
           action={
           <Button onClick={fetchSettings} variant="primary">
                 <RefreshCw className="admin-w-16-h-16-mr-4" />
-                Попробовать снова
+                {t('admin2.ws_try_again')}
               </Button>
           } />
 
@@ -133,7 +133,7 @@ const WizardSettings = () => {
       <div className="admin-d-flex-ai-center-gap-8-mb-24-fw-wrap">
           <Settings className="admin-w-32-h-32-blue" />
           <h2 className="admin-fs-2xl-fw-semi-primary-m-0-flex-1-minw-200">
-            Настройки мастера регистрации
+            {t('admin2.ws_title')}
           </h2>
 
         <div className="admin-flex-col-24">
@@ -141,7 +141,7 @@ const WizardSettings = () => {
           {error &&
           <Alert
             type="error"
-            title="Ошибка загрузки"
+            title={t('admin2.ws_load_alert_title')}
             message={error}
             onClose={() => setError(null)} />
 
@@ -152,12 +152,12 @@ const WizardSettings = () => {
             <div className="admin-d-flex-ai-center-jc-between-mb-16">
               <div className="admin-flex-1">
                 <h3 className="admin-fs-lg-fw-semi-primary-m-0-0-4px-0">
-                  Версия мастера регистрации
+                  {t('admin2.ws_version_section_title')}
                 </h3>
                 <p className="admin-fs-sm-secondary-m-0">
                   {settings.use_new_wizard ?
-                  'Используется новый мастер с улучшенным дизайном, корзиной и онлайн-оплатой' :
-                  'Используется классический мастер регистрации'
+                  t('admin2.ws_new_desc') :
+                  t('admin2.ws_classic_desc')
                   }
                 </p>
               </div>
@@ -168,7 +168,7 @@ const WizardSettings = () => {
                   onChange={handleToggleWizard} />
 
                 <span className="admin-fs-sm-fw-med-col-dyn" style={{ '--admin-col0': settings.use_new_wizard ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)' }}>
-                  {settings.use_new_wizard ? 'Новый мастер' : 'Старый мастер'}
+                  {settings.use_new_wizard ? t('admin2.ws_new_label') : t('admin2.ws_old_label')}
                 </span>
               </div>
             </div>
@@ -177,20 +177,20 @@ const WizardSettings = () => {
           {/* Статистика использования */}
           <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16">
             <MacOSStatCard
-              title="Использование нового мастера"
+              title={t('admin2.ws_stat_usage_title')}
               value={settings.use_new_wizard ? '100%' : '0%'}
               icon={settings.use_new_wizard ? CheckCircle : AlertCircle}
               color={settings.use_new_wizard ? 'green' : 'orange'}
-              trend={settings.use_new_wizard ? 'Активен' : 'Неактивен'}
+              trend={settings.use_new_wizard ? t('admin2.ws_status_active') : t('admin2.ws_status_inactive')}
               trendColor={settings.use_new_wizard ? 'var(--mac-success)' : 'var(--mac-warning)'} />
 
             
             <MacOSStatCard
-              title="Последнее обновление"
-              value={settings.updated_at ? new Date(settings.updated_at).toLocaleDateString('ru-RU') : 'Неизвестно'}
+              title={t('admin2.ws_stat_updated_title')}
+              value={settings.updated_at ? new Date(settings.updated_at).toLocaleDateString('ru-RU') : t('admin2.ws_unknown')}
               icon={RefreshCw}
               color="blue"
-              trend="Настройки"
+              trend={t('admin2.ws_stat_trend_settings')}
               trendColor="var(--mac-text-secondary)" />
 
           </div>
@@ -200,42 +200,42 @@ const WizardSettings = () => {
             <MacOSCard className="admin-p-24-tr-all-var-mac-duration-bd-dyn-bgc-dyn-tf-dyn" style={{ '--admin-bd0': !settings.use_new_wizard ? '2px solid var(--mac-accent-blue)' : '1px solid var(--mac-border)', '--admin-bgc1': !settings.use_new_wizard ? 'var(--mac-accent-bg)' : 'var(--mac-bg-primary)', '--admin-tf2': !settings.use_new_wizard ? 'scale(1.02)' : 'scale(1)' }}>
               <div className="admin-d-flex-ai-center-gap-4-mb-8">
                 <h4 className="admin-fs-lg-fw-semi-primary-m-0">
-                  Классический мастер
+                  {t('admin2.ws_classic_card_title')}
                 </h4>
                 <Badge
                   variant={!settings.use_new_wizard ? 'primary' : 'secondary'}
                   size="sm">
 
-                  {!settings.use_new_wizard ? 'Активен' : 'Неактивен'}
+                  {!settings.use_new_wizard ? t('admin2.ws_status_active') : t('admin2.ws_status_inactive')}
                 </Badge>
               </div>
               <ul className="admin-fs-sm-secondary-m-0-pl-16-d-flex-fd-column-gap-4">
-                <li>• Проверенная стабильность</li>
-                <li>• Привычный интерфейс</li>
-                <li>• Базовая функциональность</li>
-                <li>• Простая оплата</li>
+                <li>{t('admin2.ws_classic_feat_1')}</li>
+                <li>{t('admin2.ws_classic_feat_2')}</li>
+                <li>{t('admin2.ws_classic_feat_3')}</li>
+                <li>{t('admin2.ws_classic_feat_4')}</li>
               </ul>
             </MacOSCard>
 
             <MacOSCard className="admin-p-24-tr-all-var-mac-duration-bd-dyn-bgc-dyn-tf-dyn" style={{ '--admin-bd0': settings.use_new_wizard ? '2px solid var(--mac-success)' : '1px solid var(--mac-border)', '--admin-bgc1': settings.use_new_wizard ? 'var(--mac-success-bg)' : 'var(--mac-bg-primary)', '--admin-tf2': settings.use_new_wizard ? 'scale(1.02)' : 'scale(1)' }}>
               <div className="admin-d-flex-ai-center-gap-4-mb-8">
                 <h4 className="admin-fs-lg-fw-semi-primary-m-0">
-                  Новый мастер
+                  {t('admin2.ws_new_card_title')}
                 </h4>
                 <Badge
                   variant={settings.use_new_wizard ? 'success' : 'secondary'}
                   size="sm">
 
-                  {settings.use_new_wizard ? 'Активен' : 'Неактивен'}
+                  {settings.use_new_wizard ? t('admin2.ws_status_active') : t('admin2.ws_status_inactive')}
                 </Badge>
               </div>
               <ul className="admin-fs-sm-secondary-m-0-pl-16-d-flex-fd-column-gap-4">
-                <li>• macOS дизайн</li>
-                <li>• Корзина услуг</li>
-                <li>• Онлайн-оплата (Click)</li>
-                <li>• Автосохранение</li>
-                <li>• Горячие клавиши</li>
-                <li>• Льготы и повторные визиты</li>
+                <li>{t('admin2.ws_new_feat_1')}</li>
+                <li>{t('admin2.ws_new_feat_2')}</li>
+                <li>{t('admin2.ws_new_feat_3')}</li>
+                <li>{t('admin2.ws_new_feat_4')}</li>
+                <li>{t('admin2.ws_new_feat_5')}</li>
+                <li>{t('admin2.ws_new_feat_6')}</li>
               </ul>
             </MacOSCard>
           </div>
@@ -246,7 +246,7 @@ const WizardSettings = () => {
               <div className="admin-flex-center-8">
                 <AlertCircle className="admin-w-20-h-20-warning-fsk-0" />
                 <p className="admin-fs-sm-warning-m-0-fw-med">
-                  Изменения не сохранены. Нажмите «Сохранить» для применения настроек.
+                  {t('admin2.ws_unsaved_changes')}
                 </p>
               </div>
             </MacOSCard>
@@ -255,7 +255,7 @@ const WizardSettings = () => {
           {/* Информация об обновлении */}
           {settings.updated_at &&
           <div className="admin-fs-xs-tertiary-ta-center-p-8px-0">
-              Последнее обновление: {new Date(settings.updated_at).toLocaleString('ru-RU')}
+              {t('admin2.ws_last_updated', { date: new Date(settings.updated_at).toLocaleString('ru-RU') })}
             </div>
           }
 
@@ -267,7 +267,7 @@ const WizardSettings = () => {
               disabled={saving}
               className="admin-d-flex-ai-center-gap-4-p-4px-16px-minw-120">
 
-              Отменить
+              {t('admin2.ws_cancel_button')}
             </Button>
             
             <Button
@@ -281,12 +281,12 @@ const WizardSettings = () => {
               {saving ?
               <>
                   <RefreshCw aria-hidden="true" className="admin-w-16-h-16-anim-spin-1s-linear-infin" />
-                  Сохранение...
+                  {t('admin2.ws_saving')}
                 </> :
 
               <>
                   <Save aria-hidden="true" className="admin-icon-16" />
-                  Сохранить
+                  {t('admin2.ws_save_button')}
                 </>
               }
             </Button>
@@ -298,13 +298,12 @@ const WizardSettings = () => {
       <Modal
         isOpen={showConfirmModal}
         onClose={() => setShowConfirmModal(false)}
-        title="Подтверждение изменений"
+        title={t('admin2.ws_confirm_title')}
         size="sm">
 
         <div className="admin-p-24">
           <p className="admin-fs-base-primary-mb-24-lh-var-mac-line-height">
-            Вы собираетесь {settings.use_new_wizard ? 'включить' : 'отключить'} новый мастер регистрации. 
-            Это изменение повлияет на всех пользователей системы.
+            {t('admin2.ws_confirm_message', { action: settings.use_new_wizard ? t('admin2.ws_action_enable') : t('admin2.ws_action_disable') })}
           </p>
           
           <div className="admin-d-flex-jc-end-gap-var-mac-spacing-sm">
@@ -313,7 +312,7 @@ const WizardSettings = () => {
               onClick={() => setShowConfirmModal(false)}
               disabled={saving}>
 
-              Отмена
+              {t('admin2.ws_cancel_modal_button')}
             </Button>
             <Button
               type="button"
@@ -326,12 +325,12 @@ const WizardSettings = () => {
               {saving ?
               <>
                   <RefreshCw aria-hidden="true" className="admin-w-16-h-16-anim-spin-1s-linear-infin-mr-4" />
-                  Сохранение...
+                  {t('admin2.ws_saving')}
                 </> :
 
               <>
                   <Save aria-hidden="true" className="admin-w-16-h-16-mr-4" />
-                  Подтвердить
+                  {t('admin2.ws_confirm_button')}
                 </>
               }
             </Button>

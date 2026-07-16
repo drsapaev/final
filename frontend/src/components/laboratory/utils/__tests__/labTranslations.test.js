@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { t, tInterpolate, TRANSLATIONS } from '../labTranslations';
+import { t, tInterpolate, TRANSLATIONS } from '../../../../i18n/useTranslation';
 
 describe('labTranslations (STRAT#3)', () => {
   describe('t() function', () => {

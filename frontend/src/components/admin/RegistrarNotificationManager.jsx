@@ -23,7 +23,7 @@ import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 const RegistrarNotificationManager = () => {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState('send');
@@ -41,7 +41,7 @@ const RegistrarNotificationManager = () => {
   });
 
   // Состояние для тестирования
-  const [testMessage, setTestMessage] = useState('Тестовое уведомление системы');
+  const [testMessage, setTestMessage] = useState(t('admin2.rnm_default_test_message'));
 
   useEffect(() => {
     loadRegistrars();
@@ -54,7 +54,7 @@ const RegistrarNotificationManager = () => {
       setRegistrars(response.data.registrars || []);
     } catch (error) {
       logger.error('Ошибка загрузки регистраторов:', error);
-      toast.error('Ошибка загрузки списка регистраторов');
+      toast.error(t('admin2.rnm_load_registrars_error'));
     }
   };
 
@@ -64,13 +64,13 @@ const RegistrarNotificationManager = () => {
       setStats(response.data);
     } catch (error) {
       logger.error('Ошибка загрузки статистики:', error);
-      toast.error('Ошибка загрузки статистики');
+      toast.error(t('admin2.rnm_load_stats_error'));
     }
   };
 
   const handleSendNotification = async () => {
     if (!notificationForm.message.trim()) {
-      toast.error('Введите текст уведомления');
+      toast.error(t('admin2.rnm_message_required'));
       return;
     }
 
@@ -84,18 +84,18 @@ const RegistrarNotificationManager = () => {
       });
 
       if (response.data.success) {
-        toast.success(`Уведомление отправлено ${response.data.sent_count} регистраторам`);
+        toast.success(t('admin2.rnm_notification_sent', { count: response.data.sent_count }));
         setNotificationForm({
           ...notificationForm,
           message: ''
         });
         loadStats(); // Обновляем статистику
       } else {
-        toast.error('Ошибка отправки уведомления');
+        toast.error(t('admin2.rnm_send_notification_error'));
       }
     } catch (error) {
       logger.error('Ошибка отправки уведомления:', error);
-      toast.error('Ошибка отправки уведомления');
+      toast.error(t('admin2.rnm_send_notification_error'));
     } finally {
       setLoading(false);
     }
@@ -107,14 +107,14 @@ const RegistrarNotificationManager = () => {
       const response = await api.post('/registrar/notifications/daily-summary');
 
       if (response.data.success) {
-        toast.success(`Ежедневная сводка отправлена ${response.data.sent_count} регистраторам`);
+        toast.success(t('admin2.rnm_daily_summary_sent', { count: response.data.sent_count }));
         loadStats();
       } else {
-        toast.error('Ошибка отправки сводки');
+        toast.error(t('admin2.rnm_send_summary_error'));
       }
     } catch (error) {
       logger.error('Ошибка отправки сводки:', error);
-      toast.error('Ошибка отправки ежедневной сводки');
+      toast.error(t('admin2.rnm_send_daily_summary_error'));
     } finally {
       setLoading(false);
     }
@@ -122,7 +122,7 @@ const RegistrarNotificationManager = () => {
 
   const handleTestNotification = async () => {
     if (!testMessage.trim()) {
-      toast.error('Введите текст тестового уведомления');
+      toast.error(t('admin2.rnm_test_message_required'));
       return;
     }
 
@@ -131,14 +131,14 @@ const RegistrarNotificationManager = () => {
       const response = await api.post(`/registrar/notifications/test?message=${encodeURIComponent(testMessage)}`);
 
       if (response.data.success) {
-        toast.success(`Тестовое уведомление отправлено ${response.data.sent_count} регистраторам`);
+        toast.success(t('admin2.rnm_test_notification_sent', { count: response.data.sent_count }));
         loadStats();
       } else {
-        toast.error('Ошибка отправки тестового уведомления');
+        toast.error(t('admin2.rnm_send_test_notification_error'));
       }
     } catch (error) {
       logger.error('Ошибка отправки тестового уведомления:', error);
-      toast.error('Ошибка отправки тестового уведомления');
+      toast.error(t('admin2.rnm_send_test_notification_error'));
     } finally {
       setLoading(false);
     }
@@ -150,24 +150,24 @@ const RegistrarNotificationManager = () => {
       <MacOSCard className="admin-p-24">
         <h3 className="admin-m-0016px0-primary-flex-ai-center-gap-8-lg-med">
           <Send className="admin-icon-20" />
-          Отправить уведомление
+          {t('admin2.rnm_send_notification_title')}
         </h3>
 
         <div className="admin-grid-gtc-1fr1fr-gap-16-mb-16">
           <div>
             <label className="admin-block-sm-med-primary-mb-8">
-              Тип уведомления
+              {t('admin2.rnm_label_type')}
             </label>
             <Select
             value={notificationForm.alert_type}
             onChange={(value) => setNotificationForm({ ...notificationForm, alert_type: value })}
             options={[
-            { value: 'system_error', label: 'Системная ошибка' },
-            { value: 'payment_issue', label: 'Проблема с оплатой' },
-            { value: 'queue_overflow', label: 'Переполнение очереди' },
-            { value: 'equipment_failure', label: 'Неисправность оборудования' },
-            { value: 'security_alert', label: 'Безопасность' },
-            { value: 'maintenance', label: 'Техническое обслуживание' }]
+            { value: 'system_error', label: t('admin2.rnm_type_system_error') },
+            { value: 'payment_issue', label: t('admin2.rnm_type_payment_issue') },
+            { value: 'queue_overflow', label: t('admin2.rnm_type_queue_overflow') },
+            { value: 'equipment_failure', label: t('admin2.rnm_type_equipment_failure') },
+            { value: 'security_alert', label: t('admin2.rnm_type_security_alert') },
+            { value: 'maintenance', label: t('admin2.rnm_type_maintenance') }]
             }
             size="large"
             className="admin-w-full" />
@@ -176,15 +176,15 @@ const RegistrarNotificationManager = () => {
 
           <div>
             <label className="admin-block-sm-med-primary-mb-8">
-              Приоритет
+              {t('admin2.rnm_label_priority')}
             </label>
             <Select
             value={notificationForm.priority}
             onChange={(value) => setNotificationForm({ ...notificationForm, priority: value })}
             options={[
-            { value: 'normal', label: 'Обычный' },
-            { value: 'warning', label: 'Предупреждение' },
-            { value: 'critical', label: 'Критический' }]
+            { value: 'normal', label: t('admin2.rnm_priority_normal') },
+            { value: 'warning', label: t('admin2.rnm_priority_warning') },
+            { value: 'critical', label: t('admin2.rnm_priority_critical') }]
             }
             size="large"
             className="admin-w-full" />
@@ -194,10 +194,10 @@ const RegistrarNotificationManager = () => {
 
         <div className="admin-mb-16">
           <label className="admin-block-sm-med-primary-mb-8">
-            Отделение (опционально)
+            {t('admin2.rnm_label_department')}
           </label>
           <Input
-          placeholder="Например: Кардиология, Стоматология"
+          placeholder={t('admin2.rnm_department_placeholder')}
           value={notificationForm.department}
           onChange={(e) => setNotificationForm({ ...notificationForm, department: e.target.value })}
           className="admin-w-full" />
@@ -206,10 +206,10 @@ const RegistrarNotificationManager = () => {
 
         <div className="admin-mb-16">
           <label className="admin-block-sm-med-primary-mb-8">
-            Текст уведомления
+            {t('admin2.rnm_label_message')}
           </label>
           <Textarea
-          placeholder="Введите текст уведомления для регистраторов..."
+          placeholder={t('admin2.rnm_message_placeholder')}
           value={notificationForm.message}
           onChange={(e) => setNotificationForm({ ...notificationForm, message: e.target.value })}
           rows={4}
@@ -223,7 +223,7 @@ const RegistrarNotificationManager = () => {
         className="admin-flex-center-8">
         
           {loading ? <RefreshCw className="admin-w-16-h-16-anim-spin1slinearinfinite" /> : <Send className="admin-icon-16" />}
-          Отправить уведомление
+          {t('admin2.rnm_send_notification_title')}
         </Button>
       </MacOSCard>
 
@@ -231,7 +231,7 @@ const RegistrarNotificationManager = () => {
       <MacOSCard className="admin-p-24">
         <h3 className="admin-m-0016px0-primary-flex-ai-center-gap-8-lg-med">
           <Activity className="admin-icon-20" />
-          Быстрые действия
+          {t('admin2.rnm_quick_actions_title')}
         </h3>
 
         <div className="admin-flex-gap-16-wrap">
@@ -241,12 +241,12 @@ const RegistrarNotificationManager = () => {
           className="admin-flex-center-8">
           
             <Calendar className="admin-icon-16" />
-            Отправить ежедневную сводку
+            {t('admin2.rnm_send_daily_summary_btn')}
           </Button>
 
           <div className="admin-flex-gap-8-ai-center">
             <Input
-            placeholder="Текст тестового уведомления"
+            placeholder={t('admin2.rnm_test_message_placeholder')}
             value={testMessage}
             onChange={(e) => setTestMessage(e.target.value)}
             className="admin-minw-200" />
@@ -257,7 +257,7 @@ const RegistrarNotificationManager = () => {
             className="admin-flex-center-8">
             
               <MessageSquare className="admin-icon-16" />
-              Тест
+              {t('admin2.rnm_test_btn')}
             </Button>
           </div>
         </div>
@@ -270,14 +270,14 @@ const RegistrarNotificationManager = () => {
       <div className="admin-flex-jc-between-ai-center-mb-24">
         <h3 className="admin-m-0-primary-flex-ai-center-gap-8-lg-med">
           <Users className="admin-icon-20" />
-          Активные регистраторы ({registrars.length})
+          {t('admin2.rnm_active_registrars_title', { count: registrars.length })}
         </h3>
         <Button
         onClick={loadRegistrars}
         className="admin-flex-center-8">
         
           <RefreshCw className="admin-icon-16" />
-          Обновить
+          {t('admin2.rnm_refresh_btn')}
         </Button>
       </div>
 
@@ -315,7 +315,7 @@ const RegistrarNotificationManager = () => {
               <Badge
             variant={registrar.is_active ? 'success' : 'error'}>
             
-                {registrar.is_active ? 'Активен' : 'Неактивен'}
+                {registrar.is_active ? t('admin2.rnm_status_active') : t('admin2.rnm_status_inactive')}
               </Badge>
             </div>
           </div>
@@ -324,7 +324,7 @@ const RegistrarNotificationManager = () => {
 
       {registrars.length === 0 &&
     <div className="admin-ta-center-p-32-secondary-sm">
-          Нет активных регистраторов
+          {t('admin2.rnm_no_registrars')}
         </div>
     }
     </MacOSCard>;
@@ -335,14 +335,14 @@ const RegistrarNotificationManager = () => {
       <div className="admin-flex-jc-between-ai-center-mb-24">
         <h3 className="admin-m-0-primary-flex-ai-center-gap-8-lg-med">
           <BarChart3 className="admin-icon-20" />
-          Статистика уведомлений
+          {t('admin2.rnm_stats_title')}
         </h3>
         <Button
         onClick={loadStats}
         className="admin-flex-center-8">
         
           <RefreshCw className="admin-icon-16" />
-          Обновить
+          {t('admin2.rnm_refresh_btn')}
         </Button>
       </div>
 
@@ -352,33 +352,33 @@ const RegistrarNotificationManager = () => {
             <div className="admin-2xl-bold-blue">
               {stats.total_sent}
             </div>
-            <div className="admin-secondary-sm">Всего отправлено</div>
+            <div className="admin-secondary-sm">{t('admin2.rnm_stat_total_sent')}</div>
           </div>
 
           <div className="admin-p-16-bg-success-bg-radius-var--mac-radius-md-ta-center-bd-1solidvar-mac-su-76b6ec4f">
             <div className="admin-2xl-bold-success">
               {stats.successful_deliveries}
             </div>
-            <div className="admin-secondary-sm">Успешно доставлено</div>
+            <div className="admin-secondary-sm">{t('admin2.rnm_stat_successful')}</div>
           </div>
 
           <div className="admin-p-16-bg-error-bg-radius-var--mac-radius-md-ta-center-bd-1solidvar-mac-error-border">
             <div className="admin-2xl-bold-error">
               {stats.failed_deliveries}
             </div>
-            <div className="admin-secondary-sm">Ошибки доставки</div>
+            <div className="admin-secondary-sm">{t('admin2.rnm_stat_failed')}</div>
           </div>
         </div> :
 
     <div className="admin-ta-center-p-32-secondary-sm">
-          Загрузка статистики...
+          {t('admin2.rnm_stats_loading')}
         </div>
     }
 
       {stats && stats.channels_stats &&
     <div className="admin-mt-24">
           <h4 className="admin-m-0016px0-primary-base-med">
-            Статистика по каналам
+            {t('admin2.rnm_channels_stats_title')}
           </h4>
           <div className="admin-grid-gtc-rauto-fitcminmax150pxc1fr-gap-16">
             <div className="admin-p-12-bd-1solidvar-mac-border-radius-var--mac-radius-sm-ta-center">
@@ -408,9 +408,9 @@ const RegistrarNotificationManager = () => {
 
 
   const tabs = [
-  { id: 'send', label: 'Отправка', icon: Send },
-  { id: 'registrars', label: 'Регистраторы', icon: Users },
-  { id: 'stats', label: 'Статистика', icon: BarChart3 }];
+  { id: 'send', label: t('admin2.rnm_tab_send'), icon: Send },
+  { id: 'registrars', label: t('admin2.rnm_tab_registrars'), icon: Users },
+  { id: 'stats', label: t('admin2.rnm_tab_stats'), icon: BarChart3 }];
 
 
   return (
@@ -418,7 +418,7 @@ const RegistrarNotificationManager = () => {
       <div className="admin-flex-ai-center-gap-16-mb-24">
         <Bell className="admin-w-24-h-24-blue" />
         <h2 className="admin-m-0-primary-2xl-semi">
-          Уведомления регистратуры
+          {t('admin2.rnm_page_title')}
         </h2>
       </div>
 

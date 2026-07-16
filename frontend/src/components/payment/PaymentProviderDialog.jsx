@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect, useRef } from 'react';
 import {
   CreditCard,
@@ -47,6 +47,7 @@ const PaymentProviderDialog = ({
   onSuccess,
   onError
 }) => {
+  const { t } = useTranslation();
   const { executeAction, loading } = useAsyncAction();
 
   const [paymentState, setPaymentState] = useState('init'); // init|processing|polling|success|failed
@@ -98,7 +99,7 @@ const PaymentProviderDialog = ({
 
   const initPayment = async () => {
     if (!invoiceId) {
-      setError('ID invoice не указан');
+      setError(t('payment.pay_dlg_no_invoice_id'));
       return;
     }
 
@@ -128,15 +129,15 @@ const PaymentProviderDialog = ({
             }, 10000);
           }
         } else {
-          throw new Error(data.error_message || 'Не удалось создать платёж');
+          throw new Error(data.error_message || t('payment.pay_dlg_create_payment_failed'));
         }
 
         return data;
       },
       {
-        loadingMessage: 'Инициация платежа...',
-        successMessage: 'Платёж создан. Переходите по ссылке для оплаты.',
-        errorMessage: 'Ошибка создания платежа',
+        loadingMessage: t('payment.pay_dlg_loading_init'),
+        successMessage: t('payment.pay_dlg_success_created'),
+        errorMessage: t('payment.pay_dlg_error_create'),
         onError: (err) => {
           setError(err.message);
           setPaymentState('failed');
@@ -165,7 +166,7 @@ const PaymentProviderDialog = ({
       if (attemptsRef.current >= maxPollingAttempts) {
         clearPolling();
         setPaymentState('failed');
-        setError('Время ожидания оплаты истекло. Проверьте статус платежа вручную.');
+        setError(t('payment.pay_dlg_timeout'));
         notify.error(t('payment.timeout'));
       }
     }, pollingIntervalMs);
@@ -196,7 +197,7 @@ const PaymentProviderDialog = ({
       } else if (data.status === 'failed' || data.status === 'cancelled') {
         clearPolling();
         setPaymentState('failed');
-        setError(`Платёж ${data.status === 'failed' ? 'не прошёл' : 'отменён'}`);
+        setError(data.status === 'failed' ? t('payment.pay_dlg_payment_failed') : t('payment.pay_dlg_payment_cancelled'));
 
         if (onError) {
           onError(new Error(`Payment ${data.status}`));
@@ -213,7 +214,7 @@ const PaymentProviderDialog = ({
   const printTicket = (ticket) => {
     const opened = printPanelTicketInBrowser({
       ...ticket,
-      specialty_name: ticket.department || ticket.specialty || ticket.queue_name || 'Очередь',
+      specialty_name: ticket.department || ticket.specialty || ticket.queue_name || t('payment.pay_dlg_queue'),
       source: 'payment',
     });
 
@@ -235,8 +236,8 @@ const PaymentProviderDialog = ({
     await executeAction(
       () => checkPaymentStatus(),
       {
-        loadingMessage: 'Проверка статуса...',
-        errorMessage: 'Ошибка проверки статуса'
+        loadingMessage: t('payment.pay_dlg_loading_check'),
+        errorMessage: t('payment.pay_dlg_error_check')
       }
     );
   };
@@ -248,12 +249,12 @@ const PaymentProviderDialog = ({
       case 'init':
         return [
         {
-          label: 'Отмена',
+          label: t('payment.pay_dlg_cancel'),
           onClick: onClose,
           variant: 'secondary'
         },
         {
-          label: `Оплатить через ${providerLabel}`,
+          label: t('payment.pay_dlg_pay_via', { provider: providerLabel }),
           onClick: initPayment,
           variant: 'primary',
           icon: <CreditCard size={16} />,
@@ -264,19 +265,19 @@ const PaymentProviderDialog = ({
       case 'processing':
         return [
         {
-          label: 'Отмена',
+          label: t('payment.pay_dlg_cancel'),
           onClick: onClose,
           variant: 'secondary'
         },
         {
-          label: 'Открыть ссылку повторно',
+          label: t('payment.pay_dlg_reopen_link'),
           onClick: () => paymentUrl && window.open(paymentUrl, '_blank'),
           variant: 'primary',
           icon: <ExternalLink size={16} />,
           disabled: !paymentUrl
         },
         {
-          label: 'Начать отслеживание',
+          label: t('payment.pay_dlg_start_tracking'),
           onClick: startPolling,
           variant: 'primary',
           icon: <Clock size={16} />
@@ -286,7 +287,7 @@ const PaymentProviderDialog = ({
       case 'polling':
         return [
         {
-          label: 'Остановить отслеживание',
+          label: t('payment.pay_dlg_stop_tracking'),
           onClick: () => {
             clearPolling();
             setPaymentState('processing');
@@ -294,7 +295,7 @@ const PaymentProviderDialog = ({
           variant: 'secondary'
         },
         {
-          label: 'Проверить сейчас',
+          label: t('payment.pay_dlg_check_now'),
           onClick: manualCheck,
           variant: 'primary',
           icon: <RefreshCw size={16} />,
@@ -305,12 +306,12 @@ const PaymentProviderDialog = ({
       case 'success':
         return [
         {
-          label: 'Закрыть',
+          label: t('payment.pay_dlg_close'),
           onClick: onClose,
           variant: 'secondary'
         },
         printTickets.length > 0 && {
-          label: 'Печать талонов',
+          label: t('payment.pay_dlg_print_tickets'),
           onClick: printAllTickets,
           variant: 'primary',
           icon: <Printer size={16} />
@@ -320,12 +321,12 @@ const PaymentProviderDialog = ({
       case 'failed':
         return [
         {
-          label: 'Закрыть',
+          label: t('payment.pay_dlg_close'),
           onClick: onClose,
           variant: 'secondary'
         },
         {
-          label: 'Попробовать снова',
+          label: t('payment.pay_dlg_try_again'),
           onClick: () => {
             resetState();
             initPayment();
@@ -334,7 +335,7 @@ const PaymentProviderDialog = ({
           icon: <RefreshCw size={16} />
         },
         {
-          label: 'Проверить статус',
+          label: t('payment.pay_dlg_check_status'),
           onClick: manualCheck,
           variant: 'outline',
           icon: <RefreshCw size={16} />,
@@ -345,7 +346,7 @@ const PaymentProviderDialog = ({
       default:
         return [
         {
-          label: 'Закрыть',
+          label: t('payment.pay_dlg_close'),
           onClick: onClose,
           variant: 'secondary'
         }];
@@ -362,25 +363,25 @@ const PaymentProviderDialog = ({
           <div className="payment-init">
             <div className="payment-header">
               <CreditCard size={48} className={`payment-icon ${provider}`} />
-              <h3>Оплата через {providerLabel}</h3>
+              <h3>{t('payment.pay_dlg_title_pay_via', { provider: providerLabel })}</h3>
             </div>
 
             <div className="payment-details">
               <div className="detail-row">
-                <span className="detail-label">Сумма к оплате:</span>
+                <span className="detail-label">{t('payment.pay_dlg_amount_due')}</span>
                 <span className="detail-value">
                   {totalAmount?.toLocaleString()} {currency}
                 </span>
               </div>
               <div className="detail-row">
-                <span className="detail-label">Способ оплаты:</span>
-                <span className="detail-value">{providerLabel} (онлайн)</span>
+                <span className="detail-label">{t('payment.pay_dlg_payment_method')}</span>
+                <span className="detail-value">{t('payment.pay_dlg_method_online', { provider: providerLabel })}</span>
               </div>
             </div>
 
             <div className="payment-info">
-              <p>После нажатия кнопки «Оплатить» откроется страница {providerLabel} для завершения платежа.</p>
-              <p>Не закрывайте это окно до завершения оплаты.</p>
+              <p>{t('payment.pay_dlg_init_hint_1', { provider: providerLabel })}</p>
+              <p>{t('payment.pay_dlg_init_hint_2')}</p>
             </div>
           </div>);
 
@@ -390,12 +391,12 @@ const PaymentProviderDialog = ({
           <div className="payment-processing">
             <div className="payment-header">
               <ExternalLink size={48} className="payment-icon processing" />
-              <h3>Переход к оплате</h3>
+              <h3>{t('payment.pay_dlg_processing_title')}</h3>
             </div>
 
             <div className="payment-info">
-              <p>Страница оплаты {providerLabel} должна открыться в новом окне.</p>
-              <p>Если окно не открылось, нажмите кнопку ниже.</p>
+              <p>{t('payment.pay_dlg_processing_hint_1', { provider: providerLabel })}</p>
+              <p>{t('payment.pay_dlg_processing_hint_2')}</p>
             </div>
 
             {paymentUrl &&
@@ -406,16 +407,16 @@ const PaymentProviderDialog = ({
                 rel="noopener noreferrer"
                 className="payment-url">
 
-                  Открыть страницу оплаты
+                  {t('payment.pay_dlg_open_payment_page')}
                 </a>
               </div>
             }
 
             <div className="payment-instructions">
-              <p><strong>После завершения оплаты:</strong></p>
+              <p><strong>{t('payment.pay_dlg_after_completion')}</strong></p>
               <ul>
-                <li>Нажмите «Начать отслеживание» для автоматической проверки</li>
-                <li>Или закройте окно {providerLabel} и вернитесь сюда</li>
+                <li>{t('payment.pay_dlg_instruction_1')}</li>
+                <li>{t('payment.pay_dlg_instruction_2', { provider: providerLabel })}</li>
               </ul>
             </div>
           </div>);
@@ -426,24 +427,24 @@ const PaymentProviderDialog = ({
           <div className="payment-polling">
             <div className="payment-header">
               <Clock size={48} className="payment-icon polling" />
-              <h3>Ожидание оплаты</h3>
+              <h3>{t('payment.pay_dlg_waiting_title')}</h3>
             </div>
 
             <div className="polling-status">
               <div className="polling-indicator">
                 <div className="spinner"></div>
-                <span>Проверяем статус платежа...</span>
+                <span>{t('payment.pay_dlg_checking_status')}</span>
               </div>
 
               <div className="polling-info">
-                <p>Попытка {pollingAttempts} из {maxPollingAttempts}</p>
-                <p>Проверка каждые {pollingIntervalMs / 1000} секунд</p>
+                <p>{t('payment.pay_dlg_attempt_of', { current: pollingAttempts, max: maxPollingAttempts })}</p>
+                <p>{t('payment.pay_dlg_check_every', { seconds: pollingIntervalMs / 1000 })}</p>
               </div>
             </div>
 
             <div className="payment-info">
-              <p>Система автоматически проверяет статус вашего платежа.</p>
-              <p>Вы можете закрыть окно {providerLabel} и дождаться подтверждения здесь.</p>
+              <p>{t('payment.pay_dlg_polling_hint_1')}</p>
+              <p>{t('payment.pay_dlg_polling_hint_2', { provider: providerLabel })}</p>
             </div>
           </div>);
 
@@ -453,29 +454,29 @@ const PaymentProviderDialog = ({
           <div className="payment-success">
             <div className="payment-header">
               <CheckCircle size={48} className="payment-icon success" />
-              <h3>Оплата успешна!</h3>
+              <h3>{t('payment.pay_dlg_success_title')}</h3>
             </div>
 
             <div className="success-info">
-              <p>Платёж успешно обработан.</p>
-              <p>Визиты созданы и добавлены в очередь.</p>
+              <p>{t('payment.pay_dlg_success_info_1')}</p>
+              <p>{t('payment.pay_dlg_success_info_2')}</p>
             </div>
 
             {printTickets.length > 0 &&
             <div className="print-tickets">
-                <h4>Талоны для печати:</h4>
+                <h4>{t('payment.pay_dlg_tickets_for_print')}</h4>
                 <div className="tickets-list">
                   {printTickets.map((ticket, index) =>
                 <div key={index} className="ticket-item">
                       <div className="ticket-info">
                         <div className="ticket-patient">{ticket.patient_name}</div>
                         <div className="ticket-details">
-                          {ticket.doctor_name} • Очередь #{ticket.queue_number}
+                          {ticket.doctor_name} • {t('payment.pay_dlg_queue_label', { number: ticket.queue_number })}
                         </div>
                       </div>
                       <button
                     className="print-ticket-btn"
-                    aria-label={`Печать талона для ${ticket.patient_name}`}
+                    aria-label={t('payment.pay_dlg_print_ticket_aria', { patient: ticket.patient_name })}
                     onClick={() => printTicket(ticket)}>
 
                         <Printer size={16} />
@@ -493,7 +494,7 @@ const PaymentProviderDialog = ({
           <div className="payment-failed">
             <div className="payment-header">
               <XCircle size={48} className="payment-icon failed" />
-              <h3>Ошибка оплаты</h3>
+              <h3>{t('payment.pay_dlg_failed_title')}</h3>
             </div>
 
             {error &&
@@ -504,12 +505,12 @@ const PaymentProviderDialog = ({
             }
 
             <div className="failure-info">
-              <p>Платёж не был завершён успешно.</p>
-              <p>Вы можете:</p>
+              <p>{t('payment.pay_dlg_failed_info_1')}</p>
+              <p>{t('payment.pay_dlg_failed_info_2')}</p>
               <ul>
-                <li>Попробовать оплатить снова</li>
-                <li>Проверить статус платежа</li>
-                <li>Обратиться к администратору</li>
+                <li>{t('payment.pay_dlg_failed_action_retry')}</li>
+                <li>{t('payment.pay_dlg_failed_action_check')}</li>
+                <li>{t('payment.pay_dlg_failed_action_admin')}</li>
               </ul>
             </div>
           </div>);
@@ -525,7 +526,7 @@ const PaymentProviderDialog = ({
     <ModernDialog
         isOpen={isOpen}
         onClose={onClose}
-        title={`Оплата через ${providerLabel}`}
+        title={t('payment.pay_dlg_title_pay_via', { provider: providerLabel })}
         actions={getActions()}
         maxWidth="32rem"
         closeOnBackdrop={false}
@@ -542,7 +543,7 @@ const PaymentProviderDialog = ({
       <ModernDialog
         isOpen={showTicketPrinter}
         onClose={() => setShowTicketPrinter(false)}
-        title="Печать талонов"
+        title={t('payment.pay_dlg_print_tickets')}
         maxWidth="50rem"
         closeOnBackdrop={false}
         className="ticket-printer-dialog">

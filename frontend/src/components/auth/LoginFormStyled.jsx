@@ -16,7 +16,7 @@ import {
   Button, Card, CardHeader, CardTitle, CardContent, Input, Checkbox, Alert,
 } from '../ui/macos';
 import logger from '../../utils/logger';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const landingRoute = getCanonicalRouteById('landing')?.path || '/';
 const loginRoute = getCanonicalRouteById('login')?.path || '/login';
@@ -112,7 +112,7 @@ const LoginFormStyled = () => {
     try {
       // Валидация обязательных полей
       if (!formData.username || !formData.password) {
-        setError('Пожалуйста, введите логин и пароль');
+        setError(t('misc.lfs_pozhaluysta_vvedite_login_i_'));
         setLoading(false);
         return;
       }
@@ -143,7 +143,7 @@ const LoginFormStyled = () => {
           responseDetail: apiErr?.response?.data?.detail,
           responseMessage: apiErr?.response?.data?.message,
           rawMessage: apiErr?.message,
-          fallbackMessage: 'Ошибка авторизации',
+          fallbackMessage: t('misc.lfs_oshibka_avtorizatsii'),
         }));
         normalizedError.response = apiErr?.response;
         normalizedError.rawMessage = apiErr?.message;
@@ -221,7 +221,7 @@ const LoginFormStyled = () => {
           navigate(landingRoute, { replace: true });
         }
       } else {
-        throw new Error('Не получен токен доступа');
+        throw new Error(t('misc.lfs_ne_poluchen_token_dostupa'));
       }
     } catch (err) {
       // Улучшенная обработка ошибок с нормализацией
@@ -231,7 +231,7 @@ const LoginFormStyled = () => {
         responseDetail: err?.response?.data?.detail,
         responseMessage: err?.response?.data?.message,
         rawMessage: err?.normalizedMessage || rawMessage,
-        fallbackMessage: 'Ошибка входа',
+        fallbackMessage: t('misc.lfs_oshibka_vhoda'),
       });
 
       if (rawMessage && /failed to fetch/i.test(rawMessage)) {
@@ -281,7 +281,7 @@ const LoginFormStyled = () => {
         navigate(target, { replace: true });
       }
     } catch {
-      setError('Ошибка после 2FA верификации');
+      setError(t('misc.lfs_oshibka_posle_2fa_verifikats'));
       setRequires2FA(false);
     }
   };
@@ -319,9 +319,9 @@ const LoginFormStyled = () => {
   // Раньше это были 3 обычные <button> без role/aria-selected/aria-controls.
   // Теперь это proper tablist с keyboard navigation support.
   const twoFactorTabs = [
-    { id: 'totp', label: 'Приложение' },
-    { id: 'backup', label: 'Backup код' },
-    { id: 'recovery', label: 'Восстановление' },
+    { id: 'totp', label: t('misc.lfs_prilozhenie') },
+    { id: 'backup', label: t('misc.lfs_backup_kod') },
+    { id: 'recovery', label: t('misc.lfs_vosstanovlenie') },
   ];
   const twoFactorTabPanelId = 'twofactor-tabpanel';
 
@@ -419,7 +419,7 @@ const LoginFormStyled = () => {
           <div style={{ marginBottom: 'var(--mac-spacing-5)' }}>
             <div
               role="tablist"
-              aria-label="Методы двухфакторной аутентификации"
+              aria-label={t('misc.lfs_metody_dvuhfaktornoy_autenti')}
               style={{ display: 'flex', gap: 'var(--mac-spacing-2)', marginBottom: 'var(--mac-spacing-4)' }}
             >
               {twoFactorTabs.map((tab, index) => {
@@ -591,12 +591,12 @@ const LoginFormStyled = () => {
                 onChange={handleInputChange}
                 required
                 autoComplete="username"
-                placeholder="Имя пользователя, email или телефон"
+                placeholder={t('misc.lfs_imya_polzovatelya_email_ili_')}
                 style={authControlStyles} />
             </div>
 
             <div style={{ marginBottom: '10px' }}>
-              <label style={{ display: 'block', marginBottom: 'var(--mac-spacing-2)', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-primary, #1d1d1f)', fontWeight: 'var(--mac-font-weight-medium)' }}>Пароль *</label>
+              <label style={{ display: 'block', marginBottom: 'var(--mac-spacing-2)', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-primary, #1d1d1f)', fontWeight: 'var(--mac-font-weight-medium)' }}>{t('misc.lfs_parol')}</label>
               <div style={{ position: 'relative' }}>
                 <Input
                   type={showPassword ? 'text' : 'password'}
@@ -608,7 +608,7 @@ const LoginFormStyled = () => {
                   onKeyUp={handleKeyUp}
                   required
                   autoComplete="current-password"
-                  placeholder="Введите пароль"
+                  placeholder={t('misc.lfs_vvedite_parol')}
                   style={authControlStyles}
                   aria-describedby={capsLockOn ? 'capslock-warning' : undefined}
                 />
@@ -616,7 +616,7 @@ const LoginFormStyled = () => {
                 <Button type="button" variant="ghost" size="small" onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: 4, top: 4, ...authGhostButtonStyles, ...authButtonBaseStyles }}>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                     {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
-                    {showPassword ? 'Скрыть' : 'Показать'}
+                    {showPassword ? t('misc.lfs_skryt') : t('misc.lfs_pokazat')}
                   </span>
                 </Button>
               </div>
@@ -670,7 +670,7 @@ const LoginFormStyled = () => {
             <Button type="submit" variant="primary" fullWidth disabled={loading} size="large" style={{ ...authPrimaryButtonStyles, ...authButtonBaseStyles }}>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                 <LogIn size={16} />
-                {loading ? 'Вход...' : 'ВОЙТИ'}
+                {loading ? t('misc.lfs_vhod') : t('misc.lfs_voyti')}
                 {!loading && <ArrowRight size={16} />}
               </span>
             </Button>

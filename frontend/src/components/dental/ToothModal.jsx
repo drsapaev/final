@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 /**
  * Tooth Modal Component
  * Модальное окно для работы с зубом
@@ -210,34 +210,6 @@ const styles = {
   },
 };
 
-const COPY = {
-  toothPrefix: 'Зуб №',
-  quadrantSuffix: 'квадрант',
-  proceduresTitle: 'Процедуры',
-  materialLabel: 'Материал',
-  noMaterial: 'Без материала',
-  nextVisitLabel: 'Следующий визит',
-  notesLabel: 'Примечания',
-  notesPlaceholder: 'Особенности лечения, рекомендации...',
-  followUpLabel: 'Требуется контрольный осмотр',
-  historyTitle: 'История лечения',
-  totalCostLabel: 'Общая стоимость',
-  includesLabel: 'Включает',
-  materialPrefix: 'материал',
-  currencySuffix: 'сум',
-  cancelAction: 'Отмена',
-  saveAction: 'Сохранить',
-  deleteAction: 'Удалить',
-  // Phase 4A: prosthetic-specific fields (shown only when a prosthetic
-  // procedure — Crown / Bridge / Implant / Veneer — is selected).
-  prostheticSectionTitle: 'Параметры протеза',
-  shadeLabel: 'Оттенок (VITA)',
-  fitQualityLabel: 'Качество посадки',
-  warrantyPeriodLabel: 'Гарантия (мес.)',
-  patientSatisfactionLabel: 'Удовлетворённость пациента',
-  shadePlaceholder: 'Напр. A1, A2, B2...',
-  noShade: 'Не указан',
-};
 // H6 fix: TOOTH_PROCEDURES and MATERIALS now imported from dentalConstants.js (SSOT).
 const ToothModal = ({
   open,
@@ -247,6 +219,7 @@ const ToothModal = ({
   onSave,
   visitId
 }) => {
+  const { t } = useTranslation();
   const [formData, setFormData] = useState({
     status: '',
     procedures: [],
@@ -367,17 +340,17 @@ const ToothModal = ({
         <div style={styles.header}>
           <h2 style={styles.title}>
             <Hospital size={18} aria-hidden="true" />
-            {COPY.toothPrefix}{toothNumber} - {getToothName(toothNumber)}
+            {t('dental.dental_tm_tooth_prefix')}{toothNumber} - {getToothName(toothNumber)}
           </h2>
           <Badge variant="primary" size="small">
-            {`${Math.floor(toothNumber / 10)} ${COPY.quadrantSuffix}`}
+            {`${Math.floor(toothNumber / 10)} ${t('dental.dental_tm_quadrant_suffix')}`}
           </Badge>
         </div>
       </DialogTitle>
 
       <DialogContent style={styles.content}>
         <section style={styles.section}>
-          <h3 style={styles.sectionTitle}>{COPY.proceduresTitle}</h3>
+          <h3 style={styles.sectionTitle}>{t('dental.dental_tm_procedures_title')}</h3>
 
           <div style={styles.buttonGrid}>
             {Object.entries(TOOTH_PROCEDURES).map(([key, procedure]) => (
@@ -403,12 +376,12 @@ const ToothModal = ({
                   </span>
                   <div>
                     <p style={styles.itemTitle}>{procedure.name}</p>
-                    <p style={styles.itemMeta}>{`${(procedure.price / 1000).toFixed(0)}k ${COPY.currencySuffix}`}</p>
+                    <p style={styles.itemMeta}>{`${(procedure.price / 1000).toFixed(0)}k ${t('dental.dental_tm_currency_suffix')}`}</p>
                   </div>
                   <button
                     type="button"
-                    aria-label={COPY.deleteAction}
-                    title={COPY.deleteAction}
+                    aria-label={t('dental.dental_tm_delete')}
+                    title={t('dental.dental_tm_delete')}
                     style={styles.iconButton}
                     onClick={() => removeProcedure(procedure.id)}
                   >
@@ -422,21 +395,21 @@ const ToothModal = ({
 
         <div style={styles.twoColumnGrid}>
           <Select
-            label={COPY.materialLabel}
+            label={t('dental.dental_tm_material_label')}
             value={formData.material}
             onChange={(value) => setFormData({ ...formData, material: value })}
             options={[
-              { value: '', label: COPY.noMaterial },
+              { value: '', label: t('dental.dental_tm_no_material') },
               ...Object.entries(MATERIALS).map(([key, material]) => ({
                 value: key,
-                label: `${material.name} - ${(material.price / 1000).toFixed(0)}k ${COPY.currencySuffix}`,
+                label: `${material.name} - ${(material.price / 1000).toFixed(0)}k ${t('dental.dental_tm_currency_suffix')}`,
               })),
             ]}
           />
 
           <Input
             type="date"
-            label={COPY.nextVisitLabel}
+            label={t('dental.dental_tm_next_visit_label')}
             value={formData.nextVisitDate}
             onChange={(e) => setFormData({ ...formData, nextVisitDate: e.target.value })}
             style={{ width: '100%', boxSizing: 'border-box' }}
@@ -447,49 +420,49 @@ const ToothModal = ({
           <section style={styles.section}>
             <div style={styles.divider} />
             <h3 style={styles.sectionTitle}>
-              {COPY.prostheticSectionTitle}
+              {t('dental.dental_tm_prosthetic_section_title')}
             </h3>
             <div style={styles.twoColumnGrid}>
               <Input
                 type="text"
-                label={COPY.shadeLabel}
+                label={t('dental.dental_tm_shade_label')}
                 value={formData.shade}
                 onChange={(e) => setFormData({ ...formData, shade: e.target.value })}
-                placeholder={COPY.shadePlaceholder}
+                placeholder={t('dental.dental_tm_shade_placeholder')}
                 style={{ width: '100%', boxSizing: 'border-box' }}
               />
               <Select
-                label={COPY.fitQualityLabel}
+                label={t('dental.dental_tm_fit_quality_label')}
                 value={formData.fitQuality}
                 onChange={(value) => setFormData({ ...formData, fitQuality: value })}
                 options={[
                   { value: '', label: '—' },
-                  { value: 'excellent', label: 'Отлично' },
-                  { value: 'good', label: 'Хорошо' },
-                  { value: 'satisfactory', label: 'Удовлетворительно' },
-                  { value: 'poor', label: 'Плохо' },
+                  { value: 'excellent', label: t('dental.dental_tm_fit_excellent') },
+                  { value: 'good', label: t('dental.dental_tm_fit_good') },
+                  { value: 'satisfactory', label: t('dental.dental_tm_fit_satisfactory') },
+                  { value: 'poor', label: t('dental.dental_tm_fit_poor') },
                 ]}
               />
               <Input
                 type="number"
-                label={COPY.warrantyPeriodLabel}
+                label={t('dental.dental_tm_warranty_period_label')}
                 value={formData.warrantyPeriod}
                 onChange={(e) => setFormData({ ...formData, warrantyPeriod: e.target.value })}
-                placeholder="Напр. 60"
+                placeholder={t('dental.dental_tm_warranty_placeholder')}
                 min="0"
                 style={{ width: '100%', boxSizing: 'border-box' }}
               />
               <Select
-                label={COPY.patientSatisfactionLabel}
+                label={t('dental.dental_tm_patient_satisfaction_label')}
                 value={formData.patientSatisfaction}
                 onChange={(value) => setFormData({ ...formData, patientSatisfaction: value })}
                 options={[
                   { value: '', label: '—' },
-                  { value: '5', label: '5 — Отлично' },
-                  { value: '4', label: '4 — Хорошо' },
-                  { value: '3', label: '3 — Удовлетворительно' },
-                  { value: '2', label: '2 — Плохо' },
-                  { value: '1', label: '1 — Очень плохо' },
+                  { value: '5', label: t('dental.dental_tm_sat_5') },
+                  { value: '4', label: t('dental.dental_tm_sat_4') },
+                  { value: '3', label: t('dental.dental_tm_sat_3') },
+                  { value: '2', label: t('dental.dental_tm_sat_2') },
+                  { value: '1', label: t('dental.dental_tm_sat_1') },
                 ]}
               />
             </div>
@@ -497,10 +470,10 @@ const ToothModal = ({
         )}
 
         <Textarea
-          label={COPY.notesLabel}
+          label={t('dental.dental_tm_notes_label')}
           value={formData.notes}
           onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-          placeholder={COPY.notesPlaceholder}
+          placeholder={t('dental.dental_tm_notes_placeholder')}
           minRows={3}
           textareaStyle={{ width: '100%', boxSizing: 'border-box' }}
         />
@@ -508,11 +481,11 @@ const ToothModal = ({
         <label style={styles.checkboxRow}>
           <input
             type="checkbox"
-            aria-label={COPY.followUpLabel}
+            aria-label={t('dental.dental_tm_follow_up_label')}
             checked={formData.requiresFollowUp}
             onChange={(e) => setFormData({ ...formData, requiresFollowUp: e.target.checked })}
           />
-          <span>{COPY.followUpLabel}</span>
+          <span>{t('dental.dental_tm_follow_up_label')}</span>
         </label>
 
         {history.length > 0 && (
@@ -520,7 +493,7 @@ const ToothModal = ({
             <div style={styles.divider} />
             <h3 style={styles.sectionTitle}>
               <History size={16} aria-hidden="true" />
-              {COPY.historyTitle}
+              {t('dental.dental_tm_history_title')}
             </h3>
 
             <ul style={styles.list}>
@@ -544,12 +517,12 @@ const ToothModal = ({
 
         <Alert severity="info">
           <h3 style={styles.totalTitle}>
-            {COPY.totalCostLabel}: {(calculateTotalPrice() / 1000).toFixed(0)}k {COPY.currencySuffix}
+            {t('dental.dental_tm_total_cost_label')}: {(calculateTotalPrice() / 1000).toFixed(0)}k {t('dental.dental_tm_currency_suffix')}
           </h3>
           {formData.procedures.length > 0 && (
             <span style={styles.totalCaption}>
-              {COPY.includesLabel}: {formData.procedures.map(p => p.name).join(', ')}
-              {formData.material && `, ${COPY.materialPrefix}: ${MATERIALS[formData.material]?.name}`}
+              {t('dental.dental_tm_includes_label')}: {formData.procedures.map(p => p.name).join(', ')}
+              {formData.material && `, ${t('dental.dental_tm_material_prefix')}: ${MATERIALS[formData.material]?.name}`}
             </span>
           )}
         </Alert>
@@ -557,7 +530,7 @@ const ToothModal = ({
 
       <DialogActions>
         <Button type="button" onClick={onClose}>
-          {COPY.cancelAction}
+          {t('dental.dental_tm_cancel')}
         </Button>
         <Button
           type="button"
@@ -566,7 +539,7 @@ const ToothModal = ({
           disabled={loading || formData.procedures.length === 0}
           loading={loading}
         >
-          {COPY.saveAction}
+          {t('dental.dental_tm_save')}
         </Button>
       </DialogActions>
     </Dialog>

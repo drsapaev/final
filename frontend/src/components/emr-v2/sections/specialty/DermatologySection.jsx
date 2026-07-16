@@ -20,7 +20,7 @@ import { MCP_PROVIDERS } from '../../../../constants/ai';
 import logger from '../../../../utils/logger';
 import './DermatologySection.css';
 import { Checkbox } from '../../../ui/macos';
-import { useTranslation } from '../../../../i18n/adapter';
+import { useTranslation } from '../../../../i18n/useTranslation';
 
 /**
  * DermatologySection Component
@@ -116,6 +116,7 @@ export function DermatologySection({
     }
   }, [handlePhotoUpload]);
   const handleActivationKeyDown = (event, action) => {
+    const { t } = useTranslation();
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       action();
@@ -124,36 +125,36 @@ export function DermatologySection({
 
   return (
     <EMRSection
-      title="Дерматологические данные"
+      title={t('misc.ds_dermatologicheskie_dannye')}
       icon=""
       disabled={disabled}
       defaultOpen={true}>
       
             {/* Skin Type */}
             <div className="dermatology-field-group">
-                <label className="dermatology-label">Тип кожи</label>
+                <label className="dermatology-label">{t('misc.ds_tip_kozhi')}</label>
                 <select
           value={skinType}
           onChange={(e) => handleSkinTypeChange(e.target.value)}
           disabled={disabled}
           className="dermatology-select">
           
-                    <option value="">Не указан</option>
-                    <option value="normal">Нормальная</option>
-                    <option value="dry">Сухая</option>
-                    <option value="oily">Жирная</option>
-                    <option value="combination">Комбинированная</option>
-                    <option value="sensitive">Чувствительная</option>
+                    <option value="">{t('misc.ds_ne_ukazan')}</option>
+                    <option value="normal">{t('misc.ds_normalnaya')}</option>
+                    <option value="dry">{t('misc.ds_suhaya')}</option>
+                    <option value="oily">{t('misc.ds_zhirnaya')}</option>
+                    <option value="combination">{t('misc.ds_kombinirovannaya')}</option>
+                    <option value="sensitive">{t('misc.ds_chuvstvitelnaya')}</option>
                 </select>
             </div>
 
             {/* Conditions */}
             <div className="dermatology-field-group">
-                <label className="dermatology-label">Состояния</label>
+                <label className="dermatology-label">{t('misc.ds_sostoyaniya')}</label>
                 <div className="dermatology-conditions">
-                    {['Акне', 'Розацеа', 'Экзема', 'Псориаз', 'Пигментация', 'Морщины'].map((condition) =>
+                    {[t('misc.ds_akne'), t('misc.ds_rozatsea'), t('misc.ds_ekzema'), t('misc.ds_psoriaz'), t('misc.ds_pigmentatsiya'), t('misc.ds_morschiny')].map((condition) =>
           <label key={condition} className="dermatology-checkbox">
-                            <Checkbox aria-label={`Состояние кожи: ${condition}`} checked={conditions.includes(condition)} onChange={(e) => {
+                            <Checkbox aria-label={t('misc.ds_sostoyanie_kozhi_condition', { condition: condition })} checked={conditions.includes(condition)} onChange={(e) => {
                 if (e.target.checked) {
                   handleConditionAdd(condition);
                 } else {
@@ -171,7 +172,7 @@ export function DermatologySection({
             {/* Photo Gallery */}
             <div className="dermatology-field-group">
                 <div className="dermatology-photo-header">
-                    <label className="dermatology-label">Фото-архив</label>
+                    <label className="dermatology-label">{t('misc.ds_foto_arhiv')}</label>
                     {!disabled &&
           <button
             type="button"
@@ -180,14 +181,14 @@ export function DermatologySection({
             disabled={analyzingPhoto}>
             
                             <Camera size={16} />
-                            {analyzingPhoto ? 'Анализ...' : 'Загрузить фото'}
+                            {analyzingPhoto ? t('misc.ds_analiz') : t('misc.ds_zagruzit_foto')}
                         </button>
           }
                 </div>
                 <input
           ref={fileInputRef}
           type="file"
-          aria-label="Загрузить фото для дерматологического осмотра"
+          aria-label={t('misc.ds_zagruzit_foto_dlya_dermatolo')}
           accept="image/*"
           onChange={handleFileSelect}
           style={{ display: 'none' }} />
@@ -196,7 +197,7 @@ export function DermatologySection({
                 {photos.length === 0 ?
         <div className="dermatology-empty-photos">
                         <ImageIcon size={48} />
-                        <p>Нет загруженных фото</p>
+                        <p>{t('misc.ds_net_zagruzhennyh_foto')}</p>
                     </div> :
 
         <div className="dermatology-photo-grid">
@@ -204,8 +205,8 @@ export function DermatologySection({
           <div key={photo.id} className="dermatology-photo-item">
                                 <img
               src={photo.url}
-              alt={`Фото ${photo.category}`}
-              aria-label={`Открыть фото ${photo.category}`}
+              alt={t('misc.ds_foto_photo_category', { category: photo.category })}
+              aria-label={t('misc.ds_otkryt_foto_photo_category', { category: photo.category })}
               role="button"
               tabIndex={0}
               onClick={() => setSelectedPhoto(photo)}
@@ -221,7 +222,7 @@ export function DermatologySection({
             <button
               type="button"
               onClick={() => handlePhotoDelete(photo.id)}
-              aria-label={`Удалить фото ${photo.category}`}
+              aria-label={t('misc.ds_udalit_foto_photo_category', { category: photo.category })}
               className="dermatology-photo-delete">
               
                                         <X size={14} />
@@ -235,14 +236,14 @@ export function DermatologySection({
 
             {/* Localization */}
             <div className="dermatology-field-group">
-                <label className="dermatology-label">Локализация поражений</label>
+                <label className="dermatology-label">{t('misc.ds_lokalizatsiya_porazheniy')}</label>
                 <EMRSmartFieldV2
           value={localization?.description || ''}
           onChange={(value) => onChange?.('localization', {
             ...localization,
             description: value
           })}
-          placeholder="Опишите локализацию поражений..."
+          placeholder={t('misc.ds_opishite_lokalizatsiyu_poraz')}
           multiline
           rows={3}
           disabled={disabled} />
@@ -259,7 +260,7 @@ export function DermatologySection({
         onKeyDown={(event) => handleActivationKeyDown(event, () => setSelectedPhoto(null))}>
         
                     <div className="dermatology-photo-modal-content" onClickCapture={(e) => e.stopPropagation()}>
-                        <img src={selectedPhoto.url} alt="Увеличенное фото" />
+                        <img src={selectedPhoto.url} alt={t('misc.ds_uvelichennoe_foto')} />
                         {selectedPhoto.analysis &&
           <div className="dermatology-photo-analysis-detail">
                                 <h4>AI Анализ:</h4>
@@ -269,7 +270,7 @@ export function DermatologySection({
                         <button
             type="button"
             onClick={() => setSelectedPhoto(null)}
-            aria-label="Закрыть просмотр фото"
+            aria-label={t('misc.ds_zakryt_prosmotr_foto')}
             className="dermatology-photo-modal-close">
             
                             <X size={20} />

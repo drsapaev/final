@@ -28,7 +28,7 @@ import { getErrorMessage } from '../utils/errorHandler';
 import { formatRegistrarDate, formatRegistrarTime, parseRegistrarTimestamp } from '../utils/dateUtils';
 import notify from '../services/notify';
 // STRAT#31: useTranslation adapter for confirm/notify i18n.
-import { useTranslation } from '../i18n/adapter';
+import { useTranslation } from '../i18n/useTranslation';
 import { formatUZS } from '../utils/formatCurrency';
 import {
   Dialog,
@@ -72,20 +72,24 @@ const shiftDay = (days) => {
   return getLocalDateString(d);
 };
 
+// STRAT#31 i18n: DATE_PRESETS uses stable `id` for option value matching.
+// The user-visible label is computed inside the component via tI18n('cashier.range_<id>').
 const DATE_PRESETS = [
-  { label: 'Сегодня',   getRange: () => ({ from: getLocalDateString(), to: getLocalDateString() }) },
-  { label: 'Вчера',     getRange: () => ({ from: shiftDay(-1), to: shiftDay(-1) }) },
-  { label: 'Неделя',    getRange: () => ({ from: shiftDay(-6), to: getLocalDateString() }) },
-  { label: 'Месяц',     getRange: () => ({ from: shiftDay(-29), to: getLocalDateString() }) },
+  { id: 'today',   getRange: () => ({ from: getLocalDateString(), to: getLocalDateString() }) },
+  { id: 'yesterday', getRange: () => ({ from: shiftDay(-1), to: shiftDay(-1) }) },
+  { id: 'week',    getRange: () => ({ from: shiftDay(-6), to: getLocalDateString() }) },
+  { id: 'month',   getRange: () => ({ from: shiftDay(-29), to: getLocalDateString() }) },
 ];
 
 // Вспомогательная функция для создания прозрачного цвета была удалена (MEDIUM #14 dead code cleanup)
-const PAYMENT_METHOD_LABELS = {
-  cash: 'Наличные',
-  card: 'Карта',
+// STRAT#31 i18n: PAYMENT_METHOD_LABELS converted to a factory that takes `t` (the unified
+// useTranslation t function) so that cash/card labels are reactive to language changes.
+const buildPaymentMethodLabels = (t) => ({
+  cash: t('cashier.method_cash'),
+  card: t('cashier.method_card'),
   payme: 'PayMe',
-  click: 'Click'
-};
+  click: 'Click',
+});
 
 const resolvePaymentId = (paymentRowOrId) => {
   if (typeof paymentRowOrId === 'number' || typeof paymentRowOrId === 'string') {
@@ -110,9 +114,9 @@ const resolvePaymentMethodCode = (method) => {
   return normalizedMethod;
 };
 
-const resolvePaymentMethodLabel = (method) => {
+const resolvePaymentMethodLabel = (method, labels) => {
   const methodCode = resolvePaymentMethodCode(method);
-  return PAYMENT_METHOD_LABELS[methodCode] || String(method || 'Наличные');
+  return labels[methodCode] || String(method || labels.cash);
 };
 
 const extractReceiptDateTime = (paymentRow) => {
@@ -181,7 +185,7 @@ const buildReceiptServices = (paymentRow, totalAmount) => {
   return [];
 };
 
-const buildReceiptPrintPayload = (paymentRow) => {
+const buildReceiptPrintPayload = (paymentRow, labels, defaultPatientLabel) => {
   const paymentId = resolvePaymentId(paymentRow);
   const totalAmount = Number(paymentRow?.total_amount || paymentRow?.amount || 0);
   const services = buildReceiptServices(paymentRow, totalAmount);
@@ -201,13 +205,13 @@ const buildReceiptPrintPayload = (paymentRow) => {
       discount: 0,
       total: totalAmount,
       method: methodCode,
-      method_name: resolvePaymentMethodLabel(paymentRow?.method),
+      method_name: resolvePaymentMethodLabel(paymentRow?.method, labels),
       status: paymentRow?.status ?? null,
       paid_amount: receivedAmount,
       change: changeDue
     },
     patient: {
-      full_name: paymentRow?.patient || paymentRow?.patient_name || 'Пациент',
+      full_name: paymentRow?.patient || paymentRow?.patient_name || defaultPatientLabel,
       phone: paymentRow?.patient_phone || null
     },
     services,
@@ -215,29 +219,29 @@ const buildReceiptPrintPayload = (paymentRow) => {
   };
 };
 
-const getPaymentStatusMeta = (status) => {
+const getPaymentStatusMeta = (status, t) => {
   const normalizedStatus = String(status || '').trim().toLowerCase();
   const statusMap = {
-    paid: { variant: 'success', ariaLabel: 'Статус оплаты: оплачено' },
-    partial: { variant: 'info', ariaLabel: 'Статус оплаты: частично оплачено' },
-    cancelled: { variant: 'danger', ariaLabel: 'Статус оплаты: отменён' },
-    refunded: { variant: 'danger', ariaLabel: 'Статус оплаты: возвращён' },
-    pending: { variant: 'warning', ariaLabel: 'Статус оплаты: ожидает' },
-    unknown: { variant: 'secondary', ariaLabel: 'Статус оплаты: неизвестно' },
+    paid: { variant: 'success', ariaLabel: t('cashier.status_paid_aria') },
+    partial: { variant: 'info', ariaLabel: t('cashier.status_partial_aria') },
+    cancelled: { variant: 'danger', ariaLabel: t('cashier.status_cancelled_aria') },
+    refunded: { variant: 'danger', ariaLabel: t('cashier.status_refunded_aria') },
+    pending: { variant: 'warning', ariaLabel: t('cashier.status_pending_aria') },
+    unknown: { variant: 'secondary', ariaLabel: t('cashier.status_unknown_aria') },
   };
 
   return statusMap[normalizedStatus] || statusMap.unknown;
 };
 
-const getPaymentStatusLabel = (status) => {
+const getPaymentStatusLabel = (status, t) => {
   const normalizedStatus = String(status || '').trim().toLowerCase();
   const statusMap = {
-    paid: 'Оплачено',
-    partial: 'Частично',
-    cancelled: 'Отменён',
-    refunded: 'Возвращено',
-    pending: 'Ожидает',
-    unknown: 'Неизвестно',
+    paid: t('cashier.status_paid'),
+    partial: t('cashier.status_partial'),
+    cancelled: t('cashier.status_cancelled'),
+    refunded: t('cashier.status_refunded'),
+    pending: t('cashier.status_pending'),
+    unknown: t('cashier.status_unknown'),
   };
 
   return statusMap[normalizedStatus] || statusMap.unknown;
@@ -349,6 +353,15 @@ const CashierPanel = () => {
   const location = useLocation();
   const { getStats, getPendingPayments, getPayments, ...paymentsHook } = usePayments();
   // ✅ v2.1: isLoading теперь вычисляется из отдельных loading состояний (см. ниже)
+
+  // STRAT#31 i18n: localized helpers (reactive to language changes via tI18n).
+  // paymentMethodLabels — replaces module-level PAYMENT_METHOD_LABELS constant.
+  // datePresets — DATE_PRESETS with localized labels; uses stable `id` for option matching.
+  const paymentMethodLabels = buildPaymentMethodLabels(tI18n);
+  const datePresets = DATE_PRESETS.map((p) => ({
+    ...p,
+    label: tI18n(`cashier.range_${p.id}`),
+  }));
 
   // ✅ Получаем patientId из URL для автоматического поиска
   const getPatientIdFromUrl = useCallback(() => {
@@ -669,7 +682,7 @@ const CashierPanel = () => {
   };
 
   const handlePaymentError = (error) => {
-    const message = getErrorMessage(error, 'Не удалось обработать платёж. Проверьте соединение и попробуйте снова.');
+    const message = getErrorMessage(error, tI18n('cashier.payment_process_failed'));
     setPaymentError(message);
     logger.error('Ошибка платежа:', error);
   };
@@ -680,7 +693,7 @@ const CashierPanel = () => {
 
   const openPaymentWidget = (appointment) => {
     if (!canCreateDirectCashierPayment(appointment) || isBackendGroupedCashierPayment(appointment)) {
-      const message = 'Онлайн-оплата недоступна для групповых платежей. Используйте кнопку «Касса».';
+      const message = tI18n('cashier.online_payment_group_unavailable');
       setPaymentError(message);
       notify.error(message);
       return;
@@ -708,22 +721,22 @@ const CashierPanel = () => {
           visit_id: visitId,
           amount: paymentData.amount,
           method: paymentData.method,
-          note: paymentData.note || 'Оплата медицинских услуг'
+          note: paymentData.note || tI18n('cashier.payment_note_default')
         });
 
         if (!result.success) {
-          throw new Error(`Не удалось оплатить визит #${visitId}: ${result.error}`);
+          throw new Error(tI18n('cashier.payment_visit_failed', { visitId, error: result.error }));
         }
       }
 
-      notify.success(`Оплата успешно обработана! Сумма: ${format(paymentData.amount)}`);
+      notify.success(tI18n('cashier.payment_success', { amount: format(paymentData.amount) }));
       paymentModal.closeModal();
       setPendingPage(1);
       setRefreshKey((prev) => prev + 1); // Принудительное обновление списка
 
     } catch (error) {
       logger.error('Ошибка обработки платежа:', error);
-      const message = getErrorMessage(error, 'Не удалось обработать платёж. Проверьте соединение и попробуйте снова.');
+      const message = getErrorMessage(error, tI18n('cashier.payment_process_failed'));
       setPaymentError(message);
       notify.error(message);
     }
@@ -753,7 +766,7 @@ const CashierPanel = () => {
       setRefreshKey((prev) => prev + 1); // Обновляем данные
     } catch (err) {
       logger.error('Error confirming payment:', err);
-      notify.error(getErrorMessage(err, 'Не удалось подтвердить платёж. Проверьте соединение и попробуйте снова.'));
+      notify.error(getErrorMessage(err, tI18n('cashier.payment_confirm_failed')));
     } finally {
       setProcessingAction(null);
     }
@@ -766,7 +779,7 @@ const CashierPanel = () => {
       ? (payment.id || payment.payment_id)
       : payment;
     const patient = typeof payment === 'object' && payment !== null
-      ? (payment.patient || payment.patient_name || `Пациент #${payment.patient_id}`)
+      ? (payment.patient || payment.patient_name || tI18n('cashier.patient_with_id', { id: payment.patient_id }))
       : null;
     const amount = typeof payment === 'object' && payment !== null
       ? Number(payment.total_amount || payment.amount || 0)
@@ -796,10 +809,10 @@ const CashierPanel = () => {
         notify.info(tI18n('cashier.payment_cancelled'));
         triggerDataReload();
       } else {
-        notify.error(getErrorMessage(result.error, 'Не удалось выполнить возврат. Проверьте соединение и попробуйте снова.'));
+        notify.error(getErrorMessage(result.error, tI18n('cashier.refund_failed')));
       }
     } catch (error) {
-      notify.error(getErrorMessage(error, 'Не удалось отменить платёж. Проверьте соединение и попробуйте снова.'));
+      notify.error(getErrorMessage(error, tI18n('cashier.cancel_failed')));
     } finally {
       setProcessingAction(null);
     }
@@ -817,7 +830,7 @@ const CashierPanel = () => {
         notify.error(
           getErrorMessage(
             result.error,
-            'Не удалось экспортировать платежи. Проверьте соединение и попробуйте снова.'
+            tI18n('cashier.export_failed')
           )
         );
       }
@@ -866,13 +879,13 @@ const CashierPanel = () => {
         setRefundPaymentId(null);
         setRefundReason('');
         setRefundAmount('');
-        notify.success(`Возврат успешно выполнен. Сумма: ${result.data.refunded_amount} UZS`);
+        notify.success(tI18n('cashier.refund_success_amount', { amount: result.data.refunded_amount }));
         triggerDataReload();
       } else {
-        notify.error(getErrorMessage(result.error, 'Не удалось оформить возврат. Проверьте соединение и попробуйте снова.'));
+        notify.error(getErrorMessage(result.error, tI18n('cashier.refund_create_failed')));
       }
     } catch (error) {
-      notify.error(getErrorMessage(error, 'Не удалось выполнить возврат. Проверьте соединение и попробуйте снова.'));
+      notify.error(getErrorMessage(error, tI18n('cashier.refund_failed')));
     } finally {
       setProcessingAction(null);
     }
@@ -892,7 +905,7 @@ const CashierPanel = () => {
     try {
       if (paymentRowOrId && typeof paymentRowOrId === 'object') {
         try {
-          const opened = printPanelReceiptInBrowser(buildReceiptPrintPayload(paymentRowOrId));
+          const opened = printPanelReceiptInBrowser(buildReceiptPrintPayload(paymentRowOrId, paymentMethodLabels, tI18n('cashier.default_patient')));
           if (opened) {
             notify.success(tI18n('cashier.print_dialog_opened'));
             return;
@@ -908,7 +921,7 @@ const CashierPanel = () => {
 
       const result = await paymentsHook.getReceipt(paymentId);
       if (!result.success) {
-        notify.error(getErrorMessage(result.error, 'Не удалось получить чек. Проверьте соединение и попробуйте снова.'));
+        notify.error(getErrorMessage(result.error, tI18n('cashier.receipt_load_failed')));
         return;
       }
 
@@ -929,7 +942,7 @@ const CashierPanel = () => {
       setHourlyStats(result.data);
       setShowHourlyChart(true);
     } else {
-      notify.error(getErrorMessage(result.error, 'Не удалось загрузить статистику платежей. Проверьте соединение и попробуйте снова.'));
+      notify.error(getErrorMessage(result.error, tI18n('cashier.stats_load_failed')));
     }
   };
 
@@ -947,13 +960,13 @@ const CashierPanel = () => {
     // Проверяем, является ли первый элемент объектом
     if (serviceCodes.length > 0 && typeof serviceCodes[0] === 'object' && serviceCodes[0] !== null) {
       // Извлекаем имена услуг из объектов
-      codes = serviceCodes.map((s) => s.name || s.code || `Услуга #${s.id || '?'}`);
+      codes = serviceCodes.map((s) => s.name || s.code || tI18n('cashier.service_fallback', { id: s.id || '?' }));
       names = serviceCodes.map((s) => {
         const parts = [];
         if (s.name) parts.push(s.name);
         if (s.price) parts.push(formatUZS(s.price));
         if (s.quantity && s.quantity > 1) parts.push(`x${s.quantity}`);
-        return parts.length > 0 ? parts.join(' — ') : `Услуга #${s.id || '?'}`;
+        return parts.length > 0 ? parts.join(' — ') : tI18n('cashier.service_fallback', { id: s.id || '?' });
       });
     }
 
@@ -991,7 +1004,7 @@ const CashierPanel = () => {
             </span>
           )}
           {codes.length > 2 && (
-            <span className="cashier-badge cashier-badge-more" title={`Ещё ${codes.length - 2} услуг`}>
+            <span className="cashier-badge cashier-badge-more" title={tI18n('cashier.services_more', { count: codes.length - 2 })}>
               +{codes.length - 2}
             </span>
           )}
@@ -1097,9 +1110,9 @@ const CashierPanel = () => {
               visibility of system status). hideSidebar:true убирает боковую
               навигацию, поэтому без заголовка кассир теряет контекст страницы. */}
           <header className="cashier-page-header">
-            <h1 className="cashier-page-title">Касса</h1>
+            <h1 className="cashier-page-title">{tI18n('cashier.title')}</h1>
             <p className="cashier-page-subtitle">
-              Медицинская клиника · {new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}
+              {tI18n('cashier.subtitle', { date: new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' }) })}
             </p>
           </header>
 
@@ -1118,18 +1131,18 @@ const CashierPanel = () => {
                 <Search className="cashier-search-icon" />
                 <input
                   id="cashier-search-input"
-                  aria-label="Поиск платежей кассира"
+                  aria-label={tI18n('cashier.search_aria')}
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   onFocus={() => setSearchFocused(true)}
                   onBlur={() => setSearchFocused(false)}
                   className="cashier-text-sm cashier-text-primary"
-                  placeholder="Поиск: имя пациента, ID или телефон..."
-                  title="Можно искать по имени, ID (patient:123) или телефону" />
+                  placeholder={tI18n('cashier.search_placeholder')}
+                  title={tI18n('cashier.search_title')} />
                 {searchFocused && !query && (
                   <div className="cashier-search-hint" role="status" aria-live="polite">
-                    <span className="cashier-search-hint-label">Примеры:</span>
-                    <code className="cashier-search-hint-code">Иванов</code>
+                    <span className="cashier-search-hint-label">{tI18n('cashier.search_hint_label')}</span>
+                    <code className="cashier-search-hint-code">{tI18n('cashier.search_example_name')}</code>
                     <code className="cashier-search-hint-code">patient:123</code>
                     <code className="cashier-search-hint-code">+99890...</code>
                   </div>
@@ -1143,14 +1156,14 @@ const CashierPanel = () => {
                 <select
                   value={status}
                   onChange={(e) => setStatus(e.target.value)}
-                  aria-label="Фильтр по статусу платежа"
+                  aria-label={tI18n('cashier.filter_status')}
                   className="cashier-text-sm cashier-text-primary">
-                  <option value="all">Все статусы</option>
-                  <option value="paid">Оплачено</option>
-                  <option value="partial">Частично</option>
-                  <option value="pending">Ожидает</option>
-                  <option value="cancelled">Отменён</option>
-                  <option value="refunded">Возвращён</option>
+                  <option value="all">{tI18n('cashier.all_statuses')}</option>
+                  <option value="paid">{tI18n('cashier.status_paid')}</option>
+                  <option value="partial">{tI18n('cashier.status_partial')}</option>
+                  <option value="pending">{tI18n('cashier.status_pending')}</option>
+                  <option value="cancelled">{tI18n('cashier.status_cancelled')}</option>
+                  <option value="refunded">{tI18n('cashier.status_refunded')}</option>
                 </select>
               )}
 
@@ -1159,8 +1172,8 @@ const CashierPanel = () => {
                 <Calendar className="cashier-date-icon" />
                 <SegmentedControl
                   options={[
-                  { label: 'Одна дата', value: 'single' },
-                  { label: 'Диапазон', value: 'range' }]
+                  { label: tI18n('cashier.single_date'), value: 'single' },
+                  { label: tI18n('cashier.date_mode_range'), value: 'range' }]
                   }
                   value={dateMode}
                   onChange={setDateMode}
@@ -1180,15 +1193,15 @@ const CashierPanel = () => {
                   {/* UX Audit #1.4: Quick date presets replace single "Сегодня" button.
                       Reduces 2-3 clicks (open date picker → navigate to yesterday) to 1 click. */}
                   <SegmentedControl
-                    options={DATE_PRESETS.map((p) => ({ label: p.label, value: p.label }))}
+                    options={datePresets.map((p) => ({ label: p.label, value: p.id }))}
                     value="__none__"
-                    onChange={(label) => {
-                      const preset = DATE_PRESETS.find((p) => p.label === label);
+                    onChange={(id) => {
+                      const preset = datePresets.find((p) => p.id === id);
                       if (!preset) return;
                       setSelectedDate(preset.getRange().to);
                     }}
                     size="default"
-                    aria-label="Быстрый выбор даты"
+                    aria-label={tI18n('cashier.date_preset_aria')}
                   />
                 </> :
 
@@ -1207,17 +1220,17 @@ const CashierPanel = () => {
                   className="cashier-min-w-140" />
 
                   <SegmentedControl
-                    options={DATE_PRESETS.map((p) => ({ label: p.label, value: p.label }))}
+                    options={datePresets.map((p) => ({ label: p.label, value: p.id }))}
                     value="__none__"
-                    onChange={(label) => {
-                      const preset = DATE_PRESETS.find((p) => p.label === label);
+                    onChange={(id) => {
+                      const preset = datePresets.find((p) => p.id === id);
                       if (!preset) return;
                       const { from, to } = preset.getRange();
                       setDateFrom(from);
                       setDateTo(to);
                     }}
                     size="default"
-                    aria-label="Быстрый выбор диапазона дат"
+                    aria-label={tI18n('cashier.date_range_preset_aria')}
                   />
                 </>
               }
@@ -1238,7 +1251,7 @@ const CashierPanel = () => {
                       {format(stats.total_amount)}
                     </div>
                     <div className="cashier-stat-cap">
-                      Всего за период
+                      {tI18n('cashier.total_period')}
                     </div>
                   </div>
                   <div className="cashier-text-center">
@@ -1246,7 +1259,7 @@ const CashierPanel = () => {
                       {format(stats.cash_amount)}
                     </div>
                     <div className="cashier-stat-cap">
-                      Наличные
+                      {tI18n('cashier.method_cash')}
                     </div>
                   </div>
                   <div className="cashier-text-center">
@@ -1254,7 +1267,7 @@ const CashierPanel = () => {
                       {format(stats.card_amount)}
                     </div>
                     <div className="cashier-stat-cap">
-                      Карта
+                      {tI18n('cashier.method_card')}
                     </div>
                   </div>
                   <div className="cashier-text-center">
@@ -1262,7 +1275,7 @@ const CashierPanel = () => {
                       {stats.paid_count}
                     </div>
                     <div className="cashier-stat-cap">
-                      Оплачено
+                      {tI18n('cashier.status_paid')}
                     </div>
                   </div>
                   {stats.cancelled_count > 0 &&
@@ -1271,7 +1284,7 @@ const CashierPanel = () => {
                         {stats.cancelled_count}
                       </div>
                       <div className="cashier-stat-cap">
-                        Отменено
+                        {tI18n('cashier.cancelled_count')}
                       </div>
                     </div>
                 }
@@ -1283,7 +1296,7 @@ const CashierPanel = () => {
                     {format(stats.pending_amount || 0)}
                   </div>
                   <div className="cashier-stat-cap-base">
-                    Ожидает оплаты ({stats.pending_count} заявок)
+                    {tI18n('cashier.pending_count_caption', { count: stats.pending_count })}
                   </div>
                 </div>
               </>
@@ -1298,25 +1311,25 @@ const CashierPanel = () => {
                 size="sm"
                 variant="outline"
                 onClick={handleRefresh}
-                title="Обновить данные">
+                title={tI18n('cashier.refresh_title')}>
 
-                Обновить
+                {tI18n('cashier.refresh_btn')}
               </Button>
               <Button
                 size="sm"
                 variant="outline"
                 onClick={exportToCSV}
-                title="Экспорт в CSV">
+                title={tI18n('cashier.export_title')}>
 
-                Экспорт
+                {tI18n('cashier.export_btn')}
               </Button>
               <Button
                 size="sm"
                 variant="outline"
                 onClick={loadHourlyStats}
-                title="Почасовая статистика">
+                title={tI18n('cashier.hourly_stats_title')}>
 
-                Аналитика
+                {tI18n('cashier.analytics_btn')}
               </Button>
             </div>
           </div>
@@ -1330,20 +1343,20 @@ const CashierPanel = () => {
               tabs={[
               {
                 id: 'pending',
-                label: 'Ожидающие оплаты',
+                label: tI18n('cashier.tab_pending'),
                 icon: DollarSign,
                 badge: appointments.length > 0 ? appointments.length : undefined
               },
               {
                 id: 'history',
-                label: 'История платежей',
+                label: tI18n('cashier.tab_history'),
                 icon: CreditCard,
                 // UX Audit #3.3: badge с totalItems для консистентности.
                 badge: totalItems > 0 ? totalItems : undefined
               },
               {
                 id: 'refunds',
-                label: 'Возвраты',
+                label: tI18n('cashier.tab_refunds'),
                 icon: RefreshCw
                 // UX Audit #3.3: badge для refunds будет добавлен в отдельном PR,
                 // когда RefundRequestsTable будет экспортировать свой count через callback.
@@ -1372,12 +1385,12 @@ const CashierPanel = () => {
                 <table className="cashier-table">
                   <thead>
                     <tr className="cashier-table-row">
-                      <th className="cashier-text-sm cashier-text-primary">Дата/Время</th>
-                      <th className="cashier-text-sm cashier-text-primary">Пациент</th>
-                      <th className="cashier-text-sm cashier-text-primary">Услуги</th>
-                      <th className="cashier-text-sm cashier-text-primary">Сумма</th>
-                      <th className="cashier-text-sm cashier-text-primary">Статус</th>
-                      <th className="cashier-text-sm cashier-text-primary">Действия</th>
+                      <th className="cashier-text-sm cashier-text-primary">{tI18n('cashier.col_date_time')}</th>
+                      <th className="cashier-text-sm cashier-text-primary">{tI18n('cashier.col_patient')}</th>
+                      <th className="cashier-text-sm cashier-text-primary">{tI18n('cashier.col_services')}</th>
+                      <th className="cashier-text-sm cashier-text-primary">{tI18n('cashier.col_amount')}</th>
+                      <th className="cashier-text-sm cashier-text-primary">{tI18n('cashier.col_status')}</th>
+                      <th className="cashier-text-sm cashier-text-primary">{tI18n('cashier.col_actions')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1397,12 +1410,12 @@ const CashierPanel = () => {
                     <table className="cashier-table">
                       <thead>
                         <tr className="cashier-table-row">
-                          <th className="cashier-text-sm cashier-text-primary">Дата/Время</th>
-                          <th className="cashier-text-sm cashier-text-primary">Пациент</th>
-                          <th className="cashier-text-sm cashier-text-primary">Услуги</th>
-                          <th className="cashier-text-sm cashier-text-primary">Сумма</th>
-                          <th className="cashier-text-sm cashier-text-primary">Статус</th>
-                          <th className="cashier-text-sm cashier-text-primary">Действия</th>
+                          <th className="cashier-text-sm cashier-text-primary">{tI18n('cashier.col_date_time')}</th>
+                          <th className="cashier-text-sm cashier-text-primary">{tI18n('cashier.col_patient')}</th>
+                          <th className="cashier-text-sm cashier-text-primary">{tI18n('cashier.col_services')}</th>
+                          <th className="cashier-text-sm cashier-text-primary">{tI18n('cashier.col_amount')}</th>
+                          <th className="cashier-text-sm cashier-text-primary">{tI18n('cashier.col_status')}</th>
+                          <th className="cashier-text-sm cashier-text-primary">{tI18n('cashier.col_actions')}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1412,7 +1425,7 @@ const CashierPanel = () => {
                       className="cashier-table-row">
 
                             <td
-                              aria-label="Дата и время ожидаемого приёма"
+                              aria-label={tI18n('cashier.appointment_date_aria')}
                               className="cashier-text-sm cashier-text-primary">
                               <div className="cashier-date-stack">
                                 <span className="cashier-date-main">
@@ -1432,13 +1445,13 @@ const CashierPanel = () => {
                             <td className="cashier-text-sm cashier-text-primary">
                               {appointment.patient_last_name && appointment.patient_first_name ?
                         `${appointment.patient_last_name} ${appointment.patient_first_name}` :
-                        appointment.patient_name || `Пациент #${appointment.patient_id}`
+                        appointment.patient_name || tI18n('cashier.patient_with_id', { id: appointment.patient_id })
                         }
                               {/* UX Audit #2.6: badge «Групповой» для grouped-платежей,
                                   чтобы было видно, почему кнопка «Онлайн» дизейблится. */}
                               {isBackendGroupedCashierPayment(appointment) && (
-                                <span className="cashier-badge cashier-badge-grouped" title="Несколько визитов в одном платеже">
-                                  Групповой
+                                <span className="cashier-badge cashier-badge-grouped" title={tI18n('cashier.grouped_payment_title')}>
+                                  {tI18n('cashier.grouped_badge')}
                                 </span>
                               )}
                             </td>
@@ -1452,8 +1465,8 @@ const CashierPanel = () => {
                               <Badge
                                 variant="warning"
                                 role="status"
-                                aria-label="Статус оплаты: ожидает">
-                                Ожидает оплаты
+                                aria-label={tI18n('cashier.status_pending_aria')}>
+                                {tI18n('cashier.pending_payment_badge')}
                               </Badge>
                             </td>
                             <td className="cashier-cell-padded">
@@ -1463,12 +1476,12 @@ const CashierPanel = () => {
                             variant="outline"
                             onClick={() => openPaymentWidget(appointment)}
                             disabled={!canCreateDirectCashierPayment(appointment) || isBackendGroupedCashierPayment(appointment)}
-                            aria-label="Начать онлайн-оплату"
+                            aria-label={tI18n('cashier.start_online_payment_aria')}
                             title={!canCreateDirectCashierPayment(appointment) || isBackendGroupedCashierPayment(appointment)
-                              ? 'Онлайн-оплата недоступна для групповых платежей (несколько визитов). Используйте кнопку «Касса».'
-                              : 'Оплата онлайн через Click/PayMe/Kaspi'}>
+                              ? tI18n('cashier.online_payment_disabled_title')
+                              : tI18n('cashier.online_payment_enabled_title')}>
 
-                                  Онлайн
+                                  {tI18n('cashier.online_btn')}
                                 </Button>
                                 <Button
                             size="sm"
@@ -1476,10 +1489,10 @@ const CashierPanel = () => {
                               paymentModal.openModal(appointment);
                             }}
                             disabled={!canCreateCashierPayment(appointment)}
-                            aria-label="Принять оплату через кассу"
-                            title={!canCreateCashierPayment(appointment) ? 'Приём оплаты недоступен для этой записи' : 'Принять оплату через кассу'}>
+                            aria-label={tI18n('cashier.cash_payment_aria')}
+                            title={!canCreateCashierPayment(appointment) ? tI18n('cashier.cash_payment_disabled_title') : tI18n('cashier.cash_payment_aria')}>
 
-                                  Касса
+                                  {tI18n('cashier.cash_btn')}
                                 </Button>
                               </div>
                             </td>
@@ -1497,10 +1510,10 @@ const CashierPanel = () => {
                     disabled={pendingPage === 1 || pendingLoading}
                     onClick={() => setPendingPage((p) => Math.max(1, p - 1))}>
 
-                          ← Назад
+                          {tI18n('cashier.prev_page')}
                         </Button>
                         <span className="cashier-pagination-info">
-                          Страница {pendingPage} из {pendingTotalPages} (Всего: {pendingTotalItems})
+                          {tI18n('cashier.pagination_info', { current: pendingPage, total: pendingTotalPages, total_items: pendingTotalItems })}
                         </span>
                         <Button
                     size="sm"
@@ -1508,7 +1521,7 @@ const CashierPanel = () => {
                     disabled={pendingPage === pendingTotalPages || pendingLoading}
                     onClick={() => setPendingPage((p) => Math.min(pendingTotalPages, p + 1))}>
 
-                          Вперёд →
+                          {tI18n('cashier.next_page')}
                         </Button>
                       </div>
                 }
@@ -1517,12 +1530,12 @@ const CashierPanel = () => {
               (/* UX Audit #4.3: actionable empty state вместо голого текста. */
               <div className="cashier-empty-state" role="status">
                 <CheckCircle size={32} className="cashier-empty-state-icon" aria-hidden="true" />
-                <div className="cashier-empty-state-title">Все платежи обработаны</div>
+                <div className="cashier-empty-state-title">{tI18n('cashier.empty_pending_title')}</div>
                 <div className="cashier-empty-state-text">
-                  Новых записей, ожидающих оплаты, нет.
+                  {tI18n('cashier.empty_pending_text')}
                 </div>
                 <Button size="sm" variant="outline" onClick={() => setActiveTab('history')}>
-                  Открыть историю платежей
+                  {tI18n('cashier.open_history_btn')}
                 </Button>
               </div>
               )}
@@ -1537,13 +1550,13 @@ const CashierPanel = () => {
                 <table className="cashier-table">
                   <thead>
                     <tr className="cashier-table-row">
-                      <th className="cashier-text-sm cashier-text-primary">Дата/Время</th>
-                      <th className="cashier-text-sm cashier-text-primary">Пациент</th>
-                      <th className="cashier-text-sm cashier-text-primary">Услуга</th>
-                      <th className="cashier-text-sm cashier-text-primary">Способ</th>
-                      <th className="cashier-text-sm cashier-text-primary">Сумма</th>
-                      <th className="cashier-text-sm cashier-text-primary">Статус</th>
-                      <th className="cashier-text-sm cashier-text-primary">Действия</th>
+                      <th className="cashier-text-sm cashier-text-primary">{tI18n('cashier.col_date_time')}</th>
+                      <th className="cashier-text-sm cashier-text-primary">{tI18n('cashier.col_patient')}</th>
+                      <th className="cashier-text-sm cashier-text-primary">{tI18n('cashier.col_service')}</th>
+                      <th className="cashier-text-sm cashier-text-primary">{tI18n('cashier.col_method_short')}</th>
+                      <th className="cashier-text-sm cashier-text-primary">{tI18n('cashier.col_amount')}</th>
+                      <th className="cashier-text-sm cashier-text-primary">{tI18n('cashier.col_status')}</th>
+                      <th className="cashier-text-sm cashier-text-primary">{tI18n('cashier.col_actions')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1565,18 +1578,18 @@ const CashierPanel = () => {
                         <tr className="cashier-table-row">
                           {/* UX Audit #4.2: кликабельные заголовки с сортировкой. */}
                           <th className="cashier-text-sm cashier-text-primary cashier-th-sortable" onClick={() => toggleSort('date')}>
-                            Дата/Время {sortField === 'date' && (sortDir === 'asc' ? '↑' : '↓')}
+                            {tI18n('cashier.col_date_time')} {sortField === 'date' && (sortDir === 'asc' ? '↑' : '↓')}
                           </th>
                           <th className="cashier-text-sm cashier-text-primary cashier-th-sortable" onClick={() => toggleSort('patient')}>
-                            Пациент {sortField === 'patient' && (sortDir === 'asc' ? '↑' : '↓')}
+                            {tI18n('cashier.col_patient')} {sortField === 'patient' && (sortDir === 'asc' ? '↑' : '↓')}
                           </th>
-                          <th className="cashier-text-sm cashier-text-primary">Услуга</th>
-                          <th className="cashier-text-sm cashier-text-primary">Способ</th>
+                          <th className="cashier-text-sm cashier-text-primary">{tI18n('cashier.col_service')}</th>
+                          <th className="cashier-text-sm cashier-text-primary">{tI18n('cashier.col_method_short')}</th>
                           <th className="cashier-text-sm cashier-text-primary cashier-th-sortable" onClick={() => toggleSort('amount')}>
-                            Сумма {sortField === 'amount' && (sortDir === 'asc' ? '↑' : '↓')}
+                            {tI18n('cashier.col_amount')} {sortField === 'amount' && (sortDir === 'asc' ? '↑' : '↓')}
                           </th>
-                          <th className="cashier-text-sm cashier-text-primary">Статус</th>
-                          <th className="cashier-text-sm cashier-text-primary">Действия</th>
+                          <th className="cashier-text-sm cashier-text-primary">{tI18n('cashier.col_status')}</th>
+                          <th className="cashier-text-sm cashier-text-primary">{tI18n('cashier.col_actions')}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1585,7 +1598,7 @@ const CashierPanel = () => {
                     <tr key={`payment-${row.id || row.payment_id || index}`} className="cashier-table-row">
 
                               <td
-                                aria-label="Дата и время платежа в истории"
+                                aria-label={tI18n('cashier.payment_history_date_aria')}
                                 className="cashier-text-sm cashier-text-primary">
                                 <div className="cashier-date-stack">
                                   <span className="cashier-date-main">{row.date || '—'}</span>
@@ -1609,10 +1622,10 @@ const CashierPanel = () => {
                               </td>
                               <td className="cashier-cell-padded">
                                 <Badge
-                                  variant={getPaymentStatusMeta(row.status).variant}
+                                  variant={getPaymentStatusMeta(row.status, tI18n).variant}
                                   role="status"
-                                  aria-label={getPaymentStatusMeta(row.status).ariaLabel}>
-                                  {getPaymentStatusLabel(row.status)}
+                                  aria-label={getPaymentStatusMeta(row.status, tI18n).ariaLabel}>
+                                  {getPaymentStatusLabel(row.status, tI18n)}
                                 </Badge>
                               </td>
                               <td className="cashier-cell-actions">
@@ -1627,14 +1640,14 @@ const CashierPanel = () => {
                                   variant="success"
                                   onClick={() => confirmPayment(row.id)}
                                   disabled={!hasBackendPaymentAction(row, 'confirm') || processingAction?.id === row.id}
-                                  aria-label="Подтвердить платёж">
+                                  aria-label={tI18n('cashier.confirm_payment_aria')}>
                                   {processingAction?.id === row.id && processingAction?.type === 'confirm' ?
                                     <Loader2 size={14} className="animate-spin" aria-hidden="true" /> :
                                     <CheckCircle size={14} />}
-                                  Принять
+                                  {tI18n('cashier.confirm_payment_confirm')}
                                 </Button>
                                 <details className="cashier-overflow-menu">
-                                  <summary className="cashier-overflow-trigger" aria-label="Дополнительные действия с платёжом">
+                                  <summary className="cashier-overflow-trigger" aria-label={tI18n('cashier.more_actions_aria')}>
                                     <MoreVertical size={16} aria-hidden="true" />
                                   </summary>
                                   <div className="cashier-overflow-popover" role="menu">
@@ -1644,8 +1657,8 @@ const CashierPanel = () => {
                                       onClick={() => openCancelDialog(row)}
                                       disabled={!hasBackendPaymentAction(row, 'cancel') || processingAction?.id === row.id}
                                       role="menuitem"
-                                      aria-label="Отменить платёж">
-                                      <XCircle size={14} aria-hidden="true" /> Отменить платёж
+                                      aria-label={tI18n('cashier.btn_cancel')}>
+                                      <XCircle size={14} aria-hidden="true" /> {tI18n('cashier.btn_cancel')}
                                     </button>
                                     <button
                                       type="button"
@@ -1653,8 +1666,8 @@ const CashierPanel = () => {
                                       onClick={() => openRefundDialog(row)}
                                       disabled={!hasBackendPaymentAction(row, 'refund') || processingAction?.id === row.id}
                                       role="menuitem"
-                                      aria-label="Оформить возврат">
-                                      <Undo2 size={14} aria-hidden="true" /> Оформить возврат
+                                      aria-label={tI18n('cashier.refund_aria')}>
+                                      <Undo2 size={14} aria-hidden="true" /> {tI18n('cashier.refund_confirm')}
                                     </button>
                                     <button
                                       type="button"
@@ -1662,8 +1675,8 @@ const CashierPanel = () => {
                                       onClick={() => handlePrintReceipt(row)}
                                       disabled={!hasBackendPaymentAction(row, 'print_receipt') || processingAction?.id === row.id}
                                       role="menuitem"
-                                      aria-label="Распечатать чек">
-                                      <Receipt size={14} aria-hidden="true" /> Печать чека
+                                      aria-label={tI18n('cashier.print_receipt_aria')}>
+                                      <Receipt size={14} aria-hidden="true" /> {tI18n('cashier.print_receipt_btn')}
                                     </button>
                                   </div>
                                 </details>
@@ -1675,9 +1688,9 @@ const CashierPanel = () => {
                             <td colSpan="7" className="cashier-empty-cell">
                               {/* UX Audit #4.3: actionable empty state для истории. */}
                               <div className="cashier-empty-state cashier-empty-state--inline" role="status">
-                                <div className="cashier-empty-state-title">Нет платежей за выбранный период</div>
+                                <div className="cashier-empty-state-title">{tI18n('cashier.empty_history_title')}</div>
                                 <div className="cashier-empty-state-text">
-                                  Попробуйте изменить фильтры или выбрать другую дату.
+                                  {tI18n('cashier.empty_history_text')}
                                 </div>
                               </div>
                             </td>
@@ -1695,10 +1708,10 @@ const CashierPanel = () => {
                     disabled={currentPage === 1 || historyLoading}
                     onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}>
 
-                          ← Назад
+                          {tI18n('cashier.prev_page')}
                         </Button>
                         <span className="cashier-pagination-info">
-                          Страница {currentPage} из {totalPages} (Всего: {totalItems})
+                          {tI18n('cashier.pagination_info', { current: currentPage, total: totalPages, total_items: totalItems })}
                         </span>
                         <Button
                     size="sm"
@@ -1706,7 +1719,7 @@ const CashierPanel = () => {
                     disabled={currentPage === totalPages || historyLoading}
                     onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}>
 
-                          Вперёд →
+                          {tI18n('cashier.next_page')}
                         </Button>
                       </div>
                 }
@@ -1732,50 +1745,50 @@ const CashierPanel = () => {
             maxWidth="sm"
             fullWidth>
 
-            <DialogTitle>Отмена платежа</DialogTitle>
+            <DialogTitle>{tI18n('cashier.cancel_dialog_title')}</DialogTitle>
             <DialogContent>
               {cancelPaymentContext && (
-                <div className="cashier-cancel-context" role="group" aria-label="Контекст отменяемого платежа">
+                <div className="cashier-cancel-context" role="group" aria-label={tI18n('cashier.cancel_context_aria')}>
                   <Typography variant="body2" color="textSecondary">
-                    Платёж #{cancelPaymentContext.id}
+                    {tI18n('cashier.payment_id_label', { id: cancelPaymentContext.id })}
                   </Typography>
                   {cancelPaymentContext.patient && (
                     <Typography variant="body1">
-                      Пациент: <strong>{cancelPaymentContext.patient}</strong>
+                      {tI18n('cashier.patient_label')} <strong>{cancelPaymentContext.patient}</strong>
                     </Typography>
                   )}
                   {cancelPaymentContext.amount > 0 && (
                     <Typography variant="body1">
-                      Сумма: <strong>{format(cancelPaymentContext.amount)}</strong>
+                      {tI18n('cashier.amount_label')} <strong>{format(cancelPaymentContext.amount)}</strong>
                     </Typography>
                   )}
                 </div>
               )}
               <Typography variant="body2" className="cashier-mb-4">
-                Это действие нельзя отменить. Укажите причину для аудита.
+                {tI18n('cashier.cancel_dialog_text')}
               </Typography>
               <textarea
-                aria-label="Причина отмены платежа (обязательно, минимум 10 символов)"
+                aria-label={tI18n('cashier.cancel_reason_aria')}
                 value={cancelReason}
                 onChange={(e) => setCancelReason(e.target.value)}
-                placeholder="Причина отмены (обязательно, минимум 10 символов)"
+                placeholder={tI18n('cashier.cancel_reason_placeholder')}
                 required
                 minLength={10}
                 className="cashier-text-sm cashier-text-primary cashier-refund-textarea" />
               <Typography variant="caption" color="textSecondary">
-                {cancelReason.trim().length}/10 символов
+                {tI18n('cashier.char_count', { count: cancelReason.trim().length })}
               </Typography>
             </DialogContent>
             <DialogActions>
               <Button variant="outline" onClick={() => setCancelDialogOpen(false)}>
-                Закрыть
+                {tI18n('cashier.close_btn')}
               </Button>
               <Button
                 variant="danger"
                 onClick={handleCancelPayment}
                 disabled={processingAction?.type === 'cancel' || cancelReason.trim().length < 10}>
                 {processingAction?.type === 'cancel' ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : null}
-                Отменить платёж
+                {tI18n('cashier.btn_cancel')}
               </Button>
             </DialogActions>
           </Dialog>
@@ -1798,11 +1811,11 @@ const CashierPanel = () => {
 
             <DialogTitle>
               <Typography variant="h6">
-                Онлайн-оплата
+                {tI18n('cashier.online_payment_dialog_title')}
               </Typography>
               {paymentWidget.selectedItem &&
               <Typography variant="body2" color="textSecondary">
-                  Пациент: {paymentWidget.selectedItem.patient_name} • {paymentWidget.selectedItem.department}
+                  {tI18n('cashier.patient_summary', { name: paymentWidget.selectedItem.patient_name, department: paymentWidget.selectedItem.department })}
                 </Typography>
               }
             </DialogTitle>
@@ -1819,7 +1832,7 @@ const CashierPanel = () => {
                 visitId={canCreateDirectCashierPayment(paymentWidget.selectedItem) ? resolveSingleCashierVisitId(paymentWidget.selectedItem) : null}
                 amount={paymentWidget.selectedItem.remaining_amount || paymentWidget.selectedItem.total_amount || paymentWidget.selectedItem.cost || 0}
                 currency="UZS"
-                description={`Оплата за ${paymentWidget.selectedItem.department || 'медицинские услуги'}`}
+                description={tI18n('cashier.payment_description', { department: paymentWidget.selectedItem.department || tI18n('cashier.payment_note_default') })}
                 onSuccess={handlePaymentSuccess}
                 onError={handlePaymentError}
                 onCancel={handlePaymentCancel} />
@@ -1829,7 +1842,7 @@ const CashierPanel = () => {
 
             <DialogActions>
               <Button onClick={handlePaymentCancel}>
-                Закрыть
+                {tI18n('cashier.close_btn')}
               </Button>
             </DialogActions>
           </Dialog>
@@ -1844,7 +1857,7 @@ const CashierPanel = () => {
             <DialogTitle>
               <Box display="flex" alignItems="center">
                 <CheckCircle className="cashier-check-icon" />
-                Оплата успешна!
+                {tI18n('cashier.payment_success_dialog_title')}
               </Box>
             </DialogTitle>
 
@@ -1852,23 +1865,23 @@ const CashierPanel = () => {
               {paymentSuccess &&
               <Box>
                   <Typography variant="body1" gutterBottom>
-                    Платёж успешно обработан
+                    {tI18n('cashier.payment_success_dialog_body')}
                   </Typography>
                   {paymentSuccess.amount !== undefined &&
                   <Typography variant="body2" color="textSecondary">
-                    Сумма: {format(Number(paymentSuccess.amount) || 0)}
+                    {tI18n('cashier.amount_label')} {format(Number(paymentSuccess.amount) || 0)}
                   </Typography>
                   }
                   {paymentSuccess.change_due > 0 &&
                   <Typography variant="body2" color="textSecondary">
-                    Сдача: {format(Number(paymentSuccess.change_due))}
+                    {tI18n('cashier.change_label')} {format(Number(paymentSuccess.change_due))}
                   </Typography>
                   }
                   <Typography variant="body2" color="textSecondary">
-                    ID платежа: {paymentSuccess.payment_id}
+                    {tI18n('cashier.payment_id_field', { id: paymentSuccess.payment_id })}
                   </Typography>
                   <Typography variant="body2" color="textSecondary">
-                    Провайдер: {paymentSuccess.provider}
+                    {tI18n('cashier.provider_label', { provider: paymentSuccess.provider })}
                   </Typography>
                 </Box>
               }
@@ -1885,19 +1898,19 @@ const CashierPanel = () => {
           <Dialog open={refundDialogOpen} onClose={() => setRefundDialogOpen(false)}>
             <DialogTitle>
               <Box display="flex" alignItems="center">
-                Возврат средств
+                {tI18n('cashier.refund_title')}
               </Box>
             </DialogTitle>
             <DialogContent>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 <Typography variant="body2" color="textSecondary">
-                  Исходная сумма платежа: {formatUZS(refundPaymentAmount)}
+                  {tI18n('cashier.refund_dialog_subtitle', { amount: formatUZS(refundPaymentAmount) })}
                 </Typography>
                 <Box>
-                  <Typography variant="body2" gutterBottom>Сумма возврата:</Typography>
+                  <Typography variant="body2" gutterBottom>{tI18n('cashier.refund_amount_label')}:</Typography>
                   <input
                     type="number"
-                    aria-label="Сумма возврата"
+                    aria-label={tI18n('cashier.refund_amount_label')}
                     value={refundAmount}
                     onChange={(e) => setRefundAmount(e.target.value)}
                     className="cashier-refund-input"
@@ -1906,12 +1919,12 @@ const CashierPanel = () => {
 
                 </Box>
                 <Box>
-                  <Typography variant="body2" gutterBottom>Причина возврата:</Typography>
+                  <Typography variant="body2" gutterBottom>{tI18n('cashier.refund_reason_label')}:</Typography>
                   <textarea
-                    aria-label="Причина возврата"
+                    aria-label={tI18n('cashier.refund_reason_label')}
                     value={refundReason}
                     onChange={(e) => setRefundReason(e.target.value)}
-                    placeholder="Укажите причину возврата (минимум 3 символа)"
+                    placeholder={tI18n('cashier.refund_reason_placeholder')}
                     rows={3}
                     className="cashier-refund-textarea" />
 
@@ -1920,11 +1933,11 @@ const CashierPanel = () => {
             </DialogContent>
             <DialogActions>
               <Button variant="outline" onClick={() => setRefundDialogOpen(false)}>
-                Отмена
+                {tI18n('cashier.cancel')}
               </Button>
               <Button variant="danger" onClick={handleRefund} disabled={processingAction?.type === 'refund'}>
                 {processingAction?.type === 'refund' ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : null}
-                Выполнить возврат
+                {tI18n('cashier.refund_execute_btn')}
               </Button>
             </DialogActions>
           </Dialog>
@@ -1935,7 +1948,7 @@ const CashierPanel = () => {
               Теперь: полноценный BarChart с XAxis/YAxis/Tooltip/CartesianGrid. */}
           <Dialog open={showHourlyChart} onClose={() => setShowHourlyChart(false)}>
             <DialogTitle>
-              Почасовая статистика за {selectedDate}
+              {tI18n('cashier.hourly_stats_dialog_title', { date: selectedDate })}
             </DialogTitle>
             <DialogContent>
               {hourlyStats.filter((h) => h.count > 0).length > 0 ? (
@@ -1963,8 +1976,8 @@ const CashierPanel = () => {
                         }}
                         labelFormatter={(h) => `${h}:00`}
                         formatter={(value, name) => {
-                          if (name === 'count') return [value, 'Платежей'];
-                          if (name === 'amount') return [formatUZS(value), 'Сумма'];
+                          if (name === 'count') return [value, tI18n('cashier.hourly_stats_count_label')];
+                          if (name === 'amount') return [formatUZS(value), tI18n('cashier.hourly_stats_amount_label')];
                           return [value, name];
                         }}
                       />
@@ -1973,11 +1986,11 @@ const CashierPanel = () => {
                   </ResponsiveContainer>
                 </div>
               ) : (
-                <Typography color="textSecondary">Нет платежей за этот день</Typography>
+                <Typography color="textSecondary">{tI18n('cashier.hourly_stats_empty')}</Typography>
               )}
             </DialogContent>
             <DialogActions>
-              <Button onClick={() => setShowHourlyChart(false)}>Закрыть</Button>
+              <Button onClick={() => setShowHourlyChart(false)}>{tI18n('cashier.close_btn')}</Button>
             </DialogActions>
           </Dialog>
         </div>
@@ -1986,28 +1999,27 @@ const CashierPanel = () => {
       {sessionWarning && (
         <div
           role="alertdialog"
-          aria-label="Предупреждение об истечении сессии"
+          aria-label={tI18n('cashier.session_warning_aria')}
           className="cashier-session-warning-overlay">
           <div className="cashier-session-warning-card">
             <h3 className="cashier-session-warning-title">
-              Сессия скоро истечёт
+              {tI18n('cashier.session_warning_title')}
             </h3>
             <p className="cashier-session-warning-text">
-              Сессия истечёт через <strong>{sessionSecondsLeft ?? '?'}</strong> сек.
-              Несохранённые данные будут потеряны. Сохраните текущий платёж или продлите сессию.
+              {tI18n('cashier.session_warning_text', { seconds: sessionSecondsLeft ?? '?' })}
             </p>
             <div className="cashier-session-warning-actions">
               <button
                 type="button"
                 onClick={() => setSessionWarning(null)}
                 className="cashier-session-warning-btn cashier-session-warning-btn--secondary">
-                Закрыть и потерять данные
+                {tI18n('cashier.session_warning_dismiss')}
               </button>
               <button
                 type="button"
                 onClick={() => { setSessionWarning(null); notify.info(tI18n('cashier.session_extending')); }}
                 className="cashier-session-warning-btn cashier-session-warning-btn--primary">
-                Продлить сессию
+                {tI18n('cashier.session_warning_extend')}
               </button>
             </div>
           </div>

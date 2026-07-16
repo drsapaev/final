@@ -2,7 +2,7 @@
 import PropTypes from 'prop-types';
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 
 // Контекст для уведомлений

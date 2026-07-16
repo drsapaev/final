@@ -3,7 +3,7 @@ import Picker from '@emoji-mart/react';
 import data from '@emoji-mart/data';
 import { Smile } from 'lucide-react';
 import PropTypes from 'prop-types';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const EmojiPicker = ({ onEmojiSelect, disabled = false }) => {
   const { t } = useTranslation();

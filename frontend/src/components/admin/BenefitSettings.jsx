@@ -28,7 +28,7 @@ import { toast } from 'react-toastify';
 import { fetchBenefitSettings, saveBenefitSettings } from '../../api/adminSettings';
 
 import logger from '../../utils/logger';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 /**
  * Компонент для управления настройками льгот в админке
  */
@@ -60,8 +60,8 @@ const BenefitSettings = () => {
       setLastUpdated(new Date(data.updated_at));
     } catch (error) {
       logger.error('Error loading benefit settings:', error);
-      setError(error.response?.data?.detail || 'Не удалось загрузить настройки льгот. Проверьте подключение к серверу.');
-      toast.error('Ошибка загрузки настроек льгот');
+      setError(error.response?.data?.detail || t('admin2.bs_error_load_settings'));
+      toast.error(t('admin2.bs_toast_load_error'));
     } finally {
       setLoading(false);
     }
@@ -76,12 +76,12 @@ const BenefitSettings = () => {
     setShowConfirmModal(false);
     try {
       const response = await saveBenefitSettings(settings);
-      toast.success(response?.message || 'Настройки сохранены');
+      toast.success(response?.message || t('admin2.bs_toast_saved'));
       setOriginalSettings(settings);
       setLastUpdated(new Date());
     } catch (error) {
       logger.error('Error saving benefit settings:', error);
-      toast.error(error.response?.data?.detail || 'Ошибка сохранения настроек');
+      toast.error(error.response?.data?.detail || t('admin2.bs_toast_save_error'));
     } finally {
       setSaving(false);
     }
@@ -109,7 +109,7 @@ const BenefitSettings = () => {
           <div className="admin-flex-center-12 mb-6">
             <Settings className="admin-icon-32-blue" />
             <h2 className="admin-benefit-h2">
-              Настройки льгот
+              {t('admin2.bs_title')}
             </h2>
           </div>
           <Skeleton height="600px" />
@@ -126,17 +126,17 @@ const BenefitSettings = () => {
           <div className="admin-flex-center-12 mb-6">
             <Settings className="admin-icon-32-blue" />
             <h2 className="admin-benefit-h2">
-              Настройки льгот
+              {t('admin2.bs_title')}
             </h2>
           </div>
           <MacOSEmptyState
             icon={AlertCircle}
-            title="Не удалось загрузить настройки"
-            description="Проверьте подключение к серверу и попробуйте обновить страницу"
+            title={t('admin2.bs_empty_title')}
+            description={t('admin2.bs_empty_desc')}
             action={
               <Button onClick={loadSettings} variant="primary">
                 <RefreshCw className="w-4 h-4 mr-2" />
-                Попробовать снова
+                {t('admin2.bs_btn_retry')}
               </Button>
             }
           />
@@ -153,7 +153,7 @@ const BenefitSettings = () => {
           {error && (
             <Alert
               type="error"
-              title="Ошибка загрузки"
+              title={t('admin2.bs_alert_load_error_title')}
               message={error}
               onClose={() => setError(null)}
             />
@@ -164,17 +164,17 @@ const BenefitSettings = () => {
             <div>
               <h2 className="admin-benefit-h2-with-icon">
                 <Settings className="admin-icon-32-blue" />
-                Настройки льгот
+                {t('admin2.bs_title')}
               </h2>
               <p className="admin-setting-desc">
-                Управление параметрами льгот и повторных визитов
+                {t('admin2.bs_header_subtitle')}
               </p>
             </div>
 
             <div className="admin-flex-center-16">
               {lastUpdated && (
                 <div className="admin-benefit-updated">
-                  Обновлено: {lastUpdated.toLocaleDateString('ru-RU')} в {lastUpdated.toLocaleTimeString('ru-RU')}
+                  {t('admin2.bs_updated_at', { date: lastUpdated.toLocaleDateString('ru-RU'), time: lastUpdated.toLocaleTimeString('ru-RU') })}
                 </div>
               )}
 
@@ -185,7 +185,7 @@ const BenefitSettings = () => {
                 className="admin-action-btn"
               >
                 <RefreshCw className="admin-refresh-conditional" style={{ '--admin-spin-anim': loading ? 'admin-spin 1s linear infinite' : 'none' }} />
-                Обновить
+                {t('admin2.bs_btn_refresh')}
               </Button>
             </div>
           </div>
@@ -201,17 +201,17 @@ const BenefitSettings = () => {
                 <div>
                   <div className="admin-setting-title">
                     <h3 className="admin-setting-h3">
-                      Повторные визиты
+                      {t('admin2.bs_card_repeat_visits_title')}
                     </h3>
                     <Badge
                       variant={settings.repeat_visit_discount > 0 ? 'success' : 'secondary'}
                       size="sm"
                     >
-                      {settings.repeat_visit_discount > 0 ? 'Активны' : 'Неактивны'}
+                      {settings.repeat_visit_discount > 0 ? t('admin2.bs_status_active') : t('admin2.bs_status_inactive')}
                     </Badge>
                   </div>
                   <p className="admin-setting-desc">
-                    Настройки для повторных консультаций
+                    {t('admin2.bs_card_repeat_visits_desc')}
                   </p>
                 </div>
               </div>
@@ -220,7 +220,7 @@ const BenefitSettings = () => {
                 {/* Окно повторного визита */}
                 <div>
                   <label className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">
-                    Окно повторного визита (дней)
+                    {t('admin2.bs_label_repeat_window')}
                   </label>
                   <div className="admin-flex-center-12">
                     <div className="admin-input-icon-wrap">
@@ -236,18 +236,18 @@ const BenefitSettings = () => {
                       />
                     </div>
                     <span className="admin-unit-span">
-                      дней
+                      {t('admin2.bs_unit_days')}
                     </span>
                   </div>
                   <p className="admin-help-p">
-                    Период, в течение которого консультация считается повторной
+                    {t('admin2.bs_help_repeat_window')}
                   </p>
                 </div>
 
                 {/* Скидка на повторный визит */}
                 <div>
                   <label className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">
-                    Скидка на повторный визит (%)
+                    {t('admin2.bs_label_repeat_discount')}
                   </label>
                   <div className="admin-flex-center-12">
                     <div className="admin-input-icon-wrap">
@@ -267,7 +267,7 @@ const BenefitSettings = () => {
                     </span>
                   </div>
                   <p className="admin-help-p">
-                    0% = бесплатно, 50% = половина цены, 100% = полная цена
+                    {t('admin2.bs_help_repeat_discount')}
                   </p>
                 </div>
 
@@ -277,12 +277,12 @@ const BenefitSettings = () => {
                     <Info className="admin-info-icon-blue" />
                     <div className="admin-info-text-blue">
                       <p className="admin-info-p-mt-8">
-                        Как работают повторные визиты:
+                        {t('admin2.bs_info_repeat_title')}
                       </p>
                       <ul className="admin-info-list">
-                        <li>• Проверяется наличие консультации у того же врача</li>
-                        <li>• В течение указанного периода (дней)</li>
-                        <li>• Применяется указанная скидка</li>
+                        <li>{t('admin2.bs_info_repeat_li_1')}</li>
+                        <li>{t('admin2.bs_info_repeat_li_2')}</li>
+                        <li>{t('admin2.bs_info_repeat_li_3')}</li>
                       </ul>
                     </div>
                   </div>
@@ -299,17 +299,17 @@ const BenefitSettings = () => {
                 <div>
                   <div className="admin-setting-title">
                     <h3 className="admin-setting-h3">
-                      Льготные визиты
+                      {t('admin2.bs_card_benefit_visits_title')}
                     </h3>
                     <Badge
                       variant={settings.benefit_consultation_free ? 'success' : 'warning'}
                       size="sm"
                     >
-                      {settings.benefit_consultation_free ? 'Бесплатно' : 'Платно'}
+                      {settings.benefit_consultation_free ? t('admin2.bs_status_free') : t('admin2.bs_status_paid')}
                     </Badge>
                   </div>
                   <p className="admin-setting-desc">
-                    Настройки для льготных категорий пациентов
+                    {t('admin2.bs_card_benefit_visits_desc')}
                   </p>
                 </div>
               </div>
@@ -324,10 +324,10 @@ const BenefitSettings = () => {
                     />
                     <div>
                       <span className="admin-setting-label-block">
-                        Льготные консультации бесплатны
+                        {t('admin2.bs_chk_benefit_free')}
                       </span>
                       <p className="admin-setting-p-tertiary">
-                        Консультации специалистов для льготных категорий
+                        {t('admin2.bs_chk_benefit_free_desc')}
                       </p>
                     </div>
                   </div>
@@ -342,10 +342,10 @@ const BenefitSettings = () => {
                     />
                     <div>
                       <span className="admin-setting-label-block">
-                        Автоодобрение заявок &quot;All Free&quot;
+                        {t('admin2.bs_chk_auto_approve')}
                       </span>
                       <p className="admin-setting-p-tertiary">
-                        Автоматически одобрять все заявки на бесплатные услуги
+                        {t('admin2.bs_chk_auto_approve_desc')}
                       </p>
                     </div>
                   </div>
@@ -358,10 +358,10 @@ const BenefitSettings = () => {
                       <AlertCircle className="admin-info-icon-warning" />
                       <div className="admin-info-text-warning">
                         <p className="admin-info-p-mt-4">
-                          Внимание!
+                          {t('admin2.bs_warning_title')}
                         </p>
                         <p className="admin-text-xs admin-m-0">
-                          При включении автоодобрения все заявки &quot;All Free&quot; будут одобряться без проверки администратора.
+                          {t('admin2.bs_warning_auto_approve_desc')}
                         </p>
                       </div>
                     </div>
@@ -374,11 +374,11 @@ const BenefitSettings = () => {
                     <Info className="admin-info-icon-warning" />
                     <div className="admin-info-text-warning">
                       <p className="admin-info-p-mt-8">
-                        Типы льгот:
+                        {t('admin2.bs_info_benefit_types_title')}
                       </p>
                       <ul className="admin-info-list">
-                        <li>• <strong>Льготный</strong> - обычно только консультации</li>
-                        <li>• <strong>All Free</strong> - любые услуги (требует одобрения)</li>
+                        <li>• <strong>{t('admin2.bs_info_benefit_type_lgotnyy')}</strong>{t('admin2.bs_info_benefit_type_lgotnyy_desc')}</li>
+                        <li>• <strong>All Free</strong>{t('admin2.bs_info_benefit_type_allfree_desc')}</li>
                       </ul>
                     </div>
                   </div>
@@ -393,7 +393,7 @@ const BenefitSettings = () => {
               {hasChanges() && (
                 <div className="admin-unsaved-badge">
                   <AlertCircle className="w-3.5 h-3.5" />
-                  Есть несохранённые изменения
+                  {t('admin2.bs_unsaved_changes')}
                 </div>
               )}
             </div>
@@ -406,7 +406,7 @@ const BenefitSettings = () => {
                   disabled={saving}
                   className="admin-action-btn"
                 >
-                  Отменить
+                  {t('admin2.bs_btn_cancel')}
                 </Button>
               )}
 
@@ -420,7 +420,7 @@ const BenefitSettings = () => {
                 ) : (
                   <Save className="w-4 h-4" />
                 )}
-                {saving ? 'Сохранение...' : 'Сохранить настройки'}
+                {saving ? t('admin2.bs_btn_saving') : t('admin2.bs_btn_save')}
               </Button>
             </div>
           </div>
@@ -428,38 +428,38 @@ const BenefitSettings = () => {
           {/* Статистика настроек */}
           <div className="admin-grid-auto-200">
             <MacOSStatCard
-              title="Окно повторных визитов"
-              value={`${settings.repeat_visit_days} дней`}
+              title={t('admin2.bs_stat_repeat_window_title')}
+              value={`${settings.repeat_visit_days} ${t('admin2.bs_unit_days')}`}
               icon={Calendar}
               color="blue"
-              trend={settings.repeat_visit_discount > 0 ? 'Скидка активна' : 'Скидка неактивна'}
+              trend={settings.repeat_visit_discount > 0 ? t('admin2.bs_trend_discount_active') : t('admin2.bs_trend_discount_inactive')}
               trendColor={settings.repeat_visit_discount > 0 ? 'var(--mac-success)' : 'var(--mac-text-secondary)'}
             />
 
             <MacOSStatCard
-              title="Скидка на повторные визиты"
+              title={t('admin2.bs_stat_discount_title')}
               value={`${settings.repeat_visit_discount}%`}
               icon={Percent}
               color={settings.repeat_visit_discount > 0 ? 'green' : 'orange'}
-              trend={settings.repeat_visit_discount > 0 ? 'Применяется' : 'Не применяется'}
+              trend={settings.repeat_visit_discount > 0 ? t('admin2.bs_trend_applied') : t('admin2.bs_trend_not_applied')}
               trendColor={settings.repeat_visit_discount > 0 ? 'var(--mac-success)' : 'var(--mac-warning)'}
             />
 
             <MacOSStatCard
-              title="Льготные консультации"
-              value={settings.benefit_consultation_free ? 'Бесплатно' : 'Платно'}
+              title={t('admin2.bs_stat_benefit_title')}
+              value={settings.benefit_consultation_free ? t('admin2.bs_status_free') : t('admin2.bs_status_paid')}
               icon={Shield}
               color={settings.benefit_consultation_free ? 'green' : 'orange'}
-              trend={settings.benefit_consultation_free ? 'Активны' : 'Неактивны'}
+              trend={settings.benefit_consultation_free ? t('admin2.bs_status_active') : t('admin2.bs_status_inactive')}
               trendColor={settings.benefit_consultation_free ? 'var(--mac-success)' : 'var(--mac-warning)'}
             />
 
             <MacOSStatCard
-              title="Автоодобрение All Free"
-              value={settings.all_free_auto_approve ? 'Включено' : 'Выключено'}
+              title={t('admin2.bs_stat_auto_approve_title')}
+              value={settings.all_free_auto_approve ? t('admin2.bs_status_enabled') : t('admin2.bs_status_disabled')}
               icon={CheckCircle}
               color={settings.all_free_auto_approve ? 'orange' : 'blue'}
-              trend={settings.all_free_auto_approve ? 'Автоматически' : 'Вручную'}
+              trend={settings.all_free_auto_approve ? t('admin2.bs_trend_auto') : t('admin2.bs_trend_manual')}
               trendColor={settings.all_free_auto_approve ? 'var(--mac-warning)' : 'var(--mac-info)'}
             />
           </div>
@@ -467,31 +467,31 @@ const BenefitSettings = () => {
           {/* Предварительный просмотр */}
           <MacOSCard className="admin-preview-card">
             <h4 className="admin-preview-h4">
-              Текущие настройки:
+              {t('admin2.bs_preview_title')}
             </h4>
             <div className="admin-preview-grid">
               <div className="flex items-center justify-center gap-2">
                 <Calendar className="admin-icon-14-tertiary" />
                 <span className="text-[var(--mac-text-secondary)]">
-                  Окно: {settings.repeat_visit_days} дней
+                  {t('admin2.bs_preview_window', { days: settings.repeat_visit_days })}
                 </span>
               </div>
               <div className="flex items-center justify-center gap-2">
                 <DollarSign className="admin-icon-14-tertiary" />
                 <span className="text-[var(--mac-text-secondary)]">
-                  Скидка: {settings.repeat_visit_discount}%
+                  {t('admin2.bs_preview_discount', { discount: settings.repeat_visit_discount })}
                 </span>
               </div>
               <div className="flex items-center justify-center gap-2">
                 <CheckCircle className="admin-icon-14-color" style={{ '--admin-icon-color': settings.benefit_consultation_free ? 'var(--mac-success)' : 'var(--mac-text-tertiary)' }} />
                 <span className="text-[var(--mac-text-secondary)]">
-                  Льготы: {settings.benefit_consultation_free ? 'Бесплатно' : 'Платно'}
+                  {t('admin2.bs_preview_benefits', { state: settings.benefit_consultation_free ? t('admin2.bs_status_free') : t('admin2.bs_status_paid') })}
                 </span>
               </div>
               <div className="flex items-center justify-center gap-2">
                 <Shield className="admin-icon-14-color" style={{ '--admin-icon-color': settings.all_free_auto_approve ? 'var(--mac-warning)' : 'var(--mac-text-tertiary)' }} />
                 <span className="text-[var(--mac-text-secondary)]">
-                  All Free: {settings.all_free_auto_approve ? 'Автоодобрение' : 'Ручное одобрение'}
+                  All Free: {settings.all_free_auto_approve ? t('admin2.bs_status_auto_approve') : t('admin2.bs_status_manual_approve')}
                 </span>
               </div>
             </div>
@@ -503,13 +503,12 @@ const BenefitSettings = () => {
       <Modal
         isOpen={showConfirmModal}
         onClose={() => setShowConfirmModal(false)}
-        title="Подтверждение изменений"
+        title={t('admin2.bs_modal_confirm_title')}
         size="sm"
       >
         <div className="p-6">
           <p className="admin-confirm-p">
-            Вы собираетесь сохранить изменения в настройках льгот.
-            Это повлияет на всех пользователей системы.
+            {t('admin2.bs_modal_confirm_text')}
           </p>
 
           <div className="admin-flex-end-12">
@@ -518,7 +517,7 @@ const BenefitSettings = () => {
               onClick={() => setShowConfirmModal(false)}
               disabled={saving}
             >
-              Отмена
+              {t('admin2.bs_modal_cancel')}
             </Button>
             <Button
               onClick={confirmSave}
@@ -529,12 +528,12 @@ const BenefitSettings = () => {
               {saving ? (
                 <>
                   <RefreshCw className="admin-refresh-mr-8-conditional" style={{ '--admin-spin-anim': 'admin-spin 1s linear infinite' }} />
-                  Сохранение...
+                  {t('admin2.bs_btn_saving')}
                 </>
               ) : (
                 <>
                   <Save className="w-4 h-4 mr-2" />
-                  Подтвердить
+                  {t('admin2.bs_modal_confirm')}
                 </>
               )}
             </Button>

@@ -1,4 +1,4 @@
-import { useTranslation } from '../../../i18n/adapter';
+import { useTranslation } from '../../../i18n/useTranslation';
 const Skeleton = ({
   variant = 'text',
   width = '100%',

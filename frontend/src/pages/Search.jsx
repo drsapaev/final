@@ -7,12 +7,13 @@ import {
   AppEmpty, AppError, Button,
   Input } from '../components/ui/macos';
 import { getRoleHomeRoute } from '../routing/routeSelectors.js';
-import { useTranslation } from '../i18n/adapter';
+import { useTranslation } from '../i18n/useTranslation';
 
 const registrarHomeRoute = getRoleHomeRoute('registrar');
 
 // Modern Search Page with Full Functionality
 export default function Search() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [patients, setPatients] = useState([]);
@@ -103,7 +104,7 @@ export default function Search() {
     } catch (err) {
       // PR-38 / Medium-23: log instead of silent catch.
       logger.error('Search: query failed', err?.message);
-      setError('Ошибка поиска. Попробуйте снова.');
+      setError(t('misc.srch_error_search_failed'));
     } finally {
       setLoading(false);
     }
@@ -136,14 +137,14 @@ export default function Search() {
   // Get status badge color
   const getStatusColor = (status) => {
     const colors = {
-      open: { bg: 'var(--mac-accent-bg)', color: 'var(--mac-accent)', label: 'Открыт' },
-      waiting: { bg: 'var(--mac-warning-bg)', color: 'var(--mac-warning)', label: 'Ожидание' },
-      in_progress: { bg: 'var(--mac-warning-bg)', color: 'var(--mac-warning)', label: 'В процессе' },
-      in_visit: { bg: 'var(--mac-success-bg)', color: 'var(--mac-success)', label: 'На приёме' },
-      completed: { bg: 'var(--mac-success-bg)', color: 'var(--mac-success)', label: 'Завершён' },
-      closed: { bg: 'var(--mac-bg-secondary)', color: 'var(--mac-text-secondary)', label: 'Закрыт' },
-      canceled: { bg: 'var(--mac-error-bg)', color: 'var(--mac-error)', label: 'Отменён' },
-      paid: { bg: 'var(--mac-success-bg)', color: 'var(--mac-success)', label: 'Оплачен' },
+      open: { bg: 'var(--mac-accent-bg)', color: 'var(--mac-accent)', label: t('misc.srch_status_open') },
+      waiting: { bg: 'var(--mac-warning-bg)', color: 'var(--mac-warning)', label: t('misc.srch_status_waiting') },
+      in_progress: { bg: 'var(--mac-warning-bg)', color: 'var(--mac-warning)', label: t('misc.srch_status_in_progress') },
+      in_visit: { bg: 'var(--mac-success-bg)', color: 'var(--mac-success)', label: t('misc.srch_status_in_visit') },
+      completed: { bg: 'var(--mac-success-bg)', color: 'var(--mac-success)', label: t('misc.srch_status_completed') },
+      closed: { bg: 'var(--mac-bg-secondary)', color: 'var(--mac-text-secondary)', label: t('misc.srch_status_closed') },
+      canceled: { bg: 'var(--mac-error-bg)', color: 'var(--mac-error)', label: t('misc.srch_status_canceled') },
+      paid: { bg: 'var(--mac-success-bg)', color: 'var(--mac-success)', label: t('misc.srch_status_paid') },
     };
     return colors[status] || { bg: 'var(--mac-bg-secondary)', color: 'var(--mac-text-secondary)', label: status || '—' };
   };
@@ -190,7 +191,7 @@ export default function Search() {
           // one of idsToFetch. Use index to find which one failed.
           const idx = results.indexOf(result);
           const failedPid = idsToFetch[idx];
-          namesMap[failedPid] = `Пациент #${failedPid}`;
+          namesMap[failedPid] = t('misc.srch_patient_fallback', { id: failedPid });
           hasUpdates = true;
         }
       }
@@ -218,10 +219,10 @@ export default function Search() {
       <div style={styles.header}>
         <h1 style={styles.title}>
           <span style={styles.icon}>🔍</span>
-          Глобальный поиск
+          {t('misc.srch_title')}
         </h1>
         <p style={styles.subtitle}>
-          Поиск пациентов, визитов и записей по ФИО, телефону, ID
+          {t('misc.srch_subtitle')}
         </p>
       </div>
 
@@ -229,23 +230,23 @@ export default function Search() {
       <form onSubmit={handleSearch} style={styles.searchForm}>
         <div style={styles.searchBox}>
           <label htmlFor={searchInputId} style={styles.visuallyHidden}>
-            Поиск пациентов и визитов
+            {t('misc.srch_label_search')}
           </label>
           <Input
             id={searchInputId}
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Введите ФИО, телефон, ID пациента или номер визита..."
+            placeholder={t('misc.srch_input_placeholder')}
             style={styles.searchInput}
-            aria-label="Поиск пациентов и визитов"
+            aria-label={t('misc.srch_label_search')}
             aria-describedby={query.length > 0 && query.length < 2 ? searchHintId : undefined}
             autoFocus
           />
           <button
             type="submit"
             disabled={isSearchDisabled}
-            aria-label={loading ? 'Поиск выполняется' : 'Искать пациентов и визиты'}
+            aria-label={loading ? t('misc.srch_aria_search_in_progress') : t('misc.srch_aria_search_patients_visits')}
             aria-describedby={query.length > 0 && query.length < 2 ? searchHintId : undefined}
             style={{
               ...styles.searchButton,
@@ -255,19 +256,19 @@ export default function Search() {
             {loading ? (
               <span style={styles.spinner}>⏳</span>
             ) : (
-              'Искать'
+              t('misc.srch_btn_search')
             )}
           </button>
         </div>
         {query.length > 0 && query.length < 2 && (
-          <p id={searchHintId} style={styles.hint}>Введите минимум 2 символа для поиска</p>
+          <p id={searchHintId} style={styles.hint}>{t('misc.srch_hint_min_chars')}</p>
         )}
       </form>
 
       {/* Error Message */}
       {error && (
         <AppError
-          title="Ошибка поиска"
+          title={t('misc.srch_error_title')}
           description={error}
           action={
             <Button
@@ -277,8 +278,8 @@ export default function Search() {
               loading={loading}
               size="small"
               variant="outline"
-              aria-label="Повторить поиск с текущим запросом">
-              Повторить поиск
+              aria-label={t('misc.srch_aria_retry_search')}>
+              {t('misc.srch_btn_retry')}
             </Button>
           }
           style={styles.errorBox}
@@ -287,42 +288,42 @@ export default function Search() {
 
       {/* Results Tabs */}
       {searchPerformed && (
-        <div style={styles.tabs} role="group" aria-label="Фильтр результатов поиска">
+        <div style={styles.tabs} role="group" aria-label={t('misc.srch_aria_filter_group')}>
           <button
             type="button"
             onClick={() => setActiveTab('all')}
             aria-pressed={activeTab === 'all'}
-            aria-label="Показать все результаты поиска"
+            aria-label={t('misc.srch_aria_show_all_results')}
             style={{
               ...styles.tab,
               ...(activeTab === 'all' ? styles.tabActive : {}),
             }}
           >
-            Все ({patients.length + visits.length})
+            {t('misc.srch_tab_all', { count: patients.length + visits.length })}
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('patients')}
             aria-pressed={activeTab === 'patients'}
-            aria-label="Показать только пациентов"
+            aria-label={t('misc.srch_aria_show_patients_only')}
             style={{
               ...styles.tab,
               ...(activeTab === 'patients' ? styles.tabActive : {}),
             }}
           >
-            Пациенты ({patients.length})
+            {t('misc.srch_tab_patients', { count: patients.length })}
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('visits')}
             aria-pressed={activeTab === 'visits'}
-            aria-label="Показать только визиты"
+            aria-label={t('misc.srch_aria_show_visits_only')}
             style={{
               ...styles.tab,
               ...(activeTab === 'visits' ? styles.tabActive : {}),
             }}
           >
-            Визиты ({visits.length})
+            {t('misc.srch_tab_visits', { count: visits.length })}
           </button>
         </div>
       )}
@@ -334,16 +335,18 @@ export default function Search() {
           <div style={styles.section}>
             <h2 style={styles.sectionTitle}>
               <span style={styles.sectionIcon}>👤</span>
-              Пациенты
+              {t('misc.srch_section_patients')}
               <span style={styles.count}>{patients.length}</span>
             </h2>
             <div style={styles.grid}>
-              {patients.map(patient => (
+              {patients.map(patient => {
+                const patientDisplay = [patient.last_name, patient.first_name, patient.middle_name].filter(Boolean).join(' ') || `#${patient.id}`;
+                return (
                 <div
                   key={patient.id}
                   role="button"
                   tabIndex={0}
-                  aria-label={`Открыть пациента ${[patient.last_name, patient.first_name, patient.middle_name].filter(Boolean).join(' ') || `#${patient.id}`}`}
+                  aria-label={t('misc.srch_aria_open_patient', { name: patientDisplay })}
                   onClick={() => goToPatient(patient)}
                   onKeyDown={(event) => handleActivationKeyDown(event, () => goToPatient(patient))}
                   style={styles.card}
@@ -370,7 +373,7 @@ export default function Search() {
                     )}
                   </div>
                 </div>
-              ))}
+              );})}
             </div>
           </div>
         )}
@@ -380,18 +383,19 @@ export default function Search() {
           <div style={styles.section}>
             <h2 style={styles.sectionTitle}>
               <span style={styles.sectionIcon}>📋</span>
-              Визиты
+              {t('misc.srch_section_visits')}
               <span style={styles.count}>{visits.length}</span>
             </h2>
             <div style={styles.grid}>
               {visits.map(visit => {
                 const statusInfo = getStatusColor(visit.status);
+                const visitPatientName = patientNames[visit.patient_id] || t('misc.srch_visit_patient_fallback', { patientId: visit.patient_id });
                 return (
                   <div
                     key={visit.id}
                     role="button"
                     tabIndex={0}
-                    aria-label={`Открыть визит #${visit.id} пациента ${patientNames[visit.patient_id] || `#${visit.patient_id}`}`}
+                    aria-label={t('misc.srch_aria_open_visit', { visitId: visit.id, patientName: visitPatientName })}
                     onClick={() => goToVisit(visit)}
                     onKeyDown={(event) => handleActivationKeyDown(event, () => goToVisit(visit))}
                     style={styles.card}
@@ -399,11 +403,11 @@ export default function Search() {
                     onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
                   >
                     <div style={styles.cardHeader}>
-                      <span style={styles.visitId}>Визит #{visit.id}</span>
+                      <span style={styles.visitId}>{t('misc.srch_visit_id', { visitId: visit.id })}</span>
                       <span style={styles.cardArrow}>→</span>
                     </div>
                     <div style={styles.visitPatient}>
-                      {patientNames[visit.patient_id] || `Пациент #${visit.patient_id}`}
+                      {visitPatientName}
                     </div>
                     <div style={styles.visitMeta}>
                       <span
@@ -434,8 +438,8 @@ export default function Search() {
         {/* No Results */}
         {searchPerformed && !loading && patients.length === 0 && visits.length === 0 && (
           <AppEmpty
-            title="Ничего не найдено"
-            description="Проверьте написание ФИО, телефон, ID пациента или номер визита и попробуйте снова."
+            title={t('misc.srch_no_results_title')}
+            description={t('misc.srch_no_results_description')}
             style={styles.noResults}
           />
         )}
@@ -443,16 +447,16 @@ export default function Search() {
         {/* Initial State */}
         {!searchPerformed && !loading && (
           <AppEmpty
-            title="Начните поиск"
-            description="Введите ФИО пациента, номер телефона, ID пациента или номер визита."
+            title={t('misc.srch_initial_title')}
+            description={t('misc.srch_initial_description')}
             action={
               <div style={styles.tips}>
                 <div style={styles.tip}>
-                  <strong>Примеры запросов:</strong>
+                  <strong>{t('misc.srch_examples_title')}</strong>
                 </div>
-                <div style={styles.tip}>• «Иванов» — поиск по фамилии</div>
-                <div style={styles.tip}>• «+998» — поиск по телефону</div>
-                <div style={styles.tip}>• «428» — поиск по ID пациента или визита</div>
+                <div style={styles.tip}>{t('misc.srch_example_name')}</div>
+                <div style={styles.tip}>{t('misc.srch_example_phone')}</div>
+                <div style={styles.tip}>{t('misc.srch_example_id')}</div>
               </div>
             }
             style={styles.initialState}
