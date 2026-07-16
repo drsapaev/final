@@ -57,37 +57,37 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // Полный список IANA был бы ~400 пунктов — это перегрузка для администратора клиники.
 const TIMEZONES = [
   // Узбекистан и Центральная Азия
-  { value: 'Asia/Tashkent', label: 'Ташкент (UTC+5)' },
-  { value: 'Asia/Samarkand', label: 'Самарканд (UTC+5)' },
-  { value: 'Asia/Almaty', label: 'Алматы (UTC+6)' },
-  { value: 'Asia/Bishkek', label: 'Бишкек (UTC+6)' },
-  { value: 'Asia/Ashgabat', label: 'Ашхабад (UTC+5)' },
-  { value: 'Asia/Dushanbe', label: 'Душанбе (UTC+5)' },
+  { value: 'Asia/Tashkent', labelKey: 'misc.setup_tz_tashkent' },
+  { value: 'Asia/Samarkand', labelKey: 'misc.setup_tz_samarkand' },
+  { value: 'Asia/Almaty', labelKey: 'misc.setup_tz_almaty' },
+  { value: 'Asia/Bishkek', labelKey: 'misc.setup_tz_bishkek' },
+  { value: 'Asia/Ashgabat', labelKey: 'misc.setup_tz_ashgabat' },
+  { value: 'Asia/Dushanbe', labelKey: 'misc.setup_tz_dushanbe' },
   // Россия
-  { value: 'Europe/Moscow', label: 'Москва (UTC+3)' },
-  { value: 'Europe/Samara', label: 'Самара (UTC+4)' },
-  { value: 'Asia/Yekaterinburg', label: 'Екатеринбург (UTC+5)' },
-  { value: 'Asia/Omsk', label: 'Омск (UTC+6)' },
-  { value: 'Asia/Novosibirsk', label: 'Новосибирск (UTC+7)' },
-  { value: 'Asia/Krasnoyarsk', label: 'Красноярск (UTC+7)' },
-  { value: 'Asia/Irkutsk', label: 'Иркутск (UTC+8)' },
-  { value: 'Asia/Yakutsk', label: 'Якутск (UTC+9)' },
-  { value: 'Asia/Vladivostok', label: 'Владивосток (UTC+10)' },
+  { value: 'Europe/Moscow', labelKey: 'misc.setup_tz_moscow' },
+  { value: 'Europe/Samara', labelKey: 'misc.setup_tz_samara' },
+  { value: 'Asia/Yekaterinburg', labelKey: 'misc.setup_tz_yekaterinburg' },
+  { value: 'Asia/Omsk', labelKey: 'misc.setup_tz_omsk' },
+  { value: 'Asia/Novosibirsk', labelKey: 'misc.setup_tz_novosibirsk' },
+  { value: 'Asia/Krasnoyarsk', labelKey: 'misc.setup_tz_krasnoyarsk' },
+  { value: 'Asia/Irkutsk', labelKey: 'misc.setup_tz_irkutsk' },
+  { value: 'Asia/Yakutsk', labelKey: 'misc.setup_tz_yakutsk' },
+  { value: 'Asia/Vladivostok', labelKey: 'misc.setup_tz_vladivostok' },
   // Другие популярные
-  { value: 'Europe/Kiev', label: 'Киев (UTC+2)' },
-  { value: 'Europe/Minsk', label: 'Минск (UTC+3)' },
-  { value: 'Europe/Istanbul', label: 'Стамбул (UTC+3)' },
-  { value: 'Europe/Dubai', label: 'Дубай (UTC+4)' },
-  { value: 'Europe/London', label: 'Лондон (UTC+0)' },
-  { value: 'Europe/Berlin', label: 'Берлин (UTC+1)' },
-  { value: 'America/New_York', label: 'Нью-Йорк (UTC-5)' },
+  { value: 'Europe/Kiev', labelKey: 'misc.setup_tz_kiev' },
+  { value: 'Europe/Minsk', labelKey: 'misc.setup_tz_minsk' },
+  { value: 'Europe/Istanbul', labelKey: 'misc.setup_tz_istanbul' },
+  { value: 'Europe/Dubai', labelKey: 'misc.setup_tz_dubai' },
+  { value: 'Europe/London', labelKey: 'misc.setup_tz_london' },
+  { value: 'Europe/Berlin', labelKey: 'misc.setup_tz_berlin' },
+  { value: 'America/New_York', labelKey: 'misc.setup_tz_new_york' },
 ];
 
 // UX Audit Stage 2 (Setup issue 2.1): индикатор силы пароля.
 // Возвращает { score: 0-4, label, color, percent }.
 function getPasswordStrength(password) {
   if (!password) {
-    return { score: 0, label: '', color: 'transparent', percent: 0 };
+    return { score: 0, labelKey: '', color: 'transparent', percent: 0 };
   }
 
   let score = 0;
@@ -102,11 +102,11 @@ function getPasswordStrength(password) {
   score = Math.min(score, 4);
 
   const labels = [
-    { label: 'Очень слабый', color: 'var(--mac-error)', percent: 25 },
-    { label: 'Слабый', color: 'var(--mac-warning)', percent: 50 },
-    { label: 'Средний', color: 'var(--mac-warning)', percent: 75 },
-    { label: 'Хороший', color: 'var(--mac-success)', percent: 100 },
-    { label: 'Сильный', color: 'var(--mac-success)', percent: 100 },
+    { labelKey: 'misc.setup_pw_strength_very_weak', color: 'var(--mac-error)', percent: 25 },
+    { labelKey: 'misc.setup_pw_strength_weak', color: 'var(--mac-warning)', percent: 50 },
+    { labelKey: 'misc.setup_pw_strength_medium', color: 'var(--mac-warning)', percent: 75 },
+    { labelKey: 'misc.setup_pw_strength_good', color: 'var(--mac-success)', percent: 100 },
+    { labelKey: 'misc.setup_pw_strength_strong', color: 'var(--mac-success)', percent: 100 },
   ];
 
   return { score, ...labels[score] };
@@ -117,38 +117,38 @@ function getPasswordStrength(password) {
 const REQUIRED_FIELDS = [
   {
     key: 'clinicName',
-    label: 'Название клиники',
+    labelKey: 'misc.setup_label_clinic_name',
     isComplete: (form) => Boolean(form.clinicName.trim())
   },
   {
     key: 'branchName',
-    label: 'Название филиала',
+    labelKey: 'misc.setup_label_branch_name',
     isComplete: (form) => Boolean(form.branchName.trim())
   },
   {
     key: 'adminUsername',
-    label: 'Username администратора (минимум 3 символа)',
+    labelKey: 'misc.setup_label_admin_username_min3',
     isComplete: (form) => form.adminUsername.trim().length >= 3
   },
   {
     key: 'adminFullName',
-    label: 'Полное имя администратора',
+    labelKey: 'misc.setup_label_admin_full_name',
     isComplete: (form) => Boolean(form.adminFullName.trim())
   },
   {
     key: 'adminEmail',
-    label: 'Email администратора',
+    labelKey: 'misc.setup_label_admin_email',
     isComplete: (form) => EMAIL_PATTERN.test(form.adminEmail.trim())
   },
   {
     key: 'adminPassword',
-    label: 'Пароль администратора (минимум 8 символов)',
+    labelKey: 'misc.setup_label_admin_password_min8',
     isComplete: (form) => form.adminPassword.length >= 8
   },
   // UX Audit Stage 2 (Setup issue 2.1): подтверждение пароля — обязательное поле.
   {
     key: 'adminPasswordConfirm',
-    label: 'Подтверждение пароля',
+    labelKey: 'misc.setup_label_password_confirm',
     isComplete: (form) =>
       Boolean(form.adminPasswordConfirm) &&
       form.adminPasswordConfirm === form.adminPassword
@@ -187,6 +187,7 @@ export default function Setup() {
   // UX Audit Stage 1 (Setup issue 2.3): SPA-навигация вместо window.location.assign.
   const navigate = useNavigate();
   const loginRoute = getCanonicalRouteById('login')?.path || '/login';
+  const { t } = useTranslation();
 
   const requiredFieldRefs = useRef({});
   // UX Audit Stage 2 (Setup issue 2.2): track touched fields для real-time валидации.
@@ -229,8 +230,8 @@ export default function Setup() {
   }, [missingRequiredFields, submitAttempted, touched]);
 
   const missingRequiredLabels = useMemo(() => {
-    return missingRequiredFields.map((field) => field.label);
-  }, [missingRequiredFields]);
+    return missingRequiredFields.map((field) => t(field.labelKey));
+  }, [missingRequiredFields, t]);
 
   const isSubmitDisabled = useMemo(() => {
     return missingRequiredFields.length > 0 || status.loading;
@@ -240,8 +241,8 @@ export default function Setup() {
     if (status.loading || missingRequiredFields.length === 0) {
       return undefined;
     }
-    return `Заполните: ${missingRequiredLabels.join(', ')}`;
-  }, [missingRequiredFields.length, missingRequiredLabels, status.loading]);
+    return t('misc.setup_submit_title_fill', { fields: missingRequiredLabels.join(', ') });
+  }, [missingRequiredFields.length, missingRequiredLabels, status.loading, t]);
 
   // UX Audit Stage 2 (Setup issue 2.1): индикатор силы пароля — пересчитывается
   // только при изменении adminPassword.
@@ -348,7 +349,7 @@ export default function Setup() {
       setStatus({
         loading: false,
         error: '',
-        success: 'Первичная настройка завершена. Переходим к входу...'
+        success: t('misc.setup_msg_success')
       });
 
       // UX Audit Stage 1 (Setup issue 2.3): SPA-navigate с задержкой 800мс.
@@ -359,7 +360,7 @@ export default function Setup() {
       logger.error('[setup] initialization failed', error);
       setStatus({
         loading: false,
-        error: error?.message || 'Не удалось завершить первичную настройку',
+        error: error?.message || t('misc.setup_msg_error'),
         success: ''
       });
     }
@@ -378,10 +379,9 @@ export default function Setup() {
       <MacOSCard className="setup-card">
         <div className="setup-hero">
           <span className="setup-badge">First-Run Setup</span>
-          <h1 className="setup-heading">Настройка инсталляции клиники</h1>
+          <h1 className="setup-heading">{t('misc.setup_heading')}</h1>
           <p className="setup-description">
-            Этот шаг создаёт данные клиники, первый филиал и главного администратора
-            внутри уже развёрнутой системы.
+            {t('misc.setup_description')}
           </p>
         </div>
 
@@ -390,16 +390,16 @@ export default function Setup() {
               Секция 1: Клиника
               ==================================================================== */}
           <section className="setup-section">
-            <h2 className="setup-section-title">Клиника</h2>
+            <h2 className="setup-section-title">{t('misc.setup_section_clinic')}</h2>
             <div className="setup-grid">
               <label className="setup-label">
-                <span>Название клиники <span className="setup-required-marker">*</span></span>
+                <span>{t('misc.setup_label_clinic_name')} <span className="setup-required-marker">*</span></span>
                 <Input
                   ref={setRequiredFieldRef('clinicName')}
                   className={fieldStyle('clinicName')}
                   name="clinicName"
                   required
-                  aria-label="Название клиники"
+                  aria-label={t('misc.setup_aria_clinic_name')}
                   aria-invalid={visibleInvalidKeys.has('clinicName')}
                   value={form.clinicName}
                   onChange={updateField('clinicName')}
@@ -407,10 +407,10 @@ export default function Setup() {
                 />
               </label>
               <label className="setup-label">
-                Телефон
+                {t('misc.setup_label_phone')}
                 <Input
                   className="setup-field"
-                  aria-label="Телефон клиники"
+                  aria-label={t('misc.setup_aria_clinic_phone')}
                   value={form.clinicPhone}
                   onChange={updateField('clinicPhone')}
                 />
@@ -420,41 +420,41 @@ export default function Setup() {
                 <Input
                   className="setup-field"
                   type="email"
-                  aria-label="Email клиники"
+                  aria-label={t('misc.setup_aria_clinic_email')}
                   value={form.clinicEmail}
                   onChange={updateField('clinicEmail')}
                 />
               </label>
               <label className="setup-label">
-                Часовой пояс
+                {t('misc.setup_label_timezone')}
                 <select
                   className="setup-field setup-select"
-                  aria-label="Часовой пояс клиники"
+                  aria-label={t('misc.setup_aria_clinic_timezone')}
                   value={form.clinicTimezone}
                   onChange={updateField('clinicTimezone')}
                 >
                   {TIMEZONES.map((tz) => (
-                    <option key={tz.value} value={tz.value}>{tz.label}</option>
+                    <option key={tz.value} value={tz.value}>{t(tz.labelKey)}</option>
                   ))}
                 </select>
               </label>
               <label className="setup-label setup-label--wide">
-                Адрес
+                {t('misc.setup_label_address')}
                 <textarea
                   className="setup-field setup-textarea"
-                  aria-label="Адрес клиники"
+                  aria-label={t('misc.setup_aria_clinic_address')}
                   value={form.clinicAddress}
                   onChange={updateField('clinicAddress')}
                 />
               </label>
               <label className="setup-label setup-label--wide">
-                URL логотипа
+                {t('misc.setup_label_logo_url')}
                 <Input
                   className="setup-field"
-                  aria-label="URL логотипа клиники"
+                  aria-label={t('misc.setup_aria_clinic_logo_url')}
                   value={form.clinicLogoUrl}
                   onChange={updateField('clinicLogoUrl')}
-                  placeholder="(необязательно)"
+                  placeholder={t('misc.setup_placeholder_optional')}
                 />
               </label>
             </div>
@@ -464,23 +464,23 @@ export default function Setup() {
               Секция 2: Первый филиал
               ==================================================================== */}
           <section className="setup-section">
-            <h2 className="setup-section-title">Первый филиал</h2>
+            <h2 className="setup-section-title">{t('misc.setup_section_branch')}</h2>
 
             {/* UX Audit Stage 2 (Setup issue 2.2): чекбокс авто-копирования. */}
             <label className="setup-checkbox-row">
-              <Checkbox checked={branchSameAsClinic} onChange={handleBranchSameAsClinicChange} aria-label="Адрес, телефон, email и часовой пояс филиала совпадают с клиникой" />
-              <span>Адрес, телефон, email и часовой пояс филиала совпадают с клиникой</span>
+              <Checkbox checked={branchSameAsClinic} onChange={handleBranchSameAsClinicChange} aria-label={t('misc.setup_aria_branch_same')} />
+              <span>{t('misc.setup_label_branch_same')}</span>
             </label>
 
             <div className="setup-grid">
               <label className="setup-label">
-                <span>Название филиала <span className="setup-required-marker">*</span></span>
+                <span>{t('misc.setup_label_branch_name')} <span className="setup-required-marker">*</span></span>
                 <Input
                   ref={setRequiredFieldRef('branchName')}
                   className={fieldStyle('branchName')}
                   name="branchName"
                   required
-                  aria-label="Название филиала"
+                  aria-label={t('misc.setup_aria_branch_name')}
                   aria-invalid={visibleInvalidKeys.has('branchName')}
                   value={form.branchName}
                   onChange={updateField('branchName')}
@@ -488,20 +488,20 @@ export default function Setup() {
                 />
               </label>
               <label className="setup-label">
-                Код филиала
+                {t('misc.setup_label_branch_code')}
                 <Input
                   className="setup-field"
-                  aria-label="Код филиала"
+                  aria-label={t('misc.setup_aria_branch_code')}
                   value={form.branchCode}
                   onChange={updateField('branchCode')}
-                  placeholder="(необязательно)"
+                  placeholder={t('misc.setup_placeholder_optional')}
                 />
               </label>
               <label className="setup-label">
-                Телефон филиала
+                {t('misc.setup_label_branch_phone')}
                 <Input
                   className="setup-field"
-                  aria-label="Телефон филиала"
+                  aria-label={t('misc.setup_aria_branch_phone')}
                   value={form.branchPhone}
                   onChange={updateField('branchPhone')}
                   readOnly={branchFieldReadOnly}
@@ -509,11 +509,11 @@ export default function Setup() {
                 />
               </label>
               <label className="setup-label">
-                Email филиала
+                {t('misc.setup_label_branch_email')}
                 <Input
                   className="setup-field"
                   type="email"
-                  aria-label="Email филиала"
+                  aria-label={t('misc.setup_aria_branch_email')}
                   value={form.branchEmail}
                   onChange={updateField('branchEmail')}
                   readOnly={branchFieldReadOnly}
@@ -521,24 +521,24 @@ export default function Setup() {
                 />
               </label>
               <label className="setup-label">
-                Часовой пояс филиала
+                {t('misc.setup_label_branch_timezone')}
                 <select
                   className="setup-field setup-select"
-                  aria-label="Часовой пояс филиала"
+                  aria-label={t('misc.setup_aria_branch_timezone')}
                   value={form.branchTimezone}
                   onChange={updateField('branchTimezone')}
                   disabled={branchFieldReadOnly}
                 >
                   {TIMEZONES.map((tz) => (
-                    <option key={tz.value} value={tz.value}>{tz.label}</option>
+                    <option key={tz.value} value={tz.value}>{t(tz.labelKey)}</option>
                   ))}
                 </select>
               </label>
               <label className="setup-label setup-label--wide">
-                Адрес филиала
+                {t('misc.setup_label_branch_address')}
                 <textarea
                   className="setup-field setup-textarea"
-                  aria-label="Адрес филиала"
+                  aria-label={t('misc.setup_aria_branch_address')}
                   value={form.branchAddress}
                   onChange={updateField('branchAddress')}
                   readOnly={branchFieldReadOnly}
@@ -552,7 +552,7 @@ export default function Setup() {
               Секция 3: Главный администратор
               ==================================================================== */}
           <section className="setup-section">
-            <h2 className="setup-section-title">Главный администратор</h2>
+            <h2 className="setup-section-title">{t('misc.setup_section_admin')}</h2>
             <div className="setup-grid">
               <label className="setup-label">
                 <span>Username <span className="setup-required-marker">*</span></span>
@@ -562,23 +562,23 @@ export default function Setup() {
                   name="adminUsername"
                   required
                   minLength={3}
-                  aria-label="Username администратора"
+                  aria-label={t('misc.setup_aria_admin_username')}
                   aria-invalid={visibleInvalidKeys.has('adminUsername')}
                   value={form.adminUsername}
                   onChange={updateField('adminUsername')}
                   onBlur={handleBlur('adminUsername')}
-                  placeholder="Например: admin, ivanov, root"
+                  placeholder={t('misc.setup_placeholder_admin_username')}
                   autoComplete="username"
                 />
               </label>
               <label className="setup-label">
-                <span>Полное имя <span className="setup-required-marker">*</span></span>
+                <span>{t('misc.setup_label_full_name')} <span className="setup-required-marker">*</span></span>
                 <Input
                   ref={setRequiredFieldRef('adminFullName')}
                   className={fieldStyle('adminFullName')}
                   name="adminFullName"
                   required
-                  aria-label="Полное имя администратора"
+                  aria-label={t('misc.setup_aria_admin_full_name')}
                   aria-invalid={visibleInvalidKeys.has('adminFullName')}
                   value={form.adminFullName}
                   onChange={updateField('adminFullName')}
@@ -593,7 +593,7 @@ export default function Setup() {
                   type="email"
                   name="adminEmail"
                   required
-                  aria-label="Email администратора"
+                  aria-label={t('misc.setup_aria_admin_email')}
                   aria-invalid={visibleInvalidKeys.has('adminEmail')}
                   value={form.adminEmail}
                   onChange={updateField('adminEmail')}
@@ -605,7 +605,7 @@ export default function Setup() {
               {/* ============ Пароль + подтверждение ============ */}
               {/* UX Audit Stage 2 (Setup issue 2.1): блок пароля с show/hide и силой. */}
               <label className="setup-label">
-                <span>Пароль <span className="setup-required-marker">*</span></span>
+                <span>{t('misc.setup_label_password')} <span className="setup-required-marker">*</span></span>
                 <div className="setup-password-field">
                   <Input
                     ref={setRequiredFieldRef('adminPassword')}
@@ -614,7 +614,7 @@ export default function Setup() {
                     name="adminPassword"
                     required
                     minLength={8}
-                    aria-label="Пароль администратора"
+                    aria-label={t('misc.setup_aria_admin_password')}
                     aria-invalid={visibleInvalidKeys.has('adminPassword')}
                     autoComplete="new-password"
                     value={form.adminPassword}
@@ -625,8 +625,8 @@ export default function Setup() {
                     type="button"
                     className="setup-password-toggle"
                     onClick={() => setShowPassword((v) => !v)}
-                    aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
-                    title={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
+                    aria-label={showPassword ? t('misc.setup_aria_hide_password') : t('misc.setup_aria_show_password')}
+                    title={showPassword ? t('misc.setup_aria_hide_password') : t('misc.setup_aria_show_password')}
                   >
                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
@@ -648,20 +648,20 @@ export default function Setup() {
                       className="setup-strength-label"
                       style={{ color: passwordStrength.color }}
                     >
-                      {passwordStrength.label}
+                      {t(passwordStrength.labelKey)}
                     </span>
                   </div>
                 )}
 
                 {/* Подсказка по требованиям */}
                 <span className="setup-hint">
-                  Минимум 8 символов. Рекомендуется использовать заглавные и строчные буквы, цифры и спецсимволы.
+                  {t('misc.setup_hint_password')}
                 </span>
               </label>
 
               {/* Подтверждение пароля */}
               <label className="setup-label">
-                <span>Повторите пароль <span className="setup-required-marker">*</span></span>
+                <span>{t('misc.setup_label_password_repeat')} <span className="setup-required-marker">*</span></span>
                 <div className="setup-password-field">
                   <Input
                     ref={setRequiredFieldRef('adminPasswordConfirm')}
@@ -669,7 +669,7 @@ export default function Setup() {
                     type={showPasswordConfirm ? 'text' : 'password'}
                     name="adminPasswordConfirm"
                     required
-                    aria-label="Подтверждение пароля"
+                    aria-label={t('misc.setup_aria_password_confirm')}
                     aria-invalid={visibleInvalidKeys.has('adminPasswordConfirm')}
                     autoComplete="new-password"
                     value={form.adminPasswordConfirm}
@@ -680,8 +680,8 @@ export default function Setup() {
                     type="button"
                     className="setup-password-toggle"
                     onClick={() => setShowPasswordConfirm((v) => !v)}
-                    aria-label={showPasswordConfirm ? 'Скрыть пароль' : 'Показать пароль'}
-                    title={showPasswordConfirm ? 'Скрыть пароль' : 'Показать пароль'}
+                    aria-label={showPasswordConfirm ? t('misc.setup_aria_hide_password') : t('misc.setup_aria_show_password')}
+                    title={showPasswordConfirm ? t('misc.setup_aria_hide_password') : t('misc.setup_aria_show_password')}
                   >
                     {showPasswordConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
@@ -693,12 +693,12 @@ export default function Setup() {
                     {passwordsMatch ? (
                       <>
                         <Check size={14} aria-hidden="true" />
-                        <span className="setup-password-match--ok">Пароли совпадают</span>
+                        <span className="setup-password-match--ok">{t('misc.setup_msg_passwords_match')}</span>
                       </>
                     ) : (
                       <>
                         <X size={14} aria-hidden="true" />
-                        <span className="setup-password-match--err">Пароли не совпадают</span>
+                        <span className="setup-password-match--err">{t('misc.setup_msg_passwords_mismatch')}</span>
                       </>
                     )}
                   </div>
@@ -711,20 +711,19 @@ export default function Setup() {
               Секция 4: Активация (UX Audit Stage 2: перенесена из секции администратора)
               ==================================================================== */}
           <section className="setup-section">
-            <h2 className="setup-section-title">Активация лицензии</h2>
+            <h2 className="setup-section-title">{t('misc.setup_section_activation')}</h2>
             <p className="setup-section-hint">
-              Если у вас есть ключ активации от поставщика системы, укажите его здесь.
-              Без ключа система запустится в демо-режиме.
+              {t('misc.setup_activation_hint')}
             </p>
             <div className="setup-grid">
               <label className="setup-label setup-label--wide">
-                Ключ активации
+                {t('misc.setup_label_activation_key')}
                 <Input
                   className="setup-field"
-                  aria-label="Ключ активации"
+                  aria-label={t('misc.setup_aria_activation_key')}
                   value={form.activationKey}
                   onChange={updateField('activationKey')}
-                  placeholder="(необязательно)"
+                  placeholder={t('misc.setup_placeholder_optional')}
                 />
               </label>
             </div>
@@ -754,10 +753,10 @@ export default function Setup() {
                 первой попытки submit, а не сразу при открытии страницы. */}
             {submitAttempted && missingRequiredFields.length > 0 && !status.loading ? (
               <div className="setup-required-hint" role="status">
-                Заполните обязательные поля: {missingRequiredLabels.join(', ')}.
+                {t('misc.setup_required_hint', { fields: missingRequiredLabels.join(', ') })}
                 {' '}
                 <button type="button" className="setup-hint-action" onClick={focusFirstMissingField}>
-                  Показать первое поле
+                  {t('misc.setup_action_show_first_field')}
                 </button>
               </div>
             ) : null}
@@ -769,10 +768,10 @@ export default function Setup() {
                 variant="outline"
                 onClick={() => navigate(loginRoute)}
                 disabled={status.loading}
-                title="Вернуться к странице входа без сохранения"
+                title={t('misc.setup_title_back')}
               >
                 <ArrowLeft size={16} />
-                Назад
+                {t('misc.setup_action_back')}
               </Button>
               <Button
                 type="submit"
@@ -780,7 +779,7 @@ export default function Setup() {
                 disabled={isSubmitDisabled}
                 title={submitTitle}
               >
-                {status.loading ? 'Сохраняем...' : 'Завершить настройку'}
+                {status.loading ? t('misc.setup_action_saving') : t('misc.setup_action_finish')}
               </Button>
             </div>
           </div>
