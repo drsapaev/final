@@ -1,6 +1,13 @@
+// vite.config.ts — Phase 0 migration from vite.config.js
+// Added: `@/*` path alias (plan 0.2)
+// Preserved: all original behavior (proxy, sentry, visualizer, build options)
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { visualizer } from "rollup-plugin-visualizer";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const apiProxyTarget = process.env.VITE_PROXY_TARGET || process.env.BACKEND_URL || "http://localhost:18000";
 const wsProxyTarget =
@@ -12,7 +19,7 @@ const wsProxyTarget =
 // 2. SENTRY_AUTH_TOKEN env var is set (CI only)
 // 3. VITE_SENTRY_DSN env var is set
 // In dev without these, sentryPlugin is an empty array — Vite proceeds normally.
-let sentryPlugin = [];
+let sentryPlugin: unknown[] = [];
 if (process.env.SENTRY_AUTH_TOKEN && process.env.VITE_SENTRY_DSN) {
   try {
     const { sentryVitePlugin } = await import("@sentry/vite-plugin");
@@ -27,12 +34,12 @@ if (process.env.SENTRY_AUTH_TOKEN && process.env.VITE_SENTRY_DSN) {
         applicationKey: 'clinic-frontend',
       }),
     ];
-  } catch (e) {
+  } catch {
     console.warn("[vite.config] @sentry/vite-plugin not installed — skipping source map upload. Install with: npm install --save-dev @sentry/vite-plugin");
   }
 }
 
-function createPlugins(enableBundleVisualizer) {
+function createPlugins(enableBundleVisualizer: boolean) {
   const plugins = [react(), ...sentryPlugin];
 
   if (enableBundleVisualizer) {
@@ -56,6 +63,11 @@ export default defineConfig(({ mode }) => ({
       process.env.ANALYZE_BUNDLE === "true" ||
       process.env.VITE_BUNDLE_ANALYZE === "true",
   ),
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, 'src'),
+    },
+  },
   server: {
     port: 5173,
     host: '0.0.0.0',

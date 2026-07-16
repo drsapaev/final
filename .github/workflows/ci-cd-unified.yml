@@ -643,6 +643,12 @@ jobs:
         npm run lint:check
         echo "✅ Frontend lint passed"
 
+    - name: 🔒 Type-check frontend (Phase 0 TS migration gate)
+      run: |
+        cd frontend
+        npm run type-check
+        echo "✅ Frontend type-check passed"
+
     - name: Icon-only controls accessibility sweep
       run: |
         cd frontend
