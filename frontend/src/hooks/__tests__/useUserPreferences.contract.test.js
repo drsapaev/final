@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const useUserPreferencesPath = path.resolve(__dirname, '../useUserPreferences.js');
+const useUserPreferencesPath = path.resolve(__dirname, '../useUserPreferences.ts');
 
 const readSource = () => fs.readFileSync(useUserPreferencesPath, 'utf8');
 

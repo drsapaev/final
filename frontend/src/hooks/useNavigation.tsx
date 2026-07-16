@@ -1,0 +1,629 @@
+// @ts-nocheck — Phase 2: file converted .js → .ts but not yet fully typed.
+// Proper typing deferred to Phase 9 cleanup (strict mode).
+
+/**
+ * Улучшенная система навигации для медицинских интерфейсов
+ * Основана на принципах доступности и медицинских стандартах UX
+ */
+
+import React, { useState, useCallback } from 'react';
+import PropTypes from 'prop-types';
+import { useAnimation } from './useAnimation';
+import { useReducedMotion } from './useEnhancedMediaQuery';
+
+// Хук для управления навигацией
+export const useNavigation = (initialRoute = '/') => {
+  const [currentRoute, setCurrentRoute] = useState(initialRoute);
+  const [history, setHistory] = useState([initialRoute]);
+  const [historyIndex, setHistoryIndex] = useState(0);
+  const [isNavigating, setIsNavigating] = useState(false);
+
+  // Навигация к маршруту
+  const navigate = useCallback((route, options: Record<string, unknown> = {}) => {
+    const { replace = false, state: unknown = null } = options;
+
+    setIsNavigating(true);
+
+    if (replace) {
+      setHistory((prev) => [...prev.slice(0, historyIndex), route]);
+      setCurrentRoute(route);
+    } else {
+      const newHistory = [...history.slice(0, historyIndex + 1), route];
+      setHistory(newHistory);
+      setHistoryIndex(newHistory.length - 1);
+      setCurrentRoute(route);
+    }
+
+    // Имитируем задержку навигации
+    setTimeout(() => {
+      setIsNavigating(false);
+    }, 300);
+
+    // Обновляем URL в браузере
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location);
+      url.pathname = route;
+      window.history.pushState({ route, state }, '', url);
+    }
+  }, [history, historyIndex]);
+
+  // Навигация назад
+  const goBack = useCallback(() => {
+    if (historyIndex > 0) {
+      const newIndex = historyIndex - 1;
+      setHistoryIndex(newIndex);
+      setCurrentRoute(history[newIndex]);
+      setIsNavigating(true);
+
+      setTimeout(() => {
+        setIsNavigating(false);
+      }, 300);
+    }
+  }, [history, historyIndex]);
+
+  // Навигация вперед
+  const goForward = useCallback(() => {
+    if (historyIndex < history.length - 1) {
+      const newIndex = historyIndex + 1;
+      setHistoryIndex(newIndex);
+      setCurrentRoute(history[newIndex]);
+      setIsNavigating(true);
+
+      setTimeout(() => {
+        setIsNavigating(false);
+      }, 300);
+    }
+  }, [history, historyIndex]);
+
+  // Проверка возможности навигации назад/вперед
+  const canGoBack = historyIndex > 0;
+  const canGoForward = historyIndex < history.length - 1;
+
+  // Сброс истории
+  const reset = useCallback((route = '/') => {
+    setCurrentRoute(route);
+    setHistory([route]);
+    setHistoryIndex(0);
+    setIsNavigating(false);
+  }, []);
+
+  // Получение статистики навигации
+  const getNavigationStats = useCallback(() => {
+    return {
+      currentRoute,
+      historyLength: history.length,
+      historyIndex,
+      canGoBack,
+      canGoForward,
+      isNavigating
+    };
+  }, [currentRoute, history, historyIndex, canGoBack, canGoForward, isNavigating]);
+
+  return {
+    currentRoute,
+    history,
+    historyIndex,
+    isNavigating,
+    navigate,
+    goBack,
+    goForward,
+    canGoBack,
+    canGoForward,
+    reset,
+    getNavigationStats
+  };
+};
+
+// Хук для управления вкладками
+export const useTabs = (initialTab = 0) => {
+  const [activeTab, setActiveTab] = useState(initialTab);
+  const [tabHistory, setTabHistory] = useState([initialTab]);
+
+  // Переключение вкладки
+  const switchTab = useCallback((tabIndex) => {
+    setActiveTab(tabIndex);
+    setTabHistory((prev) => [...prev, tabIndex]);
+  }, []);
+
+  // Переход к предыдущей вкладке
+  const goToPreviousTab = useCallback(() => {
+    if (tabHistory.length > 1) {
+      const newHistory = tabHistory.slice(0, -1);
+      setTabHistory(newHistory);
+      setActiveTab(newHistory[newHistory.length - 1]);
+    }
+  }, [tabHistory]);
+
+  // Проверка возможности перехода назад
+  const canGoToPreviousTab = tabHistory.length > 1;
+
+  return {
+    activeTab,
+    tabHistory,
+    switchTab,
+    goToPreviousTab,
+    canGoToPreviousTab
+  };
+};
+
+// Компонент вкладки
+export const Tab = ({
+  children,
+  active = false,
+  disabled = false,
+  onClick,
+  className = '',
+  ...props
+}) => {
+  const { prefersReducedMotion } = useReducedMotion();
+
+  return (
+    <button
+      className={`tab ${active ? 'active' : ''} ${disabled ? 'disabled' : ''} ${className}`}
+      disabled={disabled}
+      onClick={onClick}
+      style={{
+        padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
+        fontSize: 'var(--mac-font-size-base)',
+        fontWeight: active ? '600' : '400',
+        color: active ? 'var(--mac-accent-blue)' : disabled ? 'var(--mac-text-tertiary)' : 'var(--mac-text-primary)',
+        backgroundColor: active ? 'var(--mac-accent-bg)' : 'transparent',
+        border: 'none',
+        borderBottom: active ? '2px solid var(--mac-accent-blue)' : '2px solid transparent',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        transition: prefersReducedMotion ? 'none' : 'all 0.2s ease',
+        outline: 'none',
+        flex: 1
+      }}
+      onMouseEnter={(e) => {
+        if (!active && !disabled && !prefersReducedMotion) {
+          e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (!active && !disabled && !prefersReducedMotion) {
+          e.target.style.backgroundColor = 'transparent';
+        }
+      }}
+      {...props}>
+      
+      {children}
+    </button>);
+
+};
+
+// Компонент контейнера вкладок
+export const Tabs = ({
+  children,
+  activeTab = 0,
+  onTabChange,
+  className = '',
+  ...props
+}) => {
+  return (
+    <div className={`tabs ${className}`} {...props}>
+      <div
+        className="tabs-header"
+        style={{
+          display: 'flex',
+          borderBottom: '1px solid var(--mac-border)',
+          backgroundColor: 'var(--mac-bg-secondary)'
+        }}>
+        
+        {React.Children.map(children, (child, index) =>
+        React.cloneElement(child, {
+          active: index === activeTab,
+          onClick: () => onTabChange && onTabChange(index)
+        })
+        )}
+      </div>
+    </div>);
+
+};
+
+// Компонент панели вкладки
+export const TabPanel = ({
+  children,
+  active = false,
+  className = '',
+  ...props
+}) => {
+  const { shouldRender, animationClasses } = useAnimation(active, 'fade', 200);
+
+  if (!shouldRender) return null;
+
+  return (
+    <div
+      className={`tab-panel ${animationClasses} ${className}`}
+      style={{
+        padding: 'var(--mac-spacing-5)',
+        backgroundColor: 'var(--mac-bg-primary)'
+      }}
+      {...props}>
+      
+      {children}
+    </div>);
+
+};
+
+// Компонент навигационного меню
+export const NavigationMenu = ({
+  items = [],
+  activeItem: unknown = null,
+  onItemClick,
+  orientation = 'horizontal',
+  className = '',
+  ...props
+}) => {
+  const { prefersReducedMotion } = useReducedMotion();
+
+  const isHorizontal = orientation === 'horizontal';
+
+  return (
+    <nav
+      className={`navigation-menu ${className}`}
+      style={{
+        display: 'flex',
+        flexDirection: isHorizontal ? 'row' : 'column',
+        gap: isHorizontal ? '0' : '8px',
+        ...(isHorizontal ? {
+          borderBottom: '1px solid var(--mac-border)'
+        } : {
+          borderRight: '1px solid var(--mac-border)',
+          paddingRight: '16px'
+        })
+      }}
+      {...props}>
+      
+      {items.map((item, index) =>
+      <button
+        key={item.id || index}
+        onClick={() => onItemClick && onItemClick(item, index)}
+        disabled={item.disabled}
+        className={`navigation-item ${activeItem === item.id ? 'active' : ''}`}
+        style={{
+          padding: isHorizontal ? '12px 16px' : '8px 16px',
+          fontSize: 'var(--mac-font-size-base)',
+          fontWeight: activeItem === item.id ? '600' : '400',
+          color: activeItem === item.id ? 'var(--mac-accent-blue)' : item.disabled ? 'var(--mac-text-tertiary)' : 'var(--mac-text-primary)',
+          backgroundColor: activeItem === item.id ? 'var(--mac-accent-bg)' : 'transparent',
+          border: 'none',
+          borderRadius: isHorizontal ? '0' : '6px',
+          cursor: item.disabled ? 'not-allowed' : 'pointer',
+          textAlign: 'left',
+          transition: prefersReducedMotion ? 'none' : 'all 0.2s ease',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 'var(--mac-spacing-2)',
+          width: '100%',
+          ...(isHorizontal && activeItem === item.id ? {
+            borderBottom: '2px solid var(--mac-accent-blue)'
+          } : {})
+        }}
+        onMouseEnter={(e) => {
+          if (activeItem !== item.id && !item.disabled && !prefersReducedMotion) {
+            e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (activeItem !== item.id && !item.disabled && !prefersReducedMotion) {
+            e.target.style.backgroundColor = 'transparent';
+          }
+        }}>
+        
+          {item.icon && <span style={{ fontSize: 'var(--mac-font-size-lg)' }}>{item.icon}</span>}
+          <span>{item.label}</span>
+          {item.badge &&
+        <span
+          style={{
+            marginLeft: 'auto',
+            padding: '2px 6px',
+            fontSize: 'var(--mac-font-size-xs)',
+            backgroundColor: 'var(--mac-error)',
+            color: 'var(--mac-bg-primary)',
+            borderRadius: 'var(--mac-radius-lg)',
+            minWidth: '18px',
+            textAlign: 'center'
+          }}>
+          
+              {item.badge}
+            </span>
+        }
+        </button>
+      )}
+    </nav>);
+
+};
+
+// Компонент хлебных крошек
+export const Breadcrumbs = ({
+  items = [],
+  separator = '/',
+  className = '',
+  ...props
+}) => {
+  return (
+    <nav
+      className={`breadcrumbs ${className}`}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 'var(--mac-spacing-2)',
+        fontSize: 'var(--mac-font-size-base)',
+        color: 'var(--mac-text-secondary)'
+      }}
+      {...props}>
+      
+      {items.map((item, index) =>
+      <React.Fragment key={item.id || index}>
+          {index > 0 &&
+        <span style={{ color: 'var(--mac-text-tertiary)' }}>{separator}</span>
+        }
+          {index === items.length - 1 ?
+        <span style={{ color: 'var(--mac-text-primary)', fontWeight: 'var(--mac-font-weight-medium)' }}>
+              {item.label}
+            </span> :
+
+        <button
+          onClick={item.onClick}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: 'var(--mac-accent-blue)',
+            cursor: 'pointer',
+            textDecoration: 'none',
+            padding: '0',
+            fontSize: 'inherit'
+          }}
+          onMouseEnter={(e) => {
+            e.target.style.textDecoration = 'underline';
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.textDecoration = 'none';
+          }}>
+          
+              {item.label}
+            </button>
+        }
+        </React.Fragment>
+      )}
+    </nav>);
+
+};
+
+// Компонент пагинации
+export const Pagination = ({
+  currentPage = 1,
+  totalPages = 1,
+  onPageChange,
+  showPageNumbers = true,
+  showPageSize = false,
+  pageSize = 10,
+  pageSizeOptions = [10, 25, 50, 100],
+  onPageSizeChange,
+  className = '',
+  ...props
+}) => {
+  const { prefersReducedMotion } = useReducedMotion();
+
+  // Генерация номеров страниц для отображения
+  const getVisiblePages = () => {
+    const delta = 2;
+    const range = [];
+    const rangeWithDots = [];
+
+    for (
+    let i = Math.max(2, currentPage - delta);
+    i <= Math.min(totalPages - 1, currentPage + delta);
+    i++)
+    {
+      range.push(i);
+    }
+
+    if (currentPage - delta > 2) {
+      rangeWithDots.push(1, '...');
+    } else {
+      rangeWithDots.push(1);
+    }
+
+    rangeWithDots.push(...range);
+
+    if (currentPage + delta < totalPages - 1) {
+      rangeWithDots.push('...', totalPages);
+    } else if (totalPages > 1) {
+      rangeWithDots.push(totalPages);
+    }
+
+    return rangeWithDots;
+  };
+
+  const visiblePages = getVisiblePages();
+
+  return (
+    <div
+      className={`pagination ${className}`}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '16px 0'
+      }}
+      {...props}>
+      
+      {/* Информация о странице */}
+      <div style={{ fontSize: 'var(--mac-font-size-base)', color: 'var(--mac-text-secondary)' }}>
+        Страница {currentPage} из {totalPages}
+      </div>
+
+      {/* Контролы пагинации */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
+        {/* Предыдущая страница */}
+        <button
+          onClick={() => onPageChange(currentPage - 1)}
+          disabled={currentPage === 1}
+          style={{
+            padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
+            fontSize: 'var(--mac-font-size-base)',
+            border: '1px solid var(--mac-border)',
+            borderRadius: 'var(--mac-radius-sm)',
+            backgroundColor: currentPage === 1 ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)',
+            color: currentPage === 1 ? 'var(--mac-text-tertiary)' : 'var(--mac-text-primary)',
+            cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+            transition: prefersReducedMotion ? 'none' : 'all 0.2s ease'
+          }}
+          onMouseEnter={(e) => {
+            if (currentPage !== 1 && !prefersReducedMotion) {
+              e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (currentPage !== 1 && !prefersReducedMotion) {
+              e.target.style.backgroundColor = 'var(--mac-bg-primary)';
+            }
+          }}>
+          
+          ← Предыдущая
+        </button>
+
+        {/* Номера страниц */}
+        {showPageNumbers &&
+        <div style={{ display: 'flex', gap: 'var(--mac-spacing-1)' }}>
+            {visiblePages.map((page, index) =>
+          <button
+            key={index}
+            onClick={() => typeof page === 'number' && onPageChange(page)}
+            disabled={page === '...'}
+            style={{
+              padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
+              fontSize: 'var(--mac-font-size-base)',
+              fontWeight: page === currentPage ? '600' : '400',
+              border: '1px solid var(--mac-border)',
+              borderRadius: 'var(--mac-radius-sm)',
+              backgroundColor: page === currentPage ? 'var(--mac-accent-blue)' : page === '...' ? 'transparent' : 'var(--mac-bg-primary)',
+              color: page === currentPage ? 'var(--mac-bg-primary)' : page === '...' ? 'transparent' : 'var(--mac-text-primary)',
+              cursor: page === '...' ? 'default' : 'pointer',
+              minWidth: '40px',
+              transition: prefersReducedMotion ? 'none' : 'all 0.2s ease'
+            }}
+            onMouseEnter={(e) => {
+              if (typeof page === 'number' && page !== currentPage && !prefersReducedMotion) {
+                e.target.style.backgroundColor = page === currentPage ? 'var(--mac-accent-blue-hover)' : 'var(--mac-bg-secondary)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (typeof page === 'number' && page !== currentPage && !prefersReducedMotion) {
+                e.target.style.backgroundColor = page === currentPage ? 'var(--mac-accent-blue)' : 'var(--mac-bg-primary)';
+              }
+            }}>
+            
+                {page}
+              </button>
+          )}
+          </div>
+        }
+
+        {/* Следующая страница */}
+        <button
+          onClick={() => onPageChange(currentPage + 1)}
+          disabled={currentPage === totalPages}
+          style={{
+            padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
+            fontSize: 'var(--mac-font-size-base)',
+            border: '1px solid var(--mac-border)',
+            borderRadius: 'var(--mac-radius-sm)',
+            backgroundColor: currentPage === totalPages ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)',
+            color: currentPage === totalPages ? 'var(--mac-text-tertiary)' : 'var(--mac-text-primary)',
+            cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+            transition: prefersReducedMotion ? 'none' : 'all 0.2s ease'
+          }}
+          onMouseEnter={(e) => {
+            if (currentPage !== totalPages && !prefersReducedMotion) {
+              e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (currentPage !== totalPages && !prefersReducedMotion) {
+              e.target.style.backgroundColor = 'var(--mac-bg-primary)';
+            }
+          }}>
+          
+          Следующая →
+        </button>
+      </div>
+
+      {/* Выбор размера страницы */}
+      {showPageSize &&
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
+          <span style={{ fontSize: 'var(--mac-font-size-base)', color: 'var(--mac-text-secondary)' }}>Показывать:</span>
+          <select
+          value={pageSize}
+          onChange={(e) => onPageSizeChange && onPageSizeChange(Number(e.target.value))}
+          style={{
+            padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
+            fontSize: 'var(--mac-font-size-base)',
+            border: '1px solid var(--mac-border)',
+            borderRadius: 'var(--mac-radius-sm)',
+            backgroundColor: 'var(--mac-bg-primary)',
+            color: 'var(--mac-text-primary)'
+          }}>
+          
+            {pageSizeOptions.map((size) =>
+          <option key={size} value={size}>
+                {size}
+              </option>
+          )}
+          </select>
+        </div>
+      }
+    </div>);
+
+};
+
+Tab.propTypes = {
+  children: PropTypes.node,
+  active: PropTypes.bool,
+  disabled: PropTypes.bool,
+  onClick: PropTypes.func,
+  className: PropTypes.string
+};
+
+Tabs.propTypes = {
+  children: PropTypes.node,
+  activeTab: PropTypes.number,
+  onTabChange: PropTypes.func,
+  className: PropTypes.string
+};
+
+TabPanel.propTypes = {
+  children: PropTypes.node,
+  active: PropTypes.bool,
+  className: PropTypes.string
+};
+
+NavigationMenu.propTypes = {
+  items: PropTypes.array,
+  activeItem: PropTypes.any,
+  onItemClick: PropTypes.func,
+  orientation: PropTypes.string,
+  className: PropTypes.string
+};
+
+Breadcrumbs.propTypes = {
+  items: PropTypes.array,
+  separator: PropTypes.node,
+  className: PropTypes.string
+};
+
+Pagination.propTypes = {
+  currentPage: PropTypes.number,
+  totalPages: PropTypes.number,
+  onPageChange: PropTypes.func,
+  showPageNumbers: PropTypes.bool,
+  showPageSize: PropTypes.bool,
+  pageSize: PropTypes.number,
+  pageSizeOptions: PropTypes.array,
+  onPageSizeChange: PropTypes.func,
+  className: PropTypes.string
+};
+
+export default useNavigation;
