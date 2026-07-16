@@ -88,10 +88,10 @@ function PatientFormsPreview({ status, preview = null, error = '', initData = ''
     // L-M-9 fix: confirmation dialog для submit (irreversible action).
     if (nextStatus === 'submitted') {
       const ok = await confirm({
-        title: 'Отправка анкеты',
-        message: 'После отправки изменения будут заблокированы.',
-        description: 'Для редактирования отправленной анкеты потребуется обратиться в клинику. Действие нельзя отменить.',
-        confirmLabel: 'Отправить',
+        title: t('patient.pat_forms_submit_title'),
+        message: t('patient.pat_forms_submit_message'),
+        description: t('patient.pat_forms_submit_description'),
+        confirmLabel: t('patient.pat_forms_submit_confirm'),
         cancelLabel: t('misc.cancel'),
         intent: 'primary',
       });
@@ -129,7 +129,7 @@ function PatientFormsPreview({ status, preview = null, error = '', initData = ''
           status: 'saved',
           savedStatus: submission.status || '',
           error: '',
-          message: submission.status === 'draft' ? 'Черновик сохранён.' : 'Анкета отправлена.',
+          message: submission.status === 'draft' ? t('patient.pat_forms_draft_saved') : t('patient.pat_forms_submitted'),
           submittedAt: submission.submitted_at || '',
           updatedAt: submission.updated_at || '',
         },
@@ -150,7 +150,7 @@ function PatientFormsPreview({ status, preview = null, error = '', initData = ''
         },
       }));
     }
-  }, [formState, initData, patientId, confirm]);
+  }, [formState, initData, patientId, confirm, t]);
 
   // L-M-1 fix: обновляем ref для autosave-timer.
   handleSaveRef.current = handleSave;
@@ -192,8 +192,8 @@ function PatientFormsPreview({ status, preview = null, error = '', initData = ''
     return (
       <PanelEmptyState
         icon="doc.text"
-        title="Откройте из Telegram"
-        description="Защищённые анкеты требуют Telegram Mini App identity перед показом данных пациента."
+        title={t('patient.pat_forms_missing_init_title')}
+        description={t('patient.pat_forms_missing_init_desc')}
       />
     );
   }
@@ -202,8 +202,8 @@ function PatientFormsPreview({ status, preview = null, error = '', initData = ''
     return (
       <PanelEmptyState
         icon="doc.text"
-        title="Загрузка анкет…"
-        description="Проверяем защищённый Telegram Mini App identity."
+        title={t('patient.pat_forms_loading_title')}
+        description={t('patient.pat_forms_loading_desc')}
         variant="loading"
       />
     );
@@ -213,8 +213,8 @@ function PatientFormsPreview({ status, preview = null, error = '', initData = ''
     return (
       <PanelEmptyState
         icon="exclamationmark.triangle"
-        title="Анкеты недоступны"
-        description={error || 'Не удалось загрузить защищённые анкеты пациента.'}
+        title={t('patient.pat_forms_error_title')}
+        description={error || t('patient.pat_forms_error_desc')}
         variant="error"
       />
     );
@@ -224,8 +224,8 @@ function PatientFormsPreview({ status, preview = null, error = '', initData = ''
     return (
       <PanelEmptyState
         icon="doc.text"
-        title="Нет доступных анкет"
-        description="Защищённые анкеты пациента ещё не настроены."
+        title={t('patient.pat_forms_no_forms_title')}
+        description={t('patient.pat_forms_no_forms_desc')}
       />
     );
   }
@@ -251,15 +251,15 @@ function PatientFormsPreview({ status, preview = null, error = '', initData = ''
       {/* L-L-7 fix: progress-indicator для multi-form.
           Показывает «Анкета N из M» если форм больше одной. */}
       {forms.length > 1 && (
-        <div className="pp-forms-progress" aria-label="Прогресс заполнения анкет">
+        <div className="pp-forms-progress" aria-label={t('patient.pat_forms_progress_aria')}>
           <Icon name="doc.text" size={14} />
-          <span>Анкет доступно: {forms.length}</span>
+          <span>{t('patient.pat_forms_available', { count: forms.length })}</span>
           <span className="pp-forms-progress-separator">·</span>
           <span>
-            Заполнено: {forms.filter((f) => {
+            {t('patient.pat_forms_filled', { count: forms.filter((f) => {
               const s = formState[f.id]?.savedStatus;
               return s === 'submitted' || s === 'draft';
-            }).length}
+            }).length })}
           </span>
         </div>
       )}
@@ -277,11 +277,11 @@ function PatientFormsPreview({ status, preview = null, error = '', initData = ''
               <div className="pp-badges-row">
                 {currentFormState.savedStatus && (
                   <Badge variant={currentFormState.savedStatus === 'submitted' ? 'success' : 'info'}>
-                    {currentFormState.savedStatus === 'submitted' ? 'Отправлена' : 'Черновик сохранён'}
+                    {currentFormState.savedStatus === 'submitted' ? t('patient.pat_forms_badge_submitted') : t('patient.pat_forms_badge_draft')}
                   </Badge>
                 )}
                 <Badge variant={storageEnabled ? 'success' : 'warning'}>
-                  {storageEnabled ? 'Защищённое хранилище включено' : 'Только чтение'}
+                  {storageEnabled ? t('patient.pat_forms_storage_on') : t('patient.pat_forms_storage_off')}
                 </Badge>
               </div>
             </div>
@@ -297,7 +297,7 @@ function PatientFormsPreview({ status, preview = null, error = '', initData = ''
                         checked={Boolean(fieldValue)}
                         disabled={!storageEnabled}
                         label={field.label}
-                        description={storageEnabled ? 'Включено в защищённую отправку Mini App.' : 'Защищённый ввод не включён.'}
+                        description={storageEnabled ? t('patient.pat_forms_field_storage_on') : t('patient.pat_forms_field_storage_off')}
                         onChange={(checked) => handleFieldChange(form.id, field, checked)}
                       />
                     ) : field.type === 'textarea' ? (
@@ -309,7 +309,7 @@ function PatientFormsPreview({ status, preview = null, error = '', initData = ''
                         minRows={3}
                         maxRows={8}
                         maxLength={field.max_length || undefined}
-                        placeholder="Введите данные в защищённом Mini App."
+                        placeholder={t('patient.pat_forms_input_placeholder')}
                         onChange={(event) => handleFieldChange(form.id, field, event.target.value)}
                       />
                     ) : (
@@ -319,7 +319,7 @@ function PatientFormsPreview({ status, preview = null, error = '', initData = ''
                         value={typeof fieldValue === 'string' ? fieldValue : ''}
                         disabled={!storageEnabled}
                         maxLength={field.max_length || undefined}
-                        placeholder="Введите данные в защищённом Mini App."
+                        placeholder={t('patient.pat_forms_input_placeholder')}
                         onChange={(event) => handleFieldChange(form.id, field, event.target.value)}
                       />
                     )}
@@ -341,20 +341,20 @@ function PatientFormsPreview({ status, preview = null, error = '', initData = ''
                 )}
                 {currentFormState.updatedAt && (
                   <div className="pp-form-timestamp">
-                    Последнее сохранение: {currentFormState.updatedAt}
+                    {t('patient.pat_forms_last_saved', { time: currentFormState.updatedAt })}
                   </div>
                 )}
                 {/* L-M-1 fix: autosave indicator */}
                 {autoSavingForms[form.id] && (
                   <div className="pp-form-autosave-indicator" aria-live="polite">
                     <Icon name="arrow.clockwise" size={12} />
-                    Автосохранение…
+                    {t('patient.pat_forms_autosaving')}
                   </div>
                 )}
                 {!autoSavingForms[form.id] && autoSaveTimestamps[form.id] && (
                   <div className="pp-form-autosave-timestamp">
                     <Icon name="checkmark.circle" size={12} />
-                    Сохранено {autoSaveTimestamps[form.id].toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+                    {t('patient.pat_forms_saved_at', { time: autoSaveTimestamps[form.id].toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) })}
                   </div>
                 )}
                 <div className="pp-actions-row">
@@ -366,7 +366,7 @@ function PatientFormsPreview({ status, preview = null, error = '', initData = ''
                     onClick={() => handleSave(form, 'draft')}
                   >
                     <Icon name="square.and.arrow.down" size={16} />
-                    Сохранить черновик
+                    {t('patient.pat_forms_save_draft')}
                   </Button>
                   <Button
                     variant="primary"
@@ -376,7 +376,7 @@ function PatientFormsPreview({ status, preview = null, error = '', initData = ''
                     onClick={() => handleSave(form, 'submitted')}
                   >
                     <Icon name="paperplane" size={16} />
-                    Отправить анкету
+                    {t('patient.pat_forms_submit_button')}
                   </Button>
                 </div>
               </div>

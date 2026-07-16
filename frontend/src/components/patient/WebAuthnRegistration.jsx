@@ -30,9 +30,9 @@ export default function WebAuthnRegistration({ patientId }) {
 
   const handleRegister = async () => {
     const success = await register({
-      name: credentialName || `Passkey ${new Date().toLocaleDateString('ru-RU')}`,
+      name: credentialName || t('patient.pat_web_passkey_default', { date: new Date().toLocaleDateString('ru-RU') }),
       rpId: window.location.hostname,
-      rpName: 'Медицинская клиника',
+      rpName: t('patient.pat_web_rp_name'),
     });
     if (success) {
       setCredentialName('');
@@ -52,7 +52,7 @@ export default function WebAuthnRegistration({ patientId }) {
       <Card variant="filled" padding="default">
         <CardContent>
           <Alert severity="warning">
-            WebAuthn не поддерживается этим браузером. Используйте Chrome, Safari или Edge с включённой поддержкой биометрии.
+            {t('patient.pat_web_not_supported')}
           </Alert>
         </CardContent>
       </Card>
@@ -64,7 +64,7 @@ export default function WebAuthnRegistration({ patientId }) {
       <CardHeader style={{ background: 'var(--mac-bg-tertiary)', borderBottom: '1px solid var(--mac-border)', padding: '12px 16px' }}>
         <CardTitle style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
           <Icon name="lock.shield" size={20} />
-          Ключи доступа (Passkeys)
+          {t('patient.pat_web_title')}
         </CardTitle>
       </CardHeader>
       <CardContent style={{ padding: '16px', display: 'grid', gap: '16px' }}>
@@ -72,10 +72,10 @@ export default function WebAuthnRegistration({ patientId }) {
         <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
           <div style={{ flex: 1 }}>
             <Input
-              label="Название устройства"
+              label={t('patient.pat_web_device_name')}
               value={credentialName}
               onChange={(e) => setCredentialName(e.target.value)}
-              placeholder="Напр. iPhone 15, Рабочий ноутбук"
+              placeholder={t('patient.pat_web_device_name_placeholder')}
               disabled={isRegistering}
             />
           </div>
@@ -86,26 +86,26 @@ export default function WebAuthnRegistration({ patientId }) {
             disabled={isRegistering}
           >
             <Icon name="plus" size={16} />
-            {isRegistering ? 'Регистрация…' : 'Добавить passkey'}
+            {isRegistering ? t('patient.pat_web_registering') : t('patient.pat_web_add_passkey')}
           </Button>
         </div>
 
         {error && (
           <Alert severity="error">
-            {error === 'webauthn_not_supported' && 'Браузер не поддерживает WebAuthn'}
-            {error === 'not_authenticated' && 'Необходимо войти в систему'}
-            {error === 'registration_cancelled' && 'Регистрация отменена'}
-            {error === 'registration_failed' && 'Ошибка регистрации. Попробуйте снова.'}
+            {error === 'webauthn_not_supported' && t('patient.pat_web_err_not_supported')}
+            {error === 'not_authenticated' && t('patient.pat_web_err_not_authenticated')}
+            {error === 'registration_cancelled' && t('patient.pat_web_err_cancelled')}
+            {error === 'registration_failed' && t('patient.pat_web_err_failed')}
             {!['webauthn_not_supported', 'not_authenticated', 'registration_cancelled', 'registration_failed'].includes(error) && error}
           </Alert>
         )}
 
         {/* Credentials list */}
         {loading ? (
-          <Alert severity="info">Загрузка списка ключей…</Alert>
+          <Alert severity="info">{t('patient.pat_web_loading')}</Alert>
         ) : credentials.length === 0 ? (
           <Alert severity="info">
-            У вас нет зарегистрированных ключей доступа. Добавьте passkey для входа без Telegram.
+            {t('patient.pat_web_empty')}
           </Alert>
         ) : (
           <div style={{ display: 'grid', gap: '8px' }}>
@@ -124,11 +124,11 @@ export default function WebAuthnRegistration({ patientId }) {
               >
                 <div>
                   <div style={{ fontWeight: 500, color: 'var(--mac-text-primary)' }}>
-                    {cred.name || 'Без названия'}
+                    {cred.name || t('patient.pat_web_no_name')}
                   </div>
                   <div style={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>
-                    {cred.device_type || 'Устройство'}
-                    {cred.last_used_at ? ` · посл. использование: ${new Date(cred.last_used_at).toLocaleDateString('ru-RU')}` : ''}
+                    {cred.device_type || t('patient.pat_web_device_default')}
+                    {cred.last_used_at ? ` · ${t('patient.pat_web_last_used', { date: new Date(cred.last_used_at).toLocaleDateString('ru-RU') })}` : ''}
                   </div>
                 </div>
                 <Button
@@ -137,7 +137,7 @@ export default function WebAuthnRegistration({ patientId }) {
                   onClick={() => handleDeactivate(cred.id)}
                 >
                   <Icon name="trash" size={14} />
-                  Удалить
+                  {t('patient.pat_web_delete')}
                 </Button>
               </div>
             ))}
@@ -146,9 +146,7 @@ export default function WebAuthnRegistration({ patientId }) {
 
         {/* Info */}
         <Alert severity="info">
-          Ключи доступа (passkeys) — это безопасная альтернатива паролям.
-          Они хранятся на вашем устройстве и используют биометрию (Face ID, Touch ID)
-          или PIN-код для входа. Passkeys защищены от фишинга.
+          {t('patient.pat_web_info')}
         </Alert>
       </CardContent>
     </Card>

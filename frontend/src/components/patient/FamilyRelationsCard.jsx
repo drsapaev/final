@@ -31,12 +31,12 @@ import PropTypes from 'prop-types';
 import { useConfirm } from '../common/ConfirmDialog';
 
 const RELATION_TYPES = {
-  parent: { label: 'Родитель', Icon: Users },
-  child: { label: 'Ребёнок', Icon: Baby },
-  guardian: { label: 'Опекун', Icon: UserRoundCog },
-  spouse: { label: 'Супруг(а)', Icon: Users },
-  sibling: { label: 'Брат/сестра', Icon: Users },
-  other: { label: 'Другое', Icon: Users }
+  parent: { labelKey: 'patient.pat_fam_relation_parent', Icon: Users },
+  child: { labelKey: 'patient.pat_fam_relation_child', Icon: Baby },
+  guardian: { labelKey: 'patient.pat_fam_relation_guardian', Icon: UserRoundCog },
+  spouse: { labelKey: 'patient.pat_fam_relation_spouse', Icon: Users },
+  sibling: { labelKey: 'patient.pat_fam_relation_sibling', Icon: Users },
+  other: { labelKey: 'patient.pat_fam_relation_other', Icon: Users }
 };
 
 const styles = {
@@ -275,11 +275,11 @@ export default function FamilyRelationsCard({
       setIsRelativeOf(response.data.is_relative_of || []);
     } catch (err) {
       logger.error('Error loading family:', err);
-      setError('Не удалось загрузить информацию о семье');
+      setError(t('patient.pat_fam_load_error'));
     } finally {
       setLoading(false);
     }
-  }, [patientId]);
+  }, [patientId, t]);
 
   useEffect(() => {
     loadFamily();
@@ -288,9 +288,9 @@ export default function FamilyRelationsCard({
   const handleDeleteRelation = async (relationId) => {
     // P-013 fix: replaced window.confirm() with shared useConfirm hook.
     const ok = await confirm({
-      title: 'Удаление семейной связи',
-      message: 'Удалить эту семейную связь?',
-      description: 'Это действие необратимо.',
+      title: t('patient.pat_fam_delete_title'),
+      message: t('patient.pat_fam_delete_message'),
+      description: t('patient.pat_fam_delete_description'),
       confirmLabel: t('misc.delete'),
       cancelLabel: t('misc.cancel'),
       intent: 'danger',
@@ -303,7 +303,7 @@ export default function FamilyRelationsCard({
       onFamilyChange?.();
     } catch (err) {
       logger.error('Error deleting relation:', err);
-      setError('Не удалось удалить связь');
+      setError(t('patient.pat_fam_delete_error'));
     }
   };
 
@@ -319,16 +319,16 @@ export default function FamilyRelationsCard({
         </span>
         <div style={styles.relationMain}>
           <div style={styles.relationName}>
-            <span>{person?.full_name || 'Неизвестно'}</span>
+            <span>{person?.full_name || t('patient.pat_fam_unknown')}</span>
             {rel.is_primary_contact && (
               <Badge variant="primary" size="small">
                 <Star size={12} aria-hidden="true" />
-                Основной контакт
+                {t('patient.pat_fam_primary_contact')}
               </Badge>
             )}
           </div>
           <div style={styles.relationMeta}>
-            <Badge variant="outline" size="small">{typeInfo.label}</Badge>
+            <Badge variant="outline" size="small">{t(typeInfo.labelKey)}</Badge>
             {person?.phone && (
               <span style={styles.phone}>
                 <Phone size={13} aria-hidden="true" />
@@ -371,12 +371,12 @@ export default function FamilyRelationsCard({
         <div style={styles.header}>
           <h2 style={styles.title}>
             <Users size={19} color="var(--mac-accent-blue)" aria-hidden="true" />
-            Семья и родственники
+            {t('patient.pat_fam_title')}
           </h2>
           {canEdit && (
             <Button size="small" onClick={() => setDialogOpen(true)}>
               <UserPlus size={14} aria-hidden="true" />
-              Добавить
+              {t('patient.pat_fam_add')}
             </Button>
           )}
         </div>
@@ -384,12 +384,12 @@ export default function FamilyRelationsCard({
         {error && <Alert severity="error" style={{ marginBottom: '14px' }}>{error}</Alert>}
 
         {!hasFamily ? (
-          <p style={styles.empty}>Нет связанных родственников</p>
+          <p style={styles.empty}>{t('patient.pat_fam_empty')}</p>
         ) : (
           <>
             {family.length > 0 && (
               <section aria-label="Patient relatives">
-                <h3 style={styles.sectionTitle}>Родственники пациента:</h3>
+                <h3 style={styles.sectionTitle}>{t('patient.pat_fam_relatives_section')}</h3>
                 <ul style={styles.list}>{family.map((rel) => renderRelation(rel, false))}</ul>
               </section>
             )}
@@ -397,7 +397,7 @@ export default function FamilyRelationsCard({
             {isRelativeOf.length > 0 && (
               <section aria-label="Patient is relative of">
                 {family.length > 0 && <div style={styles.divider} />}
-                <h3 style={styles.sectionTitle}>Является родственником для:</h3>
+                <h3 style={styles.sectionTitle}>{t('patient.pat_fam_is_relative_section')}</h3>
                 <ul style={styles.list}>{isRelativeOf.map((rel) => renderRelation(rel, true))}</ul>
               </section>
             )}
@@ -430,6 +430,7 @@ FamilyRelationsCard.propTypes = {
 };
 
 function AddRelationDialog({ open, onClose, patientId, patientName, onSuccess }) {
+  const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [selectedPatient, setSelectedPatient] = useState(null);
@@ -456,7 +457,7 @@ function AddRelationDialog({ open, onClose, patientId, patientName, onSuccess })
 
   const handleSubmit = async () => {
     if (!selectedPatient) {
-      setError('Выберите родственника');
+      setError(t('patient.pat_fam_select_relative'));
       return;
     }
 
@@ -483,7 +484,7 @@ function AddRelationDialog({ open, onClose, patientId, patientName, onSuccess })
       onSuccess();
     } catch (err) {
       logger.error('Error creating relation:', err);
-      setError(err.response?.data?.detail || 'Не удалось создать связь');
+      setError(err.response?.data?.detail || t('patient.pat_fam_create_error'));
     } finally {
       setLoading(false);
     }
@@ -491,13 +492,13 @@ function AddRelationDialog({ open, onClose, patientId, patientName, onSuccess })
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Добавить родственника для {patientName}</DialogTitle>
+      <DialogTitle>{t('patient.pat_fam_dialog_title', { name: patientName })}</DialogTitle>
       <DialogContent>
         {error && <Alert severity="error" style={{ marginBottom: '14px' }}>{error}</Alert>}
 
         <div style={styles.searchRow}>
           <label style={styles.fieldGroup}>
-            <span style={styles.label}>Поиск по ФИО или телефону</span>
+            <span style={styles.label}>{t('patient.pat_fam_search_label')}</span>
             <Input
               aria-label="Search patient by name or phone"
               value={searchQuery}
@@ -507,7 +508,7 @@ function AddRelationDialog({ open, onClose, patientId, patientName, onSuccess })
             />
           </label>
           <Button type="button" variant="outline" onClick={handleSearch}>
-            Найти
+            {t('patient.pat_fam_search_button')}
           </Button>
         </div>
 
@@ -521,7 +522,7 @@ function AddRelationDialog({ open, onClose, patientId, patientName, onSuccess })
                   onClick={() => setSelectedPatient(patient)}
                 >
                   <span>{patient.last_name} {patient.first_name} {patient.middle_name || ''}</span>
-                  <span style={styles.resultPhone}>{patient.phone || 'Без телефона'}</span>
+                  <span style={styles.resultPhone}>{patient.phone || t('patient.pat_fam_no_phone')}</span>
                 </button>
               </li>
             ))}
@@ -532,37 +533,37 @@ function AddRelationDialog({ open, onClose, patientId, patientName, onSuccess })
           <Alert severity="info" style={{ marginBottom: '14px' }}>
             <span style={styles.selectedPatient}>
               <span>
-                Выбран: {selectedPatient.last_name} {selectedPatient.first_name}
+                {t('patient.pat_fam_selected', { name: `${selectedPatient.last_name} ${selectedPatient.first_name}` })}
                 {selectedPatient.phone && ` (${selectedPatient.phone})`}
               </span>
               <Button type="button" variant="link" size="small" onClick={() => setSelectedPatient(null)}>
-                Изменить
+                {t('patient.pat_fam_change')}
               </Button>
             </span>
           </Alert>
         )}
 
         <label style={styles.fieldGroup}>
-          <span style={styles.label}>Тип связи</span>
+          <span style={styles.label}>{t('patient.pat_fam_relation_type')}</span>
           <select
             value={relationType}
             onChange={(event) => setRelationType(event.target.value)}
             style={styles.input}
           >
-            {Object.entries(RELATION_TYPES).map(([key, { label }]) => (
-              <option key={key} value={key}>{label}</option>
+            {Object.entries(RELATION_TYPES).map(([key, { labelKey }]) => (
+              <option key={key} value={key}>{t(labelKey)}</option>
             ))}
           </select>
         </label>
 
         <label style={styles.fieldGroup}>
-          <span style={styles.label}>Описание (необязательно)</span>
+          <span style={styles.label}>{t('patient.pat_fam_description_optional')}</span>
           <textarea
             aria-label="Family relation description"
             value={description}
             onChange={(event) => setDescription(event.target.value)}
             style={styles.textarea}
-            placeholder="Например: Бабушка по маминой линии"
+            placeholder={t('patient.pat_fam_description_placeholder')}
           />
         </label>
 
@@ -570,13 +571,13 @@ function AddRelationDialog({ open, onClose, patientId, patientName, onSuccess })
           <Checkbox aria-label="Mark as primary contact" checked={isPrimaryContact} onChange={(event) => setIsPrimaryContact(event.target.checked)}
           />
           <span style={styles.checkboxText}>
-            <span>Основной контакт</span>
-            <span style={styles.helpText}>Для пациентов без телефона (дети, пожилые)</span>
+            <span>{t('patient.pat_fam_primary_contact')}</span>
+            <span style={styles.helpText}>{t('patient.pat_fam_primary_contact_help')}</span>
           </span>
         </label>
       </DialogContent>
       <DialogActions>
-        <Button type="button" onClick={onClose}>Отмена</Button>
+        <Button type="button" onClick={onClose}>{t('patient.pat_fam_cancel')}</Button>
         <Button
           type="button"
           variant="primary"
@@ -584,7 +585,7 @@ function AddRelationDialog({ open, onClose, patientId, patientName, onSuccess })
           disabled={loading || !selectedPatient}
           onClick={handleSubmit}
         >
-          Добавить
+          {t('patient.pat_fam_add')}
         </Button>
       </DialogActions>
     </Dialog>

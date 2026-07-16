@@ -14,7 +14,7 @@ import logger from '../../utils/logger';
 import './PaymentManager.css';
 import PropTypes from 'prop-types';
 import { Input } from '../ui/macos';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 // UX Audit Stage 3 (Payment issue 8.1):
 // Удалён `const API_BASE = '/api/v1'` и `import { tokenManager }` —
@@ -26,16 +26,18 @@ const getInvoiceId = (invoice) => invoice?.invoice_id ?? invoice?.id ?? null;
 // UX Audit Stage 3 (Payment issue 8.2):
 // Локализация статусов счетов для русского UI.
 // Раньше отображались английские «pending», «paid», «failed».
-const INVOICE_STATUS_LABELS = {
-  pending: 'Ожидает оплаты',
-  paid: 'Оплачен',
-  failed: 'Ошибка',
-  cancelled: 'Отменён',
-  expired: 'Истёк',
+// i18n: keys are translated at call time via getInvoiceStatusLabel(status, t).
+const INVOICE_STATUS_KEYS = {
+  pending: 'payment.pay_mgr_status_pending',
+  paid: 'payment.pay_mgr_status_paid',
+  failed: 'payment.pay_mgr_status_failed',
+  cancelled: 'payment.pay_mgr_status_cancelled',
+  expired: 'payment.pay_mgr_status_expired',
 };
 
-function getInvoiceStatusLabel(status) {
-  return INVOICE_STATUS_LABELS[status] || status;
+function getInvoiceStatusLabel(status, t) {
+  const key = INVOICE_STATUS_KEYS[status];
+  return key ? t(key) : status;
 }
 
 const PaymentManager = ({
@@ -45,6 +47,7 @@ const PaymentManager = ({
   initialAmount = null,
   patientInfo = null
 }) => {
+  const { t } = useTranslation();
   // Состояние компонента
   const [selectedProvider, setSelectedProvider] = useState('click');
   const [paymentAmount, setPaymentAmount] = useState(initialAmount || 0);
@@ -72,7 +75,7 @@ const PaymentManager = ({
       setInvoices(Array.isArray(data) ? data : []);
     } catch (error) {
       logger.error('Ошибка загрузки счетов:', error);
-      toast.error(error?.message || 'Ошибка загрузки данных');
+      toast.error(error?.message || t('payment.pay_mgr_error_loading'));
     } finally {
       setLoading(false);
     }
@@ -112,7 +115,7 @@ const PaymentManager = ({
     // Раньше было `if (!paymentAmount || paymentAmount <= 0)` — пропускало NaN.
     // Теперь используем isValidPaymentAmount с проверкой Number.isFinite.
     if (!isValidPaymentAmount(paymentAmount)) {
-      toast.error('Введите корректную сумму оплаты (число больше нуля)');
+      toast.error(t('payment.pay_mgr_invalid_amount'));
       return;
     }
 
@@ -123,7 +126,9 @@ const PaymentManager = ({
         currency: 'UZS',
         provider: selectedProvider,
         // UX Audit: защищаемся от patientInfo без fio (было «Оплата - undefined»)
-        description: `Оплата медицинских услуг${patientInfo?.fio ? ` - ${patientInfo.fio}` : ''}`,
+        description: patientInfo?.fio
+          ? t('payment.pay_mgr_description_with_patient', { patient: patientInfo.fio })
+          : t('payment.pay_mgr_description'),
         patient_info: patientInfo,
       });
       setCreatedInvoiceId(result.invoice_id);
@@ -135,10 +140,10 @@ const PaymentManager = ({
         setShowPayMePayment(true);
       }
 
-      toast.success('Счёт создан, переходим к оплате');
+      toast.success(t('payment.pay_mgr_invoice_created'));
     } catch (error) {
       logger.error('Ошибка создания счета:', error);
-      toast.error(`Ошибка создания счёта: ${error?.message || 'Неизвестная ошибка'}`);
+      toast.error(t('payment.pay_mgr_invoice_create_error', { error: error?.message || t('payment.unknown_error') }));
     } finally {
       setLoading(false);
     }
@@ -158,7 +163,7 @@ const PaymentManager = ({
 
   // Обработчики успешной оплаты
   const handlePaymentSuccess = (paymentData) => {
-    toast.success('Оплата завершена успешно!');
+    toast.success(t('payment.pay_mgr_payment_success'));
     setShowClickPayment(false);
     setShowPayMePayment(false);
     loadPendingInvoices(); // Обновляем список счетов
@@ -170,7 +175,7 @@ const PaymentManager = ({
   };
 
   const handlePaymentError = (error) => {
-    toast.error(`Ошибка оплаты: ${error?.message || 'Неизвестная ошибка'}`);
+    toast.error(t('payment.pay_mgr_payment_error', { error: error?.message || t('payment.unknown_error') }));
     setShowClickPayment(false);
     setShowPayMePayment(false);
   };
@@ -215,13 +220,13 @@ const PaymentManager = ({
           <div className="payment-manager-header">
             <h2 id="payment-manager-title">
               <CreditCard size={24} aria-hidden="true" />
-              Модуль онлайн оплаты
+              {t('payment.pay_mgr_module_title')}
             </h2>
             <button
               className="close-btn"
               onClick={() => onClose && onClose({ success: false })}
-              aria-label="Закрыть окно оплаты"
-              title="Закрыть (Esc)"
+              aria-label={t('payment.pay_mgr_close_aria')}
+              title={t('payment.pay_mgr_close_title')}
               type="button"
             >
               <X size={20} aria-hidden="true" />
@@ -233,32 +238,32 @@ const PaymentManager = ({
             <div className="payment-section">
               <h3>
                 <DollarSign size={20} aria-hidden="true" />
-                Новая оплата
+                {t('payment.pay_mgr_new_payment')}
               </h3>
 
               <div className="payment-form">
                 <div className="form-row">
-                  <label htmlFor="payment-manager-amount">Сумма оплаты (сум)</label>
+                  <label htmlFor="payment-manager-amount">{t('payment.pay_mgr_amount_label')}</label>
                   <Input
                     id="payment-manager-amount"
                     type="number"
-                    aria-label="Сумма оплаты"
+                    aria-label={t('payment.pay_mgr_amount_aria')}
                     value={paymentAmount || ''}
                     onChange={handleAmountChange}
-                    placeholder="Введите сумму"
+                    placeholder={t('payment.pay_mgr_amount_placeholder')}
                     min="1"
                   />
                 </div>
 
                 <div className="form-row">
-                  <label>Платёжный провайдер</label>
+                  <label>{t('payment.pay_mgr_provider_label')}</label>
                   <div className="provider-options">
                     <label className="radio-option">
                       <input
                         type="radio"
                         name="provider"
                         value="click"
-                        aria-label="Использовать Click для оплаты"
+                        aria-label={t('payment.pay_mgr_provider_click_aria')}
                         checked={selectedProvider === 'click'}
                         onChange={(e) => setSelectedProvider(e.target.value)}
                       />
@@ -270,7 +275,7 @@ const PaymentManager = ({
                         type="radio"
                         name="provider"
                         value="payme"
-                        aria-label="Использовать PayMe для оплаты"
+                        aria-label={t('payment.pay_mgr_provider_payme_aria')}
                         checked={selectedProvider === 'payme'}
                         onChange={(e) => setSelectedProvider(e.target.value)}
                       />
@@ -283,11 +288,11 @@ const PaymentManager = ({
                   <div className="patient-info">
                     {/* UX Audit Stage 3: semantic <dl> вместо <p><strong> */}
                     <dl>
-                      <dt>Пациент:</dt>
+                      <dt>{t('payment.pay_mgr_patient')}</dt>
                       <dd>{patientInfo.fio || '—'}</dd>
                       {patientInfo.phone && (
                         <>
-                          <dt>Телефон:</dt>
+                          <dt>{t('payment.pay_mgr_phone')}</dt>
                           <dd>{patientInfo.phone}</dd>
                         </>
                       )}
@@ -301,7 +306,7 @@ const PaymentManager = ({
                   disabled={loading || !isValidPaymentAmount(paymentAmount)}
                   type="button"
                 >
-                  {loading ? 'Создание...' : 'Создать оплату'}
+                  {loading ? t('payment.pay_mgr_creating') : t('payment.pay_mgr_create_btn')}
                 </button>
               </div>
             </div>
@@ -310,18 +315,18 @@ const PaymentManager = ({
             <div className="invoices-section">
               <h3>
                 <Receipt size={20} aria-hidden="true" />
-                Неоплаченные счета
+                {t('payment.pay_mgr_unpaid_invoices')}
               </h3>
 
               {loading ? (
                 <div className="loading-state">
                   <Clock size={20} aria-hidden="true" />
-                  Загрузка...
+                  {t('payment.pay_mgr_loading')}
                 </div>
               ) : invoices.length === 0 ? (
                 <div className="empty-state">
                   <CheckCircle size={24} aria-hidden="true" />
-                  Нет неоплаченных счетов
+                  {t('payment.pay_mgr_no_unpaid')}
                 </div>
               ) : (
                 <div className="invoices-list">
@@ -338,7 +343,7 @@ const PaymentManager = ({
                           <span className="invoice-provider">{invoice.provider}</span>
                           {/* UX Audit Stage 3: локализация статуса */}
                           <span className="invoice-status">
-                            {getInvoiceStatusLabel(invoice.status)}
+                            {getInvoiceStatusLabel(invoice.status, t)}
                           </span>
                         </div>
                         {invoice.description && (
@@ -354,7 +359,7 @@ const PaymentManager = ({
                         disabled={loading}
                         type="button"
                       >
-                        Оплатить
+                        {t('payment.pay_mgr_pay_btn')}
                       </button>
                     </div>
                   ))}
