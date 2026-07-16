@@ -22,10 +22,10 @@ import { isOnPath } from './navigation';
 /**
  * @returns {(path: string, options?: { replace?: boolean, state?: any }) => void}
  */
-export function useNavigateSafely() {
+export function useNavigateSafely(): (path: string, options?: { replace?: boolean; state?: unknown }) => void {
   const navigate = useNavigate();
 
-  return (path, options = {}) => {
+  return (path: string, options: { replace?: boolean; state?: unknown } = {}) => {
     const { replace = false, state = null } = options;
     if (isOnPath(path)) {
       return;

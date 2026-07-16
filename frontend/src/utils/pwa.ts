@@ -121,18 +121,25 @@ async function sendSubscriptionToServer(subscription) {
 }
 
 // Установка PWA
+interface BeforeInstallPromptEvent {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
+}
+
 export function installPWA() {
   // Проверяем, можно ли установить PWA
-  if (window.deferredPrompt) {
-    window.deferredPrompt.prompt();
+  const win = window as unknown as { deferredPrompt?: BeforeInstallPromptEvent | null };
+  if (win.deferredPrompt) {
+    const prompt = win.deferredPrompt;
+    prompt.prompt();
 
-    window.deferredPrompt.userChoice.then((choiceResult) => {
+    prompt.userChoice.then((choiceResult) => {
       if (choiceResult.outcome === 'accepted') {
         logger.log('PWA установлено');
       } else {
         logger.log('PWA не установлено');
       }
-      window.deferredPrompt = null;
+      win.deferredPrompt = null;
     });
   }
 }
@@ -140,17 +147,19 @@ export function installPWA() {
 // Проверка, установлено ли PWA
 export function isPWAInstalled() {
   return window.matchMedia('(display-mode: standalone)').matches ||
-    window.navigator.standalone === true;
+    (window.navigator as unknown as { standalone?: boolean }).standalone === true;
 }
 
 // Получение информации о подключении
 export function getConnectionInfo() {
   if ('connection' in navigator) {
+    const conn = (navigator as unknown as { connection?: { effectiveType?: string; downlink?: number; rtt?: number; saveData?: boolean } }).connection;
+    if (!conn) return null;
     return {
-      effectiveType: navigator.connection.effectiveType,
-      downlink: navigator.connection.downlink,
-      rtt: navigator.connection.rtt,
-      saveData: navigator.connection.saveData
+      effectiveType: conn.effectiveType,
+      downlink: conn.downlink,
+      rtt: conn.rtt,
+      saveData: conn.saveData,
     };
   }
 
