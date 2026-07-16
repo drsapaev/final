@@ -50,17 +50,17 @@ async function getActiveServiceWorkerRegistration() {
   const { serviceWorker } = navigator;
 
   if (typeof serviceWorker.getRegistration === 'function') {
-    const registration = await serviceWorker.getRegistration();
+    const registration: ServiceWorkerRegistration | undefined = await serviceWorker.getRegistration();
     if (!registration?.active) {
       throw new Error('Service Worker is not active');
     }
     return registration;
   }
 
-  const registration = await Promise.race([
+  const registration = (await Promise.race([
     serviceWorker.ready,
     timeoutAfter(SERVICE_WORKER_CONVERSION_TIMEOUT_MS, 'Service Worker readiness timed out')
-  ]);
+  ])) as ServiceWorkerRegistration;
 
   if (!registration.active) {
     throw new Error('Service Worker is not active');
@@ -75,14 +75,14 @@ async function getActiveServiceWorkerRegistration() {
  * @param {number} quality - Качество JPEG (0.1 - 1.0)
  * @returns {Promise<File>} - Конвертированный JPEG файл
  */
-export async function convertHEICToJPEG(heicFile, quality = 0.8) {
+export async function convertHEICToJPEG(heicFile: File | Blob, quality: number = 0.8): Promise<File> {
   try {
     // Проверяем поддержку Service Worker
     if (!('serviceWorker' in navigator)) {
       throw new Error('Service Worker не поддерживается');
     }
 
-    const registration = await getActiveServiceWorkerRegistration();
+    const registration = (await getActiveServiceWorkerRegistration()) as ServiceWorkerRegistration;
 
     if (!registration.active) {
       throw new Error('Service Worker не активен');
@@ -126,7 +126,7 @@ export async function convertHEICToJPEG(heicFile, quality = 0.8) {
       }, [messageChannel.port2]);
     });
 
-    return convertedFileFromWorker;
+    return convertedFileFromWorker as File;
 
   } catch (error) {
     logger.error('HEIC conversion error:', error);
@@ -168,24 +168,24 @@ async function convertHEICFallback(heicFile, quality = 0.8) {
  * @param {number} quality - Качество JPEG
  * @returns {Promise<File[]>} - Массив конвертированных файлов
  */
-export async function convertMultipleFiles(files, quality = 0.8) {
+export async function convertMultipleFiles(files: File[] | FileList | Iterable<File>, quality: number = 0.8): Promise<File[]> {
   const fileArray = Array.from(files);
-  const convertedFiles = [];
+  const convertedFiles: File[] = [];
 
   for (const file of fileArray) {
     try {
-      if (isHEICFile(file)) {
-        logger.log(`Converting HEIC file: ${file.name}`);
-        const convertedFile = await convertHEICToJPEG(file, quality);
+      if (isHEICFile(file as File)) {
+        logger.log(`Converting HEIC file: ${(file as File).name}`);
+        const convertedFile = await convertHEICToJPEG(file as File, quality);
         convertedFiles.push(convertedFile);
       } else {
         // Не HEIC файл, добавляем как есть
-        convertedFiles.push(file);
+        convertedFiles.push(file as File);
       }
     } catch (error) {
-      logger.error(`Failed to convert ${file.name}:`, error);
+      logger.error(`Failed to convert ${(file as File).name}:`, error);
       // В случае ошибки, добавляем оригинальный файл
-      convertedFiles.push(file);
+      convertedFiles.push(file as File);
     }
   }
 
