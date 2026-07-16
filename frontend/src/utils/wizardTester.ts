@@ -178,7 +178,7 @@ class WizardTester {
     logger.log('🚀 Запуск всех тестов мастера регистрации...');
     logger.log('='.repeat(50));
 
-    const results = {};
+    const results: Record<string, unknown> = {};
 
     // Тест настроек
     results.wizardSettings = await this.testWizardSettings();
@@ -319,8 +319,8 @@ class WizardTester {
 
 // Экспорт для использования в консоли
 if (typeof window !== 'undefined') {
-  window.WizardTester = WizardTester;
-  window.wizardTester = new WizardTester();
+  (window as unknown as { WizardTester?: unknown }).WizardTester = WizardTester;
+  (window as unknown as { wizardTester?: WizardTester }).wizardTester = new WizardTester();
 
   logger.log('🧪 WizardTester загружен!');
   logger.log('Используйте: wizardTester.runAllTests() для запуска всех тестов');
