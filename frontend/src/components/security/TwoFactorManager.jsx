@@ -26,7 +26,7 @@ import {
   Button,
   Input,
 } from '../ui/macos';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const accentGradients = {
   info: 'linear-gradient(135deg, var(--mac-accent), color-mix(in srgb, var(--mac-accent), white 18%))',

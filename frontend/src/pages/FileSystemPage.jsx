@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import FileManager from '../components/files/FileManager';
 import {
-export default FileSystemPage;import { useTranslation } from '../i18n/adapter';
+export default FileSystemPage;import { useTranslation } from '../i18n/useTranslation';
 
   Upload,
   Download,

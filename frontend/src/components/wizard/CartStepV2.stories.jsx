@@ -5,7 +5,7 @@
  * and cart summary. Shows states: empty cart, with items, with discount.
  */
 import CartStepV2 from './CartStepV2';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 export default {
   title: 'Wizard/CartStepV2',

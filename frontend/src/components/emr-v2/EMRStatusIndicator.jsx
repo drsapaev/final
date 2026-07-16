@@ -16,7 +16,7 @@
 import PropTypes from 'prop-types';
 import { useState, useEffect } from 'react';
 import './EMRStatusIndicator.css';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 /**
  * Format relative time (e.g., "2 мин назад")

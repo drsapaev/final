@@ -6,7 +6,7 @@ import { roleToRoute } from '../constants/routes';
 import {
   AppEmpty, AppError, AppLoading, Button, Card, CardContent, CardHeader,
 } from '../components/ui/macos';
-import { useTranslation } from '../i18n/adapter';
+import { useTranslation } from '../i18n/useTranslation';
 
 export default function UserSelect() {
   const { t } = useTranslation();

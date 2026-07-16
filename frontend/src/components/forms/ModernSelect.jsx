@@ -12,7 +12,7 @@ import {
 import { useTheme } from '../../contexts/ThemeContext';
 import './ModernSelect.css';
 import { Input } from '../ui/macos';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const ModernSelect = ({
   label,

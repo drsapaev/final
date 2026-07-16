@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 // Система модальных окон
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import PropTypes from 'prop-types';

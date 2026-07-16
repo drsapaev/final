@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 // Тестовый компонент для проверки работоспособности всех созданных компонентов
 import React, { useState } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';

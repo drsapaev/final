@@ -7,7 +7,7 @@ import {
 import { api } from '../api/client.js';
 import { getActivationStatus } from '../api';
 import { useTheme } from '../contexts/ThemeContext';
-import { useTranslation } from '../i18n/adapter';
+import { useTranslation } from '../i18n/useTranslation';
 
 export default function Activation() {
   const { t } = useTranslation();

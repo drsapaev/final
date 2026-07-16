@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import { X } from 'lucide-react';
 // UX Audit Registrar #5: useTheme удалён — все стили в CSS с macos tokens.
 import './ModernDialog.css';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const ModernDialog = ({
   isOpen,

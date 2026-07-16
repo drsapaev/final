@@ -14,7 +14,7 @@ import {
   AppEmpty, AppError, AppLoading, Button,
 } from '../components/ui/macos';
 import { notify } from '../services/notify.js';
-import { useTranslation } from '../i18n/adapter';
+import { useTranslation } from '../i18n/useTranslation';
 
 // Get user role for role-based UI
 const getUserRole = () => {

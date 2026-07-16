@@ -14,7 +14,7 @@ import { COLOR_SCHEMES } from '../../theme/colorScheme.js';
 import { getCanonicalRouteById, getEffectiveRouteByPath, getRoleHomeRoute } from '../../routing/routeSelectors.js';
 
 import logger from '../../utils/logger';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const landingRoute = getCanonicalRouteById('landing')?.path || '/';
 const loginRoute = getCanonicalRouteById('login')?.path || '/login';

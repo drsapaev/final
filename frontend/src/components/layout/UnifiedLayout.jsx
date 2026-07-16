@@ -4,7 +4,7 @@ import UnifiedSidebar from './UnifiedSidebar';
 import { useTheme } from '../../contexts/ThemeContext';
 import '../../styles/unified-sidebar.css';
 import PropTypes from 'prop-types';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 /**
  * Унифицированный макет с сайдбаром

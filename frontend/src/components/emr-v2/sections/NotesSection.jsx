@@ -11,7 +11,7 @@ import EMRSection from './EMRSection';
 import EMRTextField from './EMRTextField';
 import { DoctorTemplatesPanel, DoctorTemplatesButton } from '../DoctorTemplatesPanel';
 import { useDoctorSectionTemplates } from '../../../hooks/useDoctorSectionTemplates';
-import { useTranslation } from '../../../i18n/adapter';
+import { useTranslation } from '../../../i18n/useTranslation';
 
 /**
  * NotesSection Component

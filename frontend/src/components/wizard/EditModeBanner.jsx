@@ -10,7 +10,7 @@
  */
 import PropTypes from 'prop-types';
 import './EditModeBanner.css';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const EditModeBanner = ({ editMode, initialData }) => {
   const { t } = useTranslation();

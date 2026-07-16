@@ -2,7 +2,7 @@ import PropTypes from 'prop-types';
 import MedicalCard from './MedicalCard';
 import Icon from '../Icon';
 import { useTheme } from '../../contexts/ThemeContext';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 /**
  * Карточка пациента в стиле MediLab

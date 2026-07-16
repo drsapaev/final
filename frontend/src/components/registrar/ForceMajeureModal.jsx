@@ -26,7 +26,7 @@ import { Input } from '../ui/macos';
 // UX Audit: inline-стили перенесены в ForceMajeureModal.css.
 // useTheme + tokenManager удалены (auth через axios-interceptor, theme через CSS).
 import './ForceMajeureModal.css';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const ForceMajeureModal = ({
   isOpen,

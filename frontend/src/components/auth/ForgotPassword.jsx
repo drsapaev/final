@@ -1,4 +1,5 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
+import i18n from '../../i18n';
 /**
  * ForgotPassword — password recovery component.
  *
@@ -55,8 +56,8 @@ function getPasswordStrength(password) {
 // ============================================================================
 const translations = {
   RU: {
-    title: t('final.password_recovery_title'),
-    subtitle: t('final.password_recovery_subtitle'),
+    title: i18n.t('final.password_recovery_title'),
+    subtitle: i18n.t('final.password_recovery_subtitle'),
     methodPhone: 'По номеру телефона',
     methodEmail: 'По электронной почте',
     phoneLabel: 'Номер телефона',
@@ -220,6 +221,7 @@ const translations = {
 const RESEND_COOLDOWN_SECONDS = 30;
 
 const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
+  const { t } = useTranslation();
   // All state at the top (UX Audit #15 — was scattered)
   const [step, setStep] = useState('method');
   const [method, setMethod] = useState('phone');
@@ -234,8 +236,6 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [passwordsMatch, setPasswordsMatch] = useState(null);
   const [resendCountdown, setResendCountdown] = useState(0);
-
-  const t = translations[language] || translations.RU;
 
   const passwordStrength = getPasswordStrength(newPassword);
 

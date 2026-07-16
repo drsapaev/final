@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 import { api } from '../../api/client';
 import { useState } from 'react';
 import { Card, Button,

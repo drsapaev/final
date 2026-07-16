@@ -5,7 +5,7 @@
  * Shows 3 states: step 1 active, step 2 active, both completed.
  */
 import StepProgressIndicator from './StepProgressIndicator';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 export default {
   title: 'Wizard/StepProgressIndicator',

@@ -24,7 +24,7 @@ import logger from '../utils/logger';
 import PropTypes from 'prop-types';
 import { formatRegistrarTime } from '../utils/dateUtils';
 import './displayboard.css';
-import { useTranslation } from '../i18n/adapter';
+import { useTranslation } from '../i18n/useTranslation';
 
 const DEFAULT_BOARD_STATS = { last_ticket: 0, waiting: 0, serving: 0, done: 0 };
 

@@ -20,7 +20,7 @@ import { Card } from '../ui/macos';
 import { fetchRegistrarServices } from '../../api/registrar';
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 /**
  * Интегрированный селектор услуг для регистратуры
  * Использует справочник из админ панели согласно detail.md стр. 112

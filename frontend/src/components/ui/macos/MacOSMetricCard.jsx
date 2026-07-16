@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Minus, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import PropTypes from 'prop-types';
-import { useTranslation } from '../../../i18n/adapter';
+import { useTranslation } from '../../../i18n/useTranslation';
 
 const MacOSMetricCard = ({
   title,

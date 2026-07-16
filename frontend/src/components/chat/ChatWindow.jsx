@@ -24,7 +24,7 @@ import { useToast } from '../../components/common/Toast';
 import logger from '../../utils/logger';
 import './Chat.css';
 import { Input } from '../ui/macos';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const groupReactions = (reactions) => {
   if (!reactions) return {};

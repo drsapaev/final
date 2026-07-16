@@ -19,7 +19,7 @@ import PropTypes from 'prop-types';
 import { apiClient } from '../../api/client';
 import logger from '../../utils/logger';
 import './EMRDiffViewer.css';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 /**
  * Human-readable field labels (Russian)

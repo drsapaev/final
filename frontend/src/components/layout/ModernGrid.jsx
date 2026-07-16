@@ -1,7 +1,7 @@
 import { useTheme } from '../../contexts/ThemeContext';
 import PropTypes from 'prop-types';
 import './ModernGrid.css';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const ModernGrid = ({
   children,

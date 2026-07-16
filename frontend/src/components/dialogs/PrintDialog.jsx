@@ -10,7 +10,7 @@ import { toast } from 'react-toastify';
 import './PrintDialog.css';
 
 import logger from '../../utils/logger';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const formatPrintServiceLabel = (service) => {
   if (service == null) return '';

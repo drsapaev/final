@@ -15,7 +15,7 @@ import PropTypes from 'prop-types';
 import treatmentTemplatesData from '../../../data/treatmentTemplates.json';
 import './TreatmentTemplatesPanel.css';
 import { Input } from '../../ui/macos';
-import { useTranslation } from '../../../i18n/adapter';
+import { useTranslation } from '../../../i18n/useTranslation';
 
 /**
  * Category metadata

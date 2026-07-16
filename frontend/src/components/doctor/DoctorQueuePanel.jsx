@@ -29,7 +29,7 @@ import {
   formatRegistrarTime,
   getRegistrarTimestampDisplay,
 } from '../../utils/dateUtils';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const QUEUE_ACTION_ALIASES = {
   call: ['call'],

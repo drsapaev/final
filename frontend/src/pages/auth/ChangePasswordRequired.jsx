@@ -9,7 +9,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { getErrorMessage } from '../../utils/errorHandler';
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 /**
  * Компонент для обязательной смены пароля при первом входе

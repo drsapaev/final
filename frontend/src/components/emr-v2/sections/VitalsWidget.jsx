@@ -1,7 +1,7 @@
 import PropTypes from 'prop-types';
 import './VitalsWidget.css';
 import { Input } from '../../ui/macos';
-import { useTranslation } from '../../../i18n/adapter';
+import { useTranslation } from '../../../i18n/useTranslation';
 
 /**
  * VitalsWidget (Кардиология)

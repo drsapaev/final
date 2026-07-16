@@ -9,7 +9,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useAIChat } from '../../hooks/useAIChat';
 import './AIChatWidget.css';
 import PropTypes from 'prop-types';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 /**
  * AI Chat Widget Component

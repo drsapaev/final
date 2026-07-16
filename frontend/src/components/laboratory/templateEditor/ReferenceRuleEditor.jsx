@@ -1,6 +1,6 @@
 import PropTypes from 'prop-types';
 import { Button, Icon } from '../../ui/macos';
-import { useTranslation } from '../../../i18n/adapter';
+import { useTranslation } from '../../../i18n/useTranslation';
 
 /**
  * L-H-6 fix: ReferenceRuleEditor выделен в отдельный файл (~290 строк).

@@ -1,5 +1,5 @@
 import { Button } from '../ui/macos';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 /**
  * SessionWarningModal — shared session expiry warning (Sprint 10).

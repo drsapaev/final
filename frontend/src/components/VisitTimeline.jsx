@@ -1,4 +1,4 @@
-import { t } from '../i18n/adapter';
+import { useTranslation } from '../i18n/useTranslation';
 import { CheckCircle, Clock, AlertCircle, CreditCard, User, FileText, Pill } from 'lucide-react';
 import PropTypes from 'prop-types';
 import { Card, Badge } from './ui/macos';

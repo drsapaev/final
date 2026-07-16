@@ -3,7 +3,7 @@ import React, { useState, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Input } from '../ui/macos';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 /**
  * Контекст для форм

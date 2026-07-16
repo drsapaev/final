@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 
 import Alert from './Alert';
 import MacOSEmptyState from './MacOSEmptyState';
-import { useTranslation } from '../../../i18n/adapter';
+import { useTranslation } from '../../../i18n/useTranslation';
 
 const fontFamily = '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif';
 

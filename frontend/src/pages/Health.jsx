@@ -5,7 +5,7 @@ import {
   AppEmpty, AppError, AppLoading, Button,
 } from '../components/ui/macos';
 import auth from '../stores/auth.js';
-import { useTranslation } from '../i18n/adapter';
+import { useTranslation } from '../i18n/useTranslation';
 
 export default function Health() {
   const { t } = useTranslation();

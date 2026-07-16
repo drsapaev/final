@@ -16,7 +16,7 @@ import {
   Button, Card, CardHeader, CardTitle, CardContent, Input, Checkbox, Alert,
 } from '../ui/macos';
 import logger from '../../utils/logger';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const landingRoute = getCanonicalRouteById('landing')?.path || '/';
 const loginRoute = getCanonicalRouteById('login')?.path || '/login';

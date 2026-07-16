@@ -1,4 +1,4 @@
-import { t } from '../i18n/adapter';
+import { useTranslation } from '../i18n/useTranslation';
 import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {

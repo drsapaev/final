@@ -8,7 +8,7 @@ import { toast } from 'react-toastify';
 import './CancelDialog.css';
 
 import logger from '../../utils/logger';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
   const { t } = useTranslation();
   const [reason, setReason] = useState('');

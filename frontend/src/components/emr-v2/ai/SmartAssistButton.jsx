@@ -8,7 +8,7 @@
  */
 import PropTypes from 'prop-types';
 import './SmartAssistButton.css';
-import { useTranslation } from '../../../i18n/adapter';
+import { useTranslation } from '../../../i18n/useTranslation';
 
 /**
  * SmartAssistButton Component

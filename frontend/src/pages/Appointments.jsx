@@ -8,7 +8,7 @@ import {
 import { api } from '../api/client.js';
 
 import logger from '../utils/logger';
-import { useTranslation } from '../i18n/adapter';
+import { useTranslation } from '../i18n/useTranslation';
 function todayStr() {
   const d = new Date();
   const y = d.getFullYear();

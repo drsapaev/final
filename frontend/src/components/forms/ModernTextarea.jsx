@@ -8,7 +8,7 @@ import {
 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import './ModernTextarea.css';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const ModernTextarea = ({
   label,

@@ -1,4 +1,4 @@
-import { t } from '../i18n/adapter';
+import { useTranslation } from '../i18n/useTranslation';
 import { useEffect, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import RoleGate from '../components/RoleGate.jsx';

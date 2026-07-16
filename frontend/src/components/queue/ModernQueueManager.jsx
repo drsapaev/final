@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import ModernDialog from '../dialogs/ModernDialog';

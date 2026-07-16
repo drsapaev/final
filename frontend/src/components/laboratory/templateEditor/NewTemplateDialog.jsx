@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import {
   Alert, Button, Dialog, DialogTitle, DialogContent, DialogActions, Input, Label, Textarea, Icon,
 } from '../../ui/macos';
-import { useTranslation } from '../../../i18n/adapter';
+import { useTranslation } from '../../../i18n/useTranslation';
 
 /**
  * L-H-6 fix: NewTemplateDialog выделен в отдельный файл (~110 строк).

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, useCallback } from 'react';
 import RoleGate from '../components/RoleGate.jsx';
 import { api } from '../api/client.js';
 import { Input } from '../components/ui/macos';
-import { useTranslation } from '../i18n/adapter';
+import { useTranslation } from '../i18n/useTranslation';
 
 function todayStr() {
   const d = new Date();

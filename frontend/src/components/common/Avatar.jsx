@@ -1,6 +1,6 @@
 import './Avatar.css';
 import PropTypes from 'prop-types';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const roleGradients = {
     admin: 'linear-gradient(135deg, var(--mac-accent-purple), var(--mac-accent-purple))',

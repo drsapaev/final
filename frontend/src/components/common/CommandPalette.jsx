@@ -22,7 +22,7 @@ import { createPortal } from 'react-dom';
 import { Search, ArrowRight, Clock } from 'lucide-react';
 import { getCanonicalRoutes, isRouteAccessibleToProfile } from '../../routing/routeSelectors';
 import { Input } from '../ui/macos';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const MAX_RESULTS = 8;
 const MAX_RECENT = 5;

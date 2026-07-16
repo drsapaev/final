@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 import { useEffect, useState } from 'react';
 import { Bell, X } from 'lucide-react';
 import { pushNotifications } from '../../services/pushNotifications';

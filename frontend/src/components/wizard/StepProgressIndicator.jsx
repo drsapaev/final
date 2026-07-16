@@ -9,7 +9,7 @@
  * Раньше: только 4-пиксельные полоски без текста — Nielsen #1 (visibility).
  */
 import PropTypes from 'prop-types';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const STEP_LABELS = {
   ru: ['Пациент', 'Услуги'],

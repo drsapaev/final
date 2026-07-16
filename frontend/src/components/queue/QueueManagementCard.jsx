@@ -21,7 +21,7 @@ import {
 import api from '../../services/api';
 import logger from '../../utils/logger';
 import './QueueManagementCard.css';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const normalizeQueueAction = (action) => String(action || '').trim().toLowerCase().replace(/-/g, '_');
 

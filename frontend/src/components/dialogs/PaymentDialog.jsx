@@ -12,7 +12,7 @@ import './PaymentDialog.css';
 
 import logger from '../../utils/logger';
 import { Input } from '../ui/macos';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 const PaymentDialog = ({
   isOpen,
   onClose,

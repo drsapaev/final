@@ -4,7 +4,7 @@ import {
   Box, Card, CardContent, Typography, Button, Alert,
 } from '../components/ui/macos';
 import { XCircle as CancelIcon, Home as HomeIcon, Headset as SupportIcon } from 'lucide-react';
-import { useTranslation } from '../i18n/adapter';
+import { useTranslation } from '../i18n/useTranslation';
 
 const SUPPORT_TELEGRAM_HANDLE = '@clinic_support';
 const SUPPORT_TELEGRAM_URL = 'https://t.me/clinic_support';

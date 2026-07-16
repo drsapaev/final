@@ -4,7 +4,7 @@ import { api } from '../api/client.js';
 import {
   AppEmpty, AppError, AppLoading, Button, Card, CardContent, CardHeader, Input,
 } from '../components/ui/macos';
-import { useTranslation } from '../i18n/adapter';
+import { useTranslation } from '../i18n/useTranslation';
 
 /**
  * Аудит: список последних действий пользователей.

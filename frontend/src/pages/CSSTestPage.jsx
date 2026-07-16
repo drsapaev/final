@@ -6,7 +6,7 @@ import ModernTabs from '../components/navigation/ModernTabs';
 import { AlertCircle, CheckCircle, XCircle, Info } from 'lucide-react';
 
 import logger from '../utils/logger';
-import { useTranslation } from '../i18n/adapter';
+import { useTranslation } from '../i18n/useTranslation';
 const CSSTestPage = () => {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState('cardio');

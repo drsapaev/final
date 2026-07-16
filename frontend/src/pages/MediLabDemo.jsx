@@ -13,7 +13,7 @@ import '../styles/cursor-effects.css';
 import '../styles/animations.css';
 import '../styles/responsive.css';
 import { Input } from '../components/ui/macos';
-import { useTranslation } from '../i18n/adapter';
+import { useTranslation } from '../i18n/useTranslation';
 
 const resolveTabFromPath = (path) => {
   if (path.includes('/patients')) return 'patients';

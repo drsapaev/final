@@ -7,7 +7,7 @@ import { Play, Pause } from 'lucide-react';
 import auth from '../../stores/auth';
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const VoiceMessage = ({ message, fileUrl }) => {
   const { t } = useTranslation();
