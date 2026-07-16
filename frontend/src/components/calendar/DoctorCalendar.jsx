@@ -23,6 +23,7 @@ import { getApiOrigin } from '../../api/runtime';
 import tokenManager from '../../utils/tokenManager';
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const API_BASE = getApiOrigin();
 
@@ -59,7 +60,7 @@ const getWeekDays = (startDate) => {
   return days;
 };
 
-const WEEKDAY_NAMES = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+const WEEKDAY_NAMES = [t('misc.dc_pn'), t('misc.dc_vt'), t('misc.dc_sr'), t('misc.dc_cht'), t('misc.dc_pt'), t('misc.dc_sb'), t('misc.dc_vs')];
 
 
 
@@ -80,6 +81,7 @@ const DoctorCalendar = ({
   onViewAppointment,
   compact = false
 }) => {
+  const { t } = useTranslation();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
 
@@ -127,7 +129,7 @@ const DoctorCalendar = ({
       );
 
       if (!response.ok) {
-        throw new Error('Не удалось загрузить расписание');
+        throw new Error(t('misc.dc_ne_udalos_zagruzit_raspisani'));
       }
 
       const data = await response.json();
@@ -379,8 +381,8 @@ const DoctorCalendar = ({
                     <button
             style={styles.navButton}
             onClick={goToPrevWeek}
-            title="Предыдущая неделя"
-            aria-label="Предыдущая неделя">
+            title={t('misc.dc_predyduschaya_nedelya')}
+            aria-label={t('misc.dc_predyduschaya_nedelya')}>
 
                         <ChevronLeft size={18} />
                     </button>
@@ -395,8 +397,8 @@ const DoctorCalendar = ({
                     <button
             style={styles.navButton}
             onClick={goToNextWeek}
-            title="Следующая неделя"
-            aria-label="Следующая неделя">
+            title={t('misc.dc_sleduyuschaya_nedelya')}
+            aria-label={t('misc.dc_sleduyuschaya_nedelya')}>
 
                         <ChevronRight size={18} />
                     </button>
@@ -404,8 +406,8 @@ const DoctorCalendar = ({
                     <button
             style={styles.navButton}
             onClick={loadSchedule}
-            title="Обновить"
-            aria-label="Обновить">
+            title={t('misc.dc_obnovit')}
+            aria-label={t('misc.dc_obnovit')}>
 
                         <RefreshCw size={16} className={loading ? 'spinning' : ''} />
                     </button>

@@ -24,19 +24,19 @@ import { useTranslation } from '../../i18n/useTranslation';
 /**
  * Human-readable field labels (Russian)
  */
-const FIELD_LABELS = {
-    complaints: 'Жалобы',
-    anamnesis: 'Анамнез',
-    examination: 'Осмотр',
-    diagnosis: 'Диагноз',
-    icd10_code: 'Код МКБ-10',
-    treatment: 'Лечение',
-    recommendations: 'Рекомендации',
-    notes: 'Примечания',
-    vitals: 'Витальные показатели',
-    lab_results: 'Лабораторные данные',
-    prescriptions: 'Назначения',
-};
+const getFieldLabels = (t) => ({
+    complaints: t('misc.edv_field_complaints'),
+    anamnesis: t('misc.edv_field_anamnesis'),
+    examination: t('misc.edv_field_examination'),
+    diagnosis: t('misc.edv_field_diagnosis'),
+    icd10_code: t('misc.edv_field_icd10_code'),
+    treatment: t('misc.edv_field_treatment'),
+    recommendations: t('misc.edv_field_recommendations'),
+    notes: t('misc.edv_field_notes'),
+    vitals: t('misc.edv_field_vitals'),
+    lab_results: t('misc.edv_field_lab_results'),
+    prescriptions: t('misc.edv_field_prescriptions'),
+});
 
 /**
  * Fixed field order for consistent display
@@ -58,30 +58,30 @@ const FIELD_ORDER = [
 /**
  * Get human-readable field label
  */
-function getFieldLabel(field) {
-    return FIELD_LABELS[field] || field;
+function getFieldLabel(field, t) {
+    return getFieldLabels(t)[field] || field;
 }
 
 /**
  * Format value for display
  */
-function formatValue(value) {
+function formatValue(value, t) {
     if (value === null || value === undefined) {
         return '—';
     }
     if (typeof value === 'object') {
         // Handle nested objects/arrays
         if (Array.isArray(value)) {
-            return value.length > 0 ? value.map(v => formatValue(v)).join(', ') : '—';
+            return value.length > 0 ? value.map(v => formatValue(v, t)).join(', ') : '—';
         }
         // Object - format key-value pairs
         return Object.entries(value)
             .filter(([, v]) => v !== null && v !== undefined && v !== '')
-            .map(([k, v]) => `${getFieldLabel(k)}: ${formatValue(v)}`)
+            .map(([k, v]) => `${getFieldLabel(k, t)}: ${formatValue(v, t)}`)
             .join('; ') || '—';
     }
     if (typeof value === 'boolean') {
-        return value ? 'Да' : 'Нет';
+        return value ? t('misc.edv_yes') : t('misc.edv_no');
     }
     return String(value || '—');
 }
@@ -101,6 +101,7 @@ export function EMRDiffViewer({
     versionTo,
     onClose,
 }) {
+    const { t } = useTranslation();
     const [diff, setDiff] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
@@ -120,7 +121,7 @@ export function EMRDiffViewer({
                 setDiff(response.data);
             } catch (err) {
                 logger.error('Failed to load diff:', err);
-                setError(err.message || 'Не удалось загрузить сравнение');
+                setError(err.message || t('misc.edv_ne_udalos_zagruzit_sravnenie'));
             } finally {
                 setLoading(false);
             }
@@ -164,9 +165,9 @@ export function EMRDiffViewer({
      */
     const getChangeTypeLabel = (changeType) => {
         switch (changeType) {
-            case 'added': return '➕ Добавлено';
-            case 'removed': return '➖ Удалено';
-            case 'modified': return '✏️ Изменено';
+            case 'added': return t('misc.edv_dobavleno');
+            case 'removed': return t('misc.edv_udaleno');
+            case 'modified': return t('misc.edv_izmeneno');
             default: return changeType;
         }
     };
@@ -207,7 +208,7 @@ export function EMRDiffViewer({
                     <>
                         {/* Summary */}
                         <div className="emr-diff__summary">
-                            {diff.summary || `${sortedChanges.length} изменений`}
+                            {diff.summary || t('misc.edv_sortedchanges_length_izmenen', { length: sortedChanges.length })}
                         </div>
 
                         {/* No changes */}
@@ -228,7 +229,7 @@ export function EMRDiffViewer({
                                         {/* Field header */}
                                         <div className="emr-diff__change-header">
                                             <span className="emr-diff__field">
-                                                {getFieldLabel(change.field)}
+                                                {getFieldLabel(change.field, t)}
                                             </span>
                                             <span className="emr-diff__change-type">
                                                 {getChangeTypeLabel(change.change_type)}
@@ -240,9 +241,9 @@ export function EMRDiffViewer({
                                             {/* Old value (for modified/removed) */}
                                             {(change.change_type === 'modified' || change.change_type === 'removed') && (
                                                 <div className="emr-diff__value emr-diff__value--old">
-                                                    <span className="emr-diff__value-label">Было:</span>
+                                                    <span className="emr-diff__value-label">{t('misc.edv_bylo')}</span>
                                                     <span className="emr-diff__value-content">
-                                                        {formatValue(change.old_value)}
+                                                        {formatValue(change.old_value, t)}
                                                     </span>
                                                 </div>
                                             )}
@@ -250,9 +251,9 @@ export function EMRDiffViewer({
                                             {/* New value (for modified/added) */}
                                             {(change.change_type === 'modified' || change.change_type === 'added') && (
                                                 <div className="emr-diff__value emr-diff__value--new">
-                                                    <span className="emr-diff__value-label">Стало:</span>
+                                                    <span className="emr-diff__value-label">{t('misc.edv_stalo')}</span>
                                                     <span className="emr-diff__value-content">
-                                                        {formatValue(change.new_value)}
+                                                        {formatValue(change.new_value, t)}
                                                     </span>
                                                 </div>
                                             )}

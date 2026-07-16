@@ -48,6 +48,7 @@ const AppointmentContextMenu = ({
   theme = 'light',
   isDoctorView = false
 }) => {
+  const { t } = useTranslation();
   const menuRef = useRef(null);
   const [isVisible, setIsVisible] = useState(false);
 
@@ -91,14 +92,14 @@ const AppointmentContextMenu = ({
   const menuItems = [
   {
     id: 'view',
-    label: 'Просмотр',
+    label: t('misc.acm_prosmotr'),
     icon: Eye,
     color: colors.text,
     visible: true
   },
   {
     id: 'edit',
-    label: 'Редактировать',
+    label: t('misc.acm_redaktirovat'),
     icon: Edit,
     color: colors.text,
     visible: true
@@ -106,21 +107,21 @@ const AppointmentContextMenu = ({
   { type: 'divider' },
   {
     id: 'in_cabinet',
-    label: 'В кабинет',
+    label: t('misc.acm_v_kabinet'),
     icon: User,
     color: colors.accent,
     visible: hasBackendAction(row, 'in_cabinet', 'can_start_visit')
   },
   {
     id: 'call',
-    label: 'Вызвать',
+    label: t('misc.acm_vyzvat'),
     icon: Clock,
     color: colors.success,
     visible: hasBackendAction(row, 'call', 'can_start_visit')
   },
   {
     id: 'complete',
-    label: 'Завершить',
+    label: t('misc.acm_zavershit'),
     icon: CheckCircle,
     color: colors.success,
     visible: hasBackendAction(row, 'complete', 'can_complete')
@@ -128,14 +129,14 @@ const AppointmentContextMenu = ({
   { type: 'divider' },
   {
     id: 'payment',
-    label: 'Оплата',
+    label: t('misc.acm_oplata'),
     icon: CreditCard,
     color: colors.success,
     visible: hasBackendAction(row, 'payment', 'can_mark_paid')
   },
   {
     id: 'print',
-    label: 'Печать талона',
+    label: t('misc.acm_pechat_talona'),
     icon: Printer,
     color: colors.accent,
     visible: hasBackendAction(row, 'print', 'can_print_ticket')
@@ -143,14 +144,14 @@ const AppointmentContextMenu = ({
   { type: 'divider' },
   {
     id: 'reschedule',
-    label: 'Перенести',
+    label: t('misc.acm_perenesti'),
     icon: Calendar,
     color: colors.warning,
     visible: hasBackendAction(row, 'reschedule', 'can_reschedule')
   },
   {
     id: 'cancel',
-    label: 'Отменить',
+    label: t('misc.acm_otmenit'),
     icon: X,
     color: colors.error,
     visible: hasBackendAction(row, 'cancel', 'can_cancel')
@@ -158,7 +159,7 @@ const AppointmentContextMenu = ({
   { type: 'divider' },
   {
     id: 'call_patient',
-    label: 'Позвонить',
+    label: t('misc.acm_pozvonit'),
     icon: Phone,
     color: colors.text,
     visible: !!row.patient_phone
@@ -166,7 +167,7 @@ const AppointmentContextMenu = ({
   { type: 'divider' },
   {
     id: 'force_majeure',
-    label: 'Форс-мажор',
+    label: t('misc.acm_fors_mazhor'),
     // UX Audit R-2.7: tooltip объясняет, что произойдёт при клике.
     // Без tooltip «Форс-мажор» — внутренний термин, неинтуитивный для регистратора.
     title: t('final.emergency_actions_title'),
@@ -176,7 +177,7 @@ const AppointmentContextMenu = ({
   },
   {
     id: 'schedule_next',
-    label: 'Назначить следующий визит',
+    label: t('misc.acm_naznachit_sleduyuschiy_vizit'),
     icon: Calendar,
     color: colors.accent,
     visible: !isDoctorView

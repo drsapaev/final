@@ -3,8 +3,10 @@ import { api } from '../api/client';
 import { Shield, Smartphone, Download, Copy, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
 import PropTypes from 'prop-types';
 import { Input } from './ui/macos';
+import { useTranslation } from '../i18n/useTranslation';
 
 const TwoFactorSetup = ({ onComplete, onCancel }) => {
+  const { t } = useTranslation();
   const [step, setStep] = useState(1); // 1: Setup, 2: Verify, 3: Complete
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -34,7 +36,7 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
       setBackupCodes(response.backup_codes);
       setStep(2);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Ошибка настройки 2FA');
+      setError(err.response?.data?.detail || t('misc.tfs_oshibka_nastroyki_2fa'));
     } finally {
       setLoading(false);
     }
@@ -42,7 +44,7 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
 
   const handleVerify = async () => {
     if (!totpCode || totpCode.length !== 6) {
-      setError('Введите 6-значный код из приложения');
+      setError(t('misc.tfs_vvedite_6_znachnyy_kod_iz_pr'));
       return;
     }
 
@@ -55,13 +57,13 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
       });
 
       if (response.success) {
-        setSuccess('2FA успешно настроена!');
+        setSuccess(t('misc.tfs_2fa_uspeshno_nastroena'));
         setStep(3);
       } else {
-        setError(response.message || 'Неверный код');
+        setError(response.message || t('misc.tfs_nevernyy_kod'));
       }
     } catch (err) {
-      setError(err.response?.data?.detail || 'Ошибка верификации');
+      setError(err.response?.data?.detail || t('misc.tfs_oshibka_verifikatsii'));
     } finally {
       setLoading(false);
     }
@@ -173,7 +175,7 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
         }}>
         
           {loading ? <RefreshCw size={16} className="animate-spin" /> : <Shield size={16} />}
-          {loading ? 'Настройка...' : 'Настроить 2FA'}
+          {loading ? t('misc.tfs_nastroyka') : t('misc.tfs_nastroit_2fa')}
         </button>
         
         <button
@@ -257,7 +259,7 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
             </code>
             <button
             onClick={() => copyToClipboard(setupData?.secret_key, 'secret')}
-            aria-label="Скопировать секретный ключ двухфакторной аутентификации"
+            aria-label={t('misc.tfs_skopirovat_sekretnyy_klyuch_')}
             style={{
               padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
               background: 'var(--accent-color)',
@@ -330,7 +332,7 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
         }}>
         
           {loading ? <RefreshCw size={16} className="animate-spin" /> : <CheckCircle size={16} />}
-          {loading ? 'Проверка...' : 'Подтвердить'}
+          {loading ? t('misc.tfs_proverka') : t('misc.tfs_podtverdit')}
         </button>
         
         <button
@@ -428,7 +430,7 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
               </code>
               <button
             onClick={() => copyToClipboard(code, `code-${index}`)}
-            aria-label={`Скопировать резервный код ${index + 1}`}
+            aria-label={t('misc.tfs_skopirovat_rezervnyy_kod_ind', { index: index + 1 })}
             style={{
               padding: 'var(--mac-spacing-1)',
               background: 'transparent',
@@ -459,8 +461,8 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
           fontSize: 'var(--mac-font-size-xs)'
         }}>
             <AlertCircle size={16} />
-            <span style={{ fontWeight: 'var(--mac-font-weight-medium)' }}>Важно:</span>
-            <span>Сохраните эти коды в безопасном месте. Каждый код можно использовать только один раз.</span>
+            <span style={{ fontWeight: 'var(--mac-font-weight-medium)' }}>{t('misc.tfs_vazhno')}</span>
+            <span>{t('misc.tfs_sohranite_eti_kody_v_bezopas')}</span>
           </div>
         </div>
       </div>

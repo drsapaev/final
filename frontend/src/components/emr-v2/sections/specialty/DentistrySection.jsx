@@ -39,6 +39,7 @@ export function DentistrySection({
     onChange,
     disabled = false,
 }) {
+  const { t } = useTranslation();
     const [activeTab, setActiveTab] = useState('chart'); // 'chart' | 'hygiene' | 'periodontal' | 'occlusion' | 'radiographs'
 
     // Handlers
@@ -72,7 +73,7 @@ export function DentistrySection({
 
     return (
         <EMRSection
-            title="Стоматологические данные"
+            title={t('misc.ds_stomatologicheskie_dannye')}
             icon="smile"
             disabled={disabled}
             defaultOpen={true}
@@ -171,7 +172,7 @@ export function DentistrySection({
             {activeTab === 'periodontal' && (
                 <div className="dentistry-tab-content">
                     <div className="dentistry-periodontal-info">
-                        <p>Пародонтальные карманы измеряются в мм для каждого зуба</p>
+                        <p>{t('misc.ds_parodontalnye_karmany_izmery')}</p>
                         <p className="dentistry-note">
                             Глубина: 0-3мм — норма, 4-5мм — умеренный, 6+мм — тяжелый
                         </p>
@@ -179,7 +180,7 @@ export function DentistrySection({
 
                     {/* Upper Jaw */}
                     <div className="periodontal-jaw-section">
-                        <h5 className="periodontal-jaw-title">Верхняя челюсть</h5>
+                        <h5 className="periodontal-jaw-title">{t('misc.ds_verhnyaya_chelyust')}</h5>
                         <div className="periodontal-teeth-grid upper">
                             {[18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28].map(toothNum => {
                                 const depth = periodontalPockets?.[toothNum] || 0;
@@ -209,7 +210,7 @@ export function DentistrySection({
 
                     {/* Lower Jaw */}
                     <div className="periodontal-jaw-section">
-                        <h5 className="periodontal-jaw-title">Нижняя челюсть</h5>
+                        <h5 className="periodontal-jaw-title">{t('misc.ds_nizhnyaya_chelyust')}</h5>
                         <div className="periodontal-teeth-grid lower">
                             {[48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38].map(toothNum => {
                                 const depth = periodontalPockets?.[toothNum] || 0;
@@ -252,19 +253,19 @@ export function DentistrySection({
                                 <div className="periodontal-stats">
                                     <div className="stat-item">
                                         <span className="stat-value">{avg}</span>
-                                        <span className="stat-label">Средняя глубина (мм)</span>
+                                        <span className="stat-label">{t('misc.ds_srednyaya_glubina_mm')}</span>
                                     </div>
                                     <div className="stat-item">
                                         <span className="stat-value">{max}</span>
-                                        <span className="stat-label">Макс. глубина (мм)</span>
+                                        <span className="stat-label">{t('misc.ds_maks_glubina_mm')}</span>
                                     </div>
                                     <div className="stat-item severe">
                                         <span className="stat-value">{severe}</span>
-                                        <span className="stat-label">Тяжёлых (≥6мм)</span>
+                                        <span className="stat-label">{t('misc.ds_tyazhyolyh_6mm')}</span>
                                     </div>
                                     <div className="stat-item moderate">
                                         <span className="stat-value">{moderate}</span>
-                                        <span className="stat-label">Умеренных (4-5мм)</span>
+                                        <span className="stat-label">{t('misc.ds_umerennyh_4_5mm')}</span>
                                     </div>
                                 </div>
                             );
@@ -278,41 +279,41 @@ export function DentistrySection({
                 <div className="dentistry-tab-content">
                     <div className="dentistry-measurements-grid">
                         <EMRTextField
-                            label="Overjet (мм)"
+                            label={t('misc.ds_overjet_mm')}
                             value={measurements?.overjet || ''}
                             onChange={(e) => handleMeasurementChange('overjet', e.target.value)}
                             disabled={disabled}
                             type="number"
-                            placeholder="Горизонтальное перекрытие"
+                            placeholder={t('misc.ds_gorizontalnoe_perekrytie')}
                         />
                         <EMRTextField
-                            label="Overbite (мм)"
+                            label={t('misc.ds_overbite_mm')}
                             value={measurements?.overbite || ''}
                             onChange={(e) => handleMeasurementChange('overbite', e.target.value)}
                             disabled={disabled}
                             type="number"
-                            placeholder="Вертикальное перекрытие"
+                            placeholder={t('misc.ds_vertikalnoe_perekrytie')}
                         />
                         <EMRTextField
-                            label="Midline deviation (мм)"
+                            label={t('misc.ds_midline_deviation_mm')}
                             value={measurements?.midline || ''}
                             onChange={(e) => handleMeasurementChange('midline', e.target.value)}
                             disabled={disabled}
                             type="number"
-                            placeholder="Отклонение срединной линии"
+                            placeholder={t('misc.ds_otklonenie_sredinnoy_linii')}
                         />
                         <div className="dentistry-checkbox-group">
                             <label className="dentistry-checkbox">
                                 <Checkbox aria-label="Crossbite measurement" checked={measurements?.crossbite || false} onChange={(e) => handleMeasurementChange('crossbite', e.target.checked)}
                                     disabled={disabled}
                                 />
-                                <span>Перекрестный прикус</span>
+                                <span>{t('misc.ds_perekrestnyy_prikus')}</span>
                             </label>
                             <label className="dentistry-checkbox">
                                 <Checkbox aria-label="Open bite measurement" checked={measurements?.openBite || false} onChange={(e) => handleMeasurementChange('openBite', e.target.checked)}
                                     disabled={disabled}
                                 />
-                                <span>Открытый прикус</span>
+                                <span>{t('misc.ds_otkrytyy_prikus')}</span>
                             </label>
                         </div>
                     </div>
@@ -324,21 +325,21 @@ export function DentistrySection({
                 <div className="dentistry-tab-content">
                     <div className="dentistry-radiographs-grid">
                         <EMRTextField
-                            label="Панорамный снимок"
+                            label={t('misc.ds_panoramnyy_snimok')}
                             value={radiographs?.panoramic || ''}
                             onChange={(e) => handleRadiographChange('panoramic', e.target.value)}
                             disabled={disabled}
-                            placeholder="URL или путь к файлу"
+                            placeholder={t('misc.ds_url_ili_put_k_faylu')}
                         />
                         <EMRTextField
-                            label="КЛКТ"
+                            label={t('misc.ds_klkt')}
                             value={radiographs?.cbct || ''}
                             onChange={(e) => handleRadiographChange('cbct', e.target.value)}
                             disabled={disabled}
-                            placeholder="URL или путь к файлу"
+                            placeholder={t('misc.ds_url_ili_put_k_faylu')}
                         />
                         <div className="dentistry-radiographs-note">
-                            <p>Прицельные и прикусные снимки добавляются через зубную карту</p>
+                            <p>{t('misc.ds_pritselnye_i_prikusnye_snimk')}</p>
                         </div>
                     </div>
                 </div>

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import TelegramManager from '../components/telegram/TelegramManager';
 import {
+import { useTranslation } from '../i18n/useTranslation';
   MessageSquare,
   Bot,
   Settings,
@@ -26,12 +27,12 @@ const TelegramPage = () => {void
   const [activeTab, setActiveTab] = useState('overview');
 
   const tabs = [
-  { id: 'overview', label: 'Обзор', icon: Bot },
-  { id: 'notifications', label: 'Уведомления', icon: Bell },
-  { id: 'templates', label: 'Шаблоны', icon: FileText },
-  { id: 'users', label: 'Пользователи', icon: Users },
-  { id: 'analytics', label: 'Аналитика', icon: BarChart3 },
-  { id: 'settings', label: 'Настройки', icon: Settings }];
+  { id: 'overview', label: t('misc.tp_obzor'), icon: Bot },
+  { id: 'notifications', label: t('misc.tp_uvedomleniya'), icon: Bell },
+  { id: 'templates', label: t('misc.tp_shablony'), icon: FileText },
+  { id: 'users', label: t('misc.tp_polzovateli'), icon: Users },
+  { id: 'analytics', label: t('misc.tp_analitika'), icon: BarChart3 },
+  { id: 'settings', label: t('misc.tp_nastroyki'), icon: Settings }];
 
 
   const renderOverview = () =>
@@ -42,8 +43,8 @@ const TelegramPage = () => {void
           <div className="flex items-center space-x-3">
             <Send className="w-8 h-8 text-blue-600" />
             <div>
-              <h3 className="font-semibold text-blue-800">Отправить уведомление</h3>
-              <p className="text-sm text-blue-600">Быстрая отправка сообщения</p>
+              <h3 className="font-semibold text-blue-800">{t('misc.tp_otpravit_uvedomlenie')}</h3>
+              <p className="text-sm text-blue-600">{t('misc.tp_bystraya_otpravka_soobscheni')}</p>
             </div>
           </div>
         </div>
@@ -53,7 +54,7 @@ const TelegramPage = () => {void
             <QrCode className="w-8 h-8 text-green-600" />
             <div>
               <h3 className="font-semibold text-green-800">QR коды</h3>
-              <p className="text-sm text-green-600">Управление QR кодами</p>
+              <p className="text-sm text-green-600">{t('misc.tp_upravlenie_qr_kodami')}</p>
             </div>
           </div>
         </div>
@@ -62,8 +63,8 @@ const TelegramPage = () => {void
           <div className="flex items-center space-x-3">
             <Users className="w-8 h-8 text-purple-600" />
             <div>
-              <h3 className="font-semibold text-purple-800">Пользователи</h3>
-              <p className="text-sm text-purple-600">Управление пользователями</p>
+              <h3 className="font-semibold text-purple-800">{t('misc.tp_polzovateli_2')}</h3>
+              <p className="text-sm text-purple-600">{t('misc.tp_upravlenie_polzovatelyami')}</p>
             </div>
           </div>
         </div>
@@ -72,8 +73,8 @@ const TelegramPage = () => {void
           <div className="flex items-center space-x-3">
             <BarChart3 className="w-8 h-8 text-orange-600" />
             <div>
-              <h3 className="font-semibold text-orange-800">Статистика</h3>
-              <p className="text-sm text-orange-600">Аналитика и отчеты</p>
+              <h3 className="font-semibold text-orange-800">{t('misc.tp_statistika')}</h3>
+              <p className="text-sm text-orange-600">{t('misc.tp_analitika_i_otchety')}</p>
             </div>
           </div>
         </div>

@@ -4,12 +4,14 @@ import { Card, Button, Badge,
 import { useQueueManager } from '../../hooks/useQueueManager';
 import { useEMRAI } from '../../hooks/useEMRAI';
 import { useAppData } from '../../contexts/AppDataContext';
+import { useTranslation } from '../../i18n/useTranslation';
 
 /**
  * Демонстрационный компонент для проверки интеграции
  * Показывает работу всех созданных хуков и контекстов
  */
 const IntegrationDemo = () => {
+  const { t } = useTranslation();
   const [activeDemo, setActiveDemo] = useState('queue');
   
   // Используем созданные хуки
@@ -18,8 +20,8 @@ const IntegrationDemo = () => {
   const { users, appointments, actions } = useAppData();
 
   // Локальные состояния для демо
-  const [testSymptoms, setTestSymptoms] = useState('головная боль, тошнота');
-  const [testDiagnosis, setTestDiagnosis] = useState('мигрень');
+  const [testSymptoms, setTestSymptoms] = useState(t('misc.id_golovnaya_bol_toshnota'));
+  const [testDiagnosis, setTestDiagnosis] = useState(t('misc.id_migren'));
 
   useEffect(() => {
     // Имитируем загрузку данных при монтировании
@@ -28,8 +30,8 @@ const IntegrationDemo = () => {
     // Симулируем задержку API
     setTimeout(() => {
       actions.setUsers([
-        { id: 1, name: 'Доктор Иванов', role: 'Doctor' },
-        { id: 2, name: 'Медсестра Петрова', role: 'Nurse' }
+        { id: 1, name: t('misc.id_doktor_ivanov'), role: 'Doctor' },
+        { id: 2, name: t('misc.id_medsestra_petrova'), role: 'Nurse' }
       ]);
     }, 1000);
   }, [actions]);
@@ -49,9 +51,9 @@ const IntegrationDemo = () => {
       
       <div className="clinic-grid clinic-grid-cols-2 clinic-gap-md">
         <Card className="clinic-p-md">
-          <h4>Специалисты</h4>
+          <h4>{t('misc.id_spetsialisty')}</h4>
           {queueManager.loading ? (
-            <p>Загрузка...</p>
+            <p>{t('misc.id_zagruzka')}</p>
           ) : (
             <div className="clinic-space-y-sm">
               {queueManager.specialists.map(specialist => (
@@ -65,7 +67,7 @@ const IntegrationDemo = () => {
         </Card>
         
         <Card className="clinic-p-md">
-          <h4>Действия</h4>
+          <h4>{t('misc.id_deystviya')}</h4>
           <div className="clinic-space-y-sm">
             <Button 
               variant="primary" 
@@ -104,29 +106,29 @@ const IntegrationDemo = () => {
       
       <div className="clinic-grid clinic-grid-cols-2 clinic-gap-md">
         <Card className="clinic-p-md">
-          <h4>Входные данные</h4>
+          <h4>{t('misc.id_vhodnye_dannye')}</h4>
           <div className="clinic-space-y-sm">
             <div>
-              <label className="clinic-label">Симптомы:</label>
+              <label className="clinic-label">{t('misc.id_simptomy')}</label>
               <Input
                 type="text"
                 aria-label="Test symptoms"
                 value={testSymptoms}
                 onChange={(e) => setTestSymptoms(e.target.value)}
                 className="clinic-input"
-                placeholder="Введите симптомы"
+                placeholder={t('misc.id_vvedite_simptomy')}
               />
             </div>
             
             <div>
-              <label className="clinic-label">Диагноз:</label>
+              <label className="clinic-label">{t('misc.id_diagnoz')}</label>
               <Input
                 type="text"
                 aria-label="Test diagnosis"
                 value={testDiagnosis}
                 onChange={(e) => setTestDiagnosis(e.target.value)}
                 className="clinic-input"
-                placeholder="Введите диагноз"
+                placeholder={t('misc.id_vvedite_diagnoz')}
               />
             </div>
             
@@ -135,7 +137,7 @@ const IntegrationDemo = () => {
               onClick={handleAITest}
               disabled={emrAI.loading || (!testSymptoms && !testDiagnosis)}
             >
-              {emrAI.loading ? 'Анализ...' : 'Получить МКБ-10'}
+              {emrAI.loading ? t('misc.id_analiz') : t('misc.id_poluchit_mkb_10')}
             </Button>
           </div>
         </Card>
@@ -156,7 +158,7 @@ const IntegrationDemo = () => {
               ))}
             </div>
           ) : (
-            <p className="clinic-text-secondary">Нет результатов</p>
+            <p className="clinic-text-secondary">{t('misc.id_net_rezultatov')}</p>
           )}
         </Card>
       </div>
@@ -175,7 +177,7 @@ const IntegrationDemo = () => {
       
       <div className="clinic-grid clinic-grid-cols-2 clinic-gap-md">
         <Card className="clinic-p-md">
-          <h4>Пользователи из контекста</h4>
+          <h4>{t('misc.id_polzovateli_iz_konteksta')}</h4>
           {users.length > 0 ? (
             <div className="clinic-space-y-sm">
               {users.map(user => (
@@ -186,18 +188,18 @@ const IntegrationDemo = () => {
               ))}
             </div>
           ) : (
-            <p>Загрузка пользователей...</p>
+            <p>{t('misc.id_zagruzka_polzovateley')}</p>
           )}
         </Card>
         
         <Card className="clinic-p-md">
-          <h4>Действия с контекстом</h4>
+          <h4>{t('misc.id_deystviya_s_kontekstom')}</h4>
           <div className="clinic-space-y-sm">
             <Button 
               variant="secondary"
               onClick={() => actions.addUser({
                 id: Date.now(),
-                name: `Пользователь ${users.length + 1}`,
+                name: t('misc.id_polzovatel_users_length_1', { length: users.length + 1 }),
                 role: 'Test'
               })}
             >
@@ -216,7 +218,7 @@ const IntegrationDemo = () => {
       </div>
       
       <div className="clinic-p-md clinic-bg-info-light clinic-rounded">
-        <strong>Статистика:</strong>
+        <strong>{t('misc.id_statistika')}</strong>
         <ul className="clinic-mt-sm">
           <li>Пользователей в контексте: {users.length}</li>
           <li>Записей: {appointments.length}</li>
@@ -230,7 +232,7 @@ const IntegrationDemo = () => {
     <div className="clinic-page clinic-p-lg">
       <div className="clinic-header">
         <h1>🔧 Демо интеграции и размещения функций</h1>
-        <p>Тестирование кастомных хуков, API интеграции и data flow</p>
+        <p>{t('misc.id_testirovanie_kastomnyh_hukov')}</p>
       </div>
 
       {/* Навигация по демо */}
@@ -266,7 +268,7 @@ const IntegrationDemo = () => {
         <div className="clinic-grid clinic-grid-cols-3 clinic-gap-md clinic-mt-md">
           <div className="clinic-text-center">
             <div className="clinic-text-2xl">✅</div>
-            <div className="clinic-font-semibold">Хуки созданы</div>
+            <div className="clinic-font-semibold">{t('misc.id_huki_sozdany')}</div>
             <div className="clinic-text-sm clinic-text-secondary">
               useQueueManager, useEMRAI
             </div>

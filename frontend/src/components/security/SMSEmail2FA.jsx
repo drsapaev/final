@@ -30,6 +30,7 @@ const SMSEmail2FA = ({
   phoneNumber = '',
   emailAddress = ''
 }) => {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -74,15 +75,15 @@ const SMSEmail2FA = ({
       const data = await response.json();
 
       if (response.ok) {
-        setSuccess(`Код отправлен на ${method === 'sms' ? phoneNumber : emailAddress}`);
+        setSuccess(t('misc.sef_kod_otpravlen_na_method_sms_', { emailAddress: method === 'sms' ? phoneNumber : emailAddress }));
         setTimeLeft(resendDelay);
         setCanResend(false);
         setAttempts(0);
       } else {
-        setError(data.detail || 'Ошибка отправки кода');
+        setError(data.detail || t('misc.sef_oshibka_otpravki_koda'));
       }
     } catch {
-      setError('Ошибка отправки кода');
+      setError(t('misc.sef_oshibka_otpravki_koda'));
     } finally {
       setLoading(false);
     }
@@ -90,7 +91,7 @@ const SMSEmail2FA = ({
 
   const verifyCode = async () => {
     if (!code || code.length !== codeLength) {
-      setError('Введите 6-значный код');
+      setError(t('misc.sef_vvedite_6_znachnyy_kod'));
       return;
     }
 
@@ -115,21 +116,21 @@ const SMSEmail2FA = ({
       const data = await response.json();
 
       if (response.ok) {
-        setSuccess('Код подтвержден успешно!');
+        setSuccess(t('misc.sef_kod_podtverzhden_uspeshno'));
         if (onSuccess) {
           onSuccess(data);
         }
       } else {
-        setError(data.detail || 'Неверный код');
+        setError(data.detail || t('misc.sef_nevernyy_kod'));
         setAttempts((prev) => prev + 1);
 
         if (attempts + 1 >= maxAttempts) {
-          setError('Превышено количество попыток. Попробуйте позже.');
+          setError(t('misc.sef_prevysheno_kolichestvo_popyt'));
           setCanResend(false);
         }
       }
     } catch {
-      setError('Ошибка проверки кода');
+      setError(t('misc.sef_oshibka_proverki_koda'));
     } finally {
       setLoading(false);
     }
@@ -206,7 +207,7 @@ const SMSEmail2FA = ({
             <div className="relative">
               <Input
                 type={showCode ? 'text' : 'password'}
-                aria-label="Код подтверждения"
+                aria-label={t('misc.sef_kod_podtverzhdeniya')}
                 value={code}
                 onChange={handleCodeChange}
                 onKeyPress={handleKeyPress}
@@ -218,7 +219,7 @@ const SMSEmail2FA = ({
               <button
                 type="button"
                 onClick={() => setShowCode(!showCode)}
-                aria-label={showCode ? 'Скрыть код подтверждения' : 'Показать код подтверждения'}
+                aria-label={showCode ? t('misc.sef_skryt_kod_podtverzhdeniya') : t('misc.sef_pokazat_kod_podtverzhdeniya')}
                 className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600">
                 
                 {showCode ?
@@ -253,7 +254,7 @@ const SMSEmail2FA = ({
                 className="flex-1">
                 
                 <Send className="w-4 h-4 mr-2" />
-                {canResend ? 'Отправить код' : `Повторно через ${formatTime(timeLeft)}`}
+                {canResend ? t('misc.sef_otpravit_kod') : t('misc.sef_povtorno_cherez_formattime_t', { timeLeft: formatTime(timeLeft) })}
               </Button>
 
               {onCancel &&

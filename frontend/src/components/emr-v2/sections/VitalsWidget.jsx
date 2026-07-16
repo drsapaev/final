@@ -32,7 +32,7 @@ const VitalsWidget = ({ vitals = {}, onChange, onFieldTouch, disabled }) => {
         <div className="emr-vitals">
             <div className="emr-vitals__row">
                 <div className={`emr-vitals__field ${isBPCritical ? 'emr-vitals__field--critical' : isBPHigh ? 'emr-vitals__field--warning' : ''}`}>
-                    <label>АД сист.</label>
+                    <label>{t('misc.vw_ad_sist')}</label>
                     <Input
                         type="number"
                         aria-label="Systolic blood pressure"
@@ -44,7 +44,7 @@ const VitalsWidget = ({ vitals = {}, onChange, onFieldTouch, disabled }) => {
                 </div>
                 <span className="emr-vitals__separator">/</span>
                 <div className={`emr-vitals__field ${isBPCritical ? 'emr-vitals__field--critical' : isBPHigh ? 'emr-vitals__field--warning' : ''}`}>
-                    <label>АД диаст.</label>
+                    <label>{t('misc.vw_ad_diast')}</label>
                     <Input
                         type="number"
                         aria-label="Diastolic blood pressure"
@@ -55,7 +55,7 @@ const VitalsWidget = ({ vitals = {}, onChange, onFieldTouch, disabled }) => {
                     />
                 </div>
                 <div className="emr-vitals__field">
-                    <label>Пульс</label>
+                    <label>{t('misc.vw_puls')}</label>
                     <Input
                         type="number"
                         aria-label="Pulse"
@@ -81,7 +81,7 @@ const VitalsWidget = ({ vitals = {}, onChange, onFieldTouch, disabled }) => {
                 {/* BP Warning - subtle, non-blocking */}
                 {isBPHigh && (
                     <div className={`emr-vitals__warning ${isBPCritical ? 'emr-vitals__warning--critical' : ''}`}>
-                        {isBPCritical ? '⚠️ Криз' : '↑ АД'}
+                        {isBPCritical ? t('misc.vw_kriz') : t('misc.vw_ad')}
                     </div>
                 )}
             </div>

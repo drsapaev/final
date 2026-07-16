@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { Card, Button } from '../ui/macos';
 import {
+import { useTranslation } from '../../i18n/useTranslation';
   TrendingUp,
   TrendingDown,
   Users,
@@ -32,6 +33,7 @@ const KPIMetrics = ({
   showTrends = true,
   showComparisons = true
 }) => {
+  const { t } = useTranslation();
   const [animatedValues, setAnimatedValues] = useState({});
   const [selectedPeriod, setSelectedPeriod] = useState('30d');
 
@@ -112,11 +114,11 @@ const KPIMetrics = ({
     switch (type) {
       case 'revenue':
         // UX Audit: валюта — узбекский сум (не рубль ₽).
-        return `${value.toLocaleString('ru-RU')} сум`;
+        return t('misc.km_value_tolocalestring_ru_ru_s', { RU: value.toLocaleString('ru-RU') });
       case 'percentage':
         return `${value.toFixed(1)}%`;
       case 'time':
-        return `${value} мин`;
+        return t('misc.km_value_min', { value: value });
       case 'count':
         return value.toLocaleString();
       default:
@@ -191,7 +193,7 @@ const KPIMetrics = ({
             {showComparisons && metric.comparison &&
             <div className="pt-2 border-t border-gray-100">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-gray-500">Среднее по отрасли</span>
+                  <span className="text-gray-500">{t('misc.km_srednee_po_otrasli')}</span>
                   <span className="font-medium">
                     {formatValue(metric.comparison, metric.format)}
                   </span>
@@ -214,7 +216,7 @@ const KPIMetrics = ({
             {metric.goal &&
             <div className="pt-2 border-t border-gray-100">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-gray-500">Цель</span>
+                  <span className="text-gray-500">{t('misc.km_tsel')}</span>
                   <span className="font-medium">
                     {formatValue(metric.goal, metric.format)}
                   </span>
@@ -251,7 +253,7 @@ const KPIMetrics = ({
     return (
       <Card className="p-6 mb-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold">Сводка KPI</h3>
+          <h3 className="text-lg font-semibold">{t('misc.km_svodka_kpi')}</h3>
           <div className="flex items-center space-x-2">
             <Button
               variant="outline"
@@ -277,19 +279,19 @@ const KPIMetrics = ({
             <div className="text-2xl font-bold text-green-600">
               {data.summary.positive_trends || 0}
             </div>
-            <div className="text-sm text-gray-600">Положительные тренды</div>
+            <div className="text-sm text-gray-600">{t('misc.km_polozhitelnye_trendy')}</div>
           </div>
           <div className="text-center">
             <div className="text-2xl font-bold text-red-600">
               {data.summary.negative_trends || 0}
             </div>
-            <div className="text-sm text-gray-600">Отрицательные тренды</div>
+            <div className="text-sm text-gray-600">{t('misc.km_otritsatelnye_trendy')}</div>
           </div>
           <div className="text-center">
             <div className="text-2xl font-bold text-blue-600">
               {data.summary.achieved_goals || 0}
             </div>
-            <div className="text-sm text-gray-600">Достигнутые цели</div>
+            <div className="text-sm text-gray-600">{t('misc.km_dostignutye_tseli')}</div>
           </div>
         </div>
       </Card>);
@@ -347,7 +349,7 @@ const KPIMetrics = ({
       {/* Период */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-2">
-          <span className="text-sm font-medium">Период:</span>
+          <span className="text-sm font-medium">{t('misc.km_period')}</span>
           <select
             value={selectedPeriod}
             onChange={(e) => setSelectedPeriod(e.target.value)}

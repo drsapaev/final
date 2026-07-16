@@ -37,6 +37,7 @@ const PatientStepV2 = ({
   onUpdateCart,
   phoneError
 }) => {
+  const { t } = useTranslation();
   const safeData = data || {};
   const selectedGender = normalizeGenderForForm(safeData.gender);
 
@@ -55,7 +56,7 @@ const PatientStepV2 = ({
               type="text"
               value={safeData.fio || ''}
               onChange={(e) => onSearch(e.target.value)}
-              placeholder="Введите ФИО для поиска или создания"
+              placeholder={t('misc.psv_vvedite_fio_dlya_poiska_ili_')}
               error={!!errors.fio}
               icon={Search}
               iconPosition="left"
@@ -68,13 +69,13 @@ const PatientStepV2 = ({
               {safeData.id ?
               <>
                   <div className="patient-step-v2__status-dot-inline patient-step-v2__status-dot-inline--existing" />
-                  <span className="patient-step-v2__status-text-inline--existing">Существующий</span>
+                  <span className="patient-step-v2__status-text-inline--existing">{t('misc.psv_suschestvuyuschiy')}</span>
                 </> :
 
               (safeData.fio || '').length > 0 &&
               <>
                     <div className="patient-step-v2__status-dot-inline patient-step-v2__status-dot-inline--new" />
-                    <span className="patient-step-v2__status-text-inline--new">Новый</span>
+                    <span className="patient-step-v2__status-text-inline--new">{t('misc.psv_novyy')}</span>
                   </>
 
               }
@@ -133,7 +134,7 @@ const PatientStepV2 = ({
           </label>
           <div
             role="radiogroup"
-            aria-label="Пол пациента"
+            aria-label={t('misc.psv_pol_patsienta')}
             aria-required="true"
             tabIndex={-1}
             onKeyDown={(e) => {
@@ -155,7 +156,7 @@ const PatientStepV2 = ({
               onClick={() => onUpdate('gender', gender)}
               className={`patient-step-v2__gender-radio ${selectedGender === gender ? 'patient-step-v2__gender-radio--selected' : 'patient-step-v2__gender-radio--unselected'}`}>
 
-                {gender === 'male' ? 'Мужской' : 'Женский'}
+                {gender === 'male' ? t('misc.psv_muzhskoy') : t('misc.psv_zhenskiy')}
               </button>
             )}
           </div>
@@ -205,7 +206,7 @@ const PatientStepV2 = ({
               onClick={() => onSelectPatient(phoneError.patient)}
               className="patient-step-v2__phone-error-btn">
 
-                Выбрать {phoneError?.patient?.fio || 'этого пациента'}
+                Выбрать {phoneError?.patient?.fio || t('misc.psv_etogo_patsienta')}
               </button>
             </div>
           }
@@ -220,13 +221,13 @@ const PatientStepV2 = ({
             type="text"
             value={formattedBirthDate}
             onChange={(e) => onBirthDateChange(e.target.value)}
-            placeholder="ДД.ММ.ГГГГ"
+            placeholder={t('misc.psv_dd_mm_gggg')}
             maxLength={10}
             error={!!errors.birth_date}
             icon={Calendar}
             iconPosition="left"
             size="md"
-            aria-label="Дата рождения" />
+            aria-label={t('misc.psv_data_rozhdeniya')} />
 
           {errors.birth_date &&
           <span className="patient-step-v2__error-inline">
@@ -245,7 +246,7 @@ const PatientStepV2 = ({
             type="text"
             value={data.address}
             onChange={(e) => onUpdate('address', e.target.value)}
-            placeholder="Адрес проживания"
+            placeholder={t('misc.psv_adres_prozhivaniya')}
             size="md" />
 
         </div>

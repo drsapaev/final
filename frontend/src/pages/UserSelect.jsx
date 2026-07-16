@@ -26,7 +26,7 @@ export default function UserSelect() {
         const data = r.data;
         setItems(Array.isArray(data) ? data : []);
       } catch (e) {
-        setErr(e.message || 'Ошибка загрузки');
+        setErr(e.message || t('misc.us_oshibka_zagruzki'));
       } finally {
         setLoading(false);
       }
@@ -36,16 +36,16 @@ export default function UserSelect() {
   return (
     <Card style={{ maxWidth: 860 }}>
       <CardHeader>
-        <h1 style={{ fontSize: 24, fontWeight: 800, margin: 0, color: 'var(--mac-text-primary)' }}>Выбор пользователя</h1>
-        <div style={{ color: 'var(--mac-text-secondary)', fontSize: 13, marginTop: 8 }}>Доступно администратору. Нажмите, чтобы перейти к роли.</div>
+        <h1 style={{ fontSize: 24, fontWeight: 800, margin: 0, color: 'var(--mac-text-primary)' }}>{t('misc.us_vybor_polzovatelya')}</h1>
+        <div style={{ color: 'var(--mac-text-secondary)', fontSize: 13, marginTop: 8 }}>{t('misc.us_dostupno_administratoru_nazh')}</div>
       </CardHeader>
       <CardContent>
-      {err && <AppError title="Не удалось загрузить пользователей" description={err} style={{ marginBottom: 12 }} />}
+      {err && <AppError title={t('misc.us_ne_udalos_zagruzit_polzovate')} description={err} style={{ marginBottom: 12 }} />}
       {loading ? (
         <AppLoading
-          title="Загрузка пользователей"
-          description="Получаем список доступных пользователей."
-          ariaLabel="Загружаем список пользователей"
+          title={t('misc.us_zagruzka_polzovateley')}
+          description={t('misc.us_poluchaem_spisok_dostupnyh_p')}
+          ariaLabel={t('misc.us_zagruzhaem_spisok_polzovatel')}
           size="sm"
         />
       ) : (
@@ -74,7 +74,7 @@ export default function UserSelect() {
               </div>
             </div>
           ))}
-          {items.length === 0 && <AppEmpty title="Пользователи не найдены" description="Нет пользователей, доступных для выбора роли." />}
+          {items.length === 0 && <AppEmpty title={t('misc.us_polzovateli_ne_naydeny')} description={t('misc.us_net_polzovateley_dostupnyh_d')} />}
         </div>
       )}
       </CardContent>

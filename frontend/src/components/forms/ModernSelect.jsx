@@ -16,7 +16,7 @@ import { useTranslation } from '../../i18n/useTranslation';
 
 const ModernSelect = ({
   label,
-  placeholder = 'Выберите опцию',
+  placeholder = t('misc.ms_vyberite_optsiyu'),
   value,
   onChange,
   options = [],
@@ -36,6 +36,7 @@ const ModernSelect = ({
   className = '',
   ...props
 }) => {
+  const { t } = useTranslation();
   const selectListboxId = useId();
   const accessibleLabel = typeof label === 'string' && label.trim() ? label : placeholder;
   const { getColor } = useTheme();
@@ -251,8 +252,8 @@ const ModernSelect = ({
                   className="tag-remove"
                   onClick={(e) => handleRemoveOption(e, val)}
                   tabIndex={0}  // PR-42 / Medium-G: was -1 (removed from tab order)
-                  aria-label="Удалить"
-                  title="Удалить">
+                  aria-label={t('misc.ms_udalit')}
+                  title={t('misc.ms_udalit')}>
                   
                   <X size={12} />
                 </button>
@@ -354,8 +355,8 @@ const ModernSelect = ({
             className="select-action-btn"
             onClick={handleClear}
             tabIndex={0}  // PR-42 / Medium-G: was -1 (removed from tab order)
-            aria-label="Очистить выбор"
-            title="Очистить выбор">
+            aria-label={t('misc.ms_ochistit_vybor')}
+            title={t('misc.ms_ochistit_vybor')}>
             
               <X size={16} />
             </button>
@@ -399,7 +400,7 @@ const ModernSelect = ({
             ref={searchInputRef}
             type="text"
             className="search-input"
-            aria-label={`Поиск: ${accessibleLabel}`}
+            aria-label={t('misc.ms_poisk_accessiblelabel', { accessibleLabel: accessibleLabel })}
             placeholder={t('common.search')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -416,7 +417,7 @@ const ModernSelect = ({
             {loading ?
           <div className="select-loading">
                 <div className="loading-spinner" />
-                <span>Загрузка...</span>
+                <span>{t('misc.ms_zagruzka')}</span>
               </div> :
 
           (() => {

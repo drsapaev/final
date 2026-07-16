@@ -1,37 +1,39 @@
 import PropTypes from 'prop-types';
 import { Checkbox } from './ui/macos';
+import { useTranslation } from '../i18n/useTranslation';
 const ServiceChecklist = ({ value = [], onChange, department }) => {
+  const { t } = useTranslation();
   const services = {
     cardio: [
-      { id: 'cardio_consultation', name: 'Консультация кардиолога', price: 60000, group: 'Кардиология' },
-      { id: 'cardio_ekg', name: 'ЭКГ', price: 25000, group: 'Кардиология' },
-      { id: 'cardio_echo', name: 'ЭхоКГ', price: 120000, group: 'Кардиология' },
-      { id: 'cardio_holter', name: 'Холтер мониторинг', price: 200000, group: 'Кардиология' }
+      { id: 'cardio_consultation', name: t('misc.sc_konsultatsiya_kardiologa'), price: 60000, group: t('misc.sc_kardiologiya') },
+      { id: 'cardio_ekg', name: t('misc.sc_ekg'), price: 25000, group: t('misc.sc_kardiologiya') },
+      { id: 'cardio_echo', name: t('misc.sc_ehokg'), price: 120000, group: t('misc.sc_kardiologiya') },
+      { id: 'cardio_holter', name: t('misc.sc_holter_monitoring'), price: 200000, group: t('misc.sc_kardiologiya') }
     ],
     derma: [
-      { id: 'derma_consultation', name: 'Консультация дерматолога', price: 50000, group: 'Дерматология' },
-      { id: 'derma_biopsy', name: 'Биопсия кожи', price: 150000, group: 'Дерматология' },
-      { id: 'cosm_cleaning', name: 'Чистка лица', price: 80000, group: 'Косметология' },
-      { id: 'cosm_botox', name: 'Инъекции ботокса', price: 300000, group: 'Косметология' },
-      { id: 'cosm_laser', name: 'Лазерная терапия', price: 250000, group: 'Косметология' }
+      { id: 'derma_consultation', name: t('misc.sc_konsultatsiya_dermatologa'), price: 50000, group: t('misc.sc_dermatologiya') },
+      { id: 'derma_biopsy', name: t('misc.sc_biopsiya_kozhi'), price: 150000, group: t('misc.sc_dermatologiya') },
+      { id: 'cosm_cleaning', name: t('misc.sc_chistka_litsa'), price: 80000, group: t('misc.sc_kosmetologiya') },
+      { id: 'cosm_botox', name: t('misc.sc_inektsii_botoksa'), price: 300000, group: t('misc.sc_kosmetologiya') },
+      { id: 'cosm_laser', name: t('misc.sc_lazernaya_terapiya'), price: 250000, group: t('misc.sc_kosmetologiya') }
     ],
     dental: [
-      { id: 'dental_consultation', name: 'Консультация стоматолога', price: 40000, group: 'Стоматология' },
-      { id: 'dental_treatment', name: 'Лечение кариеса', price: 100000, group: 'Стоматология' },
-      { id: 'dental_extraction', name: 'Удаление зуба', price: 80000, group: 'Стоматология' },
-      { id: 'dental_prosthetics', name: 'Протезирование', price: 500000, group: 'Стоматология' }
+      { id: 'dental_consultation', name: t('misc.sc_konsultatsiya_stomatologa'), price: 40000, group: t('misc.sc_stomatologiya') },
+      { id: 'dental_treatment', name: t('misc.sc_lechenie_kariesa'), price: 100000, group: t('misc.sc_stomatologiya') },
+      { id: 'dental_extraction', name: t('misc.sc_udalenie_zuba'), price: 80000, group: t('misc.sc_stomatologiya') },
+      { id: 'dental_prosthetics', name: t('misc.sc_protezirovanie'), price: 500000, group: t('misc.sc_stomatologiya') }
     ],
     lab: [
-      { id: 'lab_blood', name: 'Общий анализ крови', price: 30000, group: 'Лабораторные' },
-      { id: 'lab_urine', name: 'Общий анализ мочи', price: 20000, group: 'Лабораторные' },
-      { id: 'lab_biochem', name: 'Биохимия крови', price: 80000, group: 'Лабораторные' },
-      { id: 'lab_biopsy', name: 'Биопсия', price: 150000, group: 'Лабораторные' }
+      { id: 'lab_blood', name: t('misc.sc_obschiy_analiz_krovi'), price: 30000, group: t('misc.sc_laboratornye') },
+      { id: 'lab_urine', name: t('misc.sc_obschiy_analiz_mochi'), price: 20000, group: t('misc.sc_laboratornye') },
+      { id: 'lab_biochem', name: t('misc.sc_biohimiya_krovi'), price: 80000, group: t('misc.sc_laboratornye') },
+      { id: 'lab_biopsy', name: t('misc.sc_biopsiya'), price: 150000, group: t('misc.sc_laboratornye') }
     ],
     procedures: [
-      { id: 'proc_injection', name: 'Инъекция', price: 15000, group: 'Процедуры' },
-      { id: 'proc_infusion', name: 'Капельница', price: 50000, group: 'Процедуры' },
-      { id: 'proc_physio', name: 'Физиотерапия', price: 35000, group: 'Процедуры' },
-      { id: 'proc_massage', name: 'Массаж', price: 40000, group: 'Процедуры' }
+      { id: 'proc_injection', name: t('misc.sc_inektsiya'), price: 15000, group: t('misc.sc_protsedury') },
+      { id: 'proc_infusion', name: t('misc.sc_kapelnitsa'), price: 50000, group: t('misc.sc_protsedury') },
+      { id: 'proc_physio', name: t('misc.sc_fizioterapiya'), price: 35000, group: t('misc.sc_protsedury') },
+      { id: 'proc_massage', name: t('misc.sc_massazh'), price: 40000, group: t('misc.sc_protsedury') }
     ]
   };
 
@@ -42,7 +44,7 @@ const ServiceChecklist = ({ value = [], onChange, department }) => {
   return (
     <div style={{ border: '1px solid #e5e5e5', borderRadius: 'var(--mac-radius-md)', padding: 'var(--mac-spacing-3)', marginBottom: 'var(--mac-spacing-3)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--mac-spacing-2)' }}>
-        <span style={{ fontWeight: 'var(--mac-font-weight-semibold)' }}>Услуги</span>
+        <span style={{ fontWeight: 'var(--mac-font-weight-semibold)' }}>{t('misc.sc_uslugi')}</span>
         <span style={{ fontSize: 'var(--mac-font-size-base)', color: 'var(--mac-success)', fontWeight: 'var(--mac-font-weight-semibold)' }}>{totalCost.toLocaleString()} UZS</span>
       </div>
       {groups.map(group => (
@@ -50,7 +52,7 @@ const ServiceChecklist = ({ value = [], onChange, department }) => {
           <div style={{ fontWeight: 'var(--mac-font-weight-medium)', fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary)', marginBottom: 'var(--mac-spacing-1)' }}>{group}</div>
           {depServices.filter(s => s.group === group).map(service => (
             <label key={service.id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)', marginBottom: 'var(--mac-spacing-1)' }}>
-              <Checkbox aria-label={`Выбрать услугу: ${service.name}`} checked={value.includes(service.id)} onChange={(e) => {
+              <Checkbox aria-label={t('misc.sc_vybrat_uslugu_service_name', { name: service.name })} checked={value.includes(service.id)} onChange={(e) => {
                   const newValue = e.target.checked 
                     ? [...value, service.id]
                     : value.filter(id => id !== service.id);

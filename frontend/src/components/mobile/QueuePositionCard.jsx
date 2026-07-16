@@ -27,29 +27,29 @@ const QueuePositionCard = ({ queueEntry }) => {
         return {
           color: 'var(--mac-accent-blue)',
           bgColor: 'var(--mac-accent-bg)',
-          text: 'В ожидании',
-          description: `Перед вами ${peopleBefore || 0} чел.`
+          text: t('misc.qpc_v_ozhidanii'),
+          description: t('misc.qpc_pered_vami_peoplebefore_0_ch', { peopleBefore: peopleBefore || 0 })
         };
       case 'called':
         return {
           color: 'var(--mac-success)',
           bgColor: 'rgba(52, 199, 89, 0.1)',
-          text: 'Вас вызывают!',
-          description: `Проходите в кабинет ${cabinet || '?'}`
+          text: t('misc.qpc_vas_vyzyvayut'),
+          description: t('misc.qpc_prohodite_v_kabinet_cabinet', { cabinet: cabinet || '?' })
         };
       case 'in_service':
       case 'in_cabinet':
         return {
           color: 'var(--mac-warning)',
           bgColor: 'rgba(255, 149, 0, 0.1)',
-          text: 'На приёме',
-          description: 'Идёт приём'
+          text: t('misc.qpc_na_priyome'),
+          description: t('misc.qpc_idyot_priyom')
         };
       default:
         return {
           color: 'var(--mac-text-secondary)',
           bgColor: 'var(--mac-bg-secondary)',
-          text: 'Статус неизвестен',
+          text: t('misc.qpc_status_neizvesten'),
           description: ''
         };
     }
@@ -65,7 +65,7 @@ const QueuePositionCard = ({ queueEntry }) => {
                         Талон №{number}
                     </h3>
                     <p className="text-sm font-medium text-gray-700">
-                        {specialty} • {doctorName || 'Врач'}
+                        {specialty} • {doctorName || t('misc.qpc_vrach')}
                     </p>
                 </div>
                 <Badge style={{ backgroundColor: config.bgColor, color: config.color }}>

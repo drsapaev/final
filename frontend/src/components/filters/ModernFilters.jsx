@@ -16,6 +16,7 @@ import { getLocalDateString, getTomorrowDateString } from '../../utils/dateUtils
 import './ModernFilters.css';
 import PropTypes from 'prop-types';
 import { Input,
+import { useTranslation } from '../../i18n/useTranslation';
   Checkbox } from '../ui/macos';
 
 const ModernFilters = ({
@@ -27,6 +28,7 @@ const ModernFilters = ({
   className = '',
   ...props
 }) => {
+  const { t } = useTranslation();
   const { getColor } = useTheme();
   const [isExpanded, setIsExpanded] = useState(false);
   const [searchValue, setSearchValue] = useState(searchParams.get('q') || '');
@@ -76,13 +78,13 @@ const ModernFilters = ({
   const hasActiveFilters = searchValue || dateValue || statusValue;
 
   const statusOptions = [
-  { value: '', label: 'Все статусы', icon: null },
-  { value: 'confirmed', label: 'Подтверждено', icon: '✓' },
-  { value: 'queued', label: 'В очереди', icon: '⏳' },
-  { value: 'paid_pending', label: 'Ожидает оплаты', icon: '💳' },
-  { value: 'paid', label: 'Оплачено', icon: '✅' },
-  { value: 'canceled', label: 'Отменено', icon: '❌' },
-  { value: 'completed', label: 'Завершено', icon: '🏁' }];
+  { value: '', label: t('misc.mf_vse_statusy'), icon: null },
+  { value: 'confirmed', label: t('misc.mf_podtverzhdeno'), icon: '✓' },
+  { value: 'queued', label: t('misc.mf_v_ocheredi'), icon: '⏳' },
+  { value: 'paid_pending', label: t('misc.mf_ozhidaet_oplaty'), icon: '💳' },
+  { value: 'paid', label: t('misc.mf_oplacheno'), icon: '✅' },
+  { value: 'canceled', label: t('misc.mf_otmeneno'), icon: '❌' },
+  { value: 'completed', label: t('misc.mf_zaversheno'), icon: '🏁' }];
 
 
   return (
@@ -95,7 +97,7 @@ const ModernFilters = ({
             ref={searchInputRef}
             type="text"
             aria-label="Search appointments"
-            placeholder="Поиск по ФИО, телефону, услугам..."
+            placeholder={t('misc.mf_poisk_po_fio_telefonu_usluga')}
             value={searchValue}
             onChange={(e) => handleSearchChange(e.target.value)}
             className="search-input"
@@ -110,7 +112,7 @@ const ModernFilters = ({
             type="button"
             className="search-clear"
             onClick={() => handleSearchChange('')}
-            aria-label="Очистить поиск">
+            aria-label={t('misc.mf_ochistit_poisk')}>
             
               <X size={16} />
             </button>
@@ -150,7 +152,7 @@ const ModernFilters = ({
             }}>
             
             <Filter size={18} />
-            <span>Фильтры</span>
+            <span>{t('misc.mf_filtry')}</span>
             {hasActiveFilters && <span className="filters-count">•</span>}
             <ChevronDown className={`toggle-icon ${isExpanded ? 'rotated' : ''}`} size={16} />
           </button>
@@ -264,7 +266,7 @@ const ModernFilters = ({
                 <Checkbox aria-label="Toggle auto refresh" checked={autoRefresh} onChange={(e) => onAutoRefreshChange(e.target.checked)} />
               
                 <RefreshCw size={16} className={autoRefresh ? 'spinning' : ''} />
-                <span>Автообновление</span>
+                <span>{t('misc.mf_avtoobnovlenie')}</span>
               </label>
 
               {/* Очистить фильтры */}

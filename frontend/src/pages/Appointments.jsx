@@ -44,7 +44,7 @@ export default function Appointments() {
       const items = Array.isArray(res?.items) ? res.items : Array.isArray(res) ? res : [];
       setRows(items);
     } catch (e) {
-      setErr(e?.data?.detail || e?.message || 'Ошибка загрузки записей');
+      setErr(e?.data?.detail || e?.message || t('misc.appo_oshibka_zagruzki_zapisey'));
     } finally {
       setBusy(false);
     }
@@ -94,7 +94,7 @@ export default function Appointments() {
         <Card>
           <CardHeader>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-              <h2 style={{ margin: 0, color: 'var(--mac-text-primary)' }}>Записи</h2>
+              <h2 style={{ margin: 0, color: 'var(--mac-text-primary)' }}>{t('misc.appo_zapisi')}</h2>
               <span style={{ color: 'var(--mac-text-secondary)', fontSize: 13 }}>
                 {filtered.length} из {rows.length}
               </span>
@@ -108,11 +108,11 @@ export default function Appointments() {
               <Input type="date" value={date} onChange={(e)=>setDate(e.target.value)} />
             </label>
             <Input
-              placeholder="Поиск по пациенту/врачу/статусу/ID"
+              placeholder={t('misc.appo_poisk_po_patsientu_vrachu_st')}
               value={q}
               onChange={(e)=>setQ(e.target.value)}
               style={{ minWidth: 260 }}
-              aria-label="Поиск по записям"
+              aria-label={t('misc.appo_poisk_po_zapisyam')}
             />
             <Button type="button" variant="outline" size="small" onClick={load} disabled={busy} loading={busy}>
               Обновить
@@ -120,13 +120,13 @@ export default function Appointments() {
             <Checkbox
               checked={useAdvancedTable}
               onChange={(next) => setUseAdvancedTable(next)}
-              label="Расширенная таблица"
+              label={t('misc.appo_rasshirennaya_tablitsa')}
             />
           </div>
 
           {err && (
             <AppError
-              title="Не удалось загрузить записи"
+              title={t('misc.appo_ne_udalos_zagruzit_zapisi')}
               description={String(err)}
               action={
                 <Button type="button" variant="outline" size="small" onClick={load} disabled={busy} loading={busy}>
@@ -185,11 +185,11 @@ export default function Appointments() {
                   <tr>
                     <td colSpan={5}>
                       <AppEmpty
-                        title={isFilteredEmpty ? 'Записи не найдены' : 'Нет записей на выбранную дату'}
+                        title={isFilteredEmpty ? t('misc.appo_zapisi_ne_naydeny') : t('misc.appo_net_zapisey_na_vybrannuyu_da')}
                         description={
                           isFilteredEmpty ?
-                            'Измените поиск по пациенту, врачу, статусу или ID, чтобы увидеть записи.' :
-                            'Если запись только что создана, обновите список.'
+                            t('misc.appo_izmenite_poisk_po_patsientu_') :
+                            t('misc.appo_esli_zapis_tolko_chto_sozdan')
                         }
                       />
                     </td>

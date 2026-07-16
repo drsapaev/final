@@ -10,6 +10,7 @@ import {
 '../constants/appointmentStatus';
 
 const AppointmentFlow = ({ appointment }) => {
+  const { t } = useTranslation();
   const getStepIcon = (step) => {
     switch (step) {
       case 'payment':
@@ -63,22 +64,22 @@ const AppointmentFlow = ({ appointment }) => {
   {
     id: 'payment',
     title: t('final.flow_payment'),
-    description: 'Ожидание оплаты записи',
+    description: t('misc.af_ozhidanie_oplaty_zapisi'),
   },
   {
     id: 'visit',
     title: t('final.flow_start_visit'),
-    description: 'Отправить пациента к врачу',
+    description: t('misc.af_otpravit_patsienta_k_vrachu'),
   },
   {
     id: 'emr',
     title: t('final.flow_emr'),
-    description: 'Электронная медицинская карта',
+    description: t('misc.af_elektronnaya_meditsinskaya_k'),
   },
   {
     id: 'prescription',
     title: t('final.flow_prescription'),
-    description: 'Назначение препаратов',
+    description: t('misc.af_naznachenie_preparatov'),
   }];
 
 
@@ -87,7 +88,7 @@ const AppointmentFlow = ({ appointment }) => {
       <div className="flex items-center gap-3 mb-6">
         <CheckCircle className="w-6 h-6 text-blue-600" />
         <div>
-          <h3 className="text-lg font-semibold">Поток записи</h3>
+          <h3 className="text-lg font-semibold">{t('misc.af_potok_zapisi')}</h3>
           <p className="text-sm text-gray-600">
             {appointment?.patient_name} • {appointment?.specialist}
           </p>
@@ -123,8 +124,8 @@ const AppointmentFlow = ({ appointment }) => {
                       }
                       size="sm">
 
-                      {status === 'completed' ? 'Готово' :
-                      status === 'current' ? 'В процессе' : 'Ожидание'}
+                      {status === 'completed' ? t('misc.af_gotovo') :
+                      status === 'current' ? t('misc.af_v_protsesse') : t('misc.af_ozhidanie')}
                     </Badge>
                   </div>
                   
@@ -141,9 +142,9 @@ const AppointmentFlow = ({ appointment }) => {
       <div className="mt-6 p-4 bg-gray-50 rounded-lg">
         <div className="flex items-center justify-between">
           <div>
-            <div className="font-medium">Статус записи</div>
+            <div className="font-medium">{t('misc.af_status_zapisi')}</div>
             <div className="text-sm text-gray-600">
-              {STATUS_LABELS[appointment?.status] || 'Неизвестно'}
+              {STATUS_LABELS[appointment?.status] || t('misc.af_neizvestno')}
             </div>
           </div>
           <Badge variant={STATUS_COLORS[appointment?.status]}>
@@ -157,7 +158,7 @@ const AppointmentFlow = ({ appointment }) => {
       <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
           <div className="flex items-center gap-2 mb-2">
             <AlertCircle className="w-4 h-4 text-yellow-600" />
-            <div className="font-medium text-yellow-900">Требуется оплата</div>
+            <div className="font-medium text-yellow-900">{t('misc.af_trebuetsya_oplata')}</div>
           </div>
           <div className="text-sm text-yellow-700">
             Запись не может быть передана врачу без предварительной оплаты
@@ -169,7 +170,7 @@ const AppointmentFlow = ({ appointment }) => {
       <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
           <div className="flex items-center gap-2 mb-2">
             <CheckCircle className="w-4 h-4 text-green-600" />
-            <div className="font-medium text-green-900">Готово к приему</div>
+            <div className="font-medium text-green-900">{t('misc.af_gotovo_k_priemu')}</div>
           </div>
           <div className="text-sm text-green-700">
             Запись оплачена, можно отправлять пациента к врачу

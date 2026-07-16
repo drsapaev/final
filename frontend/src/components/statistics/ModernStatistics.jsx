@@ -4,6 +4,7 @@ import {
   Button, Card, Icon,
 } from '../ui/macos';
 import PropTypes from 'prop-types';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const getAppointmentDate = (appointment) => appointment.date || appointment.appointment_date;
 
@@ -52,6 +53,7 @@ const ModernStatistics = ({
   onRefresh,
   ...props
 }) => {void
+  const { t } = useTranslation();
   useTheme();
   const [animatedValues, setAnimatedValues] = useState({});void
   useState('today');void
@@ -60,28 +62,28 @@ const ModernStatistics = ({
   // Переводы — PR-51: added uz + en translations (was ru-only, caused undefined titles)
   const t = {
     ru: {
-      statistics: 'Статистика',
-      totalPatients: 'Всего пациентов',
-      todayAppointments: 'Записи сегодня',
-      pendingPayments: 'Ожидают оплаты',
-      completedToday: 'Завершено сегодня',
-      revenue: 'Выручка',
-      averageWaitTime: 'Среднее время ожидания',
-      departmentLoad: 'Загрузка отделений',
-      trends: 'Тенденции',
-      today: 'Сегодня',
-      week: 'Неделя',
-      month: 'Месяц',
-      year: 'Год',
-      export: 'Экспорт',
-      refresh: 'Обновить',
-      details: 'Подробнее',
-      minutes: 'мин',
-      patients: 'пациентов',
-      appointments: 'записей',
-      sum: 'сум',
-      growth: 'рост',
-      decline: 'снижение'
+      statistics: t('misc.ms_statistika'),
+      totalPatients: t('misc.ms_vsego_patsientov'),
+      todayAppointments: t('misc.ms_zapisi_segodnya'),
+      pendingPayments: t('misc.ms_ozhidayut_oplaty'),
+      completedToday: t('misc.ms_zaversheno_segodnya'),
+      revenue: t('misc.ms_vyruchka'),
+      averageWaitTime: t('misc.ms_srednee_vremya_ozhidaniya'),
+      departmentLoad: t('misc.ms_zagruzka_otdeleniy'),
+      trends: t('misc.ms_tendentsii'),
+      today: t('misc.ms_segodnya'),
+      week: t('misc.ms_nedelya'),
+      month: t('misc.ms_mesyats'),
+      year: t('misc.ms_god'),
+      export: t('misc.ms_eksport'),
+      refresh: t('misc.ms_obnovit'),
+      details: t('misc.ms_podrobnee'),
+      minutes: t('misc.ms_min'),
+      patients: t('misc.ms_patsientov'),
+      appointments: t('misc.ms_zapisey'),
+      sum: t('misc.ms_sum'),
+      growth: t('misc.ms_rost'),
+      decline: t('misc.ms_snizhenie')
     },
     uz: {
       statistics: 'Statistika',

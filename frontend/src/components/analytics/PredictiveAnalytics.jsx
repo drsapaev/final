@@ -2,6 +2,7 @@ import { useState } from 'react';
 import PropTypes from 'prop-types';
 import { Card, Button } from '../ui/macos';
 import {
+import { useTranslation } from '../../i18n/useTranslation';
   TrendingUp,
   TrendingDown,
   Target,
@@ -28,22 +29,23 @@ const PredictiveAnalytics = ({
   onExport,
   showRecommendations = true
 }) => {
+  const { t } = useTranslation();
   const [selectedMetric, setSelectedMetric] = useState('revenue');
   const [forecastPeriod, setForecastPeriod] = useState('30d');
   const [showDetails, setShowDetails] = useState(false);
 
   const metricOptions = [
-  { id: 'revenue', label: 'Доходы', icon: TrendingUp, color: 'green' },
-  { id: 'patients', label: 'Пациенты', icon: Activity, color: 'blue' },
-  { id: 'appointments', label: 'Записи', icon: Clock, color: 'purple' },
-  { id: 'efficiency', label: 'Эффективность', icon: Target, color: 'orange' }];
+  { id: 'revenue', label: t('misc.pa_dohody'), icon: TrendingUp, color: 'green' },
+  { id: 'patients', label: t('misc.pa_patsienty'), icon: Activity, color: 'blue' },
+  { id: 'appointments', label: t('misc.pa_zapisi'), icon: Clock, color: 'purple' },
+  { id: 'efficiency', label: t('misc.pa_effektivnost'), icon: Target, color: 'orange' }];
 
 
   const periodOptions = [
-  { id: '7d', label: '7 дней' },
-  { id: '30d', label: '30 дней' },
-  { id: '90d', label: '90 дней' },
-  { id: '1y', label: '1 год' }];
+  { id: '7d', label: t('misc.pa_7_dney') },
+  { id: '30d', label: t('misc.pa_30_dney') },
+  { id: '90d', label: t('misc.pa_90_dney') },
+  { id: '1y', label: t('misc.pa_1_god') }];
 
 
   const getMetricIcon = (metricId) => {
@@ -66,7 +68,7 @@ const PredictiveAnalytics = ({
     const isPositive = trend > 0;
     const isHighConfidence = confidence > 0.8;
     const metricId = forecast.metric || selectedMetric;
-    const metricLabel = forecast.metric_label || metricOptions.find((m) => m.id === metricId)?.label || 'Прогноз';
+    const metricLabel = forecast.metric_label || metricOptions.find((m) => m.id === metricId)?.label || t('misc.pa_prognoz');
 
     return (
       <Card key={forecast.period} className="relative overflow-hidden">
@@ -103,7 +105,7 @@ const PredictiveAnalytics = ({
 
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600">Уверенность прогноза</span>
+                <span className="text-gray-600">{t('misc.pa_uverennost_prognoza')}</span>
                 <span className={`font-medium ${
                 isHighConfidence ? 'text-green-600' : 'text-yellow-600'}`
                 }>
@@ -122,7 +124,7 @@ const PredictiveAnalytics = ({
 
             {forecast.factors &&
             <div className="pt-2 border-t border-gray-100">
-                <div className="text-xs text-gray-600 mb-1">Ключевые факторы:</div>
+                <div className="text-xs text-gray-600 mb-1">{t('misc.pa_klyuchevye_faktory')}</div>
                 <div className="space-y-1">
                   {forecast.factors.map((factor, index) =>
                 <div key={index} className="flex items-center space-x-2 text-xs">
@@ -157,7 +159,7 @@ const PredictiveAnalytics = ({
     return (
       <Card className="p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold">Рекомендации</h3>
+          <h3 className="text-lg font-semibold">{t('misc.pa_rekomendatsii')}</h3>
           <div className="flex items-center space-x-2">
             <Button
               variant="outline"
@@ -206,7 +208,7 @@ const PredictiveAnalytics = ({
 
     return (
       <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Анализ трендов</h3>
+        <h3 className="text-lg font-semibold mb-4">{t('misc.pa_analiz_trendov')}</h3>
         
         <div className="space-y-4">
           {data.trends.map((trend, index) =>
@@ -285,7 +287,7 @@ const PredictiveAnalytics = ({
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
-              <span className="text-sm font-medium">Метрика:</span>
+              <span className="text-sm font-medium">{t('misc.pa_metrika')}</span>
               <select
                 value={selectedMetric}
                 onChange={(e) => setSelectedMetric(e.target.value)}
@@ -300,7 +302,7 @@ const PredictiveAnalytics = ({
             </div>
             
             <div className="flex items-center space-x-2">
-              <span className="text-sm font-medium">Период:</span>
+              <span className="text-sm font-medium">{t('misc.pa_period')}</span>
               <select
                 value={forecastPeriod}
                 onChange={(e) => setForecastPeriod(e.target.value)}
@@ -322,7 +324,7 @@ const PredictiveAnalytics = ({
               onClick={() => setShowDetails(!showDetails)}>
               
               <Eye className="w-4 h-4 mr-2" />
-              {showDetails ? 'Скрыть детали' : 'Показать детали'}
+              {showDetails ? t('misc.pa_skryt_detali') : t('misc.pa_pokazat_detali')}
             </Button>
             <Button
               variant="outline"

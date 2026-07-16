@@ -16,14 +16,14 @@ import { Input } from '../../ui/macos';
 import { useTranslation } from '../../../i18n/useTranslation';
 
 // Mock DB препаратов
-const MOCK_DRUGS = [
-{ name: 'Амоксициллин', defaultDose: '500 мг', defaultFreq: '3 раза в день' },
-{ name: 'Ибупрофен', defaultDose: '400 мг', defaultFreq: 'по требованию' },
-{ name: 'Бисопролол', defaultDose: '5 мг', defaultFreq: 'утром' },
-{ name: 'Лизиноприл', defaultDose: '10 мг', defaultFreq: 'утром' },
-{ name: 'Аторвастатин', defaultDose: '20 мг', defaultFreq: 'вечером' },
-{ name: 'Омепразол', defaultDose: '20 мг', defaultFreq: 'за 30 мин до еды' },
-{ name: 'Парацетамол', defaultDose: '500 мг', defaultFreq: 'при температуре >38' }];
+const getMockDrugs = (t) => [
+{ name: t('misc.pe_drug_amoxicillin'), defaultDose: t('misc.pe_drug_amoxicillin_dose'), defaultFreq: t('misc.pe_drug_amoxicillin_freq') },
+{ name: t('misc.pe_drug_ibuprofen'), defaultDose: t('misc.pe_drug_ibuprofen_dose'), defaultFreq: t('misc.pe_drug_ibuprofen_freq') },
+{ name: t('misc.pe_drug_bisoprolol'), defaultDose: t('misc.pe_drug_bisoprolol_dose'), defaultFreq: t('misc.pe_drug_bisoprolol_freq') },
+{ name: t('misc.pe_drug_lisinopril'), defaultDose: t('misc.pe_drug_lisinopril_dose'), defaultFreq: t('misc.pe_drug_lisinopril_freq') },
+{ name: t('misc.pe_drug_atorvastatin'), defaultDose: t('misc.pe_drug_atorvastatin_dose'), defaultFreq: t('misc.pe_drug_atorvastatin_freq') },
+{ name: t('misc.pe_drug_omeprazole'), defaultDose: t('misc.pe_drug_omeprazole_dose'), defaultFreq: t('misc.pe_drug_omeprazole_freq') },
+{ name: t('misc.pe_drug_paracetamol'), defaultDose: t('misc.pe_drug_paracetamol_dose'), defaultFreq: t('misc.pe_drug_paracetamol_freq') }];
 
 
 const PrescriptionEditor = ({
@@ -32,6 +32,7 @@ const PrescriptionEditor = ({
   isEditable = true,
   onFieldTouch
 }) => {
+  const { t } = useTranslation();
   const [isAdding, setIsAdding] = useState(false);
   const [newItem, setNewItem] = useState({
     name: '',
@@ -49,7 +50,7 @@ const PrescriptionEditor = ({
     // Search drugs
     if (field === 'name') {
       if (value.length > 1) {
-        const matches = MOCK_DRUGS.filter((d) =>
+        const matches = getMockDrugs(t).filter((d) =>
         d.name.toLowerCase().includes(value.toLowerCase())
         );
         setSuggestions(matches);
@@ -108,8 +109,8 @@ const PrescriptionEditor = ({
                                     <button
               className="prescription-action-btn prescription-action-btn--delete"
               onClick={() => handleDelete(p.id)}
-              title="Удалить"
-              aria-label="Удалить назначение">
+              title={t('misc.pe_udalit')}
+              aria-label={t('misc.pe_udalit_naznachenie')}>
               
                                         <Trash2 size={14} />
                                     </button>
@@ -135,13 +136,13 @@ const PrescriptionEditor = ({
         <div className="prescription-form">
                             <div className="prescription-form__row" style={{ position: 'relative' }}>
                                 <div className="prescription-input-group">
-                                    <label className="prescription-label">Препарат</label>
+                                    <label className="prescription-label">{t('misc.pe_preparat')}</label>
                                     <Input
                 className="prescription-input"
                 aria-label="Prescription medicine name"
                 value={newItem.name}
                 onChange={(e) => handleInputChange('name', e.target.value)}
-                placeholder="Название..."
+                placeholder={t('misc.pe_nazvanie')}
                 autoFocus />
               
                                     {suggestions.length > 0 &&
@@ -170,33 +171,33 @@ const PrescriptionEditor = ({
 
                             <div className="prescription-form__row">
                                 <div className="prescription-input-group prescription-input-group--small">
-                                    <label className="prescription-label">Доза</label>
+                                    <label className="prescription-label">{t('misc.pe_doza')}</label>
                                     <Input
                 className="prescription-input"
                 aria-label="Prescription dose"
                 value={newItem.dose}
                 onChange={(e) => handleInputChange('dose', e.target.value)}
-                placeholder="500 мг" />
+                placeholder={t('misc.pe_500_mg')} />
               
                                 </div>
                                 <div className="prescription-input-group">
-                                    <label className="prescription-label">Кратность</label>
+                                    <label className="prescription-label">{t('misc.pe_kratnost')}</label>
                                     <Input
                 className="prescription-input"
                 aria-label="Prescription frequency"
                 value={newItem.frequency}
                 onChange={(e) => handleInputChange('frequency', e.target.value)}
-                placeholder="3 р/д" />
+                placeholder={t('misc.pe_3_r_d')} />
               
                                 </div>
                                 <div className="prescription-input-group prescription-input-group--small">
-                                    <label className="prescription-label">Длит.</label>
+                                    <label className="prescription-label">{t('misc.pe_dlit')}</label>
                                     <Input
                 className="prescription-input"
                 aria-label="Prescription duration"
                 value={newItem.duration}
                 onChange={(e) => handleInputChange('duration', e.target.value)}
-                placeholder="7 дней" />
+                placeholder={t('misc.pe_7_dney')} />
               
                                 </div>
                             </div>

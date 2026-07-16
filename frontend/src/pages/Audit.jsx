@@ -27,7 +27,7 @@ export default function Audit() {
       const items = Array.isArray(payload) ? payload : Array.isArray(res) ? res : [];
       setRows(items);
     } catch (e) {
-      setErr(e?.data?.detail || e?.message || 'Ошибка загрузки аудита');
+      setErr(e?.data?.detail || e?.message || t('misc.a_oshibka_zagruzki_audita'));
     } finally {
       setBusy(false);
     }
@@ -92,7 +92,7 @@ export default function Audit() {
         <Card>
           <CardHeader>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-              <h2 style={{ margin: 0, color: 'var(--mac-text-primary)' }}>Аудит</h2>
+              <h2 style={{ margin: 0, color: 'var(--mac-text-primary)' }}>{t('misc.a_audit')}</h2>
               <span style={{ color: 'var(--mac-text-secondary)', fontSize: 13 }}>
                 {filtered.length} из {rows.length}
               </span>
@@ -110,7 +110,7 @@ export default function Audit() {
                 max={1000}
                 value={limit}
                 onChange={(e) => setLimit(Number(e.target.value) || 100)}
-                aria-label="Количество записей аудита для загрузки"
+                aria-label={t('misc.a_kolichestvo_zapisey_audita_d')}
               />
             </label>
             <label htmlFor={searchInputId} style={visuallyHiddenStyle}>
@@ -118,11 +118,11 @@ export default function Audit() {
             </label>
             <Input
               id={searchInputId}
-              placeholder="Поиск по пользователю/действию/сущности"
+              placeholder={t('misc.a_poisk_po_polzovatelyu_deystv')}
               value={q}
               onChange={(e) => setQ(e.target.value)}
               style={{ minWidth: 260 }}
-              aria-label="Поиск по журналу аудита"
+              aria-label={t('misc.a_poisk_po_zhurnalu_audita')}
             />
             <Button
               type="button"
@@ -131,14 +131,14 @@ export default function Audit() {
               onClick={load}
               disabled={busy}
               loading={busy}
-              aria-label="Обновить журнал аудита">
+              aria-label={t('misc.a_obnovit_zhurnal_audita')}>
               Обновить
             </Button>
           </div>
 
           {err && (
             <AppError
-              title="Ошибка загрузки аудита"
+              title={t('misc.a_oshibka_zagruzki_audita')}
               description={String(err)}
               action={
                 <Button
@@ -148,7 +148,7 @@ export default function Audit() {
                   onClick={load}
                   disabled={busy}
                   loading={busy}
-                  aria-label="Повторить загрузку журнала аудита">
+                  aria-label={t('misc.a_povtorit_zagruzku_zhurnala_a')}>
                   Повторить
                 </Button>
               }
@@ -159,14 +159,14 @@ export default function Audit() {
           <div style={tableWrapStyle} aria-busy={busy} aria-describedby={tableCaptionId}>
             <div className="admin-table-wrapper">
 <table style={tableStyle}>
-              <caption id={tableCaptionId} style={visuallyHiddenStyle}>Журнал аудита</caption>
+              <caption id={tableCaptionId} style={visuallyHiddenStyle}>{t('misc.a_zhurnal_audita')}</caption>
               <thead>
                 <tr>
                   <th>{t('common.time')}</th>
-                  <th>Пользователь</th>
-                  <th>Действие</th>
-                  <th>Сущность</th>
-                  <th>Детали</th>
+                  <th>{t('misc.a_polzovatel')}</th>
+                  <th>{t('misc.a_deystvie')}</th>
+                  <th>{t('misc.a_suschnost')}</th>
+                  <th>{t('misc.a_detali')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -174,9 +174,9 @@ export default function Audit() {
                   <tr>
                     <td colSpan={5}>
                       <AppLoading
-                        title="Загрузка аудита"
-                        description="Получаем последние действия пользователей."
-                        ariaLabel="Загружаем журнал аудита"
+                        title={t('misc.a_zagruzka_audita')}
+                        description={t('misc.a_poluchaem_poslednie_deystviy')}
+                        ariaLabel={t('misc.a_zagruzhaem_zhurnal_audita')}
                         size="sm"
                         style={stateCellStyle}
                       />
@@ -197,8 +197,8 @@ export default function Audit() {
                       <tr>
                         <td colSpan={5}>
                           <AppEmpty
-                            title="Нет записей"
-                            description={q ? 'По текущему поиску записи не найдены.' : 'Журнал аудита пока пуст.'}
+                            title={t('misc.a_net_zapisey')}
+                            description={q ? t('misc.a_po_tekuschemu_poisku_zapisi_') : t('misc.a_zhurnal_audita_poka_pust')}
                             style={stateCellStyle}
                           />
                         </td>

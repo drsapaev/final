@@ -104,9 +104,9 @@ const MobilePatientDashboard = () => {
 
   const getStatusLabel = (status) => {
     switch (status) {
-      case 'scheduled':return 'Запланировано';
-      case 'completed':return 'Завершено';
-      case 'cancelled':return 'Отменено';
+      case 'scheduled':return t('misc.mpd_zaplanirovano');
+      case 'completed':return t('misc.mpd_zaversheno');
+      case 'cancelled':return t('misc.mpd_otmeneno');
       default:return status;
     }
   };
@@ -140,7 +140,7 @@ const MobilePatientDashboard = () => {
                 Добро пожаловать!
               </h1>
               <p className="text-sm text-gray-600">
-                {patientData?.name || 'Пациент'}
+                {patientData?.name || t('misc.mpd_patsient')}
               </p>
             </div>
             <div className="flex items-center space-x-2">
@@ -155,10 +155,10 @@ const MobilePatientDashboard = () => {
       <div className="bg-white border-b">
         <div className="flex space-x-1 p-2">
           {[
-          { id: 'dashboard', label: 'Главная', icon: Activity },
-          { id: 'appointments', label: 'Записи', icon: Calendar },
-          { id: 'notifications', label: 'Уведомления', icon: Bell },
-          { id: 'profile', label: 'Профиль', icon: User }].
+          { id: 'dashboard', label: t('misc.mpd_glavnaya'), icon: Activity },
+          { id: 'appointments', label: t('misc.mpd_zapisi'), icon: Calendar },
+          { id: 'notifications', label: t('misc.mpd_uvedomleniya'), icon: Bell },
+          { id: 'profile', label: t('misc.mpd_profil'), icon: User }].
           map((tab) =>
           <button
             key={tab.id}
@@ -190,7 +190,7 @@ const MobilePatientDashboard = () => {
                 peopleBefore: activeQueueEntry.people_before,
                 estimatedWaitTime: activeQueueEntry.estimated_wait_time,
                 doctorName: activeQueueEntry.doctor_name,
-                specialty: activeQueueEntry.specialty || 'Приём врача',
+                specialty: activeQueueEntry.specialty || t('misc.mpd_priyom_vracha'),
                 cabinet: activeQueueEntry.cabinet
               }}
               onRefresh={loadPatientData} />
@@ -200,22 +200,22 @@ const MobilePatientDashboard = () => {
 
             {/* Быстрые действия */}
             <Card className="p-4">
-              <h3 className="font-semibold mb-3">Быстрые действия</h3>
+              <h3 className="font-semibold mb-3">{t('misc.mpd_bystrye_deystviya')}</h3>
               <div className="grid grid-cols-2 gap-3">
                 <Button className="flex flex-col items-center py-3 h-auto">
                   <Calendar className="w-6 h-6 mb-2" />
-                  <span className="text-sm">Записаться</span>
+                  <span className="text-sm">{t('misc.mpd_zapisatsya')}</span>
                 </Button>
                 <Button variant="outline" className="flex flex-col items-center py-3 h-auto">
                   <Phone className="w-6 h-6 mb-2" />
-                  <span className="text-sm">Позвонить</span>
+                  <span className="text-sm">{t('misc.mpd_pozvonit')}</span>
                 </Button>
               </div>
             </Card>
 
             {/* Ближайшие записи */}
             <Card className="p-4">
-              <h3 className="font-semibold mb-3">Ближайшие записи</h3>
+              <h3 className="font-semibold mb-3">{t('misc.mpd_blizhayshie_zapisi')}</h3>
               {getUpcomingAppointments().length > 0 ?
             <div className="space-y-3">
                   {getUpcomingAppointments().map((appointment) =>
@@ -244,25 +244,25 @@ const MobilePatientDashboard = () => {
 
             {/* Статистика */}
             <Card className="p-4">
-              <h3 className="font-semibold mb-3">Статистика</h3>
+              <h3 className="font-semibold mb-3">{t('misc.mpd_statistika')}</h3>
               <div className="grid grid-cols-3 gap-4">
                 <div className="text-center">
                   <div className="text-2xl font-bold text-blue-600">
                     {appointments.filter((a) => a.status === 'completed').length}
                   </div>
-                  <div className="text-xs text-gray-600">Визитов</div>
+                  <div className="text-xs text-gray-600">{t('misc.mpd_vizitov')}</div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-green-600">
                     {getUpcomingAppointments().length}
                   </div>
-                  <div className="text-xs text-gray-600">Записей</div>
+                  <div className="text-xs text-gray-600">{t('misc.mpd_zapisey')}</div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-purple-600">
                     {patientData?.total_spent || 0} сум
                   </div>
-                  <div className="text-xs text-gray-600">Потрачено</div>
+                  <div className="text-xs text-gray-600">{t('misc.mpd_potracheno')}</div>
                 </div>
               </div>
             </Card>
@@ -272,7 +272,7 @@ const MobilePatientDashboard = () => {
         {activeTab === 'appointments' &&
         <div className="space-y-4">
             <Card className="p-4">
-              <h3 className="font-semibold mb-3">Все записи</h3>
+              <h3 className="font-semibold mb-3">{t('misc.mpd_vse_zapisi')}</h3>
               {appointments.length > 0 ?
             <div className="space-y-3">
                   {appointments.map((appointment) =>
@@ -293,7 +293,7 @@ const MobilePatientDashboard = () => {
                         </div>
                         <div className="flex items-center space-x-1">
                           <MapPin className="w-3 h-3" />
-                          <span>{appointment.location || 'Клиника'}</span>
+                          <span>{appointment.location || t('misc.mpd_klinika')}</span>
                         </div>
                       </div>
                       {appointment.complaint &&
@@ -320,19 +320,19 @@ const MobilePatientDashboard = () => {
         {activeTab === 'profile' &&
         <div className="space-y-4">
             <Card className="p-4">
-              <h3 className="font-semibold mb-3">Личная информация</h3>
+              <h3 className="font-semibold mb-3">{t('misc.mpd_lichnaya_informatsiya')}</h3>
               <div className="space-y-3">
                 <div className="flex items-center space-x-3">
                   <User className="w-4 h-4 text-gray-400" />
                   <div>
-                    <p className="text-sm font-medium">{patientData?.name || 'Не указано'}</p>
-                    <p className="text-xs text-gray-600">Имя</p>
+                    <p className="text-sm font-medium">{patientData?.name || t('misc.mpd_ne_ukazano')}</p>
+                    <p className="text-xs text-gray-600">{t('misc.mpd_imya')}</p>
                   </div>
                 </div>
                 <div className="flex items-center space-x-3">
                   <Phone className="w-4 h-4 text-gray-400" />
                   <div>
-                    <p className="text-sm font-medium">{patientData?.phone || 'Не указано'}</p>
+                    <p className="text-sm font-medium">{patientData?.phone || t('misc.mpd_ne_ukazano')}</p>
                     <p className="text-xs text-gray-600">{t('common.phone')}</p>
                   </div>
                 </div>
@@ -340,7 +340,7 @@ const MobilePatientDashboard = () => {
             </Card>
 
             <Card className="p-4">
-              <h3 className="font-semibold mb-3">Настройки</h3>
+              <h3 className="font-semibold mb-3">{t('misc.mpd_nastroyki')}</h3>
               <div className="space-y-2">
                 <Button variant="outline" className="w-full justify-start">
                   <Bell className="w-4 h-4 mr-2" />

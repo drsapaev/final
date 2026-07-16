@@ -29,14 +29,14 @@ const FileSystemPage = () => {void
   const [activeTab, setActiveTab] = useState('files');
 
   const tabs = [
-  { id: 'files', label: 'Файлы', icon: FileText },
-  { id: 'images', label: 'Изображения', icon: Image },
-  { id: 'videos', label: 'Видео', icon: Video },
-  { id: 'audio', label: 'Аудио', icon: Music },
-  { id: 'archives', label: 'Архивы', icon: Archive },
-  { id: 'recent', label: 'Недавние', icon: Clock },
-  { id: 'shared', label: 'Общие', icon: Users },
-  { id: 'settings', label: 'Настройки', icon: Settings }];
+  { id: 'files', label: t('misc.fsp_fayly'), icon: FileText },
+  { id: 'images', label: t('misc.fsp_izobrazheniya'), icon: Image },
+  { id: 'videos', label: t('misc.fsp_video'), icon: Video },
+  { id: 'audio', label: t('misc.fsp_audio'), icon: Music },
+  { id: 'archives', label: t('misc.fsp_arhivy'), icon: Archive },
+  { id: 'recent', label: t('misc.fsp_nedavnie'), icon: Clock },
+  { id: 'shared', label: t('misc.fsp_obschie'), icon: Users },
+  { id: 'settings', label: t('misc.fsp_nastroyki'), icon: Settings }];
 
 
   const renderOverview = () =>
@@ -47,8 +47,8 @@ const FileSystemPage = () => {void
           <div className="flex items-center space-x-3">
             <Upload className="w-8 h-8 text-blue-600" />
             <div>
-              <h3 className="font-semibold text-blue-800">Загрузить файлы</h3>
-              <p className="text-sm text-blue-600">Добавить новые файлы</p>
+              <h3 className="font-semibold text-blue-800">{t('misc.fsp_zagruzit_fayly')}</h3>
+              <p className="text-sm text-blue-600">{t('misc.fsp_dobavit_novye_fayly')}</p>
             </div>
           </div>
         </div>
@@ -57,8 +57,8 @@ const FileSystemPage = () => {void
           <div className="flex items-center space-x-3">
             <Download className="w-8 h-8 text-green-600" />
             <div>
-              <h3 className="font-semibold text-green-800">Скачать архив</h3>
-              <p className="text-sm text-green-600">Экспорт файлов</p>
+              <h3 className="font-semibold text-green-800">{t('misc.fsp_skachat_arhiv')}</h3>
+              <p className="text-sm text-green-600">{t('misc.fsp_eksport_faylov')}</p>
             </div>
           </div>
         </div>
@@ -67,8 +67,8 @@ const FileSystemPage = () => {void
           <div className="flex items-center space-x-3">
             <Users className="w-8 h-8 text-purple-600" />
             <div>
-              <h3 className="font-semibold text-purple-800">Общие файлы</h3>
-              <p className="text-sm text-purple-600">Совместное использование</p>
+              <h3 className="font-semibold text-purple-800">{t('misc.fsp_obschie_fayly')}</h3>
+              <p className="text-sm text-purple-600">{t('misc.fsp_sovmestnoe_ispolzovanie')}</p>
             </div>
           </div>
         </div>
@@ -77,8 +77,8 @@ const FileSystemPage = () => {void
           <div className="flex items-center space-x-3">
             <BarChart3 className="w-8 h-8 text-orange-600" />
             <div>
-              <h3 className="font-semibold text-orange-800">Статистика</h3>
-              <p className="text-sm text-orange-600">Аналитика использования</p>
+              <h3 className="font-semibold text-orange-800">{t('misc.fsp_statistika')}</h3>
+              <p className="text-sm text-orange-600">{t('misc.fsp_analitika_ispolzovaniya')}</p>
             </div>
           </div>
         </div>
@@ -119,7 +119,7 @@ const FileSystemPage = () => {void
         <div className="mb-8">
           <div className="flex items-center space-x-3 mb-2">
             <HardDrive className="w-8 h-8 text-blue-600" />
-            <h1 className="text-3xl font-bold text-gray-900">Файловая система</h1>
+            <h1 className="text-3xl font-bold text-gray-900">{t('misc.fsp_faylovaya_sistema')}</h1>
           </div>
           <p className="text-gray-600">
             Управление файлами, документами и медиа-контентом

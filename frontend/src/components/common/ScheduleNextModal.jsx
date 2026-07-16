@@ -79,19 +79,19 @@ const ScheduleNextModal = ({
 
           switch (specialtyFilter) {
             case 'cardiology':
-              return category?.includes('кардио') ||
-              name?.includes('кардио') ||
-              name?.includes('экг') ||
+              return category?.includes(t('misc.snm_kardio')) ||
+              name?.includes(t('misc.snm_kardio')) ||
+              name?.includes(t('misc.snm_ekg')) ||
               service.code?.startsWith('K');
             case 'dermatology':
-              return category?.includes('дерма') ||
-              name?.includes('дерма') ||
-              name?.includes('кожа') ||
+              return category?.includes(t('misc.snm_derma')) ||
+              name?.includes(t('misc.snm_derma')) ||
+              name?.includes(t('misc.snm_kozha')) ||
               service.code?.startsWith('D');
             case 'dentistry':
-              return category?.includes('стомат') ||
-              name?.includes('зуб') ||
-              name?.includes('стомат') ||
+              return category?.includes(t('misc.snm_stomat')) ||
+              name?.includes(t('misc.snm_zub')) ||
+              name?.includes(t('misc.snm_stomat')) ||
               service.code?.startsWith('S');
             default:
               return true;

@@ -106,6 +106,7 @@ const spinnerStyle = {
 };
 
 const PaymentSuccess = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -146,11 +147,11 @@ const PaymentSuccess = () => {
           generateReceipt();
         }
       } else {
-        setError('Данные платежа не найдены');
+        setError(t('misc.ps_dannye_platezha_ne_naydeny'));
       }
     } catch (err) {
       logger.error('Ошибка загрузки платежа:', err);
-      setError('Не удалось загрузить информацию о платеже');
+      setError(t('misc.ps_ne_udalos_zagruzit_informats'));
     } finally {
       setLoading(false);
     }
@@ -160,7 +161,7 @@ const PaymentSuccess = () => {
     if (paymentId) {
       loadPaymentDetails();
     } else {
-      setError('Не указан ID платежа');
+      setError(t('misc.ps_ne_ukazan_id_platezha'));
       setLoading(false);
     }
   }, [loadPaymentDetails, paymentId]);
@@ -194,7 +195,7 @@ const PaymentSuccess = () => {
 Провайдер: ${getProviderName(paymentData.provider)}
 Статус: ${getStatusText(paymentData.status)}
 
-Описание: ${paymentData.description || 'Оплата медицинских услуг'}
+Описание: ${paymentData.description || t('misc.ps_oplata_meditsinskih_uslug')}
 
 Спасибо за использование наших услуг!
     `.trim();
@@ -215,10 +216,10 @@ const PaymentSuccess = () => {
           </style>
         </head>
         <body>
-          <h1>Квитанция об оплате</h1>
+          <h1>{t('misc.ps_kvitantsiya_ob_oplate')}</h1>
           <div class="meta">
-            <div><strong>Платеж:</strong> ${paymentId}</div>
-            <div><strong>Статус:</strong> ${getStatusText(paymentData.status)}</div>
+            <div><strong>{t('misc.ps_platezh')}</strong> ${paymentId}</div>
+            <div><strong>{t('misc.ps_status')}</strong> ${getStatusText(paymentData.status)}</div>
           </div>
           <pre>${receiptContent}</pre>
         </body>
@@ -231,8 +232,8 @@ const PaymentSuccess = () => {
     if (navigator.share && paymentData) {
       try {
         await navigator.share({
-          title: `Квитанция об оплате ${paymentId}`,
-          text: `Оплата на сумму ${formatAmount(paymentData.amount, paymentData.currency)} успешно завершена`,
+          title: t('misc.ps_kvitantsiya_ob_oplate_paymen', { paymentId: paymentId }),
+          text: t('misc.ps_oplata_na_summu_formatamount', { currency: formatAmount(paymentData.amount, paymentData.currency) }),
           url: window.location.href
         });
       } catch (err) {
@@ -248,9 +249,9 @@ const PaymentSuccess = () => {
   const formatAmount = (amount, currency) => {
     const numAmount = parseFloat(amount);
     if (currency === 'UZS') {
-      return `${(numAmount / 100).toLocaleString('ru-RU')} сум`;
+      return t('misc.ps_numamount_100_tolocalestring', { RU: (numAmount / 100).toLocaleString('ru-RU') });
     } else if (currency === 'KZT') {
-      return `${(numAmount / 100).toLocaleString('ru-RU')} тенге`;
+      return t('misc.ps_numamount_100_tolocalestring_2', { RU: (numAmount / 100).toLocaleString('ru-RU') });
     } else {
       return `${numAmount} ${currency}`;
     }
@@ -267,13 +268,13 @@ const PaymentSuccess = () => {
 
   const getStatusText = (status) => {
     const texts = {
-      pending: 'Ожидает',
-      processing: 'Обработка',
-      paid: 'Оплачен',
-      failed: 'Неудачно',
-      cancelled: 'Отменен',
-      refunded: 'Возвращен',
-      void: 'Аннулирован'
+      pending: t('misc.ps_ozhidaet'),
+      processing: t('misc.ps_obrabotka'),
+      paid: t('misc.ps_oplachen'),
+      failed: t('misc.ps_neudachno'),
+      cancelled: t('misc.ps_otmenen'),
+      refunded: t('misc.ps_vozvraschen'),
+      void: t('misc.ps_annulirovan')
     };
     return texts[status] || status;
   };
@@ -402,33 +403,33 @@ const PaymentSuccess = () => {
 
             <div style={detailGridStyle}>
               <div style={detailItemStyle}>
-                <p style={detailLabelStyle}>Номер платежа</p>
+                <p style={detailLabelStyle}>{t('misc.ps_nomer_platezha')}</p>
                 <p style={detailValueStyle}>#{paymentId}</p>
               </div>
 
               <div style={detailItemStyle}>
-                <p style={detailLabelStyle}>Сумма</p>
+                <p style={detailLabelStyle}>{t('misc.ps_summa')}</p>
                 <p style={{ ...detailValueStyle, color: 'var(--mac-accent-blue)' }}>
                   {formatAmount(paymentData.amount, paymentData.currency)}
                 </p>
               </div>
 
               <div style={detailItemStyle}>
-                <p style={detailLabelStyle}>Способ оплаты</p>
+                <p style={detailLabelStyle}>{t('misc.ps_sposob_oplaty')}</p>
                 <p style={{ ...detailValueStyle, fontWeight: 'var(--mac-font-weight-medium)' }}>
                   {getProviderName(paymentData.provider)}
                 </p>
               </div>
 
               <div style={detailItemStyle}>
-                <p style={detailLabelStyle}>Статус</p>
+                <p style={detailLabelStyle}>{t('misc.ps_status_2')}</p>
                 <Badge variant={getStatusColor(paymentData.status)}>
                   {getStatusText(paymentData.status)}
                 </Badge>
               </div>
 
               <div style={{ ...detailItemStyle, gridColumn: '1 / -1' }}>
-                <p style={detailLabelStyle}>Дата и время</p>
+                <p style={detailLabelStyle}>{t('misc.ps_data_i_vremya')}</p>
                 <p style={{ ...detailValueStyle, fontWeight: 'var(--mac-font-weight-medium)' }}>
                   {new Date(paymentData.created_at).toLocaleString('ru-RU')}
                 </p>
@@ -436,7 +437,7 @@ const PaymentSuccess = () => {
 
               {paymentData.description && (
                 <div style={{ ...detailItemStyle, gridColumn: '1 / -1' }}>
-                  <p style={detailLabelStyle}>Описание</p>
+                  <p style={detailLabelStyle}>{t('misc.ps_opisanie')}</p>
                   <p style={{ ...detailValueStyle, fontWeight: 'var(--mac-font-weight-medium)' }}>
                     {paymentData.description}
                   </p>

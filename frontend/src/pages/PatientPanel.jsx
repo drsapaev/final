@@ -88,14 +88,14 @@ const PatientPanel = () => {
           logger.error(`[PatientPanel] Failed to load ${label}:`, error);
           // Не показываем error если это просто 401 (пользователь не авторизован)
           if (error?.response?.status !== 401) {
-            setPatientDataError(`Не удалось загрузить ${label}. Обновите страницу.`);
+            setPatientDataError(t('misc.pp_ne_udalos_zagruzit_label_obn', { label: label }));
           }
         }
       };
 
       await Promise.allSettled([
-        safeFetch('/patients/appointments', setAppointments, 'записи'),
-        safeFetch('/patients/results', setResults, 'результаты'),
+        safeFetch('/patients/appointments', setAppointments, t('misc.pp_zapisi')),
+        safeFetch('/patients/results', setResults, t('misc.pp_rezultaty')),
       ]);
 
       if (!cancelled) {
@@ -109,7 +109,7 @@ const PatientPanel = () => {
 
   const sectionConfig = PATIENT_SECTIONS[activeSection];
   const isSectionMode = Boolean(sectionConfig);
-  const sectionTitle = sectionConfig?.title || 'Главная пациента';
+  const sectionTitle = sectionConfig?.title || t('misc.pp_glavnaya_patsienta');
 
   useEffect(() => {
     if (activeSection !== 'forms') {
@@ -188,7 +188,7 @@ const PatientPanel = () => {
 
   // L-H-6 fix: build tablist items (home + visible sections).
   const tabItems = useMemo(() => [
-    { id: 'home', label: 'Главная', icon: 'house' },
+    { id: 'home', label: t('misc.pp_glavnaya'), icon: 'house' },
     ...VISIBLE_PATIENT_TABS.map((key) => ({
       id: key,
       label: PATIENT_SECTIONS[key].title,
@@ -205,7 +205,7 @@ const PatientPanel = () => {
         <div
           className="pp-tablist"
           role="tablist"
-          aria-label="Разделы панели пациента"
+          aria-label={t('misc.pp_razdely_paneli_patsienta')}
         >
           {tabItems.map((tab) => {
             const isActive = activeSection === tab.id || (tab.id === 'home' && !isSectionMode);
@@ -237,7 +237,7 @@ const PatientPanel = () => {
             Главная › {Название секции}. Помогает пациенту понять,
             где он находится и как вернуться назад. */}
         {isSectionMode && (
-          <nav className="pp-breadcrumb" aria-label="Навигация">
+          <nav className="pp-breadcrumb" aria-label={t('misc.pp_navigatsiya')}>
             <button
               type="button"
               onClick={() => switchSection('home')}
@@ -287,7 +287,7 @@ const PatientPanel = () => {
               <Card className="pp-card">
                 <div className="pp-home-card-header">
                   <Icon name="calendar" size={16} />
-                  <h3 className="pp-home-card-title">Предстоящие визиты</h3>
+                  <h3 className="pp-home-card-title">{t('misc.pp_predstoyaschie_vizity')}</h3>
                 </div>
                 <div className="pp-home-list">
                   {appointments.length > 0 ? (
@@ -298,15 +298,15 @@ const PatientPanel = () => {
                           <div className="pp-list-item-secondary">{a.date} · {a.time}</div>
                         </div>
                         <Badge variant={a.status === 'scheduled' ? 'info' : 'success'}>
-                          {a.status === 'scheduled' ? 'Запланирован' : 'Завершён'}
+                          {a.status === 'scheduled' ? t('misc.pp_zaplanirovan') : t('misc.pp_zavershyon')}
                         </Badge>
                       </div>
                     ))
                   ) : (
                     <PanelEmptyState
                       icon="calendar"
-                      title="Визитов пока нет"
-                      description="Добавьте визит после привязки с записью в клинике или регистратурой."
+                      title={t('misc.pp_vizitov_poka_net')}
+                      description={t('misc.pp_dobavte_vizit_posle_privyazk')}
                     />
                   )}
                 </div>
@@ -315,7 +315,7 @@ const PatientPanel = () => {
               <Card className="pp-card">
                 <div className="pp-home-card-header">
                   <Icon name="heart" size={16} />
-                  <h3 className="pp-home-card-title">Результаты анализов</h3>
+                  <h3 className="pp-home-card-title">{t('misc.pp_rezultaty_analizov')}</h3>
                 </div>
                 <div className="pp-home-list">
                   {results.length > 0 ? (
@@ -334,8 +334,8 @@ const PatientPanel = () => {
                   ) : (
                     <PanelEmptyState
                       icon="doc.text"
-                      title="Результатов пока нет"
-                      description="Используйте защищённую ссылку на отчёт, когда результаты будут готовы."
+                      title={t('misc.pp_rezultatov_poka_net')}
+                      description={t('misc.pp_ispolzuyte_zaschischyonnuyu_')}
                     />
                   )}
                 </div>
@@ -345,15 +345,15 @@ const PatientPanel = () => {
         </div>
 
         {/* L-M-6 fix: loading + error states для patient data.
-            Заменяет старую подсказку "Данные загружаются" (которая показывалась
+            Заменяет старую подсказку t('misc.pp_dannye_zagruzhayutsya') (которая показывалась
             всегда когда нет данных, даже после ошибки). */}
         {patientDataLoading && !isSectionMode && (
           <Card className="pp-card">
             <div className="pp-card-body">
               <PanelEmptyState
                 icon="arrow.clockwise"
-                title="Данные пациента загружаются"
-                description="Записи и результаты появятся после загрузки. Используйте вкладки выше для доступа к защищённым разделам."
+                title={t('misc.pp_dannye_patsienta_zagruzhayut')}
+                description={t('misc.pp_zapisi_i_rezultaty_poyavyats')}
                 variant="loading"
               />
             </div>
@@ -364,7 +364,7 @@ const PatientPanel = () => {
             <div className="pp-card-body">
               <PanelEmptyState
                 icon="exclamationmark.triangle"
-                title="Ошибка загрузки"
+                title={t('misc.pp_oshibka_zagruzki')}
                 description={patientDataError}
                 variant="error"
               />

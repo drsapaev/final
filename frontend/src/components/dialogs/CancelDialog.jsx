@@ -26,10 +26,10 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
 
   const validateReason = (value) => {
     if (!value || value.trim().length < 3) {
-      return 'Причина отмены должна содержать минимум 3 символа';
+      return t('misc.cd_prichina_otmeny_dolzhna_sode');
     }
     if (value.trim().length > 500) {
-      return 'Причина отмены не должна превышать 500 символов';
+      return t('misc.cd_prichina_otmeny_ne_dolzhna_p');
     }
     return '';
   };
@@ -57,11 +57,11 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
         await onCancel(appointment.id, reason.trim());
       }
 
-      toast.success('Запись успешно отменена');
+      toast.success(t('misc.cd_zapis_uspeshno_otmenena'));
       onClose();
     } catch (error) {
       logger.error('Cancel error:', error);
-      toast.error('Ошибка при отмене записи: ' + error.message);
+      toast.error(t('misc.cd_oshibka_pri_otmene_zapisi') + error.message);
     } finally {
       setIsProcessing(false);
     }
@@ -71,13 +71,13 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
 
   const actions = [
     {
-      label: 'Отмена',
+      label: t('misc.cd_otmena'),
       variant: 'secondary',
       onClick: onClose,
       disabled: isProcessing,
     },
     {
-      label: isProcessing ? 'Отменяем...' : 'Подтвердить отмену',
+      label: isProcessing ? t('misc.cd_otmenyaem') : t('misc.cd_podtverdit_otmenu'),
       variant: 'danger',
       icon: isProcessing ? null : <X size={16} />,
       onClick: handleCancel,
@@ -89,7 +89,7 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
     <ModernDialog
       isOpen={isOpen}
       onClose={onClose}
-      title="Отменить запись"
+      title={t('misc.cd_otmenit_zapis')}
       actions={actions}
       dialogClassName="cancel-dialog--styled"
       closeOnBackdrop={!isProcessing}
@@ -159,10 +159,10 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
 
           <textarea
             id="cancel-reason"
-            aria-label="Причина отмены записи"
+            aria-label={t('misc.cd_prichina_otmeny_zapisi')}
             value={reason}
             onChange={handleReasonChange}
-            placeholder="Укажите причину отмены записи..."
+            placeholder={t('misc.cd_ukazhite_prichinu_otmeny_zap')}
             rows={4}
             aria-invalid={!!error}
             aria-describedby={error ? 'cancel-reason-error' : undefined}

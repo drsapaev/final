@@ -10,6 +10,7 @@ import PropTypes from 'prop-types';
 import { notify } from '../../services/notify.js';
 
 const VoiceRecorder = ({ onSend, onCancel }) => {
+  const { t } = useTranslation();
     const [isRecording, setIsRecording] = useState(false);
     const [audioBlob, setAudioBlob] = useState(null);
     const [duration, setDuration] = useState(0);
@@ -162,10 +163,10 @@ const VoiceRecorder = ({ onSend, onCancel }) => {
                         <button
                             onClick={startRecording}
                             className="btn-record"
-                            title="Записать голосовое сообщение"
+                            title={t('misc.vr_zapisat_golosovoe_soobscheni')}
                         >
                             <Mic size={20} />
-                            <span>Записать голосовое</span>
+                            <span>{t('misc.vr_zapisat_golosovoe')}</span>
                         </button>
                     ) : (
                         <div className="recording-active">
@@ -175,7 +176,7 @@ const VoiceRecorder = ({ onSend, onCancel }) => {
                             </div>
                             <button onClick={stopRecording} className="btn-stop">
                                 <Square size={18} />
-                                <span>Остановить</span>
+                                <span>{t('misc.vr_ostanovit')}</span>
                             </button>
                         </div>
                     )}
@@ -183,16 +184,16 @@ const VoiceRecorder = ({ onSend, onCancel }) => {
             ) : (
                 // Режим предпросмотра
                 <div className="recording-preview">
-                    <audio src={audioURL} controls className="audio-preview" aria-label="Предпросмотр голосового сообщения" />
+                    <audio src={audioURL} controls className="audio-preview" aria-label={t('misc.vr_predprosmotr_golosovogo_soob')} />
                     <span className="duration-label">{formatTime(duration)}</span>
 
                     <div className="preview-actions">
-                        <button onClick={handleCancel} className="btn-cancel" title="Отменить" aria-label="Отменить голосовое сообщение">
+                        <button onClick={handleCancel} className="btn-cancel" title={t('misc.vr_otmenit')} aria-label={t('misc.vr_otmenit_golosovoe_soobscheni')}>
                             <Trash2 size={18} />
                         </button>
-                        <button onClick={handleSend} className="btn-send" title="Отправить">
+                        <button onClick={handleSend} className="btn-send" title={t('misc.vr_otpravit')}>
                             <Send size={18} />
-                            <span>Отправить</span>
+                            <span>{t('misc.vr_otpravit_2')}</span>
                         </button>
                     </div>
                 </div>

@@ -74,15 +74,15 @@ const PaymentCancel = () => {
 
   const getReason = () => {
     const reasons = {
-      'user_cancelled': 'Вы отменили платеж',
-      'timeout': 'Время ожидания истекло',
-      'insufficient_funds': 'Недостаточно средств',
-      'card_declined': 'Карта отклонена',
-      'technical_error': 'Техническая ошибка',
-      'provider_error': 'Ошибка платежной системы'
+      'user_cancelled': t('misc.pc_vy_otmenili_platezh'),
+      'timeout': t('misc.pc_vremya_ozhidaniya_isteklo'),
+      'insufficient_funds': t('misc.pc_nedostatochno_sredstv'),
+      'card_declined': t('misc.pc_karta_otklonena'),
+      'technical_error': t('misc.pc_tehnicheskaya_oshibka'),
+      'provider_error': t('misc.pc_oshibka_platezhnoy_sistemy')
     };
 
-    return reasons[reason] || 'Платеж был отменен или не подтвержден';
+    return reasons[reason] || t('misc.pc_platezh_byl_otmenen_ili_ne_p');
   };
 
   return (
@@ -126,11 +126,11 @@ const PaymentCancel = () => {
             </Typography>
             <div style={detailGridStyle}>
               <div style={detailItemStyle}>
-                <Typography variant="body2" color="textSecondary">Номер платежа</Typography>
+                <Typography variant="body2" color="textSecondary">{t('misc.pc_nomer_platezha')}</Typography>
                 <Typography variant="h6">#{paymentId}</Typography>
               </div>
               <div style={detailItemStyle}>
-                <Typography variant="body2" color="textSecondary">Время отмены</Typography>
+                <Typography variant="body2" color="textSecondary">{t('misc.pc_vremya_otmeny')}</Typography>
                 <Typography variant="body1">{new Date().toLocaleString('ru-RU')}</Typography>
               </div>
             </div>
@@ -168,9 +168,9 @@ const PaymentCancel = () => {
             Доступные действия
           </Typography>
           <div style={actionGridStyle}>
-            <Button onClick={handleCashierPayment}>К оплате в кассе</Button>
-            <Button variant="outline" onClick={handleContactSupport}><SupportIcon style={{ marginRight: 8 }} />Связаться в Telegram</Button>
-            <Button variant="outline" onClick={() => navigate('/')}><HomeIcon style={{ marginRight: 8 }} />На главную</Button>
+            <Button onClick={handleCashierPayment}>{t('misc.pc_k_oplate_v_kasse')}</Button>
+            <Button variant="outline" onClick={handleContactSupport}><SupportIcon style={{ marginRight: 8 }} />{t('misc.pc_svyazatsya_v_telegram')}</Button>
+            <Button variant="outline" onClick={() => navigate('/')}><HomeIcon style={{ marginRight: 8 }} />{t('misc.pc_na_glavnuyu')}</Button>
           </div>
         </CardContent>
       </Card>

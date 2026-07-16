@@ -38,14 +38,14 @@ function formatDate(dateStr) {
 /**
  * Get action label in Russian
  */
-function getActionLabel(changeType) {
+function getActionLabel(changeType, t) {
     const labels = {
-        created: 'Создан',
-        updated: 'Изменён',
-        signed: 'Подписан',
-        amended: 'Поправка',
-        restored: 'Восстановлен',
-        migrated: 'Миграция',
+        created: t('misc.ehp_action_created'),
+        updated: t('misc.ehp_action_updated'),
+        signed: t('misc.ehp_action_signed'),
+        amended: t('misc.ehp_action_amended'),
+        restored: t('misc.ehp_action_restored'),
+        migrated: t('misc.ehp_action_migrated'),
     };
     return labels[changeType] || changeType;
 }
@@ -85,6 +85,7 @@ export function EMRHistoryPanel({
     isOpen = true,
     onClose,
 }) {
+    const { t } = useTranslation();
     const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
@@ -102,7 +103,7 @@ export function EMRHistoryPanel({
                 setHistory(response.data.revisions || []);
             } catch (err) {
                 logger.error('Failed to load history:', err);
-                setError(err.message || 'Не удалось загрузить историю');
+                setError(err.message || t('misc.ehp_ne_udalos_zagruzit_istoriyu'));
             } finally {
                 setLoading(false);
             }
@@ -122,7 +123,7 @@ export function EMRHistoryPanel({
                     <button
                         className="emr-history-panel__close"
                         onClick={onClose}
-                        title="Закрыть"
+                        title={t('misc.ehp_zakryt')}
                     >
                         ×
                     </button>
@@ -168,7 +169,7 @@ export function EMRHistoryPanel({
                                     }}
                                     role="button"
                                     tabIndex={0}
-                                    title={`Выбрать версию ${revision.version} для сравнения`}
+                                    title={t('misc.ehp_vybrat_versiyu_revision_vers', { version: revision.version })}
                                 >
                                     {/* Version badge */}
                                     <div className="emr-history-panel__version">
@@ -188,7 +189,7 @@ export function EMRHistoryPanel({
                                             {getActionIcon(revision.change_type)}
                                         </span>
                                         <span className="emr-history-panel__action-label">
-                                            {getActionLabel(revision.change_type)}
+                                            {getActionLabel(revision.change_type, t)}
                                         </span>
                                     </div>
 

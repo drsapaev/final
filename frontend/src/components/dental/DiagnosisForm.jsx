@@ -151,23 +151,23 @@ const DiagnosisForm = ({
 
   // Стандартные диагнозы по зубам
   const standardToothDiagnoses = [
-  { value: 'Кариес', label: t('dental.dental_df_dx_caries') },
-  { value: 'Пульпит', label: t('dental.dental_df_dx_pulpitis') },
-  { value: 'Периодонтит', label: t('dental.dental_df_dx_periodontitis') },
-  { value: 'Периапикальный абсцесс', label: t('dental.dental_df_dx_periapical_abscess') },
-  { value: 'Травма зуба', label: t('dental.dental_df_dx_tooth_trauma') },
-  { value: 'Стираемость', label: t('dental.dental_df_dx_attrition') },
-  { value: 'Эрозия', label: t('dental.dental_df_dx_erosion') },
-  { value: 'Гипоплазия', label: t('dental.dental_df_dx_hypoplasia') },
-  { value: 'Флюороз', label: t('dental.dental_df_dx_fluorosis') },
-  { value: 'Зубной камень', label: t('dental.dental_df_dx_calculus') },
-  { value: 'Гингивит', label: t('dental.dental_df_dx_gingivitis') },
-  { value: 'Пародонтит', label: t('dental.dental_df_dx_marginal_periodontitis') },
-  { value: 'Подвижность зуба', label: t('dental.dental_df_dx_tooth_mobility') },
-  { value: 'Резорбция корня', label: t('dental.dental_df_dx_root_resorption') },
-  { value: 'Киста', label: t('dental.dental_df_dx_cyst') },
-  { value: 'Гранулема', label: t('dental.dental_df_dx_granuloma') },
-  { value: 'Норма', label: t('dental.dental_df_dx_normal') }];
+  { value: t('misc.df_karies'), label: t('dental.dental_df_dx_caries') },
+  { value: t('misc.df_pulpit'), label: t('dental.dental_df_dx_pulpitis') },
+  { value: t('misc.df_periodontit'), label: t('dental.dental_df_dx_periodontitis') },
+  { value: t('misc.df_periapikalnyy_abstsess'), label: t('dental.dental_df_dx_periapical_abscess') },
+  { value: t('misc.df_travma_zuba'), label: t('dental.dental_df_dx_tooth_trauma') },
+  { value: t('misc.df_stiraemost'), label: t('dental.dental_df_dx_attrition') },
+  { value: t('misc.df_eroziya'), label: t('dental.dental_df_dx_erosion') },
+  { value: t('misc.df_gipoplaziya'), label: t('dental.dental_df_dx_hypoplasia') },
+  { value: t('misc.df_flyuoroz'), label: t('dental.dental_df_dx_fluorosis') },
+  { value: t('misc.df_zubnoy_kamen'), label: t('dental.dental_df_dx_calculus') },
+  { value: t('misc.df_gingivit'), label: t('dental.dental_df_dx_gingivitis') },
+  { value: t('misc.df_parodontit'), label: t('dental.dental_df_dx_marginal_periodontitis') },
+  { value: t('misc.df_podvizhnost_zuba'), label: t('dental.dental_df_dx_tooth_mobility') },
+  { value: t('misc.df_rezorbtsiya_kornya'), label: t('dental.dental_df_dx_root_resorption') },
+  { value: t('misc.df_kista'), label: t('dental.dental_df_dx_cyst') },
+  { value: t('misc.df_granulema'), label: t('dental.dental_df_dx_granuloma') },
+  { value: t('misc.df_norma'), label: t('dental.dental_df_dx_normal') }];
 
 
   // Рендер диагнозов по зубам

@@ -18,10 +18,10 @@ export default function Activation() {
   const [filterStatus, setFilterStatus] = useState('');
   const [err, setErr] = useState('');
   const statusFilterOptions = [
-    { value: '', label: 'Все статусы' },
-    { value: 'active', label: 'Активные' },
-    { value: 'pending', label: 'Ожидают' },
-    { value: 'disabled', label: 'Отключены' },
+    { value: '', label: t('misc.a_vse_statusy') },
+    { value: 'active', label: t('misc.a_aktivnye') },
+    { value: 'pending', label: t('misc.a_ozhidayut') },
+    { value: 'disabled', label: t('misc.a_otklyucheny') },
   ];
 
   const filtered = useMemo(() => {
@@ -44,7 +44,7 @@ export default function Activation() {
       setStatus(st || null);
       setRows(lst && lst.items || []);
     } catch (e) {
-      setErr(e?.data?.detail || e?.message || 'Ошибка загрузки');
+      setErr(e?.data?.detail || e?.message || t('misc.a_oshibka_zagruzki'));
     } finally {
       setLoading(false);
     }
@@ -65,11 +65,11 @@ export default function Activation() {
       <Nav />
       <main className="p-4 max-w-6xl mx-auto">
         <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl font-semibold">Активация</h1>
+          <h1 className="text-2xl font-semibold">{t('misc.a_aktivatsiya')}</h1>
           <div className="flex items-center gap-2">
             <Select
               id="activation-status-filter"
-              label="Статус записи"
+              label={t('misc.a_status_zapisi')}
               options={statusFilterOptions}
               value={filterStatus}
               onChange={setFilterStatus}
@@ -89,7 +89,7 @@ export default function Activation() {
 
         {err &&
         <AppError
-          title="Ошибка загрузки"
+          title={t('misc.a_oshibka_zagruzki')}
           description={err}
           action={
             <Button onClick={loadAll} disabled={loading} loading={loading} size="small" variant="outline">
@@ -105,7 +105,7 @@ export default function Activation() {
           {loading ?
           <AppLoading
             size="sm"
-            title="Загрузка статуса..."
+            title={t('misc.a_zagruzka_statusa')}
           /> :
           status ?
           <pre className="text-sm bg-gray-50 border border-gray-200 rounded p-3 overflow-auto">
@@ -113,19 +113,19 @@ export default function Activation() {
             </pre> :
 
           <AppEmpty
-            title="Статус активации недоступен"
-            description="Эндпоинт статуса активации на сервере не найден. Вероятно, функция не используется - все в порядке."
+            title={t('misc.a_status_aktivatsii_nedostupen')}
+            description={t('misc.a_endpoint_statusa_aktivatsii_')}
           />
           }
         </section>
 
         <RoleGate roles={['Admin']}>
           <section>
-            <h2 className="text-lg font-medium mb-2">Список</h2>
+            <h2 className="text-lg font-medium mb-2">{t('misc.a_spisok')}</h2>
             {loading ?
             <AppLoading
               size="sm"
-              title="Загрузка..."
+              title={t('misc.a_zagruzka')}
             /> :
             filtered.length ?
             <div className="overflow-auto border border-gray-200 rounded">
@@ -134,9 +134,9 @@ export default function Activation() {
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="text-left px-3 py-2 border-b">ID</th>
-                      <th className="text-left px-3 py-2 border-b">Имя</th>
+                      <th className="text-left px-3 py-2 border-b">{t('misc.a_imya')}</th>
                       <th className="text-left px-3 py-2 border-b">{t('common.status')}</th>
-                      <th className="text-left px-3 py-2 border-b">Обновлён</th>
+                      <th className="text-left px-3 py-2 border-b">{t('misc.a_obnovlyon')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -156,11 +156,11 @@ export default function Activation() {
               </div> :
 
             <AppEmpty
-              title={filterStatus ? 'Нет записей с выбранным статусом' : 'Нет данных'}
+              title={filterStatus ? t('misc.a_net_zapisey_s_vybrannym_stat') : t('misc.a_net_dannyh')}
               description={
                 filterStatus ?
-                  'Поменяйте фильтр статуса или обновите список.' :
-                  'Записи активации появятся здесь после загрузки.'
+                  t('misc.a_pomenyayte_filtr_statusa_ili') :
+                  t('misc.a_zapisi_aktivatsii_poyavyatsy')
               }
             />
             }

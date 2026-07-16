@@ -6,6 +6,7 @@ import {
   Alert, Badge, Button,
 } from '../ui/macos';
 import { usePWA } from '../../hooks/usePWA';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const toneConfig = {
   primary: {
@@ -126,6 +127,7 @@ const styles = {
 };
 
 function ConnectionToast({ open, position, tone, icon: Icon, title, description, onClose }) {
+  const { t } = useTranslation();
   if (!open) {
     return null;
   }
@@ -150,7 +152,7 @@ function ConnectionToast({ open, position, tone, icon: Icon, title, description,
             type="button"
             variant="ghost"
             size="small"
-            aria-label="Закрыть уведомление"
+            aria-label={t('misc.cs_zakryt_uvedomlenie')}
             onClick={onClose}
             style={styles.closeButton}
           >
@@ -229,10 +231,10 @@ const ConnectionStatus = ({ showOfflineAlert = true, position = 'top' }) => {
   };
 
   const getConnectionLabel = () => {
-    if (!isOnline) return 'Офлайн';
-    if (isSyncing) return 'Синхронизация...';
-    if (isServiceWorkerReady) return 'Онлайн';
-    return 'Подключение...';
+    if (!isOnline) return t('misc.cs_oflayn');
+    if (isSyncing) return t('misc.cs_sinhronizatsiya');
+    if (isServiceWorkerReady) return t('misc.cs_onlayn');
+    return t('misc.cs_podklyuchenie');
   };
 
   const formatLastSync = () => {
@@ -242,11 +244,11 @@ const ConnectionStatus = ({ showOfflineAlert = true, position = 'top' }) => {
     const diffMs = now - lastSyncTime;
     const diffMins = Math.floor(diffMs / 60000);
 
-    if (diffMins < 1) return 'только что';
-    if (diffMins < 60) return `${diffMins} мин назад`;
+    if (diffMins < 1) return t('misc.cs_tolko_chto');
+    if (diffMins < 60) return t('misc.cs_diffmins_min_nazad', { diffMins: diffMins });
 
     const diffHours = Math.floor(diffMins / 60);
-    if (diffHours < 24) return `${diffHours} ч назад`;
+    if (diffHours < 24) return t('misc.cs_diffhours_ch_nazad', { diffHours: diffHours });
 
     return lastSyncTime.toLocaleDateString();
   };
@@ -263,7 +265,7 @@ const ConnectionStatus = ({ showOfflineAlert = true, position = 'top' }) => {
         <Badge
           variant={toneStyle.badge}
           size="small"
-          aria-label={`Статус подключения: ${label}`}
+          aria-label={t('misc.cs_status_podklyucheniya_label', { label: label })}
         >
           <span style={styles.badgeContent}>
             <Icon size={14} aria-hidden="true" />
@@ -284,7 +286,7 @@ const ConnectionStatus = ({ showOfflineAlert = true, position = 'top' }) => {
           <div
             style={styles.progressTrack}
             role="progressbar"
-            aria-label="Синхронизация данных"
+            aria-label={t('misc.cs_sinhronizatsiya_dannyh')}
           >
             <div style={styles.progressBar} />
           </div>
@@ -296,8 +298,8 @@ const ConnectionStatus = ({ showOfflineAlert = true, position = 'top' }) => {
         position={position}
         tone="warning"
         icon={WifiOff}
-        title="Нет подключения к интернету"
-        description="Приложение работает в офлайн режиме. Данные будут синхронизированы при восстановлении связи."
+        title={t('misc.cs_net_podklyucheniya_k_interne')}
+        description={t('misc.cs_prilozhenie_rabotaet_v_oflay')}
         onClose={() => setShowOfflineToast(false)}
       />
 
@@ -306,8 +308,8 @@ const ConnectionStatus = ({ showOfflineAlert = true, position = 'top' }) => {
         position={position}
         tone="success"
         icon={Cloud}
-        title="Подключение восстановлено"
-        description="Синхронизация данных..."
+        title={t('misc.cs_podklyuchenie_vosstanovleno')}
+        description={t('misc.cs_sinhronizatsiya_dannyh_2')}
         onClose={() => setShowOnlineToast(false)}
       />
 

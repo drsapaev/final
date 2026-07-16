@@ -35,14 +35,14 @@ const CSSTestPage = () => {
         results.push({
           test: 'ModernTabs Border Conflict',
           passed: !hasBorderConflict,
-          message: hasBorderConflict ? 'Обнаружен конфликт border/borderBottom' : 'Конфликт исправлен'
+          message: hasBorderConflict ? t('misc.ctp_obnaruzhen_konflikt_border_b') : t('misc.ctp_konflikt_ispravlen')
         });
       }
     } catch (error) {
       results.push({
         test: 'ModernTabs Border Conflict',
         passed: false,
-        message: `Ошибка тестирования: ${error.message}`
+        message: t('misc.ctp_oshibka_testirovaniya_error_', { message: error.message })
       });
     }
 
@@ -53,14 +53,14 @@ const CSSTestPage = () => {
         results.push({
           test: 'Native Card Component',
           passed: true,
-          message: 'Нативный компонент Card работает корректно'
+          message: t('misc.ctp_nativnyy_komponent_card_rabo')
         });
       }
     } catch (error) {
       results.push({
         test: 'Native Card Component',
         passed: false,
-        message: `Ошибка нативного компонента: ${error.message}`
+        message: t('misc.ctp_oshibka_nativnogo_komponenta', { message: error.message })
       });
     }
 
@@ -74,14 +74,14 @@ const CSSTestPage = () => {
         results.push({
           test: 'Global CSS Fixes',
           passed: hasCorrectHeight,
-          message: hasCorrectHeight ? 'Глобальные CSS исправления работают' : 'Проблемы с глобальными стилями'
+          message: hasCorrectHeight ? t('misc.ctp_globalnye_css_ispravleniya_r') : t('misc.ctp_problemy_s_globalnymi_stilya')
         });
       }
     } catch (error) {
       results.push({
         test: 'Global CSS Fixes',
         passed: false,
-        message: `Ошибка глобальных стилей: ${error.message}`
+        message: t('misc.ctp_oshibka_globalnyh_stiley_err', { message: error.message })
       });
     }
 
@@ -91,7 +91,7 @@ const CSSTestPage = () => {
       results.push({
         test: 'ModernTabs Re-render',
         passed: true,
-        message: 'Ререндер выполнен без ошибок'
+        message: t('misc.ctp_rerender_vypolnen_bez_oshibo')
       });
       setTestResults(results);
     }, 100);
@@ -161,7 +161,7 @@ const CSSTestPage = () => {
 
         {/* Тест ModernTabs */}
         <Card className="p-6">
-          <h2 className="text-lg font-semibold mb-4">Тест ModernTabs (основная проблема)</h2>
+          <h2 className="text-lg font-semibold mb-4">{t('misc.ctp_test_moderntabs_osnovnaya_pr')}</h2>
           <p className="text-gray-600 mb-4">
             Этот компонент вызывал CSS конфликты border/borderBottom. Проверьте консоль на warnings.
           </p>
@@ -178,18 +178,18 @@ const CSSTestPage = () => {
         {/* Тест нативных компонентов */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <Card className="p-4">
-            <h3 className="font-semibold mb-2">Нативный Card</h3>
+            <h3 className="font-semibold mb-2">{t('misc.ctp_nativnyy_card')}</h3>
             <p className="text-sm text-gray-600 mb-3">
               Тестирование нативного компонента Card после миграции
             </p>
             <div className="flex gap-2">
-              <Badge variant="success">Работает</Badge>
-              <Badge variant="info">Стили OK</Badge>
+              <Badge variant="success">{t('misc.ctp_rabotaet')}</Badge>
+              <Badge variant="info">{t('misc.ctp_stili_ok')}</Badge>
             </div>
           </Card>
 
           <Card className="p-4">
-            <h3 className="font-semibold mb-2">Нативный Button</h3>
+            <h3 className="font-semibold mb-2">{t('misc.ctp_nativnyy_button')}</h3>
             <p className="text-sm text-gray-600 mb-3">
               Тестирование нативного компонента Button
             </p>
@@ -200,7 +200,7 @@ const CSSTestPage = () => {
           </Card>
 
           <Card className="p-4">
-            <h3 className="font-semibold mb-2">Нативный Badge</h3>
+            <h3 className="font-semibold mb-2">{t('misc.ctp_nativnyy_badge')}</h3>
             <p className="text-sm text-gray-600 mb-3">
               Тестирование нативного компонента Badge
             </p>
@@ -216,7 +216,7 @@ const CSSTestPage = () => {
 
         {/* Инструкции */}
         <Card className="p-6 bg-blue-50 border-blue-200">
-          <h2 className="text-lg font-semibold mb-3 text-blue-800">Инструкции по тестированию</h2>
+          <h2 className="text-lg font-semibold mb-3 text-blue-800">{t('misc.ctp_instruktsii_po_testirovaniyu')}</h2>
           <div className="space-y-2 text-blue-700">
             <p>1. Откройте консоль разработчика (F12)</p>
             <p>2. Нажмите «Запустить тесты» для автоматической проверки</p>
@@ -228,7 +228,7 @@ const CSSTestPage = () => {
 
         {/* Статистика */}
         <Card className="p-6">
-          <h2 className="text-lg font-semibold mb-4">Статистика исправлений</h2>
+          <h2 className="text-lg font-semibold mb-4">{t('misc.ctp_statistika_ispravleniy')}</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="text-center">
               <div className="text-2xl font-bold text-green-600">1</div>
@@ -236,7 +236,7 @@ const CSSTestPage = () => {
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-blue-600">3</div>
-              <div className="text-sm text-gray-600">Нативных компонента</div>
+              <div className="text-sm text-gray-600">{t('misc.ctp_nativnyh_komponenta')}</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-purple-600">15+</div>
@@ -244,7 +244,7 @@ const CSSTestPage = () => {
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-orange-600">0</div>
-              <div className="text-sm text-gray-600">Активных конфликтов</div>
+              <div className="text-sm text-gray-600">{t('misc.ctp_aktivnyh_konfliktov')}</div>
             </div>
           </div>
         </Card>

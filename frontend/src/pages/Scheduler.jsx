@@ -36,7 +36,7 @@ export default function Scheduler() {
       const items = Array.isArray(res?.items) ? res.items : Array.isArray(res) ? res : [];
       setRows(items);
     } catch (e) {
-      setErr(e?.data?.detail || e?.message || 'Ошибка загрузки расписания');
+      setErr(e?.data?.detail || e?.message || t('misc.sche_oshibka_zagruzki_raspisaniya'));
     } finally {
       setBusy(false);
     }
@@ -58,15 +58,15 @@ export default function Scheduler() {
     <div>
       <RoleGate roles={['Admin', 'Registrar', 'Doctor']}>
         <div className="clinic-ops-page-shell">
-          <h2 style={{ margin: 0 }}>Расписание</h2>
+          <h2 style={{ margin: 0 }}>{t('misc.sche_raspisanie')}</h2>
 
           <div className="clinic-ops-toolbar">
             <label htmlFor="scheduler-date">
               Дата:&nbsp;
-              <Input id="scheduler-date" className="clinic-ops-input" type="date" aria-label="Дата расписания" value={date} onChange={(e) => setDate(e.target.value)} />
+              <Input id="scheduler-date" className="clinic-ops-input" type="date" aria-label={t('misc.sche_data_raspisaniya')} value={date} onChange={(e) => setDate(e.target.value)} />
             </label>
-            <Input className="clinic-ops-input" aria-label="Поиск по врачу, кабинету или статусу" placeholder="Поиск по врачу/кабинету/статусу" value={q} onChange={(e) => setQ(e.target.value)} style={{ minWidth: 260 }} />
-            <button className="clinic-ops-button" onClick={load} disabled={busy}>{busy ? 'Загрузка' : 'Обновить'}</button>
+            <Input className="clinic-ops-input" aria-label={t('misc.sche_poisk_po_vrachu_kabinetu_ili')} placeholder={t('misc.sche_poisk_po_vrachu_kabinetu_sta')} value={q} onChange={(e) => setQ(e.target.value)} style={{ minWidth: 260 }} />
+            <button className="clinic-ops-button" onClick={load} disabled={busy}>{busy ? t('misc.sche_zagruzka') : t('misc.sche_obnovit')}</button>
           </div>
 
           {err && <div className="clinic-ops-error">{String(err)}</div>}
@@ -95,7 +95,7 @@ export default function Scheduler() {
                   </tr>
                 )}
                 {filtered.length === 0 &&
-                <tr><td colSpan={4}>Нет записей</td></tr>
+                <tr><td colSpan={4}>{t('misc.sche_net_zapisey')}</td></tr>
                 }
               </tbody>
             </table>

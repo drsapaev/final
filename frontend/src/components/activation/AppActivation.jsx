@@ -4,6 +4,7 @@ import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
 import { Input } from '../ui/macos';
 import {
+import { useTranslation } from '../../i18n/useTranslation';
   Key,
   Shield,
   CheckCircle,
@@ -15,6 +16,7 @@ import {
 } from 'lucide-react';
 
 const AppActivation = () => {
+  const { t } = useTranslation();
   const [activationKey, setActivationKey] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -23,7 +25,7 @@ const AppActivation = () => {
 
   const handleActivate = async () => {
     if (!activationKey.trim()) {
-      setError('Введите ключ активации');
+      setError(t('misc.aa_vvedite_klyuch_aktivatsii'));
       return;
     }
 
@@ -52,7 +54,7 @@ const AppActivation = () => {
       const result = await response.json();
 
       if (response.ok) {
-        setSuccess('Приложение успешно активировано!');
+        setSuccess(t('misc.aa_prilozhenie_uspeshno_aktivir'));
         setStep('success');
 
         localStorage.setItem('app_activated', 'true');
@@ -62,11 +64,11 @@ const AppActivation = () => {
           window.location.reload();
         }, 2000);
       } else {
-        throw new Error(result.detail || result.message || 'Ошибка активации');
+        throw new Error(result.detail || result.message || t('misc.aa_oshibka_aktivatsii'));
       }
     } catch (err) {
       logger.error('Ошибка активации:', err);
-      setError(err.message || 'Ошибка активации. Проверьте ключ.');
+      setError(err.message || t('misc.aa_oshibka_aktivatsii_proverte_'));
     } finally {
       setLoading(false);
     }
@@ -85,7 +87,7 @@ const AppActivation = () => {
     };
 
     navigator.clipboard.writeText(JSON.stringify(deviceInfo, null, 2));
-    setSuccess('Информация об устройстве скопирована');
+    setSuccess(t('misc.aa_informatsiya_ob_ustroystve_s'));
     setTimeout(() => setSuccess(''), 3000);
   };
 
@@ -119,7 +121,7 @@ const AppActivation = () => {
             <CheckCircle size={16} /> Доступные функции:
           </div>
           <ul style={{ margin: 0, paddingLeft: '24px', color: 'var(--mac-text-primary)', lineHeight: '1.6' }}>
-            <li>Полный доступ к системе</li>
+            <li>{t('misc.aa_polnyy_dostup_k_sisteme')}</li>
             <li>AI функции и аналитика</li>
             <li>Telegram интеграция</li>
           </ul>
@@ -180,7 +182,7 @@ const AppActivation = () => {
           <Input
             id="activation-key"
             type="text"
-            aria-label="Ключ активации"
+            aria-label={t('misc.aa_klyuch_aktivatsii')}
             className="glass-input"
             style={{ paddingLeft: '44px' }}
             value={activationKey}
@@ -200,7 +202,7 @@ const AppActivation = () => {
           style={{ width: '100%', justifyContent: 'center' }}
         >
           {loading ? <RefreshCw size={20} className="spin" /> : <Lock size={20} />}
-          {loading ? 'Активация...' : 'Активировать'}
+          {loading ? t('misc.aa_aktivatsiya') : t('misc.aa_aktivirovat')}
         </button>
 
         <button

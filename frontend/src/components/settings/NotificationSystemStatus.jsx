@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
+import { useTranslation } from '../../i18n/useTranslation';
 
 export default function NotificationSystemStatus() {
+  const { t } = useTranslation();
     const [status, setStatus] = useState(null);
     const [loading, setLoading] = useState(true);
 
@@ -22,8 +24,8 @@ export default function NotificationSystemStatus() {
         }
     }
 
-    if (loading) return <div>Загрузка статуса...</div>;
-    if (!status) return <div>Не удалось загрузить статус</div>;
+    if (loading) return <div>{t('misc.nss_zagruzka_statusa')}</div>;
+    if (!status) return <div>{t('misc.nss_ne_udalos_zagruzit_status')}</div>;
 
     return (
         <div style={{ display: 'grid', gap: 16 }}>
@@ -31,15 +33,15 @@ export default function NotificationSystemStatus() {
                 title="Email (SMTP)"
                 configured={status.email?.configured}
                 details={[
-                    { label: 'Сервер', value: status.email?.server },
-                    { label: 'Порт', value: status.email?.port },
+                    { label: t('misc.nss_server'), value: status.email?.server },
+                    { label: t('misc.nss_port'), value: status.email?.port },
                 ]}
             />
             <StatusCard
                 title="Telegram Bot"
                 configured={status.telegram?.configured}
                 details={[
-                    { label: 'Bot Token', value: status.telegram?.bot_token ? '******' : 'Не задан' },
+                    { label: 'Bot Token', value: status.telegram?.bot_token ? '******' : t('misc.nss_ne_zadan') },
                     { label: 'Chat ID', value: status.telegram?.chat_id },
                 ]}
             />
@@ -55,6 +57,7 @@ export default function NotificationSystemStatus() {
 }
 
 function StatusCard({ title, configured, details }) {
+    const { t } = useTranslation();
     return (
         <div style={{
             border: '1px solid var(--border-color)',
@@ -82,7 +85,7 @@ function StatusCard({ title, configured, details }) {
                     fontSize: 12,
                     fontWeight: 'var(--mac-font-weight-semibold)'
                 }}>
-                    {configured ? 'Активен' : 'Не настроен'}
+                    {configured ? t('misc.nss_aktiven') : t('misc.nss_ne_nastroen')}
                 </span>
             </div>
         </div>

@@ -156,13 +156,13 @@ export default function LabTemplateWorkbench({
 
   async function ensureDraftVersion() {
     if (!selectedTemplate) {
-      throw new Error('Сначала выберите шаблон');
+      throw new Error(t('misc.ltw_snachala_vyberite_shablon'));
     }
     if (hasTemplateVersionAction(activeVersion, 'update')) {
       return activeVersion.id;
     }
     if (!hasTemplateVersionAction(activeVersion, 'create_draft')) {
-      throw new Error('Сервер не разрешил создать черновик для этой версии шаблона');
+      throw new Error(t('misc.ltw_server_ne_razreshil_sozdat_c'));
     }
     const version = await labReportingApi.createTemplateVersion(selectedTemplate.id, activeVersion?.id || null);
     await onTemplatesChanged(selectedTemplate.id);
@@ -180,13 +180,13 @@ export default function LabTemplateWorkbench({
         const def = rule.default;
         if (def && def.low != null && def.high != null && def.low !== '' && def.high !== '') {
           if (parseFloat(def.low) >= parseFloat(def.high)) {
-            errors.push(`Секция "${section.title || sIdx + 1}", поле "${field.label || field.field_key}": default low (${def.low}) ≥ high (${def.high})`);
+            errors.push(t('misc.ltw_sektsiya_section_title_sidx_', { sIdx: section.title || sIdx + 1, field_key: field.label || field.field_key, low: def.low, high: def.high }));
           }
         }
         (rule.cases || []).forEach((c, cIdx) => {
           if (c.low != null && c.high != null && c.low !== '' && c.high !== '') {
             if (parseFloat(c.low) >= parseFloat(c.high)) {
-              errors.push(`Секция "${section.title || sIdx + 1}", поле "${field.label || field.field_key}", условие ${cIdx + 1}: low (${c.low}) ≥ high (${c.high})`);
+              errors.push(t('misc.ltw_sektsiya_section_title_sidx__2', { sIdx: section.title || sIdx + 1, field_key: field.label || field.field_key, cIdx: cIdx + 1, low: c.low, high: c.high }));
             }
           }
         });
@@ -205,7 +205,7 @@ export default function LabTemplateWorkbench({
         const key = field.field_key;
         if (!key) return;
         if (seenKeys.has(key)) {
-          errors.push(`Дубликат field_key "${key}" в секции "${section.title || sIdx + 1}"`);
+          errors.push(t('misc.ltw_dublikat_field_key_key_v_sek', { key: key, sIdx: section.title || sIdx + 1 }));
         }
         seenKeys.add(key);
       });
@@ -440,7 +440,7 @@ export default function LabTemplateWorkbench({
         const cloned = {
           ...fieldToClone,
           field_key: `${fieldToClone.field_key || 'field'}_copy_${Date.now()}`,
-          label: `${fieldToClone.label || 'Поле'} (копия)`,
+          label: t('misc.ltw_fieldtoclone_label_pole_kopi', { label: fieldToClone.label || 'Поле' }),
         };
         const newFields = [...section.fields];
         newFields.splice(fieldIndex + 1, 0, cloned);
@@ -499,15 +499,15 @@ export default function LabTemplateWorkbench({
               type="search"
               value={templateSearch}
               onChange={(e) => setTemplateSearch(e.target.value)}
-              placeholder="Поиск по названию, коду, семейству…"
-              aria-label="Поиск шаблонов"
+              placeholder={t('misc.ltw_poisk_po_nazvaniyu_kodu_seme')}
+              aria-label={t('misc.ltw_poisk_shablonov')}
               className="ltw-search-input"
             />
             {templateSearch && (
               <button
                 type="button"
                 onClick={() => setTemplateSearch('')}
-                aria-label="Очистить поиск"
+                aria-label={t('misc.ltw_ochistit_poisk')}
                 className="ltw-search-clear"
               >
                 ×
@@ -532,8 +532,8 @@ export default function LabTemplateWorkbench({
                 <div className="ltw-fw-600">{template.name}</div>
                 <div className="ltw-text-13 ltw-text-secondary">{template.code} • {template.family}</div>
                 <div className="ltw-flex-gap-6">
-                  {template.published_version_id && <Badge variant="success">Опубликован</Badge>}
-                  {template.draft_version_id && <Badge variant="warning">Черновик</Badge>}
+                  {template.published_version_id && <Badge variant="success">{t('misc.ltw_opublikovan')}</Badge>}
+                  {template.draft_version_id && <Badge variant="warning">{t('misc.ltw_chernovik')}</Badge>}
                 </div>
               </button>
             ))}
@@ -574,10 +574,10 @@ export default function LabTemplateWorkbench({
                     });
                     if (!ok) return;
                     setDraftVersion(hydrateVersion(activeVersion));
-                    notify('success', 'Черновик восстановлен из серверной версии.');
+                    notify('success', t('misc.ltw_chernovik_vosstanovlen_iz_se'));
                   }}
                   disabled={saving || !activeVersion}
-                  title="Отменить изменения и восстановить версию с сервера"
+                  title={t('misc.ltw_otmenit_izmeneniya_i_vosstan')}
                 >
                   <Icon name="arrow.counterclockwise" size={16} />
                   Отменить
@@ -600,7 +600,7 @@ export default function LabTemplateWorkbench({
         </CardHeader>
         <CardContent className="ltw-card-content-flat">
           {!selectedTemplate ? (
-            <Alert severity="info">Выберите шаблон слева, чтобы редактировать оформление, секции и строки анализов.</Alert>
+            <Alert severity="info">{t('misc.ltw_vyberite_shablon_sleva_chtob')}</Alert>
           ) : (
             <div className="ltw-grid-16">
               <div className="ltw-badges-row">
@@ -612,7 +612,7 @@ export default function LabTemplateWorkbench({
               {/* L-M-7 fix: заменён aria-pressed на role=tablist + role=tab + aria-selected.
                   Согласованность с LabPanel.jsx (там тоже role=tablist).
                   Keyboard-навигация: стрелки вправо/лево, Home, End. */}
-              <div className="ltw-tab-bar ltw-tablist" role="tablist" aria-label="Редактор шаблона">
+              <div className="ltw-tab-bar ltw-tablist" role="tablist" aria-label={t('misc.ltw_redaktor_shablona')}>
                 {EDITOR_TABS.map((tab) => {
                   const isActive = editorTab === tab.id;
                   return (

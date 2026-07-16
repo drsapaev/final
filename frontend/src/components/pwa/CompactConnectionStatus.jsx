@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Wifi, WifiOff, Cloud, RefreshCw } from 'lucide-react';
 import PropTypes from 'prop-types';
+import { useTranslation } from '../../i18n/useTranslation';
 /**
  * Компактный индикатор подключения с PWA статусом
  * ИСПРАВЛЕНО: Убран избыточный импорт React
  */
 const CompactConnectionStatus = ({ className = '', showTooltip = true }) => {
+  const { t } = useTranslation();
   const [isOnline, setIsOnline] = useState(() => (
     typeof navigator === 'undefined' ? true : navigator.onLine
   ));
@@ -87,10 +89,10 @@ const CompactConnectionStatus = ({ className = '', showTooltip = true }) => {
   };
 
   const getConnectionLabel = () => {
-    if (!isOnline) return 'Офлайн';
-    if (isSyncing) return 'Синхронизация...';
-    if (isServiceWorkerReady) return 'Онлайн';
-    return 'Подключение...';
+    if (!isOnline) return t('misc.ccs_oflayn');
+    if (isSyncing) return t('misc.ccs_sinhronizatsiya');
+    if (isServiceWorkerReady) return t('misc.ccs_onlayn');
+    return t('misc.ccs_podklyuchenie');
   };
 
   const formatLastSync = () => {
@@ -100,11 +102,11 @@ const CompactConnectionStatus = ({ className = '', showTooltip = true }) => {
     const diffMs = now - lastSyncTime;
     const diffMins = Math.floor(diffMs / 60000);
     
-    if (diffMins < 1) return 'только что';
-    if (diffMins < 60) return `${diffMins} мин назад`;
+    if (diffMins < 1) return t('misc.ccs_tolko_chto');
+    if (diffMins < 60) return t('misc.ccs_diffmins_min_nazad', { diffMins: diffMins });
     
     const diffHours = Math.floor(diffMins / 60);
-    if (diffHours < 24) return `${diffHours} ч назад`;
+    if (diffHours < 24) return t('misc.ccs_diffhours_ch_nazad', { diffHours: diffHours });
     
     return lastSyncTime.toLocaleDateString();
   };
@@ -117,7 +119,7 @@ const CompactConnectionStatus = ({ className = '', showTooltip = true }) => {
   return (
     <div 
       className={`flex items-center gap-1 ${className}`}
-      title={showTooltip ? `${label}${lastSync ? ` • Синхронизация: ${lastSync}` : ''}` : ''}
+      title={showTooltip ? `${label}${lastSync ? t('misc.ccs_sinhronizatsiya_lastsync', { lastSync: lastSync }) : ''}` : ''}
     >
       <Icon 
         size={16} 

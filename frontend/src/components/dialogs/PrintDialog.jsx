@@ -54,6 +54,7 @@ const PrintDialog = ({
   documentData,
   onPrint,
 }) => {
+  const { t } = useTranslation();
   const [printers, setPrinters] = useState([]);
   const [selectedPrinter, setSelectedPrinter] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -84,14 +85,14 @@ const PrintDialog = ({
       const result = await printService.getPrinters();
       if (!result.success) {
         throw new Error(
-          result.error || 'Не удалось загрузить список принтеров',
+          result.error || t('misc.pd_ne_udalos_zagruzit_spisok_pr'),
         );
       }
 
       const backendPrinters = Array.isArray(result.data) ? result.data : [];
       const normalizedPrinters = backendPrinters.map((printer) => ({
         id: printer.name || String(printer.id),
-        name: printer.display_name || printer.name || 'Принтер',
+        name: printer.display_name || printer.name || t('misc.pd_printer'),
         status: printer.status || null,
         type: printer.printer_type || 'unknown',
         isDefault: Boolean(printer.is_default),
@@ -106,7 +107,7 @@ const PrintDialog = ({
       );
     } catch (err) {
       logger.error('Printers load error:', err);
-      setError(err.message || 'Не удалось загрузить принтеры');
+      setError(err.message || t('misc.pd_ne_udalos_zagruzit_printery'));
     } finally {
       setIsLoading(false);
     }
@@ -119,11 +120,11 @@ const PrintDialog = ({
         if (onPrint) {
           await onPrint(documentData);
         }
-        toast.success('Документ отправлен на печать');
+        toast.success(t('misc.pd_dokument_otpravlen_na_pechat'));
         onClose();
       } catch (err) {
         logger.error('Print error:', err);
-        toast.error(err?.message || 'Ошибка при печати документа');
+        toast.error(err?.message || t('misc.pd_oshibka_pri_pechati_dokument'));
       } finally {
         setIsPrinting(false);
       }
@@ -131,7 +132,7 @@ const PrintDialog = ({
     }
 
     if (!selectedPrinter) {
-      toast.error('Выберите принтер');
+      toast.error(t('misc.pd_vyberite_printer'));
       return;
     }
 
@@ -140,11 +141,11 @@ const PrintDialog = ({
       if (onPrint) {
         await onPrint(documentData, selectedPrinter);
       }
-      toast.success(`Документ отправлен на принтер «${selectedPrinter}»`);
+      toast.success(t('misc.pd_dokument_otpravlen_na_printe', { selectedPrinter: selectedPrinter }));
       onClose();
     } catch (err) {
       logger.error('Print error:', err);
-      toast.error(err?.message || 'Ошибка при печати документа');
+      toast.error(err?.message || t('misc.pd_oshibka_pri_pechati_dokument'));
     } finally {
       setIsPrinting(false);
     }
@@ -153,25 +154,25 @@ const PrintDialog = ({
   const getDocumentTitle = () => {
     switch (documentType) {
       case 'ticket':
-        return 'Талон пациента';
+        return t('misc.pd_talon_patsienta');
       case 'receipt':
-        return 'Квитанция об оплате';
+        return t('misc.pd_kvitantsiya_ob_oplate');
       case 'report':
-        return 'Отчёт';
+        return t('misc.pd_otchyot');
       default:
-        return 'Документ';
+        return t('misc.pd_dokument');
     }
   };
 
   const actions = [
     {
-      label: 'Отмена',
+      label: t('misc.pd_otmena'),
       variant: 'secondary',
       onClick: onClose,
       disabled: isPrinting,
     },
     {
-      label: isPrinting ? 'Печать...' : 'Печать',
+      label: isPrinting ? t('misc.pd_pechat') : t('misc.pd_pechat_2'),
       variant: 'primary',
       icon: <Printer size={16} />,
       onClick: handlePrint,
@@ -183,7 +184,7 @@ const PrintDialog = ({
     <ModernDialog
       isOpen={isOpen}
       onClose={onClose}
-      title="Печать документа"
+      title={t('misc.pd_pechat_dokumenta')}
       actions={actions}
       dialogClassName="print-dialog--styled"
       closeOnBackdrop={!isPrinting}
@@ -241,7 +242,7 @@ const PrintDialog = ({
           <div className="print-browser-notice">
             <div className="print-browser-notice-header">
               <Printer size={20} />
-              <strong>Печать через браузер</strong>
+              <strong>{t('misc.pd_pechat_cherez_brauzer')}</strong>
             </div>
             <p className="print-browser-notice-text">
               Будет открыт системный диалог печати на текущем компьютере.
@@ -316,11 +317,11 @@ const PrintDialog = ({
                         <div className="print-printer-type">
                           {printer.type === 'thermal' ||
                           printer.type === 'ESC/POS'
-                            ? 'Термопринтер'
+                            ? t('misc.pd_termoprinter')
                             : printer.type === 'A4' ||
                                 printer.type === 'A5' ||
                                 printer.type === 'laser'
-                              ? 'Лазерный принтер'
+                              ? t('misc.pd_lazernyy_printer')
                               : printer.type}
                         </div>
                       </div>
@@ -352,7 +353,7 @@ const PrintDialog = ({
               {printers.length === 0 && !isLoading && !error && (
                 <div className="print-empty-state-full">
                   <Printer size={48} className="print-empty-state-icon" />
-                  <p className="print-empty-state-text">Принтеры не найдены</p>
+                  <p className="print-empty-state-text">{t('misc.pd_printery_ne_naydeny')}</p>
                 </div>
               )}
             </div>

@@ -20,8 +20,9 @@ const PaymentDialog = ({
   onPaymentSuccess,
   onPrintTicket,
 }) => {
+  const { t } = useTranslation();
   const [paymentAmount, setPaymentAmount] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('Карта');
+  const [paymentMethod, setPaymentMethod] = useState(t('misc.pd_karta'));
   const [isProcessing, setIsProcessing] = useState(false);
   const [isPaid, setIsPaid] = useState(false);
   const [errors, setErrors] = useState({});
@@ -30,7 +31,7 @@ const PaymentDialog = ({
   useEffect(() => {
     if (isOpen && appointment) {
       setPaymentAmount(appointment.cost || appointment.payment_amount || '');
-      setPaymentMethod(appointment.payment_type || 'Карта');
+      setPaymentMethod(appointment.payment_type || t('misc.pd_karta'));
       setIsPaid(false);
       setErrors({});
       setIsProcessing(false);
@@ -41,11 +42,11 @@ const PaymentDialog = ({
     const newErrors = {};
 
     if (!paymentAmount || !Number.isFinite(parseFloat(paymentAmount)) || parseFloat(paymentAmount) <= 0) {
-      newErrors.amount = 'Укажите корректную сумму';
+      newErrors.amount = t('misc.pd_ukazhite_korrektnuyu_summu');
     }
 
     if (!paymentMethod) {
-      newErrors.method = 'Выберите способ оплаты';
+      newErrors.method = t('misc.pd_vyberite_sposob_oplaty');
     }
 
     setErrors(newErrors);
@@ -70,10 +71,10 @@ const PaymentDialog = ({
       }
 
       setIsPaid(true);
-      toast.success('Оплата отмечена как полученная');
+      toast.success(t('misc.pd_oplata_otmechena_kak_poluche'));
     } catch (error) {
       logger.error('Payment error:', error);
-      toast.error(error?.message || 'Ошибка при обработке платежа');
+      toast.error(error?.message || t('misc.pd_oshibka_pri_obrabotke_platez'));
     } finally {
       setIsProcessing(false);
     }
@@ -96,26 +97,26 @@ const PaymentDialog = ({
   const actions = isPaid
     ? [
         {
-          label: 'Печать талона',
+          label: t('misc.pd_pechat_talona'),
           variant: 'primary',
           icon: <Printer size={16} />,
           onClick: handlePrintAndClose,
         },
         {
-          label: 'Закрыть',
+          label: t('misc.pd_zakryt'),
           variant: 'secondary',
           onClick: onClose,
         },
       ]
     : [
         {
-          label: 'Отмена',
+          label: t('misc.pd_otmena_2'),
           variant: 'secondary',
           onClick: onClose,
           disabled: isProcessing,
         },
         {
-          label: isProcessing ? 'Обработка...' : 'Оплатить',
+          label: isProcessing ? t('misc.pd_obrabotka') : t('misc.pd_oplatit'),
           variant: 'success',
           icon: isProcessing ? null : <Check size={16} />,
           onClick: handlePayment,
@@ -125,7 +126,7 @@ const PaymentDialog = ({
 
   // UX Audit Registrar #5: emoji в заголовке (✅/💳) заменены на text-only.
   // Иконки есть в actions (Printer/Check) и в success state (CheckCircle2).
-  const dialogTitle = isPaid ? 'Оплата завершена' : 'Оплата услуг';
+  const dialogTitle = isPaid ? t('misc.pd_oplata_zavershena') : t('misc.pd_oplata_uslug');
 
   return (
     <ModernDialog
@@ -187,7 +188,7 @@ const PaymentDialog = ({
               <Input
                 id="payment-amount"
                 type="number"
-                aria-label="Сумма к оплате"
+                aria-label={t('misc.pd_summa_k_oplate')}
                 aria-invalid={!!errors.amount}
                 aria-describedby={errors.amount ? 'payment-amount-error' : undefined}
                 value={paymentAmount}
@@ -197,7 +198,7 @@ const PaymentDialog = ({
                     setErrors((prev) => ({ ...prev, amount: null }));
                   }
                 }}
-                placeholder="Введите сумму"
+                placeholder={t('misc.pd_vvedite_summu')}
                 className={`payment-amount-input ${errors.amount ? 'payment-amount-input--error' : ''}`}
               />
               {errors.amount && (

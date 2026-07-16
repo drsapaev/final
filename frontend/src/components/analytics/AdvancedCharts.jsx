@@ -4,6 +4,7 @@ import { Chart, registerables } from 'chart.js';
 import { Card, Button,
   Checkbox } from '../ui/macos';
 import {
+import { useTranslation } from '../../i18n/useTranslation';
   Download,
   RefreshCw,
   BarChart3,
@@ -30,9 +31,10 @@ const AdvancedCharts = ({
   loading = false,
   onRefresh,
   onExport,
-  title = 'Продвинутая аналитика',
+  title = t('misc.ac_prodvinutaya_analitika'),
   showFilters = true
 }) => {
+  const { t } = useTranslation();
   void title;
   const chartRefs = useRef({});
   const [activeTab, setActiveTab] = useState('overview');
@@ -186,7 +188,7 @@ const AdvancedCharts = ({
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex items-center space-x-2">
             <Filter className="w-4 h-4" />
-            <span className="text-sm font-medium">Фильтры:</span>
+            <span className="text-sm font-medium">{t('misc.ac_filtry')}</span>
           </div>
           
           <select
@@ -194,11 +196,11 @@ const AdvancedCharts = ({
             onChange={(e) => setChartType(e.target.value)}
             className="px-3 py-1 border border-gray-300 rounded-md text-sm">
             
-            <option value="line">Линейный</option>
-            <option value="bar">Столбчатый</option>
-            <option value="doughnut">Круговая</option>
-            <option value="radar">Радар</option>
-            <option value="scatter">Точечная</option>
+            <option value="line">{t('misc.ac_lineynyy')}</option>
+            <option value="bar">{t('misc.ac_stolbchatyy')}</option>
+            <option value="doughnut">{t('misc.ac_krugovaya')}</option>
+            <option value="radar">{t('misc.ac_radar')}</option>
+            <option value="scatter">{t('misc.ac_tochechnaya')}</option>
           </select>
 
           <select
@@ -213,7 +215,7 @@ const AdvancedCharts = ({
           </select>
 
           <div className="flex items-center space-x-2">
-            <span className="text-sm">Метрики:</span>
+            <span className="text-sm">{t('misc.ac_metriki')}</span>
             {['revenue', 'visits', 'patients', 'doctors'].map((metric) =>
             <label key={metric} className="flex items-center space-x-1">
                 <Checkbox aria-label={`Toggle ${metric} metric`} checked={selectedMetrics.includes(metric)} onChange={(e) => {
@@ -254,7 +256,7 @@ const AdvancedCharts = ({
         <div className="p-8 text-center">
           <div className="flex items-center justify-center space-x-2">
             <RefreshCw className="w-5 h-5 animate-spin" />
-            <span>Загрузка продвинутых графиков...</span>
+            <span>{t('misc.ac_zagruzka_prodvinutyh_grafiko')}</span>
           </div>
         </div>
       </Card>);
@@ -291,11 +293,11 @@ const AdvancedCharts = ({
       <div className="border-b border-gray-200">
           <nav className="flex space-x-8">
             {[
-          { id: 'overview', label: 'Обзор', icon: Eye },
+          { id: 'overview', label: t('misc.ac_obzor'), icon: Eye },
           { id: 'kpi', label: 'KPI', icon: Target },
-          { id: 'doctors', label: 'Врачи', icon: Users },
-          { id: 'revenue', label: 'Доходы', icon: DollarSign },
-          { id: 'appointments', label: 'Записи', icon: Calendar }].
+          { id: 'doctors', label: t('misc.ac_vrachi'), icon: Users },
+          { id: 'revenue', label: t('misc.ac_dohody'), icon: DollarSign },
+          { id: 'appointments', label: t('misc.ac_zapisi'), icon: Calendar }].
           map((tab) =>
           <button
             key={tab.id}

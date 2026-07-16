@@ -22,6 +22,7 @@ import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import './ModernTabs.css';
 import PropTypes from 'prop-types';
+import { useTranslation } from '../../i18n/useTranslation';
 
 // Маппинг иконок из lucide-react
 // ⭐ SSOT: icon names from QueueProfile.icon field
@@ -55,6 +56,7 @@ const ModernTabs = ({
   departmentStats = {},
   language = 'ru'
 }) => {
+  const { t } = useTranslation();
   const [indicatorStyle, setIndicatorStyle] = useState({});
   const [tabs, setTabs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -63,10 +65,10 @@ const ModernTabs = ({
   // Переводы
   const t = {
     ru: {
-      today: 'Сегодня',
-      queue: 'В очереди',
-      pending: 'Ожидают',
-      all: 'Все отделения'
+      today: t('misc.mt_segodnya'),
+      queue: t('misc.mt_v_ocheredi'),
+      pending: t('misc.mt_ozhidayut'),
+      all: t('misc.mt_vse_otdeleniya')
     }
   }[language] || {};
 
@@ -113,7 +115,7 @@ const ModernTabs = ({
       setTabs([
       {
         key: 'cardiology',
-        label: language === 'uz' ? 'Kardiolog' : 'Кардиолог',
+        label: language === 'uz' ? 'Kardiolog' : t('misc.mt_kardiolog'),
         queue_tags: ['cardio', 'cardiology', 'cardiology_common'],
         icon: Heart,
         color: 'var(--mac-error)',
@@ -121,7 +123,7 @@ const ModernTabs = ({
       },
       {
         key: 'ecg',
-        label: language === 'uz' ? 'EKG' : 'ЭКГ',
+        label: language === 'uz' ? 'EKG' : t('misc.mt_ekg'),
         queue_tags: ['ecg', 'echokg'],
         icon: Activity,
         color: 'var(--mac-accent-purple)',
@@ -129,7 +131,7 @@ const ModernTabs = ({
       },
       {
         key: 'dermatology',
-        label: language === 'uz' ? 'Dermatolog' : 'Дерматолог',
+        label: language === 'uz' ? 'Dermatolog' : t('misc.mt_dermatolog'),
         queue_tags: ['derma', 'dermatology'],
         icon: UserCheck,
         color: 'var(--mac-warning)',
@@ -137,7 +139,7 @@ const ModernTabs = ({
       },
       {
         key: 'stomatology',
-        label: language === 'uz' ? 'Stomatolog' : 'Стоматолог',
+        label: language === 'uz' ? 'Stomatolog' : t('misc.mt_stomatolog'),
         queue_tags: ['dental', 'stomatology', 'dentist'],
         icon: Smile,
         color: 'var(--mac-accent)',
@@ -145,7 +147,7 @@ const ModernTabs = ({
       },
       {
         key: 'lab',
-        label: language === 'uz' ? 'Laboratoriya' : 'Лаборатория',
+        label: language === 'uz' ? 'Laboratoriya' : t('misc.mt_laboratoriya'),
         queue_tags: ['lab', 'laboratory'],
         icon: FlaskConical,
         color: 'var(--mac-success)',
@@ -153,7 +155,7 @@ const ModernTabs = ({
       },
       {
         key: 'procedures',
-        label: language === 'uz' ? 'Muolajalar' : 'Процедуры',
+        label: language === 'uz' ? 'Muolajalar' : t('misc.mt_protsedury'),
         queue_tags: ['procedures', 'physio', 'therapy'],
         icon: Syringe,
         color: 'var(--mac-accent-purple)',
@@ -308,7 +310,7 @@ const ModernTabs = ({
           boxShadow: 'none'
         }}>
 
-        {/* Кнопка "Все отделения" */}
+        {/* Кнопка t('misc.mt_vse_otdeleniya') */}
         <button
           className={`tab-button all-departments ${!activeTab ? 'active' : ''}`}
           onClick={() => onTabChange(null)}

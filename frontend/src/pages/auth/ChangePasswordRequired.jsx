@@ -35,11 +35,11 @@ export default function ChangePasswordRequired({ currentPassword }) {
 
     // Проверка требований к паролю
     const passwordRequirements = [
-        { label: 'Минимум 8 символов', test: (p) => p.length >= 8 },
-        { label: 'Заглавная буква', test: (p) => /[A-Z]/.test(p) },
-        { label: 'Строчная буква', test: (p) => /[a-z]/.test(p) },
-        { label: 'Цифра', test: (p) => /[0-9]/.test(p) },
-        { label: 'Специальный символ (!@#$%^&*)', test: (p) => /[!@#$%^&*(),.?":{}|<>]/.test(p) }
+        { label: t('misc.cpr_minimum_8_simvolov'), test: (p) => p.length >= 8 },
+        { label: t('misc.cpr_zaglavnaya_bukva'), test: (p) => /[A-Z]/.test(p) },
+        { label: t('misc.cpr_strochnaya_bukva'), test: (p) => /[a-z]/.test(p) },
+        { label: t('misc.cpr_tsifra'), test: (p) => /[0-9]/.test(p) },
+        { label: t('misc.cpr_spetsialnyy_simvol'), test: (p) => /[!@#$%^&*(),.?":{}|<>]/.test(p) }
     ];
 
     const isPasswordValid = passwordRequirements.every(req => req.test(formData.newPassword));
@@ -51,17 +51,17 @@ export default function ChangePasswordRequired({ currentPassword }) {
         setSuccess('');
 
         if (!isPasswordValid) {
-            setError('Пароль не соответствует требованиям безопасности');
+            setError(t('misc.cpr_parol_ne_sootvetstvuet_trebo'));
             return;
         }
 
         if (!doPasswordsMatch) {
-            setError('Пароли не совпадают');
+            setError(t('misc.cpr_paroli_ne_sovpadayut'));
             return;
         }
 
         if (formData.newPassword === formData.currentPassword) {
-            setError('Новый пароль должен отличаться от текущего');
+            setError(t('misc.cpr_novyy_parol_dolzhen_otlichat'));
             return;
         }
 
@@ -72,19 +72,19 @@ export default function ChangePasswordRequired({ currentPassword }) {
                 new_password: formData.newPassword
             });
 
-            setSuccess('Пароль успешно изменен! Перенаправление...');
+            setSuccess(t('misc.cpr_parol_uspeshno_izmenen_peren'));
 
             // Перенаправляем на страницу входа через 2 секунды
             setTimeout(() => {
                 navigate('/login', {
-                    state: { message: 'Пароль успешно изменен. Пожалуйста, войдите с новым паролем.' }
+                    state: { message: t('misc.cpr_parol_uspeshno_izmenen_pozha') }
                 });
             }, 2000);
 
         } catch (err) {
             const errorMessage = getErrorMessage(
                 err,
-                'Не удалось сменить пароль. Проверьте соединение и попробуйте снова.'
+                t('misc.cpr_ne_udalos_smenit_parol_prove')
             );
             setError(errorMessage);
             logger.error('Ошибка смены пароля:', err);
@@ -163,7 +163,7 @@ export default function ChangePasswordRequired({ currentPassword }) {
             <MacOSCard style={cardStyle}>
                 <div style={{ textAlign: 'center', marginBottom: 'var(--mac-spacing-5)' }}>
                     <Lock size={48} color={getColor('warning', 500)} style={{ marginBottom: 'var(--mac-spacing-3)' }} />
-                    <h1 style={titleStyle}>Смена пароля</h1>
+                    <h1 style={titleStyle}>{t('misc.cpr_smena_parolya')}</h1>
                     <p style={subtitleStyle}>
                         Для безопасности вашего аккаунта необходимо сменить временный пароль
                     </p>
@@ -208,7 +208,7 @@ export default function ChangePasswordRequired({ currentPassword }) {
                     <div style={inputContainerStyle}>
                         <Input
                             type={showCurrentPassword ? 'text' : 'password'}
-                            placeholder="Текущий пароль"
+                            placeholder={t('misc.cpr_tekuschiy_parol')}
                             value={formData.currentPassword}
                             onChange={(e) => setFormData({ ...formData, currentPassword: e.target.value })}
                             required
@@ -217,7 +217,7 @@ export default function ChangePasswordRequired({ currentPassword }) {
                         <button
                             type="button"
                             style={toggleButtonStyle}
-                            aria-label={showCurrentPassword ? 'Скрыть текущий пароль' : 'Показать текущий пароль'}
+                            aria-label={showCurrentPassword ? t('misc.cpr_skryt_tekuschiy_parol') : t('misc.cpr_pokazat_tekuschiy_parol')}
                             onClick={() => setShowCurrentPassword(!showCurrentPassword)}
                         >
                             {showCurrentPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -228,7 +228,7 @@ export default function ChangePasswordRequired({ currentPassword }) {
                     <div style={inputContainerStyle}>
                         <Input
                             type={showNewPassword ? 'text' : 'password'}
-                            placeholder="Новый пароль"
+                            placeholder={t('misc.cpr_novyy_parol')}
                             value={formData.newPassword}
                             onChange={(e) => setFormData({ ...formData, newPassword: e.target.value })}
                             required
@@ -237,7 +237,7 @@ export default function ChangePasswordRequired({ currentPassword }) {
                         <button
                             type="button"
                             style={toggleButtonStyle}
-                            aria-label={showNewPassword ? 'Скрыть новый пароль' : 'Показать новый пароль'}
+                            aria-label={showNewPassword ? t('misc.cpr_skryt_novyy_parol') : t('misc.cpr_pokazat_novyy_parol')}
                             onClick={() => setShowNewPassword(!showNewPassword)}
                         >
                             {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -261,7 +261,7 @@ export default function ChangePasswordRequired({ currentPassword }) {
                     <div style={inputContainerStyle}>
                         <Input
                             type={showConfirmPassword ? 'text' : 'password'}
-                            placeholder="Подтвердите новый пароль"
+                            placeholder={t('misc.cpr_podtverdite_novyy_parol')}
                             value={formData.confirmPassword}
                             onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                             required
@@ -270,7 +270,7 @@ export default function ChangePasswordRequired({ currentPassword }) {
                         <button
                             type="button"
                             style={toggleButtonStyle}
-                            aria-label={showConfirmPassword ? 'Скрыть подтверждение пароля' : 'Показать подтверждение пароля'}
+                            aria-label={showConfirmPassword ? t('misc.cpr_skryt_podtverzhdenie_parolya') : t('misc.cpr_pokazat_podtverzhdenie_parol')}
                             onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                         >
                             {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -288,7 +288,7 @@ export default function ChangePasswordRequired({ currentPassword }) {
                             marginBottom: 'var(--mac-spacing-4)'
                         }}>
                             {doPasswordsMatch ? <CheckCircle size={14} /> : <AlertCircle size={14} />}
-                            {doPasswordsMatch ? 'Пароли совпадают' : 'Пароли не совпадают'}
+                            {doPasswordsMatch ? t('misc.cpr_paroli_sovpadayut') : t('misc.cpr_paroli_ne_sovpadayut')}
                         </div>
                     )}
 
@@ -298,7 +298,7 @@ export default function ChangePasswordRequired({ currentPassword }) {
                         disabled={loading || !isPasswordValid || !doPasswordsMatch}
                         style={{ width: '100%', marginTop: 'var(--mac-spacing-2)' }}
                     >
-                        {loading ? 'Сохранение...' : 'Сменить пароль'}
+                        {loading ? t('misc.cpr_sohranenie') : t('misc.cpr_smenit_parol')}
                     </Button>
                 </form>
             </MacOSCard>

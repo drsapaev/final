@@ -35,6 +35,7 @@ const DoctorServiceSelector = ({
   canEditPrices = true,
   className = ''
 }) => {
+  const { t } = useTranslation();
   // Проверяем демо-режим в самом начале
   const isDemoMode = window.location.pathname.includes('/medilab-demo');
 
@@ -56,13 +57,13 @@ const DoctorServiceSelector = ({
 
   // Названия категорий
   const categoryNames = {
-    'consultation.cardiology': 'Консультация кардиолога',
-    'consultation.dermatology': 'Консультация дерматолога',
-    'consultation.stomatology': 'Консультация стоматолога',
-    'diagnostics.ecg': 'ЭКГ',
-    'diagnostics.echo': 'ЭхоКГ',
-    'procedure.cosmetology': 'Косметологические процедуры',
-    'laboratory.blood': 'Анализы крови'
+    'consultation.cardiology': t('misc.dss_konsultatsiya_kardiologa'),
+    'consultation.dermatology': t('misc.dss_konsultatsiya_dermatologa'),
+    'consultation.stomatology': t('misc.dss_konsultatsiya_stomatologa'),
+    'diagnostics.ecg': t('misc.dss_ekg'),
+    'diagnostics.echo': t('misc.dss_ehokg'),
+    'procedure.cosmetology': t('misc.dss_kosmetologicheskie_protsedur'),
+    'laboratory.blood': t('misc.dss_analizy_krovi')
   };
 
   const loadServices = useCallback(async () => {
@@ -93,7 +94,7 @@ const DoctorServiceSelector = ({
       }
     } catch (err) {
       logger.error('Ошибка загрузки услуг врача:', err);
-      setError('Ошибка загрузки услуг');
+      setError(t('misc.dss_oshibka_zagruzki_uslug'));
     } finally {
       setLoading(false);
     }
@@ -223,7 +224,7 @@ const DoctorServiceSelector = ({
               <div style={{
               fontSize: 'var(--mac-font-size-sm)',
               color: 'var(--mac-text-secondary)'
-            }}>Услуг</div>
+            }}>{t('misc.dss_uslug')}</div>
             </div>
             <div>
               <div style={{
@@ -234,7 +235,7 @@ const DoctorServiceSelector = ({
               <div style={{
               fontSize: 'var(--mac-font-size-sm)',
               color: 'var(--mac-text-secondary)'
-            }}>Минут</div>
+            }}>{t('misc.dss_minut')}</div>
             </div>
             <div>
               <div style={{
@@ -247,7 +248,7 @@ const DoctorServiceSelector = ({
               <div style={{
               fontSize: 'var(--mac-font-size-sm)',
               color: 'var(--mac-text-secondary)'
-            }}>Стоимость</div>
+            }}>{t('misc.dss_stoimost')}</div>
             </div>
           </div>
         </MacOSCard>
@@ -261,7 +262,7 @@ const DoctorServiceSelector = ({
           fontWeight: 'var(--mac-font-weight-medium)',
           marginBottom: 'var(--mac-spacing-3)',
           color: 'var(--mac-text-primary)'
-        }}>Выбранные услуги:</h3>
+        }}>{t('misc.dss_vybrannye_uslugi')}</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-2)' }}>
             {selectedServices.map((service) =>
           <div
@@ -336,7 +337,7 @@ const DoctorServiceSelector = ({
                   {canEditPrices ?
               <Input
                 type="number"
-                aria-label={`Цена услуги ${service.name}`}
+                aria-label={t('misc.dss_tsena_uslugi_service_name', { name: service.name })}
                 value={service.price}
                 onChange={(e) => handlePriceChange(service.id, parseFloat(e.target.value) || 0)}
                 style={{

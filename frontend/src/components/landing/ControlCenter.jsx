@@ -1,8 +1,10 @@
 import PropTypes from 'prop-types';
+import { useTranslation } from '../../i18n/useTranslation';
 export const ControlCenter = ({ onActivate, onLogin }) => {
+  const { t } = useTranslation();
   return (
     <div className="control-center spotlight-card">
-      <h2>Панель управления</h2>
+      <h2>{t('misc.cc_panel_upravleniya')}</h2>
       <div className="control-actions">
         <button
           className="control-button activation"
@@ -10,8 +12,8 @@ export const ControlCenter = ({ onActivate, onLogin }) => {
         >
           <span className="button-icon">🔑</span>
           <div className="button-content">
-            <span className="button-title">Активация системы</span>
-            <span className="button-description">Активируйте вашу лицензию</span>
+            <span className="button-title">{t('misc.cc_aktivatsiya_sistemy')}</span>
+            <span className="button-description">{t('misc.cc_aktiviruyte_vashu_litsenziyu')}</span>
           </div>
         </button>
 
@@ -21,8 +23,8 @@ export const ControlCenter = ({ onActivate, onLogin }) => {
         >
           <span className="button-icon">🚀</span>
           <div className="button-content">
-            <span className="button-title">Вход в систему</span>
-            <span className="button-description">Для зарегистрированных пользователей</span>
+            <span className="button-title">{t('misc.cc_vhod_v_sistemu')}</span>
+            <span className="button-description">{t('misc.cc_dlya_zaregistrirovannyh_polz')}</span>
           </div>
         </button>
       </div>
@@ -30,27 +32,27 @@ export const ControlCenter = ({ onActivate, onLogin }) => {
       <div className="features-grid">
         <div className="feature-item">
           <span className="feature-icon">👥</span>
-          <span className="feature-name">Управление пациентами</span>
+          <span className="feature-name">{t('misc.cc_upravlenie_patsientami')}</span>
         </div>
         <div className="feature-item">
           <span className="feature-icon">📋</span>
-          <span className="feature-name">Электронные карты</span>
+          <span className="feature-name">{t('misc.cc_elektronnye_karty')}</span>
         </div>
         <div className="feature-item">
           <span className="feature-icon">📊</span>
-          <span className="feature-name">Аналитика и отчеты</span>
+          <span className="feature-name">{t('misc.cc_analitika_i_otchety')}</span>
         </div>
         <div className="feature-item">
           <span className="feature-icon">💳</span>
-          <span className="feature-name">Прием платежей</span>
+          <span className="feature-name">{t('misc.cc_priem_platezhey')}</span>
         </div>
         <div className="feature-item">
           <span className="feature-icon">🔔</span>
-          <span className="feature-name">Уведомления</span>
+          <span className="feature-name">{t('misc.cc_uvedomleniya')}</span>
         </div>
         <div className="feature-item">
           <span className="feature-icon">🌐</span>
-          <span className="feature-name">Телемедицина</span>
+          <span className="feature-name">{t('misc.cc_telemeditsina')}</span>
         </div>
       </div>
     </div>

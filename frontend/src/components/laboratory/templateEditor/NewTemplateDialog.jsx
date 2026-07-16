@@ -50,18 +50,18 @@ function NewTemplateDialog({ open, onClose, onCreate, saving, existingTemplates 
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Новый шаблон</DialogTitle>
+      <DialogTitle>{t('misc.ntd_novyy_shablon')}</DialogTitle>
       <DialogContent>
         <form onSubmit={handleSubmit} id="new-template-form" className="ltw-form-grid">
           <div>
-            <Label htmlFor="new-template-code" className="ltw-label">Код шаблона</Label>
+            <Label htmlFor="new-template-code" className="ltw-label">{t('misc.ntd_kod_shablona_2')}</Label>
             <Input
               id="new-template-code"
-              aria-label="Код шаблона"
+              aria-label={t('misc.ntd_kod_shablona')}
               aria-invalid={Boolean(codeConflict)}
               value={form.code}
               onChange={(e) => setForm((prev) => ({ ...prev, code: e.target.value }))}
-              placeholder="Напр. hematology_basic"
+              placeholder={t('misc.ntd_napr_hematology_basic')}
               className="ltw-input-full"
               required
             />
@@ -78,41 +78,41 @@ function NewTemplateDialog({ open, onClose, onCreate, saving, existingTemplates 
             <Label htmlFor="new-template-name" className="ltw-label">{t('common.name')}</Label>
             <Input
               id="new-template-name"
-              aria-label="Название шаблона"
+              aria-label={t('misc.ntd_nazvanie_shablona')}
               value={form.name}
               onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
-              placeholder="Напр. Общий анализ крови"
+              placeholder={t('misc.ntd_napr_obschiy_analiz_krovi')}
               className="ltw-input-full"
               required
             />
           </div>
           <div>
-            <Label htmlFor="new-template-family" className="ltw-label">Семейство</Label>
+            <Label htmlFor="new-template-family" className="ltw-label">{t('misc.ntd_semeystvo')}</Label>
             <select
               id="new-template-family"
-              aria-label="Семейство шаблона"
+              aria-label={t('misc.ntd_semeystvo_shablona')}
               value={form.family}
               onChange={(e) => setForm((prev) => ({ ...prev, family: e.target.value }))}
               className="macos-input ltw-input-full"
             >
-              <option value="hematology">Гематология</option>
-              <option value="biochemistry">Биохимия</option>
-              <option value="coagulation">Коагулология</option>
-              <option value="urinalysis">Общий анализ мочи</option>
-              <option value="immunology">Иммунология</option>
-              <option value="microbiology">Микробиология</option>
-              <option value="endocrinology">Эндокринология</option>
-              <option value="other">Прочее</option>
+              <option value="hematology">{t('misc.ntd_gematologiya')}</option>
+              <option value="biochemistry">{t('misc.ntd_biohimiya')}</option>
+              <option value="coagulation">{t('misc.ntd_koagulologiya')}</option>
+              <option value="urinalysis">{t('misc.ntd_obschiy_analiz_mochi')}</option>
+              <option value="immunology">{t('misc.ntd_immunologiya')}</option>
+              <option value="microbiology">{t('misc.ntd_mikrobiologiya')}</option>
+              <option value="endocrinology">{t('misc.ntd_endokrinologiya')}</option>
+              <option value="other">{t('misc.ntd_prochee')}</option>
             </select>
           </div>
           <div>
             <Label htmlFor="new-template-description" className="ltw-label">{t('common.description')}</Label>
             <Textarea
               id="new-template-description"
-              aria-label="Описание шаблона"
+              aria-label={t('misc.ntd_opisanie_shablona')}
               value={form.description}
               onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
-              placeholder="Краткое описание шаблона"
+              placeholder={t('misc.ntd_kratkoe_opisanie_shablona')}
               minRows={3}
               className="ltw-input-full"
             />

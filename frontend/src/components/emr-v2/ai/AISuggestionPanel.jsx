@@ -11,17 +11,17 @@ import { useTranslation } from '../../../i18n/useTranslation';
 /**
  * Field labels for grouping
  */
-const FIELD_LABELS = {
-    complaints: 'Жалобы',
-    anamnesis_morbi: 'Анамнез заболевания',
-    anamnesis_vitae: 'Анамнез жизни',
-    examination: 'Осмотр',
-    diagnosis: 'Диагноз',
-    icd10_code: 'Код МКБ-10',
-    treatment: 'Лечение',
-    recommendations: 'Рекомендации',
-    notes: 'Примечания',
-};
+const getFieldLabels = (t) => ({
+    complaints: t('misc.asp_field_complaints'),
+    anamnesis_morbi: t('misc.asp_field_anamnesis_morbi'),
+    anamnesis_vitae: t('misc.asp_field_anamnesis_vitae'),
+    examination: t('misc.asp_field_examination'),
+    diagnosis: t('misc.asp_field_diagnosis'),
+    icd10_code: t('misc.asp_field_icd10_code'),
+    treatment: t('misc.asp_field_treatment'),
+    recommendations: t('misc.asp_field_recommendations'),
+    notes: t('misc.asp_field_notes'),
+});
 
 /**
  * AISuggestionPanel Component
@@ -48,6 +48,7 @@ export function AISuggestionPanel({
     isOpen = true,
     onClose,
 }) {
+    const { t } = useTranslation();
     if (!isOpen) return null;
 
     // Group suggestions by field
@@ -76,7 +77,7 @@ export function AISuggestionPanel({
                             className="ai-suggestion-panel__refresh"
                             onClick={onRefresh}
                             disabled={isLoading}
-                            title="Обновить"
+                            title={t('misc.asp_obnovit')}
                         >
                             🔄
                         </button>
@@ -85,7 +86,7 @@ export function AISuggestionPanel({
                         <button
                             className="ai-suggestion-panel__close"
                             onClick={onClose}
-                            title="Закрыть"
+                            title={t('misc.asp_zakryt')}
                         >
                             ×
                         </button>
@@ -110,7 +111,7 @@ export function AISuggestionPanel({
 
                 {!isLoading && !error && !hasAnySuggestions && (
                     <div className="ai-suggestion-panel__empty">
-                        <p>Нет подсказок</p>
+                        <p>{t('misc.asp_net_podskazok')}</p>
                         <span className="ai-suggestion-panel__empty-hint">
                             Продолжайте заполнять ЭМК — AI предложит подсказки по мере ввода
                         </span>
@@ -122,7 +123,7 @@ export function AISuggestionPanel({
                         {Object.entries(groupedSuggestions).map(([field, fieldSuggestions]) => (
                             <div key={field} className="ai-suggestion-panel__group">
                                 <div className="ai-suggestion-panel__group-header">
-                                    {FIELD_LABELS[field] || field}
+                                    {getFieldLabels(t)[field] || field}
                                 </div>
                                 {fieldSuggestions.map(suggestion => (
                                     <AISuggestionCard

@@ -10,6 +10,7 @@ import logger from '../../utils/logger';
  * Shows a non-intrusive banner that can be dismissed
  */
 export function NotificationPrompt() {
+  const { t } = useTranslation();
   const [isVisible, setIsVisible] = useState(false);
   const [isEnabled, setIsEnabled] = useState(false);
   const [isDismissed, setIsDismissed] = useState(false);
@@ -66,8 +67,8 @@ export function NotificationPrompt() {
         setIsVisible(false);
         // Show test notification
         if (typeof Notification !== 'undefined') {
-          new Notification('Уведомления включены!', {
-            body: 'Теперь вы будете получать уведомления о новых сообщениях',
+          new Notification(t('misc.np_uvedomleniya_vklyucheny'), {
+            body: t('misc.np_teper_vy_budete_poluchat_uve'),
             icon: '/favicon.ico'
           });
         }
@@ -114,8 +115,8 @@ export function NotificationPrompt() {
       <div className="notification-prompt__content">
         <Bell className="notification-prompt__icon" size={20} />
         <div className="notification-prompt__text">
-          <strong>Включить уведомления?</strong>
-          <span>Получайте уведомления о новых сообщениях</span>
+          <strong>{t('misc.np_vklyuchit_uvedomleniya')}</strong>
+          <span>{t('misc.np_poluchayte_uvedomleniya_o_no')}</span>
         </div>
       </div>
       <div className="notification-prompt__actions">
@@ -124,12 +125,12 @@ export function NotificationPrompt() {
           onClick={handleEnable}
           disabled={isLoading}>
           
-          {isLoading ? '...' : 'Включить'}
+          {isLoading ? '...' : t('misc.np_vklyuchit')}
         </button>
         <button
           className="notification-prompt__btn notification-prompt__btn--secondary"
           onClick={handleDismiss}
-          aria-label="Закрыть"
+          aria-label={t('misc.np_zakryt')}
           disabled={isLoading}>
           
           <X size={16} />

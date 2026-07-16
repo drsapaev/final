@@ -4,8 +4,10 @@ import { Shield, Smartphone, Key, RefreshCw, CheckCircle, AlertCircle } from 'lu
 import PropTypes from 'prop-types';
 import { Input,
   Checkbox } from './ui/macos';
+import { useTranslation } from '../i18n/useTranslation';
 
 const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken }) => {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -37,7 +39,7 @@ const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken })
       } else if (method === 'recovery' && recoveryToken) {
         requestData.recovery_token = recoveryToken;
       } else {
-        setError('Введите код для верификации');
+        setError(t('misc.tfv_vvedite_kod_dlya_verifikatsi'));
         setLoading(false);
         return;
       }
@@ -45,15 +47,15 @@ const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken })
       const response = await api.post('/2fa/verify', requestData);
 
       if (response.data?.access_token || response.success) {
-        setSuccess('Верификация успешна!');
+        setSuccess(t('misc.tfv_verifikatsiya_uspeshna'));
         if (onSuccess) {
           onSuccess(response);
         }
       } else {
-        setError(response.data?.message || response.message || 'Неверный код');
+        setError(response.data?.message || response.message || t('misc.tfv_nevernyy_kod'));
       }
     } catch (err) {
-      setError(err.response?.data?.detail || 'Ошибка верификации');
+      setError(err.response?.data?.detail || t('misc.tfv_oshibka_verifikatsii'));
     } finally {
       setLoading(false);
     }
@@ -186,7 +188,7 @@ const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken })
         value={recoveryToken}
         onChange={(e) => setRecoveryToken(e.target.value)}
         onKeyPress={handleKeyPress}
-        placeholder="Введите токен восстановления"
+        placeholder={t('misc.tfv_vvedite_token_vosstanovleniy')}
         style={{
           width: '100%',
           padding: 'var(--mac-spacing-4)',
@@ -292,7 +294,7 @@ const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken })
           }}>
 
           {loading ? <RefreshCw size={20} className="animate-spin" /> : <CheckCircle size={20} />}
-          {loading ? 'Проверка...' : 'Подтвердить'}
+          {loading ? t('misc.tfv_proverka') : t('misc.tfv_podtverdit')}
         </button>
         
         {onCancel &&
