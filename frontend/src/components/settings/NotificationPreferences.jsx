@@ -25,6 +25,7 @@ import {
   Switch,
 } from '../ui/macos';
 import { getState as getAuthState } from '../../stores/auth';
+import { useTranslation } from '../../i18n/useTranslation';
 import logger from '../../utils/logger';
 
 const accentGradients = {
@@ -37,85 +38,85 @@ const accentGradients = {
 const notificationSections = [
   {
     key: 'email',
-    title: 'Email уведомления',
-    description: 'Письма для рабочих сценариев и подтверждений.',
+    titleKey: 'misc.np_email_title',
+    descriptionKey: 'misc.np_email_desc',
     icon: Mail,
     accent: accentGradients.info,
     fields: [
       {
         key: 'email_appointment_reminder',
-        label: 'Напоминания о записи',
-        hint: 'Письмо перед приёмом с датой, временем и специалистом.',
+        labelKey: 'misc.np_email_appointment_reminder_label',
+        hintKey: 'misc.np_email_appointment_reminder_hint',
       },
       {
         key: 'email_appointment_confirmation',
-        label: 'Подтверждение записи',
-        hint: 'Подтверждение новой или перенесённой записи.',
+        labelKey: 'misc.np_email_appointment_confirmation_label',
+        hintKey: 'misc.np_email_appointment_confirmation_hint',
       },
       {
         key: 'email_appointment_cancellation',
-        label: 'Отмена записи',
-        hint: 'Оповещение об отмене или переносе приёма.',
+        labelKey: 'misc.np_email_appointment_cancellation_label',
+        hintKey: 'misc.np_email_appointment_cancellation_hint',
       },
       {
         key: 'email_payment_receipt',
-        label: 'Чек об оплате',
-        hint: 'Финансовые документы и подтверждение платежа.',
+        labelKey: 'misc.np_email_payment_receipt_label',
+        hintKey: 'misc.np_email_payment_receipt_hint',
       },
       {
         key: 'email_system_updates',
-        label: 'Системные обновления',
-        hint: 'Технические уведомления и продуктовые изменения.',
+        labelKey: 'misc.np_email_system_updates_label',
+        hintKey: 'misc.np_email_system_updates_hint',
       },
       {
         key: 'email_security_alerts',
-        label: 'Оповещения безопасности',
-        hint: 'Критичные события входа, 2FA и смены пароля.',
+        labelKey: 'misc.np_email_security_alerts_label',
+        hintKey: 'misc.np_email_security_alerts_hint',
       },
     ],
   },
   {
     key: 'sms',
-    title: 'SMS уведомления',
-    description: 'Короткие и срочные сообщения на телефон.',
+    titleKey: 'misc.np_sms_title',
+    descriptionKey: 'misc.np_sms_desc',
+    noteKey: 'misc.np_sms_note',
     icon: MessageSquareText,
     accent: accentGradients.success,
-    note: 'SMS-канал может тарифицироваться отдельно у оператора или провайдера.',
     fields: [
       {
         key: 'sms_appointment_reminder',
-        label: 'Напоминания о записи',
-        hint: 'Короткое SMS перед визитом в клинику.',
+        labelKey: 'misc.np_sms_appointment_reminder_label',
+        hintKey: 'misc.np_sms_appointment_reminder_hint',
       },
       {
         key: 'sms_emergency',
-        label: 'Экстренные оповещения',
-        hint: 'Критичные уведомления, которые нельзя пропустить.',
+        labelKey: 'misc.np_sms_emergency_label',
+        hintKey: 'misc.np_sms_emergency_hint',
       },
     ],
   },
   {
     key: 'push',
-    title: 'Push уведомления',
-    description: 'Оповещения для мобильного приложения и PWA.',
+    titleKey: 'misc.np_push_title',
+    descriptionKey: 'misc.np_push_desc',
+    noteKey: 'misc.np_push_note',
     icon: Smartphone,
     accent: accentGradients.purple,
-    note: 'Работает только если устройство уже дало разрешение на push-уведомления.',
     fields: [
       {
         key: 'push_appointment_reminder',
-        label: 'Напоминания о записи',
-        hint: 'Мобильное уведомление перед приёмом.',
+        labelKey: 'misc.np_push_appointment_reminder_label',
+        hintKey: 'misc.np_push_appointment_reminder_hint',
       },
       {
         key: 'push_appointment_confirmation',
-        label: 'Обновления очереди',
-        hint: 'Изменения статуса записи и очереди без захода в приложение.',
+        labelKey: 'misc.np_push_appointment_confirmation_label',
+        hintKey: 'misc.np_push_appointment_confirmation_hint',
       },
       {
         key: 'push_payment_receipt',
-        label: 'Чек об оплате',
-        hint: 'Подтверждение оплаты в виде push-сообщения.',
+        labelKey: 'misc.np_push_payment_receipt_label',
+        hintKey: 'misc.np_push_payment_receipt_hint',
       },
     ],
   },
@@ -124,23 +125,23 @@ const notificationSections = [
 const generalFields = [
   {
     key: 'reminder_time_before',
-    label: 'Напоминать за',
-    description: 'Количество минут до приёма.',
+    labelKey: 'misc.np_reminder_time_before_label',
+    descriptionKey: 'misc.np_reminder_time_before_desc',
+    suffixKey: 'misc.np_reminder_time_before_suffix',
     type: 'number',
     min: 15,
     step: 15,
-    suffix: 'мин',
   },
   {
     key: 'quiet_hours_start',
-    label: 'Тихие часы: начало',
-    description: 'В это время некритичные уведомления будут приглушены.',
+    labelKey: 'misc.np_quiet_hours_start_label',
+    descriptionKey: 'misc.np_quiet_hours_start_desc',
     type: 'time',
   },
   {
     key: 'quiet_hours_end',
-    label: 'Тихие часы: конец',
-    description: 'Время завершения тихого режима.',
+    labelKey: 'misc.np_quiet_hours_end_label',
+    descriptionKey: 'misc.np_quiet_hours_end_desc',
     type: 'time',
   },
 ];
@@ -148,46 +149,46 @@ const generalFields = [
 const policyFamilyFields = [
   {
     key: 'queue',
-    label: 'Очередь',
-    hint: 'Обновления позиции, вызовы и напоминания очереди.',
+    labelKey: 'misc.np_family_queue_label',
+    hintKey: 'misc.np_family_queue_hint',
   },
   {
     key: 'lab',
-    label: 'Лаборатория',
-    hint: 'Готовность анализов, критические и подтверждающие уведомления.',
+    labelKey: 'misc.np_family_lab_label',
+    hintKey: 'misc.np_family_lab_hint',
   },
   {
     key: 'all_free',
-    label: 'All Free',
-    hint: 'Запросы и решения по льготному обслуживанию.',
+    labelKey: 'misc.np_family_all_free_label',
+    hintKey: 'misc.np_family_all_free_hint',
   },
   {
     key: 'message',
-    label: 'Сообщения',
-    hint: 'Сигналы по новым сообщениям между пользователями.',
+    labelKey: 'misc.np_family_message_label',
+    hintKey: 'misc.np_family_message_hint',
   },
   {
     key: 'system',
-    label: 'Системные',
-    hint: 'Административные и сервисные уведомления платформы.',
+    labelKey: 'misc.np_family_system_label',
+    hintKey: 'misc.np_family_system_hint',
   },
 ];
 
 const policyEventFields = [
   {
     key: 'lab_critical_result',
-    label: 'Критический результат лаборатории',
-    hint: 'Повышенный приоритет для критичных медицинских результатов.',
+    labelKey: 'misc.np_event_lab_critical_result_label',
+    hintKey: 'misc.np_event_lab_critical_result_hint',
   },
   {
     key: 'security_alert',
-    label: 'Security alert',
-    hint: 'События безопасности аккаунта и доступа.',
+    labelKey: 'misc.np_event_security_alert_label',
+    hintKey: 'misc.np_event_security_alert_hint',
   },
   {
     key: 'billing_alert',
-    label: 'Billing alert',
-    hint: 'Ошибки и критичные события биллинга/оплаты.',
+    labelKey: 'misc.np_event_billing_alert_label',
+    hintKey: 'misc.np_event_billing_alert_hint',
   },
 ];
 
@@ -464,15 +465,16 @@ function getInitialDraft(settings) {
   return settings ? { ...settings } : null;
 }
 
-function formatSavedAt(value) {
+function formatSavedAt(value, t) {
   if (!value) {
-    return 'Изменения ещё не сохранялись в этой сессии';
+    return t('misc.np_not_saved_yet');
   }
 
-  return `Сохранено ${value.toLocaleTimeString('ru-RU', {
+  const time = value.toLocaleTimeString('ru-RU', {
     hour: '2-digit',
     minute: '2-digit',
-  })}`;
+  });
+  return t('misc.np_saved_at', { time });
 }
 
 function NotificationChannelCard({ accent, description, icon: Icon, title, note, children }) {
@@ -564,6 +566,7 @@ export function __resetNotificationSettingsCacheForTests() {
 }
 
 export default function NotificationPreferences() {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -619,7 +622,7 @@ export default function NotificationPreferences() {
       logger.info('[FIX:PROFILE] Loaded notification preferences', { userId: resolvedUserId });
     } catch (err) {
       logger.error('Failed to load notification settings:', err);
-      setError(err?.response?.data?.detail || 'Не удалось загрузить настройки уведомлений.');
+      setError(err?.response?.data?.detail || t('misc.np_load_error'));
     } finally {
       setLoading(false);
     }
@@ -669,7 +672,7 @@ export default function NotificationPreferences() {
       logger.warn('[FIX:PROFILE] Failed to load notification runtime policy', err);
       setPolicyError(
         err?.response?.data?.detail ||
-          'Не удалось загрузить anti-noise policy. Основные настройки продолжают работать.'
+          t('misc.np_load_policy_error')
       );
     } finally {
       setPolicyLoading(false);
@@ -711,7 +714,7 @@ export default function NotificationPreferences() {
         const nextSettings = rememberNotificationSettings(userId, updatedSettings || draft);
         setSettings(nextSettings);
         setDraft(getInitialDraft(nextSettings));
-        savedParts.push('каналы и базовые правила');
+        savedParts.push(t('misc.np_saved_part_channels'));
       }
 
       if (policyLoaded && policyDraft && hasPolicyChanges) {
@@ -720,24 +723,24 @@ export default function NotificationPreferences() {
         const nextPolicy = normalizePolicyDraft(updatedPolicy || policyPayload);
         setPolicySettings(cloneValue(nextPolicy));
         setPolicyDraft(cloneValue(nextPolicy));
-        savedParts.push('anti-noise policy');
+        savedParts.push(t('misc.np_saved_part_policy'));
       }
 
       setLastSavedAt(new Date());
       setSuccess(
         savedParts.length > 1
-          ? `Сохранено: ${savedParts.join(' + ')}.`
-          : 'Настройки уведомлений сохранены.'
+          ? t('misc.np_saved_combined', { parts: savedParts.join(' + ') })
+          : t('misc.np_saved_default')
       );
       logger.info('[FIX:PROFILE] Saved notification preferences', { userId });
     } catch (err) {
       logger.error('Failed to save settings:', err);
       if (savedParts.length > 0) {
         setError(
-          `Часть изменений сохранена (${savedParts.join(' + ')}), но завершить сохранение не удалось.`
+          t('misc.np_partial_save_error', { parts: savedParts.join(' + ') })
         );
       } else {
-        setError(err?.response?.data?.detail || 'Не удалось сохранить настройки уведомлений.');
+        setError(err?.response?.data?.detail || t('misc.np_save_error'));
       }
     } finally {
       setSaving(false);
@@ -745,14 +748,14 @@ export default function NotificationPreferences() {
   }
 
   if (loading) {
-    return <div style={{ opacity: 0.7 }}>Загрузка настроек уведомлений...</div>;
+    return <div style={{ opacity: 0.7 }}>{t('misc.np_loading')}</div>;
   }
 
   if (!draft) {
     return (
       <div style={{ display: 'grid', gap: 16 }}>
         <Alert severity="error">
-          {error || 'Не удалось загрузить настройки уведомлений.'}
+          {error || t('misc.np_load_error')}
         </Alert>
         <div>
           <Button
@@ -760,7 +763,7 @@ export default function NotificationPreferences() {
             onClick={() => loadSettings({ force: true })}
             startIcon={<RefreshCw size={16} />}
           >
-            Повторить загрузку
+            {t('misc.np_retry_load')}
           </Button>
         </div>
       </div>
@@ -781,12 +784,12 @@ export default function NotificationPreferences() {
             }}
           >
             <div>
-              <CardTitle>Каналы уведомлений</CardTitle>
+              <CardTitle>{t('misc.np_channels_title')}</CardTitle>
               <div style={{ marginTop: 6, fontSize: 13, color: 'var(--mac-text-secondary)' }}>
-                Настройте, по каким каналам получать рабочие и системные уведомления.
+                {t('misc.np_channels_desc')}
               </div>
               <div style={{ marginTop: 8, fontSize: 12, color: 'var(--mac-text-secondary)' }}>
-                {hasChanges ? 'Есть несохранённые изменения' : formatSavedAt(lastSavedAt)}
+                {hasChanges ? t('misc.np_unsaved_changes') : formatSavedAt(lastSavedAt, t)}
               </div>
             </div>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -796,7 +799,7 @@ export default function NotificationPreferences() {
                 disabled={saving}
                 startIcon={<RefreshCw size={16} />}
               >
-                Обновить
+                {t('misc.np_refresh')}
               </Button>
               <Button
                 variant="ghost"
@@ -804,7 +807,7 @@ export default function NotificationPreferences() {
                 disabled={!hasChanges || saving}
                 startIcon={<RotateCcw size={16} />}
               >
-                Сбросить
+                {t('misc.np_reset')}
               </Button>
               <Button
                 variant="primary"
@@ -813,7 +816,7 @@ export default function NotificationPreferences() {
                 loading={saving}
                 startIcon={<Save size={16} />}
               >
-                Сохранить настройки
+                {t('misc.np_save_settings')}
               </Button>
             </div>
           </div>
@@ -823,7 +826,7 @@ export default function NotificationPreferences() {
           {success && <Alert severity="success">{success}</Alert>}
           {!error && !success && hasChanges && (
             <Alert severity="info">
-              Изменения применятся только после нажатия кнопки «Сохранить настройки».
+              {t('misc.np_apply_hint')}
             </Alert>
           )}
         </CardContent>
@@ -833,18 +836,18 @@ export default function NotificationPreferences() {
         <NotificationChannelCard
           key={section.key}
           accent={section.accent}
-          description={section.description}
+          description={t(section.descriptionKey)}
           icon={section.icon}
-          note={section.note}
-          title={section.title}
+          note={section.noteKey ? t(section.noteKey) : undefined}
+          title={t(section.titleKey)}
         >
           {section.fields.map((field) => (
             <PreferenceRow
               key={field.key}
               checked={Boolean(draft[field.key])}
-              description={field.hint}
+              description={t(field.hintKey)}
               disabled={saving}
-              label={field.label}
+              label={t(field.labelKey)}
               onChange={(nextValue) => updateDraft(field.key, nextValue)}
             />
           ))}
@@ -871,9 +874,9 @@ export default function NotificationPreferences() {
               <Clock3 size={18} />
             </div>
             <div>
-              <CardTitle>Время и правила доставки</CardTitle>
+              <CardTitle>{t('misc.np_time_rules_title')}</CardTitle>
               <div style={{ marginTop: 6, fontSize: 13, color: 'var(--mac-text-secondary)' }}>
-                Общие правила, влияющие на все каналы уведомлений.
+                {t('misc.np_time_rules_desc')}
               </div>
             </div>
           </div>
@@ -893,10 +896,10 @@ export default function NotificationPreferences() {
             >
               <div>
                 <div style={{ fontSize: 14, fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>
-                  {field.label}
+                  {t(field.labelKey)}
                 </div>
                 <div style={{ marginTop: 4, fontSize: 12, color: 'var(--mac-text-secondary)' }}>
-                  {field.description}
+                  {t(field.descriptionKey)}
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -915,9 +918,9 @@ export default function NotificationPreferences() {
                     updateDraft(field.key, event.target.value || null);
                   }}
                 />
-                {field.suffix && (
+                {field.suffixKey && (
                   <span style={{ fontSize: 12, color: 'var(--mac-text-secondary)' }}>
-                    {field.suffix}
+                    {t(field.suffixKey)}
                   </span>
                 )}
               </div>
@@ -926,9 +929,9 @@ export default function NotificationPreferences() {
 
           <PreferenceRow
             checked={Boolean(draft.weekend_notifications)}
-            description="Если выключить, напоминания и некритичные уведомления по выходным не отправляются."
+            description={t('misc.np_weekend_hint')}
             disabled={saving}
-            label="Уведомления в выходные"
+            label={t('misc.np_weekend_label')}
             onChange={(nextValue) => updateDraft('weekend_notifications', nextValue)}
           />
         </CardContent>
@@ -965,7 +968,7 @@ export default function NotificationPreferences() {
               <div>
                 <CardTitle>Anti-noise policy</CardTitle>
                 <div style={{ marginTop: 6, fontSize: 13, color: 'var(--mac-text-secondary)' }}>
-                  Runtime-правила для mute/snooze/DND и granular realtime-контроля.
+                  {t('misc.np_policy_desc')}
                 </div>
               </div>
             </div>
@@ -977,10 +980,10 @@ export default function NotificationPreferences() {
               startIcon={<RefreshCw size={16} />}
             >
               {policyLoading
-                ? 'Загрузка...'
+                ? t('misc.np_policy_loading')
                 : policyLoaded
-                  ? 'Обновить anti-noise policy'
-                  : 'Загрузить anti-noise policy'}
+                  ? t('misc.np_policy_refresh')
+                  : t('misc.np_policy_load')}
             </Button>
           </div>
         </CardHeader>
@@ -989,7 +992,7 @@ export default function NotificationPreferences() {
 
           {!policyLoaded && (
             <Alert severity="info">
-              Этот блок использует backend runtime policy endpoint и не влияет на базовые channel toggles, пока вы его не загрузите.
+              {t('misc.np_policy_block_hint')}
             </Alert>
           )}
 
@@ -1007,10 +1010,10 @@ export default function NotificationPreferences() {
               >
                 <div>
                   <div style={{ fontSize: 14, fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>
-                    Временно отключить realtime до
+                    {t('misc.np_muted_until_label')}
                   </div>
                   <div style={{ marginTop: 4, fontSize: 12, color: 'var(--mac-text-secondary)' }}>
-                    `muted_until`: полное подавление realtime-сигналов до указанного времени.
+                    {t('misc.np_muted_until_hint')}
                   </div>
                 </div>
                 <Input
@@ -1039,10 +1042,10 @@ export default function NotificationPreferences() {
               >
                 <div>
                   <div style={{ fontSize: 14, fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>
-                    Snooze realtime до
+                    {t('misc.np_snooze_until_label')}
                   </div>
                   <div style={{ marginTop: 4, fontSize: 12, color: 'var(--mac-text-secondary)' }}>
-                    `snooze_until`: временное подавление без отключения policy.
+                    {t('misc.np_snooze_until_hint')}
                   </div>
                 </div>
                 <Input
@@ -1061,9 +1064,9 @@ export default function NotificationPreferences() {
 
               <PreferenceRow
                 checked={Boolean(policyDraft.channel_controls?.desktop ?? true)}
-                description="Глобальный realtime switch для desktop канала."
+                description={t('misc.np_realtime_desktop_hint')}
                 disabled={saving}
-                label="Realtime desktop канал"
+                label={t('misc.np_realtime_desktop_label')}
                 onChange={(nextValue) =>
                   updatePolicyDraft((prev) => ({
                     ...prev,
@@ -1077,7 +1080,7 @@ export default function NotificationPreferences() {
 
               <PreferenceRow
                 checked={Boolean(policyDraft.dnd?.enabled)}
-                description="Активирует режим Do Not Disturb для desktop realtime."
+                description={t('misc.np_dnd_hint')}
                 disabled={saving}
                 label="Do Not Disturb"
                 onChange={(nextValue) =>
@@ -1093,9 +1096,9 @@ export default function NotificationPreferences() {
 
               <PreferenceRow
                 checked={Boolean(policyDraft.dnd?.always_on)}
-                description="Если включено, DND действует постоянно и игнорирует окно времени."
+                description={t('misc.np_dnd_always_on_hint')}
                 disabled={saving || !policyDraft.dnd?.enabled}
-                label="DND всегда включён"
+                label={t('misc.np_dnd_always_on_label')}
                 onChange={(nextValue) =>
                   updatePolicyDraft((prev) => ({
                     ...prev,
@@ -1119,10 +1122,10 @@ export default function NotificationPreferences() {
               >
                 <div>
                   <div style={{ fontSize: 14, fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>
-                    Окно DND (start/end)
+                    {t('misc.np_dnd_window_label')}
                   </div>
                   <div style={{ marginTop: 4, fontSize: 12, color: 'var(--mac-text-secondary)' }}>
-                    Используется если DND включён и `always_on = false`.
+                    {t('misc.np_dnd_window_hint')}
                   </div>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
@@ -1161,9 +1164,9 @@ export default function NotificationPreferences() {
                 <PreferenceRow
                   key={family.key}
                   checked={Boolean(policyDraft.family_controls?.[family.key]?.desktop ?? true)}
-                  description={family.hint}
+                  description={t(family.hintKey)}
                   disabled={saving}
-                  label={`Realtime: ${family.label}`}
+                  label={`Realtime: ${t(family.labelKey)}`}
                   onChange={(nextValue) =>
                     updatePolicyDraft((prev) => ({
                       ...prev,
@@ -1183,9 +1186,9 @@ export default function NotificationPreferences() {
                 <PreferenceRow
                   key={eventField.key}
                   checked={Boolean(policyDraft.event_controls?.[eventField.key]?.desktop ?? true)}
-                  description={eventField.hint}
+                  description={t(eventField.hintKey)}
                   disabled={saving}
-                  label={`Realtime: ${eventField.label}`}
+                  label={`Realtime: ${t(eventField.labelKey)}`}
                   onChange={(nextValue) =>
                     updatePolicyDraft((prev) => ({
                       ...prev,
@@ -1217,12 +1220,12 @@ export default function NotificationPreferences() {
         >
           <div>
             <div style={{ fontSize: 14, fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>
-              Итог по изменениям
+              {t('misc.np_summary_title')}
             </div>
             <div style={{ marginTop: 4, fontSize: 12, color: 'var(--mac-text-secondary)' }}>
               {hasChanges
-                ? 'Есть локальные изменения. Сохраните их перед переходом на другую вкладку.'
-                : formatSavedAt(lastSavedAt)}
+                ? t('misc.np_summary_unsaved')
+                : formatSavedAt(lastSavedAt, t)}
             </div>
           </div>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -1232,7 +1235,7 @@ export default function NotificationPreferences() {
               disabled={!hasChanges || saving}
               startIcon={<RotateCcw size={16} />}
             >
-              Сбросить изменения
+              {t('misc.np_reset_changes')}
             </Button>
             <Button
               variant="primary"
@@ -1241,7 +1244,7 @@ export default function NotificationPreferences() {
               loading={saving}
               startIcon={<Bell size={16} />}
             >
-              Применить настройки
+              {t('misc.np_apply_settings')}
             </Button>
           </div>
         </CardContent>

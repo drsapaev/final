@@ -92,33 +92,33 @@ const iconButtonStyle = {
   padding: 0
 };
 
-const fileTypeOptions = [
-  { value: '', label: 'Все типы' },
-  { value: 'image', label: 'Изображения' },
-  { value: 'video', label: 'Видео' },
-  { value: 'audio', label: 'Аудио' },
-  { value: 'document', label: 'Документы' },
-  { value: 'archive', label: 'Архивы' },
-  { value: 'xray', label: 'Рентген' }
+const fileTypeOptions = (t) => [
+  { value: '', label: t('misc.fm_filter_type_all') },
+  { value: 'image', label: t('misc.fm_filter_type_images') },
+  { value: 'video', label: t('misc.fm_filter_type_video') },
+  { value: 'audio', label: t('misc.fm_filter_type_audio') },
+  { value: 'document', label: t('misc.fm_filter_type_documents') },
+  { value: 'archive', label: t('misc.fm_filter_type_archives') },
+  { value: 'xray', label: t('misc.fm_filter_type_xray') }
 ];
 
-const permissionOptions = [
-  { value: '', label: 'Все права' },
-  { value: 'public', label: 'Публичные' },
-  { value: 'private', label: 'Приватные' },
-  { value: 'restricted', label: 'Ограниченные' },
-  { value: 'confidential', label: 'Конфиденциальные' }
+const permissionOptions = (t) => [
+  { value: '', label: t('misc.fm_filter_perm_all') },
+  { value: 'public', label: t('misc.fm_filter_perm_public') },
+  { value: 'private', label: t('misc.fm_filter_perm_private') },
+  { value: 'restricted', label: t('misc.fm_filter_perm_restricted') },
+  { value: 'confidential', label: t('misc.fm_filter_perm_confidential') }
 ];
 
-const fileTypeLabels = {
-  image: 'Изображение',
-  video: 'Видео',
-  audio: 'Аудио',
-  document: 'Документ',
-  archive: 'Архив',
-  xray: 'Рентген',
-  other: 'Файл'
-};
+const fileTypeLabels = (t) => ({
+  image: t('misc.fm_label_image'),
+  video: t('misc.fm_label_video'),
+  audio: t('misc.fm_label_audio'),
+  document: t('misc.fm_label_document'),
+  archive: t('misc.fm_label_archive'),
+  xray: t('misc.fm_label_xray'),
+  other: t('misc.fm_label_other')
+});
 
 const fileTypeColors = {
   image: 'var(--mac-success)',
@@ -132,6 +132,7 @@ const fileTypeColors = {
 
 const FileManager = () => {
   useTheme();
+  const { t } = useTranslation();
   // P-013 fix: shared ConfirmDialog hook (replaces 1 native confirm() call).
   const [confirm, confirmDialog] = useConfirm();
   const [loading, setLoading] = useState(false);
@@ -244,7 +245,7 @@ const FileManager = () => {
     }
   };
 
-  const getFileDisplayName = (file) => file.title || file.filename || file.original_filename || 'Файл';
+  const getFileDisplayName = (file) => file.title || file.filename || file.original_filename || t('misc.fm_label_other');
 
   const formatFileSize = (bytes) => {
     const size = Number(bytes) || 0;
@@ -257,9 +258,9 @@ const FileManager = () => {
   };
 
   const formatDate = (dateString) => {
-    if (!dateString) return 'Не указано';
+    if (!dateString) return t('misc.fm_date_not_specified');
     const date = new Date(dateString);
-    if (Number.isNaN(date.getTime())) return 'Не указано';
+    if (Number.isNaN(date.getTime())) return t('misc.fm_date_not_specified');
 
     return date.toLocaleDateString('ru-RU', {
       year: 'numeric',
@@ -353,9 +354,9 @@ const FileManager = () => {
   const handleDelete = async (fileId) => {
     // P-013 fix: replaced native confirm() with shared useConfirm hook.
     const ok = await confirm({
-      title: 'Удаление файла',
-      message: 'Удалить этот файл?',
-      description: 'Это действие необратимо.',
+      title: t('misc.fm_delete_title'),
+      message: t('misc.fm_delete_message'),
+      description: t('misc.fm_delete_description'),
       confirmLabel: t('misc.delete'),
       cancelLabel: t('misc.cancel'),
       intent: 'danger',
@@ -418,8 +419,8 @@ const FileManager = () => {
           event.stopPropagation();
           handlePreview(file.id);
         }}
-        aria-label={`Предварительный просмотр файла ${getFileDisplayName(file)}`}
-        title="Предварительный просмотр"
+        aria-label={t('misc.fm_aria_preview_file', { name: getFileDisplayName(file) })}
+        title={t('misc.fm_title_preview')}
         style={iconButtonStyle}
       >
         <Eye size={16} />
@@ -431,8 +432,8 @@ const FileManager = () => {
           event.stopPropagation();
           handleDownload(file.id, file.filename);
         }}
-        aria-label={`Скачать файл ${getFileDisplayName(file)}`}
-        title="Скачать"
+        aria-label={t('misc.fm_aria_download_file', { name: getFileDisplayName(file) })}
+        title={t('misc.fm_title_download')}
         style={iconButtonStyle}
       >
         <Download size={16} />
@@ -444,8 +445,8 @@ const FileManager = () => {
           event.stopPropagation();
           handleDelete(file.id);
         }}
-        aria-label={`Удалить файл ${getFileDisplayName(file)}`}
-        title="Удалить"
+        aria-label={t('misc.fm_aria_delete_file', { name: getFileDisplayName(file) })}
+        title={t('misc.delete')}
         style={{ ...iconButtonStyle, color: 'var(--mac-danger)' }}
       >
         <Trash2 size={16} />
@@ -516,7 +517,7 @@ const FileManager = () => {
 
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--mac-spacing-2)' }}>
                 <Badge size="small" variant="outline">
-                  {fileTypeLabels[file.file_type] || file.file_type || 'Файл'}
+                  {fileTypeLabels(t)[file.file_type] || file.file_type || t('misc.fm_label_other')}
                 </Badge>
                 <span style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)' }}>
                   {formatDate(file.created_at)}
@@ -538,7 +539,7 @@ const FileManager = () => {
         <Checkbox
           checked={files.length > 0 && selectedFiles.length === files.length}
           onChange={(checked) => setSelectedFiles(checked ? files.map((file) => file.id) : [])}
-          aria-label={files.length > 0 && selectedFiles.length === files.length ? 'Снять выбор со всех файлов' : 'Выбрать все файлы'}
+          aria-label={files.length > 0 && selectedFiles.length === files.length ? t('misc.fm_aria_deselect_all') : t('misc.fm_aria_select_all')}
         />
       ),
       render: (_value, file) => (
@@ -547,13 +548,13 @@ const FileManager = () => {
           onChange={(checked) =>
             setSelectedFiles((prev) => (checked ? [...prev, file.id] : prev.filter((id) => id !== file.id)))
           }
-          aria-label={selectedFiles.includes(file.id) ? `Снять выбор файла ${getFileDisplayName(file)}` : `Выбрать файл ${getFileDisplayName(file)}`}
+          aria-label={selectedFiles.includes(file.id) ? t('misc.fm_aria_deselect_file', { name: getFileDisplayName(file) }) : t('misc.fm_aria_select_file', { name: getFileDisplayName(file) })}
         />
       )
     },
     {
       key: 'filename',
-      title: 'Имя файла',
+      title: t('misc.fm_col_filename'),
       render: (_value, file) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: '220px' }}>
           {getFileIcon(file, 22)}
@@ -568,22 +569,22 @@ const FileManager = () => {
     },
     {
       key: 'file_type',
-      title: 'Тип',
-      render: (value) => <Badge size="small" variant="outline">{fileTypeLabels[value] || value || 'Файл'}</Badge>
+      title: t('misc.fm_col_type'),
+      render: (value) => <Badge size="small" variant="outline">{fileTypeLabels(t)[value] || value || t('misc.fm_label_other')}</Badge>
     },
     {
       key: 'file_size',
-      title: 'Размер',
+      title: t('misc.fm_col_size'),
       render: (value) => formatFileSize(value)
     },
     {
       key: 'created_at',
-      title: 'Дата создания',
+      title: t('misc.fm_col_created'),
       render: (value) => formatDate(value)
     },
     {
       key: 'actions',
-      title: 'Действия',
+      title: t('misc.fm_col_actions'),
       render: (_value, file) => renderFileActions(file)
     }
   ];
@@ -593,7 +594,7 @@ const FileManager = () => {
       columns={tableColumns}
       data={files}
       sortable={false}
-      emptyState="Файлы не найдены"
+      emptyState={t('misc.fm_empty_state')}
     />
   );
 
@@ -602,21 +603,21 @@ const FileManager = () => {
       <div style={headerStyles}>
         <div>
           <h1 style={{ margin: 0, fontSize: 'var(--mac-font-size-3xl)', lineHeight: 1.15, color: 'var(--mac-text-primary)' }}>
-            Файловый менеджер
+            {t('misc.fm_page_title')}
           </h1>
           <p style={{ margin: '6px 0 0', color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-base)' }}>
-            Управление файлами и документами
+            {t('misc.fm_page_subtitle')}
           </p>
         </div>
 
         <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)', flexWrap: 'wrap' }}>
           <Button variant="secondary" onClick={() => setShowStatsModal(true)}>
             <BarChart3 size={16} />
-            Статистика
+            {t('misc.fm_btn_stats')}
           </Button>
           <Button variant="primary" onClick={() => setShowUploadModal(true)}>
             <Upload size={16} />
-            Загрузить
+            {t('misc.fm_btn_upload')}
           </Button>
         </div>
       </div>
@@ -638,27 +639,27 @@ const FileManager = () => {
                 }}
               />
               <Input
-                aria-label="Поиск файлов"
-                placeholder="Поиск файлов..."
+                aria-label={t('misc.fm_aria_search')}
+                placeholder={t('misc.fm_placeholder_search')}
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
                 style={{ width: '100%', paddingLeft: '36px', boxSizing: 'border-box' }}
               />
             </div>
             <Select
-              aria-label="Фильтр файлов по типу"
+              aria-label={t('misc.fm_aria_filter_type')}
               value={filters.fileType}
               onChange={(value) => handleFilterChange('fileType', value)}
-              options={fileTypeOptions}
+              options={fileTypeOptions(t)}
             />
             <Select
-              aria-label="Фильтр файлов по правам доступа"
+              aria-label={t('misc.fm_aria_filter_permission')}
               value={filters.permission}
               onChange={(value) => handleFilterChange('permission', value)}
-              options={permissionOptions}
+              options={permissionOptions(t)}
             />
             <Button variant="secondary" onClick={clearFilters}>
-              Очистить
+              {t('misc.fm_btn_clear')}
             </Button>
           </div>
         </CardContent>
@@ -670,16 +671,16 @@ const FileManager = () => {
             value={viewMode}
             onChange={setViewMode}
             options={[
-              { value: 'grid', label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}><Grid size={14} />Плитка</span> },
-              { value: 'list', label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}><ListIcon size={14} />Список</span> }
+              { value: 'grid', label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}><Grid size={14} />{t('misc.fm_view_grid')}</span> },
+              { value: 'list', label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}><ListIcon size={14} />{t('misc.fm_view_list')}</span> }
             ]}
           />
 
           {selectedCount > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)', color: 'var(--mac-text-secondary)' }}>
-              <span style={{ fontSize: 'var(--mac-font-size-sm)' }}>Выбрано: {selectedCount}</span>
+              <span style={{ fontSize: 'var(--mac-font-size-sm)' }}>{t('misc.fm_selected_count', { count: selectedCount })}</span>
               <Button size="small" variant="ghost" onClick={() => setSelectedFiles([])}>
-                Отменить
+                {t('misc.fm_btn_deselect')}
               </Button>
             </div>
           )}
@@ -689,8 +690,8 @@ const FileManager = () => {
           variant="ghost"
           size="small"
           onClick={loadFiles}
-          aria-label="Обновить список файлов"
-          title="Обновить"
+          aria-label={t('misc.fm_aria_refresh')}
+          title={t('misc.fm_title_refresh')}
           style={iconButtonStyle}
         >
           <RefreshCw size={16} />
@@ -699,15 +700,15 @@ const FileManager = () => {
 
       {loading ? (
         <Card padding="small">
-          <AppLoading title="Загрузка файлов..." />
+          <AppLoading title={t('misc.fm_loading_files')} />
         </Card>
       ) : files.length === 0 ? (
         <Card padding="small">
           <AppEmpty
             icon={File}
-            title="Файлы не найдены"
-            description="Загрузите файлы или измените фильтры поиска"
-            action={<Button variant="primary" onClick={() => setShowUploadModal(true)}>Загрузить файлы</Button>}
+            title={t('misc.fm_empty_title')}
+            description={t('misc.fm_empty_description')}
+            action={<Button variant="primary" onClick={() => setShowUploadModal(true)}>{t('misc.fm_btn_upload_files')}</Button>}
           />
         </Card>
       ) : viewMode === 'grid' ? (
@@ -718,12 +719,12 @@ const FileManager = () => {
 
       <Dialog open={showUploadModal} onClose={() => setShowUploadModal(false)} maxWidth="sm">
         <DialogTitle style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--mac-spacing-3)' }}>
-          <span>Загрузить файлы</span>
+          <span>{t('misc.fm_dialog_upload_title')}</span>
           <Button
             variant="ghost"
             size="small"
             onClick={() => setShowUploadModal(false)}
-            aria-label="Закрыть окно загрузки файлов"
+            aria-label={t('misc.fm_aria_close_upload')}
             style={iconButtonStyle}
           >
             <X size={16} />
@@ -733,7 +734,7 @@ const FileManager = () => {
           <div
             role="button"
             tabIndex={0}
-            aria-label="Выбрать файлы для загрузки"
+            aria-label={t('misc.fm_aria_select_files')}
             onClick={() => fileInputRef.current?.click()}
             onKeyDown={(event) => handleActivationKeyDown(event, () => fileInputRef.current?.click())}
             style={{
@@ -750,16 +751,16 @@ const FileManager = () => {
             }}
           >
             <UploadIcon size={32} style={{ color: 'var(--mac-text-tertiary)' }} />
-            <strong style={{ color: 'var(--mac-text-primary)' }}>Нажмите для выбора файлов</strong>
+            <strong style={{ color: 'var(--mac-text-primary)' }}>{t('misc.fm_upload_click_to_select')}</strong>
             <span style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-sm)' }}>
-              Поддерживаются все типы файлов
+              {t('misc.fm_upload_supported_types')}
             </span>
           </div>
 
           <input
             ref={fileInputRef}
             type="file"
-            aria-label="Файлы для загрузки"
+            aria-label={t('misc.fm_aria_files_input')}
             multiple
             onChange={handleFileUpload}
             style={{ display: 'none' }}
@@ -768,7 +769,7 @@ const FileManager = () => {
           {uploading && (
             <div style={{ marginTop: 'var(--mac-spacing-4)', display: 'grid', gap: 'var(--mac-spacing-2)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--mac-font-size-sm)' }}>
-                <span>Загрузка файлов...</span>
+                <span>{t('misc.fm_uploading_progress')}</span>
                 <span>{Math.round(uploadProgress)}%</span>
               </div>
               <Progress value={uploadProgress} variant="primary" />
@@ -777,19 +778,19 @@ const FileManager = () => {
         </DialogContent>
         <DialogActions>
           <Button variant="secondary" onClick={() => setShowUploadModal(false)}>
-            Отмена
+            {t('misc.cancel')}
           </Button>
         </DialogActions>
       </Dialog>
 
       <Dialog open={showStatsModal} onClose={() => setShowStatsModal(false)} maxWidth="md">
         <DialogTitle style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--mac-spacing-3)' }}>
-          <span>Статистика файлов</span>
+          <span>{t('misc.fm_dialog_stats_title')}</span>
           <Button
             variant="ghost"
             size="small"
             onClick={() => setShowStatsModal(false)}
-            aria-label="Закрыть статистику файлов"
+            aria-label={t('misc.fm_aria_close_stats')}
             style={iconButtonStyle}
           >
             <X size={16} />
@@ -797,13 +798,13 @@ const FileManager = () => {
         </DialogTitle>
         <DialogContent>
           {!stats ? (
-            <AppLoading title="Загрузка статистики..." />
+            <AppLoading title={t('misc.fm_loading_stats')} />
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 'var(--mac-spacing-3)' }}>
               <Card padding="small" shadow="small">
                 <CardHeader>
-                  <CardTitle>Всего файлов</CardTitle>
-                  <CardDescription>Количество загруженных документов</CardDescription>
+                  <CardTitle>{t('misc.fm_stat_total_files')}</CardTitle>
+                  <CardDescription>{t('misc.fm_stat_total_files_desc')}</CardDescription>
                 </CardHeader>
                 <CardContent style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <strong style={{ fontSize: '26px' }}>{stats.total_files || 0}</strong>
@@ -813,8 +814,8 @@ const FileManager = () => {
 
               <Card padding="small" shadow="small">
                 <CardHeader>
-                  <CardTitle>Общий размер</CardTitle>
-                  <CardDescription>Использовано в хранилище</CardDescription>
+                  <CardTitle>{t('misc.fm_stat_total_size')}</CardTitle>
+                  <CardDescription>{t('misc.fm_stat_total_size_desc')}</CardDescription>
                 </CardHeader>
                 <CardContent style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <strong style={{ fontSize: '26px' }}>{formatFileSize(stats.total_size)}</strong>
@@ -824,15 +825,15 @@ const FileManager = () => {
 
               <Card padding="small" shadow="small">
                 <CardHeader>
-                  <CardTitle>По типам файлов</CardTitle>
+                  <CardTitle>{t('misc.fm_stat_by_type')}</CardTitle>
                 </CardHeader>
                 <CardContent style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
                   {Object.entries(stats.files_by_type || {}).length === 0 ? (
-                    <span style={{ color: 'var(--mac-text-secondary)' }}>Нет данных</span>
+                    <span style={{ color: 'var(--mac-text-secondary)' }}>{t('misc.no_data')}</span>
                   ) : (
                     Object.entries(stats.files_by_type || {}).map(([type, count]) => (
                       <div key={type} style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--mac-spacing-3)' }}>
-                        <span style={{ color: 'var(--mac-text-secondary)' }}>{fileTypeLabels[type] || type}</span>
+                        <span style={{ color: 'var(--mac-text-secondary)' }}>{fileTypeLabels(t)[type] || type}</span>
                         <strong>{count}</strong>
                       </div>
                     ))
@@ -842,15 +843,15 @@ const FileManager = () => {
 
               <Card padding="small" shadow="small">
                 <CardHeader>
-                  <CardTitle>Использование хранилища</CardTitle>
+                  <CardTitle>{t('misc.fm_stat_storage_usage')}</CardTitle>
                 </CardHeader>
                 <CardContent style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--mac-spacing-3)' }}>
-                    <span style={{ color: 'var(--mac-text-secondary)' }}>Использовано</span>
+                    <span style={{ color: 'var(--mac-text-secondary)' }}>{t('misc.fm_stat_storage_used')}</span>
                     <strong>{formatFileSize(stats.storage_usage?.used_bytes || 0)}</strong>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--mac-spacing-3)' }}>
-                    <span style={{ color: 'var(--mac-text-secondary)' }}>Максимум</span>
+                    <span style={{ color: 'var(--mac-text-secondary)' }}>{t('misc.fm_stat_storage_max')}</span>
                     <strong>{formatFileSize(stats.storage_usage?.max_bytes || 0)}</strong>
                   </div>
                   {stats.storage_usage?.max_bytes && (
@@ -866,7 +867,7 @@ const FileManager = () => {
         </DialogContent>
         <DialogActions>
           <Button variant="primary" onClick={() => setShowStatsModal(false)}>
-            Закрыть
+            {t('misc.close')}
           </Button>
         </DialogActions>
       </Dialog>

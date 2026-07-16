@@ -75,9 +75,9 @@ const iconButtonStyle = {
   padding: 0
 };
 
-const priorityOptions = [
-  { value: 'normal', label: 'Обычный' },
-  { value: 'high', label: 'Высокий' }
+const priorityOptions = (t) => [
+  { value: 'normal', label: t('misc.esm_priority_normal') },
+  { value: 'high', label: t('misc.esm_priority_high') }
 ];
 
 const bulkTypeOptions = [
@@ -93,6 +93,7 @@ const parseRecipients = (value) =>
 
 const EmailSMSManager = () => {
   useTheme();
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(false);
   const [statistics, setStatistics] = useState(null);
@@ -173,15 +174,15 @@ const EmailSMSManager = () => {
         },
         body: JSON.stringify({
           to_email: emailForm.to,
-          subject: emailForm.subject || 'Тестовое письмо',
-          message: emailForm.message || 'Это тестовое письмо от Programma Clinic'
+          subject: emailForm.subject || t('misc.esm_test_email_subject_default'),
+          message: emailForm.message || t('misc.esm_test_email_message_default')
         })
       });
       const data = await response.json();
       setTestResults({ type: 'email', ...data });
     } catch (error) {
       logger.error('Ошибка отправки тестового email:', error);
-      setTestResults({ type: 'email', success: false, message: 'Ошибка отправки' });
+      setTestResults({ type: 'email', success: false, message: t('misc.esm_error_sending') });
     } finally {
       setLoading(false);
     }
@@ -198,14 +199,14 @@ const EmailSMSManager = () => {
         },
         body: JSON.stringify({
           phone: smsForm.phone,
-          message: smsForm.message || 'Тестовое SMS от Programma Clinic'
+          message: smsForm.message || t('misc.esm_test_sms_message_default')
         })
       });
       const data = await response.json();
       setTestResults({ type: 'sms', ...data });
     } catch (error) {
       logger.error('Ошибка отправки тестового SMS:', error);
-      setTestResults({ type: 'sms', success: false, message: 'Ошибка отправки' });
+      setTestResults({ type: 'sms', success: false, message: t('misc.esm_error_sending') });
     } finally {
       setLoading(false);
     }
@@ -234,7 +235,7 @@ const EmailSMSManager = () => {
       setTestResults({ type: 'bulk', ...data });
     } catch (error) {
       logger.error('Ошибка массовой рассылки:', error);
-      setTestResults({ type: 'bulk', success: false, message: 'Ошибка рассылки' });
+      setTestResults({ type: 'bulk', success: false, message: t('misc.esm_error_bulk') });
     } finally {
       setLoading(false);
     }
@@ -259,23 +260,23 @@ const EmailSMSManager = () => {
   };
 
   const tabs = useMemo(() => [
-    { value: 'overview', label: <TabLabel icon={BarChart3} text="Обзор" /> },
+    { value: 'overview', label: <TabLabel icon={BarChart3} text={t('misc.esm_tab_overview')} /> },
     { value: 'email', label: <TabLabel icon={Mail} text="Email" /> },
     { value: 'sms', label: <TabLabel icon={MessageSquare} text="SMS" /> },
-    { value: 'bulk', label: <TabLabel icon={Users} text="Массовые" /> },
-    { value: 'templates', label: <TabLabel icon={FileText} text="Шаблоны" /> },
-    { value: 'settings', label: <TabLabel icon={Settings} text="Настройки" /> }
-  ], []);
+    { value: 'bulk', label: <TabLabel icon={Users} text={t('misc.esm_tab_bulk')} /> },
+    { value: 'templates', label: <TabLabel icon={FileText} text={t('misc.esm_tab_templates')} /> },
+    { value: 'settings', label: <TabLabel icon={Settings} text={t('misc.esm_tab_settings')} /> }
+  ], [t]);
 
   const emailTemplateOptions = useMemo(() => [
-    { value: '', label: 'Выберите шаблон' },
+    { value: '', label: t('misc.esm_select_template') },
     ...templates.email.map((template) => ({ value: template.name, label: template.title }))
-  ], [templates.email]);
+  ], [templates.email, t]);
 
   const smsTemplateOptions = useMemo(() => [
-    { value: '', label: 'Выберите шаблон' },
+    { value: '', label: t('misc.esm_select_template') },
     ...templates.sms.map((template) => ({ value: template.name, label: template.title }))
-  ], [templates.sms]);
+  ], [templates.sms, t]);
 
   const currentBulkTemplates = bulkForm.type === 'email' ? emailTemplateOptions : smsTemplateOptions;
 
@@ -313,7 +314,7 @@ const EmailSMSManager = () => {
 
     const isSuccess = Boolean(testResults.success);
     const Icon = isSuccess ? CheckCircle : AlertCircle;
-    const label = testResults.type === 'email' ? 'Email' : testResults.type === 'sms' ? 'SMS' : 'Массовая рассылка';
+    const label = testResults.type === 'email' ? 'Email' : testResults.type === 'sms' ? 'SMS' : t('misc.esm_bulk_label');
 
     return (
       <Card
@@ -368,32 +369,32 @@ const EmailSMSManager = () => {
     <div style={stackStyles}>
       {loading && !statistics ? (
         <Card padding="small">
-          <AppLoading title="Загрузка статистики..." />
+          <AppLoading title={t('misc.esm_loading_stats')} />
         </Card>
       ) : statistics ? (
         <div style={gridStyles}>
           {renderStatCard({
-            title: 'Email отправлено',
+            title: t('misc.esm_stat_email_sent'),
             value: statistics.emails_sent || 0,
-            detail: `Успешность: ${statistics.email_success_rate?.toFixed(1) || 0}%`,
+            detail: t('misc.esm_stat_success_rate', { rate: statistics.email_success_rate?.toFixed(1) || 0 }),
             icon: Mail,
             tone: 'blue'
           })}
           {renderStatCard({
-            title: 'SMS отправлено',
+            title: t('misc.esm_stat_sms_sent'),
             value: statistics.sms_sent || 0,
-            detail: `Успешность: ${statistics.sms_success_rate?.toFixed(1) || 0}%`,
+            detail: t('misc.esm_stat_success_rate', { rate: statistics.sms_success_rate?.toFixed(1) || 0 }),
             icon: MessageSquare,
             tone: 'green'
           })}
           {renderStatCard({
-            title: 'Email ошибки',
+            title: t('misc.esm_stat_email_errors'),
             value: statistics.emails_failed || 0,
             icon: AlertCircle,
             tone: 'red'
           })}
           {renderStatCard({
-            title: 'SMS ошибки',
+            title: t('misc.esm_stat_sms_errors'),
             value: statistics.sms_failed || 0,
             icon: AlertCircle,
             tone: 'orange'
@@ -401,32 +402,32 @@ const EmailSMSManager = () => {
         </div>
       ) : (
         <Card padding="small">
-          <AppEmpty title="Статистика недоступна" description="Данные появятся после успешной загрузки." />
+          <AppEmpty title={t('misc.esm_stat_unavailable_title')} description={t('misc.esm_stat_unavailable_desc')} />
         </Card>
       )}
 
       <div style={gridStyles}>
         <ActionCard
           icon={Mail}
-          title="Тест Email"
-          description="Отправить тестовое письмо"
-          actionLabel="Перейти к тестированию"
+          title={t('misc.esm_action_test_email_title')}
+          description={t('misc.esm_action_test_email_desc')}
+          actionLabel={t('misc.esm_action_go_to_test')}
           onAction={() => setActiveTab('email')}
           variant="primary"
         />
         <ActionCard
           icon={MessageSquare}
-          title="Тест SMS"
-          description="Отправить тестовое SMS"
-          actionLabel="Перейти к тестированию"
+          title={t('misc.esm_action_test_sms_title')}
+          description={t('misc.esm_action_test_sms_desc')}
+          actionLabel={t('misc.esm_action_go_to_test')}
           onAction={() => setActiveTab('sms')}
           variant="success"
         />
         <ActionCard
           icon={Users}
-          title="Массовые рассылки"
-          description="Отправить уведомления группе"
-          actionLabel="Перейти к рассылкам"
+          title={t('misc.esm_action_bulk_title')}
+          description={t('misc.esm_action_bulk_desc')}
+          actionLabel={t('misc.esm_action_go_to_bulk')}
           onAction={() => setActiveTab('bulk')}
           variant="secondary"
         />
@@ -439,14 +440,14 @@ const EmailSMSManager = () => {
   const renderEmailForm = () => (
     <Card padding="default">
       <CardHeader>
-        <CardTitle>Отправка Email</CardTitle>
-        <CardDescription>Проверьте доставку письма на один адрес</CardDescription>
+        <CardTitle>{t('misc.esm_email_form_title')}</CardTitle>
+        <CardDescription>{t('misc.esm_email_form_desc')}</CardDescription>
       </CardHeader>
       <CardContent style={stackStyles}>
         <div style={formGridStyles}>
           <Input
             type="email"
-            label="Получатель"
+            label={t('misc.esm_label_recipient')}
             aria-label="Email recipient"
             value={emailForm.to}
             onChange={(event) => setEmailForm({ ...emailForm, to: event.target.value })}
@@ -454,39 +455,39 @@ const EmailSMSManager = () => {
           />
           <Input
             type="text"
-            label="Тема"
+            label={t('misc.esm_label_subject')}
             aria-label="Email subject"
             value={emailForm.subject}
             onChange={(event) => setEmailForm({ ...emailForm, subject: event.target.value })}
-            placeholder="Тема письма"
+            placeholder={t('misc.esm_placeholder_subject')}
           />
           <Select
-            label="Шаблон"
+            label={t('misc.esm_label_template')}
             value={emailForm.template}
             onChange={(value) => setEmailForm({ ...emailForm, template: value })}
             options={emailTemplateOptions}
           />
           <Select
-            label="Приоритет"
+            label={t('misc.esm_label_priority')}
             value={emailForm.priority}
             onChange={(value) => setEmailForm({ ...emailForm, priority: value })}
-            options={priorityOptions}
+            options={priorityOptions(t)}
           />
         </div>
         <Textarea
-          label="Сообщение"
+          label={t('misc.esm_label_message')}
           aria-label="Email message"
           value={emailForm.message}
           onChange={(event) => setEmailForm({ ...emailForm, message: event.target.value })}
           minRows={4}
-          placeholder="Текст сообщения"
+          placeholder={t('misc.esm_placeholder_message')}
         />
         <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)', flexWrap: 'wrap' }}>
           <Button variant="primary" onClick={sendTestEmail} disabled={loading || !emailForm.to} loading={loading && activeTab === 'email'}>
-            {loading && activeTab === 'email' ? 'Отправка...' : 'Отправить тест'}
+            {loading && activeTab === 'email' ? t('misc.esm_sending') : t('misc.esm_send_test')}
           </Button>
           <Button variant="secondary" onClick={clearEmailForm}>
-            Очистить
+            {t('misc.esm_clear')}
           </Button>
         </div>
       </CardContent>
@@ -496,14 +497,14 @@ const EmailSMSManager = () => {
   const renderSMSForm = () => (
     <Card padding="default">
       <CardHeader>
-        <CardTitle>Отправка SMS</CardTitle>
-        <CardDescription>Проверьте доставку SMS на один номер</CardDescription>
+        <CardTitle>{t('misc.esm_sms_form_title')}</CardTitle>
+        <CardDescription>{t('misc.esm_sms_form_desc')}</CardDescription>
       </CardHeader>
       <CardContent style={stackStyles}>
         <div style={formGridStyles}>
           <Input
             type="tel"
-            label="Номер телефона"
+            label={t('misc.esm_label_phone')}
             aria-label="SMS phone number"
             value={smsForm.phone}
             onChange={(event) => setSmsForm({ ...smsForm, phone: event.target.value })}
@@ -511,39 +512,39 @@ const EmailSMSManager = () => {
           />
           <Input
             type="text"
-            label="Отправитель"
+            label={t('misc.esm_label_sender')}
             aria-label="SMS sender"
             value={smsForm.sender}
             onChange={(event) => setSmsForm({ ...smsForm, sender: event.target.value })}
             placeholder="Clinic"
           />
           <Select
-            label="Шаблон"
+            label={t('misc.esm_label_template')}
             value={smsForm.template}
             onChange={(value) => setSmsForm({ ...smsForm, template: value })}
             options={smsTemplateOptions}
           />
           <Select
-            label="Приоритет"
+            label={t('misc.esm_label_priority')}
             value={smsForm.priority}
             onChange={(value) => setSmsForm({ ...smsForm, priority: value })}
-            options={priorityOptions}
+            options={priorityOptions(t)}
           />
         </div>
         <Textarea
-          label="Сообщение"
+          label={t('misc.esm_label_message')}
           aria-label="SMS message"
           value={smsForm.message}
           onChange={(event) => setSmsForm({ ...smsForm, message: event.target.value })}
           minRows={3}
-          placeholder="Текст SMS сообщения"
+          placeholder={t('misc.esm_placeholder_sms_message')}
         />
         <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)', flexWrap: 'wrap' }}>
           <Button variant="success" onClick={sendTestSMS} disabled={loading || !smsForm.phone} loading={loading && activeTab === 'sms'}>
-            {loading && activeTab === 'sms' ? 'Отправка...' : 'Отправить тест'}
+            {loading && activeTab === 'sms' ? t('misc.esm_sending') : t('misc.esm_send_test')}
           </Button>
           <Button variant="secondary" onClick={clearSMSForm}>
-            Очистить
+            {t('misc.esm_clear')}
           </Button>
         </div>
       </CardContent>
@@ -553,20 +554,20 @@ const EmailSMSManager = () => {
   const renderBulkForm = () => (
     <Card padding="default">
       <CardHeader>
-        <CardTitle>Массовые рассылки</CardTitle>
-        <CardDescription>Список получателей можно разделять строками, запятыми или точками с запятой</CardDescription>
+        <CardTitle>{t('misc.esm_bulk_form_title')}</CardTitle>
+        <CardDescription>{t('misc.esm_bulk_form_desc')}</CardDescription>
       </CardHeader>
       <CardContent style={stackStyles}>
         <div style={formGridStyles}>
           <Select
-            label="Тип рассылки"
+            label={t('misc.esm_label_bulk_type')}
             value={bulkForm.type}
             onChange={(value) => setBulkForm({ ...bulkForm, type: value, template: '' })}
             options={bulkTypeOptions}
           />
           <Input
             type="number"
-            label="Размер батча"
+            label={t('misc.esm_label_batch_size')}
             aria-label="Bulk batch size"
             value={bulkForm.batchSize}
             onChange={(event) => setBulkForm({ ...bulkForm, batchSize: Number.parseInt(event.target.value, 10) || 1 })}
@@ -576,7 +577,7 @@ const EmailSMSManager = () => {
           <Input
             type="number"
             step="0.1"
-            label="Задержка между батчами"
+            label={t('misc.esm_label_batch_delay')}
             aria-label="Bulk delay between batches"
             value={bulkForm.delay}
             onChange={(event) => setBulkForm({ ...bulkForm, delay: Number.parseFloat(event.target.value) || 0 })}
@@ -584,7 +585,7 @@ const EmailSMSManager = () => {
             max="10"
           />
           <Select
-            label="Шаблон"
+            label={t('misc.esm_label_template')}
             value={bulkForm.template}
             onChange={(value) => setBulkForm({ ...bulkForm, template: value })}
             options={currentBulkTemplates}
@@ -594,16 +595,16 @@ const EmailSMSManager = () => {
         {bulkForm.type === 'email' && (
           <Input
             type="text"
-            label="Тема письма"
+            label={t('misc.esm_label_subject')}
             aria-label="Bulk email subject"
             value={bulkForm.subject}
             onChange={(event) => setBulkForm({ ...bulkForm, subject: event.target.value })}
-            placeholder="Тема письма"
+            placeholder={t('misc.esm_placeholder_subject')}
           />
         )}
 
         <Textarea
-          label={`Получатели (${bulkForm.recipients.length})`}
+          label={t('misc.esm_label_recipients', { count: bulkForm.recipients.length })}
           aria-label="Bulk recipients"
           value={bulkForm.recipientsText}
           onChange={(event) => updateBulkRecipients(event.target.value)}
@@ -612,12 +613,12 @@ const EmailSMSManager = () => {
         />
 
         <Textarea
-          label="Сообщение"
+          label={t('misc.esm_label_message')}
           aria-label="Bulk message"
           value={bulkForm.message}
           onChange={(event) => setBulkForm({ ...bulkForm, message: event.target.value })}
           minRows={4}
-          placeholder="Текст сообщения"
+          placeholder={t('misc.esm_placeholder_message')}
         />
 
         <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)', flexWrap: 'wrap' }}>
@@ -627,10 +628,10 @@ const EmailSMSManager = () => {
             disabled={loading || bulkForm.recipients.length === 0}
             loading={loading && activeTab === 'bulk'}
           >
-            {loading && activeTab === 'bulk' ? 'Отправка...' : 'Запустить рассылку'}
+            {loading && activeTab === 'bulk' ? t('misc.esm_sending') : t('misc.esm_start_bulk')}
           </Button>
           <Button variant="secondary" onClick={clearBulkForm}>
-            Очистить
+            {t('misc.esm_clear')}
           </Button>
         </div>
       </CardContent>
@@ -639,46 +640,46 @@ const EmailSMSManager = () => {
 
   const renderTemplates = () => (
     <div style={gridStyles}>
-      <TemplateColumn title="Email шаблоны" icon={Mail} templates={templates.email} tone="var(--mac-accent-blue)" />
-      <TemplateColumn title="SMS шаблоны" icon={MessageSquare} templates={templates.sms} tone="var(--mac-success)" />
+      <TemplateColumn title={t('misc.esm_templates_email_title')} icon={Mail} templates={templates.email} tone="var(--mac-accent-blue)" />
+      <TemplateColumn title={t('misc.esm_templates_sms_title')} icon={MessageSquare} templates={templates.sms} tone="var(--mac-success)" />
     </div>
   );
 
   const renderSettings = () => (
     <Card padding="default">
       <CardHeader>
-        <CardTitle>Настройки Email/SMS</CardTitle>
-        <CardDescription>Параметры провайдеров и технические действия</CardDescription>
+        <CardTitle>{t('misc.esm_settings_title')}</CardTitle>
+        <CardDescription>{t('misc.esm_settings_desc')}</CardDescription>
       </CardHeader>
       <CardContent style={stackStyles}>
         <div style={gridStyles}>
           <Card padding="small" shadow="small">
             <CardHeader>
-              <CardTitle>Email настройки</CardTitle>
+              <CardTitle>{t('misc.esm_settings_email_title')}</CardTitle>
             </CardHeader>
             <CardContent style={stackStyles}>
-              <Input type="text" label="SMTP сервер" aria-label="SMTP server" placeholder="smtp.gmail.com" />
-              <Input type="number" label="Порт" aria-label="SMTP port" placeholder="587" />
+              <Input type="text" label={t('misc.esm_label_smtp_server')} aria-label="SMTP server" placeholder="smtp.gmail.com" />
+              <Input type="number" label={t('misc.esm_label_port')} aria-label="SMTP port" placeholder="587" />
               <Input type="email" label="Email" aria-label="SMTP email" placeholder="clinic@example.com" />
             </CardContent>
           </Card>
 
           <Card padding="small" shadow="small">
             <CardHeader>
-              <CardTitle>SMS настройки</CardTitle>
+              <CardTitle>{t('misc.esm_settings_sms_title')}</CardTitle>
             </CardHeader>
             <CardContent style={stackStyles}>
               <Input type="url" label="API URL" aria-label="SMS API URL" placeholder="https://api.sms-provider.com" />
-              <Input type="password" label="API ключ" aria-label="SMS API key" placeholder="••••••••••••••••" />
-              <Input type="text" label="Отправитель" aria-label="SMS default sender" placeholder="Clinic" />
+              <Input type="password" label={t('misc.esm_label_api_key')} aria-label="SMS API key" placeholder="••••••••••••••••" />
+              <Input type="text" label={t('misc.esm_label_sender')} aria-label="SMS default sender" placeholder="Clinic" />
             </CardContent>
           </Card>
         </div>
 
         <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)', flexWrap: 'wrap' }}>
-          <Button variant="primary">Сохранить настройки</Button>
+          <Button variant="primary">{t('misc.esm_save_settings')}</Button>
           <Button variant="danger" onClick={resetStatistics} disabled={loading}>
-            Сбросить статистику
+            {t('misc.esm_reset_stats')}
           </Button>
         </div>
       </CardContent>
@@ -709,15 +710,15 @@ const EmailSMSManager = () => {
       <div style={headerStyles}>
         <div>
           <h1 style={{ margin: 0, fontSize: 'var(--mac-font-size-3xl)', lineHeight: 1.15, color: 'var(--mac-text-primary)' }}>
-            Email/SMS уведомления
+            {t('misc.esm_page_title')}
           </h1>
           <p style={{ margin: '6px 0 0', color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-base)' }}>
-            Управление тестовыми отправками, шаблонами и массовыми рассылками
+            {t('misc.esm_page_subtitle')}
           </p>
         </div>
         <Button variant="secondary" onClick={loadStatistics} disabled={loading}>
           <BarChart3 size={16} />
-          Обновить статистику
+          {t('misc.esm_refresh_stats')}
         </Button>
       </div>
 
@@ -769,6 +770,7 @@ ActionCard.propTypes = {
 };
 
 const TemplateColumn = ({ title, icon: Icon, templates, tone }) => {
+  const { t } = useTranslation();
   const columns = [
     {
       key: 'title',
@@ -797,7 +799,7 @@ const TemplateColumn = ({ title, icon: Icon, templates, tone }) => {
     },
     {
       key: 'actions',
-      title: 'Действия',
+      title: t('misc.esm_col_actions'),
       render: (_value, template) => (
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--mac-spacing-2)' }}>
           <Button variant="ghost" size="small" aria-label={`View template ${template.title}`} style={iconButtonStyle}>
@@ -821,7 +823,7 @@ const TemplateColumn = ({ title, icon: Icon, templates, tone }) => {
       </CardHeader>
       <CardContent>
         {templates.length === 0 ? (
-          <AppEmpty title="Шаблоны не найдены" description="Список появится после загрузки шаблонов." />
+          <AppEmpty title={t('misc.esm_templates_empty_title')} description={t('misc.esm_templates_empty_desc')} />
         ) : (
           <Table columns={columns} data={templates} sortable={false} />
         )}
