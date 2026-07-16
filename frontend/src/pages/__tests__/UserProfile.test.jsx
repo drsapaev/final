@@ -1,7 +1,7 @@
 import React, { StrictMode } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ThemeProvider } from '../../contexts/ThemeContext.jsx';
+import { ThemeProvider } from '../../contexts/ThemeContext.tsx';
 import { MacOSThemeProvider } from '../../theme/macosTheme.jsx';
 
 const { apiGet, apiPut, setAuthProfile, getAuthState } = vi.hoisted(() => ({

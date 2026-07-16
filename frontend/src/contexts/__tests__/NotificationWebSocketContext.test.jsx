@@ -2,7 +2,7 @@ import { act, render } from '@testing-library/react';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import PropTypes from 'prop-types';
 import { MemoryRouter } from 'react-router-dom';
-import { NotificationWebSocketProvider } from '../NotificationWebSocketContext.jsx';
+import { NotificationWebSocketProvider } from '../NotificationWebSocketContext.tsx';
 
 const {
   notificationCenterMock,
