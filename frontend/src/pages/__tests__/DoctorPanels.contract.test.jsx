@@ -188,7 +188,7 @@ describe('Doctor panels SSOT contract', () => {
   });
 
   it('selects call-next from backend queue contract instead of local waiting-status scan', () => {
-    const source = read('hooks/useDoctorQueue.js');
+    const source = read('hooks/useDoctorQueue.ts');
     const callNextBlock = extractBlock(
       source,
       'const callNext = useCallback',
