@@ -12,11 +12,11 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const ROOT = path.resolve(process.cwd());
-const RESPONSIVE_MODAL = path.join(ROOT, 'src/components/ResponsiveModal.jsx');
-const RESPONSIVE_FORM = path.join(ROOT, 'src/components/forms/ResponsiveForm.jsx');
-const PHOTO_COMPARISON = path.join(ROOT, 'src/components/dermatology/PhotoComparison.jsx');
-const MODERN_INPUT = path.join(ROOT, 'src/components/forms/ModernInput.jsx');
-const MODERN_SELECT = path.join(ROOT, 'src/components/forms/ModernSelect.jsx');
+const RESPONSIVE_MODAL = path.join(ROOT, 'src/components/ResponsiveModal.tsx');
+const RESPONSIVE_FORM = path.join(ROOT, 'src/components/forms/ResponsiveForm.tsx');
+const PHOTO_COMPARISON = path.join(ROOT, 'src/components/dermatology/PhotoComparison.tsx');
+const MODERN_INPUT = path.join(ROOT, 'src/components/forms/ModernInput.tsx');
+const MODERN_SELECT = path.join(ROOT, 'src/components/forms/ModernSelect.tsx');
 
 // ---------- 1. Medium-E: label htmlFor association ----------
 

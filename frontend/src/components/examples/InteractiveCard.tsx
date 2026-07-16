@@ -1,0 +1,210 @@
+// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
+// Proper typing deferred to Phase 9 cleanup (strict mode).
+
+import { Card } from '../ui/macos';
+import { useTheme } from '../../contexts/ThemeContext';
+import { useHover } from '../../hooks/useUtils';
+import PropTypes from 'prop-types';
+
+/**
+ * Пример интерактивной карточки с эффектами наведения
+ */
+const InteractiveCard = ({
+  children,
+  onClick,
+  className = '',
+  style = {},
+  ...props
+}) => {
+  const { getColor, getSpacing, getShadow, getBorderRadius } = useTheme();
+  const { ref, isHovered } = useHover();
+
+  const cardStyle = {
+    position: 'relative',
+    overflow: 'hidden',
+    transition: 'all 0.3s ease',
+    cursor: onClick ? 'pointer' : 'default',
+    transform: isHovered ? 'translateY(-4px)' : 'translateY(0)',
+    boxShadow: isHovered ? getShadow('lg') : getShadow('md'),
+    borderColor: isHovered ? getColor('primary', 200) : getColor('border'),
+    backgroundColor: getColor('surface'),
+    ...style
+  };
+
+  const overlayStyle = {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: `linear-gradient(135deg, ${getColor('primary', 500)}15 0%, ${getColor('primary', 600)}05 100%)`,
+    opacity: isHovered ? 1 : 0,
+    transition: 'opacity 0.3s ease',
+    pointerEvents: 'none',
+    borderRadius: getBorderRadius('md')
+  };
+
+  return (
+    <Card
+      ref={ref}
+      onClick={onClick}
+      className={className}
+      style={{
+        padding: getSpacing('lg'),
+        borderRadius: getBorderRadius('lg'),
+        ...cardStyle
+      }}
+      {...props}
+    >
+      {/* Overlay эффект */}
+      <div style={overlayStyle} />
+
+      {/* Основное содержимое */}
+      <div style={{ position: 'relative', zIndex: 1 }}>
+        {children}
+      </div>
+
+      {/* Эффект свечения при наведении */}
+      {isHovered && (
+        <div style={{
+          position: 'absolute',
+          top: '-2px',
+          left: '-2px',
+          right: '-2px',
+          bottom: '-2px',
+          background: `linear-gradient(135deg, ${getColor('primary', 400)}, ${getColor('primary', 600)})`,
+          borderRadius: getBorderRadius('lg'),
+          zIndex: -1,
+          opacity: 0.1,
+          filter: 'blur(8px)'
+        }} />
+      )}
+    </Card>
+  );
+};
+
+
+InteractiveCard.propTypes = {
+  ...(InteractiveCard.propTypes || {}),
+  children: PropTypes.any,
+  className: PropTypes.any,
+  onClick: PropTypes.any,
+  style: PropTypes.any,
+};
+
+/**
+ * Пример интерактивного элемента списка
+ */
+export const InteractiveListItem = ({
+  title,
+  subtitle,
+  icon,
+  onClick,
+  ...props
+}) => {
+  const { getColor, getSpacing, getFontSize, getShadow } = useTheme();
+  const { ref, isHovered } = useHover();
+  const itemStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    padding: getSpacing('md'),
+    borderRadius: 'var(--mac-radius-md)',
+    backgroundColor: isHovered ? getColor('primary', 50) : getColor('surface'),
+    border: `1px solid ${isHovered ? getColor('primary', 200) : getColor('border')}`,
+    cursor: onClick ? 'pointer' : 'default',
+    transition: 'all 0.2s ease',
+    transform: isHovered ? 'scale(1.02)' : 'scale(1)',
+    boxShadow: isHovered ? getShadow('sm') : 'none'
+  };
+  const itemContent = (
+    <>
+      {/* Иконка */}
+      {icon && (
+        <div style={{
+          width: '40px',
+          height: '40px',
+          borderRadius: '50%',
+          backgroundColor: isHovered ? getColor('primary', 100) : getColor('secondary', 100),
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginRight: getSpacing('md'),
+          transition: 'all 0.2s ease'
+        }}>
+          {icon}
+        </div>
+      )}
+
+      {/* Текст */}
+      <div style={{ flex: 1 }}>
+        <div style={{
+          fontSize: getFontSize('base'),
+          fontWeight: 'var(--mac-font-weight-semibold)',
+          color: getColor('text'),
+          marginBottom: getSpacing('xs')
+        }}>
+          {title}
+        </div>
+        {subtitle && (
+          <div style={{
+            fontSize: getFontSize('sm'),
+            color: getColor('textSecondary')
+          }}>
+            {subtitle}
+          </div>
+        )}
+      </div>
+
+      {/* Стрелка */}
+      <div style={{
+        color: isHovered ? getColor('primary', 500) : getColor('textSecondary'),
+        transition: 'all 0.2s ease',
+        transform: isHovered ? 'translateX(4px)' : 'translateX(0)'
+      }}>
+        →
+      </div>
+    </>
+  );
+
+  if (onClick) {
+    return (
+      <div
+        ref={ref}
+        onClick={onClick}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            onClick(event);
+          }
+        }}
+        style={itemStyle}
+        {...props}
+      >
+        {itemContent}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      ref={ref}
+      style={itemStyle}
+      {...props}
+    >
+      {itemContent}
+    </div>
+  );
+};
+
+
+InteractiveListItem.propTypes = {
+  ...(InteractiveListItem.propTypes || {}),
+  icon: PropTypes.any,
+  onClick: PropTypes.any,
+  subtitle: PropTypes.any,
+  title: PropTypes.any,
+};
+
+export default InteractiveCard;

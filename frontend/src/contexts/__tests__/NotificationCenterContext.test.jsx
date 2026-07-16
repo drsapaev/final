@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyUnreadSnapshot } from '../NotificationCenterContext.tsx';
+import { applyUnreadSnapshot } from '../NotificationCenterContext';
 
 describe('NotificationCenterContext unread snapshot helpers', () => {
   it('merges websocket unread totals without discarding existing breakdowns', () => {

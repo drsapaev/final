@@ -13,8 +13,8 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const ROOT = path.resolve(process.cwd());
-const BILLING_MANAGER = path.join(ROOT, 'src/components/admin/BillingManager.jsx');
-const DENTIST_PANEL = path.join(ROOT, 'src/pages/DentistPanelUnified.jsx');
+const BILLING_MANAGER = path.join(ROOT, 'src/components/admin/BillingManager.tsx');
+const DENTIST_PANEL = path.join(ROOT, 'src/pages/DentistPanelUnified.tsx');
 const NGINX_PROD = path.join(ROOT, 'docker/nginx.conf');
 const NGINX_STAGING = path.join(ROOT, 'docker/nginx.staging.conf');
 

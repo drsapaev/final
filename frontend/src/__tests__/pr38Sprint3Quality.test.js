@@ -78,9 +78,9 @@ describe('High-22: Dead code removal', () => {
 
 // ---------- 3. Medium-23: Silent catches in Search.jsx ----------
 
-describe('Medium-23: Silent catches in Search.jsx', () => {
+describe('Medium-23: Silent catches in Search.tsx', () => {
   it('Search.jsx does not have empty catch blocks', () => {
-    const searchFile = path.join(ROOT, 'src/pages/Search.jsx');
+    const searchFile = path.join(ROOT, 'src/pages/Search.tsx');
     const src = fs.readFileSync(searchFile, 'utf-8');
     const stripped = src
       .replace(/\/\/.*$/gm, '')

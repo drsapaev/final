@@ -1,0 +1,406 @@
+// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
+// Proper typing deferred to Phase 9 cleanup (strict mode).
+
+import { useState, useEffect, useCallback } from 'react';
+import {
+  CheckCircle,
+  XCircle,
+  Clock,
+  DollarSign,
+  User,
+  Calendar,
+  AlertCircle,
+
+  Filter,
+  RefreshCw } from
+'lucide-react';
+import { useTheme } from '../../contexts/ThemeContext';
+import { toast } from 'react-toastify';
+
+// UX Audit Registrar #1: миграция с raw fetch() на централизованный api-клиент.
+// Раньше здесь было 2 raw fetch() к /registrar/price-overrides и
+// /registrar/price-override/approve с дублированием URL/headers/error-handling.
+// Теперь все операции идут через api/registrar.js (внутри — axios + interceptors).
+import {
+  fetchPriceOverrides,
+  approvePriceOverride,
+} from '../../api/registrar';
+import logger from '../../utils/logger';
+import { useTranslation } from '../../i18n/useTranslation';
+
+const PRICE_OVERRIDE_ACTION_CAN_FIELD = {
+  approve: 'can_approve',
+  reject: 'can_reject'
+};
+
+const hasBackendPriceOverrideAction = (override, action) => {
+  const normalizedAction = String(action || '').trim().toLowerCase();
+  if (!normalizedAction) {
+    return false;
+  }
+
+  if (Array.isArray(override?.available_actions)) {
+    return override.available_actions.some(
+      (availableAction) => String(availableAction || '').trim().toLowerCase() === normalizedAction
+    );
+  }
+
+  const canField = PRICE_OVERRIDE_ACTION_CAN_FIELD[normalizedAction];
+  if (canField && Object.prototype.hasOwnProperty.call(override || {}, canField)) {
+    return Boolean(override[canField]);
+  }
+
+  return false;
+};
+
+/**
+ * Компонент для одобрения/отклонения изменений цен врачами
+ */
+const PriceOverrideApproval = () => {
+  const { t } = useTranslation();
+  useTheme();
+  const [priceOverrides, setPriceOverrides] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState('pending');
+  const [selectedOverride, setSelectedOverride] = useState(null);
+  const [showApprovalModal, setShowApprovalModal] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const loadPriceOverrides = useCallback(async () => {
+    setLoading(true);
+    try {
+      // UX Audit Registrar #1: raw fetch() → fetchPriceOverrides() из api/registrar.
+      // Auth/CSRF/refresh-token обрабатываются axios-interceptor'ом в api/client.js.
+      const data = await fetchPriceOverrides({ statusFilter, limit: 100 });
+      setPriceOverrides(data);
+    } catch (error) {
+      logger.error('Error loading price overrides:', error);
+      toast.error(t('misc.poa_oshibka_zagruzki_izmeneniy_t'));
+    } finally {
+      setLoading(false);
+    }
+  }, [statusFilter]);
+
+  useEffect(() => {
+    loadPriceOverrides();
+  }, [loadPriceOverrides]);
+
+  const handleApproval = async (overrideId, action, rejectionReason = null) => {
+    setIsProcessing(true);
+    try {
+      // UX Audit Registrar #1: raw fetch() POST → approvePriceOverride() из api/registrar.
+      const result = await approvePriceOverride({
+        overrideId,
+        action,
+        rejectionReason,
+      });
+      toast.success(result.message);
+
+      // Обновляем список
+      loadPriceOverrides();
+
+      // Закрываем модальное окно
+      setShowApprovalModal(false);
+      setSelectedOverride(null);
+      setRejectionReason('');
+    } catch (error) {
+      logger.error('Error processing approval:', error);
+      // Axios errors: detail лежит в error.response.data.detail.
+      const detail = error?.response?.data?.detail || error?.message || t('misc.poa_oshibka_obrabotki_zaprosa');
+      toast.error(detail);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const formatPrice = (price) => {
+    return Number(price).toLocaleString('ru-RU') + ' UZS';
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'pending':return 'text-yellow-600 bg-yellow-100';
+      case 'approved':return 'text-green-600 bg-green-100';
+      case 'rejected':return 'text-red-600 bg-red-100';
+      default:return 'text-gray-600 bg-gray-100';
+    }
+  };
+
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case 'pending':return <Clock size={16} />;
+      case 'approved':return <CheckCircle size={16} />;
+      case 'rejected':return <XCircle size={16} />;
+      default:return <AlertCircle size={16} />;
+    }
+  };
+
+  const getStatusText = (status) => {
+    switch (status) {
+      case 'pending':return t('misc.poa_ozhidaet_odobreniya');
+      case 'approved':return t('misc.poa_odobreno');
+      case 'rejected':return t('misc.poa_otkloneno');
+      default:return status;
+    }
+  };
+
+  const getSpecialtyText = (specialty) => {
+    switch (specialty) {
+      case 'dermatology':return t('misc.poa_dermatologiya');
+      case 'cosmetology':return t('misc.poa_kosmetologiya');
+      case 'stomatology':return t('misc.poa_stomatologiya');
+      case 'dental':return t('misc.poa_stomatologiya');
+      case 'cardiology':return t('misc.poa_kardiologiya');
+      default:return specialty;
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+            Изменения цен врачами
+          </h2>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">
+            Одобрение и отклонение изменений цен процедур
+          </p>
+        </div>
+        
+        <div className="flex items-center gap-3">
+          {/* Фильтр по статусу */}
+          <div className="flex items-center gap-2">
+            <Filter size={16} className="text-gray-500" />
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+              
+              <option value="pending">{t('misc.poa_ozhidayut_odobreniya')}</option>
+              <option value="approved">{t('misc.poa_odobrennye')}</option>
+              <option value="rejected">{t('misc.poa_otklonennye')}</option>
+              <option value="all">{t('misc.poa_vse')}</option>
+            </select>
+          </div>
+          
+          {/* Кнопка обновления */}
+          <button
+            onClick={loadPriceOverrides}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50">
+            
+            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+            Обновить
+          </button>
+        </div>
+      </div>
+
+      {/* Список изменений цен */}
+      {loading ?
+      <div className="text-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto" />
+          <p className="text-gray-500 mt-2">{t('misc.poa_zagruzka')}</p>
+        </div> :
+      priceOverrides.length === 0 ?
+      <div className="text-center py-8">
+          <AlertCircle size={48} className="text-gray-400 mx-auto mb-4" />
+          <p className="text-gray-500">{t('misc.poa_izmeneniy_tsen_ne_naydeno')}</p>
+        </div> :
+
+      <div className="grid gap-4">
+          {priceOverrides.map((override) =>
+        <div
+          key={override.id}
+          className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 shadow-sm">
+          
+              {/* Header карточки */}
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(override.status)}`}>
+                    {getStatusIcon(override.status)}
+                    <span className="ml-2">{getStatusText(override.status)}</span>
+                  </span>
+                  
+                  <span className="text-sm text-gray-500 dark:text-gray-400">
+                    #{override.id}
+                  </span>
+                </div>
+                
+                <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                  <Calendar size={14} />
+                  {new Date(override.created_at).toLocaleDateString('ru-RU')}
+                </div>
+              </div>
+
+              {/* Основная информация */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
+                    Пациент
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <User size={16} className="text-gray-400" />
+                    <span className="text-sm">{override.patient_name || t('misc.poa_ne_ukazan')}</span>
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
+                    Врач
+                  </label>
+                  <div className="text-sm">
+                    <div>{override.doctor_name}</div>
+                    <div className="text-gray-500">{getSpecialtyText(override.doctor_specialty)}</div>
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
+                    Услуга
+                  </label>
+                  <div className="text-sm">{override.service_name}</div>
+                </div>
+              </div>
+
+              {/* Цены */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
+                    Базовая цена
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <DollarSign size={16} className="text-gray-400" />
+                    <span className="text-lg font-medium">{formatPrice(override.original_price)}</span>
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
+                    Новая цена
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <DollarSign size={16} className="text-blue-600" />
+                    <span className="text-lg font-medium text-blue-600">{formatPrice(override.new_price)}</span>
+                    <span className="text-sm text-gray-500">
+                      ({override.new_price > override.original_price ? '+' : ''}
+                      {formatPrice(override.new_price - override.original_price)})
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Обоснование */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
+                  Обоснование
+                </label>
+                <div className="text-sm">{override.reason}</div>
+                {override.details &&
+            <div className="text-sm text-gray-500 mt-1">{override.details}</div>
+            }
+              </div>
+
+              {/* Действия */}
+              {(hasBackendPriceOverrideAction(override, 'approve') || hasBackendPriceOverrideAction(override, 'reject')) &&
+          <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                  {hasBackendPriceOverrideAction(override, 'approve') &&
+                  <button
+              onClick={() => handleApproval(override.id, 'approve')}
+              disabled={isProcessing}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50">
+              
+                    <CheckCircle size={16} />
+                    Одобрить
+                  </button>
+            }
+
+                  {hasBackendPriceOverrideAction(override, 'reject') &&
+                  <button
+              onClick={() => {
+                setSelectedOverride(override);
+                setShowApprovalModal(true);
+              }}
+              disabled={isProcessing}
+              className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50">
+              
+                    <XCircle size={16} />
+                    Отклонить
+                  </button>
+            }
+                </div>
+          }
+            </div>
+        )}
+        </div>
+      }
+
+      {/* Модальное окно для отклонения */}
+      {showApprovalModal && selectedOverride &&
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full">
+            <div className="p-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                Отклонить изменение цены
+              </h3>
+              
+              <div className="mb-4">
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                  Услуга: {selectedOverride.service_name}
+                </p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Цена: {formatPrice(selectedOverride.original_price)} → {formatPrice(selectedOverride.new_price)}
+                </p>
+              </div>
+              
+              <div className="mb-4">
+                <label htmlFor="price-override-rejection-reason" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Причина отклонения
+                </label>
+                <textarea
+                id="price-override-rejection-reason"
+                aria-label={t('misc.poa_prichina_otkloneniya_izmenen')}
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                placeholder={t('misc.poa_ukazhite_prichinu_otkloneniy')} />
+              
+              </div>
+              
+              <div className="flex gap-3">
+                <button
+                onClick={() => handleApproval(selectedOverride.id, 'reject', rejectionReason)}
+                disabled={isProcessing || !rejectionReason.trim()}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50">
+                
+                  {isProcessing ?
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" /> :
+
+                <XCircle size={16} />
+                }
+                  Отклонить
+                </button>
+                
+                <button
+                onClick={() => {
+                  setShowApprovalModal(false);
+                  setSelectedOverride(null);
+                  setRejectionReason('');
+                }}
+                disabled={isProcessing}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700">
+                
+                  Отмена
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+    </div>);
+
+};
+
+export default PriceOverrideApproval;
