@@ -10,9 +10,9 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const ROOT = path.resolve(process.cwd());
-const TG_MANAGER = path.join(ROOT, 'src/components/TelegramManager.jsx');
-const ADMIN_PATIENTS = path.join(ROOT, 'src/components/admin/AdminPatients.jsx');
-const ADMIN_APPOINTMENTS = path.join(ROOT, 'src/components/admin/AdminAppointments.jsx');
+const TG_MANAGER = path.join(ROOT, 'src/components/TelegramManager.tsx');
+const ADMIN_PATIENTS = path.join(ROOT, 'src/components/admin/AdminPatients.tsx');
+const ADMIN_APPOINTMENTS = path.join(ROOT, 'src/components/admin/AdminAppointments.tsx');
 
 // ---------- 1. High-16: TelegramManager uses memoization ----------
 

@@ -10,14 +10,14 @@ describe('routing anti-regression enforcement', () => {
   it('keeps legacy consumers free from hand-maintained route tables', () => {
     const routeRegistry = read('src/routing/routeRegistry.js');
 
-    expect(read('src/components/layout/Nav.jsx')).not.toContain('const routes = [');
+    expect(read('src/components/layout/Nav.tsx')).not.toContain('const routes = [');
     expect(read('src/constants/routes.js')).not.toContain('const routeMap =');
     expect(routeRegistry).not.toContain('component: \'AdminPanel\'');
   });
 
   it('uses the routing subsystem as the route source of truth', () => {
-    expect(read('src/App.jsx')).toContain('from \'./routing/routeRegistry.js\'');
-    expect(read('src/App.jsx')).toContain('ROUTE_REGISTRY.map');
-    expect(read('src/components/layout/Nav.jsx')).toContain('getVisibleRoutesForShell');
+    expect(read('src/App.tsx')).toContain('from \'./routing/routeRegistry.js\'');
+    expect(read('src/App.tsx')).toContain('ROUTE_REGISTRY.map');
+    expect(read('src/components/layout/Nav.tsx')).toContain('getVisibleRoutesForShell');
   });
 });

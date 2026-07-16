@@ -14,7 +14,7 @@ function runAudit(source, extraArgs = [], extraFiles = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'icon-audit-'));
 
   try {
-    fs.writeFileSync(path.join(root, 'Example.jsx'), source);
+    fs.writeFileSync(path.join(root, 'Example.tsx'), source);
     for (const [name, content] of Object.entries(extraFiles)) {
       fs.writeFileSync(path.join(root, name), content);
     }
@@ -181,7 +181,7 @@ describe('icon-only controls accessibility audit', () => {
 
     try {
       fs.writeFileSync(
-        path.join(root, 'Example.jsx'),
+        path.join(root, 'Example.tsx'),
         `
         export function Example() {
           return (

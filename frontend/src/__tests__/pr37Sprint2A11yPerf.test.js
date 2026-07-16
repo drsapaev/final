@@ -13,7 +13,7 @@ import { describe, expect, it } from 'vitest';
 
 const ROOT = path.resolve(process.cwd());
 const MODAL = path.join(ROOT, 'src/components/ui/macos/Modal.tsx');
-const SEARCH = path.join(ROOT, 'src/pages/Search.jsx');
+const SEARCH = path.join(ROOT, 'src/pages/Search.tsx');
 
 // ---------- 1. P0-A: Focus trap in Modal ----------
 
@@ -121,7 +121,7 @@ describe('P0-13: Search.jsx N+1 query fix', () => {
 
 describe('P0-C: WCAG AA contrast fixes', () => {
   it('QueueTable.jsx does not use a foreground color with contrast < 4.5:1 on white', () => {
-    const queueTable = path.join(ROOT, 'src/components/queue/QueueTable.jsx');
+    const queueTable = path.join(ROOT, 'src/components/queue/QueueTable.tsx');
     if (!fs.existsSync(queueTable)) {
       // Skip silently — vitest will count this as a pass
       return;

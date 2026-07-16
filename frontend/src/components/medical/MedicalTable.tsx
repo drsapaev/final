@@ -1,0 +1,301 @@
+// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
+// Proper typing deferred to Phase 9 cleanup (strict mode).
+
+import React from 'react';
+import Icon from '../Icon';
+import { useTheme } from '../../contexts/ThemeContext';
+import PropTypes from 'prop-types';
+import { useTranslation } from '../../i18n/useTranslation';
+
+/**
+ * Унифицированная медицинская таблица в стиле MediLab
+ */
+const MedicalTable = ({ 
+  columns = [],
+  data = [],
+  onView,
+  onEdit,
+  onDelete,
+  sortable = true,
+  pagination = true,
+  pageSize = 10,
+  className = '',
+  ...props 
+}) => {
+  const { isDark } = useTheme();
+  const [sortField, setSortField] = React.useState('');
+  const [sortDirection, setSortDirection] = React.useState('asc');
+  const [currentPage, setCurrentPage] = React.useState(1);
+
+  // Сортировка данных
+  const sortedData = React.useMemo(() => {
+    if (!sortField) return data;
+    
+    return [...data].sort((a, b) => {
+      const aValue = a[sortField];
+      const bValue = b[sortField];
+      
+      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [data, sortField, sortDirection]);
+
+  // Пагинация
+  const paginatedData = React.useMemo(() => {
+    if (!pagination) return sortedData;
+    
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    return sortedData.slice(startIndex, endIndex);
+  }, [sortedData, currentPage, pageSize, pagination]);
+
+  const totalPages = Math.ceil(sortedData.length / pageSize);
+
+  const handleSort = (field) => {
+    if (!sortable) return;
+    
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const renderSortIcon = (field) => {
+    if (!sortable || sortField !== field) return null;
+    
+    return sortDirection === 'asc' ? 
+      <Icon name="ChevronUp" size={16} /> : 
+      <Icon name="ChevronDown" size={16} />;
+  };
+
+  const renderActionButtons = (row, index) => {
+    const actions = [];
+    
+    if (onView) {
+      actions.push(
+        <button
+          key="view"
+          onClick={() => onView(row, index)}
+          className="p-2 text-green-600 hover:bg-green-50 rounded-md transition-colors interactive-element hover-scale ripple-effect magnetic-hover focus-ring"
+          title="View details"
+          aria-label="View row details"
+        >
+          <Icon name="Eye" size={16} />
+        </button>
+      );
+    }
+    
+    if (onEdit) {
+      actions.push(
+        <button
+          key="edit"
+          onClick={() => onEdit(row, index)}
+          className="p-2 text-blue-600 hover:bg-blue-50 rounded-md transition-colors interactive-element hover-scale ripple-effect magnetic-hover focus-ring"
+          title="Edit"
+          aria-label="Edit row"
+        >
+          <Icon name="Edit" size={16} />
+        </button>
+      );
+    }
+    
+    if (onDelete) {
+      actions.push(
+        <button
+          key="delete"
+          onClick={() => onDelete(row, index)}
+          className="p-2 text-red-600 hover:bg-red-50 rounded-md transition-colors interactive-element hover-scale ripple-effect magnetic-hover focus-ring"
+          title="Delete"
+          aria-label="Delete row"
+        >
+          <Icon name="Trash2" size={16} />
+        </button>
+      );
+    }
+    
+    return actions.length > 0 ? (
+      <div className="flex gap-1">
+        {actions}
+      </div>
+    ) : null;
+  };
+
+  return (
+    <div 
+      className={`medical-table ${className}`}
+      style={{
+        backgroundColor: isDark ? 'var(--mac-text-primary)' : 'var(--mac-bg-primary)',
+        borderRadius: 'var(--mac-radius-md)',
+        border: `1px solid ${isDark ? 'var(--mac-text-primary)' : 'var(--mac-border)'}`,
+        overflow: 'hidden',
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+      }}
+      {...props}
+    >
+      <div className="overflow-x-auto">
+        <div className="admin-table-wrapper">
+<table className="w-full">
+          <thead 
+            style={{
+              backgroundColor: isDark ? 'var(--mac-text-primary)' : 'var(--mac-bg-secondary)'
+            }}
+          >
+            <tr>
+              {columns.map((column) => (
+                <th
+                  key={column.key}
+                  className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
+                    sortable ? 'cursor-pointer hover:bg-gray-100 interactive-element hover-lift ripple-effect magnetic-hover focus-ring' : ''
+                  }`}
+                  style={{
+                    color: isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-text-primary)',
+                    backgroundColor: isDark ? 'var(--mac-text-primary)' : 'var(--mac-bg-secondary)'
+                  }}
+                  onClick={() => handleSort(column.key)}
+                >
+                  <div className="flex items-center gap-2">
+                    {column.label}
+                    {renderSortIcon(column.key)}
+                  </div>
+                </th>
+              ))}
+              {(onView || onEdit || onDelete) && (
+                <th 
+                  className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider"
+                  style={{
+                    color: isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-text-primary)',
+                    backgroundColor: isDark ? 'var(--mac-text-primary)' : 'var(--mac-bg-secondary)'
+                  }}
+                >
+                  Actions
+                </th>
+              )}
+            </tr>
+          </thead>
+          <tbody 
+            className="divide-y"
+            style={{
+              backgroundColor: isDark ? 'var(--mac-text-primary)' : 'var(--mac-bg-primary)',
+              borderColor: isDark ? 'var(--mac-text-primary)' : 'var(--mac-border)'
+            }}
+          >
+            {paginatedData.map((row, index) => (
+              <tr 
+                key={index}
+                className="hover:bg-gray-50 transition-colors interactive-element hover-lift ripple-effect magnetic-hover focus-ring"
+                style={{
+                  backgroundColor: isDark ? 'var(--mac-text-primary)' : 'var(--mac-bg-primary)'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = isDark ? 'var(--mac-text-secondary)' : 'var(--mac-bg-secondary)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = isDark ? 'var(--mac-text-primary)' : 'var(--mac-bg-primary)';
+                }}
+              >
+                {columns.map((column) => (
+                  <td
+                    key={column.key}
+                    className="px-6 py-4 whitespace-nowrap text-sm"
+                    style={{ color: isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-text-primary)' }}
+                  >
+                    {column.render ? column.render(row[column.key], row, index) : row[column.key]}
+                  </td>
+                ))}
+                {(onView || onEdit || onDelete) && (
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    {renderActionButtons(row, index)}
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+</div>
+      </div>
+
+      {/* Пагинация */}
+      {pagination && totalPages > 1 && (
+        <div 
+          className="px-6 py-3 border-t flex items-center justify-between"
+          style={{
+            backgroundColor: isDark ? 'var(--mac-text-primary)' : 'var(--mac-bg-primary)',
+            borderColor: isDark ? 'var(--mac-text-primary)' : 'var(--mac-border)'
+          }}
+        >
+          <div 
+            className="text-sm"
+            style={{ color: isDark ? 'var(--mac-text-tertiary)' : 'var(--mac-text-secondary)' }}
+          >
+            Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, sortedData.length)} of {sortedData.length} results
+          </div>
+          
+          <div className="flex gap-2">
+            <button
+              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-1 text-sm border rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 interactive-element hover-lift ripple-effect magnetic-hover focus-ring"
+              style={{
+                color: isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-text-primary)',
+                borderColor: isDark ? 'var(--mac-text-primary)' : 'var(--mac-border)',
+                backgroundColor: isDark ? 'var(--mac-text-primary)' : 'var(--mac-bg-primary)'
+              }}
+            >
+              Previous
+            </button>
+            
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+              <button
+                key={page}
+                onClick={() => setCurrentPage(page)}
+                className={`px-3 py-1 text-sm border rounded-md interactive-element hover-lift ripple-effect magnetic-hover focus-ring ${
+                  page === currentPage ? 'bg-blue-500 text-white border-blue-500' : 'hover:bg-gray-50'
+                }`}
+                style={{
+                  color: page === currentPage ? 'var(--mac-bg-primary)' : (isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-text-primary)'),
+                  borderColor: page === currentPage ? 'var(--mac-accent-blue)' : (isDark ? 'var(--mac-text-primary)' : 'var(--mac-border)'),
+                  backgroundColor: page === currentPage ? 'var(--mac-accent-blue)' : (isDark ? 'var(--mac-text-primary)' : 'var(--mac-bg-primary)')
+                }}
+              >
+                {page}
+              </button>
+            ))}
+            
+            <button
+              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1 text-sm border rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 interactive-element hover-lift ripple-effect magnetic-hover focus-ring"
+              style={{
+                color: isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-text-primary)',
+                borderColor: isDark ? 'var(--mac-text-primary)' : 'var(--mac-border)',
+                backgroundColor: isDark ? 'var(--mac-text-primary)' : 'var(--mac-bg-primary)'
+              }}
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+
+MedicalTable.propTypes = {
+  ...(MedicalTable.propTypes || {}),
+  className: PropTypes.any,
+  columns: PropTypes.any,
+  data: PropTypes.any,
+  onDelete: PropTypes.any,
+  onEdit: PropTypes.any,
+  onView: PropTypes.any,
+  pageSize: PropTypes.any,
+  pagination: PropTypes.any,
+  sortable: PropTypes.any,
+};
+
+export default MedicalTable;
+
