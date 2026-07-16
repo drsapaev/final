@@ -14,7 +14,7 @@ const source = fs.readFileSync(
 );
 
 const iconSource = fs.readFileSync(
-  path.join(ROOT, 'components/ui/macos/Icon.jsx'),
+  path.join(ROOT, 'components/ui/macos/Icon.tsx'),
   'utf8'
 );
 
