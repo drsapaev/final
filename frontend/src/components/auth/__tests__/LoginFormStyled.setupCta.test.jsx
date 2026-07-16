@@ -8,7 +8,7 @@ const { useSetupStatusMock } = vi.hoisted(() => ({
   useSetupStatusMock: vi.fn(),
 }));
 
-vi.mock('../../../hooks/useSetupStatus.js', () => ({
+vi.mock('../../../hooks/useSetupStatus.ts', () => ({
   useSetupStatus: useSetupStatusMock,
 }));
 
