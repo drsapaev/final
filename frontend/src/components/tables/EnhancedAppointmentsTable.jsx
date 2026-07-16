@@ -451,7 +451,7 @@ const EnhancedAppointmentsTable = ({
       }
     };
 
-    const config = statusConfig[status] || statusConfig.scheduled;void
+    const config = statusConfig[status] || statusConfig.scheduled;
     config.icon;
 
     return (

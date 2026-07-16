@@ -11,7 +11,7 @@ const ModernContainer = ({
   centered = false,
   className = '',
   ...props
-}) => {void
+}) => {
   useTheme();
 
   const maxWidthValues = {

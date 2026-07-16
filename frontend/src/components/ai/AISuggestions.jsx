@@ -12,13 +12,14 @@ const AISuggestions = ({
   suggestions = [],
   type = 'icd10',
   onSelect,
-  title = t('misc.as_ai_podskazki'),
+  title,
   showConfidence = true,
   maxHeight = 400,
   clinicalRecommendations = null,
   fallbackProvider = null
 }) => {
   const { t } = useTranslation();
+  title = title || t('misc.as_ai_podskazki');
   const [expanded, setExpanded] = useState(true);
   const [copiedId, setCopiedId] = useState(null);
 

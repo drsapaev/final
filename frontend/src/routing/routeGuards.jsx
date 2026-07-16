@@ -200,6 +200,7 @@ SystemRoutePage.propTypes = {
 };
 
 export function UnauthorizedPage() {
+  const { t } = useTranslation();
   return (
     <SystemRoutePage
       code="401"
@@ -210,6 +211,7 @@ export function UnauthorizedPage() {
 }
 
 export function ForbiddenPage() {
+  const { t } = useTranslation();
   return (
     <SystemRoutePage
       code="403"
@@ -220,6 +222,7 @@ export function ForbiddenPage() {
 }
 
 export function NotFoundPage() {
+  const { t } = useTranslation();
   return (
     <SystemRoutePage
       code="404"

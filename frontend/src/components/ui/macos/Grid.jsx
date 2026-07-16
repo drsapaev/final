@@ -23,7 +23,7 @@ const Grid = React.forwardRef(({
   alignItems = 'stretch',
   wrap = 'wrap',
   ...props
-}, ref) => {void
+}, ref) => {
   useTheme();
   void sm;
   void md;

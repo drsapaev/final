@@ -15,8 +15,9 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { getLocalDateString, getTomorrowDateString } from '../../utils/dateUtils';
 import './ModernFilters.css';
 import PropTypes from 'prop-types';
-import { Input,
 import { useTranslation } from '../../i18n/useTranslation';
+import i18n from '../../i18n';
+import { Input,
   Checkbox } from '../ui/macos';
 
 const ModernFilters = ({
@@ -78,13 +79,13 @@ const ModernFilters = ({
   const hasActiveFilters = searchValue || dateValue || statusValue;
 
   const statusOptions = [
-  { value: '', label: t('misc.mf_vse_statusy'), icon: null },
-  { value: 'confirmed', label: t('misc.mf_podtverzhdeno'), icon: '✓' },
-  { value: 'queued', label: t('misc.mf_v_ocheredi'), icon: '⏳' },
-  { value: 'paid_pending', label: t('misc.mf_ozhidaet_oplaty'), icon: '💳' },
-  { value: 'paid', label: t('misc.mf_oplacheno'), icon: '✅' },
-  { value: 'canceled', label: t('misc.mf_otmeneno'), icon: '❌' },
-  { value: 'completed', label: t('misc.mf_zaversheno'), icon: '🏁' }];
+  { value: '', label: i18n.t('misc.mf_vse_statusy'), icon: null },
+  { value: 'confirmed', label: i18n.t('misc.mf_podtverzhdeno'), icon: '✓' },
+  { value: 'queued', label: i18n.t('misc.mf_v_ocheredi'), icon: '⏳' },
+  { value: 'paid_pending', label: i18n.t('misc.mf_ozhidaet_oplaty'), icon: '💳' },
+  { value: 'paid', label: i18n.t('misc.mf_oplacheno'), icon: '✅' },
+  { value: 'canceled', label: i18n.t('misc.mf_otmeneno'), icon: '❌' },
+  { value: 'completed', label: i18n.t('misc.mf_zaversheno'), icon: '🏁' }];
 
 
   return (
@@ -97,7 +98,7 @@ const ModernFilters = ({
             ref={searchInputRef}
             type="text"
             aria-label="Search appointments"
-            placeholder={t('misc.mf_poisk_po_fio_telefonu_usluga')}
+            placeholder={i18n.t('misc.mf_poisk_po_fio_telefonu_usluga')}
             value={searchValue}
             onChange={(e) => handleSearchChange(e.target.value)}
             className="search-input"
@@ -112,7 +113,7 @@ const ModernFilters = ({
             type="button"
             className="search-clear"
             onClick={() => handleSearchChange('')}
-            aria-label={t('misc.mf_ochistit_poisk')}>
+            aria-label={i18n.t('misc.mf_ochistit_poisk')}>
             
               <X size={16} />
             </button>
@@ -152,7 +153,7 @@ const ModernFilters = ({
             }}>
             
             <Filter size={18} />
-            <span>{t('misc.mf_filtry')}</span>
+            <span>{i18n.t('misc.mf_filtry')}</span>
             {hasActiveFilters && <span className="filters-count">•</span>}
             <ChevronDown className={`toggle-icon ${isExpanded ? 'rotated' : ''}`} size={16} />
           </button>
@@ -266,7 +267,7 @@ const ModernFilters = ({
                 <Checkbox aria-label="Toggle auto refresh" checked={autoRefresh} onChange={(e) => onAutoRefreshChange(e.target.checked)} />
               
                 <RefreshCw size={16} className={autoRefresh ? 'spinning' : ''} />
-                <span>{t('misc.mf_avtoobnovlenie')}</span>
+                <span>{i18n.t('misc.mf_avtoobnovlenie')}</span>
               </label>
 
               {/* Очистить фильтры */}

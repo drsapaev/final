@@ -34,8 +34,7 @@ const MobilePatientDashboard = () => {
   const [patientData, setPatientData] = useState(null);
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('dashboard');void
-
+  const [activeTab, setActiveTab] = useState('dashboard');
   usePWA();
 
   useEffect(() => {

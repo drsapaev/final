@@ -33,7 +33,7 @@ export const useAIAssistant = (options = {}) => {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [isListening, setIsListening] = useState(false);void
+  const [isListening, setIsListening] = useState(false);
   useReducedMotion();
 
   // Отправка сообщения

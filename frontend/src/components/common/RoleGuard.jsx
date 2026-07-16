@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import { useTheme } from '../../contexts/ThemeContext';
 import { getProfileRoles, hasRouteAccess as hasRouteAccessByRole, normalizeRole } from '../../routing/routeSelectors.js';
 import { useTranslation } from '../../i18n/useTranslation';
+import i18n from '../../i18n';
 
 /**
  * Компонент для проверки ролевого доступа
@@ -16,7 +17,7 @@ export function RoleGuard({
   route = null
 }) {
   const { t } = useTranslation();
-  const theme = useTheme();void
+  const theme = useTheme();
   theme;
 
   // Получаем профиль из контекста или пропсов
@@ -24,12 +25,12 @@ export function RoleGuard({
   JSON.parse(sessionStorage.getItem('auth_profile') || 'null') : null);
 
   if (!userProfile) {
-    return fallback || <AccessDenied message={t('misc.rg_neobhodima_avtorizatsiya')} theme={theme} />;
+    return fallback || <AccessDenied message={i18n.t('misc.rg_neobhodima_avtorizatsiya')} theme={theme} />;
   }
 
   // Проверяем доступ по маршруту
   if (route && !hasRouteAccessByRole(userProfile, route)) {
-    return fallback || <AccessDenied message={t('misc.rg_nedostatochno_prav_dlya_dost')} theme={theme} />;
+    return fallback || <AccessDenied message={i18n.t('misc.rg_nedostatochno_prav_dlya_dost')} theme={theme} />;
   }
 
   // Проверяем роли
@@ -40,7 +41,7 @@ export function RoleGuard({
     );
 
     if (!hasRole) {
-      return fallback || <AccessDenied message={t('misc.rg_nedostatochno_prav_dlya_vypo')} theme={theme} />;
+      return fallback || <AccessDenied message={i18n.t('misc.rg_nedostatochno_prav_dlya_vypo')} theme={theme} />;
     }
   }
 
@@ -52,7 +53,7 @@ export function RoleGuard({
     );
 
     if (!hasPermission) {
-      return fallback || <AccessDenied message={t('misc.rg_nedostatochno_razresheniy_dl')} theme={theme} />;
+      return fallback || <AccessDenied message={i18n.t('misc.rg_nedostatochno_razresheniy_dl')} theme={theme} />;
     }
   }
 
@@ -196,7 +197,7 @@ function AccessDenied({ message, theme }) {
   return (
     <div style={containerStyle}>
       <div style={iconStyle}>🚫</div>
-      <div style={titleStyle}>{t('misc.rg_dostup_zapreschen')}</div>
+      <div style={titleStyle}>{i18n.t('misc.rg_dostup_zapreschen')}</div>
       <div style={messageStyle}>{message}</div>
     </div>);
 
@@ -277,9 +278,9 @@ export function UserInfo({ profile = null, showRoles = true, showPermissions = f
 
   return (
     <div style={containerStyle}>
-      <div style={titleStyle}>{t('misc.rg_informatsiya_o_polzovatele')}</div>
-      <div style={infoStyle}>Имя: {userProfile.username || t('misc.rg_ne_ukazano')}</div>
-      <div style={infoStyle}>Email: {userProfile.email || t('misc.rg_ne_ukazano')}</div>
+      <div style={titleStyle}>{i18n.t('misc.rg_informatsiya_o_polzovatele')}</div>
+      <div style={infoStyle}>Имя: {userProfile.username || i18n.t('misc.rg_ne_ukazano')}</div>
+      <div style={infoStyle}>Email: {userProfile.email || i18n.t('misc.rg_ne_ukazano')}</div>
 
       {showRoles &&
       <div style={infoStyle}>

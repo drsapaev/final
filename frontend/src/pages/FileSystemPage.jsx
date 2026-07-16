@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import FileManager from '../components/files/FileManager';
-import {
 export default FileSystemPage;import { useTranslation } from '../i18n/useTranslation';
+import {
 
   Upload,
   Download,
@@ -23,7 +23,7 @@ export default FileSystemPage;import { useTranslation } from '../i18n/useTransla
  * Страница файловой системы
  * Централизованное управление файлами и документами
  */
-const FileSystemPage = () => {void
+const FileSystemPage = () => {
   const { t } = useTranslation();
   useTheme();
   const [activeTab, setActiveTab] = useState('files');

@@ -1,4 +1,5 @@
 // Error Boundary для обработки ошибок React
+import i18n from '../../i18n';
 import React from 'react';
 
 import { Button } from '../ui/macos';
@@ -106,9 +107,8 @@ function ErrorFallback({ error, errorInfo, onRetry, theme }) {
     color: getColor('text', 'secondary'),
     marginBottom: getSpacing('lg'),
     lineHeight: 1.6
-  };void
-
-  {
+  };
+  const buttonStyle = {
     padding: `${getSpacing('sm')} ${getSpacing('lg')}`,
     backgroundColor: getColor('primary', 'main'),
     color: getColor('primary', 'contrast'),

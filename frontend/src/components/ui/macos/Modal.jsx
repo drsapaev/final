@@ -25,7 +25,7 @@ const Modal = ({
   className = '',
   style = {},
   ...props
-}) => {void
+}) => {
   useTheme();
   void variant;
   const modalRef = useRef(null);

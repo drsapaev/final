@@ -17,7 +17,7 @@ const Progress = React.forwardRef(({
   className = '',
   style = {},
   ...props
-}, ref) => {void
+}, ref) => {
   useTheme();
 
   const percentage = Math.min(100, Math.max(0, value / max * 100));
@@ -153,7 +153,7 @@ export const CircularProgress = React.forwardRef(({
   className = '',
   style = {},
   ...props
-}, ref) => {void
+}, ref) => {
   useTheme();
 
   const percentage = Math.min(100, Math.max(0, value / max * 100));

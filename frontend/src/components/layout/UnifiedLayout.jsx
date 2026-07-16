@@ -13,7 +13,7 @@ import { useTranslation } from '../../i18n/useTranslation';
 const UnifiedLayout = ({ children, showSidebar = true }) => {
   const { t } = useTranslation();
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);void
+  const [isMobile, setIsMobile] = useState(false);
   useLocation();
   const { isDark } = useTheme();
 

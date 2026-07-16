@@ -21,6 +21,7 @@ import logger from '../../../../utils/logger';
 import './DermatologySection.css';
 import { Checkbox } from '../../../ui/macos';
 import { useTranslation } from '../../../../i18n/useTranslation';
+import i18n from '../../../i18n';
 
 /**
  * DermatologySection Component
@@ -116,7 +117,7 @@ export function DermatologySection({
     }
   }, [handlePhotoUpload]);
   const handleActivationKeyDown = (event, action) => {
-    const { t } = useTranslation();
+    // t accessed via closure or i18n.t()
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       action();
@@ -125,36 +126,36 @@ export function DermatologySection({
 
   return (
     <EMRSection
-      title={t('misc.ds_dermatologicheskie_dannye')}
+      title={i18n.t('misc.ds_dermatologicheskie_dannye')}
       icon=""
       disabled={disabled}
       defaultOpen={true}>
       
             {/* Skin Type */}
             <div className="dermatology-field-group">
-                <label className="dermatology-label">{t('misc.ds_tip_kozhi')}</label>
+                <label className="dermatology-label">{i18n.t('misc.ds_tip_kozhi')}</label>
                 <select
           value={skinType}
           onChange={(e) => handleSkinTypeChange(e.target.value)}
           disabled={disabled}
           className="dermatology-select">
           
-                    <option value="">{t('misc.ds_ne_ukazan')}</option>
-                    <option value="normal">{t('misc.ds_normalnaya')}</option>
-                    <option value="dry">{t('misc.ds_suhaya')}</option>
-                    <option value="oily">{t('misc.ds_zhirnaya')}</option>
-                    <option value="combination">{t('misc.ds_kombinirovannaya')}</option>
-                    <option value="sensitive">{t('misc.ds_chuvstvitelnaya')}</option>
+                    <option value="">{i18n.t('misc.ds_ne_ukazan')}</option>
+                    <option value="normal">{i18n.t('misc.ds_normalnaya')}</option>
+                    <option value="dry">{i18n.t('misc.ds_suhaya')}</option>
+                    <option value="oily">{i18n.t('misc.ds_zhirnaya')}</option>
+                    <option value="combination">{i18n.t('misc.ds_kombinirovannaya')}</option>
+                    <option value="sensitive">{i18n.t('misc.ds_chuvstvitelnaya')}</option>
                 </select>
             </div>
 
             {/* Conditions */}
             <div className="dermatology-field-group">
-                <label className="dermatology-label">{t('misc.ds_sostoyaniya')}</label>
+                <label className="dermatology-label">{i18n.t('misc.ds_sostoyaniya')}</label>
                 <div className="dermatology-conditions">
-                    {[t('misc.ds_akne'), t('misc.ds_rozatsea'), t('misc.ds_ekzema'), t('misc.ds_psoriaz'), t('misc.ds_pigmentatsiya'), t('misc.ds_morschiny')].map((condition) =>
+                    {[i18n.t('misc.ds_akne'), i18n.t('misc.ds_rozatsea'), i18n.t('misc.ds_ekzema'), i18n.t('misc.ds_psoriaz'), i18n.t('misc.ds_pigmentatsiya'), i18n.t('misc.ds_morschiny')].map((condition) =>
           <label key={condition} className="dermatology-checkbox">
-                            <Checkbox aria-label={t('misc.ds_sostoyanie_kozhi_condition', { condition: condition })} checked={conditions.includes(condition)} onChange={(e) => {
+                            <Checkbox aria-label={i18n.t('misc.ds_sostoyanie_kozhi_condition', { condition: condition })} checked={conditions.includes(condition)} onChange={(e) => {
                 if (e.target.checked) {
                   handleConditionAdd(condition);
                 } else {
@@ -172,7 +173,7 @@ export function DermatologySection({
             {/* Photo Gallery */}
             <div className="dermatology-field-group">
                 <div className="dermatology-photo-header">
-                    <label className="dermatology-label">{t('misc.ds_foto_arhiv')}</label>
+                    <label className="dermatology-label">{i18n.t('misc.ds_foto_arhiv')}</label>
                     {!disabled &&
           <button
             type="button"
@@ -181,14 +182,14 @@ export function DermatologySection({
             disabled={analyzingPhoto}>
             
                             <Camera size={16} />
-                            {analyzingPhoto ? t('misc.ds_analiz') : t('misc.ds_zagruzit_foto')}
+                            {analyzingPhoto ? i18n.t('misc.ds_analiz') : i18n.t('misc.ds_zagruzit_foto')}
                         </button>
           }
                 </div>
                 <input
           ref={fileInputRef}
           type="file"
-          aria-label={t('misc.ds_zagruzit_foto_dlya_dermatolo')}
+          aria-label={i18n.t('misc.ds_zagruzit_foto_dlya_dermatolo')}
           accept="image/*"
           onChange={handleFileSelect}
           style={{ display: 'none' }} />
@@ -197,7 +198,7 @@ export function DermatologySection({
                 {photos.length === 0 ?
         <div className="dermatology-empty-photos">
                         <ImageIcon size={48} />
-                        <p>{t('misc.ds_net_zagruzhennyh_foto')}</p>
+                        <p>{i18n.t('misc.ds_net_zagruzhennyh_foto')}</p>
                     </div> :
 
         <div className="dermatology-photo-grid">
@@ -205,8 +206,8 @@ export function DermatologySection({
           <div key={photo.id} className="dermatology-photo-item">
                                 <img
               src={photo.url}
-              alt={t('misc.ds_foto_photo_category', { category: photo.category })}
-              aria-label={t('misc.ds_otkryt_foto_photo_category', { category: photo.category })}
+              alt={i18n.t('misc.ds_foto_photo_category', { category: photo.category })}
+              aria-label={i18n.t('misc.ds_otkryt_foto_photo_category', { category: photo.category })}
               role="button"
               tabIndex={0}
               onClick={() => setSelectedPhoto(photo)}
@@ -222,7 +223,7 @@ export function DermatologySection({
             <button
               type="button"
               onClick={() => handlePhotoDelete(photo.id)}
-              aria-label={t('misc.ds_udalit_foto_photo_category', { category: photo.category })}
+              aria-label={i18n.t('misc.ds_udalit_foto_photo_category', { category: photo.category })}
               className="dermatology-photo-delete">
               
                                         <X size={14} />
@@ -236,14 +237,14 @@ export function DermatologySection({
 
             {/* Localization */}
             <div className="dermatology-field-group">
-                <label className="dermatology-label">{t('misc.ds_lokalizatsiya_porazheniy')}</label>
+                <label className="dermatology-label">{i18n.t('misc.ds_lokalizatsiya_porazheniy')}</label>
                 <EMRSmartFieldV2
           value={localization?.description || ''}
           onChange={(value) => onChange?.('localization', {
             ...localization,
             description: value
           })}
-          placeholder={t('misc.ds_opishite_lokalizatsiyu_poraz')}
+          placeholder={i18n.t('misc.ds_opishite_lokalizatsiyu_poraz')}
           multiline
           rows={3}
           disabled={disabled} />
@@ -260,7 +261,7 @@ export function DermatologySection({
         onKeyDown={(event) => handleActivationKeyDown(event, () => setSelectedPhoto(null))}>
         
                     <div className="dermatology-photo-modal-content" onClickCapture={(e) => e.stopPropagation()}>
-                        <img src={selectedPhoto.url} alt={t('misc.ds_uvelichennoe_foto')} />
+                        <img src={selectedPhoto.url} alt={i18n.t('misc.ds_uvelichennoe_foto')} />
                         {selectedPhoto.analysis &&
           <div className="dermatology-photo-analysis-detail">
                                 <h4>AI Анализ:</h4>
@@ -270,7 +271,7 @@ export function DermatologySection({
                         <button
             type="button"
             onClick={() => setSelectedPhoto(null)}
-            aria-label={t('misc.ds_zakryt_prosmotr_foto')}
+            aria-label={i18n.t('misc.ds_zakryt_prosmotr_foto')}
             className="dermatology-photo-modal-close">
             
                             <X size={20} />

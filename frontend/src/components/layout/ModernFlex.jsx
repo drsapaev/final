@@ -13,7 +13,7 @@ const ModernFlex = ({
   responsive = true,
   className = '',
   ...props
-}) => {void
+}) => {
   useTheme();
 
   const gapValues = {

@@ -1,4 +1,5 @@
 import { useTranslation } from '../../i18n/useTranslation';
+import i18n from '../../i18n';
 /**
  * Shared ConfirmDialog component + useConfirm hook.
  *
@@ -25,8 +26,8 @@ import { useTranslation } from '../../i18n/useTranslation';
  *   const ok = await confirm({
  *     title: 'Удаление пациента',
  *     message: `Удалить пациента ${name}? Действие необратимо.`,
- *     confirmLabel: t('misc.delete'),
- *     cancelLabel: t('misc.cancel'),
+ *     confirmLabel: i18n.t('misc.delete'),
+ *     cancelLabel: i18n.t('misc.cancel'),
  *     intent: 'danger',  // 'danger' | 'warning' | 'primary'
  *   });
  *   if (ok) await deletePatient(id);
@@ -91,7 +92,7 @@ export function ConfirmDialog({
   const isConfirmDisabled = requireText !== null && typedText !== requireText;
 
   const handleConfirm = () => {
-    const { t } = useTranslation();
+    // t accessed via closure or i18n.t()
     onConfirm?.();
     onClose?.();
   };

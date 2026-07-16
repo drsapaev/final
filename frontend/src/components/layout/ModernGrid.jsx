@@ -13,7 +13,7 @@ const ModernGrid = ({
   minColumnWidth = '250px',
   className = '',
   ...props
-}) => {void
+}) => {
   useTheme();
 
   const getGridColumns = () => {
