@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { renderRouteDocsMarkdown } from '../routeDocsSnapshot.js';
+import { renderRouteDocsMarkdown } from '../routeDocsSnapshot';
 import { resolveSetupRedirect } from '../routeGuards';
-import { ROUTE_REGISTRY, SIDEBAR_PRESETS } from '../routeRegistry.js';
+import { ROUTE_REGISTRY, SIDEBAR_PRESETS } from '../routeRegistry';
 import {
   getCompatibilityRedirects,
   getAdminNavSections,
@@ -15,7 +15,7 @@ import {
   getRouteChromeState,
   isInternalDemoEnabled,
   isRouteAccessibleToProfile,
-} from '../routeSelectors.js';
+} from '../routeSelectors';
 
 const PRODUCTION_ROLE_HOMES = {
   admin: '/admin',

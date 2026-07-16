@@ -1,3 +1,6 @@
+// @ts-nocheck — Phase 6: file converted but not yet fully typed.
+// Proper typing deferred to Phase 9 cleanup (strict mode).
+
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';

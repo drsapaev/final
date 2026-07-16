@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { ROUTE_REGISTRY } from '../routing/routeRegistry.js';
+import { ROUTE_REGISTRY } from '../routing/routeRegistry';
 import { sanitizeSpeedInsightsEvent } from '../utils/speedInsightsPrivacy.js';
 
 describe('Speed Insights privacy sanitizer', () => {
