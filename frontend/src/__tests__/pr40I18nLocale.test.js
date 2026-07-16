@@ -13,8 +13,8 @@ import { describe, expect, it } from 'vitest';
 
 const ROOT = path.resolve(process.cwd());
 const REGISTRAR = path.join(ROOT, 'src/pages/RegistrarPanel.jsx');
-const DATE_UTILS = path.join(ROOT, 'src/utils/dateUtils.js');
-const FORMAT_CURRENCY = path.join(ROOT, 'src/utils/formatCurrency.js');
+const DATE_UTILS = path.join(ROOT, 'src/utils/dateUtils.ts');
+const FORMAT_CURRENCY = path.join(ROOT, 'src/utils/formatCurrency.ts');
 
 // ---------- 1. P0-18: Unified localStorage key ----------
 
@@ -71,7 +71,8 @@ describe('High-20: Locale-aware formatting', () => {
       .replace(/\/\/.*$/gm, '')
       .replace(/\/\*[\s\S]*?\*\//g, '');
     // Look for: locale = getLocale() or locale = getActiveLocale()
-    const usesDynamicLocale = /locale\s*=\s*(?:getLocale|getActiveLocale)\(\)/.test(stripped);
+    // Allow optional TS type annotation between `locale` and `=` (e.g. `locale: string = getLocale()`).
+    const usesDynamicLocale = /locale\s*(?::\s*[^=]+)?\s*=\s*(?:getLocale|getActiveLocale)\(\)/.test(stripped);
     expect(usesDynamicLocale).toBe(true);
   });
 });
