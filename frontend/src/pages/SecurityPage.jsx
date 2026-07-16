@@ -3,9 +3,8 @@ import { useTheme } from '../contexts/ThemeContext';
 import TwoFactorManager from '../components/security/TwoFactorManager';
 import TwoFactorSetupWizard from '../components/security/TwoFactorSetupWizard';
 import SMSEmail2FA from '../components/security/SMSEmail2FA';
+import { useTranslation } from '../i18n/useTranslation';
 import {
-export default SecurityPage;import { useTranslation } from '../i18n/useTranslation';
-
   Shield,
 
   Key,
@@ -21,7 +20,7 @@ export default SecurityPage;import { useTranslation } from '../i18n/useTranslati
  * Страница управления безопасностью
  * Централизованное управление всеми аспектами безопасности
  */
-const SecurityPage = () => {void
+const SecurityPage = () => {
   const { t } = useTranslation();
   useTheme();
   const [activeTab, setActiveTab] = useState('overview');
@@ -30,11 +29,11 @@ const SecurityPage = () => {void
   const [smsEmailMethod] = useState('sms');
 
   const tabs = [
-  { id: 'overview', label: 'Обзор', icon: Shield },
+  { id: 'overview', label: t('misc.sp_tab_overview'), icon: Shield },
   { id: '2fa', label: '2FA', icon: Key },
-  { id: 'devices', label: 'Устройства', icon: Smartphone },
-  { id: 'sessions', label: 'Сессии', icon: Activity },
-  { id: 'logs', label: 'Журнал', icon: AlertTriangle }];
+  { id: 'devices', label: t('misc.sp_tab_devices'), icon: Smartphone },
+  { id: 'sessions', label: t('misc.sp_tab_sessions'), icon: Activity },
+  { id: 'logs', label: t('misc.sp_tab_logs'), icon: AlertTriangle }];
 
 
   const renderOverview = () =>
@@ -45,8 +44,8 @@ const SecurityPage = () => {void
           <div className="flex items-center space-x-3">
             <CheckCircle className="w-8 h-8 text-green-600" />
             <div>
-              <h3 className="font-semibold text-green-800">Пароль</h3>
-              <p className="text-sm text-green-600">Надежный пароль установлен</p>
+              <h3 className="font-semibold text-green-800">{t('misc.sp_password_title')}</h3>
+              <p className="text-sm text-green-600">{t('misc.sp_password_status')}</p>
             </div>
           </div>
         </div>
@@ -56,7 +55,7 @@ const SecurityPage = () => {void
             <Key className="w-8 h-8 text-yellow-600" />
             <div>
               <h3 className="font-semibold text-yellow-800">2FA</h3>
-              <p className="text-sm text-yellow-600">Рекомендуется включить</p>
+              <p className="text-sm text-yellow-600">{t('misc.sp_2fa_status')}</p>
             </div>
           </div>
         </div>
@@ -65,8 +64,8 @@ const SecurityPage = () => {void
           <div className="flex items-center space-x-3">
             <Smartphone className="w-8 h-8 text-blue-600" />
             <div>
-              <h3 className="font-semibold text-blue-800">Устройства</h3>
-              <p className="text-sm text-blue-600">2 доверенных устройства</p>
+              <h3 className="font-semibold text-blue-800">{t('misc.sp_devices_title')}</h3>
+              <p className="text-sm text-blue-600">{t('misc.sp_devices_count')}</p>
             </div>
           </div>
         </div>
@@ -74,32 +73,32 @@ const SecurityPage = () => {void
 
       {/* Рекомендации */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-        <h3 className="text-lg font-semibold text-blue-800 mb-4">Рекомендации по безопасности</h3>
+        <h3 className="text-lg font-semibold text-blue-800 mb-4">{t('misc.sp_recommendations_title')}</h3>
         <div className="space-y-3">
           <div className="flex items-start space-x-3">
             <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5" />
             <div>
-              <h4 className="font-medium text-blue-800">Включите двухфакторную аутентификацию</h4>
+              <h4 className="font-medium text-blue-800">{t('misc.sp_rec_2fa_title')}</h4>
               <p className="text-sm text-blue-700">
-                Это добавит дополнительный уровень защиты к вашему аккаунту
+                {t('misc.sp_rec_2fa_desc')}
               </p>
             </div>
           </div>
           <div className="flex items-start space-x-3">
             <CheckCircle className="w-5 h-5 text-green-600 mt-0.5" />
             <div>
-              <h4 className="font-medium text-blue-800">Регулярно обновляйте пароль</h4>
+              <h4 className="font-medium text-blue-800">{t('misc.sp_rec_password_title')}</h4>
               <p className="text-sm text-blue-700">
-                Используйте уникальные пароли для разных сервисов
+                {t('misc.sp_rec_password_desc')}
               </p>
             </div>
           </div>
           <div className="flex items-start space-x-3">
             <Smartphone className="w-5 h-5 text-blue-600 mt-0.5" />
             <div>
-              <h4 className="font-medium text-blue-800">Проверяйте доверенные устройства</h4>
+              <h4 className="font-medium text-blue-800">{t('misc.sp_rec_devices_title')}</h4>
               <p className="text-sm text-blue-700">
-                Удаляйте устройства, которыми больше не пользуетесь
+                {t('misc.sp_rec_devices_desc')}
               </p>
             </div>
           </div>
@@ -109,7 +108,7 @@ const SecurityPage = () => {void
       {/* Быстрые действия */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="border border-gray-200 rounded-lg p-6">
-          <h3 className="text-lg font-semibold mb-4">Быстрые действия</h3>
+          <h3 className="text-lg font-semibold mb-4">{t('misc.sp_quick_actions_title')}</h3>
           <div className="space-y-3">
             <button
             onClick={() => setShowSetupWizard(true)}
@@ -117,8 +116,8 @@ const SecurityPage = () => {void
             
               <Key className="w-5 h-5 text-blue-600" />
               <div>
-                <div className="font-medium">Настроить 2FA</div>
-                <div className="text-sm text-gray-600">Добавить двухфакторную аутентификацию</div>
+                <div className="font-medium">{t('misc.sp_action_setup_2fa')}</div>
+                <div className="text-sm text-gray-600">{t('misc.sp_action_setup_2fa_desc')}</div>
               </div>
             </button>
             <button
@@ -127,8 +126,8 @@ const SecurityPage = () => {void
             
               <Smartphone className="w-5 h-5 text-green-600" />
               <div>
-                <div className="font-medium">Управление устройствами</div>
-                <div className="text-sm text-gray-600">Просмотр и управление доверенными устройствами</div>
+                <div className="font-medium">{t('misc.sp_action_devices')}</div>
+                <div className="text-sm text-gray-600">{t('misc.sp_action_devices_desc')}</div>
               </div>
             </button>
             <button
@@ -137,31 +136,31 @@ const SecurityPage = () => {void
             
               <AlertTriangle className="w-5 h-5 text-orange-600" />
               <div>
-                <div className="font-medium">Журнал безопасности</div>
-                <div className="text-sm text-gray-600">Просмотр активности и подозрительных действий</div>
+                <div className="font-medium">{t('misc.sp_action_logs')}</div>
+                <div className="text-sm text-gray-600">{t('misc.sp_action_logs_desc')}</div>
               </div>
             </button>
           </div>
         </div>
 
         <div className="border border-gray-200 rounded-lg p-6">
-          <h3 className="text-lg font-semibold mb-4">Статистика безопасности</h3>
+          <h3 className="text-lg font-semibold mb-4">{t('misc.sp_stats_title')}</h3>
           <div className="space-y-4">
             <div className="flex justify-between items-center">
-              <span className="text-gray-600">Последний вход</span>
-              <span className="font-medium">2 часа назад</span>
+              <span className="text-gray-600">{t('misc.sp_stats_last_login_label')}</span>
+              <span className="font-medium">{t('misc.sp_stats_last_login_value')}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-gray-600">Активные сессии</span>
+              <span className="text-gray-600">{t('misc.sp_stats_active_sessions_label')}</span>
               <span className="font-medium">3</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-gray-600">Доверенные устройства</span>
+              <span className="text-gray-600">{t('misc.sp_stats_trusted_devices_label')}</span>
               <span className="font-medium">2</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-gray-600">Уровень безопасности</span>
-              <span className="font-medium text-yellow-600">Средний</span>
+              <span className="text-gray-600">{t('misc.sp_stats_security_level_label')}</span>
+              <span className="font-medium text-yellow-600">{t('misc.sp_stats_security_level_value')}</span>
             </div>
           </div>
         </div>
@@ -193,10 +192,10 @@ const SecurityPage = () => {void
         <div className="mb-8">
           <div className="flex items-center space-x-3 mb-2">
             <Shield className="w-8 h-8 text-blue-600" />
-            <h1 className="text-3xl font-bold text-gray-900">Безопасность</h1>
+            <h1 className="text-3xl font-bold text-gray-900">{t('misc.sp_page_title')}</h1>
           </div>
           <p className="text-gray-600">
-            Управление безопасностью аккаунта и двухфакторной аутентификацией
+            {t('misc.sp_page_subtitle')}
           </p>
         </div>
 
@@ -254,3 +253,4 @@ const SecurityPage = () => {void
 
 };
 
+export default SecurityPage;

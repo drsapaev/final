@@ -32,9 +32,10 @@ const ForceMajeureModal = ({
   isOpen,
   onClose,
   specialistId,
-  specialistName = 'Специалист',
+  specialistName,
   onSuccess
 }) => {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState('transfer'); // 'transfer' | 'cancel'
   const [reason, setReason] = useState('');
   const [refundType, setRefundType] = useState('deposit'); // 'deposit' | 'bank_transfer'
@@ -78,12 +79,12 @@ const ForceMajeureModal = ({
   // Transfer to tomorrow
   const handleTransfer = async () => {
     if (!reason.trim() || reason.length < 5) {
-      setError('Укажите причину (минимум 5 символов)');
+      setError(t('misc.fm_reason_required'));
       return;
     }
 
     if (confirmText !== 'ПОДТВЕРЖДАЮ') {
-      setError('Введите "ПОДТВЕРЖДАЮ" для подтверждения');
+      setError(t('misc.fm_confirm_required'));
       return;
     }
 
@@ -98,12 +99,12 @@ const ForceMajeureModal = ({
       });
 
       const result = response.data;
-      setSuccess(`Перенесено записей: ${result.transferred || 0}`);
+      setSuccess(t('misc.fm_transfer_success', { count: result.transferred || 0 }));
       logger.log('[ForceMajeureModal] Transfer successful:', result);
       if (onSuccess) onSuccess('transfer', result);
     } catch (err) {
       logger.error('[ForceMajeureModal] Transfer error:', err);
-      setError(err.message || 'Ошибка сети');
+      setError(err.message || t('misc.fm_network_error'));
     } finally {
       setLoading(false);
     }
@@ -112,12 +113,12 @@ const ForceMajeureModal = ({
   // Cancel with refund
   const handleCancel = async () => {
     if (!reason.trim() || reason.length < 5) {
-      setError('Укажите причину (минимум 5 символов)');
+      setError(t('misc.fm_reason_required'));
       return;
     }
 
     if (confirmText !== 'ПОДТВЕРЖДАЮ') {
-      setError('Введите "ПОДТВЕРЖДАЮ" для подтверждения');
+      setError(t('misc.fm_confirm_required'));
       return;
     }
 
@@ -133,12 +134,12 @@ const ForceMajeureModal = ({
       });
 
       const result = response.data;
-      setSuccess(`Отменено записей: ${result.cancelled || 0}, возвратов: ${result.refunds_created || 0}`);
+      setSuccess(t('misc.fm_cancel_success', { cancelled: result.cancelled || 0, refunds: result.refunds_created || 0 }));
       logger.log('[ForceMajeureModal] Cancel successful:', result);
       if (onSuccess) onSuccess('cancel', result);
     } catch (err) {
       logger.error('[ForceMajeureModal] Cancel error:', err);
-      setError(err.message || 'Ошибка сети');
+      setError(err.message || t('misc.fm_network_error'));
     } finally {
       setLoading(false);
     }
@@ -148,7 +149,7 @@ const ForceMajeureModal = ({
 
   const isConfirmValid = confirmText === 'ПОДТВЕРЖДАЮ';
   const isReasonValid = reason.trim().length >= 5;
-  const primaryActionLabel = loading ? 'Обработка...' : activeTab === 'transfer' ? 'Перенести' : 'Отменить и вернуть';
+  const primaryActionLabel = loading ? t('misc.fm_processing') : activeTab === 'transfer' ? t('misc.fm_transfer_button') : t('misc.fm_cancel_button');
   const primaryActionIcon = loading ? <Loader2 size={18} className="animate-spin" /> : activeTab === 'transfer' ? <ArrowRight size={18} /> : <XCircle size={18} />;
   const dialogSurfaceStyle = {
     backgroundColor: 'var(--mac-bg-primary)'
@@ -162,17 +163,17 @@ const ForceMajeureModal = ({
         </div>
         <div className="fmm-header-text">
           <h2 className="fmm-header-title">
-            Форс-мажор
+            {t('misc.fm_title')}
           </h2>
           <p className="fmm-header-subtitle">
-            {specialistName}
+            {specialistName || t('misc.fm_default_specialist')}
           </p>
         </div>
       </div>
       <button
         onClick={onClose}
         className="fmm-close-btn"
-        aria-label="Закрыть диалог">
+        aria-label={t('misc.fm_aria_close')}>
         <XCircle size={18} />
       </button>
     </div>
@@ -180,7 +181,7 @@ const ForceMajeureModal = ({
 
   const actions = [
     {
-      label: 'Отмена',
+      label: t('misc.fm_action_cancel'),
       variant: 'secondary',
       onClick: onClose,
       disabled: loading
@@ -198,7 +199,7 @@ const ForceMajeureModal = ({
     <ModernDialog
       isOpen={isOpen}
       onClose={onClose}
-      title="Форс-мажор"
+      title={t('misc.fm_title')}
       customHeader={header}
       actions={actions}
       maxWidth="40rem"
@@ -214,14 +215,14 @@ const ForceMajeureModal = ({
             onClick={() => setActiveTab('transfer')}
             className={`fmm-tab-btn fmm-tab-btn--transfer ${activeTab === 'transfer' ? 'fmm-tab-btn--active' : ''}`}>
             <Calendar size={18} />
-            Перенести на завтра
+            {t('misc.fm_tab_transfer')}
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('cancel')}
             className={`fmm-tab-btn fmm-tab-btn--cancel ${activeTab === 'cancel' ? 'fmm-tab-btn--active' : ''}`}>
             <DollarSign size={18} />
-            Отменить с возвратом
+            {t('misc.fm_tab_cancel')}
           </button>
         </div>
 
@@ -230,18 +231,18 @@ const ForceMajeureModal = ({
           <Users size={32} className="fmm-dry-run-icon" />
           <div className="fmm-dry-run-info">
             <p className="fmm-dry-run-count">
-              {dryRunResult.count} записей
+              {t('misc.fm_entries_count', { count: dryRunResult.count })}
             </p>
             <p className="fmm-dry-run-subtitle">
-              будут {activeTab === 'transfer' ? 'перенесены' : 'отменены'}
-              {dryRunResult.totalAmount > 0 && ` • ${dryRunResult.totalAmount.toLocaleString()} сум`}
+              {t('misc.fm_entries_action', { action: activeTab === 'transfer' ? t('misc.fm_transferred_word') : t('misc.fm_cancelled_word') })}
+              {dryRunResult.totalAmount > 0 && t('misc.fm_entries_amount', { amount: dryRunResult.totalAmount.toLocaleString() })}
             </p>
           </div>
           <button
             type="button"
             onClick={loadPendingEntries}
             className="fmm-refresh-btn"
-            aria-label="Обновить список">
+            aria-label={t('misc.fm_aria_refresh')}>
             <RefreshCw size={18} />
           </button>
         </div>
@@ -249,17 +250,17 @@ const ForceMajeureModal = ({
 
         <div>
           <label className="fmm-field-label">
-            Причина *
+            {t('misc.fm_reason_label')}
           </label>
           <textarea
             aria-label="Force majeure reason"
             value={reason}
             onChange={(e) => setReason(e.target.value)}
-            placeholder="Опишите причину форс-мажора..."
+            placeholder={t('misc.fm_reason_placeholder')}
             className={`fmm-textarea ${error ? 'fmm-textarea--error' : ''}`} />
           {!isReasonValid && reason.length > 0 &&
           <p className="fmm-error-text">
-            Минимум 5 символов
+            {t('misc.fm_reason_min')}
           </p>
           }
         </div>
@@ -267,7 +268,7 @@ const ForceMajeureModal = ({
         {activeTab === 'cancel' &&
         <div className="fmm-grid-gap-sm">
           <label className="fmm-field-label fmm-field-label--mb1">
-            Тип возврата
+            {t('misc.fm_refund_type_label')}
           </label>
           <div className="fmm-refund-grid">
             <label className={`fmm-refund-option ${refundType === 'deposit' ? 'fmm-refund-option--selected' : ''}`}>
@@ -283,8 +284,8 @@ const ForceMajeureModal = ({
                 {refundType === 'deposit' && <div className="fmm-refund-radio-dot" />}
               </div>
               <div>
-                <div className="fmm-refund-label">На депозит</div>
-                <div className="fmm-refund-label" style="font-size: var(--mac-font-size-xs); color: var(--mac-text-secondary);">Мгновенно на баланс</div>
+                <div className="fmm-refund-label">{t('misc.fm_refund_deposit')}</div>
+                <div className="fmm-refund-label" style="font-size: var(--mac-font-size-xs); color: var(--mac-text-secondary);">{t('misc.fm_refund_deposit_desc')}</div>
               </div>
             </label>
             <label className={`fmm-refund-option ${refundType === 'bank_transfer' ? 'fmm-refund-option--selected' : ''}`}>
@@ -300,8 +301,8 @@ const ForceMajeureModal = ({
                 {refundType === 'bank_transfer' && <div className="fmm-refund-radio-dot" />}
               </div>
               <div>
-                <div className="fmm-refund-label">На карту</div>
-                <div className="fmm-refund-label" style="font-size: var(--mac-font-size-xs); color: var(--mac-text-secondary);">Заявка на возврат</div>
+                <div className="fmm-refund-label">{t('misc.fm_refund_card')}</div>
+                <div className="fmm-refund-label" style="font-size: var(--mac-font-size-xs); color: var(--mac-text-secondary);">{t('misc.fm_refund_card_desc')}</div>
               </div>
             </label>
           </div>
@@ -310,10 +311,10 @@ const ForceMajeureModal = ({
 
         <div className="fmm-error-box" style="border-radius: 14px;">
           <p className="fmm-warning-text">
-            ⚠️ Это действие нельзя отменить!
+            {t('misc.fm_warning_irreversible')}
           </p>
           <label className="fmm-field-label" style="font-size: var(--mac-font-size-sm); color: var(--mac-error);">
-            Введите <strong>ПОДТВЕРЖДАЮ</strong> для продолжения:
+            {t('misc.fm_confirm_prefix')}<strong>ПОДТВЕРЖДАЮ</strong>{t('misc.fm_confirm_suffix')}
           </label>
           <Input
             type="text"
@@ -332,7 +333,7 @@ const ForceMajeureModal = ({
 
         {success &&
         <div className="fmm-success-box">
-          ✅ {success}
+          {t('misc.fm_success_prefix')} {success}
         </div>
         }
       </div>
