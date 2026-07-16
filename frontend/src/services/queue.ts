@@ -9,7 +9,14 @@ function getAuthToken() {
   return tokenManager.getAccessToken() || '';
 }
 
-async function apiRequest(path, options = {}) {
+interface QueueRequestOptions {
+  absolute?: boolean;
+  headers?: Record<string, string>;
+  method?: string;
+  body?: unknown;
+}
+
+async function apiRequest<T = unknown>(path: string, options: QueueRequestOptions = {}): Promise<T> {
   const base = options.absolute ? '' : getApiOrigin();
   const token = getAuthToken();
 
@@ -59,7 +66,7 @@ async function apiRequest(path, options = {}) {
 }
 
 // Глобальное уведомление об обновлении очереди
-function notifyQueueUpdate(specialty, action = 'update') {
+function notifyQueueUpdate(specialty: string, action: string = 'update'): void {
   logger.log('[queueService] notifyQueueUpdate:', { specialty, action });
   // Отправляем CustomEvent для синхронизации всех компонентов
   const event = new CustomEvent('queueUpdated', {
@@ -68,7 +75,7 @@ function notifyQueueUpdate(specialty, action = 'update') {
   window.dispatchEvent(event);
 }
 
-function hasBackendQueueAction(entry, action, flagName) {
+function hasBackendQueueAction(entry: Record<string, unknown> | null, action: string, flagName: string): boolean {
   if (!entry) return false;
   if (Array.isArray(entry.available_actions)) {
     return entry.available_actions.includes(action);
@@ -79,7 +86,7 @@ function hasBackendQueueAction(entry, action, flagName) {
   return false;
 }
 
-function selectNextCallEntry(queue) {
+function selectNextCallEntry(queue: Record<string, unknown> | null | undefined): Record<string, unknown> | null {
   const entries = Array.isArray(queue?.entries) ? queue.entries : [];
   const backendEntryId = queue?.next_call_entry_id;
 
@@ -126,7 +133,7 @@ export const queueService = {
 
   // Вызвать следующего ожидающего пациента по специальности
   callNextWaiting: async (specialty) => {
-    const queue = await apiRequest(`/doctor/${encodeURIComponent(specialty)}/queue/today`);
+    const queue = await apiRequest<{ entries?: Array<Record<string, unknown>>; next_call_entry_id?: unknown }>(`/doctor/${encodeURIComponent(specialty)}/queue/today`);
     if (!queue?.entries?.length) return { success: false, message: 'Очередь пуста' };
     const nextEntry = selectNextCallEntry(queue);
     if (!nextEntry?.id) return { success: false, message: 'Нет ожидающих пациентов' };
