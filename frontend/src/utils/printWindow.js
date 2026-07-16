@@ -44,12 +44,19 @@ export const finalizePrintableWindow = (printWindow, html, logger) => {
   return true;
 };
 
+interface OpenPrintableWindowOptions {
+  html: string;
+  features?: string;
+  logger?: unknown;
+  onOpenFailure?: () => void;
+}
+
 export const openPrintableWindow = ({
   html,
   features = 'width=900,height=700',
   logger,
-  onOpenFailure
-}) => {
+  onOpenFailure,
+}: OpenPrintableWindowOptions): boolean => {
   const printWindow = window.open('', '_blank', features);
 
   if (!printWindow) {
