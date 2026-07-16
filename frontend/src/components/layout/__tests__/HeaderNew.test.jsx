@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { ThemeProvider } from '../../../contexts/ThemeContext.jsx';
 import { MacOSThemeProvider } from '../../../theme/macosTheme.jsx';
-import { TranslationProvider } from '../../../hooks/useTranslation.jsx';  // PR-50
+import { TranslationProvider } from '../../../i18n/useTranslation';  // PR-50
 import HeaderNew, { isThemeMenuInteraction } from '../HeaderNew.jsx';
 
 const authState = {

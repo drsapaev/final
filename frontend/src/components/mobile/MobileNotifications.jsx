@@ -11,6 +11,7 @@ import { notify } from '../../services/notify.js';
  * Компонент для управления мобильными уведомлениями
  */
 const MobileNotifications = () => {
+  const { t } = useTranslation();
   const [notifications, setNotifications] = useState([]);
   const [permission, setPermission] = useState('default');
   const [loading, setLoading] = useState(false);

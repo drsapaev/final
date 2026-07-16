@@ -142,8 +142,8 @@ export function TreatmentSection({
           disabled={disabled || myExpLoading}
           className="btn btn-my-experience"
           title={hasMyExperience ?
-          t('misc.ts_moy_opyt_icd10code') по ${icd10Code}` : ''}` :
-          t('misc.ts_net_sohranyonnyh_shablonov')
+            t('misc.ts_moy_opyt_icd10code', { code: icd10Code }) :
+            t('misc.ts_net_sohranyonnyh_shablonov')
           }
           style={{
             display: 'inline-flex',

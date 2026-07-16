@@ -62,16 +62,6 @@ const ModernTabs = ({
   const [loading, setLoading] = useState(true);
   const tabsRef = useRef(null);
 
-  // Переводы
-  const t = {
-    ru: {
-      today: t('misc.mt_segodnya'),
-      queue: t('misc.mt_v_ocheredi'),
-      pending: t('misc.mt_ozhidayut'),
-      all: t('misc.mt_vse_otdeleniya')
-    }
-  }[language] || {};
-
   // ⭐ SSOT: Загрузка профилей очередей (вкладок) из БД через API
   // Tabs определяются в backend, frontend только отображает
   const loadQueueProfiles = useCallback(async () => {

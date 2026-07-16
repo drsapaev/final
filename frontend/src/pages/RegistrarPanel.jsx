@@ -269,6 +269,8 @@ const RegistrarPanel = () => {
   // subscribes to languageChanged events and triggers a re-render, so
   // i18n.language is always current when this component renders.
   const { t: tI18n, language } = useTranslation();
+  // Normalize language for legacy components that expect 'uz' not 'uz-Latn'
+  const legacyLanguage = language?.startsWith('uz') ? 'uz' : language?.split('-')[0] || 'ru';
   // Backward-compat wrapper: WelcomeView and QueueView receive `t` as a prop
   // and call t('key') for registrarPanel.* flat keys. Wrap tI18n to accept
   // flat keys and route them to the registrarPanel namespace.
@@ -1461,7 +1463,7 @@ const RegistrarPanel = () => {
           onProfilesLoaded={setQueueProfiles} // ⭐ SSOT: Store profiles for filtering
           departmentStats={departmentStats}
           theme={theme}
-          language={language}
+          language={legacyLanguage}
           dynamicDepartments={dynamicDepartments} />
 
         </div>
@@ -1475,7 +1477,7 @@ const RegistrarPanel = () => {
         {currentView === 'welcome' && (
           <WelcomeView
             t={t}
-            language={language}
+            language={legacyLanguage}
             theme={theme}
             textColor={textColor}
             appointments={appointments}
@@ -1527,7 +1529,7 @@ const RegistrarPanel = () => {
             getSpacing={getSpacing}
             getFontSize={getFontSize}
             getColor={getColor}
-            language={language}
+            language={legacyLanguage}
             theme={theme}
             doctors={doctors}
           />
@@ -1636,7 +1638,7 @@ const RegistrarPanel = () => {
               data={filteredAppointments}
               loading={appointmentsLoading}
               theme={theme}
-              language={language}
+              language={legacyLanguage}
               outerBorder={false}
               services={services}
               showCheckboxes={false} // UX Audit R-4.7: bulk-action UI удалён (QW-01 fix),

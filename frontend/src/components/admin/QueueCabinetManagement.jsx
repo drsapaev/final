@@ -30,8 +30,7 @@ const INITIAL_FILTERS = {
   cabinetNumber: '',
 };
 
-const formatDate = (value) => {
-  const { t } = useTranslation();
+const formatDate = (value, t) => {
   if (!value) return '—';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
@@ -181,7 +180,7 @@ const QueueCabinetManagement = () => {
         return {
           day: (
             <span className="admin-primary-fs-sm">
-              {formatDate(queue.day)}
+              {formatDate(queue.day, t)}
             </span>
           ),
           specialist_name: (

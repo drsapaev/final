@@ -466,7 +466,7 @@ const CartStepV2 = ({
                         <option value="">{t('misc.csv_vyberite_vracha')}</option>
                         {doctorOptions.map((doctor, index) =>
                     <option key={`${doctor.id ?? 'doctor'}-${doctor.specialty ?? ''}-${index}`} value={doctor.id}>
-                            {getDoctorDisplayName(doctor)}{doctor.specialty ? ` · ${doctor.specialty}` : 't('misc.csv_doctor_cabinet_kab_doctor_ca')'}
+                            {getDoctorDisplayName(doctor)}{doctor.specialty ? ` · ${doctor.specialty}` : t('misc.csv_doctor_cabinet_kab_doctor_ca')}
                           </option>)}
                       </select>
                       {filteredDoctors.length === 0 && normalizedDoctorsData.length > 0 && (

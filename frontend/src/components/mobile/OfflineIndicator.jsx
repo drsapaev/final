@@ -9,6 +9,7 @@ import { notify } from '../../services/notify.js';
  * Индикатор офлайн/онлайн статуса для мобильных устройств
  */
 const OfflineIndicator = () => {
+  const { t } = useTranslation();
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [showIndicator, setShowIndicator] = useState(false);
   const [syncStatus, setSyncStatus] = useState('idle'); // idle, syncing, success, error

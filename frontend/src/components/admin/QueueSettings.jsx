@@ -53,7 +53,6 @@ const TIMEZONE_OPTIONS = [
 ];
 
 const normalizeNumber = (value, fallback) => {
-  const { t } = useTranslation();
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
 };

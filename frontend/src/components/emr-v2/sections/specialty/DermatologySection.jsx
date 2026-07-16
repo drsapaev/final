@@ -116,6 +116,7 @@ export function DermatologySection({
     }
   }, [handlePhotoUpload]);
   const handleActivationKeyDown = (event, action) => {
+    const { t } = useTranslation();
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       action();

@@ -9,6 +9,7 @@ const ModalContext = createContext();
 let openModalExternal = null;
 
 const getFontSize = (size) => {
+  const { t } = useTranslation();
   const sizes = {
     sm: '0.875rem',
     md: '1rem',

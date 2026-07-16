@@ -3,8 +3,8 @@ import { useState } from 'react';
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
 import { Input } from '../ui/macos';
-import {
 import { useTranslation } from '../../i18n/useTranslation';
+import {
   Key,
   Shield,
   CheckCircle,

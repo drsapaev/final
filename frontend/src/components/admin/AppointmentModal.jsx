@@ -23,7 +23,6 @@ const AppointmentModal = ({
   patients = []
 }) => {
   const { t } = useTranslation();
-  const { t } = useTranslation();
   const [formData, setFormData] = useState({
     patientId: '',
     doctorId: '',

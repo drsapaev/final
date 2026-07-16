@@ -91,6 +91,7 @@ export function ConfirmDialog({
   const isConfirmDisabled = requireText !== null && typedText !== requireText;
 
   const handleConfirm = () => {
+    const { t } = useTranslation();
     onConfirm?.();
     onClose?.();
   };

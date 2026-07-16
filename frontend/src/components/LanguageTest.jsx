@@ -1,4 +1,4 @@
-import { useTranslation } from '../hooks/useTranslation';
+import { useTranslation } from '../i18n/useTranslation';
 import { useTheme } from '../contexts/ThemeContext';
 import {
   Select, Button,

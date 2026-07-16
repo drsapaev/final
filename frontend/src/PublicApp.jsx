@@ -1,7 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { ThemeProvider } from './contexts/ThemeContext';
-import { TranslationProvider } from './hooks/useTranslation';
+import { TranslationProvider } from './i18n/useTranslation';
 import { MacOSThemeProvider } from './theme/macosTheme.jsx';
 import Landing from './pages/Landing.jsx';
 import Login from './pages/Login.jsx';

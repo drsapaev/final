@@ -3,7 +3,7 @@
  * Компактный переключатель языка для хедера
  */
 import { useState, useRef, useEffect } from 'react';
-import { useTranslation } from '../hooks/useTranslation';
+import { useTranslation } from '../i18n/useTranslation';
 import {
   Button, Icon,
 } from './ui/macos';
