@@ -8,10 +8,6 @@
  * localStorage persists across browser sessions (until manually cleared) —
  * a stolen device or shared computer exposes tokens indefinitely.
  * sessionStorage is cleared when the tab closes, limiting the exposure window.
- *
- * Full httpOnly cookie migration requires backend coordination (Set-Cookie
- * with SameSite=Strict + credentials: 'include' on axios). This is a
- * partial mitigation until that work is done.
  */
 import logger from './logger';
 
@@ -19,15 +15,17 @@ const TOKEN_KEY = 'auth_token';
 const REFRESH_TOKEN_KEY = 'refresh_token';
 const USER_KEY = 'user';
 
+interface JwtPayload {
+  exp?: number;
+  [key: string]: unknown;
+}
+
 /**
  * Менеджер токенов
  */
 export const tokenManager = {
-  /**
-   * Получить access token
-   * @returns {string|null} Access token или null
-   */
-  getAccessToken() {
+  /** Получить access token */
+  getAccessToken(): string | null {
     try {
       // PR-39 / P0-2: sessionStorage instead of localStorage
       const t = sessionStorage.getItem(TOKEN_KEY);
@@ -38,16 +36,16 @@ export const tokenManager = {
     }
   },
 
-  /**
-   * Установить access token
-   * @param {string} token - Access token
-   */
-  setAccessToken(token) {
+  /** Установить access token */
+  setAccessToken(token: string | null | undefined): void {
     try {
       if (token) {
         const trimmed = typeof token === 'string' ? token.trim() : token;
-        if (trimmed) sessionStorage.setItem(TOKEN_KEY, trimmed);else
-        sessionStorage.removeItem(TOKEN_KEY);
+        if (trimmed) {
+          sessionStorage.setItem(TOKEN_KEY, String(trimmed));
+        } else {
+          sessionStorage.removeItem(TOKEN_KEY);
+        }
       } else {
         sessionStorage.removeItem(TOKEN_KEY);
       }
@@ -56,13 +54,9 @@ export const tokenManager = {
     }
   },
 
-  /**
-   * Получить refresh token
-   * @returns {string|null} Refresh token или null
-   */
-  getRefreshToken() {
+  /** Получить refresh token */
+  getRefreshToken(): string | null {
     try {
-      // PR-39 / P0-2: sessionStorage instead of localStorage
       return sessionStorage.getItem(REFRESH_TOKEN_KEY);
     } catch (error) {
       logger.error('Error reading refresh token:', error);
@@ -70,14 +64,10 @@ export const tokenManager = {
     }
   },
 
-  /**
-   * Установить refresh token
-   * @param {string} token - Refresh token
-   */
-  setRefreshToken(token) {
+  /** Установить refresh token */
+  setRefreshToken(token: string | null | undefined): void {
     try {
       if (token) {
-        // PR-39 / P0-2: sessionStorage instead of localStorage
         sessionStorage.setItem(REFRESH_TOKEN_KEY, token);
       } else {
         sessionStorage.removeItem(REFRESH_TOKEN_KEY);
@@ -87,29 +77,24 @@ export const tokenManager = {
     }
   },
 
-  /**
-   * Получить данные пользователя
-   * @returns {object|null} User data или null
-   */
-  getUserData() {
+  /** Получить данные пользователя */
+  getUserData(): Record<string, unknown> | null {
     try {
-      // PR-39 / P0-2: sessionStorage instead of localStorage (user data may contain role/permissions)
       const data = sessionStorage.getItem(USER_KEY);
-      return data ? JSON.parse(data) : null;
+      if (!data) return null;
+      // JSON.parse result is unknown — narrow to object or null.
+      const parsed: unknown = JSON.parse(data);
+      return parsed && typeof parsed === 'object' ? parsed as Record<string, unknown> : null;
     } catch (error) {
       logger.error('Error reading user data:', error);
       return null;
     }
   },
 
-  /**
-   * Установить данные пользователя
-   * @param {object} userData - User data object
-   */
-  setUserData(userData) {
+  /** Установить данные пользователя */
+  setUserData(userData: Record<string, unknown> | null | undefined): void {
     try {
       if (userData) {
-        // PR-39 / P0-2: sessionStorage instead of localStorage
         sessionStorage.setItem(USER_KEY, JSON.stringify(userData));
       } else {
         sessionStorage.removeItem(USER_KEY);
@@ -119,12 +104,9 @@ export const tokenManager = {
     }
   },
 
-  /**
-   * Очистить все токены и данные пользователя
-   */
-  clearAll() {
+  /** Очистить все токены и данные пользователя */
+  clearAll(): void {
     try {
-      // PR-39 / P0-2: sessionStorage instead of localStorage
       sessionStorage.removeItem(TOKEN_KEY);
       sessionStorage.removeItem(REFRESH_TOKEN_KEY);
       sessionStorage.removeItem(USER_KEY);
@@ -133,19 +115,17 @@ export const tokenManager = {
     }
   },
 
-  /**
-   * Проверить наличие access token
-   * @returns {boolean} true если токен существует
-   */
-  hasToken() {
+  /** Проверить наличие access token */
+  hasToken(): boolean {
     return !!this.getAccessToken();
   },
 
   /**
-   * Проверить валидность токена (базовая проверка)
-   * @returns {boolean} true если токен выглядит валидным
+   * Проверить валидность токена (базовая проверка).
+   * JWT format check + exp claim check. Non-JWT tokens are treated as valid
+   * (the backend will reject them on the next /me call).
    */
-  isTokenValid() {
+  isTokenValid(): boolean {
     const token = this.getAccessToken();
     if (!token) return false;
 
@@ -155,24 +135,24 @@ export const tokenManager = {
 
     try {
       // Проверка срока действия (если это JWT)
-      const payload = JSON.parse(atob(parts[1]));
+      // atob returns string; JSON.parse returns unknown.
+      const payload: JwtPayload = JSON.parse(atob(parts[1])) as JwtPayload;
       if (payload.exp) {
-        const expirationTime = payload.exp * 1000; // Convert to milliseconds
+        const expirationTime = payload.exp * 1000;
         return Date.now() < expirationTime;
       }
-      return true; // Если нет exp, считаем валидным
+      return true;
     } catch {
-      // Не JWT или ошибка парсинга - считаем валидным
+      // Не JWT или ошибка парсинга — считаем валидным
       return true;
     }
-  }
+  },
 };
 
-// Экспорт констант для использования в тестах
 export const TOKEN_KEYS = {
   TOKEN_KEY,
   REFRESH_TOKEN_KEY,
-  USER_KEY
-};
+  USER_KEY,
+} as const;
 
 export default tokenManager;

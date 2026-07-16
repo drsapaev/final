@@ -14,7 +14,7 @@ import { describe, expect, it } from 'vitest';
 
 const ROOT = path.resolve(process.cwd());
 const CLIENT_JS = path.join(ROOT, 'src/api/client.js');
-const TOKEN_MANAGER = path.join(ROOT, 'src/utils/tokenManager.js');
+const TOKEN_MANAGER = path.join(ROOT, 'src/utils/tokenManager.ts');
 const NGINX_PROD = path.join(ROOT, 'docker/nginx.conf');
 
 // ---------- 1. Medium-11: CSRF bootstrap enabled by default ----------
