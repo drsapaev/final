@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 /**
  * Photo Uploader Component
  * Загрузка фото до/после с поддержкой HEIC
@@ -42,6 +42,7 @@ import notify from '../../services/notify';
 import { convertHEICToJPEG, isHEICFile } from '../../utils/heicConverter';
 import PropTypes from 'prop-types';
 const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
+  const { t } = useTranslation();
   const [photos, setPhotos] = useState({
     before: [],
     after: []
@@ -266,52 +267,52 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
       <Card style={{ marginBottom: 16 }}>
         <CardContent>
           <Typography variant="h6" gutterBottom>
-            Параметры съемки
+            {t('derma.derma_photo_shoot_params')}
           </Typography>
           
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
             <div>
               <Input
-                label="Зона"
+                label={t('derma.derma_photo_zone')}
                 value={metadata.zone}
                 onChange={(e) => setMetadata({ ...metadata, zone: e.target.value })}
-                placeholder="Лицо, спина, руки..." />
+                placeholder={t('derma.derma_photo_ph_zone')} />
               
             </div>
             
             <div>
               <Select
-                label="Ракурс"
+                label={t('derma.derma_photo_angle')}
                 value={metadata.angle}
                 onChange={(e) => setMetadata({ ...metadata, angle: e.target.value })}>
                 
-                <Option value="front">Спереди</Option>
-                <Option value="side">Сбоку</Option>
-                <Option value="back">Сзади</Option>
-                <Option value="close">Крупный план</Option>
+                <Option value="front">{t('derma.derma_photo_angle_front')}</Option>
+                <Option value="side">{t('derma.derma_photo_angle_side')}</Option>
+                <Option value="back">{t('derma.derma_photo_angle_back')}</Option>
+                <Option value="close">{t('derma.derma_photo_angle_close')}</Option>
               </Select>
             </div>
             
             <div>
               <Select
-                label="Освещение"
+                label={t('derma.derma_photo_lighting')}
                 value={metadata.lighting}
                 onChange={(e) => setMetadata({ ...metadata, lighting: e.target.value })}>
                 
-                <Option value="natural">Естественное</Option>
-                <Option value="artificial">Искусственное</Option>
-                <Option value="mixed">Смешанное</Option>
+                <Option value="natural">{t('derma.derma_photo_lighting_natural')}</Option>
+                <Option value="artificial">{t('derma.derma_photo_lighting_artificial')}</Option>
+                <Option value="mixed">{t('derma.derma_photo_lighting_mixed')}</Option>
               </Select>
             </div>
             
             <div>
               <Select
-                label="Вспышка"
+                label={t('derma.derma_photo_flash')}
                 value={metadata.flash ? 'yes' : 'no'}
                 onChange={(e) => setMetadata({ ...metadata, flash: e.target.value === 'yes' })}>
                 
-                <Option value="no">Без вспышки</Option>
-                <Option value="yes">Со вспышкой</Option>
+                <Option value="no">{t('derma.derma_photo_flash_no')}</Option>
+                <Option value="yes">{t('derma.derma_photo_flash_yes')}</Option>
               </Select>
             </div>
           </div>
@@ -324,7 +325,7 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
           <CardContent>
             <Typography variant="h6" gutterBottom>
               <Camera style={{ marginRight: 8, verticalAlign: 'middle' }} />
-              Фото ДО процедуры
+              {t('derma.derma_photo_before_title')}
             </Typography>
             
             <div
@@ -345,11 +346,11 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
               <Upload style={{ width: 48, height: 48, color: 'var(--mac-text-secondary)', marginBottom: 8 }} />
               <Typography variant="body1" color="textSecondary">
                 {isBeforeDragActive ?
-                'Отпустите файлы здесь...' :
-                'Перетащите фото или нажмите для выбора'}
+                t('derma.derma_photo_drop_here') :
+                t('derma.derma_photo_drag_or_click')}
               </Typography>
               <Typography variant="caption" color="textSecondary">
-                JPG, PNG, HEIC до 10MB
+                {t('derma.derma_photo_formats_hint')}
               </Typography>
             </div>
             
@@ -363,7 +364,7 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
               }}>
               
               <CameraIcon style={{ width: 16, height: 16, marginRight: 8 }} />
-              Сделать фото
+              {t('derma.derma_photo_take_photo')}
             </Button>
               
             {/* Превью фото ДО */}
@@ -375,7 +376,7 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
                   src={photo.preview}
                   alt="Before"
                   role="button"
-                  aria-label="Открыть фото до процедуры"
+                  aria-label={t('derma.derma_photo_open_before_aria')}
                   tabIndex={0}
                   style={{
                     width: '100%',
@@ -402,7 +403,7 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
                 }}>
                       <button
                     onClick={() => deletePhoto(photo.id, 'before')}
-                    aria-label="Удалить фото до процедуры"
+                    aria-label={t('derma.derma_photo_delete_before_aria')}
                     style={{ color: 'white', background: 'none', border: 'none', cursor: 'pointer' }}>
                     
                         <Trash2 style={{ width: 16, height: 16 }} />
@@ -419,7 +420,7 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
                   fontSize: 'var(--mac-font-size-xs)',
                   borderRadius: '0 0 8px 8px'
                 }}>
-                      {photo.metadata.zone || 'Без зоны'}
+                      {photo.metadata.zone || t('derma.derma_photo_no_zone')}
                     </div>
                   </div>
               )}
@@ -433,7 +434,7 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
           <CardContent>
             <Typography variant="h6" gutterBottom>
               <Camera style={{ marginRight: 8, verticalAlign: 'middle' }} />
-              Фото ПОСЛЕ процедуры
+              {t('derma.derma_photo_after_title')}
             </Typography>
             
             <div
@@ -454,11 +455,11 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
               <Upload style={{ width: 48, height: 48, color: 'var(--mac-text-secondary)', marginBottom: 8 }} />
               <Typography variant="body1" color="textSecondary">
                 {isAfterDragActive ?
-                'Отпустите файлы здесь...' :
-                'Перетащите фото или нажмите для выбора'}
+                t('derma.derma_photo_drop_here') :
+                t('derma.derma_photo_drag_or_click')}
               </Typography>
               <Typography variant="caption" color="textSecondary">
-                JPG, PNG, HEIC до 10MB
+                {t('derma.derma_photo_formats_hint')}
               </Typography>
             </div>
             
@@ -472,7 +473,7 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
               }}>
               
               <CameraIcon style={{ width: 16, height: 16, marginRight: 8 }} />
-              Сделать фото
+              {t('derma.derma_photo_take_photo')}
             </Button>
             
             {/* Превью фото ПОСЛЕ */}
@@ -484,7 +485,7 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
                   src={photo.preview}
                   alt="After"
                   role="button"
-                  aria-label="Открыть фото после процедуры"
+                  aria-label={t('derma.derma_photo_open_after_aria')}
                   tabIndex={0}
                   style={{
                     width: '100%',
@@ -511,7 +512,7 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
                 }}>
                       <button
                     onClick={() => deletePhoto(photo.id, 'after')}
-                    aria-label="Удалить фото после процедуры"
+                    aria-label={t('derma.derma_photo_delete_after_aria')}
                     style={{ color: 'white', background: 'none', border: 'none', cursor: 'pointer' }}>
                     
                         <Trash2 style={{ width: 16, height: 16 }} />
@@ -528,7 +529,7 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
                   fontSize: 'var(--mac-font-size-xs)',
                   borderRadius: '0 0 8px 8px'
                 }}>
-                      {photo.metadata.zone || 'Без зоны'}
+                      {photo.metadata.zone || t('derma.derma_photo_no_zone')}
                     </div>
                   </div>
               )}
@@ -547,7 +548,7 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
           onClick={openCompareMode}>
           
             <ArrowLeftRight style={{ width: 16, height: 16, marginRight: 8 }} />
-            Сравнить ДО и ПОСЛЕ
+            {t('derma.derma_photo_compare_button')}
           </Button>
         </div>
       }
@@ -557,7 +558,7 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
       <div style={{ marginTop: 16 }}>
           <Progress variant="determinate" value={uploadProgress} />
           <Typography variant="caption" color="textSecondary" style={{ textAlign: 'center', display: 'block', marginTop: 8 }}>
-            Загрузка: {uploadProgress}%
+            {t('derma.derma_photo_upload_progress', { progress: uploadProgress })}
           </Typography>
         </div>
       }
@@ -565,7 +566,7 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
       {/* Конвертация HEIC */}
       {converting &&
       <Alert severity="info" style={{ marginTop: 16 }}>
-          Конвертация HEIC в JPEG...
+          {t('derma.derma_photo_heic_converting')}
         </Alert>
       }
 
@@ -577,7 +578,7 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
         fullWidth>
         
         <DialogTitle>
-          {compareMode ? 'Сравнение ДО и ПОСЛЕ' : selectedPhoto?.type === 'before' ? 'Фото ДО' : 'Фото ПОСЛЕ'}
+          {compareMode ? t('derma.derma_photo_compare_title') : selectedPhoto?.type === 'before' ? t('derma.derma_photo_before_short') : t('derma.derma_photo_after_short')}
         </DialogTitle>
         
         <DialogContent>
@@ -585,7 +586,7 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
               <div>
                 <Typography variant="h6" style={{ textAlign: 'center', marginBottom: 16 }}>
-                  ДО
+                  {t('derma.derma_photo_before_label')}
                 </Typography>
                 {photos.before[0] &&
               <img
@@ -597,7 +598,7 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
               </div>
               <div>
                 <Typography variant="h6" style={{ textAlign: 'center', marginBottom: 16 }}>
-                  ПОСЛЕ
+                  {t('derma.derma_photo_after_label')}
                 </Typography>
                 {photos.after[0] &&
               <img
@@ -619,20 +620,20 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
               {selectedPhoto.metadata &&
             <div style={{ marginTop: 16 }}>
                   <Typography variant="subtitle2" gutterBottom>
-                    Параметры съемки:
+                    {t('derma.derma_photo_shoot_params_colon')}
                   </Typography>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8 }}>
                     <div style={{ padding: 8, backgroundColor: 'var(--mac-bg-secondary)', borderRadius: 4 }}>
-                      Зона: {selectedPhoto.metadata.zone || 'Не указана'}
+                      {t('derma.derma_photo_zone_inline')} {selectedPhoto.metadata.zone || t('derma.derma_photo_zone_unspecified')}
                     </div>
                     <div style={{ padding: 8, backgroundColor: 'var(--mac-bg-secondary)', borderRadius: 4 }}>
-                      Ракурс: {selectedPhoto.metadata.angle}
+                      {t('derma.derma_photo_angle_inline')} {selectedPhoto.metadata.angle}
                     </div>
                     <div style={{ padding: 8, backgroundColor: 'var(--mac-bg-secondary)', borderRadius: 4 }}>
-                      Освещение: {selectedPhoto.metadata.lighting}
+                      {t('derma.derma_photo_lighting_inline')} {selectedPhoto.metadata.lighting}
                     </div>
                     <div style={{ padding: 8, backgroundColor: 'var(--mac-bg-secondary)', borderRadius: 4 }}>
-                      {selectedPhoto.metadata.flash ? 'Со вспышкой' : 'Без вспышки'}
+                      {selectedPhoto.metadata.flash ? t('derma.derma_photo_flash_yes') : t('derma.derma_photo_flash_no')}
                     </div>
                   </div>
                 </div>
@@ -643,7 +644,7 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
         
         <DialogActions>
           <Button onClick={() => setViewerOpen(false)}>
-            Закрыть
+            {t('derma.derma_photo_close')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -656,24 +657,24 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
         fullWidth>
         
         <DialogTitle>
-          Сделать фото {cameraType === 'before' ? 'ДО' : 'ПОСЛЕ'}
+          {t('derma.derma_photo_camera_title', { type: cameraType === 'before' ? t('derma.derma_photo_before_label') : t('derma.derma_photo_after_label') })}
         </DialogTitle>
         
         <DialogContent>
           <div style={{ position: 'relative', width: '100%', height: '400px', backgroundColor: 'black', borderRadius: 8 }}>
             {/* Здесь должен быть компонент Webcam */}
             <Typography color="white" style={{ textAlign: 'center', paddingTop: 160 }}>
-              Камера (требуется react-webcam)
+              {t('derma.derma_photo_camera_placeholder')}
             </Typography>
           </div>
         </DialogContent>
         
         <DialogActions>
           <Button onClick={() => setCameraOpen(false)}>
-            Отмена
+            {t('derma.derma_photo_cancel')}
           </Button>
           <Button variant="primary" onClick={capturePhoto}>
-            Сделать снимок
+            {t('derma.derma_photo_capture')}
           </Button>
         </DialogActions>
       </Dialog>

@@ -43,7 +43,7 @@ import {
 
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 const ProcedureTemplates = ({ onSelectProcedure }) => {
   const { t } = useTranslation();
   const [templates, setTemplates] = useState([]);
@@ -67,97 +67,97 @@ const ProcedureTemplates = ({ onSelectProcedure }) => {
 
   // Категории процедур
   const categories = [
-  { id: 'all', name: 'Все процедуры', icon: <Hospital /> },
-  { id: 'injection', name: 'Инъекционные', icon: <Sparkles /> },
-  { id: 'hardware', name: 'Аппаратные', icon: <Sparkles /> },
-  { id: 'peeling', name: 'Пилинги', icon: <Sparkles /> },
-  { id: 'care', name: 'Уходовые', icon: <Sparkles /> }];
+  { id: 'all', name: t('derma.derma_proc_category_all'), icon: <Hospital /> },
+  { id: 'injection', name: t('derma.derma_proc_category_injection'), icon: <Sparkles /> },
+  { id: 'hardware', name: t('derma.derma_proc_category_hardware'), icon: <Sparkles /> },
+  { id: 'peeling', name: t('derma.derma_proc_category_peeling'), icon: <Sparkles /> },
+  { id: 'care', name: t('derma.derma_proc_category_care'), icon: <Sparkles /> }];
 
 
   // Предустановленные шаблоны
   const defaultTemplates = [
   {
     id: 'botox-forehead',
-    name: 'Ботулотоксин - лоб',
+    name: t('derma.derma_proc_tpl_botox_forehead_name'),
     category: 'injection',
-    description: 'Коррекция морщин лба',
+    description: t('derma.derma_proc_tpl_botox_forehead_desc'),
     duration: 30,
     price: 150000,
     materials: [
-    { name: 'Ботулотоксин', unit: '50 ед.', quantity: 1 },
-    { name: 'Шприц 1мл', unit: 'шт.', quantity: 2 },
-    { name: 'Игла 30G', unit: 'шт.', quantity: 2 }],
+    { name: t('derma.derma_proc_tpl_botox_forehead_mat_botulinum'), unit: t('derma.derma_proc_unit_50u'), quantity: 1 },
+    { name: t('derma.derma_proc_tpl_botox_forehead_mat_syringe_1ml'), unit: t('derma.derma_proc_unit_pc'), quantity: 2 },
+    { name: t('derma.derma_proc_tpl_botox_forehead_mat_needle_30g'), unit: t('derma.derma_proc_unit_pc'), quantity: 2 }],
 
     steps: [
-    'Демакияж и обработка антисептиком',
-    'Разметка точек инъекций',
-    'Введение препарата в мышцы лба',
-    'Легкий массаж',
-    'Нанесение успокаивающего крема'],
+    t('derma.derma_proc_tpl_botox_forehead_step_1'),
+    t('derma.derma_proc_tpl_botox_forehead_step_2'),
+    t('derma.derma_proc_tpl_botox_forehead_step_3'),
+    t('derma.derma_proc_tpl_botox_forehead_step_4'),
+    t('derma.derma_proc_tpl_botox_forehead_step_5')],
 
     contraindications: [
-    'Беременность и лактация',
-    'Миастения',
-    'Прием антибиотиков',
-    'Воспаления в зоне инъекций'],
+    t('derma.derma_proc_tpl_botox_forehead_contra_1'),
+    t('derma.derma_proc_tpl_botox_forehead_contra_2'),
+    t('derma.derma_proc_tpl_botox_forehead_contra_3'),
+    t('derma.derma_proc_tpl_botox_forehead_contra_4')],
 
-    aftercare: 'Не трогать зону инъекций 4 часа, не наклоняться, не заниматься спортом 24 часа'
+    aftercare: t('derma.derma_proc_tpl_botox_forehead_aftercare')
   },
   {
     id: 'mesotherapy-face',
-    name: 'Мезотерапия лица',
+    name: t('derma.derma_proc_tpl_meso_face_name'),
     category: 'injection',
-    description: 'Биоревитализация кожи лица',
+    description: t('derma.derma_proc_tpl_meso_face_desc'),
     duration: 45,
     price: 200000,
     materials: [
-    { name: 'Препарат для мезотерапии', unit: '2мл', quantity: 1 },
-    { name: 'Шприц 2мл', unit: 'шт.', quantity: 1 },
-    { name: 'Игла 32G', unit: 'шт.', quantity: 5 },
-    { name: 'Анестетик', unit: 'мл', quantity: 5 }],
+    { name: t('derma.derma_proc_tpl_meso_face_mat_drug'), unit: t('derma.derma_proc_unit_2ml'), quantity: 1 },
+    { name: t('derma.derma_proc_tpl_meso_face_mat_syringe_2ml'), unit: t('derma.derma_proc_unit_pc'), quantity: 1 },
+    { name: t('derma.derma_proc_tpl_meso_face_mat_needle_32g'), unit: t('derma.derma_proc_unit_pc'), quantity: 5 },
+    { name: t('derma.derma_proc_tpl_meso_face_mat_anesthetic'), unit: t('derma.derma_proc_unit_ml'), quantity: 5 }],
 
     steps: [
-    'Очищение кожи',
-    'Нанесение анестетика на 20 минут',
-    'Обработка антисептиком',
-    'Инъекции по схеме',
-    'Нанесение маски'],
+    t('derma.derma_proc_tpl_meso_face_step_1'),
+    t('derma.derma_proc_tpl_meso_face_step_2'),
+    t('derma.derma_proc_tpl_meso_face_step_3'),
+    t('derma.derma_proc_tpl_meso_face_step_4'),
+    t('derma.derma_proc_tpl_meso_face_step_5')],
 
     contraindications: [
-    'Аллергия на компоненты',
-    'Герпес в активной фазе',
-    'Онкология',
-    'Аутоиммунные заболевания'],
+    t('derma.derma_proc_tpl_meso_face_contra_1'),
+    t('derma.derma_proc_tpl_meso_face_contra_2'),
+    t('derma.derma_proc_tpl_meso_face_contra_3'),
+    t('derma.derma_proc_tpl_meso_face_contra_4')],
 
-    aftercare: 'Избегать солнца 3 дня, использовать SPF 50+, не посещать сауну 7 дней'
+    aftercare: t('derma.derma_proc_tpl_meso_face_aftercare')
   },
   {
     id: 'chemical-peel',
-    name: 'Химический пилинг',
+    name: t('derma.derma_proc_tpl_chem_peel_name'),
     category: 'peeling',
-    description: 'Поверхностный пилинг с гликолевой кислотой',
+    description: t('derma.derma_proc_tpl_chem_peel_desc'),
     duration: 60,
     price: 120000,
     materials: [
-    { name: 'Гликолевая кислота 30%', unit: 'мл', quantity: 10 },
-    { name: 'Нейтрализатор', unit: 'мл', quantity: 20 },
-    { name: 'Постпилинговая маска', unit: 'шт.', quantity: 1 }],
+    { name: t('derma.derma_proc_tpl_chem_peel_mat_glycolic'), unit: t('derma.derma_proc_unit_ml'), quantity: 10 },
+    { name: t('derma.derma_proc_tpl_chem_peel_mat_neutralizer'), unit: t('derma.derma_proc_unit_ml'), quantity: 20 },
+    { name: t('derma.derma_proc_tpl_chem_peel_mat_postmask'), unit: t('derma.derma_proc_unit_pc'), quantity: 1 }],
 
     steps: [
-    'Демакияж и очищение',
-    'Обезжиривание кожи',
-    'Нанесение пилинга на 3-5 минут',
-    'Нейтрализация',
-    'Нанесение успокаивающей маски',
-    'Финальный уход с SPF'],
+    t('derma.derma_proc_tpl_chem_peel_step_1'),
+    t('derma.derma_proc_tpl_chem_peel_step_2'),
+    t('derma.derma_proc_tpl_chem_peel_step_3'),
+    t('derma.derma_proc_tpl_chem_peel_step_4'),
+    t('derma.derma_proc_tpl_chem_peel_step_5'),
+    t('derma.derma_proc_tpl_chem_peel_step_6')],
 
     contraindications: [
-    'Активные воспаления',
-    'Купероз',
-    'Беременность',
-    'Прием ретиноидов'],
+    t('derma.derma_proc_tpl_chem_peel_contra_1'),
+    t('derma.derma_proc_tpl_chem_peel_contra_2'),
+    t('derma.derma_proc_tpl_chem_peel_contra_3'),
+    t('derma.derma_proc_tpl_chem_peel_contra_4')],
 
-    aftercare: 'Использовать увлажняющие средства, SPF 50+ обязательно, не использовать скрабы 7 дней'
+    aftercare: t('derma.derma_proc_tpl_chem_peel_aftercare')
   }];
 
 
@@ -277,7 +277,7 @@ const ProcedureTemplates = ({ onSelectProcedure }) => {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
             <Typography variant="h6">
               <Hospital style={{ marginRight: 8, verticalAlign: 'middle' }} />
-              Шаблоны процедур
+              {t('derma.derma_proc_title')}
             </Typography>
             
             <Button
@@ -285,7 +285,7 @@ const ProcedureTemplates = ({ onSelectProcedure }) => {
               onClick={handleCreateNew}>
               
               <Plus style={{ width: 16, height: 16, marginRight: 8 }} />
-              Создать шаблон
+              {t('derma.derma_proc_create_button')}
             </Button>
           </div>
 
@@ -342,11 +342,11 @@ const ProcedureTemplates = ({ onSelectProcedure }) => {
                       <div style={{ display: 'flex', gap: 8 }}>
                         <Badge variant="info">
                           <Clock style={{ width: 12, height: 12, marginRight: 4 }} />
-                          {template.duration} мин
+                          {t('derma.derma_proc_duration_display', { duration: template.duration })}
                         </Badge>
                         <Badge variant="success">
                           <DollarSign style={{ width: 12, height: 12, marginRight: 4 }} />
-                          {(template.price / 1000).toFixed(0)}k сум
+                          {t('derma.derma_proc_price_display', { price: (template.price / 1000).toFixed(0) })}
                         </Badge>
                       </div>
                     </div>
@@ -356,7 +356,7 @@ const ProcedureTemplates = ({ onSelectProcedure }) => {
                       e.stopPropagation();
                       handleEdit(template);
                     }}
-                    aria-label={`Редактировать шаблон процедуры ${template.name}`}
+                    aria-label={t('derma.derma_proc_edit_aria', { name: template.name })}
                     style={{
                       padding: 'var(--mac-spacing-2)',
                       border: '1px solid var(--mac-border)',
@@ -378,7 +378,7 @@ const ProcedureTemplates = ({ onSelectProcedure }) => {
 
           {filteredTemplates.length === 0 &&
           <Typography variant="body2" color="textSecondary" style={{ textAlign: 'center', padding: '32px 0' }}>
-              Нет шаблонов в выбранной категории
+              {t('derma.derma_proc_empty_category')}
             </Typography>
           }
         </CardContent>
@@ -396,7 +396,7 @@ const ProcedureTemplates = ({ onSelectProcedure }) => {
               {/* Материалы */}
               <Grid item xs={12} md={6}>
                 <Typography variant="subtitle2" gutterBottom>
-                  Необходимые материалы:
+                  {t('derma.derma_proc_materials_title')}
                 </Typography>
                 <List
                 items={selectedTemplate.materials.map((material) => ({
@@ -410,7 +410,7 @@ const ProcedureTemplates = ({ onSelectProcedure }) => {
               {/* Этапы процедуры */}
               <Grid item xs={12} md={6}>
                 <Typography variant="subtitle2" gutterBottom>
-                  Этапы процедуры:
+                  {t('derma.derma_proc_steps_title')}
                 </Typography>
                 <List
                 items={selectedTemplate.steps.map((step, i) => `${i + 1}. ${step}`)}
@@ -423,7 +423,7 @@ const ProcedureTemplates = ({ onSelectProcedure }) => {
             <Grid item xs={12}>
                   <Alert severity="warning">
                     <Typography variant="subtitle2" gutterBottom>
-                      Противопоказания:
+                      {t('derma.derma_proc_contraindications_title')}
                     </Typography>
                     {selectedTemplate.contraindications.map((item, i) =>
                 <Typography key={i} variant="body2">
@@ -439,7 +439,7 @@ const ProcedureTemplates = ({ onSelectProcedure }) => {
             <Grid item xs={12}>
                   <Alert severity="info">
                     <Typography variant="subtitle2" gutterBottom>
-                      Рекомендации после процедуры:
+                      {t('derma.derma_proc_aftercare_title')}
                     </Typography>
                     <Typography variant="body2">
                       {selectedTemplate.aftercare}
@@ -460,13 +460,13 @@ const ProcedureTemplates = ({ onSelectProcedure }) => {
         fullWidth>
         
         <DialogTitle>
-          {editMode ? 'Редактировать шаблон' : 'Создать новый шаблон'}
+          {editMode ? t('derma.derma_proc_dialog_edit_title') : t('derma.derma_proc_dialog_create_title')}
         </DialogTitle>
         
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 1 }}>
             <Grid item xs={12} md={8}>
-              <div style={{ fontSize: 12, color: 'var(--mac-text-secondary)', marginBottom: 6 }}>Название процедуры</div>
+              <div style={{ fontSize: 12, color: 'var(--mac-text-secondary)', marginBottom: 6 }}>{t('derma.derma_proc_field_name')}</div>
               <Input
                 value={templateForm.name}
                 onChange={(e) => setTemplateForm({ ...templateForm, name: e.target.value })} />
@@ -474,15 +474,15 @@ const ProcedureTemplates = ({ onSelectProcedure }) => {
             </Grid>
             
             <Grid item xs={12} md={4}>
-              <div style={{ fontSize: 12, color: 'var(--mac-text-secondary)', marginBottom: 6 }}>Категория</div>
+              <div style={{ fontSize: 12, color: 'var(--mac-text-secondary)', marginBottom: 6 }}>{t('derma.derma_proc_field_category')}</div>
               <Select
                 value={templateForm.category}
                 onChange={(e) => setTemplateForm({ ...templateForm, category: e.target.value })}>
                 
-                <Option value="injection">Инъекционные</Option>
-                <Option value="hardware">Аппаратные</Option>
-                <Option value="peeling">Пилинги</Option>
-                <Option value="care">Уходовые</Option>
+                <Option value="injection">{t('derma.derma_proc_category_injection')}</Option>
+                <Option value="hardware">{t('derma.derma_proc_category_hardware')}</Option>
+                <Option value="peeling">{t('derma.derma_proc_category_peeling')}</Option>
+                <Option value="care">{t('derma.derma_proc_category_care')}</Option>
               </Select>
             </Grid>
             
@@ -496,7 +496,7 @@ const ProcedureTemplates = ({ onSelectProcedure }) => {
             </Grid>
             
             <Grid item xs={6}>
-              <div style={{ fontSize: 12, color: 'var(--mac-text-secondary)', marginBottom: 6 }}>Длительность (мин)</div>
+              <div style={{ fontSize: 12, color: 'var(--mac-text-secondary)', marginBottom: 6 }}>{t('derma.derma_proc_field_duration')}</div>
               <Input
                 type="number"
                 value={templateForm.duration}
@@ -505,7 +505,7 @@ const ProcedureTemplates = ({ onSelectProcedure }) => {
             </Grid>
             
             <Grid item xs={6}>
-              <div style={{ fontSize: 12, color: 'var(--mac-text-secondary)', marginBottom: 6 }}>Стоимость (сум)</div>
+              <div style={{ fontSize: 12, color: 'var(--mac-text-secondary)', marginBottom: 6 }}>{t('derma.derma_proc_field_price')}</div>
               <Input
                 type="number"
                 value={templateForm.price}
@@ -516,13 +516,13 @@ const ProcedureTemplates = ({ onSelectProcedure }) => {
             {/* Материалы */}
             <Grid item xs={12}>
               <Typography variant="subtitle2" gutterBottom>
-                Материалы
+                {t('derma.derma_proc_field_materials')}
               </Typography>
               {templateForm.materials.map((material, index) =>
               <Grid container spacing={1} key={index} sx={{ mb: 1 }}>
                   <Grid item xs={6}>
                     <Input
-                    placeholder="Название материала"
+                    placeholder={t('derma.derma_proc_ph_material_name')}
                     value={material.name}
                     onChange={(e) => {
                       const newMaterials = [...templateForm.materials];
@@ -533,7 +533,7 @@ const ProcedureTemplates = ({ onSelectProcedure }) => {
                   </Grid>
                   <Grid item xs={3}>
                     <Input
-                    placeholder="Кол-во"
+                    placeholder={t('derma.derma_proc_ph_material_qty')}
                     value={material.quantity}
                     onChange={(e) => {
                       const newMaterials = [...templateForm.materials];
@@ -544,7 +544,7 @@ const ProcedureTemplates = ({ onSelectProcedure }) => {
                   </Grid>
                   <Grid item xs={3}>
                     <Input
-                    placeholder="Ед."
+                    placeholder={t('derma.derma_proc_ph_material_unit')}
                     value={material.unit}
                     onChange={(e) => {
                       const newMaterials = [...templateForm.materials];
@@ -556,20 +556,20 @@ const ProcedureTemplates = ({ onSelectProcedure }) => {
                 </Grid>
               )}
               <Button size="small" onClick={addMaterial}>
-                <Plus style={{ width: 14, height: 14, marginRight: 6 }} /> Добавить материал
+                <Plus style={{ width: 14, height: 14, marginRight: 6 }} /> {t('derma.derma_proc_add_material')}
               </Button>
             </Grid>
             
             {/* Этапы */}
             <Grid item xs={12}>
               <Typography variant="subtitle2" gutterBottom>
-                Этапы процедуры
+                {t('derma.derma_proc_steps_label')}
               </Typography>
               {templateForm.steps.map((step, index) =>
               <Input
                 key={index}
                 sx={{ mb: 1 }}
-                placeholder={`Шаг ${index + 1}`}
+                placeholder={t('derma.derma_proc_ph_step', { n: index + 1 })}
                 value={step}
                 onChange={(e) => {
                   const newSteps = [...templateForm.steps];
@@ -579,13 +579,13 @@ const ProcedureTemplates = ({ onSelectProcedure }) => {
 
               )}
               <Button size="small" onClick={addStep}>
-                <Plus style={{ width: 14, height: 14, marginRight: 6 }} /> Добавить шаг
+                <Plus style={{ width: 14, height: 14, marginRight: 6 }} /> {t('derma.derma_proc_add_step')}
               </Button>
             </Grid>
             
             {/* Постуход */}
             <Grid item xs={12}>
-              <div style={{ fontSize: 12, color: 'var(--mac-text-secondary)', marginBottom: 6 }}>Рекомендации после процедуры</div>
+              <div style={{ fontSize: 12, color: 'var(--mac-text-secondary)', marginBottom: 6 }}>{t('derma.derma_proc_field_aftercare')}</div>
               <Textarea
                 rows={3}
                 value={templateForm.aftercare}
@@ -597,10 +597,10 @@ const ProcedureTemplates = ({ onSelectProcedure }) => {
         
         <DialogActions>
           <Button onClick={() => setDialogOpen(false)}>
-            Отмена
+            {t('derma.derma_proc_cancel')}
           </Button>
           <Button variant="contained" onClick={handleSave}>
-            {editMode ? 'Сохранить' : 'Создать'}
+            {editMode ? t('derma.derma_proc_save') : t('derma.derma_proc_create')}
           </Button>
         </DialogActions>
       </Dialog>

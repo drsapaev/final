@@ -1,4 +1,4 @@
-import { t } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect, useCallback } from 'react';
 import {
   DollarSign,
@@ -32,6 +32,7 @@ const PriceOverrideManager = ({
   onClose
 }) => {
   useTheme();
+  const { t } = useTranslation();
   const [newPrice, setNewPrice] = useState('');
   const [reason, setReason] = useState('');
   const [details, setDetails] = useState('');
@@ -41,11 +42,11 @@ const PriceOverrideManager = ({
 
   // Предустановленные причины для быстрого выбора
   const commonReasons = [
-  'Увеличенный объем работы',
-  'Дополнительные материалы',
-  'Сложность процедуры',
-  'Индивидуальный подход',
-  'Комбинированная процедура'];
+  t('derma.derma_price_reason_increased_volume'),
+  t('derma.derma_price_reason_additional_materials'),
+  t('derma.derma_price_reason_complexity'),
+  t('derma.derma_price_reason_individual'),
+  t('derma.derma_price_reason_combined')];
 
   const loadPriceOverrides = useCallback(async () => {
     setLoadingOverrides(true);
@@ -108,7 +109,7 @@ const PriceOverrideManager = ({
       }
     } catch (error) {
       logger.error('Error creating price override:', error);
-      notify.error(error?.response?.data?.detail || 'Ошибка создания изменения цены');
+      notify.error(error?.response?.data?.detail || t('derma.derma_price_create_failed'));
     } finally {
       setIsLoading(false);
     }
@@ -138,9 +139,9 @@ const PriceOverrideManager = ({
 
   const getStatusText = (status) => {
     switch (status) {
-      case 'pending':return 'Ожидает одобрения';
-      case 'approved':return 'Одобрено';
-      case 'rejected':return 'Отклонено';
+      case 'pending':return t('derma.derma_price_status_pending');
+      case 'approved':return t('derma.derma_price_status_approved');
+      case 'rejected':return t('derma.derma_price_status_rejected');
       default:return status;
     }
   };
@@ -182,19 +183,19 @@ const PriceOverrideManager = ({
               fontWeight: 'var(--mac-font-weight-semibold)',
               color: 'var(--mac-text-primary)'
             }}>
-              Изменение цены процедуры
+              {t('derma.derma_price_dialog_title')}
             </h3>
             <p style={{
               fontSize: 'var(--mac-font-size-sm)',
               color: 'var(--mac-text-secondary)',
               marginTop: 'var(--mac-spacing-1)'
             }}>
-              {serviceName} • Базовая цена: {formatPrice(originalPrice)}
+              {t('derma.derma_price_dialog_subtitle', { serviceName, base_price: formatPrice(originalPrice) })}
             </p>
           </div>
           <button
             onClick={onClose}
-            aria-label="Закрыть изменение цены процедуры"
+            aria-label={t('derma.derma_price_close_aria')}
             style={{
               background: 'none',
               border: 'none',
@@ -226,7 +227,7 @@ const PriceOverrideManager = ({
                 color: 'var(--mac-text-secondary)',
                 marginBottom: 'var(--mac-spacing-2)'
               }}>
-                Новая цена (UZS)
+                {t('derma.derma_price_new_price_label')}
               </label>
               <div style={{ position: 'relative' }}>
                 <DollarSign size={16} style={{
@@ -238,7 +239,7 @@ const PriceOverrideManager = ({
                 }} />
                 <Input
                   type="text"
-                  aria-label="Новая цена процедуры"
+                  aria-label={t('derma.derma_price_new_price_aria')}
                   value={newPrice}
                   onChange={(e) => setNewPrice(e.target.value)}
                   style={{
@@ -262,7 +263,7 @@ const PriceOverrideManager = ({
                     e.target.style.borderColor = 'var(--mac-border)';
                     e.target.style.boxShadow = 'none';
                   }}
-                  placeholder="Например: 120000"
+                  placeholder={t('derma.derma_price_ph_new_price')}
                   inputMode="numeric" />
                 
               </div>
@@ -276,7 +277,7 @@ const PriceOverrideManager = ({
                 color: 'var(--mac-text-secondary)',
                 marginBottom: 'var(--mac-spacing-2)'
               }}>
-                Причина изменения
+                {t('derma.derma_price_reason_label')}
               </label>
               <select
                 value={reason}
@@ -304,17 +305,17 @@ const PriceOverrideManager = ({
                   e.target.style.boxShadow = 'none';
                 }}>
                 
-                <option value="">Выберите причину</option>
+                <option value="">{t('derma.derma_price_select_reason')}</option>
                 {commonReasons.map((reasonText, index) =>
                 <option key={index} value={reasonText}>{reasonText}</option>
                 )}
-                <option value="custom">Другая причина</option>
+                <option value="custom">{t('derma.derma_price_other_reason')}</option>
               </select>
               
               {reason === 'custom' &&
               <Input
                 type="text"
-                aria-label="Другая причина изменения цены"
+                aria-label={t('derma.derma_price_other_reason_aria')}
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 style={{
@@ -338,7 +339,7 @@ const PriceOverrideManager = ({
                   e.target.style.borderColor = 'var(--mac-border)';
                   e.target.style.boxShadow = 'none';
                 }}
-                placeholder="Введите причину" />
+                placeholder={t('derma.derma_price_ph_custom_reason')} />
 
               }
             </div>
@@ -351,10 +352,10 @@ const PriceOverrideManager = ({
                 color: 'var(--mac-text-secondary)',
                 marginBottom: 'var(--mac-spacing-2)'
               }}>
-                Подробное описание (необязательно)
+                {t('derma.derma_price_details_label')}
               </label>
               <textarea
-                aria-label="Подробное описание изменения цены"
+                aria-label={t('derma.derma_price_details_aria')}
                 value={details}
                 onChange={(e) => setDetails(e.target.value)}
                 rows={3}
@@ -381,7 +382,7 @@ const PriceOverrideManager = ({
                   e.target.style.borderColor = 'var(--mac-border)';
                   e.target.style.boxShadow = 'none';
                 }}
-                placeholder="Дополнительные детали об изменении цены..." />
+                placeholder={t('derma.derma_price_ph_details')} />
               
             </div>
 
@@ -431,7 +432,7 @@ const PriceOverrideManager = ({
 
               <Save size={16} style={{ marginRight: 'var(--mac-spacing-2)' }} />
               }
-              {isLoading ? 'Отправка...' : 'Отправить на одобрение'}
+              {isLoading ? t('derma.derma_price_submitting') : t('derma.derma_price_submit')}
             </button>
           </form>
 
@@ -446,7 +447,7 @@ const PriceOverrideManager = ({
               alignItems: 'center'
             }}>
               <FileText size={16} style={{ marginRight: 'var(--mac-spacing-2)' }} />
-              История изменений цен
+              {t('derma.derma_price_history_title')}
             </h4>
             
             {loadingOverrides ?
@@ -469,7 +470,7 @@ const PriceOverrideManager = ({
               color: 'var(--mac-text-tertiary)',
               fontSize: 'var(--mac-font-size-sm)'
             }}>
-                Изменений цен пока нет
+                {t('derma.derma_price_history_empty')}
               </p> :
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-3)' }}>
@@ -533,7 +534,7 @@ const PriceOverrideManager = ({
                   marginBottom: 'var(--mac-spacing-2)'
                 }}>
                       <div>
-                        <span style={{ color: 'var(--mac-text-secondary)' }}>Было:</span>
+                        <span style={{ color: 'var(--mac-text-secondary)' }}>{t('derma.derma_price_was')}</span>
                         <span style={{
                       marginLeft: 'var(--mac-spacing-2)',
                       fontWeight: 'var(--mac-font-weight-medium)',
@@ -541,7 +542,7 @@ const PriceOverrideManager = ({
                     }}>{formatPrice(override.original_price)}</span>
                       </div>
                       <div>
-                        <span style={{ color: 'var(--mac-text-secondary)' }}>Стало:</span>
+                        <span style={{ color: 'var(--mac-text-secondary)' }}>{t('derma.derma_price_became')}</span>
                         <span style={{
                       marginLeft: 'var(--mac-spacing-2)',
                       fontWeight: 'var(--mac-font-weight-medium)',
@@ -554,7 +555,7 @@ const PriceOverrideManager = ({
                       <span style={{
                     color: 'var(--mac-text-secondary)',
                     fontSize: 'var(--mac-font-size-sm)'
-                  }}>Причина:</span>
+                  }}>{t('derma.derma_price_reason_inline')}</span>
                       <span style={{
                     marginLeft: 'var(--mac-spacing-2)',
                     fontSize: 'var(--mac-font-size-sm)',
@@ -567,7 +568,7 @@ const PriceOverrideManager = ({
                         <span style={{
                     color: 'var(--mac-text-secondary)',
                     fontSize: 'var(--mac-font-size-sm)'
-                  }}>Детали:</span>
+                  }}>{t('derma.derma_price_details_inline')}</span>
                         <span style={{
                     marginLeft: 'var(--mac-spacing-2)',
                     fontSize: 'var(--mac-font-size-sm)',

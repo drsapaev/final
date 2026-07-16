@@ -34,7 +34,7 @@ import {
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 const SkinAnalysis = ({ photos, visitId, patientId, onAnalysisComplete }) => {
   const { t } = useTranslation();
   const [analyzing, setAnalyzing] = useState(false);
@@ -72,7 +72,7 @@ const SkinAnalysis = ({ photos, visitId, patientId, onAnalysisComplete }) => {
     } catch (error) {
       logger.error('Ошибка AI анализа:', error);
       setAnalysisResult({
-        error: 'Не удалось проанализировать изображение'
+        error: t('derma.derma_skin_error_analyze')
       });
     } finally {
       setAnalyzing(false);
@@ -102,7 +102,7 @@ const SkinAnalysis = ({ photos, visitId, patientId, onAnalysisComplete }) => {
     } catch (error) {
       logger.error('Ошибка сравнительного анализа:', error);
       setAnalysisResult({
-        error: 'Не удалось выполнить сравнительный анализ'
+        error: t('derma.derma_skin_error_compare')
       });
     } finally {
       setAnalyzing(false);
@@ -169,7 +169,7 @@ const SkinAnalysis = ({ photos, visitId, patientId, onAnalysisComplete }) => {
       <Card>
         <CardContent>
           <Typography variant="body1" color="text.secondary" align="center">
-            Загрузите фото для AI анализа состояния кожи
+            {t('derma.derma_skin_upload_hint')}
           </Typography>
         </CardContent>
       </Card>);
@@ -182,7 +182,7 @@ const SkinAnalysis = ({ photos, visitId, patientId, onAnalysisComplete }) => {
         <CardContent>
           <Typography variant="h6" gutterBottom>
             <BarChart3 style={{ marginRight: 8, verticalAlign: 'middle' }} />
-            AI Анализ кожи
+            {t('derma.derma_skin_title')}
           </Typography>
 
           {/* Кнопки анализа */}
@@ -194,7 +194,7 @@ const SkinAnalysis = ({ photos, visitId, patientId, onAnalysisComplete }) => {
               disabled={analyzing}>
               
                 <Sparkles style={{ width: 16, height: 16, marginRight: 8 }} />
-                Анализировать ДО
+                {t('derma.derma_skin_analyze_before')}
               </Button>
             }
             
@@ -205,7 +205,7 @@ const SkinAnalysis = ({ photos, visitId, patientId, onAnalysisComplete }) => {
               disabled={analyzing}>
               
                 <Sparkles style={{ width: 16, height: 16, marginRight: 8 }} />
-                Анализировать ПОСЛЕ
+                {t('derma.derma_skin_analyze_after')}
               </Button>
             }
             
@@ -216,7 +216,7 @@ const SkinAnalysis = ({ photos, visitId, patientId, onAnalysisComplete }) => {
               disabled={analyzing}>
               
                 <BarChart3 style={{ width: 16, height: 16, marginRight: 8 }} />
-                Сравнительный анализ
+                {t('derma.derma_skin_compare')}
               </Button>
             }
           </div>
@@ -226,7 +226,7 @@ const SkinAnalysis = ({ photos, visitId, patientId, onAnalysisComplete }) => {
           <div style={{ marginTop: 24 }}>
               <Progress />
               <Typography variant="body2" color="textSecondary" style={{ textAlign: 'center', marginTop: 8 }}>
-                Анализ изображения с помощью AI...
+                {t('derma.derma_skin_analyzing')}
               </Typography>
             </div>
           }
@@ -238,7 +238,7 @@ const SkinAnalysis = ({ photos, visitId, patientId, onAnalysisComplete }) => {
               {analysisResult.overall_score !== undefined &&
             <div style={{ padding: 24, marginBottom: 24, textAlign: 'center', border: '1px solid var(--mac-border)', borderRadius: 8 }}>
                   <Typography variant="h6" gutterBottom>
-                    Общее состояние кожи
+                    {t('derma.derma_skin_overall_state')}
                   </Typography>
                   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 16 }}>
                     <CircularProgress
@@ -253,7 +253,7 @@ const SkinAnalysis = ({ photos, visitId, patientId, onAnalysisComplete }) => {
                         {analysisResult.overall_score}
                       </Typography>
                       <Typography variant="caption" color="textSecondary">
-                        из 100
+                        {t('derma.derma_skin_out_of')}
                       </Typography>
                     </div>
                   </div>
@@ -261,7 +261,7 @@ const SkinAnalysis = ({ photos, visitId, patientId, onAnalysisComplete }) => {
                 variant="primary"
                 style={{ marginTop: 16 }}>
                 
-                    {analysisResult.skin_type || 'Нормальная кожа'}
+                    {analysisResult.skin_type || t('derma.derma_skin_default_type')}
                   </Badge>
                 </div>
             }
@@ -270,25 +270,25 @@ const SkinAnalysis = ({ photos, visitId, patientId, onAnalysisComplete }) => {
               {analysisResult.metrics &&
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 24 }}>
                   {renderMetric(
-                'Увлажненность',
+                t('derma.derma_skin_metric_hydration'),
                 `${analysisResult.metrics.hydration || 0}%`,
                 <Droplets style={{ color: 'var(--mac-accent-blue)' }} />,
                 analysisResult.metrics.hydration_trend
               )}
                   {renderMetric(
-                'Жирность',
+                t('derma.derma_skin_metric_oiliness'),
                 `${analysisResult.metrics.oiliness || 0}%`,
                 <Sun style={{ color: 'var(--mac-accent-orange)' }} />,
                 analysisResult.metrics.oiliness_trend
               )}
                   {renderMetric(
-                'Текстура',
+                t('derma.derma_skin_metric_texture'),
                 `${analysisResult.metrics.texture || 0}%`,
                 <Layers style={{ color: 'var(--mac-accent-blue)' }} />,
                 analysisResult.metrics.texture_trend
               )}
                   {renderMetric(
-                'Тон',
+                t('derma.derma_skin_metric_tone'),
                 `${analysisResult.metrics.tone || 0}%`,
                 <Palette style={{ color: 'var(--mac-accent-purple)' }} />,
                 analysisResult.metrics.tone_trend
@@ -300,7 +300,7 @@ const SkinAnalysis = ({ photos, visitId, patientId, onAnalysisComplete }) => {
               {analysisResult.problems && analysisResult.problems.length > 0 &&
             <div style={{ padding: 16, marginBottom: 24, border: '1px solid var(--mac-border)', borderRadius: 8 }}>
                   <Typography variant="h6" gutterBottom>
-                    Обнаруженные проблемы
+                    {t('derma.derma_skin_problems_title')}
                   </Typography>
                   <div>
                     {analysisResult.problems.map((problem, index) =>
@@ -319,11 +319,11 @@ const SkinAnalysis = ({ photos, visitId, patientId, onAnalysisComplete }) => {
                             <Badge
                         variant={problem.severity === 'high' ? 'danger' : 'warning'}>
                         
-                              Степень: {problem.severity}
+                              {t('derma.derma_skin_severity_inline', { severity: problem.severity })}
                             </Badge>
                             {problem.area &&
                       <Badge variant="info">
-                                Зона: {problem.area}
+                                {t('derma.derma_skin_zone_inline', { zone: problem.area })}
                               </Badge>
                       }
                           </div>
@@ -338,7 +338,7 @@ const SkinAnalysis = ({ photos, visitId, patientId, onAnalysisComplete }) => {
               {analysisResult.improvements && analysisResult.improvements.length > 0 &&
             <Alert severity="success" style={{ marginBottom: 24 }}>
                   <Typography variant="subtitle2" gutterBottom>
-                    Положительные изменения:
+                    {t('derma.derma_skin_improvements_title')}
                   </Typography>
                   <div>
                     {analysisResult.improvements.map((improvement, index) =>
@@ -356,7 +356,7 @@ const SkinAnalysis = ({ photos, visitId, patientId, onAnalysisComplete }) => {
             <div style={{ padding: 16, marginBottom: 24, border: '1px solid var(--mac-border)', borderRadius: 8 }}>
                   <Typography variant="h6" gutterBottom>
                     <Lightbulb style={{ marginRight: 8, verticalAlign: 'middle', color: 'var(--mac-accent-orange)' }} />
-                    Рекомендации
+                    {t('derma.derma_skin_recommendations_title')}
                   </Typography>
                   <div>
                     {analysisResult.recommendations.map((rec, index) =>
@@ -370,7 +370,7 @@ const SkinAnalysis = ({ photos, visitId, patientId, onAnalysisComplete }) => {
                         {rec.procedures && rec.procedures.length > 0 &&
                   <div style={{ marginTop: 8 }}>
                             <Typography variant="caption" color="textSecondary" style={{ display: 'block', marginBottom: 4 }}>
-                              Рекомендуемые процедуры:
+                              {t('derma.derma_skin_recommended_procedures')}
                             </Typography>
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                               {rec.procedures.map((proc, i) =>
@@ -397,14 +397,14 @@ const SkinAnalysis = ({ photos, visitId, patientId, onAnalysisComplete }) => {
               {analysisResult.care_routine &&
             <div style={{ padding: 16, border: '1px solid var(--mac-border)', borderRadius: 8 }}>
                   <Typography variant="h6" gutterBottom>
-                    Домашний уход
+                    {t('derma.derma_skin_care_title')}
                   </Typography>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
                     {['morning', 'evening'].map((time) =>
                 analysisResult.care_routine[time] &&
                 <div key={time}>
                           <Typography variant="subtitle2" gutterBottom>
-                            {time === 'morning' ? 'Утренний уход' : 'Вечерний уход'}
+                            {time === 'morning' ? t('derma.derma_skin_morning_care') : t('derma.derma_skin_evening_care')}
                           </Typography>
                           <div>
                             {analysisResult.care_routine[time].map((step, index) =>

@@ -136,7 +136,7 @@ describe('Doctor panels SSOT contract', () => {
     ).toBe(true);
 
     expect(dermatology).toContain('activeTab === \'visit\' && !currentAppointment && !selectedPatient');
-    expect(dermatology).toContain('title="Выберите визит"');
+    expect(dermatology).toContain('derma_panel_select_visit_title');
     expect(
       dermatology.includes('handleTabChange(\'patients\')') ||
       dermatology.includes('handleTabChange(\'appointments\')')

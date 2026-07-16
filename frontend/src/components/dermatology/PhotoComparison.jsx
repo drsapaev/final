@@ -21,7 +21,7 @@ import {
   Layout } from
 'lucide-react';
 import PropTypes from 'prop-types';
-import { useTranslation } from '../../i18n/adapter';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
   const { t } = useTranslation();
@@ -98,7 +98,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
       <Card>
         <CardContent>
           <Typography variant="body1" color="text.secondary" align="center">
-            Для сравнения необходимы фото до и после процедуры
+            {t('derma.derma_cmp_need_photos')}
           </Typography>
         </CardContent>
       </Card>);
@@ -111,7 +111,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
         <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Typography variant="h6">
             <ArrowLeftRight style={{ marginRight: 8, verticalAlign: 'middle' }} />
-            Сравнение результатов
+            {t('derma.derma_cmp_title')}
           </Typography>
           
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -129,8 +129,8 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
                   gap: 4
                 }}
                 onClick={() => setViewMode('slider')}
-                aria-label="Включить режим сравнения: слайдер"
-                title="Слайдер">
+                aria-label={t('derma.derma_cmp_mode_slider_aria')}
+                title={t('derma.derma_cmp_mode_slider_title')}>
                 
                 <ArrowLeftRight style={{ width: 16, height: 16 }} />
               </button>
@@ -146,8 +146,8 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
                   gap: 4
                 }}
                 onClick={() => setViewMode('side-by-side')}
-                aria-label="Включить режим сравнения: рядом"
-                title="Рядом">
+                aria-label={t('derma.derma_cmp_mode_side_aria')}
+                title={t('derma.derma_cmp_mode_side_title')}>
                 
                 <Columns style={{ width: 16, height: 16 }} />
               </button>
@@ -163,8 +163,8 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
                   gap: 4
                 }}
                 onClick={() => setViewMode('overlay')}
-                aria-label="Включить режим сравнения: наложение"
-                title="Наложение">
+                aria-label={t('derma.derma_cmp_mode_overlay_aria')}
+                title={t('derma.derma_cmp_mode_overlay_title')}>
                 
                 <Layout style={{ width: 16, height: 16 }} />
               </button>
@@ -173,7 +173,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
             {/* Зум контролы */}
             <button
               onClick={handleZoomOut}
-              aria-label="Уменьшить масштаб фото"
+              aria-label={t('derma.derma_cmp_zoom_out_aria')}
               style={{
                 padding: 'var(--mac-spacing-2)',
                 border: '1px solid var(--mac-border)',
@@ -190,7 +190,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
             <Badge variant="info">{Math.round(zoom * 100)}%</Badge>
             <button
               onClick={handleZoomIn}
-              aria-label="Увеличить масштаб фото"
+              aria-label={t('derma.derma_cmp_zoom_in_aria')}
               style={{
                 padding: 'var(--mac-spacing-2)',
                 border: '1px solid var(--mac-border)',
@@ -206,7 +206,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
             </button>
             <button
               onClick={handleResetZoom}
-              aria-label="Сбросить масштаб фото"
+              aria-label={t('derma.derma_cmp_zoom_reset_aria')}
               style={{
                 padding: 'var(--mac-spacing-2)',
                 border: '1px solid var(--mac-border)',
@@ -222,7 +222,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
             </button>
             <button
               onClick={handleFullscreen}
-              aria-label="Открыть сравнение фото на весь экран"
+              aria-label={t('derma.derma_cmp_fullscreen_aria')}
               style={{
                 padding: 'var(--mac-spacing-2)',
                 border: '1px solid var(--mac-border)',
@@ -243,13 +243,13 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
         {metadata.zone &&
         <div style={{ marginBottom: 16 }}>
             <Badge variant="info" style={{ marginRight: 8 }}>
-              Зона: {metadata.zone}
+              {t('derma.derma_cmp_zone_inline', { zone: metadata.zone })}
             </Badge>
             <Badge variant="info" style={{ marginRight: 8 }}>
-              Ракурс: {metadata.angle || 'front'}
+              {t('derma.derma_cmp_angle_inline', { angle: metadata.angle || 'front' })}
             </Badge>
             <Badge variant="info" style={{ marginRight: 8 }}>
-              Освещение: {metadata.lighting || 'natural'}
+              {t('derma.derma_cmp_lighting_inline', { lighting: metadata.lighting || 'natural' })}
             </Badge>
           </div>
         }
@@ -285,7 +285,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
             
               <img
               src={afterPhoto}
-              alt="После"
+              alt={t('derma.derma_cmp_after_alt')}
               style={{
                 width: '100%',
                 height: '100%',
@@ -310,7 +310,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
             
               <img
               src={beforePhoto}
-              alt="До"
+              alt={t('derma.derma_cmp_before_alt')}
               style={{
                 width: containerWidth || '100%',
                 height: '100%',
@@ -363,7 +363,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
             borderRadius: 4,
             fontSize: 'var(--mac-font-size-base)'
           }}>
-              ДО
+              {t('derma.derma_cmp_before_label')}
             </div>
             <div style={{
             position: 'absolute',
@@ -375,7 +375,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
             borderRadius: 4,
             fontSize: 'var(--mac-font-size-base)'
           }}>
-              ПОСЛЕ
+              {t('derma.derma_cmp_after_label')}
             </div>
           </div>
         }
@@ -385,12 +385,12 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
         <div style={{ display: 'flex', gap: 16 }}>
             <div style={{ flex: 1 }}>
               <Typography variant="subtitle2" style={{ textAlign: 'center', marginBottom: 8 }}>
-                ДО
+                {t('derma.derma_cmp_before_label')}
               </Typography>
               <div style={{ position: 'relative', overflow: 'hidden', height: '400px' }}>
                 <img
                 src={beforePhoto}
-                alt="До"
+                alt={t('derma.derma_cmp_before_alt')}
                 style={{
                   width: '100%',
                   height: '100%',
@@ -404,12 +404,12 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
             
             <div style={{ flex: 1 }}>
               <Typography variant="subtitle2" style={{ textAlign: 'center', marginBottom: 8 }}>
-                ПОСЛЕ
+                {t('derma.derma_cmp_after_label')}
               </Typography>
               <div style={{ position: 'relative', overflow: 'hidden', height: '400px' }}>
                 <img
                 src={afterPhoto}
-                alt="После"
+                alt={t('derma.derma_cmp_after_alt')}
                 style={{
                   width: '100%',
                   height: '100%',
@@ -428,7 +428,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
         <div style={{ position: 'relative', height: '500px', overflow: 'hidden' }}>
             <img
             src={beforePhoto}
-            alt="До"
+            alt={t('derma.derma_cmp_before_alt')}
             style={{
               position: 'absolute',
               width: '100%',
@@ -438,10 +438,10 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
               transform: `scale(${zoom})`,
               transition: 'transform 0.3s ease'
             }} />
-          
+
             <img
             src={afterPhoto}
-            alt="После"
+            alt={t('derma.derma_cmp_after_alt')}
             style={{
               position: 'absolute',
               width: '100%',
@@ -455,11 +455,11 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
             
             <div style={{ position: 'absolute', bottom: 20, left: 20, right: 20 }}>
               <Typography variant="caption" color="white" style={{ marginBottom: 8, display: 'block' }}>
-                Прозрачность
+                {t('derma.derma_cmp_opacity')}
               </Typography>
               <Input
               type="range"
-              aria-label="Настроить прозрачность наложения фото"
+              aria-label={t('derma.derma_cmp_opacity_aria')}
               min="0"
               max="100"
               value={sliderPosition}
