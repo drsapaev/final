@@ -1,4 +1,5 @@
-// frontend/src/api/client.js
+// frontend/src/api/client.ts
+// Phase 1 — migrated from .js. Types added; logic unchanged.
 // Unified axios-based API client wrapper for the frontend.
 // Exports:
 //  - api (axios instance)
@@ -8,10 +9,12 @@
 //  - me() - GET /me
 //  - login(username, password) - POST /login (x-www-form-urlencoded)
 
-import axios from 'axios';
+import axios, { type AxiosError, type AxiosInstance, type AxiosRequestConfig, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios';
 import { buildApiUrl, buildWsUrl, getApiBaseUrl, getApiOrigin } from './runtime';
 import { tokenManager } from '../utils/tokenManager';
 import logger from '../utils/logger';
+import type { LoginResponse } from '../types/auth';
+import type { User } from '../types/api';
 
 const API_BASE = getApiBaseUrl();
 // PR-39 / Medium-11: CSRF bootstrap defaults to ON. Set VITE_CSRF_BOOTSTRAP=0
@@ -31,7 +34,7 @@ function readPersistedRateLimitUntil() {
   }
 }
 
-function persistRateLimitUntil(until) {
+function persistRateLimitUntil(until: number): void {
   try {
     window.localStorage.setItem('clinic_api_rate_limit_until', String(until || 0));
   } catch {
@@ -48,12 +51,12 @@ const api = axios.create({
 });
 
 // ✅ SECURITY: Check if token is expiring soon (within 5 minutes)
-function isTokenExpiringSoon(token) {
+function isTokenExpiringSoon(token: string | null | undefined): boolean {
   if (!token) return true;
   try {
     const parts = token.split('.');
     if (parts.length !== 3) return false;
-    const payload = JSON.parse(atob(parts[1]));
+    const payload: { exp?: number } = JSON.parse(atob(parts[1])) as { exp?: number };
     if (!payload.exp) return false;
     const expiresAt = payload.exp * 1000;
     const fiveMinutes = 5 * 60 * 1000;
@@ -65,15 +68,15 @@ function isTokenExpiringSoon(token) {
 
 // ✅ SECURITY: Single-flight pattern for token refresh
 // Prevents race conditions when multiple requests detect token expiring
-let refreshPromise = null;
-let pendingRequestsQueue = [];
+let refreshPromise: Promise<string | null> | null = null;
+let pendingRequestsQueue: Array<(value: string | null) => void> = [];
 
 /**
  * Refresh token with single-flight pattern.
  * All concurrent callers wait for the same promise, preventing multiple refresh calls.
  * @returns {Promise<string|null>} New access token or null on failure
  */
-async function refreshTokenIfNeeded() {
+async function refreshTokenIfNeeded(): Promise<string | null> {
   const token = tokenManager.getAccessToken();
   const refreshToken = tokenManager.getRefreshToken();
 
@@ -130,7 +133,7 @@ async function refreshTokenIfNeeded() {
 }
 
 // ✅ SECURITY: Get CSRF token from cookie
-function getCookie(name) {
+function getCookie(name: string): string | null {
   const value = `; ${document.cookie}`;
   const parts = value.split(`; ${name}=`);
   if (parts.length === 2) return parts.pop().split(';').shift();
@@ -138,10 +141,10 @@ function getCookie(name) {
 }
 
 // ✅ SECURITY: Fetch CSRF token from server if not in cookie
-let csrfTokenPromise = null;
+let csrfTokenPromise: Promise<string | null> | null = null;
 let csrfEndpointUnavailable = false;
 let csrfBootstrapSkippedLogged = false;
-async function ensureCSRFToken() {
+async function ensureCSRFToken(): Promise<string | null> {
   // Check cookie first
   const cookieToken = getCookie('csrf_token');
   if (cookieToken) return cookieToken;
@@ -180,7 +183,7 @@ async function ensureCSRFToken() {
 }
 
 // Ensure Authorization header is attached for every request from localStorage
-api.interceptors.request.use(async (config) => {
+api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
   const now = Date.now();
   const requestUrl = String(config.url || '');
   if (now < globalRateLimitUntil && !requestUrl.includes('/auth/')) {
@@ -210,8 +213,7 @@ api.interceptors.request.use(async (config) => {
   if (token) {
     const t = typeof token === 'string' ? token.trim() : token;
     if (t) {
-      config.headers = config.headers || {};
-      config.headers['Authorization'] = `Bearer ${t}`;
+      config.headers.set('Authorization', `Bearer ${t}`);
     }
   }
 
@@ -220,8 +222,7 @@ api.interceptors.request.use(async (config) => {
   if (['post', 'put', 'patch', 'delete'].includes(method)) {
     const csrfToken = await ensureCSRFToken();
     if (csrfToken) {
-      config.headers = config.headers || {};
-      config.headers['X-CSRF-Token'] = csrfToken;
+      config.headers.set('X-CSRF-Token', csrfToken);
     }
   }
 
@@ -231,8 +232,8 @@ api.interceptors.request.use(async (config) => {
 // ✅ SECURITY: Handle 401 responses - log but don't auto-clear tokens
 // (prevents race condition where 401 during login transition clears new token)
 api.interceptors.response.use(
-  (response) => response,
-  (error) => {
+  (response: AxiosResponse) => response,
+  (error: AxiosError) => {
     if (error.response?.status === 401) {
       logger.warn('🔒 Unauthorized response received', {
         url: error.config?.url,
@@ -254,11 +255,11 @@ api.interceptors.response.use(
   }
 );
 
-function getApiBase() {
+function getApiBase(): string {
   return API_BASE;
 }
 
-function setToken(token) {
+function setToken(token: string | null | undefined): void {
   if (token) {
     const t = typeof token === 'string' ? token.trim() : token;
     if (t) {
@@ -271,11 +272,11 @@ function setToken(token) {
   }
 }
 
-function getToken() {
+function getToken(): string | null {
   return tokenManager.getAccessToken();
 }
 
-function clearToken() {
+function clearToken(): void {
   setToken(null);
 }
 
@@ -283,7 +284,7 @@ function clearToken() {
  * Persist refresh token after login or after successful /authentication/refresh.
  * Uses tokenManager so the storage key stays consistent.
  */
-function setRefreshToken(token) {
+function setRefreshToken(token: string | null | undefined): void {
   if (token) {
     const t = typeof token === 'string' ? token.trim() : token;
     if (t) {
@@ -294,12 +295,25 @@ function setRefreshToken(token) {
   tokenManager.setRefreshToken(null);
 }
 
-function getRefreshToken() {
+function getRefreshToken(): string | null {
   return tokenManager.getRefreshToken();
 }
 
-function createLocalRateLimitError(config) {
-  const error = new Error('Client-side cooldown active after HTTP 429');
+interface LocalRateLimitError {
+  name: string;
+  message: string;
+  config: InternalAxiosRequestConfig;
+  isAxiosError: boolean;
+  response: {
+    status: number;
+    statusText: string;
+    data: unknown;
+    config: InternalAxiosRequestConfig;
+  };
+}
+
+function createLocalRateLimitError(config: InternalAxiosRequestConfig): LocalRateLimitError {
+  const error = new Error('Client-side cooldown active after HTTP 429') as unknown as LocalRateLimitError;
   error.name = 'AxiosError';
   error.config = config;
   error.isAxiosError = true;
@@ -319,10 +333,14 @@ function createLocalRateLimitError(config) {
  * Generic request wrapper that normalizes server error detail.
  * Usage: await apiRequest('get', '/visits/visits', { params: { limit: 10 } })
  */
-async function apiRequest(method, url, { params = {}, data = {} } = {}) {
+async function apiRequest<T = unknown>(
+  method: string,
+  url: string,
+  { params = {}, data = {} }: { params?: Record<string, unknown>; data?: unknown } = {},
+): Promise<T> {
   try {
     const resp = await api.request({ method, url, params, data });
-    return resp.data;
+    return resp.data as T;
   } catch (err) {
     // Normalize error payloads so callers can handle them uniformly.
     if (err && err.response && err.response.data) {
@@ -342,9 +360,9 @@ async function apiRequest(method, url, { params = {}, data = {} } = {}) {
 /**
  * Convenience API helpers used by frontend code
  */
-async function me() {
+async function me(): Promise<User> {
   // GET /auth/me
-  const resp = await api.get('/auth/me');
+  const resp = await api.get<User>('/auth/me');
   return resp.data;
 }
 
@@ -353,16 +371,21 @@ async function me() {
  * Returns the server response (object with access_token, token_type).
  * Caller should call setToken(response.access_token) to persist.
  */
-async function login(username, password) {
+async function login(username: string, password: string): Promise<LoginResponse> {
   const credentials = {
-    username: username,
-    password: password,
-    remember_me: false
+    username,
+    password,
+    remember_me: false,
   };
 
   const resp = await api.post('/authentication/login', credentials);
 
-  return resp.data;
+  // Backend contract (docs/AUTHENTICATION_LAWS_FOR_AI.md ЗАКОН 2):
+  // when requires_2fa=true, response has pending_2fa_token and NO access_token.
+  // The raw OpenAPI schema is a flat nullable superset — we narrow to the
+  // discriminated union from types/auth.ts at the type level. Runtime callers
+  // should still check `requires_2fa` before reading token fields.
+  return resp.data as LoginResponse;
 }
 
 // Backwards-compatible aliases expected by older frontend code
