@@ -4,10 +4,10 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { API_ENDPOINTS } from '../../api/endpoints.js';
+import { API_ENDPOINTS } from '../../api/endpoints.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const printServicePath = path.resolve(__dirname, '../print.js');
+const printServicePath = path.resolve(__dirname, '../print.ts');
 
 const readPrintServiceSource = () => fs.readFileSync(printServicePath, 'utf8');
 
