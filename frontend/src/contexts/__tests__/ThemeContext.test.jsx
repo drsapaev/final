@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
-import { ThemeProvider, useTheme } from '../ThemeContext.tsx';
+import { ThemeProvider, useTheme } from '../ThemeContext';
 import { getColorSchemeDefinition } from '../../theme/colorScheme.js';
 
 const { apiMock } = vi.hoisted(() => {

@@ -3,7 +3,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const managerSource = fs.readFileSync(
-  path.resolve(process.cwd(), 'src/components/TelegramManager.jsx'),
+  path.resolve(process.cwd(), 'src/components/TelegramManager.tsx'),
   'utf8'
 ).replace(/\r\n/g, '\n');
 

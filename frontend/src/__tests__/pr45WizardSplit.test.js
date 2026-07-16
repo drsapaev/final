@@ -12,19 +12,19 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const ROOT = path.resolve(process.cwd());
-const WIZARD = path.join(ROOT, 'src/components/wizard/AppointmentWizardV2.jsx');
+const WIZARD = path.join(ROOT, 'src/components/wizard/AppointmentWizardV2.tsx');
 const WIZARD_DIR = path.join(ROOT, 'src/components/wizard');
 
 // ---------- 1. EditModeBanner extracted ----------
 
 describe('PR-45: EditModeBanner extraction', () => {
   it('EditModeBanner.jsx exists in wizard directory', () => {
-    const bannerPath = path.join(WIZARD_DIR, 'EditModeBanner.jsx');
+    const bannerPath = path.join(WIZARD_DIR, 'EditModeBanner.tsx');
     expect(fs.existsSync(bannerPath)).toBe(true);
   });
 
   it('EditModeBanner.jsx exports a component', () => {
-    const bannerPath = path.join(WIZARD_DIR, 'EditModeBanner.jsx');
+    const bannerPath = path.join(WIZARD_DIR, 'EditModeBanner.tsx');
     const src = fs.readFileSync(bannerPath, 'utf-8');
     expect(src).toMatch(/export\s+(?:default|const)\s+EditModeBanner/);
   });
@@ -39,12 +39,12 @@ describe('PR-45: EditModeBanner extraction', () => {
 
 describe('PR-45: StepProgressIndicator extraction', () => {
   it('StepProgressIndicator.jsx exists in wizard directory', () => {
-    const indicatorPath = path.join(WIZARD_DIR, 'StepProgressIndicator.jsx');
+    const indicatorPath = path.join(WIZARD_DIR, 'StepProgressIndicator.tsx');
     expect(fs.existsSync(indicatorPath)).toBe(true);
   });
 
   it('StepProgressIndicator.jsx exports a component', () => {
-    const indicatorPath = path.join(WIZARD_DIR, 'StepProgressIndicator.jsx');
+    const indicatorPath = path.join(WIZARD_DIR, 'StepProgressIndicator.tsx');
     const src = fs.readFileSync(indicatorPath, 'utf-8');
     expect(src).toMatch(/export\s+(?:default|const)\s+StepProgressIndicator/);
   });

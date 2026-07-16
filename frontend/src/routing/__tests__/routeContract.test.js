@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { renderRouteDocsMarkdown } from '../routeDocsSnapshot.js';
-import { resolveSetupRedirect } from '../routeGuards.jsx';
+import { resolveSetupRedirect } from '../routeGuards';
 import { ROUTE_REGISTRY, SIDEBAR_PRESETS } from '../routeRegistry.js';
 import {
   getCompatibilityRedirects,
