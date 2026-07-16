@@ -1,3 +1,6 @@
+// @ts-nocheck — Phase 6: file converted but not yet fully typed.
+// Proper typing deferred to Phase 9 cleanup (strict mode).
+
 import { ROUTE_REGISTRY, ROLE_HOME_PRIORITY, SIDEBAR_PRESETS } from './routeRegistry.js';
 
 export function buildRouteDocsSnapshot() {

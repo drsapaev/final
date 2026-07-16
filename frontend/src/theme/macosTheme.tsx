@@ -1,3 +1,6 @@
+// @ts-nocheck — Phase 6: file converted .jsx/.js → .tsx/.ts but not yet fully typed.
+// Proper typing deferred to Phase 9 cleanup (strict mode).
+
 import PropTypes from 'prop-types';
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { ensureMinContrast, getReadableTextColor, mixColors, toRgbaString } from './colorUtils.js';

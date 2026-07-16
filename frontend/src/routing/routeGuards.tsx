@@ -1,3 +1,6 @@
+// @ts-nocheck — Phase 6: file converted .jsx/.js → .tsx/.ts but not yet fully typed.
+// Proper typing deferred to Phase 9 cleanup (strict mode).
+
 import { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Navigate, useLocation } from 'react-router-dom';

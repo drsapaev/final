@@ -8,7 +8,7 @@ function read(relativePath) {
 
 describe('routing anti-regression enforcement', () => {
   it('keeps legacy consumers free from hand-maintained route tables', () => {
-    const routeRegistry = read('src/routing/routeRegistry.js');
+    const routeRegistry = read('src/routing/routeRegistry.ts');
 
     expect(read('src/components/layout/Nav.tsx')).not.toContain('const routes = [');
     expect(read('src/constants/routes.js')).not.toContain('const routeMap =');

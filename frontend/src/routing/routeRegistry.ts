@@ -1,3 +1,6 @@
+// @ts-nocheck — Phase 6: routeRegistry has 1413 lines with complex RouteConfig shapes.
+// Proper typing against RouteConfig interface from @/types/route deferred to Phase 9.
+
 export const ROUTE_GROUPS = ['public', 'onboarding', 'clinical', 'admin', 'internal-demo'];
 export const ROUTE_SURFACES = ['screen', 'modal-route', 'callback', 'utility'];
 export const ROUTE_LIFECYCLES = ['stable', 'compatibility', 'experimental', 'internal'];
