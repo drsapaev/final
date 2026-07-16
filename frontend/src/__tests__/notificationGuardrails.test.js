@@ -5,8 +5,8 @@ import { describe, expect, it } from 'vitest';
 const ROOT = path.resolve(process.cwd(), 'src');
 
 const NOTIFICATION_FILES = [
-  'contexts/NotificationCenterContext.jsx',
-  'contexts/NotificationWebSocketContext.jsx',
+  'contexts/NotificationCenterContext.tsx',
+  'contexts/NotificationWebSocketContext.tsx',
   'components/notifications/NotificationInbox.jsx',
   'components/notifications/RoleNotificationCenter.jsx',
   'components/chat/NotificationPrompt.jsx'
@@ -48,7 +48,7 @@ describe('notification guardrails', () => {
   });
 
   it('keeps notification center loaders stable to avoid fetch loops', () => {
-    const context = read('contexts/NotificationCenterContext.jsx');
+    const context = read('contexts/NotificationCenterContext.tsx');
     const roleCenter = read('components/notifications/RoleNotificationCenter.jsx');
 
     expect(context).toContain('const inboxRef = useRef(inbox);');
