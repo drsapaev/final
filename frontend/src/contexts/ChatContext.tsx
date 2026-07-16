@@ -72,7 +72,7 @@ export const ChatProvider = ({ children }) => {
   // Подписка на auth
   useEffect(() => {
     const unsubscribe = auth.subscribe(setAuthState);
-    return unsubscribe;
+    return () => { if (typeof unsubscribe === "function") unsubscribe(); };
   }, []);
 
   const markConversationLocallyRead = useCallback((userId) => {
@@ -218,7 +218,7 @@ export const ChatProvider = ({ children }) => {
           // PR-68 / P0-2: reuse singleton AudioContext to prevent leak
           // (browsers cap ~6 concurrent contexts; was creating one per message)
           if (!chatAudioContextRef.current) {
-            chatAudioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+            chatAudioContextRef.current = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
           }
           const audioContext = chatAudioContextRef.current;
           // Resume if suspended (browsers auto-suspend after inactivity)
