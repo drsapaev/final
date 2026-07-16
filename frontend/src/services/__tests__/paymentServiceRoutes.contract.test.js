@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const paymentServicePath = path.resolve(__dirname, '../payment.js');
+const paymentServicePath = path.resolve(__dirname, '../payment.ts');
 
 describe('paymentService receipt route contract', () => {
   it('uses the backend canonical GET receipt endpoint with format_type query params', () => {
