@@ -76,6 +76,7 @@ const buildStatsSummary = (stats, queues) => {
 };
 
 const QueueCabinetManagement = () => {
+  const { t } = useTranslation();
   const [filters, setFilters] = useState(INITIAL_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState(INITIAL_FILTERS);
   const [queues, setQueues] = useState([]);
@@ -120,7 +121,7 @@ const QueueCabinetManagement = () => {
       }
     } catch (error) {
       logger.error('Ошибка загрузки информации о кабинетах:', error);
-      toast.error('Ошибка загрузки информации о кабинетах');
+      toast.error(t('admin2.qcm_load_error'));
       setQueues([]);
       setStatistics(null);
     } finally {
@@ -164,11 +165,11 @@ const QueueCabinetManagement = () => {
         params,
       });
 
-      toast.success(result?.message || 'Кабинеты синхронизированы');
+      toast.success(result?.message || t('admin2.qcm_sync_success'));
       await loadData(appliedFilters);
     } catch (error) {
       logger.error('Ошибка синхронизации кабинетов:', error);
-      toast.error(error?.message || 'Ошибка синхронизации кабинетов');
+      toast.error(error?.message || t('admin2.qcm_sync_error'));
     } finally {
       setSyncing(false);
     }
@@ -191,7 +192,7 @@ const QueueCabinetManagement = () => {
               </div>
               <div>
                 <div className="admin-fw-600-primary">
-                  {queue.specialist_name || `Специалист #${queue.specialist_id}`}
+                  {queue.specialist_name || t('admin2.qcm_specialist_fallback', { id: queue.specialist_id })}
                 </div>
                 <div className="admin-fs-xs-tertiary-3">
                   ID {queue.specialist_id}
@@ -207,10 +208,10 @@ const QueueCabinetManagement = () => {
           cabinet_number: (
             <div>
               <div className="admin-primary-fw-600-1">
-                {queue.effective_cabinet || 'Не указан'}
+                {queue.effective_cabinet || t('admin2.qcm_not_specified')}
               </div>
               <div className="admin-fs-xs-tertiary-2">
-                Очередь: {queue.cabinet_number || '—'} · Врач: {queue.doctor_cabinet || '—'}
+                {t('admin2.qcm_queue_doctor_line', { queue: queue.cabinet_number || '—', doctor: queue.doctor_cabinet || '—' })}
               </div>
             </div>
           ),
@@ -233,7 +234,7 @@ const QueueCabinetManagement = () => {
             <Badge
               variant={queue.active ? 'success' : 'secondary'}
               className="admin-fs-xs-p-4px-10px">
-              {queue.active ? 'Активна' : 'Неактивна'}
+              {queue.active ? t('admin2.qcm_status_active') : t('admin2.qcm_status_inactive')}
             </Badge>
           ),
           sync_state: (
@@ -248,30 +249,29 @@ const QueueCabinetManagement = () => {
                 }
               >
                 {queue.sync_status === 'synced'
-                  ? 'Синхронизировано'
+                  ? t('admin2.qcm_sync_state_synced')
                   : queue.sync_status === 'stale'
-                    ? 'Очередь устарела'
+                    ? t('admin2.qcm_sync_state_stale')
                     : queue.sync_status === 'missing_doctor'
-                      ? 'Нет врача'
-                      : 'Нет кабинета врача'}
+                      ? t('admin2.qcm_sync_state_missing_doctor')
+                      : t('admin2.qcm_sync_state_missing_cabinet')}
               </Badge>
               <div className="admin-d-flex-fw-wrap-gap-6">
                 <Badge
                   variant={queue.linked_doctor_found ? 'success' : 'warning'}
                   className="admin-fs-xs"
                 >
-                  {queue.linked_doctor_found ? 'Врач найден' : 'Врач не найден'}
+                  {queue.linked_doctor_found ? t('admin2.qcm_doctor_found') : t('admin2.qcm_doctor_not_found')}
                 </Badge>
                 <Badge
                   variant={queue.doctor_has_cabinet ? 'success' : 'warning'}
                   className="admin-fs-xs"
                 >
-                  {queue.doctor_has_cabinet ? 'Кабинет врача задан' : 'Кабинет врача пуст'}
+                  {queue.doctor_has_cabinet ? t('admin2.qcm_doctor_cabinet_set') : t('admin2.qcm_doctor_cabinet_empty')}
                 </Badge>
               </div>
               <div className="admin-fs-xs-tertiary-1">
-                Канонический кабинет берётся из карточки врача. Здесь можно только проверить и
-                синхронизировать очередь.
+                {t('admin2.qcm_canonical_hint')}
               </div>
               {Array.isArray(queue.integrity_warnings) && queue.integrity_warnings.length > 0 ? (
                 <div className="admin-fs-xs-tertiary">
@@ -295,11 +295,11 @@ const QueueCabinetManagement = () => {
               <h2
                 className="admin-fs-2xl-fw-semi-primary-m-0-0-8px-0-d-flex-ai-center-gap-12">
                 <Building2 className="admin-w-32-h-32-blue" />
-                Кабинеты очередей
+                {t('admin2.qcm_title')}
               </h2>
               <p
                 className="admin-secondary-fs-sm-m-0-lh-1p5">
-                SSOT-панель для просмотра и синхронизации кабинетов очередей с данными врачей.
+                {t('admin2.qcm_subtitle')}
               </p>
             </div>
 
@@ -309,14 +309,14 @@ const QueueCabinetManagement = () => {
                 variant="outline"
                 className="admin-d-inline-flex-ai-center-gap-8">
                 <RefreshCw className="w-4 h-4" />
-                Обновить
+                {t('admin2.qcm_refresh')}
               </Button>
               <Button
                 onClick={syncFromDoctors}
                 disabled={syncing}
                 className="admin-d-inline-flex-ai-center-gap-8-bgc-blue-bd-none-1">
                 <Sparkles className="w-4 h-4" />
-                {syncing ? 'Синхронизация...' : 'Синхронизировать из врачей'}
+                {syncing ? t('admin2.qcm_syncing') : t('admin2.qcm_sync_from_doctors')}
               </Button>
             </div>
           </div>
@@ -324,28 +324,28 @@ const QueueCabinetManagement = () => {
           <div
             className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16-mb-24">
             <MacOSStatCard
-              title="Очередей"
+              title={t('admin2.qcm_stat_queues')}
               value={summary.totalQueues}
               icon={CalendarDays}
               color="blue"
               loading={loading}
             />
             <MacOSStatCard
-              title="С кабинетом"
+              title={t('admin2.qcm_stat_with_cabinet')}
               value={summary.queuesWithCabinet}
               icon={MapPin}
               color="green"
               loading={loading}
             />
             <MacOSStatCard
-              title="Кабинетов"
+              title={t('admin2.qcm_stat_cabinets')}
               value={summary.uniqueCabinets}
               icon={Building2}
               color="purple"
               loading={loading}
             />
             <MacOSStatCard
-              title="Записей"
+              title={t('admin2.qcm_stat_entries')}
               value={summary.totalEntries}
               icon={Users}
               color="orange"
@@ -361,7 +361,7 @@ const QueueCabinetManagement = () => {
                 <label
                   htmlFor="queue-cabinet-day"
                   className="admin-d-block-mb-8-secondary-fs-sm-fw-600-2">
-                  Дата
+                  {t('admin2.qcm_filter_date')}
                 </label>
                 <Input
                   id="queue-cabinet-day"
@@ -382,7 +382,7 @@ const QueueCabinetManagement = () => {
                 <Input
                   id="queue-cabinet-specialist"
                   type="number"
-                  placeholder="Например, 12"
+                  placeholder={t('admin2.qcm_filter_specialist_placeholder')}
                   value={filters.specialistId}
                   onChange={(event) =>
                     setFilters((current) => ({ ...current, specialistId: event.target.value }))
@@ -394,7 +394,7 @@ const QueueCabinetManagement = () => {
                 <label
                   htmlFor="queue-cabinet-number"
                   className="admin-d-block-mb-8-secondary-fs-sm-fw-600">
-                  Номер кабинета
+                  {t('admin2.qcm_filter_cabinet_number')}
                 </label>
                 <Input
                   id="queue-cabinet-number"
@@ -411,14 +411,14 @@ const QueueCabinetManagement = () => {
                   onClick={applyFilters}
                   className="admin-d-inline-flex-ai-center-gap-8-bgc-blue-bd-none">
                   <Search className="w-4 h-4" />
-                  Применить
+                  {t('admin2.qcm_apply')}
                 </Button>
                 <Button
                   onClick={resetFilters}
                   variant="outline"
                   className="admin-d-inline-flex-ai-center-gap-8">
                   <X className="w-4 h-4" />
-                  Сбросить
+                  {t('admin2.qcm_reset')}
                 </Button>
               </div>
             </div>
@@ -427,14 +427,14 @@ const QueueCabinetManagement = () => {
           {!loading && queues.length === 0 ? (
             <MacOSEmptyState
               icon={Building2}
-              title="Нет данных о кабинетах"
-              description="Измените фильтры или нажмите синхронизацию, чтобы подтянуть кабинеты из таблицы врачей."
+              title={t('admin2.qcm_empty_title')}
+              description={t('admin2.qcm_empty_description')}
               action={
                 <Button
                   onClick={() => loadData(appliedFilters)}
                   className="admin-d-inline-flex-ai-center-gap-8">
                   <RefreshCw className="w-4 h-4" />
-                  Повторить загрузку
+                  {t('admin2.qcm_retry_load')}
                 </Button>
               }
             />
@@ -461,7 +461,7 @@ const QueueCabinetManagement = () => {
                   <td
                     colSpan={9}
                     className="admin-p-40px-16px-ta-center-secondary">
-                    Нет данных для отображения
+                    {t('admin2.qcm_empty_table')}
                   </td>
                 </tr>
               }

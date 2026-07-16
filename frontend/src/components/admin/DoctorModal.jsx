@@ -22,6 +22,7 @@ const DoctorModal = ({
   availableUsers = [],
   departments = [],
 }) => {
+  const { t } = useTranslation();
   const [formData, setFormData] = useState({
     userId: '',
     specialty: '',
@@ -70,22 +71,22 @@ const DoctorModal = ({
   }, [availableUsers, doctor?.user, formData.userId]);
 
   const selectedUserStatus = useMemo(() => {
-    if (!selectedUser) return { variant: 'warning', label: 'Пользователь не выбран' };
+    if (!selectedUser) return { variant: 'warning', label: t('admin2.dmdl_user_not_selected') };
     if (selectedUser.is_active === false) {
-      return { variant: 'warning', label: 'Аккаунт пользователя неактивен' };
+      return { variant: 'warning', label: t('admin2.dmdl_user_account_inactive') };
     }
     if (selectedUser.linked_doctor_id && String(selectedUser.linked_doctor_id) !== String(doctor?.id || '')) {
-      return { variant: 'warning', label: `Уже связан с врачом #${selectedUser.linked_doctor_id}` };
+      return { variant: 'warning', label: t('admin2.dmdl_user_already_linked', { id: selectedUser.linked_doctor_id }) };
     }
-    return { variant: 'success', label: 'Связь активна' };
+    return { variant: 'success', label: t('admin2.dmdl_user_link_active') };
   }, [doctor?.id, selectedUser]);
 
   const userOptions = useMemo(
     () => [
-      { value: '', label: 'Выберите пользователя' },
+      { value: '', label: t('admin2.dmdl_user_select_placeholder') },
       ...availableUsers.map((user) => ({
         value: String(user.id),
-        label: `${user.full_name || user.username} • ${user.role}${user.is_active ? '' : ' • неактивен'}`,
+        label: `${user.full_name || user.username} • ${user.role}${user.is_active ? '' : t('admin2.dmdl_user_inactive_suffix')}`,
       })),
     ],
     [availableUsers]
@@ -94,22 +95,22 @@ const DoctorModal = ({
   const validateForm = () => {
     const nextErrors = {};
     if (!formData.userId) {
-      nextErrors.userId = 'Нужно выбрать существующий аккаунт пользователя';
+      nextErrors.userId = t('admin2.dmdl_err_user_required');
     }
     if (!formData.specialty.trim()) {
-      nextErrors.specialty = 'Специальность обязательна';
+      nextErrors.specialty = t('admin2.dmdl_err_specialty_required');
     } else if (!/^[a-z][a-z0-9_]*$/.test(formData.specialty.trim())) {
       // PR-19: validate specialty format — must match queue_tag pattern
-      nextErrors.specialty = 'Только латинские буквы в нижнем регистре, цифры и _ (например: cardiology)';
+      nextErrors.specialty = t('admin2.dmdl_err_specialty_format');
     }
     if (formData.priceDefault !== '' && Number.isNaN(Number(formData.priceDefault))) {
-      nextErrors.priceDefault = 'Цена должна быть числом';
+      nextErrors.priceDefault = t('admin2.dmdl_err_price_number');
     }
     if (formData.startNumberOnline !== '' && Number.isNaN(Number(formData.startNumberOnline))) {
-      nextErrors.startNumberOnline = 'Стартовый номер должен быть числом';
+      nextErrors.startNumberOnline = t('admin2.dmdl_err_start_number');
     }
     if (formData.maxOnlinePerDay !== '' && Number.isNaN(Number(formData.maxOnlinePerDay))) {
-      nextErrors.maxOnlinePerDay = 'Лимит онлайн-записей должен быть числом';
+      nextErrors.maxOnlinePerDay = t('admin2.dmdl_err_max_online_number');
     }
 
     setErrors(nextErrors);
@@ -143,7 +144,7 @@ const DoctorModal = ({
       });
       onClose();
     } catch (error) {
-      setSubmitError(error.message || 'Ошибка сохранения врача');
+      setSubmitError(error.message || t('admin2.dmdl_err_save_fallback'));
     }
   };
 
@@ -161,7 +162,7 @@ const DoctorModal = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={doctor ? 'Редактировать врача' : 'Добавить врача'}
+      title={doctor ? t('admin2.dmdl_title_edit') : t('admin2.dmdl_title_add')}
       size="lg"
     >
       <form
@@ -176,7 +177,7 @@ const DoctorModal = ({
 
         <div>
           <Label required className="admin-label-block-mb-8">
-            Пользователь
+            {t('admin2.dmdl_label_user')}
           </Label>
           <Select
             value={formData.userId}
@@ -192,7 +193,7 @@ const DoctorModal = ({
           className="admin-grid-autofit-220-16"
         >
           <div>
-            <Label className="admin-label-block-mb-8">ФИО</Label>
+            <Label className="admin-label-block-mb-8">{t('admin2.dmdl_label_full_name')}</Label>
             <Input value={selectedUser?.full_name || ''} readOnly icon={User} />
           </div>
           <div>
@@ -204,7 +205,7 @@ const DoctorModal = ({
             <Input value={selectedUser?.phone || ''} readOnly icon={Phone} />
           </div>
           <div>
-            <Label className="admin-label-block-mb-8">Роль</Label>
+            <Label className="admin-label-block-mb-8">{t('admin2.dmdl_label_role')}</Label>
             <Input value={selectedUser?.role || ''} readOnly />
           </div>
         </div>
@@ -214,7 +215,7 @@ const DoctorModal = ({
             {selectedUserStatus.label}
           </Badge>
           <Badge variant={formData.cabinet ? 'info' : 'warning'}>
-            {formData.cabinet ? `Кабинет ${formData.cabinet}` : 'Кабинет не задан'}
+            {formData.cabinet ? t('admin2.dmdl_cabinet_set', { cabinet: formData.cabinet }) : t('admin2.dmdl_cabinet_not_set')}
           </Badge>
         </div>
 
@@ -223,14 +224,14 @@ const DoctorModal = ({
         >
           <div>
             <Label required className="admin-label-block-mb-8">
-              Специальность
+              {t('admin2.dmdl_label_specialty')}
             </Label>
             {departments.length > 0 ? (
               <Select
                 value={formData.specialty}
                 onChange={(value) => handleChange('specialty', value)}
                 options={[
-                  { value: '', label: '— Выберите отделение —' },
+                  { value: '', label: t('admin2.dmdl_select_department_placeholder') },
                   ...departments.map((d) => ({ value: d.value, label: d.label })),
                 ]}
                 size="large"
@@ -244,7 +245,7 @@ const DoctorModal = ({
             )}
             {renderFieldError('specialty')}
             <div className="admin-hint-text-12-secondary-mt-4">
-              Должно совпадать с key отделения (например: cardiology, derma, dental)
+              {t('admin2.dmdl_specialty_hint')}
             </div>
           </div>
 
@@ -260,7 +261,7 @@ const DoctorModal = ({
 
           <div>
             <Label className="admin-label-block-mb-8">
-              Цена по умолчанию
+              {t('admin2.dmdl_label_price_default')}
             </Label>
             <Input
               type="number"
@@ -273,7 +274,7 @@ const DoctorModal = ({
 
           <div>
             <Label className="admin-label-block-mb-8">
-              Стартовый номер онлайн
+              {t('admin2.dmdl_label_start_number')}
             </Label>
             <Input
               type="number"
@@ -286,7 +287,7 @@ const DoctorModal = ({
 
           <div>
             <Label className="admin-label-block-mb-8">
-              Онлайн записей в день
+              {t('admin2.dmdl_label_max_online')}
             </Label>
             <Input
               type="number"
@@ -302,8 +303,8 @@ const DoctorModal = ({
           <Checkbox
             checked={formData.active}
             onChange={(checked) => handleChange('active', checked)}
-            label="Врач активен"
-            description="Неактивные врачи не участвуют в текущих операционных сценариях."
+            label={t('admin2.dmdl_active_label')}
+            description={t('admin2.dmdl_active_description')}
           />
         </div>
 
@@ -311,10 +312,10 @@ const DoctorModal = ({
           className="admin-modal-actions-footer"
         >
           <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
-            Отмена
+            {t('admin2.dmdl_btn_cancel')}
           </Button>
           <Button type="submit" disabled={loading} icon={<Save size={16} />}>
-            {doctor ? 'Сохранить изменения' : 'Добавить врача'}
+            {doctor ? t('admin2.dmdl_btn_save') : t('admin2.dmdl_title_add')}
           </Button>
         </div>
       </form>
