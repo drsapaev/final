@@ -165,7 +165,7 @@ export async function applyRegistrarEditDelta({
   };
   // R-08 fix: add optimistic locking map if provided
   if (expectedEntryUpdatedAt && typeof expectedEntryUpdatedAt === 'object') {
-    payload.expected_entry_updated_at = expectedEntryUpdatedAt;
+    (payload as Record<string, unknown>).expected_entry_updated_at = expectedEntryUpdatedAt;
   }
   const response = await api.post('/registrar/cart/edit-delta', payload);
   return response.data;

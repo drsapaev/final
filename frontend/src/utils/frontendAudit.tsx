@@ -591,7 +591,7 @@ export function getFileStats() {
     correct: files.filter(f => f.status === 'correct').length,
     needsMove: files.filter(f => f.status === 'needs_move').length,
     needsFix: files.filter(f => f.status === 'needs_fix').length,
-    hasIssues: files.filter(f => f.issues && f.issues.length > 0).length
+    hasIssues: files.filter(f => (f as { issues?: unknown[] }).issues && (f as { issues?: unknown[] }).issues!.length > 0).length
   };
   
   return stats;
@@ -611,7 +611,7 @@ export function getFilesByStatus(status) {
  */
 export function getFilesWithIssues() {
   return Object.entries(FRONTEND_FILE_MAP)
-    .filter(([, file]) => file.issues && file.issues.length > 0)
+    .filter(([, file]) => (file as { issues?: unknown[] }).issues && (file as { issues?: unknown[] }).issues!.length > 0)
     .map(([path, file]) => ({ path, ...file }));
 }
 
@@ -877,9 +877,9 @@ export function FrontendAuditDisplay() {
           {filesWithIssues.map((file, index) => (
             <div key={index} style={issueItemStyle}>
               <div style={issuePathStyle}>{file.path}</div>
-              {file.issues.map((issue, issueIndex) => (
+              {(file as { issues?: unknown[] }).issues?.map((issue, issueIndex) => (
                 <div key={issueIndex} style={issueTextStyle}>
-                  • {issue}
+                  • {String(issue)}
                 </div>
               ))}
             </div>

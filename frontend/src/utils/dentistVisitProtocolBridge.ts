@@ -28,12 +28,12 @@ function resolveSavedAt(visitData, fallback = null) {
   );
 }
 
-export function buildDentistVisitProtocolData(patient, visitData, options = {}) {
+export function buildDentistVisitProtocolData(patient: unknown, visitData: Record<string, unknown>, options: Record<string, unknown> = {}): Record<string, unknown> {
   const source = options.source || 'local_cache';
   const protocolData = cloneValue(visitData);
   const patientId = resolvePatientId(patient);
   const patientName = resolvePatientName(patient);
-  const visitId = options.visitId || patient?.visit_id || protocolData.visit_id || null;
+  const visitId = options.visitId || (patient as { visit_id?: unknown })?.visit_id || protocolData.visit_id || null;
   const savedAt = resolveSavedAt(protocolData, options.savedAt);
 
   protocolData.patient_id = patientId;
@@ -46,7 +46,7 @@ export function buildDentistVisitProtocolData(patient, visitData, options = {}) 
   return protocolData;
 }
 
-export function buildDentistVisitProtocolCard(patient, visitData, options = {}) {
+export function buildDentistVisitProtocolCard(patient: unknown, visitData: Record<string, unknown>, options: Record<string, unknown> = {}): Record<string, unknown> {
   const protocolData = buildDentistVisitProtocolData(patient, visitData, options);
 
   return {
@@ -84,7 +84,7 @@ export function buildDentistVisitProtocolEmrPayload(patient, visitData) {
   };
 }
 
-export function buildDentistVisitProtocolSaveRequest(patient, visitData, options = {}) {
+export function buildDentistVisitProtocolSaveRequest(patient: unknown, visitData: Record<string, unknown>, options: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     data: buildDentistVisitProtocolEmrPayload(patient, visitData),
     row_version: options.rowVersion ?? 0,
