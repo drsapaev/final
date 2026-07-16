@@ -9,7 +9,7 @@ const __dirname = path.dirname(__filename);
 const ROOT = path.resolve(__dirname, '../..');
 
 const source = fs.readFileSync(
-  path.join(ROOT, 'api/labReporting.js'),
+  path.join(ROOT, 'api/labReporting.ts'),
   'utf8'
 );
 
@@ -29,7 +29,8 @@ describe('labReportingApi UX-AUDIT-FIX12 — AbortController support', () => {
 
   it('preserves existing request signature (path, options)', () => {
     // Backward-compat: существующие вызовы без signal продолжают работать.
-    expect(source).toContain('async function request(path, options = {}) {');
+    // Phase 1 TS migration: signature now has type annotations.
+    expect(source).toMatch(/async function request\(path[^,]*,\s*options[^=]*=\s*\{\s*\}\)/);
   });
 
   it('uses spread operator to pass signal conditionally', () => {
@@ -41,7 +42,10 @@ describe('labReportingApi UX-AUDIT-FIX12 — AbortController support', () => {
     // FIX: listQueueToday ранее принимал только targetDate. Теперь принимает
     // второй аргумент params = { limit, offset } для server-side pagination.
     expect(source).toContain('STRAT#4');
-    expect(source).toContain('listQueueToday(targetDate = null, params = {})');
+    // Phase 1 TS migration: params now have type annotations. Match the
+    // signature either without (JS) or with (TS) type annotations on both
+    // targetDate and params.
+    expect(source).toMatch(/listQueueToday\(targetDate(?:\s*:[^=]+)?\s*=\s*null,\s*params(?:\s*:[^=]+)?\s*=\s*\{\s*\}\)/);
     // limit и offset пробрасываются в query string
     expect(source).toContain("params.limit !== undefined");
     expect(source).toContain("search.set('limit', String(params.limit))");

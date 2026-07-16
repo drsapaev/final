@@ -35,7 +35,7 @@ import logger from '../utils/logger';
  * @param {number} [options.limit=100]
  * @returns {Promise<Array<object>>} Массив overrides
  */
-export async function fetchPriceOverrides({ statusFilter = 'pending', limit = 100 } = {}) {
+export async function fetchPriceOverrides({ statusFilter = 'pending', limit = 100 }: Record<string, unknown> = {}) {
   const response = await api.get('/registrar/price-overrides', {
     params: { status_filter: statusFilter, limit },
   });
