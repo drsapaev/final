@@ -7,17 +7,17 @@ const ROOT = path.resolve(process.cwd(), 'src');
 const NOTIFICATION_FILES = [
   'contexts/NotificationCenterContext.tsx',
   'contexts/NotificationWebSocketContext.tsx',
-  'components/notifications/NotificationInbox.jsx',
-  'components/notifications/RoleNotificationCenter.jsx',
-  'components/chat/NotificationPrompt.jsx'
+  'components/notifications/NotificationInbox.tsx',
+  'components/notifications/RoleNotificationCenter.tsx',
+  'components/chat/NotificationPrompt.tsx'
 ];
 
 const PANEL_FILES = [
-  'pages/RegistrarPanel.jsx',
-  'pages/CardiologistPanelUnified.jsx',
-  'pages/DentistPanelUnified.jsx',
-  'pages/DermatologistPanelUnified.jsx',
-  'pages/LabPanel.jsx'
+  'pages/RegistrarPanel.tsx',
+  'pages/CardiologistPanelUnified.tsx',
+  'pages/DentistPanelUnified.tsx',
+  'pages/DermatologistPanelUnified.tsx',
+  'pages/LabPanel.tsx'
 ];
 
 function read(filePath) {
@@ -32,7 +32,7 @@ describe('notification guardrails', () => {
       expect(content).not.toContain('alert(');
     }
 
-    const prompt = read('components/chat/NotificationPrompt.jsx');
+    const prompt = read('components/chat/NotificationPrompt.tsx');
     expect(prompt).toContain('notify.warning(');
     expect(prompt).toContain('notify.error(');
 
@@ -42,14 +42,14 @@ describe('notification guardrails', () => {
       expect(content).not.toMatch(/react-toastify/);
     }
 
-    const registrar = read('pages/RegistrarPanel.jsx');
+    const registrar = read('pages/RegistrarPanel.tsx');
     expect(registrar).toContain('loadAppointmentsInFlightRef');
     expect(registrar).toContain('autoRefreshCooldownUntilRef');
   });
 
   it('keeps notification center loaders stable to avoid fetch loops', () => {
     const context = read('contexts/NotificationCenterContext.tsx');
-    const roleCenter = read('components/notifications/RoleNotificationCenter.jsx');
+    const roleCenter = read('components/notifications/RoleNotificationCenter.tsx');
 
     expect(context).toContain('const inboxRef = useRef(inbox);');
     expect(context).toContain('const unreadSnapshotRef = useRef(unreadSnapshot);');
@@ -64,7 +64,7 @@ describe('notification guardrails', () => {
   });
 
   it('keeps registrar table action visibility on backend-provided actions', () => {
-    const table = read('components/tables/EnhancedAppointmentsTable.jsx');
+    const table = read('components/tables/EnhancedAppointmentsTable.tsx');
 
     expect(table).toContain('getBackendActionAvailability');
     expect(table).toContain('can_mark_paid');

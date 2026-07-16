@@ -12,7 +12,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const ROOT = path.resolve(process.cwd());
-const REGISTRAR = path.join(ROOT, 'src/pages/RegistrarPanel.jsx');
+const REGISTRAR = path.join(ROOT, 'src/pages/RegistrarPanel.tsx');
 const DATE_UTILS = path.join(ROOT, 'src/utils/dateUtils.js');
 const FORMAT_CURRENCY = path.join(ROOT, 'src/utils/formatCurrency.js');
 
