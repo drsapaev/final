@@ -9,7 +9,7 @@ const wizardPath = path.resolve(__dirname, '../AppointmentWizardV2.tsx');
 const wizardUtilsPath = path.resolve(__dirname, '../wizardUtils.ts');
 const patientStepPath = path.resolve(__dirname, '../PatientStepV2.tsx');
 const cartStepPath = path.resolve(__dirname, '../CartStepV2.tsx');
-const serviceResolverPath = path.resolve(__dirname, '../../../utils/serviceCodeResolver.js');
+const serviceResolverPath = path.resolve(__dirname, '../../../utils/serviceCodeResolver.ts');
 
 // UX Audit Stage 3 (Wizard issue 5.2):
 // Helper-функции вынесены в wizardUtils.js, а step-компоненты — в

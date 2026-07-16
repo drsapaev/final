@@ -7,7 +7,7 @@ import { useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { MemoryRouter } from 'react-router-dom';
 import { ChatProvider, useChat } from '../ChatContext';
-import { MESSAGE_EVENT_TYPES } from '../../constants/messagingContract.js';
+import { MESSAGE_EVENT_TYPES } from '../../constants/messagingContract.ts';
 
 const {
   authMock,

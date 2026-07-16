@@ -14,7 +14,7 @@ const { apiMock } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('../../../api/client.js', () => ({
+vi.mock('../../../api/client.ts', () => ({
   api: apiMock,
 }));
 

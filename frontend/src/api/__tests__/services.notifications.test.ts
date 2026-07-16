@@ -5,16 +5,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const apiRequestMock = vi.hoisted(() => vi.fn());
 
-vi.mock('../client.js', () => ({
+vi.mock('../client.ts', () => ({
   apiRequest: apiRequestMock,
   api: {}
 }));
 
-import { apiRequest } from '../client.js';
+import { apiRequest } from '../client.ts';
 import {
   clearNotificationQueryCache,
   notificationsService
-} from '../services.js';
+} from '../services.ts';
 
 describe('notificationsService cache', () => {
   beforeEach(() => {

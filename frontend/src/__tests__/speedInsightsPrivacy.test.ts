@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { ROUTE_REGISTRY } from '../routing/routeRegistry';
-import { sanitizeSpeedInsightsEvent } from '../utils/speedInsightsPrivacy.js';
+import { sanitizeSpeedInsightsEvent } from '../utils/speedInsightsPrivacy.ts';
 
 describe('Speed Insights privacy sanitizer', () => {
   it('drops query strings and hashes that can contain patient workflow identifiers', () => {

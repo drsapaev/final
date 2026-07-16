@@ -12,8 +12,8 @@ import { describe, expect, it } from 'vitest';
 
 const ROOT = path.resolve(process.cwd());
 const OFFLINE_INDICATOR = path.join(ROOT, 'src/components/mobile/OfflineIndicator.tsx');
-const WS_AUTH = path.join(ROOT, 'src/utils/websocketAuth.js');
-const WS_JS = path.join(ROOT, 'src/api/ws.js');
+const WS_AUTH = path.join(ROOT, 'src/utils/websocketAuth.ts');
+const WS_JS = path.join(ROOT, 'src/api/ws.ts');
 
 // ---------- 1. P0-1: No PHI in plaintext localStorage ----------
 

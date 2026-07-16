@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { API_ENDPOINTS } from '../endpoints.js';
+import { API_ENDPOINTS } from '../endpoints.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const apiDir = path.resolve(__dirname, '..');
@@ -13,7 +13,7 @@ const readSource = (fileName) => fs.readFileSync(path.join(apiDir, fileName), 'u
 
 describe('auth login API contract', () => {
   it('uses the canonical authentication login route in the API helper', () => {
-    const clientSource = readSource('client.js');
+    const clientSource = readSource('client.ts');
 
     expect(clientSource).toContain('api.post(\'/authentication/login\'');
     expect(clientSource).not.toContain('api.post(\'/auth/login\'');

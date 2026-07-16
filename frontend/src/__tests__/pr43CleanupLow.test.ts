@@ -12,7 +12,7 @@ import { describe, expect, it } from 'vitest';
 
 const ROOT = path.resolve(process.cwd());
 const DENTIST_PANEL = path.join(ROOT, 'src/pages/DentistPanelUnified.tsx');
-const FILE_VALIDATOR = path.join(ROOT, 'src/utils/fileValidator.js');
+const FILE_VALIDATOR = path.join(ROOT, 'src/utils/fileValidator.ts');
 const CASHIER_PANEL = path.join(ROOT, 'src/pages/CashierPanel.tsx');
 
 // ---------- 1. DentistPanel stubs ----------

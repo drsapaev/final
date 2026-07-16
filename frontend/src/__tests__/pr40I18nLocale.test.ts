@@ -13,8 +13,8 @@ import { describe, expect, it } from 'vitest';
 
 const ROOT = path.resolve(process.cwd());
 const REGISTRAR = path.join(ROOT, 'src/pages/RegistrarPanel.tsx');
-const DATE_UTILS = path.join(ROOT, 'src/utils/dateUtils.js');
-const FORMAT_CURRENCY = path.join(ROOT, 'src/utils/formatCurrency.js');
+const DATE_UTILS = path.join(ROOT, 'src/utils/dateUtils.ts');
+const FORMAT_CURRENCY = path.join(ROOT, 'src/utils/formatCurrency.ts');
 
 // ---------- 1. P0-18: Unified localStorage key ----------
 

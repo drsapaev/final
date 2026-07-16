@@ -10,7 +10,7 @@ import { setProfile } from '../../stores/auth';
 import { getRouteForProfile } from '../../constants/routes';
 import { getCanonicalRouteById, getEffectiveRouteByPath } from '../../routing/routeSelectors.js';
 import { useSetupStatus } from '../../hooks/useSetupStatus.js';
-import { colors } from '../../theme/tokens';
+import { colors } from '../../theme/tokens-legacy';
 import { BRAND } from '../../config/brand';
 import TwoFactorVerify from '../TwoFactorVerify.jsx';
 import ForgotPassword from './ForgotPassword';

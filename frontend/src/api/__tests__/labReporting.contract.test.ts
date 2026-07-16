@@ -9,7 +9,7 @@ const __dirname = path.dirname(__filename);
 const ROOT = path.resolve(__dirname, '../..');
 
 const source = fs.readFileSync(
-  path.join(ROOT, 'api/labReporting.js'),
+  path.join(ROOT, 'api/labReporting.ts'),
   'utf8'
 );
 
