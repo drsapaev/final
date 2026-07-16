@@ -21,7 +21,7 @@ import logger from '../../../../utils/logger';
 import './DermatologySection.css';
 import { Checkbox } from '../../../ui/macos';
 import { useTranslation } from '../../../../i18n/useTranslation';
-import i18n from '../../../i18n';
+import i18n from '../../../../i18n';
 
 /**
  * DermatologySection Component
