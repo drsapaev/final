@@ -68,3 +68,14 @@ declare module '@vercel/speed-insights/react' {
 declare module '@vercel/speed-insights' {
   export function inject(): void;
 }
+
+
+// CSS module side-effect imports (Vite handles these at build time)
+declare module '*.css';
+declare module '*.svg';
+declare module '*.png';
+declare module '*.jpg';
+declare module '*.jpeg';
+declare module '*.gif';
+declare module '*.webp';
+declare module '*.ico';

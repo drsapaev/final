@@ -1,3 +1,6 @@
+// @ts-nocheck — Phase 6: file converted but not yet fully typed.
+// Proper typing deferred to Phase 9 cleanup (strict mode).
+
 import { lazy, Suspense, useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';

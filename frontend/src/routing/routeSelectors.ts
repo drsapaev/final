@@ -1,3 +1,6 @@
+// @ts-nocheck — Phase 6: file converted .jsx/.js → .tsx/.ts but not yet fully typed.
+// Proper typing deferred to Phase 9 cleanup (strict mode).
+
 import { generatePath, matchPath } from 'react-router-dom';
 import { buildRouteDocsSnapshot } from './routeDocsSnapshot.js';
 import { ROLE_ALIASES, ROLE_HOME_PRIORITY, ROUTE_REGISTRY, SIDEBAR_PRESETS } from './routeRegistry.js';
