@@ -45,7 +45,7 @@ describe('auth store', () => {
     });
     me.mockRejectedValueOnce({ response: { status: 401 } });
 
-    const auth = await import('../auth.js');
+    const auth = await import('../auth');
     const profile = await auth.getProfile(true);
 
     expect(profile).toBeNull();
@@ -60,7 +60,7 @@ describe('auth store', () => {
       auth_profile: JSON.stringify({ id: 1, username: 'registrar' }),
     });
 
-    const auth = await import('../auth.js');
+    const auth = await import('../auth');
     const state = await auth.validateSession(true);
 
     expect(me).not.toHaveBeenCalled();
@@ -76,7 +76,7 @@ describe('auth store', () => {
     });
     me.mockResolvedValue({ id: 1, username: 'registrar' });
 
-    const auth = await import('../auth.js');
+    const auth = await import('../auth');
     const firstState = await auth.validateSession(true);
     const secondState = await auth.validateSession();
 
@@ -95,7 +95,7 @@ describe('auth store', () => {
     });
     me.mockRejectedValueOnce({ response: { status: 429 } });
 
-    const auth = await import('../auth.js');
+    const auth = await import('../auth');
     const state = await auth.validateSession(true);
 
     expect(state).toEqual({
