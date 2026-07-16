@@ -36,6 +36,7 @@ import tokenManager from '../utils/tokenManager';
 import notify from '../services/notify';
 // STRAT#33: useTranslation adapter for confirm/notify i18n.
 import { useTranslation } from '../i18n/useTranslation';
+import i18n from '../i18n';
 import { useConfirm } from '../components/common/ConfirmDialog';
 import { useSessionTimeoutWarning } from '../hooks/useSessionTimeoutWarning';
 import { useDermaHotkeys } from '../hooks/useDermaHotkeys';
@@ -110,7 +111,7 @@ function splitFullName(fullName) {
   };
 }
 
-function buildDermatologyPatientFromAppointment(appointment) {
+function buildDermatologyPatientFromAppointment(appointment, t) {
   if (!appointment) {
     return null;
   }
@@ -121,7 +122,7 @@ function buildDermatologyPatientFromAppointment(appointment) {
   }
 
   const patientName =
-    appointment.patient_fio || appointment.patient_name || appointment.name || tI18n('derma.derma_panel_patient_default');
+    appointment.patient_fio || appointment.patient_name || appointment.name || i18n.t('derma.derma_panel_patient_default');
   const nameParts = splitFullName(patientName);
 
   return {
@@ -145,11 +146,11 @@ function buildDermatologyPatientFromAppointment(appointment) {
   };
 }
 
-function buildPatientsFromAppointments(appointments) {
+function buildPatientsFromAppointments(appointments, t) {
   const patientsById = new Map();
 
   appointments.forEach((appointment) => {
-    const patient = buildDermatologyPatientFromAppointment(appointment);
+    const patient = buildDermatologyPatientFromAppointment(appointment, i18n.t.bind(null));
     if (!patient || patientsById.has(patient.patient_id)) {
       return;
     }
@@ -390,7 +391,7 @@ const DermatologistPanelUnified = () => {
       const cachedAppointments = getRecentDermatologyCache(dermatologyRequestCache.appointments, []);
       if (cachedAppointments) {
         setAppointments(cachedAppointments);
-        setPatients(buildPatientsFromAppointments(cachedAppointments));
+        setPatients(buildPatientsFromAppointments(cachedAppointments, tI18n));
         return cachedAppointments;
       }
     }
@@ -481,7 +482,7 @@ const DermatologistPanelUnified = () => {
         });
 
         setAppointments(enrichedAppointmentsData);
-        setPatients(buildPatientsFromAppointments(enrichedAppointmentsData));
+        setPatients(buildPatientsFromAppointments(enrichedAppointmentsData, tI18n));
         dermatologyRequestCache.appointments.data = enrichedAppointmentsData;
         logger.info('[Dermatology] Загружено записей:', enrichedAppointmentsData.length);
         return enrichedAppointmentsData;
@@ -562,7 +563,7 @@ const DermatologistPanelUnified = () => {
 
     const patientForEdit =
       patientFromCache ||
-      buildDermatologyPatientFromAppointment(row) ||
+      buildDermatologyPatientFromAppointment(row, tI18n) ||
       createPartialPatientFromRow(row);
 
     logger.info('[Dermatology] Открытие модального окна редактирования из локальных данных для:', row.patient_fio);
@@ -921,7 +922,7 @@ const DermatologistPanelUnified = () => {
         });
 
         const applyAppointmentSelection = (appointment) => {
-          const patientObj = buildDermatologyPatientFromAppointment(appointment);
+          const patientObj = buildDermatologyPatientFromAppointment(appointment, i18n.t.bind(null));
           if (!patientObj) {
             return false;
           }
@@ -1087,7 +1088,7 @@ const DermatologistPanelUnified = () => {
       currentAppointment?.patient_fio ||
       currentAppointment?.patient_name ||
       selectedPatient?.name ||
-      tI18n('derma.derma_panel_patient_default');
+      i18n.t('derma.derma_panel_patient_default');
 
     const payload = {
       prescription: {

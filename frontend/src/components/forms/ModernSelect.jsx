@@ -13,10 +13,11 @@ import { useTheme } from '../../contexts/ThemeContext';
 import './ModernSelect.css';
 import { Input } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
+import i18n from '../../i18n';
 
 const ModernSelect = ({
   label,
-  placeholder = t('misc.ms_vyberite_optsiyu'),
+  placeholder = i18n.t('misc.ms_vyberite_optsiyu'),
   value,
   onChange,
   options = [],
@@ -252,8 +253,8 @@ const ModernSelect = ({
                   className="tag-remove"
                   onClick={(e) => handleRemoveOption(e, val)}
                   tabIndex={0}  // PR-42 / Medium-G: was -1 (removed from tab order)
-                  aria-label={t('misc.ms_udalit')}
-                  title={t('misc.ms_udalit')}>
+                  aria-label={i18n.t('misc.ms_udalit')}
+                  title={i18n.t('misc.ms_udalit')}>
                   
                   <X size={12} />
                 </button>
@@ -355,8 +356,8 @@ const ModernSelect = ({
             className="select-action-btn"
             onClick={handleClear}
             tabIndex={0}  // PR-42 / Medium-G: was -1 (removed from tab order)
-            aria-label={t('misc.ms_ochistit_vybor')}
-            title={t('misc.ms_ochistit_vybor')}>
+            aria-label={i18n.t('misc.ms_ochistit_vybor')}
+            title={i18n.t('misc.ms_ochistit_vybor')}>
             
               <X size={16} />
             </button>
@@ -400,8 +401,8 @@ const ModernSelect = ({
             ref={searchInputRef}
             type="text"
             className="search-input"
-            aria-label={t('misc.ms_poisk_accessiblelabel', { accessibleLabel: accessibleLabel })}
-            placeholder={t('common.search')}
+            aria-label={i18n.t('misc.ms_poisk_accessiblelabel', { accessibleLabel: accessibleLabel })}
+            placeholder={i18n.t('common.search')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{
@@ -417,7 +418,7 @@ const ModernSelect = ({
             {loading ?
           <div className="select-loading">
                 <div className="loading-spinner" />
-                <span>{t('misc.ms_zagruzka')}</span>
+                <span>{i18n.t('misc.ms_zagruzka')}</span>
               </div> :
 
           (() => {

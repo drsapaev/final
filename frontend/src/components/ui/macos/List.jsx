@@ -13,7 +13,7 @@ const List = React.forwardRef(({
   variant = 'default',
   dense = false,
   ...props
-}, ref) => {void
+}, ref) => {
   useTheme();
 
   const listStyles = {

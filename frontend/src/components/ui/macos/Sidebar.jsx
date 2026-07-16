@@ -28,7 +28,7 @@ const Sidebar = React.forwardRef(({
   className = '',
   style = {},
   ...props
-}, ref) => {void
+}, ref) => {
   useTheme();
   void variant;
   // PR-49: persist collapse state in localStorage (was reset on every refresh)

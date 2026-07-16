@@ -9,6 +9,7 @@ import {
 } from './labUiLabels';
 
 import { useTranslation } from '../../i18n/useTranslation';
+import i18n from '../../i18n';
 /**
  * STRAT#28: QueueCard — extracted from LabQueueWorkbench, wrapped in React.memo.
  *
@@ -38,10 +39,10 @@ function QueueCard({ appointment, isSelected = false, onOpenAppointment }) {
       <div className="lqw-card-top">
         <div className="lqw-card-info">
           <div className="lqw-card-name">
-            {appointment.patient_fio || t('queue.patient_no_name')}
+            {appointment.patient_fio || i18n.t('queue.patient_no_name')}
           </div>
           <div className="lqw-card-meta">
-            {t('queue.visit')}: {appointment.visit_id || t('queue.visit_not_linked')} | {t('queue.phone')}:{' '}
+            {i18n.t('queue.visit')}: {appointment.visit_id || i18n.t('queue.visit_not_linked')} | {i18n.t('queue.phone')}:{' '}
             <MaskedPhone phone={appointment.patient_phone} />
           </div>
         </div>
@@ -51,12 +52,12 @@ function QueueCard({ appointment, isSelected = false, onOpenAppointment }) {
       </div>
 
       <div className="lqw-card-services">
-        <strong>{t('queue.services')}:</strong> {formatServices(appointment)}
+        <strong>{i18n.t('queue.services')}:</strong> {formatServices(appointment)}
       </div>
 
       <div className="lqw-meta-row">
         <Badge variant="primary">{formatSpecialtyLabel(appointment.specialty)}</Badge>
-        {appointment.payment_status && <Badge variant="info">{t('queue.payment')}: {formatPaymentStatus(appointment.payment_status)}</Badge>}
+        {appointment.payment_status && <Badge variant="info">{i18n.t('queue.payment')}: {formatPaymentStatus(appointment.payment_status)}</Badge>}
         {appointment.appointment_time && <Badge variant="default">{appointment.appointment_time}</Badge>}
         {appointment.report_template_name && <Badge variant="info">{appointment.report_template_name}</Badge>}
       </div>
@@ -66,9 +67,9 @@ function QueueCard({ appointment, isSelected = false, onOpenAppointment }) {
           <details className="lqw-pii-details">
             <summary
               className="lqw-pii-summary"
-              aria-label={t('queue.patient_id_aria')}
+              aria-label={i18n.t('queue.patient_id_aria')}
             >
-              {t('queue.patient_id_label')} ▸
+              {i18n.t('queue.patient_id_label')} ▸
             </summary>
             <span className="lqw-pii-value">
               {appointment.patient_id}
@@ -77,7 +78,7 @@ function QueueCard({ appointment, isSelected = false, onOpenAppointment }) {
         </div>
         <Badge variant={appointment.report_instance_id ? 'success' : 'info'}>
           <Icon name="doc.text" size={12} />
-          {appointment.report_instance_id ? t('queue.report_exists') : t('queue.report_new')}
+          {appointment.report_instance_id ? i18n.t('queue.report_exists') : i18n.t('queue.report_new')}
         </Badge>
       </div>
     </div>
@@ -98,7 +99,7 @@ function maskPhone(phone) {
 }
 
 function MaskedPhone({ phone }) {
-  if (!phone) return <span className="lqw-masked-phone-empty">{t('pii.phone_not_set')}</span>;
+  if (!phone) return <span className="lqw-masked-phone-empty">{i18n.t('pii.phone_not_set')}</span>;
   return (
     <span className="lqw-masked-phone-text">{maskPhone(phone)}</span>
   );
@@ -118,7 +119,7 @@ function formatServices(appointment) {
   if (serviceCodes.length > 0) {
     return serviceCodes.join(', ');
   }
-  return t('pii.no_services');
+  return i18n.t('pii.no_services');
 }
 
 QueueCard.propTypes = {

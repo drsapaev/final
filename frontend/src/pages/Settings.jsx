@@ -54,7 +54,7 @@ function Row({ k, v, onSave }) {
  *  - Вкладка "online_queue": простые пары key/value
  */
 export default function Settings() {void
-  useTheme();void
+  useTheme();
   useState('Settings');
   const { t } = useTranslation();
   // P-013 fix: shared ConfirmDialog hook (replaces 1 native confirm() call).

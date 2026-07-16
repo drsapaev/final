@@ -29,7 +29,7 @@ export const useTable = (data = [], options = {}) => {
   const [filterConfig, setFilterConfig] = useState(defaultFilter);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRows, setSelectedRows] = useState(new Set());
-  const [expandedRows, setExpandedRows] = useState(new Set());void
+  const [expandedRows, setExpandedRows] = useState(new Set());
   useReducedMotion();
 
   // Сортировка данных
@@ -634,7 +634,7 @@ export const Table = ({
   pageSizeOptions = [10, 25, 50, 100],
 
   ...props
-}) => {void
+}) => {
   useReducedMotion();
   void filterable;
   void onSelectAll;

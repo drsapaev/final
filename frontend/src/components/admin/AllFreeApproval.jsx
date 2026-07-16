@@ -52,7 +52,7 @@ const hasBackendAllFreeAction = (request, action) => {
 /**
  * Компонент для одобрения/отклонения заявок All Free в админке
  */
-const AllFreeApproval = () => {void
+const AllFreeApproval = () => {
   useTheme();
   const { t } = useTranslation();
   const [allFreeRequests, setAllFreeRequests] = useState([]);

@@ -445,7 +445,7 @@ const Icon = React.forwardRef(({
   className = '',
   style = {},
   ...props
-}, ref) => {void
+}, ref) => {
   useTheme();
 
   // Size mapping

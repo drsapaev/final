@@ -1,4 +1,5 @@
 import { useTranslation } from '../../i18n/useTranslation';
+import i18n from '../../i18n';
 // Система модальных окон
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import PropTypes from 'prop-types';
@@ -9,7 +10,7 @@ const ModalContext = createContext();
 let openModalExternal = null;
 
 const getFontSize = (size) => {
-  const { t } = useTranslation();
+  // t accessed via closure or i18n.t()
   const sizes = {
     sm: '0.875rem',
     md: '1rem',
@@ -442,7 +443,7 @@ export const modal = {
       return null;
     }
     return openModalExternal({
-      title: t('final.modal_confirm_title'),
+      title: i18n.t('final.modal_confirm_title'),
       content: <p>{message}</p>,
       footer:
       <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)' }}>
@@ -458,7 +459,7 @@ export const modal = {
       return null;
     }
     return openModalExternal({
-      title: t('final.modal_notification_title'),
+      title: i18n.t('final.modal_notification_title'),
       content: <p>{message}</p>,
       footer:
       <button onClick={onClose}>OK</button>

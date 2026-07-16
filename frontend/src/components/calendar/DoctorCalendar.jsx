@@ -24,6 +24,7 @@ import tokenManager from '../../utils/tokenManager';
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
+import i18n from '../../i18n';
 
 const API_BASE = getApiOrigin();
 
@@ -60,7 +61,7 @@ const getWeekDays = (startDate) => {
   return days;
 };
 
-const WEEKDAY_NAMES = [t('misc.dc_pn'), t('misc.dc_vt'), t('misc.dc_sr'), t('misc.dc_cht'), t('misc.dc_pt'), t('misc.dc_sb'), t('misc.dc_vs')];
+const WEEKDAY_NAMES = [i18n.t('misc.dc_pn'), i18n.t('misc.dc_vt'), i18n.t('misc.dc_sr'), i18n.t('misc.dc_cht'), i18n.t('misc.dc_pt'), i18n.t('misc.dc_sb'), i18n.t('misc.dc_vs')];
 
 
 
@@ -88,10 +89,10 @@ const DoctorCalendar = ({
   const [, setCurrentDate] = useState(new Date());
   const [weekStart, setWeekStart] = useState(getWeekStart(new Date()));
   const [weekDays, setWeekDays] = useState([]);
-  const [schedule, setSchedule] = useState({});void
+  const [schedule, setSchedule] = useState({});
   useState([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);void
+  const [error, setError] = useState(null);
   useState('week'); // 'week' | 'day' | 'month'
   const [, setSelectedDay] = useState(null);
 
@@ -129,7 +130,7 @@ const DoctorCalendar = ({
       );
 
       if (!response.ok) {
-        throw new Error(t('misc.dc_ne_udalos_zagruzit_raspisani'));
+        throw new Error(i18n.t('misc.dc_ne_udalos_zagruzit_raspisani'));
       }
 
       const data = await response.json();
@@ -381,8 +382,8 @@ const DoctorCalendar = ({
                     <button
             style={styles.navButton}
             onClick={goToPrevWeek}
-            title={t('misc.dc_predyduschaya_nedelya')}
-            aria-label={t('misc.dc_predyduschaya_nedelya')}>
+            title={i18n.t('misc.dc_predyduschaya_nedelya')}
+            aria-label={i18n.t('misc.dc_predyduschaya_nedelya')}>
 
                         <ChevronLeft size={18} />
                     </button>
@@ -397,8 +398,8 @@ const DoctorCalendar = ({
                     <button
             style={styles.navButton}
             onClick={goToNextWeek}
-            title={t('misc.dc_sleduyuschaya_nedelya')}
-            aria-label={t('misc.dc_sleduyuschaya_nedelya')}>
+            title={i18n.t('misc.dc_sleduyuschaya_nedelya')}
+            aria-label={i18n.t('misc.dc_sleduyuschaya_nedelya')}>
 
                         <ChevronRight size={18} />
                     </button>
@@ -406,8 +407,8 @@ const DoctorCalendar = ({
                     <button
             style={styles.navButton}
             onClick={loadSchedule}
-            title={t('misc.dc_obnovit')}
-            aria-label={t('misc.dc_obnovit')}>
+            title={i18n.t('misc.dc_obnovit')}
+            aria-label={i18n.t('misc.dc_obnovit')}>
 
                         <RefreshCw size={16} className={loading ? 'spinning' : ''} />
                     </button>

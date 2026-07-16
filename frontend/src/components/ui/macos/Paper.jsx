@@ -14,7 +14,7 @@ const Paper = React.forwardRef(({
   variant = 'elevation',
   square = false,
   ...props
-}, ref) => {void
+}, ref) => {
   useTheme();
 
   const getElevationStyles = (elevation) => {

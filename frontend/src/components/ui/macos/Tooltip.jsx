@@ -18,7 +18,7 @@ const Tooltip = ({
   className = '',
   style = {},
   ...props
-}) => {void
+}) => {
   useTheme();
   const [isVisible, setIsVisible] = useState(false);
   const [shouldRender, setShouldRender] = useState(false);

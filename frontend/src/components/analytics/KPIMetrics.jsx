@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { Card, Button } from '../ui/macos';
-import {
 import { useTranslation } from '../../i18n/useTranslation';
+import {
   TrendingUp,
   TrendingDown,
   Users,

@@ -23,6 +23,7 @@ import {
 import { usePWA } from '../../hooks/usePWA';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
+import i18n from '../../i18n';
 
 const styles = {
   shell: {
@@ -187,10 +188,10 @@ const PWAInstallPrompt = ({ onClose }) => {
   }
 
   const canRequestNotifications = capabilities.notifications && notificationPermission !== 'granted';
-  const title = updateAvailable ? t('misc.pip_obnovlenie_dostupno') : t('misc.pip_ustanovit_prilozhenie');
+  const title = updateAvailable ? i18n.t('misc.pip_obnovlenie_dostupno') : i18n.t('misc.pip_ustanovit_prilozhenie');
   const description = updateAvailable
-    ? t('misc.pip_dostupna_novaya_versiya_pril')
-    : t('misc.pip_ustanovite_prilozhenie_na_do');
+    ? i18n.t('misc.pip_dostupna_novaya_versiya_pril')
+    : i18n.t('misc.pip_ustanovite_prilozhenie_na_do');
 
   return (
     <div
@@ -218,7 +219,7 @@ const PWAInstallPrompt = ({ onClose }) => {
               variant="ghost"
               size="small"
               onClick={onClose}
-              aria-label={t('misc.pip_zakryt_priglashenie_ustanovk')}
+              aria-label={i18n.t('misc.pip_zakryt_priglashenie_ustanovk')}
               style={styles.closeButton}
             >
               <X size={14} aria-hidden="true" />
@@ -234,12 +235,12 @@ const PWAInstallPrompt = ({ onClose }) => {
             </Button>
           ) : isInstallable ? (
             <>
-              <div style={styles.chipGrid} aria-label={t('misc.pip_statusy_pwa')}>
+              <div style={styles.chipGrid} aria-label={i18n.t('misc.pip_statusy_pwa')}>
                 <CapabilityChip
                   icon={isOnline ? CheckCircle2 : WifiOff}
                   variant={isOnline ? 'success' : 'warning'}
                 >
-                  {isOnline ? t('misc.pip_onlayn') : t('misc.pip_oflayn_rezhim')}
+                  {isOnline ? i18n.t('misc.pip_onlayn') : i18n.t('misc.pip_oflayn_rezhim')}
                 </CapabilityChip>
 
                 {capabilities.notifications && (
@@ -247,7 +248,7 @@ const PWAInstallPrompt = ({ onClose }) => {
                     icon={Bell}
                     variant={notificationPermission === 'granted' ? 'success' : 'outline'}
                     onClick={canRequestNotifications ? handleNotificationPermission : undefined}
-                    ariaLabel={t('misc.pip_razreshit_push_uvedomleniya')}
+                    ariaLabel={i18n.t('misc.pip_razreshit_push_uvedomleniya')}
                   >
                     Push уведомления
                   </CapabilityChip>
@@ -263,7 +264,7 @@ const PWAInstallPrompt = ({ onClose }) => {
                   fullWidth
                 >
                   <Download size={16} aria-hidden="true" style={styles.actionIcon} />
-                  {isInstalling ? t('misc.pip_ustanovka') : t('misc.pip_ustanovit_prilozhenie')}
+                  {isInstalling ? i18n.t('misc.pip_ustanovka') : i18n.t('misc.pip_ustanovit_prilozhenie')}
                 </Button>
 
                 {capabilities.notifications && notificationPermission === 'default' && (
@@ -286,19 +287,19 @@ const PWAInstallPrompt = ({ onClose }) => {
           )}
 
           <div>
-            <p style={styles.capabilityLabel}>{t('misc.pip_vozmozhnosti_prilozheniya_2')}</p>
-            <div style={styles.chipGrid} aria-label={t('misc.pip_vozmozhnosti_prilozheniya')}>
+            <p style={styles.capabilityLabel}>{i18n.t('misc.pip_vozmozhnosti_prilozheniya_2')}</p>
+            <div style={styles.chipGrid} aria-label={i18n.t('misc.pip_vozmozhnosti_prilozheniya')}>
               {capabilities.serviceWorker && (
-                <CapabilityChip variant="outline">{t('misc.pip_oflayn_rabota')}</CapabilityChip>
+                <CapabilityChip variant="outline">{i18n.t('misc.pip_oflayn_rabota')}</CapabilityChip>
               )}
               {capabilities.notifications && (
-                <CapabilityChip variant="outline">{t('misc.pip_uvedomleniya')}</CapabilityChip>
+                <CapabilityChip variant="outline">{i18n.t('misc.pip_uvedomleniya')}</CapabilityChip>
               )}
               {capabilities.backgroundSync && (
-                <CapabilityChip variant="outline">{t('misc.pip_sinhronizatsiya')}</CapabilityChip>
+                <CapabilityChip variant="outline">{i18n.t('misc.pip_sinhronizatsiya')}</CapabilityChip>
               )}
               {capabilities.webShare && (
-                <CapabilityChip variant="outline">{t('misc.pip_bystryy_dostup')}</CapabilityChip>
+                <CapabilityChip variant="outline">{i18n.t('misc.pip_bystryy_dostup')}</CapabilityChip>
               )}
             </div>
           </div>

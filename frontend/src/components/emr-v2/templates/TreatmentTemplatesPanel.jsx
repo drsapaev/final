@@ -16,15 +16,16 @@ import treatmentTemplatesData from '../../../data/treatmentTemplates.json';
 import './TreatmentTemplatesPanel.css';
 import { Input } from '../../ui/macos';
 import { useTranslation } from '../../../i18n/useTranslation';
+import i18n from '../../../i18n';
 
 /**
  * Category metadata
  */
 const getCategoryMeta = (t) => ({
-    medications: { icon: '💊', label: t('misc.ttp_cat_medications') },
-    examinations: { icon: '🔬', label: t('misc.ttp_cat_examinations') },
-    labs: { icon: '🧪', label: t('misc.ttp_cat_labs') },
-    followup: { icon: '📅', label: t('misc.ttp_cat_followup') },
+    medications: { icon: '💊', label: i18n.t('misc.ttp_cat_medications') },
+    examinations: { icon: '🔬', label: i18n.t('misc.ttp_cat_examinations') },
+    labs: { icon: '🧪', label: i18n.t('misc.ttp_cat_labs') },
+    followup: { icon: '📅', label: i18n.t('misc.ttp_cat_followup') },
 });
 
 /**
@@ -48,7 +49,7 @@ export function TreatmentTemplatesButton({ onClick, disabled = false }) {
             type="button"
             className="treatment-templates-btn"
             onClick={onClick}
-            title={t('misc.ttp_otkryt_shablony')}
+            title={i18n.t('misc.ttp_otkryt_shablony')}
         >
             📋 Шаблоны
         </button>
@@ -132,7 +133,7 @@ export function TreatmentTemplatesPanel({
                 className="treatment-templates-backdrop"
                 role="button"
                 tabIndex={0}
-                aria-label={t('misc.ttp_zakryt_panel_shablonov_leche')}
+                aria-label={i18n.t('misc.ttp_zakryt_panel_shablonov_leche')}
                 onClick={handleClose}
                 onKeyDown={(event) => handleActivationKeyDown(event, handleClose)} />
 
@@ -150,8 +151,8 @@ export function TreatmentTemplatesPanel({
                 <div className="treatment-templates-search">
                     <Input
                         type="text"
-                        aria-label={t('misc.ttp_poisk_shablona_lecheniya')}
-                        placeholder={t('misc.ttp_poisk_shablona')}
+                        aria-label={i18n.t('misc.ttp_poisk_shablona_lecheniya')}
+                        placeholder={i18n.t('misc.ttp_poisk_shablona')}
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         autoFocus
@@ -200,7 +201,7 @@ export function TreatmentTemplatesPanel({
                                 <button
                                     className="treatment-templates-insert-btn"
                                     onClick={() => handleInsert(template)}
-                                    title={t('misc.ttp_vstavit_v_pole')}
+                                    title={i18n.t('misc.ttp_vstavit_v_pole')}
                                 >
                                     ➕ Вставить
                                 </button>

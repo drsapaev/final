@@ -52,15 +52,15 @@ const ModernStatistics = ({
   onExport,
   onRefresh,
   ...props
-}) => {void
+}) => {
   const { t } = useTranslation();
-  useTheme();
-  const [animatedValues, setAnimatedValues] = useState({});void
-  useState('today');void
-  useState(false);
+  const { theme } = useTheme();
+  const [animatedValues, setAnimatedValues] = useState({});
+  const [period, setPeriod] = useState('today');
+  const [showDetails, setShowDetails] = useState(false);
 
   // Переводы — PR-51: added uz + en translations (was ru-only, caused undefined titles)
-  const t = {
+  const tDict = {
     ru: {
       statistics: t('misc.ms_statistika'),
       totalPatients: t('misc.ms_vsego_patsientov'),
@@ -133,7 +133,7 @@ const ModernStatistics = ({
       growth: 'growth',
       decline: 'decline'
     }
-  }[language] || {};
+  }[language?.startsWith('uz') ? 'uz' : language?.split('-')[0] || 'ru'] || {};
 
   // Вычисление статистики
   const statistics = useMemo(() => {

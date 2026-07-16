@@ -17,7 +17,7 @@ const Card = React.forwardRef(({
   className = '',
   style = {},
   ...props
-}, ref) => {void
+}, ref) => {
   useTheme();
 
   // macOS card styles based on variant
