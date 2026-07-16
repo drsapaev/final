@@ -9,7 +9,7 @@ const wizardPath = path.resolve(__dirname, '../AppointmentWizardV2.jsx');
 const wizardUtilsPath = path.resolve(__dirname, '../wizardUtils.js');
 const patientStepPath = path.resolve(__dirname, '../PatientStepV2.jsx');
 const cartStepPath = path.resolve(__dirname, '../CartStepV2.jsx');
-const serviceResolverPath = path.resolve(__dirname, '../../../utils/serviceCodeResolver.js');
+const serviceResolverPath = path.resolve(__dirname, '../../../utils/serviceCodeResolver.ts');
 
 // UX Audit Stage 3 (Wizard issue 5.2):
 // Helper-функции вынесены в wizardUtils.js, а step-компоненты — в
@@ -80,7 +80,9 @@ describe('AppointmentWizardV2 registrar metadata contract', () => {
   it('maps service-array initial data back to queue_numbers before edit saves', () => {
     const source = readServiceResolverSource();
 
-    expect(source).toContain('const resolveOriginalQueueId = (serviceData = {}) => {');
+    // Phase 1 TS migration: signature now has type annotations on serviceData
+    // and return type. Allow optional `: type` after both the param and the closing paren.
+    expect(source).toMatch(/const resolveOriginalQueueId = \([^)]+\)[^=]*=>\s*\{/);
     expect(source).toContain('initialData.queue_numbers.find');
     expect(source).toContain('}, resolveOriginalQueueId(serviceItem))');
     expect(source).toContain('}, resolveOriginalQueueId({ name: serviceName, code: serviceCode }))');

@@ -47,7 +47,7 @@ export function isOnPath(path) {
  * @param {string} [options.reason] - для логирования, почему выбран hard redirect
  * @param {string} [options.redirectAfter] - URL для возврата после логина (?from=...)
  */
-export function hardRedirectToLogin(options = {}) {
+export function hardRedirectToLogin(options: Record<string, unknown> = {}) {
   const { reason = 'unauthorized', redirectAfter } = options;
   if (typeof window === 'undefined') return;
   if (getCurrentPathname() === '/login') return;
@@ -57,7 +57,7 @@ export function hardRedirectToLogin(options = {}) {
 
   const target = new URL('/login', window.location.origin);
   if (redirectAfter && redirectAfter !== '/login') {
-    target.searchParams.set('from', redirectAfter);
+    target.searchParams.set('from', String(redirectAfter));
   }
   // assign() вместо href= сохраняет историю
   window.location.assign(target.toString());
@@ -71,7 +71,7 @@ export function hardRedirectToLogin(options = {}) {
  * @param {object} [options]
  * @param {string} [options.reason]
  */
-export function hardRedirectTo(path, options = {}) {
+export function hardRedirectTo(path, options: Record<string, unknown> = {}) {
   const { reason = 'init' } = options;
   if (typeof window === 'undefined') return;
   if (isOnPath(path)) return;

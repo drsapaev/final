@@ -2,6 +2,20 @@ import logger from '../utils/logger';
 import { buildWsUrl } from '../api/runtime';
 import { tokenManager } from '../utils/tokenManager';
 
+interface WebSocketAuthOptions {
+  requireAuth?: boolean;
+  onAuthError?: (err?: unknown) => void;
+  onConnect?: (event?: unknown) => void;
+  onDisconnect?: (event?: unknown) => void;
+  onMessage?: (event: MessageEvent) => void;
+  onError?: (err?: unknown) => void;
+  onMaxReconnectAttempts?: () => void;
+  maxReconnectAttempts?: number;
+  initialReconnectDelay?: number;
+  maxReconnectDelay?: number;
+  [key: string]: unknown;
+}
+
 /**
  * Утилиты для аутентифицированных WebSocket соединений
  */
@@ -13,7 +27,7 @@ import { tokenManager } from '../utils/tokenManager';
  * @param {Object} options - Опции соединения
  * @returns {WebSocket} WebSocket соединение
  */
-export function createAuthenticatedWebSocket(baseUrl, params = {}, options = {}) {
+export function createAuthenticatedWebSocket(baseUrl: string, params: Record<string, string> = {}, options: WebSocketAuthOptions = {}): WebSocket {
   const {
     requireAuth = false,
     onAuthError = null,
@@ -100,7 +114,7 @@ export function createAuthenticatedWebSocket(baseUrl, params = {}, options = {})
  * @param {Object} options - Опции соединения
  * @returns {WebSocket} WebSocket соединение
  */
-export function createQueueWebSocket(department, date, options = {}) {
+export function createQueueWebSocket(department: string, date: string, options: WebSocketAuthOptions = {}): WebSocket {
   const baseUrl = buildWsUrl('/api/v1/ws-auth/ws/queue/optional-auth');
   const params = { department, date };
 
@@ -113,9 +127,9 @@ export function createQueueWebSocket(department, date, options = {}) {
  * @param {Object} options - Опции соединения
  * @returns {WebSocket} WebSocket соединение
  */
-export function createDisplayBoardWebSocket(boardId, options = {}) {
+export function createDisplayBoardWebSocket(boardId: string, options: WebSocketAuthOptions = {}): WebSocket {
   const baseUrl = buildWsUrl(`/api/v1/display/ws/board/${encodeURIComponent(boardId)}`);
-  const params = {};
+  const params: Record<string, string> = {};
 
   return createAuthenticatedWebSocket(baseUrl, params, options);
 }
@@ -147,7 +161,14 @@ export function sendAuthenticatedMessage(ws, message) {
  * @param {Object} options - Опции
  * @returns {Object} Объект с методами управления соединением
  */
-export function createReconnectingAuthWebSocket(baseUrl, params = {}, options = {}) {
+interface ReconnectingWebSocketHandle {
+  disconnect: () => void;
+  send: (data: unknown) => void;
+  readonly readyState: number;
+  readonly isConnected: boolean;
+}
+
+export function createReconnectingAuthWebSocket(baseUrl: string, params: Record<string, string> = {}, options: WebSocketAuthOptions = {}): ReconnectingWebSocketHandle {
   const {
     maxReconnectAttempts = 10,
     initialReconnectDelay = 1000, // Start with 1 second
