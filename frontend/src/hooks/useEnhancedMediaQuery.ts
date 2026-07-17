@@ -1,37 +1,82 @@
 /**
- * Улучшенная система адаптивности для медицинских интерфейсов
- * Основана на принципах mobile-first и медицинских стандартах UX
+ * Улучшенная система адаптивности для медицинских интерфейсов.
+ * Основана на принципах mobile-first и медицинских стандартах UX.
  */
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
-// Хук для определения размера экрана
-export const useBreakpoint = () => {
-  const [breakpoint, setBreakpoint] = useState(() => {
+export type BreakpointName = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl';
+export type DeviceType = 'mobile' | 'tablet' | 'desktop';
+export type OrientationType = 'portrait' | 'landscape';
+
+export interface BreakpointInfo {
+  breakpoint: BreakpointName;
+  isXs: boolean;
+  isSm: boolean;
+  isMd: boolean;
+  isLg: boolean;
+  isXl: boolean;
+  is2Xl: boolean;
+  isMobile: boolean;
+  isTablet: boolean;
+  isDesktop: boolean;
+}
+
+export interface DeviceInfo {
+  device: DeviceType;
+  isMobile: boolean;
+  isTablet: boolean;
+  isDesktop: boolean;
+}
+
+export interface OrientationInfo {
+  orientation: OrientationType;
+  isPortrait: boolean;
+  isLandscape: boolean;
+}
+
+export interface TouchInfo {
+  isTouchDevice: boolean;
+}
+
+export interface HoverInfo {
+  hasHoverSupport: boolean;
+}
+
+export interface ReducedMotionInfo {
+  prefersReducedMotion: boolean;
+}
+
+export interface HighContrastInfo {
+  prefersHighContrast: boolean;
+}
+
+export type EnhancedMediaQueryInfo = BreakpointInfo &
+  DeviceInfo &
+  OrientationInfo &
+  TouchInfo &
+  HoverInfo &
+  ReducedMotionInfo &
+  HighContrastInfo;
+
+function resolveBreakpoint(width: number): BreakpointName {
+  if (width < 640) return 'xs';
+  if (width < 768) return 'sm';
+  if (width < 1024) return 'md';
+  if (width < 1280) return 'lg';
+  if (width < 1536) return 'xl';
+  return '2xl';
+}
+
+export const useBreakpoint = (): BreakpointInfo => {
+  const [breakpoint, setBreakpoint] = useState<BreakpointName>(() => {
     if (typeof window === 'undefined') return 'md';
-
-    const width = window.innerWidth;
-    if (width < 640) return 'xs';
-    if (width < 768) return 'sm';
-    if (width < 1024) return 'md';
-    if (width < 1280) return 'lg';
-    if (width < 1536) return 'xl';
-    return '2xl';
+    return resolveBreakpoint(window.innerWidth);
   });
 
   useEffect(() => {
-    const handleResize = () => {
-      const width = window.innerWidth;
-      let newBreakpoint = 'md';
-
-      if (width < 640) newBreakpoint = 'xs';else
-      if (width < 768) newBreakpoint = 'sm';else
-      if (width < 1024) newBreakpoint = 'md';else
-      if (width < 1280) newBreakpoint = 'lg';else
-      if (width < 1536) newBreakpoint = 'xl';else
-      newBreakpoint = '2xl';
-
-      setBreakpoint(newBreakpoint);
+    const handleResize = (): void => {
+      setBreakpoint(resolveBreakpoint(window.innerWidth));
     };
 
     window.addEventListener('resize', handleResize);
@@ -48,13 +93,12 @@ export const useBreakpoint = () => {
     is2Xl: breakpoint === '2xl',
     isMobile: breakpoint === 'xs' || breakpoint === 'sm',
     isTablet: breakpoint === 'md',
-    isDesktop: breakpoint === 'lg' || breakpoint === 'xl' || breakpoint === '2xl'
+    isDesktop: breakpoint === 'lg' || breakpoint === 'xl' || breakpoint === '2xl',
   };
 };
 
-// Хук для определения устройства
-export const useDevice = () => {
-  const [device] = useState(() => {
+export const useDevice = (): DeviceInfo => {
+  const [device] = useState<DeviceType>(() => {
     if (typeof window === 'undefined') return 'desktop';
 
     const userAgent = navigator.userAgent.toLowerCase();
@@ -70,19 +114,18 @@ export const useDevice = () => {
     device,
     isMobile: device === 'mobile',
     isTablet: device === 'tablet',
-    isDesktop: device === 'desktop'
+    isDesktop: device === 'desktop',
   };
 };
 
-// Хук для определения ориентации экрана
-export const useOrientation = () => {
-  const [orientation, setOrientation] = useState(() => {
+export const useOrientation = (): OrientationInfo => {
+  const [orientation, setOrientation] = useState<OrientationType>(() => {
     if (typeof window === 'undefined') return 'landscape';
     return window.innerWidth > window.innerHeight ? 'landscape' : 'portrait';
   });
 
   useEffect(() => {
-    const handleResize = () => {
+    const handleResize = (): void => {
       setOrientation(window.innerWidth > window.innerHeight ? 'landscape' : 'portrait');
     };
 
@@ -93,13 +136,12 @@ export const useOrientation = () => {
   return {
     orientation,
     isPortrait: orientation === 'portrait',
-    isLandscape: orientation === 'landscape'
+    isLandscape: orientation === 'landscape',
   };
 };
 
-// Хук для определения поддержки touch
-export const useTouchDevice = () => {
-  const [isTouchDevice] = useState(() => {
+export const useTouchDevice = (): TouchInfo => {
+  const [isTouchDevice] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
   });
@@ -107,16 +149,15 @@ export const useTouchDevice = () => {
   return { isTouchDevice };
 };
 
-// Хук для определения поддержки hover
-export const useHoverSupport = () => {
-  const [hasHoverSupport, setHasHoverSupport] = useState(() => {
+export const useHoverSupport = (): HoverInfo => {
+  const [hasHoverSupport, setHasHoverSupport] = useState<boolean>(() => {
     if (typeof window === 'undefined') return true;
     return window.matchMedia('(hover: hover)').matches;
   });
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(hover: hover)');
-    const handleChange = (e) => setHasHoverSupport(e.matches);
+    const handleChange = (e: MediaQueryListEvent): void => setHasHoverSupport(e.matches);
 
     mediaQuery.addEventListener('change', handleChange);
     return () => mediaQuery.removeEventListener('change', handleChange);
@@ -125,16 +166,15 @@ export const useHoverSupport = () => {
   return { hasHoverSupport };
 };
 
-// Хук для определения поддержки reduced motion
-export const useReducedMotion = () => {
-  const [prefersReducedMotion, setPrefersReducedMotion] = useState(() => {
+export const useReducedMotion = (): ReducedMotionInfo => {
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   });
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const handleChange = (e) => setPrefersReducedMotion(e.matches);
+    const handleChange = (e: MediaQueryListEvent): void => setPrefersReducedMotion(e.matches);
 
     mediaQuery.addEventListener('change', handleChange);
     return () => mediaQuery.removeEventListener('change', handleChange);
@@ -143,16 +183,15 @@ export const useReducedMotion = () => {
   return { prefersReducedMotion };
 };
 
-// Хук для определения поддержки высокого контраста
-export const useHighContrast = () => {
-  const [prefersHighContrast, setPrefersHighContrast] = useState(() => {
+export const useHighContrast = (): HighContrastInfo => {
+  const [prefersHighContrast, setPrefersHighContrast] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     return window.matchMedia('(prefers-contrast: high)').matches;
   });
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-contrast: high)');
-    const handleChange = (e) => setPrefersHighContrast(e.matches);
+    const handleChange = (e: MediaQueryListEvent): void => setPrefersHighContrast(e.matches);
 
     mediaQuery.addEventListener('change', handleChange);
     return () => mediaQuery.removeEventListener('change', handleChange);
@@ -161,8 +200,7 @@ export const useHighContrast = () => {
   return { prefersHighContrast };
 };
 
-// Комбинированный хук для всех медиа-запросов
-export const useEnhancedMediaQuery = () => {
+export const useEnhancedMediaQuery = (): EnhancedMediaQueryInfo => {
   const breakpoint = useBreakpoint();
   const device = useDevice();
   const orientation = useOrientation();
@@ -178,7 +216,7 @@ export const useEnhancedMediaQuery = () => {
     ...touchDevice,
     ...hoverSupport,
     ...reducedMotion,
-    ...highContrast
+    ...highContrast,
   };
 };
 
