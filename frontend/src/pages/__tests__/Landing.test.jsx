@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import Landing from '../Landing';
 import { ThemeProvider } from '../../contexts/ThemeContext';
 import { TranslationProvider } from '../../i18n/useTranslation';
-import { MacOSThemeProvider } from '../../theme/macosTheme.jsx';
+import { MacOSThemeProvider } from '../../theme/macosTheme.tsx';
 
 function renderLanding() {
   let root = document.getElementById('root');

@@ -15,7 +15,7 @@ vi.mock('../../api/queue', () => queueApiMocks);
 
 import QueueJoin from '../QueueJoin';
 
-const queueJoinSourcePath = path.resolve(process.cwd(), 'src/pages/QueueJoin.jsx');
+const queueJoinSourcePath = path.resolve(process.cwd(), 'src/pages/QueueJoin.tsx');
 const readQueueJoinSource = () => fs.readFileSync(queueJoinSourcePath, 'utf8');
 
 function setupQueueApiMock({

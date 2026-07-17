@@ -5,10 +5,10 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const unifiedSettingsPath = path.resolve(__dirname, '../UnifiedSettings.jsx');
+const unifiedSettingsPath = path.resolve(__dirname, '../UnifiedSettings.tsx');
 const changePasswordRequiredPath = path.resolve(
   __dirname,
-  '../../../pages/auth/ChangePasswordRequired.jsx'
+  '../../../pages/auth/ChangePasswordRequired.tsx'
 );
 
 const readSource = (filePath) => fs.readFileSync(filePath, 'utf8');

@@ -11,7 +11,7 @@ const files = ['DentalPriceManager', 'DentalVisitScreen', 'DiagnosisForm', 'Exam
 
 describe('Dental components STRAT#38 — i18n migration', () => {
   for (const name of files) {
-    const source = fs.readFileSync(path.join(ROOT, `components/dental/${name}.jsx`), 'utf8');
+    const source = fs.readFileSync(path.join(ROOT, `components/dental/${name}.tsx`), 'utf8');
     it(`${name} has no hardcoded Russian notify strings`, () => {
       expect(source).not.toMatch(/notify\.\w+\('[А-Яа-я]/);
     });

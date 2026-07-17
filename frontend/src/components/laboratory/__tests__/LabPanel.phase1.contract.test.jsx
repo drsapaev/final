@@ -13,7 +13,7 @@ const readSource = (relPath) =>
 
 describe('LabPanel Phase 1 safety contract (H-1, H-2, H-3)', () => {
   it('H-1: LabPanel imports and calls useSessionTimeoutWarning', () => {
-    const source = readSource('pages/LabPanel.jsx');
+    const source = readSource('pages/LabPanel.tsx');
 
     expect(source).toContain('from \'../hooks/useSessionTimeoutWarning\'');
     expect(source).toContain('useSessionTimeoutWarning({');
@@ -23,7 +23,7 @@ describe('LabPanel Phase 1 safety contract (H-1, H-2, H-3)', () => {
   });
 
   it('H-1: LabPanel renders a session timeout warning dialog', () => {
-    const source = readSource('pages/LabPanel.jsx');
+    const source = readSource('pages/LabPanel.tsx');
 
     expect(source).toContain('sessionWarning');
     expect(source).toContain('Сессия скоро истечёт');
@@ -31,8 +31,8 @@ describe('LabPanel Phase 1 safety contract (H-1, H-2, H-3)', () => {
   });
 
   it('H-2: useLabHotkeys hook exists and is wired in LabPanel', () => {
-    const hookSource = readSource('hooks/useLabHotkeys.js');
-    const panelSource = readSource('pages/LabPanel.jsx');
+    const hookSource = readSource('hooks/useLabHotkeys.ts');
+    const panelSource = readSource('pages/LabPanel.tsx');
 
     // Hook file exists with correct exports
     expect(hookSource).toContain('export const useLabHotkeys');
@@ -46,7 +46,7 @@ describe('LabPanel Phase 1 safety contract (H-1, H-2, H-3)', () => {
   });
 
   it('H-2: useLabHotkeys supports Ctrl+1/2/3 for tab switching', () => {
-    const source = readSource('hooks/useLabHotkeys.js');
+    const source = readSource('hooks/useLabHotkeys.ts');
 
     expect(source).toContain('\'1\': \'queue\'');
     expect(source).toContain('\'2\': \'templates\'');
@@ -56,14 +56,14 @@ describe('LabPanel Phase 1 safety contract (H-1, H-2, H-3)', () => {
   });
 
   it('H-3: LabReportWorkbench has no English aria-labels for lab results', () => {
-    const source = readSource('components/laboratory/LabReportWorkbench.jsx');
+    const source = readSource('components/laboratory/LabReportWorkbench.tsx');
 
     // Must NOT contain the old English aria-label
     expect(source).not.toContain('Lab result for');
 
     // STRAT#24: field rendering moved to ReportEditor component.
     // Check there for the localized aria-label pattern.
-    const reportEditorSource = readSource('components/laboratory/ReportEditor.jsx');
+    const reportEditorSource = readSource('components/laboratory/ReportEditor.tsx');
     expect(reportEditorSource).toContain("t('workbench.result_label')");
   });
 });

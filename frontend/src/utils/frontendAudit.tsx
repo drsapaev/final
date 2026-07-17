@@ -1,3 +1,6 @@
+// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
+// Proper typing deferred to Phase 9 cleanup (strict mode).
+
 // Утилиты для аудита frontend структуры
 import { useTheme } from '../contexts/ThemeContext';
 

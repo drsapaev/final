@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const labPanelPath = path.resolve(__dirname, '../LabPanel.jsx');
+const labPanelPath = path.resolve(__dirname, '../LabPanel.tsx');
 
 const readLabPanelSource = () => fs.readFileSync(labPanelPath, 'utf8');
 

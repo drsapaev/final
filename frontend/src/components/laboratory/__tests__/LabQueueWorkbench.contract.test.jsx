@@ -9,7 +9,7 @@ const __dirname = path.dirname(__filename);
 const ROOT = path.resolve(__dirname, '../../..');
 
 const source = fs.readFileSync(
-  path.join(ROOT, 'components/laboratory/LabQueueWorkbench.jsx'),
+  path.join(ROOT, 'components/laboratory/LabQueueWorkbench.tsx'),
   'utf8'
 );
 
@@ -79,7 +79,7 @@ describe('LabQueueWorkbench UX-AUDIT-FIX11 — MaskedPhone affordance', () => {
     expect(source).toContain('queueTotal={queueTotal}');
     // VirtualizedQueueList handles the actual load-more rendering
     const virtualListSource = fs.readFileSync(
-      path.join(ROOT, 'components/laboratory/VirtualizedQueueList.jsx'),
+      path.join(ROOT, 'components/laboratory/VirtualizedQueueList.tsx'),
       'utf8'
     );
     expect(virtualListSource).toContain('hasMore && onLoadMore');
@@ -125,7 +125,7 @@ describe('LabQueueWorkbench UX-AUDIT-FIX11 — MaskedPhone affordance', () => {
     // STRAT#28: card rendering moved to QueueCard.jsx — check there too.
     const ROOT = path.resolve(__dirname, '../../..');
     const queueCardSource = fs.readFileSync(
-      path.join(ROOT, 'components/laboratory/QueueCard.jsx'),
+      path.join(ROOT, 'components/laboratory/QueueCard.tsx'),
       'utf8'
     );
 

@@ -13,7 +13,7 @@ const ROOT = path.resolve(__dirname, '../../..');
 // Теперь они вынесены в templateEditor/{ContentTab,DesignTab,SignersTab,PreviewTab}.jsx —
 // тест проверяет, что LabTemplateWorkbench импортирует и использует их.
 const source = fs.readFileSync(
-  path.join(ROOT, 'components/laboratory/LabTemplateWorkbench.jsx'),
+  path.join(ROOT, 'components/laboratory/LabTemplateWorkbench.tsx'),
   'utf8'
 ).replace(/\r\n/g, '\n');
 
@@ -64,7 +64,7 @@ describe('LabTemplateWorkbench Phase 4+ structure contract', () => {
     expect(source).toContain('SignersTab');
     // L-H-6: signer field keys теперь в SignersTab.jsx + config.js
     const signersTabSource = fs.readFileSync(
-      path.join(ROOT, 'components/laboratory/templateEditor/SignersTab.jsx'),
+      path.join(ROOT, 'components/laboratory/templateEditor/SignersTab.tsx'),
       'utf8'
     ).replace(/\r\n/g, '\n');
     expect(signersTabSource).toContain('lab_technician_label');
@@ -76,7 +76,7 @@ describe('LabTemplateWorkbench Phase 4+ structure contract', () => {
   it('Preview tab renders a read-only sample of the template (delegated to PreviewTab.jsx)', () => {
     expect(source).toContain('PreviewTab');
     const previewTabSource = fs.readFileSync(
-      path.join(ROOT, 'components/laboratory/templateEditor/PreviewTab.jsx'),
+      path.join(ROOT, 'components/laboratory/templateEditor/PreviewTab.tsx'),
       'utf8'
     ).replace(/\r\n/g, '\n');
     expect(previewTabSource).toContain('Предпросмотр показывает структуру бланка');
@@ -119,7 +119,7 @@ describe('LabTemplateWorkbench Phase 4+ structure contract', () => {
     // L-H-6: 'up'/'down' теперь в ContentTab.jsx как строковые литералы
     // в onMoveField / onMoveSection колбэках.
     const contentTabSource = fs.readFileSync(
-      path.join(ROOT, 'components/laboratory/templateEditor/ContentTab.jsx'),
+      path.join(ROOT, 'components/laboratory/templateEditor/ContentTab.tsx'),
       'utf8'
     ).replace(/\r\n/g, '\n');
     expect(contentTabSource).toContain("'up'");

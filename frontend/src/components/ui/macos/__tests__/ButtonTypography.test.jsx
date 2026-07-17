@@ -2,7 +2,7 @@ import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import { ThemeProvider } from '../../../../contexts/ThemeContext.jsx';
+import { ThemeProvider } from '../../../../contexts/ThemeContext.tsx';
 import Button from '../Button';
 import Typography from '../Typography';
 

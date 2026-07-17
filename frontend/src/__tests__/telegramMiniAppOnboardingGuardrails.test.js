@@ -3,7 +3,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const appSource = fs.readFileSync(
-  path.resolve(process.cwd(), 'src/pages/TelegramMiniAppPatientShell.jsx'),
+  path.resolve(process.cwd(), 'src/pages/TelegramMiniAppPatientShell.tsx'),
   'utf8'
 ).replace(/\r\n/g, '\n');
 

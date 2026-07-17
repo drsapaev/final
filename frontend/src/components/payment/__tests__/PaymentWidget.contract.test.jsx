@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 const ROOT = path.resolve(process.cwd(), 'src/components/payment');
 
 const readPaymentWidget = () =>
-  fs.readFileSync(path.join(ROOT, 'PaymentWidget.jsx'), 'utf8').replace(/\r\n/g, '\n');
+  fs.readFileSync(path.join(ROOT, 'PaymentWidget.tsx'), 'utf8').replace(/\r\n/g, '\n');
 
 describe('PaymentWidget backend payment status contract', () => {
   it('polls the canonical backend payment status route', () => {

@@ -8,11 +8,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import LabReportWorkbench from '../LabReportWorkbench';
 import { labReportingApi } from '../../../api/labReporting';
-import { ThemeProvider } from '../../../contexts/ThemeContext.jsx';
-import { MacOSThemeProvider } from '../../../theme/macosTheme.jsx';
+import { ThemeProvider } from '../../../contexts/ThemeContext.tsx';
+import { MacOSThemeProvider } from '../../../theme/macosTheme.tsx';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const workbenchPath = path.resolve(__dirname, '../LabReportWorkbench.jsx');
+const workbenchPath = path.resolve(__dirname, '../LabReportWorkbench.tsx');
 
 vi.mock('../../../api/labReporting', () => ({
   labReportingApi: {

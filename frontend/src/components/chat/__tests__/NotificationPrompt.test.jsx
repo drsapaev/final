@@ -32,7 +32,7 @@ vi.mock('../../../utils/logger', () => ({
   }
 }));
 
-import NotificationPrompt from '../NotificationPrompt.jsx';
+import NotificationPrompt from '../NotificationPrompt.tsx';
 
 describe('NotificationPrompt', () => {
   beforeEach(() => {

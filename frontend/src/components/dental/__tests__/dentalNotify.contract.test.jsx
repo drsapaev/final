@@ -15,15 +15,15 @@ const readSource = (fileName) =>
 // the shared notify service (not react-toastify toast, not bare logger.error
 // without UI feedback).
 const FILES_WITH_USER_FACING_ERRORS = [
-  'DiagnosisForm.jsx',
-  'ExaminationForm.jsx',
-  'PatientCard.jsx',
-  'PhotoArchive.jsx',
-  'ToothModal.jsx',
-  'TreatmentPlanner.jsx',
-  'VisitProtocol.jsx',
-  'DentalPriceManager.jsx',
-  'DentalVisitScreen.jsx',
+  'DiagnosisForm.tsx',
+  'ExaminationForm.tsx',
+  'PatientCard.tsx',
+  'PhotoArchive.tsx',
+  'ToothModal.tsx',
+  'TreatmentPlanner.tsx',
+  'VisitProtocol.tsx',
+  'DentalPriceManager.tsx',
+  'DentalVisitScreen.tsx',
 ];
 
 describe('dental notify unification contract (H8)', () => {

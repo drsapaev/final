@@ -5,10 +5,10 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const wizardPath = path.resolve(__dirname, '../AppointmentWizardV2.jsx');
+const wizardPath = path.resolve(__dirname, '../AppointmentWizardV2.tsx');
 const wizardUtilsPath = path.resolve(__dirname, '../wizardUtils.js');
-const patientStepPath = path.resolve(__dirname, '../PatientStepV2.jsx');
-const cartStepPath = path.resolve(__dirname, '../CartStepV2.jsx');
+const patientStepPath = path.resolve(__dirname, '../PatientStepV2.tsx');
+const cartStepPath = path.resolve(__dirname, '../CartStepV2.tsx');
 const serviceResolverPath = path.resolve(__dirname, '../../../utils/serviceCodeResolver.ts');
 
 // UX Audit Stage 3 (Wizard issue 5.2):

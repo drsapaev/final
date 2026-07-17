@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('../../api/client.js', () => ({
+vi.mock('../../api/client.ts', () => ({
   me: vi.fn(),
   setToken: vi.fn(),
 }));
 
-import { me, setToken as setClientToken } from '../../api/client.js';
+import { me, setToken as setClientToken } from '../../api/client.ts';
 
 function createJwt(expSecondsFromNow) {
   const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));

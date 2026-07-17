@@ -13,7 +13,7 @@ const readSource = (relPath) =>
 
 describe('CardiologistPanel Phase 1 safety contract (C-1 through C-7 + H-1)', () => {
   it('C-1: ECGParser parseSCPFile does NOT return hardcoded fake parameters', () => {
-    const source = readSource('components/cardiology/ECGParser.jsx');
+    const source = readSource('components/cardiology/ECGParser.tsx');
 
     // Extract only the parseSCPFile function body (not comments).
     const scpBlock = source.slice(
@@ -34,7 +34,7 @@ describe('CardiologistPanel Phase 1 safety contract (C-1 through C-7 + H-1)', ()
   });
 
   it('C-2: ECGParser has no void artifacts', () => {
-    const source = readSource('components/cardiology/ECGParser.jsx');
+    const source = readSource('components/cardiology/ECGParser.tsx');
 
     // The void artifact was: `void view.getUint16(0, true);void`
     expect(source).not.toContain('void view.getUint16');
@@ -42,7 +42,7 @@ describe('CardiologistPanel Phase 1 safety contract (C-1 through C-7 + H-1)', ()
   });
 
   it('C-3: cancel action is wired to handleCancelAppointment (not a no-op stub)', () => {
-    const source = readSource('pages/CardiologistPanelUnified.jsx');
+    const source = readSource('pages/CardiologistPanelUnified.tsx');
 
     // Must NOT contain the old no-op stub.
     expect(source).not.toContain('// Логика отмены записи\n        break;');
@@ -60,7 +60,7 @@ describe('CardiologistPanel Phase 1 safety contract (C-1 through C-7 + H-1)', ()
   });
 
   it('C-4: Добавить ЭКГ button renders a form when showForm.type === ecg', () => {
-    const source = readSource('pages/CardiologistPanelUnified.jsx');
+    const source = readSource('pages/CardiologistPanelUnified.tsx');
 
     // Must render UI when type === 'ecg'.
     expect(source).toContain('showForm.type === \'ecg\'');
@@ -73,35 +73,35 @@ describe('CardiologistPanel Phase 1 safety contract (C-1 through C-7 + H-1)', ()
   });
 
   it('C-5: ECGViewer onDrop catch has notify.error', () => {
-    const source = readSource('components/cardiology/ECGViewer.jsx');
+    const source = readSource('components/cardiology/ECGViewer.tsx');
 
     // i18n-unification: hardcoded Russian replaced with i18n key
     expect(source).toContain('cardio_ecg_upload_failed');
   });
 
   it('C-6: ECGViewer downloadFile catch has notify.error', () => {
-    const source = readSource('components/cardiology/ECGViewer.jsx');
+    const source = readSource('components/cardiology/ECGViewer.tsx');
 
     // i18n-unification: t() replaced with tI18n() (reactive)
     expect(source).toContain("tI18n('final.ecg_download_failed')");
   });
 
   it('C-7: ECGViewer deleteFile catch has notify.error', () => {
-    const source = readSource('components/cardiology/ECGViewer.jsx');
+    const source = readSource('components/cardiology/ECGViewer.tsx');
 
     // i18n-unification: t() replaced with tI18n() (reactive)
     expect(source).toContain("tI18n('final.ecg_delete_failed')");
   });
 
   it('H-1: ECGViewer parseECGFileData catch has notify.warning', () => {
-    const source = readSource('components/cardiology/ECGViewer.jsx');
+    const source = readSource('components/cardiology/ECGViewer.tsx');
 
     // i18n-unification: t() replaced with tI18n() (reactive)
     expect(source).toContain("tI18n('final.ecg_parse_warning')");
   });
 
   it('ECGViewer imports notify + getErrorMessage', () => {
-    const source = readSource('components/cardiology/ECGViewer.jsx');
+    const source = readSource('components/cardiology/ECGViewer.tsx');
 
     expect(source).toContain('from \'../../services/notify\'');
     expect(source).toContain('from \'../../utils/errorHandler\'');

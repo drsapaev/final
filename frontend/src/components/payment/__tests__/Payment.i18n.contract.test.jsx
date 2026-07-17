@@ -9,15 +9,15 @@ const translationsSource = fs.readFileSync(path.join(ROOT, 'i18n/locales/ru.js')
 
 describe('Payment components STRAT#39 — i18n migration', () => {
   it('PaymentProviderDialog has no hardcoded Russian notify', () => {
-    const source = fs.readFileSync(path.join(ROOT, 'components/payment/PaymentProviderDialog.jsx'), 'utf8');
+    const source = fs.readFileSync(path.join(ROOT, 'components/payment/PaymentProviderDialog.tsx'), 'utf8');
     expect(source).not.toMatch(/notify\.\w+\('[А-Яа-я]/);
   });
   it('CashPaymentModal has no hardcoded Russian notify', () => {
-    const source = fs.readFileSync(path.join(ROOT, 'components/payment/CashPaymentModal.jsx'), 'utf8');
+    const source = fs.readFileSync(path.join(ROOT, 'components/payment/CashPaymentModal.tsx'), 'utf8');
     expect(source).not.toMatch(/notify\.\w+\('[А-Яа-я]/);
   });
   it('RefundRequestsTable has no hardcoded Russian strings', () => {
-    const source = fs.readFileSync(path.join(ROOT, 'components/cashier/RefundRequestsTable.jsx'), 'utf8');
+    const source = fs.readFileSync(path.join(ROOT, 'components/cashier/RefundRequestsTable.tsx'), 'utf8');
     expect(source).not.toMatch(/notify\.\w+\('[А-Яа-я]/);
     expect(source).not.toMatch(/title: '[А-Яа-я]/);
   });

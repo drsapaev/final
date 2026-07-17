@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 const sourcePath = path.resolve(
   process.cwd(),
-  'src/components/admin/AllFreeApproval.jsx'
+  'src/components/admin/AllFreeApproval.tsx'
 );
 
 const readSource = () => fs.readFileSync(sourcePath, 'utf8');

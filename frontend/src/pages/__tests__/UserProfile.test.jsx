@@ -1,8 +1,8 @@
 import React, { StrictMode } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ThemeProvider } from '../../contexts/ThemeContext.jsx';
-import { MacOSThemeProvider } from '../../theme/macosTheme.jsx';
+import { ThemeProvider } from '../../contexts/ThemeContext.tsx';
+import { MacOSThemeProvider } from '../../theme/macosTheme.tsx';
 
 const { apiGet, apiPut, setAuthProfile, getAuthState } = vi.hoisted(() => ({
   apiGet: vi.fn(),
@@ -23,7 +23,7 @@ vi.mock('../../stores/auth', () => ({
   setProfile: setAuthProfile,
 }));
 
-vi.mock('../../components/settings/NotificationPreferences.jsx', () => ({
+vi.mock('../../components/settings/NotificationPreferences.tsx', () => ({
   default: () => <div>Notification Preferences Stub</div>,
 }));
 
@@ -31,7 +31,7 @@ vi.mock('../../components/security/TwoFactorManager', () => ({
   default: () => <div>Two Factor Stub</div>,
 }));
 
-import UserProfile, { __resetSelfProfileCacheForTests } from '../UserProfile.jsx';
+import UserProfile, { __resetSelfProfileCacheForTests } from '../UserProfile.tsx';
 
 function renderUserProfile() {
   return render(

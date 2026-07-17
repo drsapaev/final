@@ -2,7 +2,7 @@ import '@testing-library/jest-dom';
 import { render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { ThemeProvider } from '../../../contexts/ThemeContext.jsx';
+import { ThemeProvider } from '../../../contexts/ThemeContext.tsx';
 import ServiceCatalog from '../ServiceCatalog';
 import { api } from '../../../api/client';
 

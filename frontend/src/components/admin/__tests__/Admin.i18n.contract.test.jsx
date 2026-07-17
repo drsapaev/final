@@ -7,10 +7,10 @@ const __dirname = path.dirname(__filename);
 const ROOT = path.resolve(__dirname, '../../..');
 
 const files = {
-  AdminAppointments: 'components/admin/AdminAppointments.jsx',
-  AdminDoctors: 'components/admin/AdminDoctors.jsx',
-  AdminFinanceOverview: 'components/admin/AdminFinanceOverview.jsx',
-  AdminPatients: 'components/admin/AdminPatients.jsx',
+  AdminAppointments: 'components/admin/AdminAppointments.tsx',
+  AdminDoctors: 'components/admin/AdminDoctors.tsx',
+  AdminFinanceOverview: 'components/admin/AdminFinanceOverview.tsx',
+  AdminPatients: 'components/admin/AdminPatients.tsx',
 };
 
 const translationsSource = fs.readFileSync(

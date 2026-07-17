@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 const sourcePath = path.resolve(
   process.cwd(),
-  'src/components/registrar/PriceOverrideApproval.jsx'
+  'src/components/registrar/PriceOverrideApproval.tsx'
 );
 
 const readSource = () => fs.readFileSync(sourcePath, 'utf8');

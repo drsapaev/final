@@ -14,13 +14,13 @@ const source = fs.readFileSync(
 );
 
 const workbenchSource = fs.readFileSync(
-  path.join(ROOT, 'components/laboratory/LabReportWorkbench.jsx'),
+  path.join(ROOT, 'components/laboratory/LabReportWorkbench.tsx'),
   'utf8'
 );
 
 // STRAT#24: numeric validation moved to ReportEditor component
 const reportEditorSource = fs.readFileSync(
-  path.join(ROOT, 'components/laboratory/ReportEditor.jsx'),
+  path.join(ROOT, 'components/laboratory/ReportEditor.tsx'),
   'utf8'
 );
 
