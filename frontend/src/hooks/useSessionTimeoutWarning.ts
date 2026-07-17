@@ -58,8 +58,7 @@ export function useSessionTimeoutWarning({
   onExpired,
   warningThresholdMs = DEFAULT_WARNING_THRESHOLD,
   pollIntervalMs = DEFAULT_POLL_INTERVAL,
-    enabled = true,
-  enabled: boolean = true,
+  enabled = true,
 }: UseSessionTimeoutWarningOptions = {}) {
   const warningFiredRef = useRef(false);
   const expiredFiredRef = useRef(false);
