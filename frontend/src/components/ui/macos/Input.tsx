@@ -18,7 +18,7 @@ const Input = React.forwardRef(({
   onClear,   // Extract to prevent passing to input
   ...props
 }, ref) => {
-  const [isFocused, setIsFocused] = React.useState(false);
+  const [isFocused, setIsFocused] = React.useState<boolean>(false);
   const sizeStyles = {
     sm: {
       padding: '6px 12px',

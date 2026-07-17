@@ -23,15 +23,15 @@ const Tooltip = ({
   ...props
 }) => {
   useTheme();
-  const [isVisible, setIsVisible] = useState(false);
-  const [shouldRender, setShouldRender] = useState(false);
+  const [isVisible, setIsVisible] = useState<boolean>(false);
+  const [shouldRender, setShouldRender] = useState<boolean>(false);
   const [coords, setCoords] = useState({ x: 0, y: 0 });
   const [mouseCoords, setMouseCoords] = useState({ x: 0, y: 0 });
-  const [tooltipSize, setTooltipSize] = useState(null); // ✅ NEW: Размеры тултипа
+  const [tooltipSize, setTooltipSize] = useState<unknown>(null); // ✅ NEW: Размеры тултипа
 
-  const triggerRef = useRef(null);
-  const tooltipRef = useRef(null);
-  const timeoutRef = useRef(null);
+  const triggerRef = useRef<unknown>(null);
+  const tooltipRef = useRef<unknown>(null);
+  const timeoutRef = useRef<unknown>(null);
 
   // Position calculations
   const positionMap = {

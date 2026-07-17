@@ -25,9 +25,9 @@ const FileUpload = ({
   className,
   style
 }) => {
-  const [converting, setConverting] = useState(false);
-  const [error, setError] = useState(null);
-  const [previews, setPreviews] = useState([]);
+  const [converting, setConverting] = useState<boolean>(false);
+  const [error, setError] = useState<unknown>(null);
+  const [previews, setPreviews] = useState<unknown[]>([]);
 
   const handleDrop = useCallback(async (acceptedFiles, rejectedFiles) => {
     setError(null);

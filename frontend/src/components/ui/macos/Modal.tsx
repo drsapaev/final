@@ -31,13 +31,13 @@ const Modal = ({
 }) => {
   useTheme();
   void variant;
-  const modalRef = useRef(null);
-  const backdropRef = useRef(null);
+  const modalRef = useRef<unknown>(null);
+  const backdropRef = useRef<unknown>(null);
   // PR-37 / P0-B: unique id for aria-labelledby — avoids collisions when
   // multiple modals are rendered simultaneously.
   const titleId = useId();
   // PR-37 / P0-A: track the previously-focused element to restore focus on close.
-  const previouslyFocusedRef = useRef(null);
+  const previouslyFocusedRef = useRef<unknown>(null);
 
   // PR-37 / P0-A: Focus trap implementation.
   // On open: save document.activeElement, move focus into the modal.

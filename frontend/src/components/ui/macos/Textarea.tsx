@@ -17,7 +17,7 @@ const Textarea = React.forwardRef(({
   textareaStyle = {},
   ...props
 }, ref) => {
-  const textareaRef = useRef(null);
+  const textareaRef = useRef<unknown>(null);
   const internalRef = ref || textareaRef;
 
   const sizeStyles = {
