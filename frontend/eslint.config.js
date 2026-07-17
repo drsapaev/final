@@ -142,15 +142,51 @@ export default [
         ecmaFeatures: {
           jsx: true,
         },
+        // Stabilization Sprint B2: provide project so @typescript-eslint/parser
+        // resolves TS DOM lib types (BodyInit, RequestInit, NotificationOptions,
+        // NotificationPermission, etc.). Without this, ESLint reports
+        // no-undef for TS DOM types because it doesn't read tsconfig.json.
+        project: './tsconfig.json',
       },
       globals: {
         ...globals.browser,
         ...globals.es2022,
         ...globals.node,
+        // Stabilization Sprint B2: TS DOM lib types that ESLint doesn't
+        // know about by default. These are global types declared by
+        // "lib": ["DOM", "DOM.Iterable"] in tsconfig.json.
+        BodyInit: 'readonly',
+        RequestInit: 'readonly',
+        Response: 'readonly',
+        Request: 'readonly',
+        Headers: 'readonly',
+        FormData: 'readonly',
+        URLSearchParams: 'readonly',
+        AbortController: 'readonly',
+        AbortSignal: 'readonly',
+        NotificationOptions: 'readonly',
+        NotificationPermission: 'readonly',
+        Notification: 'readonly',
+        WebSocket: 'readonly',
+        FileReader: 'readonly',
+        Blob: 'readonly',
+        File: 'readonly',
+        AudioContext: 'readonly',
+        webkitAudioContext: 'readonly',
+        ServiceWorkerRegistration: 'readonly',
+        PublicKeyCredentialCreationOptions: 'readonly',
+        PublicKeyCredentialRequestOptions: 'readonly',
+        Credential: 'readonly',
+        AttestationConveyancePreference: 'readonly',
+        UserVerificationRequirement: 'readonly',
       },
     },
     rules: {
       'no-unused-vars': 'off',
+      // Stabilization Sprint B2: turn off no-undef for .ts/.tsx — TypeScript
+      // already does this check via tsc. ESLint's no-undef doesn't understand
+      // TS type declarations (interfaces, types, DOM lib globals).
+      'no-undef': 'off',
       // Phase 0 — TS rules (lenient at start; strict at Phase 9)
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
       '@typescript-eslint/no-explicit-any': 'off',                       // ← off at start; warn at Phase 9
@@ -188,16 +224,27 @@ export default [
     // =================================================================
     files: [
       'src/api/client.js',
+      'src/api/client.ts',
       'src/api/runtime.js',
+      'src/api/runtime.ts',
       'src/api/setup.js',
+      'src/api/setup.ts',
       'src/api/mcpClient.js',
+      'src/api/mcpClient.ts',
       'src/api/patients.js',
+      'src/api/patients.ts',
       'src/api/payments.js',
+      'src/api/payments.ts',
       'src/utils/tokenManager.js',
+      'src/utils/tokenManager.ts',
       'src/utils/navigation.js',
+      'src/utils/navigation.ts',
       'src/utils/navigationReact.js',
+      'src/utils/navigationReact.ts',
       'src/contexts/ThemeContext.jsx',
+      'src/contexts/ThemeContext.tsx',
       'src/theme/colorScheme.js',
+      'src/theme/colorScheme.ts',
     ],
     rules: {
       'no-restricted-properties': 'off',
