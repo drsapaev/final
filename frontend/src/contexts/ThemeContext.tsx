@@ -62,7 +62,7 @@ interface ThemeContextValue {
   isLight: boolean;
   themeConfig: ThemeConfig;
   designTokens: typeof tokens;
-  getColor: (color: ColorToken, shade?: number) => string;
+  getColor: (color: ColorToken, shade?: number | string) => string;
   getSpacing: (size: Spacing) => string;
   getFontSize: (size: FontSize) => string;
   getShadow: (size: ShadowSize) => string;
@@ -180,25 +180,34 @@ export const ThemeProvider = ({ children }: ThemeProviderProps) => {
   const isLight = theme === 'light';
   const themeConfig = useMemo<ThemeConfig>(() => ({ mode: theme, colorScheme }), [theme, colorScheme]);
 
-  const getColor = useCallback((color: ColorToken, shade = 500): string => {
+  const getColor = useCallback((color: ColorToken, shade: number | string = 500): string => {
+    const numericShade = typeof shade === 'number' ? shade : 500;
     if (color === 'primary' || color === 'secondary') {
-      return (tokenColors as Record<string, Record<number, string>>)[color]?.[shade] || (tokenColors as Record<string, Record<number, string>>).primary?.[500] || 'var(--mac-accent-blue)';
+      return (tokenColors as Record<string, Record<number, string>>)[color]?.[numericShade] || (tokenColors as Record<string, Record<number, string>>).primary?.[500] || 'var(--mac-accent-blue)';
     }
     if (color === 'success' || color === 'warning' || color === 'danger' || color === 'info') {
       const status = (tokenColors as unknown as { status?: Record<string, string> }).status;
       return status?.[color] || (tokenColors as Record<string, Record<number, string>>).primary?.[500] || 'var(--mac-accent-blue)';
     }
     if (color === 'text') {
-      return (tokenColors as Record<string, { text?: Record<string, string> }>).semantic?.text?.primary || 'var(--mac-text-primary)';
+      const semantic = (tokenColors as Record<string, { text?: Record<string, string> }>).semantic;
+      const key = typeof shade === 'string' ? shade : 'primary';
+      return semantic?.text?.[key] || 'var(--mac-text-primary)';
     }
     if (color === 'background') {
-      return (tokenColors as Record<string, { background?: Record<string, string> }>).semantic?.background?.primary || 'var(--mac-bg-primary)';
+      const semantic = (tokenColors as Record<string, { background?: Record<string, string> }>).semantic;
+      const key = typeof shade === 'string' ? shade : 'primary';
+      return semantic?.background?.[key] || 'var(--mac-bg-primary)';
     }
     if (color === 'border') {
-      return (tokenColors as Record<string, { border?: Record<string, string> }>).semantic?.border?.medium || 'var(--mac-border)';
+      const semantic = (tokenColors as Record<string, { border?: Record<string, string> }>).semantic;
+      const key = typeof shade === 'string' ? shade : 'medium';
+      return semantic?.border?.[key] || 'var(--mac-border)';
     }
     if (color === 'surface') {
-      return (tokenColors as Record<string, { surface?: Record<string, string> }>).semantic?.surface?.card || 'var(--mac-bg-primary)';
+      const semantic = (tokenColors as Record<string, { surface?: Record<string, string> }>).semantic;
+      const key = typeof shade === 'string' ? shade : 'card';
+      return semantic?.surface?.[key] || 'var(--mac-bg-primary)';
     }
     return (tokenColors as Record<string, Record<number, string>>).primary?.[500] || 'var(--mac-accent-blue)';
   }, []);
