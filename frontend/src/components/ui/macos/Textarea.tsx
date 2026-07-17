@@ -1,10 +1,27 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback, type CSSProperties, type FocusEvent, type FormEvent } from 'react';
 import PropTypes from 'prop-types';
 
-const Textarea = React.forwardRef(({
+type TextareaSize = 'sm' | 'md' | 'lg';
+type TextareaVariant = 'default' | 'filled' | 'error';
+
+interface TextareaProps extends Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, 'children' | 'style' | 'size'> {
+  className?: string;
+  style?: CSSProperties;
+  size?: TextareaSize;
+  variant?: TextareaVariant;
+  error?: boolean;
+  disabled?: boolean;
+  autoResize?: boolean;
+  minRows?: number;
+  maxRows?: number;
+  textareaStyle?: CSSProperties;
+}
+
+interface TextareaStyle extends CSSProperties {
+  transition?: string;
+}
+
+const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(({
   className,
   style,
   size = 'md',
@@ -17,10 +34,10 @@ const Textarea = React.forwardRef(({
   textareaStyle = {},
   ...props
 }, ref) => {
-  const textareaRef = useRef<unknown>(null);
-  const internalRef = ref || textareaRef;
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const internalRef = (ref || textareaRef) as React.RefObject<HTMLTextAreaElement>;
 
-  const sizeStyles = {
+  const sizeStyles: Record<TextareaSize, CSSProperties> = {
     sm: {
       padding: '8px 12px',
       fontSize: 'var(--mac-font-size-sm)',
@@ -38,7 +55,7 @@ const Textarea = React.forwardRef(({
     }
   };
 
-  const variantStyles = {
+  const variantStyles: Record<TextareaVariant, CSSProperties> = {
     default: {
       border: '1px solid var(--mac-border)',
       background: 'var(--mac-bg-primary)',
@@ -56,11 +73,11 @@ const Textarea = React.forwardRef(({
     }
   };
 
-  const currentVariant = error ? 'error' : variant;
+  const currentVariant: TextareaVariant = error ? 'error' : variant;
   const currentSize = sizeStyles[size];
   const currentVariantStyle = variantStyles[currentVariant];
 
-  const textareaStyles = {
+  const textareaStyles: TextareaStyle = {
     width: '100%',
     borderRadius: 'var(--mac-radius-md)',
     fontSize: currentSize.fontSize,
@@ -81,28 +98,29 @@ const Textarea = React.forwardRef(({
     ...textareaStyle
   };
 
-  const handleFocus = (e) => {
+  const handleFocus = (e: FocusEvent<HTMLTextAreaElement>) => {
     if (!disabled) {
-      e.target.style.borderColor = error ? 'var(--mac-error)' : 'var(--mac-accent-blue)';
-      e.target.style.boxShadow = `0 0 0 3px ${error ? 'rgba(255, 59, 48, 0.1)' : 'rgba(0, 122, 255, 0.1)'}`;
+      e.currentTarget.style.borderColor = error ? 'var(--mac-error)' : 'var(--mac-accent-blue)';
+      e.currentTarget.style.boxShadow = `0 0 0 3px ${error ? 'rgba(255, 59, 48, 0.1)' : 'rgba(0, 122, 255, 0.1)'}`;
     }
   };
 
-  const handleBlur = (e) => {
-    e.target.style.borderColor = currentVariantStyle.border.split(' ')[2];
-    e.target.style.boxShadow = 'none';
+  const handleBlur = (e: FocusEvent<HTMLTextAreaElement>) => {
+    const borderVal = (currentVariantStyle.border as string | undefined) || '';
+    e.currentTarget.style.borderColor = borderVal.split(' ')[2] || '';
+    e.currentTarget.style.boxShadow = 'none';
   };
 
   const adjustHeight = useCallback(() => {
     if (autoResize && internalRef.current) {
       const textarea = internalRef.current;
       textarea.style.height = 'auto';
-      
+
       const scrollHeight = textarea.scrollHeight;
-      const lineHeight = parseInt(currentSize.lineHeight) * parseInt(currentSize.fontSize);
+      const lineHeight = parseInt(String(currentSize.lineHeight)) * parseInt(String(currentSize.fontSize));
       const minHeight = lineHeight * minRows;
       const maxHeight = lineHeight * maxRows;
-      
+
       const newHeight = Math.min(Math.max(scrollHeight, minHeight), maxHeight);
       textarea.style.height = `${newHeight}px`;
     }
@@ -122,7 +140,7 @@ const Textarea = React.forwardRef(({
       disabled={disabled}
       onFocus={handleFocus}
       onBlur={handleBlur}
-      onInput={adjustHeight}
+      onInput={(e: FormEvent<HTMLTextAreaElement>) => adjustHeight()}
       rows={minRows}
       {...props}
     />

@@ -1,7 +1,20 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useTranslation } from '../../../i18n/useTranslation';
+import type { CSSProperties, ReactNode } from 'react';
+
+type SkeletonVariant = 'text' | 'circle' | 'rect' | 'card' | 'table' | 'list';
+type SkeletonSize = string | number;
+
+interface SkeletonProps {
+  variant?: SkeletonVariant;
+  width?: SkeletonSize;
+  height?: SkeletonSize;
+  lines?: number;
+  spacing?: SkeletonSize;
+  animation?: boolean;
+  className?: string;
+  style?: CSSProperties;
+}
+
 const Skeleton = ({
   variant = 'text',
   width = '100%',
@@ -11,40 +24,43 @@ const Skeleton = ({
   animation = true,
   className,
   style
-}) => {
-  const baseStyle = {
+}: SkeletonProps) => {
+  const { t } = useTranslation();
+  void t;
+
+  const baseStyle: CSSProperties = {
     background: 'var(--mac-bg-tertiary)',
     borderRadius: 'var(--mac-radius-sm)',
     animation: animation ? 'skeleton-pulse 1.5s ease-in-out infinite' : 'none',
     ...style
   };
 
-  const textStyle = {
+  const textStyle: CSSProperties = {
     ...baseStyle,
     height: height,
     width: width
   };
 
-  const circleStyle = {
+  const circleStyle: CSSProperties = {
     ...baseStyle,
     width: height,
     height: height,
     borderRadius: '50%'
   };
 
-  const rectStyle = {
+  const rectStyle: CSSProperties = {
     ...baseStyle,
     width: width,
     height: height
   };
 
-  const containerStyle = {
+  const containerStyle: CSSProperties = {
     display: 'flex',
     flexDirection: 'column',
     gap: spacing
   };
 
-  const renderTextSkeleton = () => {
+  const renderTextSkeleton = (): ReactNode => {
     if (lines === 1) {
       return <div className={className} style={textStyle} />;
     }
@@ -64,15 +80,15 @@ const Skeleton = ({
     );
   };
 
-  const renderCircleSkeleton = () => (
+  const renderCircleSkeleton = (): ReactNode => (
     <div className={className} style={circleStyle} />
   );
 
-  const renderRectSkeleton = () => (
+  const renderRectSkeleton = (): ReactNode => (
     <div className={className} style={rectStyle} />
   );
 
-  const renderCardSkeleton = () => (
+  const renderCardSkeleton = (): ReactNode => (
     <div className={className} style={containerStyle}>
       <div style={{ ...rectStyle, height: '16px', width: '60%' }} />
       <div style={{ ...rectStyle, height: '24px', width: '80%' }} />
@@ -80,7 +96,7 @@ const Skeleton = ({
     </div>
   );
 
-  const renderTableSkeleton = () => (
+  const renderTableSkeleton = (): ReactNode => (
     <div className={className} style={containerStyle}>
       {/* Header */}
       <div style={{ display: 'flex', gap: spacing }}>
@@ -105,7 +121,7 @@ const Skeleton = ({
     </div>
   );
 
-  const renderListSkeleton = () => (
+  const renderListSkeleton = (): ReactNode => (
     <div className={className} style={containerStyle}>
       {Array.from({ length: lines }, (_, index) => (
         <div
