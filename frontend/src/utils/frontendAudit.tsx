@@ -1,13 +1,33 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 // Утилиты для аудита frontend структуры
 import { useTheme } from '../contexts/ThemeContext';
+import type { CSSProperties } from 'react';
+
+type FileStatus = 'correct' | 'needs_move' | 'needs_fix';
+
+interface FileEntry {
+  purpose: string;
+  currentLocation: string;
+  recommendedLocation: string;
+  status: FileStatus;
+  issues?: string[];
+}
+
+interface FileWithIssues extends FileEntry {
+  path: string;
+}
+
+interface FileStats {
+  total: number;
+  correct: number;
+  needsMove: number;
+  needsFix: number;
+  hasIssues: number;
+}
 
 /**
  * Карта файлов frontend с их назначением и рекомендуемым местом
  */
-export const FRONTEND_FILE_MAP = {
+export const FRONTEND_FILE_MAP: Record<string, FileEntry> = {
   // Core и layout
   'src/App.jsx': {
     purpose: 'Главный компонент приложения, роутинг, провайдеры',
@@ -587,23 +607,23 @@ export const FRONTEND_FILE_MAP = {
 /**
  * Получает статистику по файлам
  */
-export function getFileStats() {
+export function getFileStats(): FileStats {
   const files = Object.values(FRONTEND_FILE_MAP);
-  const stats = {
+  const stats: FileStats = {
     total: files.length,
     correct: files.filter(f => f.status === 'correct').length,
     needsMove: files.filter(f => f.status === 'needs_move').length,
     needsFix: files.filter(f => f.status === 'needs_fix').length,
-    hasIssues: files.filter(f => (f as { issues?: unknown[] }).issues && (f as { issues?: unknown[] }).issues!.length > 0).length
+    hasIssues: files.filter(f => f.issues && f.issues.length > 0).length
   };
-  
+
   return stats;
 }
 
 /**
  * Получает файлы по статусу
  */
-export function getFilesByStatus(status) {
+export function getFilesByStatus(status: FileStatus): FileWithIssues[] {
   return Object.entries(FRONTEND_FILE_MAP)
     .filter(([, file]) => file.status === status)
     .map(([path, file]) => ({ path, ...file }));
@@ -612,16 +632,16 @@ export function getFilesByStatus(status) {
 /**
  * Получает файлы с проблемами
  */
-export function getFilesWithIssues() {
+export function getFilesWithIssues(): FileWithIssues[] {
   return Object.entries(FRONTEND_FILE_MAP)
-    .filter(([, file]) => (file as { issues?: unknown[] }).issues && (file as { issues?: unknown[] }).issues!.length > 0)
+    .filter(([, file]) => file.issues && file.issues.length > 0)
     .map(([path, file]) => ({ path, ...file }));
 }
 
 /**
  * Получает рекомендуемую структуру папок
  */
-export function getRecommendedStructure() {
+export function getRecommendedStructure(): Record<string, string[]> {
   return {
     'src/': [
       'App.jsx',
@@ -763,52 +783,52 @@ export function FrontendAuditDisplay() {
   const filesWithIssues = getFilesWithIssues();
   const recommendedStructure = getRecommendedStructure();
 
-  const containerStyle = {
+  const containerStyle: CSSProperties = {
     padding: getSpacing('lg'),
     backgroundColor: getColor('background', 'primary'),
     borderRadius: 'var(--mac-radius-md)',
     marginBottom: getSpacing('md')
   };
 
-  const titleStyle = {
+  const titleStyle: CSSProperties = {
     fontSize: getFontSize('xl'),
     fontWeight: 'var(--mac-font-weight-semibold)',
     color: getColor('text', 'primary'),
     marginBottom: getSpacing('lg')
   };
 
-  const statsStyle = {
+  const statsStyle: CSSProperties = {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
     gap: getSpacing('md'),
     marginBottom: getSpacing('lg')
   };
 
-  const statCardStyle = {
+  const statCardStyle: CSSProperties = {
     padding: getSpacing('md'),
     backgroundColor: getColor('background', 'secondary'),
     borderRadius: 'var(--mac-radius-md)',
     border: `1px solid ${getColor('border', 'light')}`
   };
 
-  const statTitleStyle = {
+  const statTitleStyle: CSSProperties = {
     fontSize: getFontSize('sm'),
     fontWeight: 'var(--mac-font-weight-medium)',
     color: getColor('text', 'secondary'),
     marginBottom: getSpacing('xs')
   };
 
-  const statValueStyle = {
+  const statValueStyle: CSSProperties = {
     fontSize: getFontSize('lg'),
     fontWeight: 'var(--mac-font-weight-semibold)',
     color: getColor('text', 'primary')
   };
 
-  const issuesStyle = {
+  const issuesStyle: CSSProperties = {
     marginBottom: getSpacing('lg')
   };
 
-  const issueItemStyle = {
+  const issueItemStyle: CSSProperties = {
     padding: getSpacing('sm'),
     backgroundColor: getColor('background', 'secondary'),
     borderRadius: 'var(--mac-radius-sm)',
@@ -816,34 +836,34 @@ export function FrontendAuditDisplay() {
     borderLeft: `4px solid ${getColor('warning', 'main')}`
   };
 
-  const issuePathStyle = {
+  const issuePathStyle: CSSProperties = {
     fontSize: getFontSize('sm'),
     fontWeight: 'var(--mac-font-weight-medium)',
     color: getColor('text', 'primary'),
     marginBottom: getSpacing('xs')
   };
 
-  const issueTextStyle = {
+  const issueTextStyle: CSSProperties = {
     fontSize: getFontSize('sm'),
     color: getColor('text', 'secondary')
   };
 
-  const structureStyle = {
+  const structureStyle: CSSProperties = {
     marginTop: getSpacing('lg')
   };
 
-  const folderStyle = {
+  const folderStyle: CSSProperties = {
     marginBottom: getSpacing('md')
   };
 
-  const folderTitleStyle = {
+  const folderTitleStyle: CSSProperties = {
     fontSize: getFontSize('md'),
     fontWeight: 'var(--mac-font-weight-semibold)',
     color: getColor('text', 'primary'),
     marginBottom: getSpacing('sm')
   };
 
-  const fileListStyle = {
+  const fileListStyle: CSSProperties = {
     fontSize: getFontSize('sm'),
     color: getColor('text', 'secondary'),
     marginLeft: getSpacing('md')
@@ -880,7 +900,7 @@ export function FrontendAuditDisplay() {
           {filesWithIssues.map((file, index) => (
             <div key={index} style={issueItemStyle}>
               <div style={issuePathStyle}>{file.path}</div>
-              {(file as { issues?: unknown[] }).issues?.map((issue, issueIndex) => (
+              {file.issues?.map((issue, issueIndex) => (
                 <div key={issueIndex} style={issueTextStyle}>
                   • {String(issue)}
                 </div>
