@@ -47,7 +47,7 @@ const useDoctors = () => {
     }
   }, []);
 
-  const loadAvailableUsers = useCallback(async (doctorId = null) => {
+  const loadAvailableUsers = useCallback(async (doctorId: unknown = null) => {
     try {
       const response = await api.get('/admin/doctors/available-users', {
         params: doctorId ? { doctor_id: doctorId } : undefined,
