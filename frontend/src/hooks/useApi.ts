@@ -1,110 +1,159 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 /**
- * Универсальные хуки для API интеграции
- * Заменяют прямые fetch запросы унифицированным подходом
+ * Универсальные хуки для API интеграции.
+ * Заменяют прямые fetch запросы унифицированным подходом.
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, apiRequest } from '../api/client';
 import { toast } from 'react-toastify';
 import { tokenManager } from '../utils/tokenManager';
 import logger from '../utils/logger';
-/**
- * Хук для выполнения API запросов с состоянием загрузки
- */
-export function useApiCall() {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
 
-  const execute = useCallback(async (apiCall, options: Record<string, unknown> = {}) => {
-    const {
-      showError = true,
-      showSuccess = false as boolean,
-      successMessage = 'Операция выполнена успешно',
-      errorMessage = 'Произошла ошибка'
-    } = options;
+// ============================================================================
+// useApiCall
+// ============================================================================
 
-    setLoading(true);
-    setError(null);
+interface ApiCallOptions {
+  showError?: boolean;
+  showSuccess?: boolean;
+  successMessage?: string;
+  errorMessage?: string;
+}
 
-    try {
-      const result = await apiCall();
+interface UseApiCallReturn {
+  execute: <T = unknown>(apiCall: () => Promise<T>, options?: ApiCallOptions) => Promise<T>;
+  loading: boolean;
+  error: string | null;
+}
 
-      if (showSuccess) {
-        toast.success(successMessage);
+interface CatchError {
+  response?: { data?: { detail?: string } };
+  message?: string;
+}
+
+export function useApiCall(): UseApiCallReturn {
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const execute = useCallback(
+    async <T = unknown,>(
+      apiCall: () => Promise<T>,
+      options: ApiCallOptions = {},
+    ): Promise<T> => {
+      const {
+        showError = true,
+        showSuccess = false,
+        successMessage = 'Операция выполнена успешно',
+        errorMessage = 'Произошла ошибка',
+      } = options;
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        const result = await apiCall();
+
+        if (showSuccess) {
+          toast.success(successMessage);
+        }
+
+        return result;
+      } catch (err) {
+        const e = err as CatchError;
+        const errorMsg = e?.response?.data?.detail || e?.message || errorMessage;
+        setError(String(errorMsg));
+
+        if (showError) {
+          toast.error(String(errorMsg));
+        }
+
+        throw err;
+      } finally {
+        setLoading(false);
       }
-
-      return result;
-    } catch (err) {
-      const errorMsg = err.response?.data?.detail || err.message || errorMessage;
-      setError(String(errorMsg));
-
-      if (showError) {
-        toast.error(errorMsg);
-      }
-
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    },
+    [],
+  );
 
   return { execute, loading, error };
 }
 
-/**
- * Хук для загрузки данных с автоматическим повтором
- */
-export function useApiData(endpoint, options: Record<string, unknown> = {}) {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+// ============================================================================
+// useApiData
+// ============================================================================
+
+interface UseApiDataOptions {
+  params?: Record<string, unknown>;
+  dependencies?: unknown[];
+  autoLoad?: boolean;
+  fallbackData?: unknown;
+  silent?: boolean;
+}
+
+interface UseApiDataReturn {
+  data: unknown;
+  loading: boolean;
+  error: string | null;
+  refresh: () => Promise<unknown>;
+  silentRefresh: () => Promise<unknown>;
+  loadData: (loadOptions?: { silent?: boolean }) => Promise<unknown>;
+}
+
+export function useApiData(
+  endpoint: string,
+  options: UseApiDataOptions = {},
+): UseApiDataReturn {
+  const [data, setData] = useState<unknown>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
   const {
     params = {},
-    dependencies = [] as unknown[],
-    autoLoad = true as boolean,
-    fallbackData = null as unknown,
-    silent = false as boolean
+    dependencies = [],
+    autoLoad = true,
+    fallbackData = null,
+    silent = false,
   } = options;
 
-  const loadData = useCallback(async (loadOptions: Record<string, unknown> = {}) => {
-    const { silent: loadSilent = silent } = loadOptions;
-
-    if (!loadSilent) {
-      setLoading(true);
-    }
-    setError(null);
-
-    try {
-      const result = await apiRequest('GET', endpoint, { params });
-      setData(result);
-      return result;
-    } catch (err) {
-      const errorMsg = err.response?.data?.detail || err.message || 'Ошибка загрузки данных';
-      setError(String(errorMsg));
-
-      if (fallbackData) {
-        setData(fallbackData);
-      }
+  const loadData = useCallback(
+    async (loadOptions: { silent?: boolean } = {}): Promise<unknown> => {
+      const { silent: loadSilent = silent } = loadOptions;
 
       if (!loadSilent) {
-        logger.error(`API Error (${endpoint}):`, errorMsg);
+        setLoading(true);
       }
+      setError(null);
 
-      throw err;
-    } finally {
-      if (!loadSilent) {
-        setLoading(false);
+      try {
+        const result = await apiRequest<unknown>('GET', endpoint, { params });
+        setData(result);
+        return result;
+      } catch (err) {
+        const e = err as CatchError;
+        const errorMsg = e?.response?.data?.detail || e?.message || 'Ошибка загрузки данных';
+        setError(String(errorMsg));
+
+        if (fallbackData) {
+          setData(fallbackData);
+        }
+
+        if (!loadSilent) {
+          logger.error(`API Error (${endpoint}):`, errorMsg);
+        }
+
+        throw err;
+      } finally {
+        if (!loadSilent) {
+          setLoading(false);
+        }
       }
-    }
-  }, [endpoint, params, fallbackData, silent]);
+    },
+    [endpoint, params, fallbackData, silent],
+  );
 
   const dependenciesKey = useMemo(
     () => JSON.stringify(dependencies ?? []),
-    [dependencies]
+    [dependencies],
   );
 
   useEffect(() => {
@@ -113,187 +162,256 @@ export function useApiData(endpoint, options: Record<string, unknown> = {}) {
     }
   }, [loadData, autoLoad, dependenciesKey]);
 
-  const refresh = useCallback(() => loadData(), [loadData]);
-  const silentRefresh = useCallback(() => loadData({ silent: true }), [loadData]);
+  const refresh = useCallback((): Promise<unknown> => loadData(), [loadData]);
+  const silentRefresh = useCallback((): Promise<unknown> => loadData({ silent: true }), [loadData]);
 
   return { data, loading, error, refresh, silentRefresh, loadData };
 }
 
-/**
- * Хук для работы с пациентами
- */
-export function usePatients(department: unknown = null) {
-  const endpoint = department ? `/patients?department=${department}&limit=100` : '/patients?limit=100';
+// ============================================================================
+// Domain-specific hooks
+// ============================================================================
+
+export function usePatients(department: string | null = null) {
+  const endpoint = department
+    ? `/patients?department=${department}&limit=100`
+    : '/patients?limit=100';
 
   return useApiData(endpoint, {
     fallbackData: [],
-    dependencies: [department]
+    dependencies: [department],
   });
 }
 
-/**
- * Хук для работы с записями/визитами
- */
-export function useAppointments(options: Record<string, unknown> = {}) {
+interface UseAppointmentsOptions {
+  department?: string | null;
+  limit?: number;
+}
+
+export function useAppointments(options: UseAppointmentsOptions = {}) {
   const { department, limit = 50 } = options;
-  const params = { limit };
+  const params: Record<string, unknown> = { limit };
   if (department) params.department = department;
 
   return useApiData('/registrar/all-appointments', {
     params,
     fallbackData: [],
-    dependencies: [department, limit]
+    dependencies: [department, limit],
   });
 }
 
-/**
- * Хук для работы с очередями
- */
-export function useQueues(date: unknown = null) {
-  const params = date ? { date } : {};
+export function useQueues(date: string | null = null) {
+  const params: Record<string, unknown> = date ? { date } : {};
 
   return useApiData('/queues', {
     params,
     fallbackData: [],
-    dependencies: [date]
+    dependencies: [date],
   });
 }
 
-/**
- * Хук для работы с услугами
- */
-export function useServices(specialty: unknown = null) {
-  const params = specialty ? { specialty } : {};
+export function useServices(specialty: string | null = null) {
+  const params: Record<string, unknown> = specialty ? { specialty } : {};
 
   return useApiData('/services', {
     params,
     fallbackData: [],
-    dependencies: [specialty]
+    dependencies: [specialty],
   });
 }
 
-/**
- * Хук для отправки форм с валидацией
- */
-export function useFormSubmit() {
+// ============================================================================
+// useFormSubmit
+// ============================================================================
+
+interface FormSubmitOptions {
+  method?: string;
+  validate?: ((data: Record<string, unknown>) => string | null) | null;
+  transform?: ((data: Record<string, unknown>) => Record<string, unknown>) | null;
+}
+
+interface UseFormSubmitReturn {
+  submitForm: (
+    endpoint: string,
+    formData: Record<string, unknown>,
+    options?: FormSubmitOptions,
+  ) => Promise<unknown>;
+  loading: boolean;
+  error: string | null;
+}
+
+export function useFormSubmit(): UseFormSubmitReturn {
   const { execute, loading, error } = useApiCall();
 
-  const submitForm = useCallback(async (endpoint, formData, options: Record<string, unknown> = {}) => {
-    const { method = 'POST', validate: unknown = null, transform: unknown = null } = options;
+  const submitForm = useCallback(
+    async (
+      endpoint: string,
+      formData: Record<string, unknown>,
+      options: FormSubmitOptions = {},
+    ): Promise<unknown> => {
+      const { method = 'POST', validate = null, transform = null } = options;
 
-    // Валидация данных
-    if (validate && typeof validate === 'function') {
-      const validationError = (validate as (...args: unknown[]) => void)(formData);
-      if (validationError) {
-        toast.error(validationError);
-        throw new Error(validationError);
+      if (validate && typeof validate === 'function') {
+        const validationError = validate(formData);
+        if (validationError) {
+          toast.error(validationError);
+          throw new Error(validationError);
+        }
       }
-    }
 
-    // Трансформация данных
-    const dataToSend = transform ? (transform as (...args: unknown[]) => void)(formData) : formData;
+      const dataToSend = transform ? transform(formData) : formData;
 
-    return execute(() => apiRequest(method, endpoint, { data: dataToSend }), {
-      showSuccess: true,
-      successMessage: 'Данные сохранены успешно'
-    });
-  }, [execute]);
+      return execute(
+        () => apiRequest<unknown>(method, endpoint, { data: dataToSend }),
+        {
+          showSuccess: true,
+          successMessage: 'Данные сохранены успешно',
+        },
+      );
+    },
+    [execute],
+  );
 
   return { submitForm, loading, error };
 }
 
-/**
- * Хук для работы с файлами
- */
-export function useFileUpload() {
+// ============================================================================
+// useFileUpload
+// ============================================================================
+
+interface UseFileUploadReturn {
+  uploadFile: (
+    file: File | Blob,
+    endpoint?: string,
+    options?: Record<string, unknown>,
+  ) => Promise<unknown>;
+  loading: boolean;
+  error: string | null;
+}
+
+export function useFileUpload(): UseFileUploadReturn {
   const { execute, loading, error } = useApiCall();
 
-  const uploadFile = useCallback(async (file, endpoint = '/files/upload', options: Record<string, unknown> = {}) => {
-    const formData = new FormData();
-    formData.append('file', file);
+  const uploadFile = useCallback(
+    async (
+      file: File | Blob,
+      endpoint: string = '/files/upload',
+      options: Record<string, unknown> = {},
+    ): Promise<unknown> => {
+      const formData = new FormData();
+      formData.append('file', file);
 
-    // Добавляем дополнительные поля
-    Object.entries(options).forEach(([key, value]) => {
-      formData.append(key, value);
-    });
+      Object.entries(options).forEach(([key, value]) => {
+        formData.append(key, String(value));
+      });
 
-    return execute(() => api.post(endpoint, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      }
-    }), {
-      showSuccess: true,
-      successMessage: 'Файл загружен успешно'
-    });
-  }, [execute]);
+      return execute(
+        () =>
+          api.post(endpoint, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+          }),
+        {
+          showSuccess: true,
+          successMessage: 'Файл загружен успешно',
+        },
+      );
+    },
+    [execute],
+  );
 
   return { uploadFile, loading, error };
 }
 
-/**
- * Хук для работы с WebSocket соединениями
- */
-export function useWebSocket(url, options: Record<string, unknown> = {}) {
-  const [socket, setSocket] = useState(null);
-  const [connected, setConnected] = useState(false);
-  const [lastMessage, setLastMessage] = useState(null);
+// ============================================================================
+// useWebSocket
+// ============================================================================
+
+interface UseWebSocketOptions {
+  onMessage?: ((message: unknown) => void) | null;
+  onConnect?: (() => void) | null;
+  onDisconnect?: (() => void) | null;
+  autoConnect?: boolean;
+}
+
+interface UseWebSocketReturn {
+  connect: () => void;
+  disconnect: () => void;
+  sendMessage: (message: unknown) => void;
+  connected: boolean;
+  lastMessage: unknown;
+}
+
+export function useWebSocket(
+  url: string,
+  options: UseWebSocketOptions = {},
+): UseWebSocketReturn {
+  const [socket, setSocket] = useState<WebSocket | null>(null);
+  const [connected, setConnected] = useState<boolean>(false);
+  const [lastMessage, setLastMessage] = useState<unknown>(null);
 
   const {
     onMessage = null,
-    onConnect = null as unknown,
-    onDisconnect = null as unknown,
-    autoConnect = true as boolean
+    onConnect = null,
+    onDisconnect = null,
+    autoConnect = true,
   } = options;
 
-  const connect = useCallback(() => {
+  const onMessageRef = useRef(onMessage);
+  const onConnectRef = useRef(onConnect);
+  const onDisconnectRef = useRef(onDisconnect);
+
+  useEffect(() => {
+    onMessageRef.current = onMessage;
+    onConnectRef.current = onConnect;
+    onDisconnectRef.current = onDisconnect;
+  });
+
+  const connect = useCallback((): void => {
     if (socket) return;
 
-    // Добавляем токен аутентификации к URL
     const token = tokenManager.getAccessToken();
-    // P0 security fix: JWT sent via Sec-WebSocket-Protocol subprotocol (bearer.<token>)
-    // instead of URL query (?token=...). The URL query form leaked the JWT into nginx
-    // access logs, browser history, and Referer headers. Backend supports subprotocol
-    // auth since PR-4 (backend).
-    const authenticatedUrl = url;
     const subprotocols = token ? [`bearer.${token}`] : [];
 
-    const ws = new WebSocket(authenticatedUrl, subprotocols);
+    const ws = new WebSocket(url, subprotocols);
 
-    ws.onopen = () => {
+    ws.onopen = (): void => {
       setConnected(true);
-      if (onConnect) (onConnect as (...args: unknown[]) => void)();
+      onConnectRef.current?.();
     };
 
-    ws.onmessage = (event) => {
-      const message = JSON.parse(event.data);
+    ws.onmessage = (event: MessageEvent): void => {
+      const message: unknown = JSON.parse(event.data);
       setLastMessage(message);
-      if (onMessage) (onMessage as (...args: unknown[]) => void)(message);
+      onMessageRef.current?.(message);
     };
 
-    ws.onclose = () => {
+    ws.onclose = (): void => {
       setConnected(false);
       setSocket(null);
-      if (onDisconnect) (onDisconnect as (...args: unknown[]) => void)();
+      onDisconnectRef.current?.();
     };
 
-    ws.onerror = (error) => {
+    ws.onerror = (error: Event): void => {
       logger.error('WebSocket error:', error);
     };
 
     setSocket(ws);
-  }, [url, onMessage, onConnect, onDisconnect, socket]);
+  }, [url, socket]);
 
-  const disconnect = useCallback(() => {
+  const disconnect = useCallback((): void => {
     if (socket) {
       socket.close();
     }
   }, [socket]);
 
-  const sendMessage = useCallback((message) => {
-    if (socket && connected) {
-      socket.send(JSON.stringify(message));
-    }
-  }, [socket, connected]);
+  const sendMessage = useCallback(
+    (message: unknown): void => {
+      if (socket && connected) {
+        socket.send(JSON.stringify(message));
+      }
+    },
+    [socket, connected],
+  );
 
   useEffect(() => {
     if (autoConnect) {
@@ -308,37 +426,50 @@ export function useWebSocket(url, options: Record<string, unknown> = {}) {
   return { connect, disconnect, sendMessage, connected, lastMessage };
 }
 
-/**
- * Хук для кэширования данных
- */
-export function useCachedData(key, fetcher, options: Record<string, unknown> = {}) {
-  const { ttl = 5 * 60 * 1000, fallback: unknown = null } = options; // 5 минут по умолчанию
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
+// ============================================================================
+// useCachedData
+// ============================================================================
+
+interface UseCachedDataOptions {
+  ttl?: number;
+  fallback?: unknown;
+}
+
+interface UseCachedDataReturn {
+  data: unknown;
+  loading: boolean;
+  clearCache: () => void;
+}
+
+export function useCachedData(
+  key: string,
+  fetcher: () => Promise<unknown>,
+  options: UseCachedDataOptions = {},
+): UseCachedDataReturn {
+  const { ttl = 5 * 60 * 1000, fallback = null } = options;
+  const [data, setData] = useState<unknown>(null);
+  const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    const loadCachedData = async () => {
+    const loadCachedData = async (): Promise<void> => {
       try {
-        // Проверяем кэш
         const cached = localStorage.getItem(`cache_${key}`);
         if (cached) {
-          const { data: cachedData, timestamp } = JSON.parse(cached);
-          if (Date.now() - timestamp < ttl) {
-            setData(cachedData);
+          const parsed = JSON.parse(cached) as { data: unknown; timestamp: number };
+          if (Date.now() - parsed.timestamp < ttl) {
+            setData(parsed.data);
             setLoading(false);
             return;
           }
         }
 
-        // Загружаем свежие данные
         const freshData = await fetcher();
         setData(freshData);
 
-        // Сохраняем в кэш
-        localStorage.setItem(`cache_${key}`, JSON.stringify({
-          data: freshData,
-          timestamp: Date.now()
-        }));
+        localStorage.setItem(
+          `cache_${key}`,
+          JSON.stringify({ data: freshData, timestamp: Date.now() }),
+        );
       } catch (error) {
         logger.error('Cache error:', error);
         if (fallback) {
@@ -352,7 +483,7 @@ export function useCachedData(key, fetcher, options: Record<string, unknown> = {
     loadCachedData();
   }, [key, fetcher, ttl, fallback]);
 
-  const clearCache = useCallback(() => {
+  const clearCache = useCallback((): void => {
     localStorage.removeItem(`cache_${key}`);
   }, [key]);
 
