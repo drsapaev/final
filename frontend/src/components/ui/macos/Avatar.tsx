@@ -1,8 +1,19 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import PropTypes from 'prop-types';
-function getInitials(name) {
+import type { CSSProperties } from 'react';
+
+type AvatarSize = 'small' | 'medium' | 'large';
+type AvatarStatus = 'online' | 'busy' | 'away';
+
+interface AvatarProps {
+  src?: string | null;
+  name?: string | null;
+  size?: AvatarSize;
+  status?: AvatarStatus | null;
+  style?: CSSProperties;
+  className?: string;
+}
+
+function getInitials(name: string | null | undefined): string {
   if (!name) return '';
   const parts = String(name).trim().split(/\s+/);
   const first = parts[0]?.[0] || '';
@@ -10,10 +21,10 @@ function getInitials(name) {
   return (first + last).toUpperCase();
 }
 
-export const Avatar = ({ src, name, size = 'medium', status, style = {}, className = '' }) => {
+export const Avatar = ({ src, name, size = 'medium', status, style = {}, className = '' }: AvatarProps) => {
   const sizePx = size === 'small' ? 24 : size === 'large' ? 40 : 32;
 
-  const containerStyle = {
+  const containerStyle: CSSProperties = {
     position: 'relative',
     width: `${sizePx}px`,
     height: `${sizePx}px`,
@@ -22,14 +33,14 @@ export const Avatar = ({ src, name, size = 'medium', status, style = {}, classNa
     backgroundColor: 'var(--mac-bg-tertiary)'
   };
 
-  const imgStyle = {
+  const imgStyle: CSSProperties = {
     width: '100%',
     height: '100%',
     objectFit: 'cover',
     display: src ? 'block' : 'none'
   };
 
-  const fallbackStyle = {
+  const fallbackStyle: CSSProperties = {
     width: '100%',
     height: '100%',
     display: 'flex',
@@ -40,10 +51,10 @@ export const Avatar = ({ src, name, size = 'medium', status, style = {}, classNa
     color: 'var(--mac-text-secondary)'
   };
 
-  const statusColor = status === 'online' ? 'var(--mac-success)' : status === 'busy' ? 'var(--mac-error)' : status === 'away' ? 'var(--mac-warning)' : null;
+  const statusColor: string | null = status === 'online' ? 'var(--mac-success)' : status === 'busy' ? 'var(--mac-error)' : status === 'away' ? 'var(--mac-warning)' : null;
 
   return (
-    <div className={`mac-avatar ${className}`} style={{ ...containerStyle, ...style }} title={name}>
+    <div className={`mac-avatar ${className}`} style={{ ...containerStyle, ...style }} title={name ?? undefined}>
       <img src={src} alt={name || 'User'} style={imgStyle} />
       {!src && (
         <div style={fallbackStyle} aria-hidden>{getInitials(name)}</div>
@@ -79,5 +90,3 @@ Avatar.propTypes = {
 };
 
 export default Avatar;
-
-

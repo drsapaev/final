@@ -1,45 +1,58 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
-import React from 'react';
+import React, { type ReactNode, type CSSProperties } from 'react';
 import PropTypes from 'prop-types';
 
-const Label = React.forwardRef(({ 
+type LabelVariant = 'default' | 'muted' | 'error';
+type LabelSize = 'sm' | 'md' | 'lg';
+
+interface LabelProps extends Omit<React.LabelHTMLAttributes<HTMLLabelElement>, 'children'> {
+  children?: ReactNode;
+  className?: string;
+  variant?: LabelVariant;
+  size?: LabelSize;
+  required?: boolean;
+  style?: CSSProperties;
+}
+
+interface LabelStyle extends CSSProperties {
+  transition?: string;
+}
+
+const Label = React.forwardRef<HTMLLabelElement, LabelProps>(({
   children,
-  className = '', 
+  className = '',
   variant = 'default',
   size = 'md',
   required = false,
   style = {},
-  ...props 
+  ...props
 }, ref) => {
-  const baseStyles = {
+  const baseStyles: LabelStyle = {
     fontSize: '14px',
     fontWeight: '500',
     lineHeight: '1',
     cursor: 'pointer',
     transition: 'color var(--mac-duration-normal) var(--mac-ease)'
   };
-  
-  const variants = {
+
+  const variants: Record<LabelVariant, CSSProperties> = {
     default: { color: 'var(--mac-text-primary)' },
     muted: { color: 'var(--mac-text-secondary)' },
     error: { color: 'var(--mac-error)' }
   };
-  
-  const sizes = {
+
+  const sizes: Record<LabelSize, CSSProperties> = {
     sm: { fontSize: '12px' },
     md: { fontSize: '14px' },
     lg: { fontSize: '16px' }
   };
-  
-  const labelStyles = {
+
+  const labelStyles: CSSProperties = {
     ...baseStyles,
     ...variants[variant],
     ...sizes[size],
     ...style
   };
-  
+
   return (
     <label
       ref={ref}

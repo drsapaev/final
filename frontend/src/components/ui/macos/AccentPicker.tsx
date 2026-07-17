@@ -1,10 +1,10 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
-import { ACCENT_OPTIONS, useMacOSTheme } from '../../../theme/macosTheme.jsx';
+import { ACCENT_OPTIONS, useMacOSTheme, type AccentName } from '../../../theme/macosTheme.jsx';
 import PropTypes from 'prop-types';
+import type { CSSProperties } from 'react';
 
-const LABELS = {
+type AccentKey = typeof ACCENT_OPTIONS[number];
+
+const LABELS: Record<string, string> = {
   blue: 'Blue',
   purple: 'Purple',
   pink: 'Pink',
@@ -15,7 +15,13 @@ const LABELS = {
   graphite: 'Graphite'
 };
 
-export default function AccentPicker({ size = 22, className = '', style = {} }) {
+interface AccentPickerProps {
+  size?: number;
+  className?: string;
+  style?: CSSProperties;
+}
+
+export default function AccentPicker({ size = 22, className = '', style = {} }: AccentPickerProps) {
   const { accent, setAccent } = useMacOSTheme();
 
   return (
@@ -34,7 +40,7 @@ export default function AccentPicker({ size = 22, className = '', style = {} }) 
             role="radio"
             aria-checked={isActive}
             aria-label={LABELS[key] || key}
-            onClick={() => setAccent(key)}
+            onClick={() => setAccent(key as AccentName)}
             title={LABELS[key] || key}
             style={{
               width: `${size}px`,
@@ -52,7 +58,7 @@ export default function AccentPicker({ size = 22, className = '', style = {} }) 
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
-                setAccent(key);
+                setAccent(key as AccentName);
               }
             }}
           />
@@ -70,4 +76,5 @@ AccentPicker.propTypes = {
   style: PropTypes.any,
 };
 
-
+// Silence unused-import warning in environments that strip type-only imports.
+export type { AccentKey };

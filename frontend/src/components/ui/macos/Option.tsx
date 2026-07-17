@@ -1,14 +1,22 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
-import React from 'react';
+import React, { type ReactNode, type CSSProperties } from 'react';
 import PropTypes from 'prop-types';
+
+interface OptionProps extends Omit<React.OptionHTMLAttributes<HTMLOptionElement>, 'children'> {
+  children?: ReactNode;
+  disabled?: boolean;
+  className?: string;
+  style?: CSSProperties;
+}
+
+interface OptionStyles extends CSSProperties {
+  transition?: string;
+}
 
 /**
  * macOS-style Option Component
  * Simple option component for Select dropdowns
  */
-const Option = React.forwardRef(({
+const Option = React.forwardRef<HTMLOptionElement, OptionProps>(({
   children,
   value,
   disabled = false,
@@ -16,7 +24,7 @@ const Option = React.forwardRef(({
   style = {},
   ...props
 }, ref) => {
-  const optionStyles = {
+  const optionStyles: OptionStyles = {
     padding: '8px 12px',
     fontSize: '13px',
     color: disabled ? 'var(--mac-text-disabled)' : 'var(--mac-text-primary)',
@@ -27,15 +35,15 @@ const Option = React.forwardRef(({
     ...style
   };
 
-  const handleMouseEnter = (e) => {
+  const handleMouseEnter = (e: React.MouseEvent<HTMLOptionElement>) => {
     if (!disabled) {
-      e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
+      e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)';
     }
   };
 
-  const handleMouseLeave = (e) => {
+  const handleMouseLeave = (e: React.MouseEvent<HTMLOptionElement>) => {
     if (!disabled) {
-      e.target.style.backgroundColor = 'transparent';
+      e.currentTarget.style.backgroundColor = 'transparent';
     }
   };
 
