@@ -1,10 +1,20 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import PropTypes from 'prop-types';
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode
+} from 'react';
 import { useInRouterContext, useLocation } from 'react-router-dom';
 import tokens, { colors as tokenColors } from '../theme/tokens-legacy';
+// colorScheme.ts / colorUtils.ts are still @ts-nocheck; their functions
+// accept (string, string) and return string|null. They'll be migrated in a
+// later batch — for now the implicit-any return is acceptable under the
+// current tsconfig (noImplicitAny: false).
 import {
   applyColorSchemeToDom,
   getStoredColorScheme,
@@ -18,14 +28,70 @@ import { mixColors, toRgbaString } from '../theme/colorUtils.js';
 import logger from '../utils/logger';
 import { isPublicRoutePath } from '../routing/routeSelectors.js';
 
-const ThemeContext = createContext<unknown>(null);
+type ThemeMode = 'light' | 'dark';
+type ColorScheme = string;
+type Spacing = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | string;
+type FontSize = 'xs' | 'sm' | 'base' | 'md' | 'lg' | 'xl' | string;
+type ShadowSize = 'sm' | 'md' | 'lg' | 'xl' | string;
+type ColorToken =
+  | 'primary'
+  | 'secondary'
+  | 'success'
+  | 'warning'
+  | 'danger'
+  | 'info'
+  | 'text'
+  | 'background'
+  | 'border'
+  | 'surface'
+  | string;
+
+interface ThemeConfig {
+  mode: ThemeMode;
+  colorScheme: ColorScheme;
+}
+
+interface ThemeContextValue {
+  theme: ThemeMode;
+  resolvedTheme: ThemeMode;
+  colorScheme: ColorScheme;
+  setColorScheme: (nextScheme: ColorScheme, options?: SetColorSchemeOptions) => void;
+  setTheme: (nextTheme: ColorScheme) => void;
+  toggleTheme: () => void;
+  isDark: boolean;
+  isLight: boolean;
+  themeConfig: ThemeConfig;
+  designTokens: typeof tokens;
+  getColor: (color: ColorToken, shade?: number) => string;
+  getSpacing: (size: Spacing) => string;
+  getFontSize: (size: FontSize) => string;
+  getShadow: (size: ShadowSize) => string;
+}
+
+interface SetColorSchemeOptions {
+  skipRemoteSave?: boolean;
+}
+
+interface ThemeRouteSyncProps {
+  onPathnameChange: (pathname: string) => void;
+}
+
+interface ThemeProviderProps {
+  children?: ReactNode;
+}
+
+interface AuthStateChangedEvent extends Event {
+  detail?: { token?: string | null };
+}
+
+const ThemeContext = createContext<ThemeContextValue | null>(null);
 const THEME_PREFERENCE_SAVE_DEBOUNCE_MS = 400;
 const THEME_PREFERENCE_CACHE_MS = 30_000;
 const AUTH_TOKEN_STORAGE_KEY = 'auth_token';
-const themePreferenceCache = new Map();
-const themePreferenceRequestPromiseByToken = new Map();
+const themePreferenceCache = new Map<string, { cachedAt: number; theme: ColorScheme }>();
+const themePreferenceRequestPromiseByToken = new Map<string, Promise<ColorScheme | null>>();
 
-function getAuthTokenSnapshot() {
+function getAuthTokenSnapshot(): string | null {
   if (typeof window === 'undefined') {
     return null;
   }
@@ -37,7 +103,7 @@ function getAuthTokenSnapshot() {
   }
 }
 
-function ThemeRouteSync({ onPathnameChange }) {
+function ThemeRouteSync({ onPathnameChange }: ThemeRouteSyncProps) {
   const location = useLocation();
 
   useEffect(() => {
@@ -47,7 +113,7 @@ function ThemeRouteSync({ onPathnameChange }) {
   return null;
 }
 
-function getCachedThemePreference(token) {
+function getCachedThemePreference(token: string): ColorScheme | null {
   const entry = themePreferenceCache.get(token);
   if (!entry) {
     return null;
@@ -61,7 +127,7 @@ function getCachedThemePreference(token) {
   return entry.theme;
 }
 
-function setCachedThemePreference(token, theme) {
+function setCachedThemePreference(token: string, theme: ColorScheme): void {
   if (!token || !theme) {
     return;
   }
@@ -72,7 +138,7 @@ function setCachedThemePreference(token, theme) {
   });
 }
 
-function clearCachedThemePreference(token) {
+function clearCachedThemePreference(token?: string | null): void {
   if (token) {
     themePreferenceCache.delete(token);
     themePreferenceRequestPromiseByToken.delete(token);
@@ -83,7 +149,7 @@ function clearCachedThemePreference(token) {
   themePreferenceRequestPromiseByToken.clear();
 }
 
-export const useTheme = () => {
+export const useTheme = (): ThemeContextValue => {
   const context = useContext(ThemeContext);
   if (!context) {
     throw new Error('useTheme must be used within a ThemeProvider');
@@ -91,62 +157,69 @@ export const useTheme = () => {
   return context;
 };
 
-export const ThemeProvider = ({ children }) => {
+export const ThemeProvider = ({ children }: ThemeProviderProps) => {
   const hasRouterContext = useInRouterContext();
-  const [pathname, setPathname] = useState(() => (
+  const [pathname, setPathname] = useState<string>(() => (
     typeof window !== 'undefined' ? window.location.pathname : '/'
   ));
-  const [systemTheme, setSystemTheme] = useState(() => getSystemTheme());
-  const [colorScheme, setColorSchemeState] = useState(() => getStoredColorScheme());
-  const [authToken, setAuthToken] = useState(() => getAuthTokenSnapshot());
-  const [preferencesReady, setPreferencesReady] = useState(() => !getAuthTokenSnapshot());
-  const hydratedTokenRef = useRef<unknown>(null);
-  const skipNextRemoteSaveRef = useRef(false);
-  const lastSavedPreferenceRef = useRef<unknown>(null);
-  const saveTimeoutRef = useRef<unknown>(null);
-  const routerFallbackLoggedRef = useRef(false);
+  const [systemTheme, setSystemTheme] = useState<ThemeMode>(() => getSystemTheme() as ThemeMode);
+  const [colorScheme, setColorSchemeState] = useState<ColorScheme>(() => getStoredColorScheme() as ColorScheme);
+  const [authToken, setAuthToken] = useState<string | null>(() => getAuthTokenSnapshot());
+  const [preferencesReady, setPreferencesReady] = useState<boolean>(() => !getAuthTokenSnapshot());
+  const hydratedTokenRef = useRef<string | null>(null);
+  const skipNextRemoteSaveRef = useRef<boolean>(false);
+  const lastSavedPreferenceRef = useRef<ColorScheme | null>(null);
+  // window.setTimeout returns `number` in DOM, but the project's global
+  // types (vitest/globals) override setTimeout to return NodeJS.Timeout.
+  // Anchor to the DOM signature explicitly so the ref holds a `number`.
+  const saveTimeoutRef = useRef<number | null>(null);
+  const routerFallbackLoggedRef = useRef<boolean>(false);
 
-  const theme = resolveThemeMode(colorScheme, systemTheme);
+  const theme = resolveThemeMode(colorScheme, systemTheme) as ThemeMode;
   const isDark = theme === 'dark';
   const isLight = theme === 'light';
-  const themeConfig = useMemo(() => ({ mode: theme, colorScheme }), [theme, colorScheme]);
+  const themeConfig = useMemo<ThemeConfig>(() => ({ mode: theme, colorScheme }), [theme, colorScheme]);
 
-  const getColor = useCallback((color, shade = 500) => {
+  const getColor = useCallback((color: ColorToken, shade = 500): string => {
     if (color === 'primary' || color === 'secondary') {
-      return tokenColors[color]?.[shade] || tokenColors.primary?.[500] || 'var(--mac-accent-blue)';
+      return (tokenColors as Record<string, Record<number, string>>)[color]?.[shade] || (tokenColors as Record<string, Record<number, string>>).primary?.[500] || 'var(--mac-accent-blue)';
     }
     if (color === 'success' || color === 'warning' || color === 'danger' || color === 'info') {
-      return tokenColors.status?.[color] || tokenColors.primary?.[500] || 'var(--mac-accent-blue)';
+      const status = (tokenColors as unknown as { status?: Record<string, string> }).status;
+      return status?.[color] || (tokenColors as Record<string, Record<number, string>>).primary?.[500] || 'var(--mac-accent-blue)';
     }
     if (color === 'text') {
-      return tokenColors.semantic?.text?.primary || 'var(--mac-text-primary)';
+      return (tokenColors as Record<string, { text?: Record<string, string> }>).semantic?.text?.primary || 'var(--mac-text-primary)';
     }
     if (color === 'background') {
-      return tokenColors.semantic?.background?.primary || 'var(--mac-bg-primary)';
+      return (tokenColors as Record<string, { background?: Record<string, string> }>).semantic?.background?.primary || 'var(--mac-bg-primary)';
     }
     if (color === 'border') {
-      return tokenColors.semantic?.border?.medium || 'var(--mac-border)';
+      return (tokenColors as Record<string, { border?: Record<string, string> }>).semantic?.border?.medium || 'var(--mac-border)';
     }
     if (color === 'surface') {
-      return tokenColors.semantic?.surface?.card || 'var(--mac-bg-primary)';
+      return (tokenColors as Record<string, { surface?: Record<string, string> }>).semantic?.surface?.card || 'var(--mac-bg-primary)';
     }
-    return tokenColors.primary?.[500] || 'var(--mac-accent-blue)';
+    return (tokenColors as Record<string, Record<number, string>>).primary?.[500] || 'var(--mac-accent-blue)';
   }, []);
 
-  const getSpacing = useCallback((size) => {
-    return tokens?.spacing?.[size] || tokens?.spacing?.md || '16px';
+  const getSpacing = useCallback((size: Spacing): string => {
+    const spacing = (tokens as { spacing?: Record<string, string> }).spacing;
+    return spacing?.[size] || spacing?.md || '16px';
   }, []);
 
-  const getFontSize = useCallback((size) => {
-    return tokens?.typography?.fontSize?.[size] || tokens?.typography?.fontSize?.base || '16px';
+  const getFontSize = useCallback((size: FontSize): string => {
+    const fontSize = (tokens as { typography?: { fontSize?: Record<string, string> } }).typography?.fontSize;
+    return fontSize?.[size] || fontSize?.base || '16px';
   }, []);
 
-  const getShadow = useCallback((size) => {
-    return tokens?.shadows?.[size] || tokens?.shadows?.md || '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
+  const getShadow = useCallback((size: ShadowSize): string => {
+    const shadows = (tokens as { shadows?: Record<string, string> }).shadows;
+    return shadows?.[size] || shadows?.md || '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
   }, []);
 
-  const setColorScheme = useCallback((nextScheme, options = {}) => {
-    const normalizedScheme = normalizeColorScheme(nextScheme);
+  const setColorScheme = useCallback((nextScheme: ColorScheme, options: SetColorSchemeOptions = {}): void => {
+    const normalizedScheme = normalizeColorScheme(nextScheme) as ColorScheme | null;
     if (!normalizedScheme) {
       logger.warn('[FIX:THEME] Ignoring unsupported color scheme', { nextScheme });
       return;
@@ -166,11 +239,11 @@ export const ThemeProvider = ({ children }) => {
     });
   }, []);
 
-  const setTheme = useCallback((nextTheme) => {
+  const setTheme = useCallback((nextTheme: ColorScheme): void => {
     setColorScheme(nextTheme);
   }, [setColorScheme]);
 
-  const toggleTheme = useCallback(() => {
+  const toggleTheme = useCallback((): void => {
     setColorScheme(theme === 'dark' ? 'light' : 'dark');
   }, [setColorScheme, theme]);
 
@@ -179,24 +252,25 @@ export const ThemeProvider = ({ children }) => {
       return undefined;
     }
 
-    const syncAuthToken = (nextToken) => {
+    const syncAuthToken = (nextToken: string | null): void => {
       setAuthToken((currentToken) => {
         const resolvedToken = typeof nextToken === 'string' ? nextToken : getAuthTokenSnapshot();
         return currentToken === resolvedToken ? currentToken : resolvedToken;
       });
     };
 
-    const handleStorage = (event) => {
+    const handleStorage = (event: StorageEvent) => {
       if (!event.key || event.key === AUTH_TOKEN_STORAGE_KEY) {
         syncAuthToken(event.newValue || null);
       }
     };
 
-    const handleAuthStateChanged = (event) => {
-      syncAuthToken(event?.detail?.token || null);
+    const handleAuthStateChanged = (event: Event): void => {
+      const detail = (event as AuthStateChangedEvent)?.detail;
+      syncAuthToken(detail?.token || null);
     };
 
-    syncAuthToken();
+    syncAuthToken(getAuthTokenSnapshot());
     window.addEventListener('storage', handleStorage);
     window.addEventListener('authStateChanged', handleAuthStateChanged);
 
@@ -208,21 +282,23 @@ export const ThemeProvider = ({ children }) => {
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handleChange = (event) => {
+    const handleChange = (event: MediaQueryListEvent): void => {
       setSystemTheme(event.matches ? 'dark' : 'light');
     };
 
     if (mediaQuery.addEventListener) {
       mediaQuery.addEventListener('change', handleChange);
     } else {
-      mediaQuery.addListener(handleChange);
+      // Legacy Safari < 14 fallback — addListener is missing from the
+      // modern lib.dom typings but exists at runtime on older browsers.
+      (mediaQuery as unknown as { addListener: (cb: (e: MediaQueryListEvent) => void) => void }).addListener(handleChange);
     }
 
     return () => {
       if (mediaQuery.removeEventListener) {
         mediaQuery.removeEventListener('change', handleChange);
       } else {
-        mediaQuery.removeListener(handleChange);
+        (mediaQuery as unknown as { removeListener: (cb: (e: MediaQueryListEvent) => void) => void }).removeListener(handleChange);
       }
     };
   }, []);
@@ -249,19 +325,22 @@ export const ThemeProvider = ({ children }) => {
   useEffect(() => {
     const root = document.documentElement;
     const computedStyle = window.getComputedStyle(root);
-    const macBgPrimary = computedStyle.getPropertyValue('--mac-bg-primary').trim() || tokenColors.semantic.background.primary;
-    const macBgSecondary = computedStyle.getPropertyValue('--mac-bg-secondary').trim() || tokenColors.semantic.background.secondary;
-    const macBgTertiary = computedStyle.getPropertyValue('--mac-bg-tertiary').trim() || tokenColors.semantic.background.tertiary;
-    const macTextPrimary = computedStyle.getPropertyValue('--mac-text-primary').trim() || tokenColors.semantic.text.primary;
-    const macTextSecondary = computedStyle.getPropertyValue('--mac-text-secondary').trim() || tokenColors.semantic.text.secondary;
-    const macBorder = computedStyle.getPropertyValue('--mac-border').trim() || tokenColors.semantic.border.medium;
+    const semanticColors = (tokenColors as { semantic?: Record<string, Record<string, string>> }).semantic;
+    const primaryColors = (tokenColors as { primary?: Record<number, string> }).primary;
+    const statusColors = (tokenColors as { status?: Record<string, string> }).status;
+    const macBgPrimary = computedStyle.getPropertyValue('--mac-bg-primary').trim() || semanticColors?.background.primary;
+    const macBgSecondary = computedStyle.getPropertyValue('--mac-bg-secondary').trim() || semanticColors?.background.secondary;
+    const macBgTertiary = computedStyle.getPropertyValue('--mac-bg-tertiary').trim() || semanticColors?.background.tertiary;
+    const macTextPrimary = computedStyle.getPropertyValue('--mac-text-primary').trim() || semanticColors?.text.primary;
+    const macTextSecondary = computedStyle.getPropertyValue('--mac-text-secondary').trim() || semanticColors?.text.secondary;
+    const macBorder = computedStyle.getPropertyValue('--mac-border').trim() || semanticColors?.border.medium;
     const macHover =
       computedStyle.getPropertyValue('--mac-nav-item-hover').trim() ||
       computedStyle.getPropertyValue('--mac-bg-secondary').trim() ||
-      tokenColors.semantic.surface.hover;
+      semanticColors?.surface.hover;
     const macAccent =
       computedStyle.getPropertyValue('--mac-accent').trim() ||
-      tokenColors.primary[isDark ? 400 : 500];
+      primaryColors?.[isDark ? 400 : 500];
 
     root.style.setProperty('--bg-primary', macBgPrimary);
     root.style.setProperty('--bg-secondary', macBgSecondary);
@@ -273,9 +352,9 @@ export const ThemeProvider = ({ children }) => {
     root.style.setProperty('--hover-bg', macHover);
     root.style.setProperty('--accent-color', macAccent);
 
-    const success = computedStyle.getPropertyValue('--mac-success').trim() || tokenColors.status.success;
-    const warning = computedStyle.getPropertyValue('--mac-warning').trim() || tokenColors.status.warning;
-    const error = computedStyle.getPropertyValue('--mac-error').trim() || tokenColors.status.danger;
+    const success = computedStyle.getPropertyValue('--mac-success').trim() || statusColors?.success;
+    const warning = computedStyle.getPropertyValue('--mac-warning').trim() || statusColors?.warning;
+    const error = computedStyle.getPropertyValue('--mac-error').trim() || statusColors?.danger;
     const info = computedStyle.getPropertyValue('--mac-accent').trim() || macAccent;
 
     root.style.setProperty('--success-color', success);
@@ -285,25 +364,25 @@ export const ThemeProvider = ({ children }) => {
     root.style.setProperty(
       '--shadow-sm',
       computedStyle.getPropertyValue('--mac-shadow-sm').trim() ||
-      tokens?.shadows?.sm ||
+      (tokens as { shadows?: Record<string, string> }).shadows?.sm ||
       '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
     );
     root.style.setProperty(
       '--shadow-md',
       computedStyle.getPropertyValue('--mac-shadow-md').trim() ||
-      tokens?.shadows?.md ||
+      (tokens as { shadows?: Record<string, string> }).shadows?.md ||
       '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
     );
     root.style.setProperty(
       '--shadow-lg',
       computedStyle.getPropertyValue('--mac-shadow-lg').trim() ||
-      tokens?.shadows?.lg ||
+      (tokens as { shadows?: Record<string, string> }).shadows?.lg ||
       '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
     );
     root.style.setProperty(
       '--shadow-xl',
       computedStyle.getPropertyValue('--mac-shadow-xl').trim() ||
-      tokens?.shadows?.xl ||
+      (tokens as { shadows?: Record<string, string> }).shadows?.xl ||
       '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
     );
 
@@ -369,7 +448,7 @@ export const ThemeProvider = ({ children }) => {
     if (inFlight) {
       setPreferencesReady(false);
       void inFlight
-        .then((serverTheme) => {
+        .then((serverTheme: ColorScheme | null) => {
           if (cancelled || !serverTheme) {
             return;
           }
@@ -387,11 +466,12 @@ export const ThemeProvider = ({ children }) => {
             return serverTheme;
           });
         })
-        .catch((error) => {
-          if (error?.response?.status === 401 || error?.response?.status === 403) {
+        .catch((error: unknown) => {
+          const err = error as { response?: { status?: number } };
+          if (err?.response?.status === 401 || err?.response?.status === 403) {
             clearCachedThemePreference(authToken);
             logger.info('[FIX:THEME] Skipping theme preference reuse due to auth state', {
-              status: error?.response?.status,
+              status: err?.response?.status,
             });
             return;
           }
@@ -407,15 +487,15 @@ export const ThemeProvider = ({ children }) => {
       };
     }
 
-    const loadThemePreference = async () => {
+    const loadThemePreference = async (): Promise<void> => {
       try {
-        const requestPromise = apiClient.get('/users/me/preferences').then((response) => {
-          const serverTheme = normalizeColorScheme(response?.data?.theme);
+        const requestPromise = apiClient.get('/users/me/preferences').then((response: { data?: { theme?: unknown } }) => {
+          const serverTheme = normalizeColorScheme(response?.data?.theme) as ColorScheme | null;
           if (serverTheme) {
             setCachedThemePreference(authToken, serverTheme);
           }
           return serverTheme;
-        });
+        }) as Promise<ColorScheme | null>;
         themePreferenceRequestPromiseByToken.set(authToken, requestPromise);
         const serverTheme = await requestPromise;
         if (cancelled) {
@@ -439,10 +519,11 @@ export const ThemeProvider = ({ children }) => {
           });
         }
       } catch (error) {
-        if (error?.response?.status === 401 || error?.response?.status === 403) {
+        const err = error as { response?: { status?: number } };
+        if (err?.response?.status === 401 || err?.response?.status === 403) {
           clearCachedThemePreference(authToken);
           logger.info('[FIX:THEME] Skipping theme preference load due to auth state', {
-            status: error?.response?.status,
+            status: err?.response?.status,
           });
           return;
         }
@@ -482,19 +563,22 @@ export const ThemeProvider = ({ children }) => {
       return undefined;
     }
 
+    const capturedAuthToken = authToken;
+    const capturedColorScheme = colorScheme;
     saveTimeoutRef.current = window.setTimeout(async () => {
         try {
-          await apiClient.put('/users/me/preferences', { theme: colorScheme });
-          setCachedThemePreference(authToken, colorScheme);
-          lastSavedPreferenceRef.current = colorScheme;
+          await apiClient.put('/users/me/preferences', { theme: capturedColorScheme });
+          setCachedThemePreference(capturedAuthToken, capturedColorScheme);
+          lastSavedPreferenceRef.current = capturedColorScheme;
           logger.info('[FIX:THEME] Saved color scheme to user preferences', {
-            colorScheme,
+            colorScheme: capturedColorScheme,
           });
         } catch (error) {
-          if (error?.response?.status === 401 || error?.response?.status === 403) {
-            clearCachedThemePreference(authToken);
+          const err = error as { response?: { status?: number } };
+          if (err?.response?.status === 401 || err?.response?.status === 403) {
+            clearCachedThemePreference(capturedAuthToken);
             logger.info('[FIX:THEME] Skipping theme preference save due to auth state', {
-              status: error?.response?.status,
+              status: err?.response?.status,
             });
             return;
           }
@@ -510,7 +594,7 @@ export const ThemeProvider = ({ children }) => {
     };
   }, [authToken, colorScheme, preferencesReady, pathname]);
 
-  const value = useMemo(() => ({
+  const value = useMemo<ThemeContextValue>(() => ({
     theme,
     resolvedTheme: theme,
     colorScheme,
