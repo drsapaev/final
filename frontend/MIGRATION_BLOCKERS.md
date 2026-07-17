@@ -19,6 +19,20 @@ are completed by the current rules. Only then evaluate what works and what
 needs adjustment. (Per reviewer recommendation: avoid infinitely improving
 the process instead of migrating code.)
 
+**⚠️ HONEST STATUS (2026-07-17):** The structural migration is complete
+(0 .js/.jsx files in src/), but the type migration is NOT complete.
+430 of 774 files (55.6%) have `@ts-nocheck` — TypeScript is disabled for
+the majority of the project. This is acknowledged as technical debt (B5
+Legacy category) and will be addressed in follow-up sprints.
+
+The migration is split into two phases:
+- **Phase A — Structural migration**: COMPLETE. All files renamed .js → .ts.
+  Project builds, tsc passes (because @ts-nocheck disables checking for
+  55.6% of files), tests pass.
+- **Phase B — Type migration**: IN PROGRESS. 344 files (44.4%) are properly
+  typed. 430 files need @ts-nocheck removed and real types added.
+  Target: 774 / 774 (100%) with 0 @ts-nocheck.
+
 ---
 
 ## Baseline at Phase 1 (2026-07-17)
