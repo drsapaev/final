@@ -1,14 +1,22 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
-import React from 'react';
+import React, { type ReactNode, type CSSProperties } from 'react';
 import PropTypes from 'prop-types';
+
+type BadgeVariant = 'default' | 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'info' | 'outline';
+type BadgeSize = 'small' | 'default' | 'large';
+
+interface BadgeProps extends Omit<React.HTMLAttributes<HTMLSpanElement>, 'children' | 'style'> {
+  children?: ReactNode;
+  variant?: BadgeVariant;
+  size?: BadgeSize;
+  className?: string;
+  style?: CSSProperties;
+}
 
 /**
  * macOS-style Badge Component
  * Implements Apple's Human Interface Guidelines for badges and labels
  */
-const Badge = React.forwardRef(({
+const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>(({
   children,
   variant = 'default',
   size = 'default',
@@ -19,7 +27,7 @@ const Badge = React.forwardRef(({
   // SW-01: removed useTheme() — Badge doesn't use theme values
 
   // Size mapping
-  const sizeMap = {
+  const sizeMap: Record<BadgeSize, CSSProperties> = {
     small: {
       padding: '2px 6px',
       fontSize: '10px',
@@ -40,7 +48,7 @@ const Badge = React.forwardRef(({
   const sizeStyles = sizeMap[size] || sizeMap.default;
 
   // Variant styles
-  const variantStyles = {
+  const variantStyles: Record<BadgeVariant, CSSProperties> = {
     default: {
       backgroundColor: 'var(--mac-bg-tertiary)',
       color: 'var(--mac-text-primary)',
@@ -83,7 +91,7 @@ const Badge = React.forwardRef(({
     }
   };
 
-  const badgeStyles = {
+  const badgeStyles: CSSProperties = {
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -103,7 +111,7 @@ const Badge = React.forwardRef(({
       className={`mac-badge ${className}`}
       style={badgeStyles}
       {...props}>
-      
+
       {children}
     </span>);
 

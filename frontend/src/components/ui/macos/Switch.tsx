@@ -1,10 +1,31 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, type ReactNode, type CSSProperties, type ChangeEvent } from 'react';
 import PropTypes from 'prop-types';
 
-const Switch = React.forwardRef(({ 
+type SwitchSize = 'small' | 'default' | 'large';
+
+interface SwitchProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'children' | 'style' | 'onChange' | 'size' | 'checked' | 'defaultChecked'> {
+  checked?: boolean;
+  defaultChecked?: boolean;
+  onChange?: (checked: boolean, e: ChangeEvent<HTMLInputElement>) => void;
+  disabled?: boolean;
+  size?: SwitchSize;
+  label?: ReactNode;
+  className?: string;
+  style?: CSSProperties;
+  id?: string;
+}
+
+interface SwitchDimensions {
+  w: number;
+  h: number;
+  knob: number;
+}
+
+interface SwitchStyle extends CSSProperties {
+  transition?: string;
+}
+
+const Switch = React.forwardRef<HTMLInputElement, SwitchProps>(({
   checked: checkedProp,
   defaultChecked = false,
   onChange,
@@ -16,13 +37,13 @@ const Switch = React.forwardRef(({
   id,
   ...props
 }, ref) => {
-  const [isChecked, setIsChecked] = useState(checkedProp ?? defaultChecked);
+  const [isChecked, setIsChecked] = useState<boolean>(checkedProp ?? defaultChecked);
 
   useEffect(() => {
     if (typeof checkedProp === 'boolean') setIsChecked(checkedProp);
   }, [checkedProp]);
 
-  const sizes = {
+  const sizes: Record<SwitchSize, SwitchDimensions> = {
     small: { w: 34, h: 20, knob: 16 },
     default: { w: 44, h: 24, knob: 20 },
     large: { w: 54, h: 30, knob: 26 }
@@ -30,14 +51,14 @@ const Switch = React.forwardRef(({
   const s = sizes[size] || sizes.default;
   const controlId = id || `swt_${Math.random().toString(36).slice(2)}`;
 
-  const handleToggle = (e) => {
+  const handleToggle = (e: ChangeEvent<HTMLInputElement>) => {
     if (disabled) return;
     const next = !isChecked;
     if (typeof checkedProp !== 'boolean') setIsChecked(next);
     onChange && onChange(next, e);
   };
 
-  const wrapper = {
+  const wrapper: CSSProperties = {
     display: 'inline-flex',
     alignItems: 'center',
     gap: '10px',
@@ -46,7 +67,7 @@ const Switch = React.forwardRef(({
     ...style
   };
 
-  const track = {
+  const track: SwitchStyle = {
     width: s.w,
     height: s.h,
     borderRadius: s.h,
@@ -57,7 +78,7 @@ const Switch = React.forwardRef(({
     transition: 'all 200ms cubic-bezier(0.2,0.8,0.2,1)'
   };
 
-  const knob = {
+  const knob: SwitchStyle = {
     position: 'absolute',
     top: 1,
     left: isChecked ? s.w - s.knob - 1 : 1,
@@ -69,8 +90,9 @@ const Switch = React.forwardRef(({
     transition: 'left 200ms cubic-bezier(0.2,0.8,0.2,1)'
   };
 
-  const labelStyles = { fontSize: '13px', color: 'var(--mac-text-primary)' };
-  const accessibleLabel = props['aria-label'] || (typeof label === 'string' ? label : 'Toggle setting');
+  const labelStyles: CSSProperties = { fontSize: '13px', color: 'var(--mac-text-primary)' };
+  const ariaLabelProp = props['aria-label'] as string | undefined;
+  const accessibleLabel = ariaLabelProp || (typeof label === 'string' ? label : 'Toggle setting');
 
   return (
     <label className={`mac-switch ${className}`} style={wrapper} htmlFor={controlId} aria-disabled={disabled}>
@@ -119,6 +141,3 @@ Switch.propTypes = {
 Switch.displayName = 'Switch';
 
 export default Switch;
-
-
-
