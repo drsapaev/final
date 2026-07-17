@@ -1,9 +1,6 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
-// src/stores/auth.js
+// src/stores/auth.ts
 // Lightweight auth store used across the frontend.
-// - Keeps token/profile in localStorage
+// - Keeps token/profile in sessionStorage
 // - Notifies subscribers on changes
 // - Provides compatibility aliases for historical imports
 //
@@ -23,17 +20,33 @@
 import { me, setToken as setClientToken } from '../api/client.js';
 import { tokenManager } from '../utils/tokenManager';
 import logger from '../utils/logger';
+
+interface UserProfile {
+  id?: number | null;
+  name?: string;
+  email?: string;
+  role?: string;
+  [key: string]: unknown;
+}
+
+interface AuthState {
+  token: string | null;
+  profile: UserProfile | null;
+}
+
+type AuthSubscriber = (state: AuthState) => void;
+
 const TOKEN_KEY = 'auth_token';
 const PROFILE_KEY = 'auth_profile';
 const SESSION_VALIDATION_CACHE_MS = 30_000;
 
-const subscribers = new Set();
-let profileLoadPromise = null;
-let sessionValidationPromise = null;
+const subscribers = new Set<AuthSubscriber>();
+let profileLoadPromise: Promise<UserProfile | null> | null = null;
+let sessionValidationPromise: Promise<AuthState> | null = null;
 let lastValidatedAt = 0;
-let lastValidatedToken = null;
+let lastValidatedToken: string | null = null;
 
-function notify() {
+function notify(): void {
   const state = getState();
   for (const s of subscribers) {
     try {
@@ -53,10 +66,11 @@ function notify() {
 
 /**
  * Subscribe to auth changes.
- * @param {(state: {token:string|null, profile:object|null}) => void} fn
- * @returns {()=>void} unsubscribe
+ * @param fn subscriber called with the current AuthState on subscribe
+ *   and on every subsequent change.
+ * @returns unsubscribe
  */
-export function subscribe(fn) {
+export function subscribe(fn: AuthSubscriber): () => void {
   subscribers.add(fn);
   // call immediately with current state
   try {
@@ -64,10 +78,12 @@ export function subscribe(fn) {
   } catch (e) {
     logger.error('auth subscriber initial call error:', e);
   }
-  return () => subscribers.delete(fn);
+  return () => {
+    subscribers.delete(fn);
+  };
 }
 
-export function getToken() {
+export function getToken(): string | null {
   try {
     return sessionStorage.getItem(TOKEN_KEY);
   } catch {
@@ -75,23 +91,23 @@ export function getToken() {
   }
 }
 
-export function getProfileFromStorage() {
+export function getProfileFromStorage(): UserProfile | null {
   try {
     const raw = sessionStorage.getItem(PROFILE_KEY);
-    return raw ? JSON.parse(raw) : null;
+    return raw ? (JSON.parse(raw) as UserProfile) : null;
   } catch {
     return null;
   }
 }
 
-export function getState() {
+export function getState(): AuthState {
   return {
     token: getToken(),
     profile: getProfileFromStorage(),
   };
 }
 
-function clearProfileStorageOnly() {
+function clearProfileStorageOnly(): void {
   try {
     sessionStorage.removeItem(PROFILE_KEY);
   } catch (e) {
@@ -101,9 +117,9 @@ function clearProfileStorageOnly() {
 
 /**
  * Set auth token locally and inform client (if compatible)
- * @param {string|null} token
+ * @param token new token value (null to clear)
  */
-export function setToken(token) {
+export function setToken(token: string | null): void {
   const previousToken = getToken();
 
   try {
@@ -140,7 +156,7 @@ export function setToken(token) {
 /**
  * Clear token & profile.
  */
-export function clearToken() {
+export function clearToken(): void {
   profileLoadPromise = null;
   sessionValidationPromise = null;
   lastValidatedAt = 0;
@@ -169,9 +185,9 @@ export function clearToken() {
 /**
  * Fetch current user profile from API (if available).
  * Attempts client.me() or client.me (various names). Falls back to local storage.
- * @param {boolean} force - if true, refetch from server even if profile exists
+ * @param force if true, refetch from server even if profile exists
  */
-export async function getProfile(force = false) {
+export async function getProfile(force = false): Promise<UserProfile | null> {
   const token = getToken();
   const stored = getProfileFromStorage();
   if (!token) {
@@ -185,10 +201,10 @@ export async function getProfile(force = false) {
   if (profileLoadPromise) return profileLoadPromise;
 
   // Используем централизованный API клиент
-  profileLoadPromise = (async () => {
+  profileLoadPromise = (async (): Promise<UserProfile | null> => {
     try {
       if (typeof me === 'function') {
-        const res = await me();
+        const res = (await me()) as UserProfile | null;
         if (res) {
           setProfile(res);
           logger.info('[FIX:AUTH] Loaded auth profile from backend');
@@ -196,7 +212,8 @@ export async function getProfile(force = false) {
         }
       }
     } catch (err) {
-      const status = err?.response?.status;
+      const e = err as { response?: { status?: number } };
+      const status = e?.response?.status;
       if (status === 401 || status === 403) {
         logger.warn('[FIX:AUTH] Backend rejected current session, clearing auth state', {
           status,
@@ -221,7 +238,7 @@ export async function getProfile(force = false) {
   return profileLoadPromise;
 }
 
-export async function validateSession(force = false) {
+export async function validateSession(force = false): Promise<AuthState> {
   const token = getToken();
   if (!token) {
     lastValidatedAt = 0;
@@ -258,7 +275,7 @@ export async function validateSession(force = false) {
     return sessionValidationPromise;
   }
 
-  sessionValidationPromise = (async () => {
+  sessionValidationPromise = (async (): Promise<AuthState> => {
     const shouldRefetch = force || !storedProfile;
     const profile = await getProfile(shouldRefetch);
     const nextToken = getToken();
@@ -285,10 +302,10 @@ export async function validateSession(force = false) {
 }
 
 /**
- * Save profile to localStorage and notify subscribers.
- * @param {object|null} profile
+ * Save profile to sessionStorage and notify subscribers.
+ * @param profile new profile value (null to clear)
  */
-export function setProfile(profile) {
+export function setProfile(profile: UserProfile | null): void {
   try {
     if (profile === null || profile === undefined) {
       sessionStorage.removeItem(PROFILE_KEY);
