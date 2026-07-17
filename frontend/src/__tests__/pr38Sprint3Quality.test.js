@@ -11,7 +11,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const ROOT = path.resolve(process.cwd());
-const USE_PATIENTS = path.join(ROOT, 'src/hooks/usePatients.js');
+const USE_PATIENTS = path.join(ROOT, 'src/hooks/usePatients.ts');
 
 // ---------- 1. High-21: usePatients.js uses axios, not raw fetch ----------
 
@@ -57,7 +57,7 @@ describe('High-22: Dead code removal', () => {
   });
 
   it('src/hooks/useUtils.js is not imported by production code (only by examples/)', () => {
-    const useUtils = path.join(ROOT, 'src/hooks/useUtils.js');
+    const useUtils = path.join(ROOT, 'src/hooks/useUtils.ts');
     if (!fs.existsSync(useUtils)) {
       return; // removed — best outcome
     }
@@ -78,9 +78,9 @@ describe('High-22: Dead code removal', () => {
 
 // ---------- 3. Medium-23: Silent catches in Search.jsx ----------
 
-describe('Medium-23: Silent catches in Search.jsx', () => {
+describe('Medium-23: Silent catches in Search.tsx', () => {
   it('Search.jsx does not have empty catch blocks', () => {
-    const searchFile = path.join(ROOT, 'src/pages/Search.jsx');
+    const searchFile = path.join(ROOT, 'src/pages/Search.tsx');
     const src = fs.readFileSync(searchFile, 'utf-8');
     const stripped = src
       .replace(/\/\/.*$/gm, '')

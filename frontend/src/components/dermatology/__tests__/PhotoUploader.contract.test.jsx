@@ -13,7 +13,7 @@ const readSource = (fileName) =>
 
 describe('derma PhotoUploader wiring contract (CRITICAL #1 + MEDIUM #9)', () => {
   it('validates patientId/visitId BEFORE starting FileReader (not inside onload)', () => {
-    const source = readSource('PhotoUploader.jsx');
+    const source = readSource('PhotoUploader.tsx');
 
     // The check must be at the top of handleFileDrop, before FileReader is created.
     // Previously it was inside reader.onload — an async callback — causing
@@ -32,7 +32,7 @@ describe('derma PhotoUploader wiring contract (CRITICAL #1 + MEDIUM #9)', () => 
   });
 
   it('does NOT throw inside reader.onload (uses try/catch instead)', () => {
-    const source = readSource('PhotoUploader.jsx');
+    const source = readSource('PhotoUploader.tsx');
 
     // The old `throw new Error('Photo upload requires patientId or visitId')`
     // inside reader.onload must be gone.
@@ -41,7 +41,7 @@ describe('derma PhotoUploader wiring contract (CRITICAL #1 + MEDIUM #9)', () => 
   });
 
   it('passes updated photos (not stale) to onDataUpdate on upload', () => {
-    const source = readSource('PhotoUploader.jsx');
+    const source = readSource('PhotoUploader.tsx');
 
     // The old bug: `onDataUpdate(photos)` where `photos` was stale
     // (setPhotos had not yet applied). The fix computes `updated` inside
@@ -54,7 +54,7 @@ describe('derma PhotoUploader wiring contract (CRITICAL #1 + MEDIUM #9)', () => 
   });
 
   it('passes updated photos (not undefined) to onDataUpdate on delete', () => {
-    const source = readSource('PhotoUploader.jsx');
+    const source = readSource('PhotoUploader.tsx');
 
     // The old bug: `onDataUpdate()` called with no argument → parent
     // received undefined.
@@ -70,7 +70,7 @@ describe('derma PhotoUploader wiring contract (CRITICAL #1 + MEDIUM #9)', () => 
   });
 
   it('imports notify service for user-facing error messages', () => {
-    const source = readSource('PhotoUploader.jsx');
+    const source = readSource('PhotoUploader.tsx');
 
     expect(source).toContain('from \'../../services/notify\'');
     expect(source).toMatch(/notify\.error\(/);
@@ -78,7 +78,7 @@ describe('derma PhotoUploader wiring contract (CRITICAL #1 + MEDIUM #9)', () => 
   });
 
   it('handles FileReader.onerror callback (not just onload)', () => {
-    const source = readSource('PhotoUploader.jsx');
+    const source = readSource('PhotoUploader.tsx');
 
     // Previously only onload was handled — if FileReader failed, the
     // upload progress stayed at 0% with no feedback.

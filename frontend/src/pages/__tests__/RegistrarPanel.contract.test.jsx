@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const registrarPanelPath = path.resolve(__dirname, '../RegistrarPanel.jsx');
+const registrarPanelPath = path.resolve(__dirname, '../RegistrarPanel.tsx');
 // Decomp step 1: helpers extracted to ./registrar/registrarHelpers.js.
 // Decomp step 2: hotkeys extracted to ./registrar/useRegistrarHotkeys.js.
 // Decomp step 3: reschedule helpers extracted to ./registrar/useRegistrarReschedule.js.

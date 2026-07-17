@@ -8,8 +8,8 @@ const read = (filePath) => fs.readFileSync(path.join(ROOT, filePath), 'utf8');
 
 describe('Queue manager command contract', () => {
   it('keeps registrar queue call-next as a backend-owned command, not a row command', () => {
-    const tableSource = read('components/queue/QueueTable.jsx');
-    const managerSource = read('components/queue/ModernQueueManager.jsx');
+    const tableSource = read('components/queue/QueueTable.tsx');
+    const managerSource = read('components/queue/ModernQueueManager.tsx');
 
     expect(managerSource).toContain('callNextPatientInQueue');
     expect(managerSource).toContain('onClick={callPatient}');
@@ -23,7 +23,7 @@ describe('Queue manager command contract', () => {
   });
 
   it('uses backend-provided available specialists for queue doctor options', () => {
-    const managerSource = read('components/queue/ModernQueueManager.jsx');
+    const managerSource = read('components/queue/ModernQueueManager.tsx');
 
     expect(managerSource).toContain('specialists,');
     expect(managerSource).toContain('if (!Array.isArray(specialists) || specialists.length === 0) return []');
@@ -34,10 +34,10 @@ describe('Queue manager command contract', () => {
   });
 
   it('keeps registrar online queue doctor selection explicit before doctor-specific commands load', () => {
-    const registrarSource = read('pages/RegistrarPanel.jsx');
-    const queueViewSource = read('pages/registrar/views/QueueView.jsx');
-    const managerSource = read('components/queue/ModernQueueManager.jsx');
-    const tableSource = read('components/queue/QueueTable.jsx');
+    const registrarSource = read('pages/RegistrarPanel.tsx');
+    const queueViewSource = read('pages/registrar/views/QueueView.tsx');
+    const managerSource = read('components/queue/ModernQueueManager.tsx');
+    const tableSource = read('components/queue/QueueTable.tsx');
 
     expect(registrarSource).toContain('Выбор врача остаётся явным: URL-параметр или ручной выбор в очереди');
     // Decomp 6a: selectedDoctor prop moved to QueueView.jsx

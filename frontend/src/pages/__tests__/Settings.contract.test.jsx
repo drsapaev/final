@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const settingsPath = path.resolve(__dirname, '../Settings.jsx');
+const settingsPath = path.resolve(__dirname, '../Settings.tsx');
 
 describe('Settings generic key/value route contract', () => {
   it('uses the published settings endpoint with axios response data and canonical PUT body', () => {

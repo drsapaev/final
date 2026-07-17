@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import Login from '../Login';
 import { ThemeProvider } from '../../contexts/ThemeContext';
-import { MacOSThemeProvider } from '../../theme/macosTheme.jsx';
+import { MacOSThemeProvider } from '../../theme/macosTheme.tsx';
 
 vi.mock('../../api/client', () => ({
   api: {
@@ -15,7 +15,7 @@ vi.mock('../../api/client', () => ({
   setToken: vi.fn(),
 }));
 
-vi.mock('../../hooks/useSetupStatus.js', () => ({
+vi.mock('../../hooks/useSetupStatus.ts', () => ({
   useSetupStatus: () => ({
     initialized: true,
     isLoading: false,

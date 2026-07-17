@@ -12,7 +12,7 @@ describe('hosted payment provider ticket contract', () => {
   // PaymentProviderDialog.jsx. The wrappers preserve the public API and
   // CSS classes; the source of truth (and the api-calls / ticket-parsing
   // patterns the contract verifies) now lives in PaymentProviderDialog.jsx.
-  const PROVIDER_FILES = ['PaymentProviderDialog.jsx'];
+  const PROVIDER_FILES = ['PaymentProviderDialog.tsx'];
 
   for (const fileName of PROVIDER_FILES) {
     it(`${fileName} uses the authenticated api client for protected registrar invoice endpoints`, () => {
@@ -42,7 +42,7 @@ describe('hosted payment provider ticket contract', () => {
   }
 
   it('PaymentClick and PaymentPayMe are thin wrappers around PaymentProviderDialog', () => {
-    for (const fileName of ['PaymentClick.jsx', 'PaymentPayMe.jsx']) {
+    for (const fileName of ['PaymentClick.tsx', 'PaymentPayMe.tsx']) {
       const source = readProvider(fileName);
       expect(source).toContain('import PaymentProviderDialog from \'./PaymentProviderDialog\'');
       // Wrappers must NOT contain api calls directly — that logic lives in the dialog.

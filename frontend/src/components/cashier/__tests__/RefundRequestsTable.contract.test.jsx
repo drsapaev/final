@@ -4,7 +4,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const ROOT = path.resolve(process.cwd(), 'src');
-const source = fs.readFileSync(path.join(ROOT, 'components/cashier/RefundRequestsTable.jsx'), 'utf8');
+const source = fs.readFileSync(path.join(ROOT, 'components/cashier/RefundRequestsTable.tsx'), 'utf8');
 
 describe('RefundRequestsTable command contract', () => {
   it('uses the published refund request list filter query name', () => {

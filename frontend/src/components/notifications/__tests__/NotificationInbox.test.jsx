@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import NotificationInbox from '../NotificationInbox.jsx';
+import NotificationInbox from '../NotificationInbox.tsx';
 
 const {
   store,

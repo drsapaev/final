@@ -9,7 +9,7 @@ const readComponent = (relativePath) =>
 
 describe('specialist price override API client contract', () => {
   it('uses the authenticated api client for dermatology price override endpoints', () => {
-    const source = readComponent('dermatology/PriceOverrideManager.jsx');
+    const source = readComponent('dermatology/PriceOverrideManager.tsx');
 
     expect(source).toContain('import { api } from \'../../api/client\'');
     expect(source).toContain('api.get(\'/derma/price-overrides\'');
@@ -20,7 +20,7 @@ describe('specialist price override API client contract', () => {
   });
 
   it('uses the authenticated api client for dental price override endpoints', () => {
-    const source = readComponent('dental/DentalPriceManager.jsx');
+    const source = readComponent('dental/DentalPriceManager.tsx');
 
     expect(source).toContain('import { api } from \'../../api/client\'');
     expect(source).toContain('api.get(\'/dental/price-overrides\'');

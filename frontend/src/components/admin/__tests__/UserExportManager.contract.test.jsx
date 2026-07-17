@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const userExportManagerPath = path.resolve(__dirname, '../UserExportManager.jsx');
+const userExportManagerPath = path.resolve(__dirname, '../UserExportManager.tsx');
 
 const readSource = () => fs.readFileSync(userExportManagerPath, 'utf8');
 

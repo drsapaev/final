@@ -1,8 +1,8 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import ColorSchemeSelector from '../ColorSchemeSelector.jsx';
-import { ThemeProvider } from '../../../contexts/ThemeContext.jsx';
-import { MacOSThemeProvider } from '../../../theme/macosTheme.jsx';
+import ColorSchemeSelector from '../ColorSchemeSelector.tsx';
+import { ThemeProvider } from '../../../contexts/ThemeContext.tsx';
+import { MacOSThemeProvider } from '../../../theme/macosTheme.tsx';
 
 const { apiMock } = vi.hoisted(() => ({
   apiMock: {
@@ -11,7 +11,7 @@ const { apiMock } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('../../../api/client.js', () => ({
+vi.mock('../../../api/client.ts', () => ({
   api: apiMock,
 }));
 

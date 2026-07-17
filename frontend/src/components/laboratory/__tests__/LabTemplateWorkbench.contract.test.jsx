@@ -11,7 +11,7 @@ const ROOT = path.resolve(__dirname, '../../..');
 // L-H-6 fix: helper-функции вынесены в templateEditor/utils.js.
 // Контракт-тест обновлён, чтобы читать оба файла.
 const source = fs.readFileSync(
-  path.join(ROOT, 'components/laboratory/LabTemplateWorkbench.jsx'),
+  path.join(ROOT, 'components/laboratory/LabTemplateWorkbench.tsx'),
   'utf8'
 );
 

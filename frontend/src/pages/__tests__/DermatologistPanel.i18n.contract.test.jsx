@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT = path.resolve(__dirname, '../..');
-const source = fs.readFileSync(path.join(ROOT, 'pages/DermatologistPanelUnified.jsx'), 'utf8');
+const source = fs.readFileSync(path.join(ROOT, 'pages/DermatologistPanelUnified.tsx'), 'utf8');
 const translationsSource = fs.readFileSync(path.join(ROOT, 'i18n/locales/ru.js'), 'utf8');
 
 describe('DermatologistPanel STRAT#33 — i18n migration', () => {

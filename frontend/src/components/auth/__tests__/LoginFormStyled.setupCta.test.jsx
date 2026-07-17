@@ -2,13 +2,13 @@ import { MemoryRouter } from 'react-router-dom';
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import LoginFormStyled from '../LoginFormStyled.jsx';
+import LoginFormStyled from '../LoginFormStyled.tsx';
 
 const { useSetupStatusMock } = vi.hoisted(() => ({
   useSetupStatusMock: vi.fn(),
 }));
 
-vi.mock('../../../hooks/useSetupStatus.js', () => ({
+vi.mock('../../../hooks/useSetupStatus.ts', () => ({
   useSetupStatus: useSetupStatusMock,
 }));
 

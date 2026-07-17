@@ -1,8 +1,8 @@
 import React, { StrictMode } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ThemeProvider } from '../../../contexts/ThemeContext.jsx';
-import { MacOSThemeProvider } from '../../../theme/macosTheme.jsx';
+import { ThemeProvider } from '../../../contexts/ThemeContext.tsx';
+import { MacOSThemeProvider } from '../../../theme/macosTheme.tsx';
 
 const {
   apiGet,
@@ -55,7 +55,7 @@ vi.mock('../../../utils/logger', () => ({
 
 import NotificationPreferences, {
   __resetNotificationSettingsCacheForTests,
-} from '../NotificationPreferences.jsx';
+} from '../NotificationPreferences.tsx';
 
 const baseSettings = {
   email_appointment_reminder: true,

@@ -20,7 +20,7 @@ vi.mock('../../../utils/logger', () => ({
   },
 }));
 
-import NotificationSystemStatus from '../NotificationSystemStatus.jsx';
+import NotificationSystemStatus from '../NotificationSystemStatus.tsx';
 
 describe('NotificationSystemStatus', () => {
   beforeEach(() => {

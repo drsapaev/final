@@ -21,7 +21,7 @@ const migratedFiles = [
 describe('Admin remaining STRAT#37 — i18n migration', () => {
   for (const name of migratedFiles) {
     const source = fs.readFileSync(
-      path.join(ROOT, `components/admin/${name}.jsx`), 'utf8'
+      path.join(ROOT, `components/admin/${name}.tsx`), 'utf8'
     );
     
     it(`${name} imports t from i18n adapter`, () => {

@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 const SOURCE = fs
   .readFileSync(
-    path.resolve(process.cwd(), 'src/components/payment/PaymentManager.jsx'),
+    path.resolve(process.cwd(), 'src/components/payment/PaymentManager.tsx'),
     'utf8'
   )
   .replace(/\r\n/g, '\n');

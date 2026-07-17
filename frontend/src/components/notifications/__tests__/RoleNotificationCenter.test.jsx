@@ -35,7 +35,7 @@ vi.mock('../NotificationInbox', () => ({
   default: () => <div data-testid="notification-inbox" />
 }));
 
-import RoleNotificationCenter from '../RoleNotificationCenter.jsx';
+import RoleNotificationCenter from '../RoleNotificationCenter.tsx';
 
 describe('RoleNotificationCenter', () => {
   let loadNotifications;

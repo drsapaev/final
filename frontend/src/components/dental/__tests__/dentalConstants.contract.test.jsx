@@ -87,7 +87,7 @@ describe('dental SSOT contract (dentalConstants.js)', () => {
   });
 
   it('TeethChart.jsx imports constants from dentalConstants (no local redefinition)', () => {
-    const source = readSource('TeethChart.jsx');
+    const source = readSource('TeethChart.tsx');
 
     expect(source).toContain('from \'./dentalConstants\'');
     expect(source).toContain('TOOTH_STATUS');
@@ -103,7 +103,7 @@ describe('dental SSOT contract (dentalConstants.js)', () => {
   });
 
   it('ToothModal.jsx imports procedures/materials from dentalConstants (no local redefinition)', () => {
-    const source = readSource('ToothModal.jsx');
+    const source = readSource('ToothModal.tsx');
 
     expect(source).toContain('from \'./dentalConstants\'');
     expect(source).toContain('TOOTH_PROCEDURES');

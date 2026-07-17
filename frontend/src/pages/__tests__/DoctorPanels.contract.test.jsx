@@ -6,9 +6,9 @@ import { describe, expect, it } from 'vitest';
 const ROOT = path.resolve(process.cwd(), 'src');
 
 const DOCTOR_PANEL_FILES = [
-  'pages/CardiologistPanelUnified.jsx',
-  'pages/DentistPanelUnified.jsx',
-  'pages/DermatologistPanelUnified.jsx',
+  'pages/CardiologistPanelUnified.tsx',
+  'pages/DentistPanelUnified.tsx',
+  'pages/DermatologistPanelUnified.tsx',
 ];
 
 const read = (filePath) => fs.readFileSync(path.join(ROOT, filePath), 'utf8');
@@ -54,7 +54,7 @@ describe('Doctor panels SSOT contract', () => {
   });
 
   it('keeps doctor table command visibility backend-owned when rows are missing action fields', () => {
-    const table = read('components/tables/EnhancedAppointmentsTable.jsx');
+    const table = read('components/tables/EnhancedAppointmentsTable.tsx');
     const actionBlock = extractBlock(
       table,
       'const backendCanPay = getBackendActionAvailability',
@@ -118,9 +118,9 @@ describe('Doctor panels SSOT contract', () => {
   });
 
   it('renders a safe visit empty state when specialty visit tabs have no selected context', () => {
-    const cardiology = read('pages/CardiologistPanelUnified.jsx');
-    const cardiologyVisitTab = read('components/cardiology/VisitTab.jsx');
-    const dermatology = read('pages/DermatologistPanelUnified.jsx');
+    const cardiology = read('pages/CardiologistPanelUnified.tsx');
+    const cardiologyVisitTab = read('components/cardiology/VisitTab.tsx');
+    const dermatology = read('pages/DermatologistPanelUnified.tsx');
 
     // R-15: visit tab extracted to VisitTab.jsx — check both files.
     // Phase 4+: sidebar reduced — 'appointments' merged into 'patients' tab.
@@ -144,8 +144,8 @@ describe('Doctor panels SSOT contract', () => {
   });
 
   it('keeps dermatology prescription availability backend-owned', () => {
-    const dermatology = read('pages/DermatologistPanelUnified.jsx');
-    const prescriptionSystem = read('components/PrescriptionSystem.jsx');
+    const dermatology = read('pages/DermatologistPanelUnified.tsx');
+    const prescriptionSystem = read('components/PrescriptionSystem.tsx');
 
     expect(dermatology).toContain('/appointments/${appointmentId}/status');
     expect(dermatology).toContain('setCanCreatePrescription(statusData.can_create_prescription === true)');
@@ -164,11 +164,11 @@ describe('Doctor panels SSOT contract', () => {
     // (UX Audit Doctor H-30). Тест обновлён, чтобы читать актуальный файл.
     // Контракт SSOT остаётся тем же: все действия gated через
     // hasBackendQueueAction(), не через status-стринги.
-    const source = read('components/doctor/DoctorQueuePanel.jsx');
+    const source = read('components/doctor/DoctorQueuePanel.tsx');
 
     expect(source).toContain('const hasBackendQueueAction =');
     // DoctorPanel.jsx по-прежнему деструктурирует canCallNext из хука очереди
-    const doctorPanelSource = read('pages/DoctorPanel.jsx');
+    const doctorPanelSource = read('pages/DoctorPanel.tsx');
     expect(doctorPanelSource).toContain('canCallNext');
 
     // Текущий набор действий в очереди: call / start_visit / complete.
@@ -188,7 +188,7 @@ describe('Doctor panels SSOT contract', () => {
   });
 
   it('selects call-next from backend queue contract instead of local waiting-status scan', () => {
-    const source = read('hooks/useDoctorQueue.js');
+    const source = read('hooks/useDoctorQueue.ts');
     const callNextBlock = extractBlock(
       source,
       'const callNext = useCallback',

@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { MacOSThemeProvider, useMacOSTheme } from '../macosTheme.jsx';
+import { MacOSThemeProvider, useMacOSTheme } from '../macosTheme.tsx';
 
 function AccentHarness() {
   const { accent, setAccent } = useMacOSTheme();

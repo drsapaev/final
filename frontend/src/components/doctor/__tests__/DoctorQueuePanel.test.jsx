@@ -70,7 +70,7 @@ vi.mock('../../ui/macos', () => ({
   Alert: DoctorQueuePanelTestMacOSAlert,
 }));
 
-import DoctorQueuePanel from '../DoctorQueuePanel.jsx';
+import DoctorQueuePanel from '../DoctorQueuePanel.tsx';
 
 describe('DoctorQueuePanel', () => {
   beforeEach(() => {
@@ -266,7 +266,7 @@ describe('DoctorQueuePanel', () => {
 
   it('keeps queue command visibility behind backend actions and flags', () => {
     const source = readFileSync(
-      join(process.cwd(), 'src/components/doctor/DoctorQueuePanel.jsx'),
+      join(process.cwd(), 'src/components/doctor/DoctorQueuePanel.tsx'),
       'utf8',
     );
 

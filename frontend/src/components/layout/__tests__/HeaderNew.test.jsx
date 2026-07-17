@@ -2,10 +2,10 @@ import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
-import { ThemeProvider } from '../../../contexts/ThemeContext.jsx';
-import { MacOSThemeProvider } from '../../../theme/macosTheme.jsx';
+import { ThemeProvider } from '../../../contexts/ThemeContext.tsx';
+import { MacOSThemeProvider } from '../../../theme/macosTheme.tsx';
 import { TranslationProvider } from '../../../i18n/useTranslation';  // PR-50
-import HeaderNew, { isThemeMenuInteraction } from '../HeaderNew.jsx';
+import HeaderNew, { isThemeMenuInteraction } from '../HeaderNew.tsx';
 
 const authState = {
   token: 'header-test-token',

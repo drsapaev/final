@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT = path.resolve(__dirname, '..');
-const PANEL_PATH = path.resolve(__dirname, '../../../pages/DentistPanelUnified.jsx');
+const PANEL_PATH = path.resolve(__dirname, '../../../pages/DentistPanelUnified.tsx');
 
 const readSource = (fileName) =>
   fs.readFileSync(path.join(ROOT, fileName), 'utf8').replace(/\r\n/g, '\n');
@@ -17,7 +17,7 @@ const readPanel = () =>
 
 describe('DentalVisitScreen contract (Phase 4+ minimalist visit screen)', () => {
   it('imports SSOT constants from dentalConstants (no local redefinition)', () => {
-    const source = readSource('DentalVisitScreen.jsx');
+    const source = readSource('DentalVisitScreen.tsx');
 
     expect(source).toContain('from \'../dental/dentalConstants\'');
     expect(source).toContain('TOOTH_STATUS_LABELS');
@@ -26,7 +26,7 @@ describe('DentalVisitScreen contract (Phase 4+ minimalist visit screen)', () => 
   });
 
   it('uses TeethChart + ToothModal for the chart workflow', () => {
-    const source = readSource('DentalVisitScreen.jsx');
+    const source = readSource('DentalVisitScreen.tsx');
 
     expect(source).toContain('import TeethChart from \'../dental/TeethChart\'');
     expect(source).toContain('import ToothModal from \'../dental/ToothModal\'');
@@ -35,7 +35,7 @@ describe('DentalVisitScreen contract (Phase 4+ minimalist visit screen)', () => 
   });
 
   it('integrates AIAssistant inline (not as a separate tab) for ICD-10 suggestions', () => {
-    const source = readSource('DentalVisitScreen.jsx');
+    const source = readSource('DentalVisitScreen.tsx');
 
     // AI must be embedded in the visit screen, not a separate tab.
     expect(source).toContain('import AIAssistant from \'../ai/AIAssistant\'');
@@ -52,7 +52,7 @@ describe('DentalVisitScreen contract (Phase 4+ minimalist visit screen)', () => 
   });
 
   it('auto-saves EMR draft through POST /v2/emr/{visitId}', () => {
-    const source = readSource('DentalVisitScreen.jsx');
+    const source = readSource('DentalVisitScreen.tsx');
 
     expect(source).toContain('saveEMR');
     expect(source).toContain('scheduleAutosave');
@@ -62,14 +62,14 @@ describe('DentalVisitScreen contract (Phase 4+ minimalist visit screen)', () => 
   });
 
   it('loads existing EMR on mount via GET /v2/emr/{visitId}', () => {
-    const source = readSource('DentalVisitScreen.jsx');
+    const source = readSource('DentalVisitScreen.tsx');
 
     expect(source).toContain('loadExistingEMR');
     expect(source).toContain('apiClient.get(`/v2/emr/${visitId}`');
   });
 
   it('loads patient visit history via GET /v2/emr/patient/{patientId}', () => {
-    const source = readSource('DentalVisitScreen.jsx');
+    const source = readSource('DentalVisitScreen.tsx');
 
     expect(source).toContain('loadHistory');
     expect(source).toContain('apiClient.get(`/v2/emr/patient/${patientId}`');
@@ -77,7 +77,7 @@ describe('DentalVisitScreen contract (Phase 4+ minimalist visit screen)', () => 
   });
 
   it('renders the minimalist layout: header + anamnesis + chart + extras + history', () => {
-    const source = readSource('DentalVisitScreen.jsx');
+    const source = readSource('DentalVisitScreen.tsx');
 
     expect(source).toContain('PatientHeader');
     expect(source).toContain('AnamnesisSection');
@@ -95,7 +95,7 @@ describe('DentalVisitScreen contract (Phase 4+ minimalist visit screen)', () => 
   });
 
   it('passes onCompleteVisit through to PatientHeader (wired to C-1/C-3 confirm)', () => {
-    const source = readSource('DentalVisitScreen.jsx');
+    const source = readSource('DentalVisitScreen.tsx');
 
     expect(source).toContain('onCompleteVisit={onCompleteVisit}');
     expect(source).toContain('Завершить визит');

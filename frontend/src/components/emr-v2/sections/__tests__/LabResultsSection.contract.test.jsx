@@ -9,12 +9,12 @@ const __dirname = path.dirname(__filename);
 const ROOT = path.resolve(__dirname, '../../../..');
 
 const source = fs.readFileSync(
-  path.join(ROOT, 'components/emr-v2/sections/LabResultsSection.jsx'),
+  path.join(ROOT, 'components/emr-v2/sections/LabResultsSection.tsx'),
   'utf8'
 );
 
 const iconSource = fs.readFileSync(
-  path.join(ROOT, 'components/ui/macos/Icon.jsx'),
+  path.join(ROOT, 'components/ui/macos/Icon.tsx'),
   'utf8'
 );
 

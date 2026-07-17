@@ -9,12 +9,12 @@ const __dirname = path.dirname(__filename);
 const ROOT = path.resolve(__dirname, '../../..');
 
 const source = fs.readFileSync(
-  path.join(ROOT, 'components/laboratory/ReportEditor.jsx'),
+  path.join(ROOT, 'components/laboratory/ReportEditor.tsx'),
   'utf8'
 );
 
 const workbenchSource = fs.readFileSync(
-  path.join(ROOT, 'components/laboratory/LabReportWorkbench.jsx'),
+  path.join(ROOT, 'components/laboratory/LabReportWorkbench.tsx'),
   'utf8'
 );
 

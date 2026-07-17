@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const echoFormPath = path.resolve(__dirname, '../EchoForm.jsx');
+const echoFormPath = path.resolve(__dirname, '../EchoForm.tsx');
 
 const readEchoFormSource = () => fs.readFileSync(echoFormPath, 'utf8');
 
