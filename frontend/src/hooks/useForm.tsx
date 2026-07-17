@@ -1,130 +1,191 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 /**
- * Улучшенная система форм для медицинских интерфейсов
- * Основана на принципах доступности и медицинских стандартах UX
+ * Улучшенная система форм для медицинских интерфейсов.
+ * Основана на принципах доступности и медицинских стандартах UX.
  */
 
-import { useState, useCallback } from 'react';
-import PropTypes from 'prop-types';
+import { useCallback, useState } from 'react';
+import type { ReactNode, CSSProperties, FormEvent, ChangeEvent, FocusEvent } from 'react';
 import { useAnimation } from './useAnimation';
 import { useReducedMotion } from './useEnhancedMediaQuery';
-
 import logger from '../utils/logger';
-// @ts-expect-error — ui/macos not yet migrated to TS (Phase 4 redo)
-// @ts-expect-error — module not yet migrated or path issue
+
+// @ts-expect-error — ui/macos not yet migrated (Phase 4 redo)
 import { Input } from '../../ui/macos';
-// Валидаторы для медицинских форм
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- validators return mixed types (boolean | string | null); Phase 9 cleanup
+
+// ============================================================================
+// Validators
+// ============================================================================
+
+type ValidatorFn = (value: unknown) => boolean;
+type CurriedValidator = (param: unknown) => ValidatorFn;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- validators return mixed types; Phase 9 cleanup
 export const validators: Record<string, (...args: any[]) => any> = {
-  required: (value: unknown) => {
-    if (typeof value === 'string') {
-      return value.trim() !== '';
-    }
+  required: (value: unknown): boolean => {
+    if (typeof value === 'string') return value.trim() !== '';
     return value != null && value !== '';
   },
 
-  email: (value: unknown) => {
+  email: (value: unknown): boolean => {
     if (!value) return true;
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(String(value));
   },
 
-  phone: (value: unknown) => {
+  phone: (value: unknown): boolean => {
     if (!value) return true;
     const phoneRegex = /^\+?[\d\s-()]{10,}$/;
     return phoneRegex.test(String(value).replace(/\s/g, ''));
   },
 
-  minLength: (min: number) => (value) => {
+  minLength: (min: number): ValidatorFn => (value: unknown): boolean => {
     if (!value) return true;
     return String(value).length >= min;
   },
 
-  maxLength: (max) => (value) => {
+  maxLength: (max: number): ValidatorFn => (value: unknown): boolean => {
     if (!value) return true;
     return String(value).length <= max;
   },
 
-  pattern: (regex) => (value) => {
+  pattern: (regex: RegExp): ValidatorFn => (value: unknown): boolean => {
     if (!value) return true;
     return regex.test(String(value));
   },
 
-  numeric: (value) => {
+  numeric: (value: unknown): boolean => {
     if (!value) return true;
     return !isNaN(Number(value));
   },
 
-  min: (min) => (value) => {
+  min: (min: number): ValidatorFn => (value: unknown): boolean => {
     if (!value) return true;
     const num = Number(value);
     return !isNaN(num) && num >= min;
   },
 
-  max: (max) => (value) => {
+  max: (max: number): ValidatorFn => (value: unknown): boolean => {
     if (!value) return true;
     const num = Number(value);
     return !isNaN(num) && num <= max;
   },
 
-  date: (value) => {
+  date: (value: unknown): boolean => {
     if (!value) return true;
-    const date = new Date(value);
-    return !isNaN(date.getTime());
+    const d = new Date(String(value));
+    return !isNaN(d.getTime());
   },
 
-  future: (value) => {
+  future: (value: unknown): boolean => {
     if (!value) return true;
-    const date = new Date(value);
-    return !isNaN(date.getTime()) && date > new Date();
+    const d = new Date(String(value));
+    return !isNaN(d.getTime()) && d > new Date();
   },
 
-  past: (value) => {
+  past: (value: unknown): boolean => {
     if (!value) return true;
-    const date = new Date(value);
-    return !isNaN(date.getTime()) && date < new Date();
-  }
+    const d = new Date(String(value));
+    return !isNaN(d.getTime()) && d < new Date();
+  },
 };
 
-// Хук для управления формой
-export const useForm = <T extends Record<string, unknown> = Record<string, unknown>>(initialValues: T = {} as T, options: Record<string, unknown> = {}) => {
+// ============================================================================
+// useForm hook
+// ============================================================================
+
+interface ValidationRule {
+  message?: string;
+  [key: string]: unknown;
+}
+
+interface UseFormOptions<T> {
+  validateOnChange?: boolean;
+  validateOnBlur?: boolean;
+  validateOnSubmit?: boolean;
+  resetOnSubmit?: boolean;
+  validation?: Record<string, Record<string, ValidationRule>>;
+  onSubmit?: ((values: T) => void | Promise<void>) | null;
+}
+
+interface FieldProps {
+  name: string;
+  value: unknown;
+  onChange: (value: unknown) => void;
+  onBlur: () => void;
+  onFocus: () => void;
+  error: string | undefined;
+  touched: boolean;
+  isValid: boolean;
+}
+
+interface FormStats {
+  totalFields: number;
+  touchedFields: number;
+  errorFields: number;
+  isValid: boolean;
+  isSubmitting: boolean;
+  hasChanges: boolean;
+}
+
+interface UseFormReturn<T> {
+  values: T;
+  errors: Record<string, string[]>;
+  touched: Record<string, boolean>;
+  isValid: boolean;
+  isSubmitting: boolean;
+  handleChange: (name: string, value: unknown) => void;
+  handleBlur: (name: string) => void;
+  handleFocus: () => void;
+  handleSubmit: (e?: FormEvent) => Promise<void>;
+  reset: () => void;
+  validateForm: () => boolean;
+  getFieldProps: (name: string) => FieldProps;
+  getFormStats: () => FormStats;
+  setValues: React.Dispatch<React.SetStateAction<T>>;
+  setErrors: React.Dispatch<React.SetStateAction<Record<string, string[]>>>;
+  setTouched: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
+}
+
+export const useForm = <T extends Record<string, unknown> = Record<string, unknown>>(
+  initialValues: T = {} as T,
+  options: UseFormOptions<T> = {},
+): UseFormReturn<T> => {
   const {
     validateOnChange = true,
     validateOnBlur = true,
     validateOnSubmit = true,
     resetOnSubmit = false,
     validation = {},
-    onSubmit = null
+    onSubmit = null,
   } = options;
 
-  const [values, setValues] = useState<T>(initialValues as T);
-  const [errors, setErrors] = useState({});
-  const [touched, setTouched] = useState({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isValid, setIsValid] = useState(true);
+  const [values, setValues] = useState<T>(initialValues);
+  const [errors, setErrors] = useState<Record<string, string[]>>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [isValid, setIsValid] = useState<boolean>(true);
 
-  // Валидация поля
-  const validateField = useCallback((name, value, rules = {}) => {
-    const fieldErrors = [];
+  const validateField = useCallback(
+    (name: string, value: unknown, rules: Record<string, ValidationRule> = {}): string[] => {
+      const fieldErrors: string[] = [];
 
-    Object.entries(rules).forEach(([ruleName, ruleValue]) => {
-      const validator = validators[ruleName];
-      if (validator) {
-        const result = validator(ruleValue)(value);
-        if (!result) {
-          fieldErrors.push((ruleValue as { message?: string }).message || `Ошибка валидации: ${ruleName}`);
+      Object.entries(rules).forEach(([ruleName, ruleValue]) => {
+        const validator = validators[ruleName];
+        if (validator) {
+          const result = validator(ruleValue)(value);
+          if (!result) {
+            fieldErrors.push(ruleValue.message || `Ошибка валидации: ${ruleName}`);
+          }
         }
-      }
-    });
+      });
 
-    return fieldErrors;
-  }, []);
+      return fieldErrors;
+    },
+    [],
+  );
 
-  // Валидация всей формы
-  const validateForm = useCallback(() => {
-    const allErrors = {};
+  const validateForm = useCallback((): boolean => {
+    const allErrors: Record<string, string[]> = {};
     let formIsValid = true;
 
     Object.entries(values).forEach(([name, value]) => {
@@ -142,54 +203,40 @@ export const useForm = <T extends Record<string, unknown> = Record<string, unkno
     return formIsValid;
   }, [values, validation, validateField]);
 
-  // Обработка изменения поля
-  const handleChange = useCallback((name, value) => {
-    setValues((prev) => ({
-      ...prev,
-      [name]: value
-    }));
+  const handleChange = useCallback(
+    (name: string, value: unknown): void => {
+      setValues((prev) => ({ ...prev, [name]: value }));
 
-    if (validateOnChange && validation?.[name]) {
-      const fieldErrors = validateField(name, value, validation[name]);
-      setErrors((prev) => ({
-        ...prev,
-        [name]: fieldErrors
-      }));
-    }
+      if (validateOnChange && validation?.[name]) {
+        const fieldErrors = validateField(name, value, validation[name]);
+        setErrors((prev) => ({ ...prev, [name]: fieldErrors }));
+      }
 
-    // Очистка ошибок при изменении
-    if (errors[name]) {
-      setErrors((prev) => ({
-        ...prev,
-        [name]: []
-      }));
-    }
-  }, [validateOnChange, validation, validateField, errors]);
+      if (errors[name]) {
+        setErrors((prev) => ({ ...prev, [name]: [] }));
+      }
+    },
+    [validateOnChange, validation, validateField, errors],
+  );
 
-  // Обработка потери фокуса
-  const handleBlur = useCallback((name) => {
-    setTouched((prev) => ({
-      ...prev,
-      [name]: true
-    }));
+  const handleBlur = useCallback(
+    (name: string): void => {
+      setTouched((prev) => ({ ...prev, [name]: true }));
 
-    if (validateOnBlur && validation?.[name]) {
-      const value = values[name];
-      const fieldErrors = validateField(name, value, validation[name]);
-      setErrors((prev) => ({
-        ...prev,
-        [name]: fieldErrors
-      }));
-    }
-  }, [validateOnBlur, validation, validateField, values]);
+      if (validateOnBlur && validation?.[name]) {
+        const value = values[name];
+        const fieldErrors = validateField(name, value, validation[name]);
+        setErrors((prev) => ({ ...prev, [name]: fieldErrors }));
+      }
+    },
+    [validateOnBlur, validation, validateField, values],
+  );
 
-  // Обработка фокуса
-  const handleFocus = useCallback(() => {
-
-
+  const handleFocus = useCallback((): void => {
     // Можно добавить логику для фокуса
-  }, []); // Сброс формы
-  const reset = useCallback(() => {
+  }, []);
+
+  const reset = useCallback((): void => {
     setValues(initialValues);
     setErrors({});
     setTouched({});
@@ -197,89 +244,110 @@ export const useForm = <T extends Record<string, unknown> = Record<string, unkno
     setIsValid(true);
   }, [initialValues]);
 
-  // Отправка формы
-  const handleSubmit = useCallback(async (e) => {
-    e?.preventDefault();
+  const handleSubmit = useCallback(
+    async (e?: FormEvent): Promise<void> => {
+      e?.preventDefault();
 
-    setTouched(Object.keys(values).reduce((acc, key) => ({ ...acc, [key]: true }), {}));
+      setTouched(
+        Object.keys(values).reduce(
+          (acc: Record<string, boolean>, key: string) => {
+            acc[key] = true;
+            return acc;
+          },
+          {},
+        ),
+      );
 
-    if (validateOnSubmit) {
-      const formIsValid = validateForm();
-      if (!formIsValid) return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      if (onSubmit) {
-        await (onSubmit as (values: T) => void | Promise<void>)(values);
+      if (validateOnSubmit) {
+        const formIsValid = validateForm();
+        if (!formIsValid) return;
       }
 
-      if (resetOnSubmit) {
-        reset();
+      setIsSubmitting(true);
+
+      try {
+        if (onSubmit) {
+          await onSubmit(values);
+        }
+
+        if (resetOnSubmit) {
+          reset();
+        }
+      } catch (error) {
+        logger.error('Form submission error:', error);
+      } finally {
+        setIsSubmitting(false);
       }
-    } catch (error) {
-      logger.error('Form submission error:', error);
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [values, validateOnSubmit, validateForm, onSubmit, resetOnSubmit, reset]);
+    },
+    [values, validateOnSubmit, validateForm, onSubmit, resetOnSubmit, reset],
+  );
 
-  // Получение значения поля
-  const getFieldProps = useCallback((name) => {
-    return {
-      name,
-      value: values[name] || '',
-      onChange: (value) => handleChange(name, value),
-      onBlur: () => handleBlur(name),
-// @ts-expect-error — callback signature mismatch; Phase 9 cleanup
-      onFocus: () => handleFocus(name),
-      error: errors[name]?.[0],
-      touched: touched[name],
-      isValid: !errors[name] || errors[name].length === 0
-    };
-  }, [values, errors, touched, handleChange, handleBlur, handleFocus]);
+  const getFieldProps = useCallback(
+    (name: string): FieldProps => {
+      return {
+        name,
+        value: values[name] || '',
+        onChange: (value: unknown) => handleChange(name, value),
+        onBlur: () => handleBlur(name),
+        onFocus: () => handleFocus(),
+        error: errors[name]?.[0],
+        touched: Boolean(touched[name]),
+        isValid: !errors[name] || errors[name].length === 0,
+      };
+    },
+    [values, errors, touched, handleChange, handleBlur, handleFocus],
+  );
 
-  // Получение статистики формы
-  const getFormStats = useCallback(() => {
+  const getFormStats = useCallback((): FormStats => {
     return {
       totalFields: Object.keys(values).length,
       touchedFields: Object.keys(touched).length,
       errorFields: Object.keys(errors).length,
       isValid,
       isSubmitting,
-      hasChanges: JSON.stringify(values) !== JSON.stringify(initialValues)
+      hasChanges: JSON.stringify(values) !== JSON.stringify(initialValues),
     };
   }, [values, touched, errors, isValid, isSubmitting, initialValues]);
 
   return {
-    // Данные формы
     values,
     errors,
     touched,
     isValid,
     isSubmitting,
-
-    // Действия
     handleChange,
     handleBlur,
     handleFocus,
     handleSubmit,
     reset,
     validateForm,
-
-    // Утилиты
     getFieldProps,
     getFormStats,
-
-    // Прямой доступ к сеттерам
     setValues,
     setErrors,
-    setTouched
+    setTouched,
   };
 };
 
-// Поле формы
+// ============================================================================
+// FormField component
+// ============================================================================
+
+interface FormFieldProps {
+  name: string;
+  label?: ReactNode;
+  type?: string;
+  placeholder?: string;
+  required?: boolean;
+  disabled?: boolean;
+  error?: string;
+  value?: unknown;
+  onChange?: (value: unknown) => void;
+  onBlur?: (e: FocusEvent<HTMLInputElement>) => void;
+  className?: string;
+  [key: string]: unknown;
+}
+
 export const FormField = ({
   name,
   label,
@@ -293,12 +361,13 @@ export const FormField = ({
   onBlur,
   className = '',
   ...props
-}) => {
+}: FormFieldProps): React.ReactElement => {
   const { prefersReducedMotion } = useReducedMotion();
   const { shouldRender, animationStyles } = useAnimation(!!error, 'slideDown', 200);
 
-  const handleChange = (e) => {
-    const newValue = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
+  const handleChange = (e: ChangeEvent<HTMLInputElement>): void => {
+    const newValue =
+      e.target.type === 'checkbox' ? e.target.checked : e.target.value;
     if (onChange) {
       onChange(newValue);
     }
@@ -306,27 +375,27 @@ export const FormField = ({
 
   return (
     <div className={`form-field ${className}`} style={{ marginBottom: 'var(--mac-spacing-4)' }}>
-      {label &&
-      <label
-        htmlFor={name}
-        style={{
-          display: 'block',
-          marginBottom: 'var(--mac-spacing-1)',
-          fontSize: 'var(--mac-font-size-base)',
-          fontWeight: 'var(--mac-font-weight-medium)',
-          color: error ? 'var(--mac-error)' : 'var(--mac-text-primary)'
-        }}>
-        
+      {label && (
+        <label
+          htmlFor={name}
+          style={{
+            display: 'block',
+            marginBottom: 'var(--mac-spacing-1)',
+            fontSize: 'var(--mac-font-size-base)',
+            fontWeight: 'var(--mac-font-weight-medium)',
+            color: error ? 'var(--mac-error)' : 'var(--mac-text-primary)',
+          }}
+        >
           {label}
           {required && <span style={{ color: 'var(--mac-error)' }}> *</span>}
         </label>
-      }
+      )}
 
       <Input
         id={name}
         name={name}
         type={type}
-        value={value || ''}
+        value={(value as string) || ''}
         onChange={handleChange}
         placeholder={placeholder}
         disabled={disabled}
@@ -340,41 +409,59 @@ export const FormField = ({
           backgroundColor: disabled ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)',
           color: 'var(--mac-text-primary)',
           outline: 'none',
-          transition: prefersReducedMotion ? 'none' : 'border-color 0.2s ease, box-shadow 0.2s ease'
+          transition: prefersReducedMotion ? 'none' : 'border-color 0.2s ease, box-shadow 0.2s ease',
         }}
-        onFocus={(e) => {
+        onFocus={(e: FocusEvent<HTMLInputElement>) => {
           if (!prefersReducedMotion) {
-            (e.target as HTMLElement).style.borderColor = error ? 'var(--mac-error)' : 'var(--mac-accent-blue)';
-            (e.target as HTMLElement).style.boxShadow = `0 0 0 3px ${error ? 'var(--mac-error-bg)' : 'var(--mac-accent-bg)'}`;
+            e.target.style.borderColor = error ? 'var(--mac-error)' : 'var(--mac-accent-blue)';
+            e.target.style.boxShadow = `0 0 0 3px ${error ? 'var(--mac-error-bg)' : 'var(--mac-accent-bg)'}`;
           }
         }}
-        onBlur={(e) => {
+        onBlur={(e: FocusEvent<HTMLInputElement>) => {
           if (!prefersReducedMotion) {
-            (e.target as HTMLElement).style.borderColor = error ? 'var(--mac-error)' : 'var(--mac-border)';
-            (e.target as HTMLElement).style.boxShadow = 'none';
+            e.target.style.borderColor = error ? 'var(--mac-error)' : 'var(--mac-border)';
+            e.target.style.boxShadow = 'none';
           }
           if (onBlur) onBlur(e);
         }}
-        {...props} />
-      
+        {...props}
+      />
 
-      {shouldRender && error &&
-      <div
-        className={`form-field-error ${animationStyles}`}
-        style={{
-          marginTop: 'var(--mac-spacing-1)',
-          fontSize: 'var(--mac-font-size-xs)',
-          color: 'var(--mac-error)'
-        }}>
-        
+      {shouldRender && error && (
+        <div
+          className={`form-field-error ${animationStyles}`}
+          style={{
+            marginTop: 'var(--mac-spacing-1)',
+            fontSize: 'var(--mac-font-size-xs)',
+            color: 'var(--mac-error)',
+          }}
+        >
           {error}
         </div>
-      }
-    </div>);
-
+      )}
+    </div>
+  );
 };
 
-// Текстовое поле формы
+// ============================================================================
+// FormTextarea component
+// ============================================================================
+
+interface FormTextareaProps {
+  name: string;
+  label?: ReactNode;
+  placeholder?: string;
+  required?: boolean;
+  disabled?: boolean;
+  error?: string;
+  value?: unknown;
+  onChange?: (value: string) => void;
+  onBlur?: (e: FocusEvent<HTMLTextAreaElement>) => void;
+  rows?: number;
+  className?: string;
+  [key: string]: unknown;
+}
+
 export const FormTextarea = ({
   name,
   label,
@@ -388,10 +475,10 @@ export const FormTextarea = ({
   rows = 3,
   className = '',
   ...props
-}) => {
+}: FormTextareaProps): React.ReactElement => {
   const { prefersReducedMotion } = useReducedMotion();
 
-  const handleChange = (e) => {
+  const handleChange = (e: ChangeEvent<HTMLTextAreaElement>): void => {
     if (onChange) {
       onChange(e.target.value);
     }
@@ -399,26 +486,26 @@ export const FormTextarea = ({
 
   return (
     <div className={`form-textarea ${className}`} style={{ marginBottom: 'var(--mac-spacing-4)' }}>
-      {label &&
-      <label
-        htmlFor={name}
-        style={{
-          display: 'block',
-          marginBottom: 'var(--mac-spacing-1)',
-          fontSize: 'var(--mac-font-size-base)',
-          fontWeight: 'var(--mac-font-weight-medium)',
-          color: error ? 'var(--mac-error)' : 'var(--mac-text-primary)'
-        }}>
-        
+      {label && (
+        <label
+          htmlFor={name}
+          style={{
+            display: 'block',
+            marginBottom: 'var(--mac-spacing-1)',
+            fontSize: 'var(--mac-font-size-base)',
+            fontWeight: 'var(--mac-font-weight-medium)',
+            color: error ? 'var(--mac-error)' : 'var(--mac-text-primary)',
+          }}
+        >
           {label}
           {required && <span style={{ color: 'var(--mac-error)' }}> *</span>}
         </label>
-      }
+      )}
 
       <textarea
         id={name}
         name={name}
-        value={value || ''}
+        value={(value as string) || ''}
         onChange={handleChange}
         placeholder={placeholder}
         disabled={disabled}
@@ -435,40 +522,63 @@ export const FormTextarea = ({
           color: 'var(--mac-text-primary)',
           outline: 'none',
           resize: 'vertical',
-          transition: prefersReducedMotion ? 'none' : 'border-color 0.2s ease, box-shadow 0.2s ease'
+          transition: prefersReducedMotion ? 'none' : 'border-color 0.2s ease, box-shadow 0.2s ease',
         }}
-        onFocus={(e) => {
+        onFocus={(e: FocusEvent<HTMLTextAreaElement>) => {
           if (!prefersReducedMotion) {
-            (e.target as HTMLElement).style.borderColor = error ? 'var(--mac-error)' : 'var(--mac-accent-blue)';
-            (e.target as HTMLElement).style.boxShadow = `0 0 0 3px ${error ? 'var(--mac-error-bg)' : 'var(--mac-accent-bg)'}`;
+            e.target.style.borderColor = error ? 'var(--mac-error)' : 'var(--mac-accent-blue)';
+            e.target.style.boxShadow = `0 0 0 3px ${error ? 'var(--mac-error-bg)' : 'var(--mac-accent-bg)'}`;
           }
         }}
-        onBlur={(e) => {
+        onBlur={(e: FocusEvent<HTMLTextAreaElement>) => {
           if (!prefersReducedMotion) {
-            (e.target as HTMLElement).style.borderColor = error ? 'var(--mac-error)' : 'var(--mac-border)';
-            (e.target as HTMLElement).style.boxShadow = 'none';
+            e.target.style.borderColor = error ? 'var(--mac-error)' : 'var(--mac-border)';
+            e.target.style.boxShadow = 'none';
           }
           if (onBlur) onBlur(e);
         }}
-        {...props} />
-      
+        {...props}
+      />
 
-      {error &&
-      <div
-        style={{
-          marginTop: 'var(--mac-spacing-1)',
-          fontSize: 'var(--mac-font-size-xs)',
-          color: 'var(--mac-error)'
-        }}>
-        
+      {error && (
+        <div
+          style={{
+            marginTop: 'var(--mac-spacing-1)',
+            fontSize: 'var(--mac-font-size-xs)',
+            color: 'var(--mac-error)',
+          }}
+        >
           {error}
         </div>
-      }
-    </div>);
-
+      )}
+    </div>
+  );
 };
 
-// Выпадающий список формы
+// ============================================================================
+// FormSelect component
+// ============================================================================
+
+interface SelectOption {
+  value: string;
+  label: string;
+}
+
+interface FormSelectProps {
+  name: string;
+  label?: ReactNode;
+  placeholder?: string;
+  required?: boolean;
+  disabled?: boolean;
+  error?: string;
+  value?: unknown;
+  onChange?: (value: string) => void;
+  onBlur?: (e: FocusEvent<HTMLSelectElement>) => void;
+  options?: SelectOption[];
+  className?: string;
+  [key: string]: unknown;
+}
+
 export const FormSelect = ({
   name,
   label,
@@ -482,10 +592,10 @@ export const FormSelect = ({
   options = [],
   className = '',
   ...props
-}) => {
+}: FormSelectProps): React.ReactElement => {
   const { prefersReducedMotion } = useReducedMotion();
 
-  const handleChange = (e) => {
+  const handleChange = (e: ChangeEvent<HTMLSelectElement>): void => {
     if (onChange) {
       onChange(e.target.value);
     }
@@ -493,26 +603,26 @@ export const FormSelect = ({
 
   return (
     <div className={`form-select ${className}`} style={{ marginBottom: 'var(--mac-spacing-4)' }}>
-      {label &&
-      <label
-        htmlFor={name}
-        style={{
-          display: 'block',
-          marginBottom: 'var(--mac-spacing-1)',
-          fontSize: 'var(--mac-font-size-base)',
-          fontWeight: 'var(--mac-font-weight-medium)',
-          color: error ? 'var(--mac-error)' : 'var(--mac-text-primary)'
-        }}>
-        
+      {label && (
+        <label
+          htmlFor={name}
+          style={{
+            display: 'block',
+            marginBottom: 'var(--mac-spacing-1)',
+            fontSize: 'var(--mac-font-size-base)',
+            fontWeight: 'var(--mac-font-weight-medium)',
+            color: error ? 'var(--mac-error)' : 'var(--mac-text-primary)',
+          }}
+        >
           {label}
           {required && <span style={{ color: 'var(--mac-error)' }}> *</span>}
         </label>
-      }
+      )}
 
       <select
         id={name}
         name={name}
-        value={value || ''}
+        value={(value as string) || ''}
         onChange={handleChange}
         disabled={disabled}
         required={required}
@@ -526,59 +636,70 @@ export const FormSelect = ({
           color: 'var(--mac-text-primary)',
           outline: 'none',
           cursor: disabled ? 'not-allowed' : 'pointer',
-          transition: prefersReducedMotion ? 'none' : 'border-color 0.2s ease, box-shadow 0.2s ease'
+          transition: prefersReducedMotion ? 'none' : 'border-color 0.2s ease, box-shadow 0.2s ease',
         }}
-        onFocus={(e) => {
+        onFocus={(e: FocusEvent<HTMLSelectElement>) => {
           if (!prefersReducedMotion) {
-            (e.target as HTMLElement).style.borderColor = error ? 'var(--mac-error)' : 'var(--mac-accent-blue)';
-            (e.target as HTMLElement).style.boxShadow = `0 0 0 3px ${error ? 'var(--mac-error-bg)' : 'var(--mac-accent-bg)'}`;
+            e.target.style.borderColor = error ? 'var(--mac-error)' : 'var(--mac-accent-blue)';
+            e.target.style.boxShadow = `0 0 0 3px ${error ? 'var(--mac-error-bg)' : 'var(--mac-accent-bg)'}`;
           }
         }}
-        onBlur={(e) => {
+        onBlur={(e: FocusEvent<HTMLSelectElement>) => {
           if (!prefersReducedMotion) {
-            (e.target as HTMLElement).style.borderColor = error ? 'var(--mac-error)' : 'var(--mac-border)';
-            (e.target as HTMLElement).style.boxShadow = 'none';
+            e.target.style.borderColor = error ? 'var(--mac-error)' : 'var(--mac-border)';
+            e.target.style.boxShadow = 'none';
           }
           if (onBlur) onBlur(e);
         }}
-        {...props}>
-        
-        {placeholder &&
-        <option value="" disabled>
+        {...props}
+      >
+        {placeholder && (
+          <option value="" disabled>
             {placeholder}
           </option>
-        }
-        {options.map((option) =>
-        <option key={option.value} value={option.value}>
+        )}
+        {options.map((option: SelectOption) => (
+          <option key={option.value} value={option.value}>
             {option.label}
           </option>
-        )}
+        ))}
       </select>
 
-      {error &&
-      <div
-        style={{
-          marginTop: 'var(--mac-spacing-1)',
-          fontSize: 'var(--mac-font-size-xs)',
-          color: 'var(--mac-error)'
-        }}>
-        
+      {error && (
+        <div
+          style={{
+            marginTop: 'var(--mac-spacing-1)',
+            fontSize: 'var(--mac-font-size-xs)',
+            color: 'var(--mac-error)',
+          }}
+        >
           {error}
         </div>
-      }
-    </div>);
-
+      )}
+    </div>
+  );
 };
 
-// Компонент формы
+// ============================================================================
+// Form component
+// ============================================================================
+
+interface FormComponentProps {
+  children: ReactNode;
+  onSubmit?: (e: FormEvent) => void;
+  className?: string;
+  style?: CSSProperties;
+  [key: string]: unknown;
+}
+
 export const Form = ({
   children,
   onSubmit,
   className = '',
   style = {},
   ...props
-}) => {
-  const handleSubmit = (e) => {
+}: FormComponentProps): React.ReactElement => {
+  const handleSubmit = (e: FormEvent): void => {
     e.preventDefault();
     if (onSubmit) {
       onSubmit(e);
@@ -593,62 +714,13 @@ export const Form = ({
         display: 'flex',
         flexDirection: 'column',
         gap: 'var(--mac-spacing-4)',
-        ...style
+        ...style,
       }}
-      {...props}>
-      
+      {...props}
+    >
       {children}
-    </form>);
-
-};
-
-FormField.propTypes = {
-  name: PropTypes.string,
-  label: PropTypes.node,
-  type: PropTypes.string,
-  placeholder: PropTypes.string,
-  required: PropTypes.bool,
-  disabled: PropTypes.bool,
-  error: PropTypes.node,
-  value: PropTypes.any,
-  onChange: PropTypes.func,
-  onBlur: PropTypes.func,
-  className: PropTypes.string
-};
-
-FormTextarea.propTypes = {
-  name: PropTypes.string,
-  label: PropTypes.node,
-  placeholder: PropTypes.string,
-  required: PropTypes.bool,
-  disabled: PropTypes.bool,
-  error: PropTypes.node,
-  value: PropTypes.any,
-  onChange: PropTypes.func,
-  onBlur: PropTypes.func,
-  rows: PropTypes.number,
-  className: PropTypes.string
-};
-
-FormSelect.propTypes = {
-  name: PropTypes.string,
-  label: PropTypes.node,
-  placeholder: PropTypes.string,
-  required: PropTypes.bool,
-  disabled: PropTypes.bool,
-  error: PropTypes.node,
-  value: PropTypes.any,
-  onChange: PropTypes.func,
-  onBlur: PropTypes.func,
-  options: PropTypes.array,
-  className: PropTypes.string
-};
-
-Form.propTypes = {
-  children: PropTypes.node,
-  onSubmit: PropTypes.func,
-  className: PropTypes.string,
-  style: PropTypes.object
+    </form>
+  );
 };
 
 export default useForm;
