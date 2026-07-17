@@ -1,22 +1,49 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 /**
  * Улучшенная система таблиц для медицинских интерфейсов
  * Основана на принципах доступности и медицинских стандартах UX
  */
 
 import { useState, useCallback, useMemo } from 'react';
+import type { ReactNode, CSSProperties, MouseEvent } from 'react';
 import PropTypes from 'prop-types';
 
 import { useReducedMotion } from './useEnhancedMediaQuery';
 import { Input,
 // @ts-expect-error — ui/macos not yet migrated (Phase 4 redo)
-// @ts-expect-error — module not yet migrated or path issue
   Checkbox } from '../../ui/macos';
 
 // Хук для управления таблицей
-export const useTable = <T extends Record<string, unknown>>(data: T[] = [], options: Record<string, unknown> = {}) => {
+interface SortConfig { key: string; direction: 'asc' | 'desc' }
+interface UseTableOptions<T> {
+  pageSize?: number;
+  filterable?: boolean;
+  searchable?: boolean;
+  defaultSort?: SortConfig | null;
+  defaultFilter?: Record<string, unknown> | null;
+}
+interface UseTableReturn<T> {
+  data: T[];
+  allData: T[];
+  filteredData: T[];
+  currentPage: number;
+  totalPages: number;
+  sortConfig: SortConfig | null;
+  filterConfig: Record<string, unknown> | null;
+  searchTerm: string;
+  selectedRows: Set<unknown>;
+  expandedRows: Set<unknown>;
+  setCurrentPage: React.Dispatch<React.SetStateAction<number>>;
+  handleSort: (key: string) => void;
+  handleFilter: (key: string, value: unknown) => void;
+  handleSearch: (term: string) => void;
+  handleRowSelect: (rowId: unknown, selected: boolean) => void;
+  handleSelectAll: (selected: boolean) => void;
+  handleRowExpand: (rowId: unknown, expanded: boolean) => void;
+  resetFilters: () => void;
+  getTableStats: () => Record<string, unknown>;
+}
+
+export const useTable = <T extends Record<string, unknown>>(data: T[] = [], options: UseTableOptions<T> = {}): UseTableReturn<T> => {
   const {
     pageSize = 10,
 
@@ -29,12 +56,12 @@ export const useTable = <T extends Record<string, unknown>>(data: T[] = [], opti
     defaultFilter = null
   } = options;
 
-  const [currentPage, setCurrentPage] = useState(1);
-  const [sortConfig, setSortConfig] = useState(defaultSort);
-  const [filterConfig, setFilterConfig] = useState(defaultFilter);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedRows, setSelectedRows] = useState(new Set());
-  const [expandedRows, setExpandedRows] = useState(new Set());
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [sortConfig, setSortConfig] = useState<SortConfig | null>(defaultSort);
+  const [filterConfig, setFilterConfig] = useState<Record<string, unknown> | null>(defaultFilter);
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [selectedRows, setSelectedRows] = useState<Set<unknown>>(new Set());
+  const [expandedRows, setExpandedRows] = useState<Set<unknown>>(new Set());
   useReducedMotion();
 
   // Сортировка данных
@@ -83,7 +110,7 @@ export const useTable = <T extends Record<string, unknown>>(data: T[] = [], opti
   const paginatedData = filteredData.slice(startIndex, startIndex + Number(pageSize));
 
   // Сортировка
-  const handleSort = useCallback((key) => {
+  const handleSort = useCallback((key: string): void => {
     setSortConfig((prevConfig) => {
       if (prevConfig && prevConfig?.key === key) {
         return {
@@ -96,7 +123,7 @@ export const useTable = <T extends Record<string, unknown>>(data: T[] = [], opti
   }, []);
 
   // Фильтрация
-  const handleFilter = useCallback((key, value) => {
+  const handleFilter = useCallback((key: string, value: unknown): void => {
     setFilterConfig((prevConfig) => ({
       ...prevConfig,
       [key]: value
@@ -105,13 +132,13 @@ export const useTable = <T extends Record<string, unknown>>(data: T[] = [], opti
   }, []);
 
   // Поиск
-  const handleSearch = useCallback((term) => {
+  const handleSearch = useCallback((term: string): void => {
     setSearchTerm(term);
     setCurrentPage(1); // Сброс на первую страницу при поиске
   }, []);
 
   // Выбор строк
-  const handleRowSelect = useCallback((rowId, selected) => {
+  const handleRowSelect = useCallback((rowId: unknown, selected: boolean): void => {
     setSelectedRows((prev) => {
       const newSet = new Set(prev);
       if (selected) {
@@ -124,7 +151,7 @@ export const useTable = <T extends Record<string, unknown>>(data: T[] = [], opti
   }, []);
 
   // Выбор всех строк
-  const handleSelectAll = useCallback((selected) => {
+  const handleSelectAll = useCallback((selected: boolean): void => {
     if (selected) {
       setSelectedRows(new Set(paginatedData.map((row) => row.id)));
     } else {
@@ -133,7 +160,7 @@ export const useTable = <T extends Record<string, unknown>>(data: T[] = [], opti
   }, [paginatedData]);
 
   // Разворачивание строк
-  const handleRowExpand = useCallback((rowId, expanded) => {
+  const handleRowExpand = useCallback((rowId: unknown, expanded: boolean): void => {
     setExpandedRows((prev) => {
       const newSet = new Set(prev);
       if (expanded) {
@@ -146,7 +173,7 @@ export const useTable = <T extends Record<string, unknown>>(data: T[] = [], opti
   }, []);
 
   // Сброс всех фильтров и поиска
-  const resetFilters = useCallback(() => {
+  const resetFilters = useCallback((): void => {
     setSortConfig(defaultSort);
     setFilterConfig(defaultFilter);
     setSearchTerm('');
@@ -154,7 +181,7 @@ export const useTable = <T extends Record<string, unknown>>(data: T[] = [], opti
   }, [defaultSort, defaultFilter]);
 
   // Получение статистики таблицы
-  const getTableStats = useCallback(() => {
+  const getTableStats = useCallback((): Record<string, unknown> => {
     return {
       totalItems: data.length,
       filteredItems: filteredData.length,
@@ -199,6 +226,23 @@ export const useTable = <T extends Record<string, unknown>>(data: T[] = [], opti
 };
 
 // Заголовок таблицы
+interface TableColumn {
+  key?: string;
+  title?: string;
+  align?: string;
+  sortable?: boolean;
+  render?: (value: unknown, row: Record<string, unknown>) => React.ReactNode;
+}
+
+interface TableHeaderProps {
+  columns?: TableColumn[];
+  sortConfig?: SortConfig | null;
+  onSort?: (key: string) => void;
+  sortable?: boolean;
+  className?: string;
+  [key: string]: unknown;
+}
+
 export const TableHeader = ({
   columns = [],
   sortConfig,
@@ -206,7 +250,7 @@ export const TableHeader = ({
   sortable = true,
   className = '',
   ...props
-}) => {
+}: TableHeaderProps): React.ReactElement => {
   const { prefersReducedMotion } = useReducedMotion();
 
   return (
@@ -218,7 +262,7 @@ export const TableHeader = ({
           className="table-header-cell"
           style={{
             padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
-            textAlign: column.align || 'left',
+            textAlign: (column.align || 'left') as 'left' | 'center' | 'right',
             fontSize: 'var(--mac-font-size-base)',
             fontWeight: 'var(--mac-font-weight-semibold)',
             color: 'var(--mac-text-primary)',
@@ -256,6 +300,20 @@ export const TableHeader = ({
 };
 
 // Строка таблицы
+interface TableRowProps {
+  row: Record<string, unknown>;
+  columns?: TableColumn[];
+  selected?: boolean;
+  expanded?: boolean;
+  expandable?: boolean;
+  selectable?: boolean;
+  onSelect?: (rowId: unknown, selected: boolean) => void;
+  onExpand?: (rowId: unknown, expanded: boolean) => void;
+  onClick?: (row: Record<string, unknown>, e: MouseEvent) => void;
+  className?: string;
+  [key: string]: unknown;
+}
+
 export const TableRow = ({
   row,
   columns = [],
@@ -268,23 +326,23 @@ export const TableRow = ({
   onClick,
   className = '',
   ...props
-}) => {
+}: TableRowProps): React.ReactElement => {
   const { prefersReducedMotion } = useReducedMotion();
 
-  const handleClick = (e) => {
+  const handleClick = (e: MouseEvent): void => {
     if (onClick) {
       onClick(row, e);
     }
   };
 
-  const handleSelect = (e) => {
+  const handleSelect = (e: MouseEvent): void => {
     e.stopPropagation();
     if (onSelect) {
       onSelect(row.id, !selected);
     }
   };
 
-  const handleExpand = (e) => {
+  const handleExpand = (e: MouseEvent): void => {
     e.stopPropagation();
     if (onExpand) {
       onExpand(row.id, !expanded);
@@ -360,13 +418,13 @@ export const TableRow = ({
         className="table-cell"
         style={{
           padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
-          textAlign: column.align || 'left',
+          textAlign: (column.align || 'left') as 'left' | 'center' | 'right',
           fontSize: 'var(--mac-font-size-base)',
           color: 'var(--mac-text-primary)',
           borderBottom: '1px solid var(--mac-border)'
         }}>
         
-          {column.render ? column.render(row[column?.key], row) : row[column?.key]}
+          {column.render ? column.render(row[column?.key], row) : String(row[column?.key] ?? '')}
         </td>
       )}
     </tr>);
@@ -374,6 +432,20 @@ export const TableRow = ({
 };
 
 // Тело таблицы
+interface TableBodyProps {
+  data?: Record<string, unknown>[];
+  columns?: TableColumn[];
+  selectedRows?: Set<unknown>;
+  expandedRows?: Set<unknown>;
+  expandable?: boolean;
+  selectable?: boolean;
+  onRowSelect?: (rowId: unknown, selected: boolean) => void;
+  onRowExpand?: (rowId: unknown, expanded: boolean) => void;
+  onRowClick?: (row: Record<string, unknown>, e: MouseEvent) => void;
+  className?: string;
+  [key: string]: unknown;
+}
+
 export const TableBody = ({
   data = [],
   columns = [],
@@ -386,12 +458,12 @@ export const TableBody = ({
   onRowClick,
   className = '',
   ...props
-}) => {
+}: TableBodyProps): React.ReactElement => {
   return (
     <tbody className={`table-body ${className}`} {...props}>
       {data.map((row) =>
       <TableRow
-        key={row.id}
+        key={String(row.id)}
         row={row}
         columns={columns}
         selected={selectedRows.has(row.id)}
@@ -408,6 +480,18 @@ export const TableBody = ({
 };
 
 // Пагинация таблицы
+interface TablePaginationProps {
+  currentPage: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+  pageSize: number;
+  totalItems: number;
+  showPageSize?: boolean;
+  pageSizeOptions?: number[];
+  className?: string;
+  [key: string]: unknown;
+}
+
 export const TablePagination = ({
   currentPage,
   totalPages,
@@ -418,7 +502,7 @@ export const TablePagination = ({
   pageSizeOptions = [10, 25, 50, 100],
   className = '',
   ...props
-}) => {
+}: TablePaginationProps): React.ReactElement => {
   const { prefersReducedMotion } = useReducedMotion();
   void showPageSize;
   void pageSizeOptions;
@@ -441,7 +525,7 @@ export const TablePagination = ({
       
       {/* Информация о странице */}
       <div style={{ fontSize: 'var(--mac-font-size-base)', color: 'var(--mac-text-secondary)' }}>
-        Показано {startItem}-{endItem} из {totalItems} записей
+        Показано {startItem}-{endItem} из {String(totalItems)} записей
       </div>
 
       {/* Контролы пагинации */}
@@ -480,7 +564,7 @@ export const TablePagination = ({
             const pageNumber = Math.max(1, Math.min(totalPages, currentPage - 2 + i));
             return (
               <button
-                key={pageNumber}
+                key={String(pageNumber)}
                 onClick={() => onPageChange(pageNumber)}
                 style={{
                   padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
@@ -544,13 +628,21 @@ export const TablePagination = ({
 };
 
 // Поиск в таблице
+interface TableSearchProps {
+  searchTerm: string;
+  onSearch: (term: string) => void;
+  placeholder?: string;
+  className?: string;
+  [key: string]: unknown;
+}
+
 export const TableSearch = ({
   searchTerm,
   onSearch,
   placeholder = 'Поиск...',
   className = '',
   ...props
-}) => {
+}: TableSearchProps): React.ReactElement => {
   const { prefersReducedMotion } = useReducedMotion();
 
   return (
@@ -571,7 +663,7 @@ export const TableSearch = ({
         type="text"
         aria-label={placeholder || 'Table search'}
         value={searchTerm}
-        onChange={(e) => onSearch(e.target.value)}
+        onChange={(e: React.ChangeEvent<HTMLInputElement>) => onSearch(e.target.value)}
         placeholder={placeholder}
         style={{
           flex: 1,
@@ -600,6 +692,36 @@ export const TableSearch = ({
 };
 
 // Полная таблица
+interface TableProps {
+  data?: Record<string, unknown>[];
+  columns?: TableColumn[];
+  loading?: boolean;
+  error?: string | null;
+  emptyMessage?: string;
+  sortable?: boolean;
+  filterable?: boolean;
+  searchable?: boolean;
+  selectable?: boolean;
+  expandable?: boolean;
+  pagination?: boolean;
+  currentPage?: number;
+  totalPages?: number;
+  sortConfig?: SortConfig | null;
+  searchTerm?: string;
+  onPageChange?: (page: number) => void;
+  onSort?: (key: string) => void;
+  onSearch?: (term: string) => void;
+  onRowSelect?: (rowId: unknown, selected: boolean) => void;
+  onRowExpand?: (rowId: unknown, expanded: boolean) => void;
+  onRowClick?: (row: Record<string, unknown>, e: MouseEvent) => void;
+  onSelectAll?: (selected: boolean) => void;
+  className?: string;
+  style?: CSSProperties;
+  pageSize?: number;
+  pageSizeOptions?: number[];
+  [key: string]: unknown;
+}
+
 export const Table = ({
   data = [],
   columns = [],
@@ -639,7 +761,7 @@ export const Table = ({
   pageSizeOptions = [10, 25, 50, 100],
 
   ...props
-}) => {
+}: TableProps): React.ReactElement => {
   useReducedMotion();
   void filterable;
   void onSelectAll;
@@ -744,87 +866,6 @@ export const Table = ({
       }
     </div>);
 
-};
-
-TableHeader.propTypes = {
-  columns: PropTypes.array,
-  sortConfig: PropTypes.object,
-  onSort: PropTypes.func,
-  sortable: PropTypes.bool,
-  className: PropTypes.string
-};
-
-TableRow.propTypes = {
-  row: PropTypes.object,
-  columns: PropTypes.array,
-  selected: PropTypes.bool,
-  expanded: PropTypes.bool,
-  expandable: PropTypes.bool,
-  selectable: PropTypes.bool,
-  onSelect: PropTypes.func,
-  onExpand: PropTypes.func,
-  onClick: PropTypes.func,
-  className: PropTypes.string
-};
-
-TableBody.propTypes = {
-  data: PropTypes.array,
-  columns: PropTypes.array,
-  selectedRows: PropTypes.instanceOf(Set),
-  expandedRows: PropTypes.instanceOf(Set),
-  expandable: PropTypes.bool,
-  selectable: PropTypes.bool,
-  onRowSelect: PropTypes.func,
-  onRowExpand: PropTypes.func,
-  onRowClick: PropTypes.func,
-  className: PropTypes.string
-};
-
-TablePagination.propTypes = {
-  currentPage: PropTypes.number,
-  totalPages: PropTypes.number,
-  onPageChange: PropTypes.func,
-  pageSize: PropTypes.number,
-  totalItems: PropTypes.number,
-  showPageSize: PropTypes.bool,
-  pageSizeOptions: PropTypes.array,
-  className: PropTypes.string
-};
-
-TableSearch.propTypes = {
-  searchTerm: PropTypes.string,
-  onSearch: PropTypes.func,
-  placeholder: PropTypes.string,
-  className: PropTypes.string
-};
-
-Table.propTypes = {
-  data: PropTypes.array,
-  columns: PropTypes.array,
-  loading: PropTypes.bool,
-  error: PropTypes.any,
-  emptyMessage: PropTypes.string,
-  sortable: PropTypes.bool,
-  filterable: PropTypes.bool,
-  searchable: PropTypes.bool,
-  selectable: PropTypes.bool,
-  expandable: PropTypes.bool,
-  pagination: PropTypes.bool,
-  currentPage: PropTypes.number,
-  totalPages: PropTypes.number,
-  sortConfig: PropTypes.object,
-  searchTerm: PropTypes.string,
-  onPageChange: PropTypes.func,
-  onSort: PropTypes.func,
-  onSearch: PropTypes.func,
-  onRowSelect: PropTypes.func,
-  onRowExpand: PropTypes.func,
-  onRowClick: PropTypes.func,
-  onSelectAll: PropTypes.func,
-  className: PropTypes.string,
-  style: PropTypes.object,
-  pageSize: PropTypes.number,
-  pageSizeOptions: PropTypes.array
 };
 
 export default useTable;
