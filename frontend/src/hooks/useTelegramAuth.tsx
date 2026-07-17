@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 /**
  * useTelegramAuth — M4-P0-2 frontend integration (P5).
  *
@@ -14,42 +11,59 @@
  *   3. Store JWT access_token + refresh_token
  *   4. Attach Authorization: Bearer <token> to all subsequent requests
  *   5. On 401: try refresh, if fails → re-exchange
- *
- * Usage:
- *   const { token, isAuthenticating, error, exchange } = useTelegramAuth();
- *
- *   // In API calls:
- *   api.post('/telegram/mini-app/cabinet/summary', {
- *     ...body,
- *     // No more init_data needed — JWT is in Authorization header
- *   });
  */
-import { useState, useCallback, useEffect, useRef } from 'react';
-// @ts-expect-error — module not yet migrated or path issue
-import { api } from '../../api/client';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { api } from '../api/client';
+// @ts-expect-error — module resolves at runtime via Vite alias
 import { readTelegramMiniAppInitData } from '../patientUtils';
 
 const TOKEN_STORAGE_KEY = 'patient_jwt_token';
 const REFRESH_TOKEN_STORAGE_KEY = 'patient_refresh_token';
 const TOKEN_EXPIRY_KEY = 'patient_token_expires_at';
 
-export function useTelegramAuth() {
-  const [token, setToken] = useState(() => {
+interface TokenData {
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
+}
+
+interface ExchangeErrorResponse {
+  response?: {
+    data?: {
+      detail?: {
+        reason?: string;
+      };
+    };
+  };
+}
+
+export interface UseTelegramAuthReturn {
+  token: string | null;
+  isAuthenticating: boolean;
+  error: string;
+  exchange: () => Promise<string | null>;
+  refreshToken: () => Promise<string | null>;
+  clearTokens: () => void;
+  isAuthenticated: boolean;
+}
+
+export function useTelegramAuth(): UseTelegramAuthReturn {
+  const [token, setToken] = useState<string | null>(() => {
     try {
       return sessionStorage.getItem(TOKEN_STORAGE_KEY);
     } catch {
       return null;
     }
   });
-  const [isAuthenticating, setIsAuthenticating] = useState(false);
-  const [error, setError] = useState('');
-  const refreshTimerRef = useRef(null);
+  const [isAuthenticating, setIsAuthenticating] = useState<boolean>(false);
+  const [error, setError] = useState<string>('');
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const storeTokens = useCallback((data) => {
+  const storeTokens = useCallback((data: TokenData): void => {
     try {
       sessionStorage.setItem(TOKEN_STORAGE_KEY, data.access_token);
       sessionStorage.setItem(REFRESH_TOKEN_STORAGE_KEY, data.refresh_token);
-      const expiresAt = Date.now() + (data.expires_in * 1000);
+      const expiresAt = Date.now() + data.expires_in * 1000;
       sessionStorage.setItem(TOKEN_EXPIRY_KEY, String(expiresAt));
       setToken(data.access_token);
     } catch {
@@ -57,7 +71,7 @@ export function useTelegramAuth() {
     }
   }, []);
 
-  const clearTokens = useCallback(() => {
+  const clearTokens = useCallback((): void => {
     try {
       sessionStorage.removeItem(TOKEN_STORAGE_KEY);
       sessionStorage.removeItem(REFRESH_TOKEN_STORAGE_KEY);
@@ -68,7 +82,7 @@ export function useTelegramAuth() {
     setToken(null);
   }, []);
 
-  const exchange = useCallback(async () => {
+  const exchange = useCallback(async (): Promise<string | null> => {
     const initData = readTelegramMiniAppInitData();
     if (!initData) {
       setError('init_data_required');
@@ -83,13 +97,15 @@ export function useTelegramAuth() {
         init_data: initData,
       });
 
-      if (response.data?.access_token) {
-        storeTokens(response.data);
-        return response.data.access_token;
+      const data = response.data as TokenData | undefined;
+      if (data?.access_token) {
+        storeTokens(data);
+        return data.access_token;
       }
       return null;
     } catch (err) {
-      const reason = err?.response?.data?.detail?.reason || 'exchange_failed';
+      const e = err as ExchangeErrorResponse;
+      const reason = e?.response?.data?.detail?.reason || 'exchange_failed';
       setError(String(reason));
       return null;
     } finally {
@@ -97,7 +113,7 @@ export function useTelegramAuth() {
     }
   }, [storeTokens]);
 
-  const refreshToken = useCallback(async () => {
+  const refreshToken = useCallback(async (): Promise<string | null> => {
     try {
       const storedRefresh = sessionStorage.getItem(REFRESH_TOKEN_STORAGE_KEY);
       if (!storedRefresh) {
@@ -108,9 +124,10 @@ export function useTelegramAuth() {
         refresh_token: storedRefresh,
       });
 
-      if (response.data?.access_token) {
-        storeTokens(response.data);
-        return response.data.access_token;
+      const data = response.data as TokenData | undefined;
+      if (data?.access_token) {
+        storeTokens(data);
+        return data.access_token;
       }
       return null;
     } catch {
@@ -119,7 +136,6 @@ export function useTelegramAuth() {
     }
   }, [storeTokens, clearTokens]);
 
-  // Auto-exchange on mount if no token
   useEffect(() => {
     if (!token) {
       exchange();
@@ -127,7 +143,6 @@ export function useTelegramAuth() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Auto-refresh before expiry
   useEffect(() => {
     if (!token) return;
 
@@ -135,13 +150,13 @@ export function useTelegramAuth() {
       const expiresAt = parseInt(sessionStorage.getItem(TOKEN_EXPIRY_KEY) || '0', 10);
       const now = Date.now();
       const msUntilExpiry = expiresAt - now;
-      const refreshAt = msUntilExpiry - 60_000; // Refresh 1 min before expiry
+      const refreshAt = msUntilExpiry - 60_000;
 
       if (refreshAt > 0) {
         if (refreshTimerRef.current) {
           clearTimeout(refreshTimerRef.current);
         }
-        refreshTimerRef.current = window.setTimeout(() => {
+        refreshTimerRef.current = setTimeout(() => {
           refreshToken();
         }, refreshAt);
       }
