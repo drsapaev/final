@@ -8,10 +8,11 @@ import PropTypes from 'prop-types';
 
 import { useReducedMotion } from './useEnhancedMediaQuery';
 import { Input,
+// @ts-expect-error — ui/macos not yet migrated (Phase 4 redo)
   Checkbox } from '../../ui/macos';
 
 // Хук для управления таблицей
-export const useTable = (data = [], options = {}) => {
+export const useTable = <T extends Record<string, unknown>>(data: T[] = [], options: Record<string, unknown> = {}) => {
   const {
     pageSize = 10,
 
@@ -37,13 +38,13 @@ export const useTable = (data = [], options = {}) => {
     if (!sortConfig) return data;
 
     return [...data].sort((a, b) => {
-      const aValue = a[sortConfig.key];
-      const bValue = b[sortConfig.key];
+      const aValue = a[(sortConfig as { key?: string; direction?: string } | null)?.key];
+      const bValue = b[(sortConfig as { key?: string; direction?: string } | null)?.key];
 
       if (aValue === bValue) return 0;
 
       const comparison = aValue < bValue ? -1 : 1;
-      return sortConfig.direction === 'desc' ? -comparison : comparison;
+      return (sortConfig as { key?: string; direction?: string } | null)?.direction === 'desc' ? -comparison : comparison;
     });
   }, [data, sortConfig]);
 
@@ -73,17 +74,17 @@ export const useTable = (data = [], options = {}) => {
   }, [sortedData, searchTerm, filterConfig, searchable, filterable]);
 
   // Пагинация
-  const totalPages = Math.ceil(filteredData.length / pageSize);
-  const startIndex = (currentPage - 1) * pageSize;
-  const paginatedData = filteredData.slice(startIndex, startIndex + pageSize);
+  const totalPages = Math.ceil(filteredData.length / Number(pageSize));
+  const startIndex = (Number(currentPage) - 1) * Number(pageSize);
+  const paginatedData = filteredData.slice(startIndex, startIndex + Number(pageSize));
 
   // Сортировка
   const handleSort = useCallback((key) => {
     setSortConfig((prevConfig) => {
-      if (prevConfig && prevConfig.key === key) {
+      if (prevConfig && prevConfig?.key === key) {
         return {
           key,
-          direction: prevConfig.direction === 'asc' ? 'desc' : 'asc'
+          direction: prevConfig?.direction === 'asc' ? 'desc' : 'asc'
         };
       }
       return { key, direction: 'asc' };
@@ -209,7 +210,7 @@ export const TableHeader = ({
       <tr>
         {columns.map((column) =>
         <th
-          key={column.key}
+          key={column?.key}
           className="table-header-cell"
           style={{
             padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
@@ -223,23 +224,23 @@ export const TableHeader = ({
             userSelect: 'none',
             transition: prefersReducedMotion ? 'none' : 'background-color 0.2s ease'
           }}
-          onClick={() => sortable && column.sortable !== false && onSort(column.key)}
+          onClick={() => sortable && column.sortable !== false && onSort(column?.key)}
           onMouseEnter={(e) => {
             if (sortable && column.sortable !== false && !prefersReducedMotion) {
-              e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
+              (e.target as HTMLElement).style.backgroundColor = 'var(--mac-bg-secondary)';
             }
           }}
           onMouseLeave={(e) => {
             if (!prefersReducedMotion) {
-              e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
+              (e.target as HTMLElement).style.backgroundColor = 'var(--mac-bg-secondary)';
             }
           }}>
           
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
-              {column.title || column.key}
-              {sortable && column.sortable !== false && sortConfig && sortConfig.key === column.key &&
+              {column.title || column?.key}
+              {sortable && column.sortable !== false && sortConfig && (sortConfig as { key?: string; direction?: string } | null)?.key === column?.key &&
             <span style={{ fontSize: 'var(--mac-font-size-xs)' }}>
-                  {sortConfig.direction === 'asc' ? '↑' : '↓'}
+                  {(sortConfig as { key?: string; direction?: string } | null)?.direction === 'asc' ? '↑' : '↓'}
                 </span>
             }
             </div>
@@ -298,12 +299,12 @@ export const TableRow = ({
       onClick={handleClick}
       onMouseEnter={(e) => {
         if (onClick && !prefersReducedMotion) {
-          e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
+          (e.target as HTMLElement).style.backgroundColor = 'var(--mac-bg-secondary)';
         }
       }}
       onMouseLeave={(e) => {
         if (onClick && !prefersReducedMotion) {
-          e.target.style.backgroundColor = selected ? 'var(--mac-accent-bg)' : 'var(--mac-bg-primary)';
+          (e.target as HTMLElement).style.backgroundColor = selected ? 'var(--mac-accent-bg)' : 'var(--mac-bg-primary)';
         }
       }}
       {...props}>
@@ -334,12 +335,12 @@ export const TableRow = ({
           }}
           onMouseEnter={(e) => {
             if (!prefersReducedMotion) {
-              e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
+              (e.target as HTMLElement).style.backgroundColor = 'var(--mac-bg-secondary)';
             }
           }}
           onMouseLeave={(e) => {
             if (!prefersReducedMotion) {
-              e.target.style.backgroundColor = 'transparent';
+              (e.target as HTMLElement).style.backgroundColor = 'transparent';
             }
           }}>
           
@@ -351,7 +352,7 @@ export const TableRow = ({
       {/* Ячейки данных */}
       {columns.map((column) =>
       <td
-        key={column.key}
+        key={column?.key}
         className="table-cell"
         style={{
           padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
@@ -361,7 +362,7 @@ export const TableRow = ({
           borderBottom: '1px solid var(--mac-border)'
         }}>
         
-          {column.render ? column.render(row[column.key], row) : row[column.key]}
+          {column.render ? column.render(row[column?.key], row) : row[column?.key]}
         </td>
       )}
     </tr>);
@@ -457,12 +458,12 @@ export const TablePagination = ({
           }}
           onMouseEnter={(e) => {
             if (currentPage !== 1 && !prefersReducedMotion) {
-              e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
+              (e.target as HTMLElement).style.backgroundColor = 'var(--mac-bg-secondary)';
             }
           }}
           onMouseLeave={(e) => {
             if (currentPage !== 1 && !prefersReducedMotion) {
-              e.target.style.backgroundColor = 'var(--mac-bg-primary)';
+              (e.target as HTMLElement).style.backgroundColor = 'var(--mac-bg-primary)';
             }
           }}>
           
@@ -491,12 +492,12 @@ export const TablePagination = ({
                 }}
                 onMouseEnter={(e) => {
                   if (pageNumber !== currentPage && !prefersReducedMotion) {
-                    e.target.style.backgroundColor = pageNumber === currentPage ? 'var(--mac-accent-blue-hover)' : 'var(--mac-bg-secondary)';
+                    (e.target as HTMLElement).style.backgroundColor = pageNumber === currentPage ? 'var(--mac-accent-blue-hover)' : 'var(--mac-bg-secondary)';
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (pageNumber !== currentPage && !prefersReducedMotion) {
-                    e.target.style.backgroundColor = pageNumber === currentPage ? 'var(--mac-accent-blue)' : 'var(--mac-bg-primary)';
+                    (e.target as HTMLElement).style.backgroundColor = pageNumber === currentPage ? 'var(--mac-accent-blue)' : 'var(--mac-bg-primary)';
                   }
                 }}>
                 
@@ -522,12 +523,12 @@ export const TablePagination = ({
           }}
           onMouseEnter={(e) => {
             if (currentPage !== totalPages && !prefersReducedMotion) {
-              e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
+              (e.target as HTMLElement).style.backgroundColor = 'var(--mac-bg-secondary)';
             }
           }}
           onMouseLeave={(e) => {
             if (currentPage !== totalPages && !prefersReducedMotion) {
-              e.target.style.backgroundColor = 'var(--mac-bg-primary)';
+              (e.target as HTMLElement).style.backgroundColor = 'var(--mac-bg-primary)';
             }
           }}>
           
@@ -581,12 +582,12 @@ export const TableSearch = ({
         }}
         onFocus={(e) => {
           if (!prefersReducedMotion) {
-            e.target.style.borderColor = 'var(--mac-accent-blue)';
+            (e.target as HTMLElement).style.borderColor = 'var(--mac-accent-blue)';
           }
         }}
         onBlur={(e) => {
           if (!prefersReducedMotion) {
-            e.target.style.borderColor = 'var(--mac-border)';
+            (e.target as HTMLElement).style.borderColor = 'var(--mac-border)';
           }
         }} />
       

@@ -254,12 +254,12 @@ export const Modal = ({
                 }}
                 onMouseEnter={(e) => {
                   if (!prefersReducedMotion) {
-                    e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
+                    (e.target as HTMLElement).style.backgroundColor = 'var(--mac-bg-secondary)';
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (!prefersReducedMotion) {
-                    e.target.style.backgroundColor = 'transparent';
+                    (e.target as HTMLElement).style.backgroundColor = 'transparent';
                   }
                 }}
                 aria-label="Закрыть модальное окно"
