@@ -121,6 +121,7 @@ export function useEMR(visitId, { autoLoad = true, specialty = 'general' } = {})
         const loadPromise = (async () => {
             try {
                 const response = await apiClient.get(`/v2/emr/${visitId}`, {
+                    // @ts-expect-error — silent is a custom axios property not in AxiosRequestConfig type
                     silent: true,
                     validateStatus: (status) => status === 404 || (status >= 200 && status < 300),
                 });
@@ -192,7 +193,7 @@ export function useEMR(visitId, { autoLoad = true, specialty = 'general' } = {})
     // =========================================================================
     // SAVE EMR
     // =========================================================================
-    const saveEMR = useCallback(async (options = {}) => {
+    const saveEMR = useCallback(async (options: Record<string, unknown> = {}) => {
         const { isDraft = true, force = false } = options;
 
         if (writeAccessDeniedRef.current) {
@@ -203,7 +204,7 @@ export function useEMR(visitId, { autoLoad = true, specialty = 'general' } = {})
             return {
                 accessDenied: true,
                 status: 403,
-                message: getAccessDeniedMessage()
+                message: getAccessDeniedMessage(undefined)
             };
         }
 
@@ -256,7 +257,7 @@ export function useEMR(visitId, { autoLoad = true, specialty = 'general' } = {})
             return {
                 accessDenied: true,
                 status: 403,
-                message: getAccessDeniedMessage()
+                message: getAccessDeniedMessage(undefined)
             };
         }
 
@@ -306,7 +307,7 @@ export function useEMR(visitId, { autoLoad = true, specialty = 'general' } = {})
             return {
                 accessDenied: true,
                 status: 403,
-                message: getAccessDeniedMessage()
+                message: getAccessDeniedMessage(undefined)
             };
         }
 
