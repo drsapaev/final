@@ -1,10 +1,8 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import PropTypes from 'prop-types';
 import { Navigate, useLocation } from 'react-router-dom';
 import auth from '../stores/auth.js';
+import type { AuthState } from '../stores/auth';
 import logger from '../utils/logger';
 import {
   getEffectiveRouteByPath,
@@ -15,12 +13,44 @@ import {
 } from './routeSelectors.js';
 import { useTranslation } from '../i18n/useTranslation';
 
-function isSameAuthState(prev, next) {
+// Reuse the route selector's structural type so we don't duplicate the
+// field list. routeGuards only inspects id, group, auth, roles.
+type GuardedRoute = Parameters<typeof getEffectiveRouteByPath>[0] extends infer R
+  ? R extends null
+    ? null
+    : { id: string; group: string; auth: string; roles: string[]; [key: string]: unknown }
+  : never;
+
+interface RouteProfile {
+  role?: string;
+  role_name?: string;
+  roles?: string[];
+  is_superuser?: boolean;
+  is_admin?: boolean;
+  admin?: boolean;
+  username?: string;
+  email?: string;
+  specialty?: string;
+  [key: string]: unknown;
+}
+
+interface RouteAccessBoundaryProps {
+  route: GuardedRoute | null;
+  children?: ReactNode;
+}
+
+interface SystemRoutePageProps {
+  title: string;
+  description: string;
+  code: string;
+}
+
+function isSameAuthState(prev: AuthState, next: AuthState): boolean {
   return prev.token === next.token &&
     JSON.stringify(prev.profile || null) === JSON.stringify(next.profile || null);
 }
 
-function canAccessRoute(route, profile) {
+function canAccessRoute(route: GuardedRoute | null, profile: RouteProfile | null | undefined): boolean {
   if (!route) {
     return false;
   }
@@ -41,8 +71,8 @@ function canAccessRoute(route, profile) {
   return route.roles.some((role) => currentRoles.includes(normalizeRole(role)));
 }
 
-export function resolveSetupRedirect(pathname, initialized) {
-  const route = getEffectiveRouteByPath(pathname);
+export function resolveSetupRedirect(pathname: string, initialized: boolean): string | null {
+  const route = getEffectiveRouteByPath(pathname) as GuardedRoute | null;
   if (!route) {
     return initialized ? null : '/setup';
   }
@@ -61,20 +91,21 @@ export function resolveSetupRedirect(pathname, initialized) {
   return null;
 }
 
-export function RouteAccessBoundary({ route, children }) {
+export function RouteAccessBoundary({ route, children }: RouteAccessBoundaryProps) {
   const { t } = useTranslation();
-  const [state, setState] = useState(() => auth.getState());
-  const [isChecking, setIsChecking] = useState(() => Boolean(auth.getToken()) && route?.auth !== 'public');
+  void t;
+  const [state, setState] = useState<AuthState>(() => auth.getState());
+  const [isChecking, setIsChecking] = useState<boolean>(() => Boolean(auth.getToken()) && route?.auth !== 'public');
   const location = useLocation();
 
   useEffect(() => {
     let isMounted = true;
-    const unsubscribe = auth.subscribe((nextState) => {
+    const unsubscribe = auth.subscribe((nextState: AuthState) => {
       if (!isMounted) return;
       setState((prevState) => (isSameAuthState(prevState, nextState) ? prevState : nextState));
     });
 
-    const validateSession = async () => {
+    const validateSession = async (): Promise<void> => {
       if (!route || route.auth === 'public') {
         if (isMounted) setIsChecking(false);
         return;
@@ -95,10 +126,11 @@ export function RouteAccessBoundary({ route, children }) {
           setState((prevState) => (isSameAuthState(prevState, nextState) ? prevState : nextState));
         }
       } catch (error) {
+        const message = error instanceof Error ? error.message : 'unknown error';
         logger.warn('[routing] protected route validation failed', {
           routeId: route.id,
           path: location.pathname,
-          error: error?.message || 'unknown error',
+          error: message,
         });
       } finally {
         if (isMounted) setIsChecking(false);
@@ -133,7 +165,7 @@ export function RouteAccessBoundary({ route, children }) {
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
-  if (!canAccessRoute(route, state.profile)) {
+  if (!canAccessRoute(route, state.profile as RouteProfile | null)) {
     return <Navigate to={route.auth === 'authenticated' ? '/unauthorized' : '/forbidden'} replace />;
   }
 
@@ -162,7 +194,7 @@ export function LegacyRouteRedirect() {
   return <Navigate to={target} replace />;
 }
 
-function SystemRoutePage({ title, description, code }) {
+function SystemRoutePage({ title, description, code }: SystemRoutePageProps) {
   return (
     <div style={{
       minHeight: '100vh',
@@ -204,33 +236,36 @@ SystemRoutePage.propTypes = {
 
 export function UnauthorizedPage() {
   const { t } = useTranslation();
+  const tr = t as (key: string) => string;
   return (
     <SystemRoutePage
       code="401"
-      title={t('misc.rg_trebuetsya_vhod')}
-      description={t('misc.rg_voydite_v_sistemu_chtoby_otk')}
+      title={tr('misc.rg_trebuetsya_vhod')}
+      description={tr('misc.rg_voydite_v_sistemu_chtoby_otk')}
     />
   );
 }
 
 export function ForbiddenPage() {
   const { t } = useTranslation();
+  const tr = t as (key: string) => string;
   return (
     <SystemRoutePage
       code="403"
-      title={t('misc.rg_dostup_zapreschyon')}
-      description={t('misc.rg_u_vashey_uchyotnoy_zapisi_ne')}
+      title={tr('misc.rg_dostup_zapreschyon')}
+      description={tr('misc.rg_u_vashey_uchyotnoy_zapisi_ne')}
     />
   );
 }
 
 export function NotFoundPage() {
   const { t } = useTranslation();
+  const tr = t as (key: string) => string;
   return (
     <SystemRoutePage
       code="404"
-      title={t('misc.rg_stranitsa_ne_naydena')}
-      description={t('misc.rg_zaproshennyy_marshrut_ne_vho')}
+      title={tr('misc.rg_stranitsa_ne_naydena')}
+      description={tr('misc.rg_zaproshennyy_marshrut_ne_vho')}
     />
   );
 }

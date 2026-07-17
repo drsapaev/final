@@ -29,7 +29,7 @@ interface UserProfile {
   [key: string]: unknown;
 }
 
-interface AuthState {
+export interface AuthState {
   token: string | null;
   profile: UserProfile | null;
 }
