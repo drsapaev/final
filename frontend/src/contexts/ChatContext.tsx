@@ -1,7 +1,4 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
-import { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
+import { createContext, useContext, useEffect, useState, useRef, useCallback, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import PropTypes from 'prop-types';
 import { getWsBaseUrl } from '../api/runtime';
@@ -17,43 +14,154 @@ import {
 } from '../constants/messagingContract';
 import { isPublicRoutePath } from '../routing/routeSelectors';
 
-const ChatContext = createContext<unknown>(null);
+// Domain value objects. The backend chat protocol is dynamic, so we model
+// the canonical surface here and let extra fields ride along via the
+// index signature. These intentionally match the shape produced by
+// api/messages.ts (which is still implicit-any — typed in a later batch).
+interface ChatReaction {
+  emoji: string;
+  count: number;
+  user_ids?: number[];
+}
 
-export const ChatProvider = ({ children }) => {
+interface ChatMessage {
+  id: number;
+  sender_id: number;
+  recipient_id: number;
+  sender_name?: string;
+  content?: string;
+  is_read?: boolean;
+  reactions?: ChatReaction[];
+  created_at?: string;
+  [key: string]: unknown;
+}
+
+interface Conversation {
+  user_id: number;
+  unread_count?: number;
+  last_message?: string;
+  last_message_at?: string;
+  [key: string]: unknown;
+}
+
+interface AvailableUser {
+  id: number;
+  name?: string;
+  [key: string]: unknown;
+}
+
+interface ConversationsResponse {
+  conversations?: Conversation[];
+  total_unread?: number;
+}
+
+interface ConversationResponse {
+  messages?: ChatMessage[];
+  has_more?: boolean;
+}
+
+interface UnreadCountResponse {
+  count?: number;
+}
+
+interface AvailableUsersResponse {
+  users?: AvailableUser[];
+}
+
+interface AuthState {
+  token?: string | null;
+  profile?: { id?: number | null; [key: string]: unknown } | null;
+  [key: string]: unknown;
+}
+
+interface WsIncomingMessage {
+  type?: string;
+  contract_version?: string;
+  message?: ChatMessage;
+  sender_id?: number | string;
+  is_typing?: boolean;
+  message_id?: number;
+  message_ids?: number[];
+  users?: Record<string, unknown>;
+  reactions?: ChatReaction[];
+  [key: string]: unknown;
+}
+
+interface ChatContextValue {
+  conversations: Conversation[];
+  messages: ChatMessage[];
+  activeConversation: number | null;
+  unreadCount: number;
+  isConnected: boolean;
+  isLoading: boolean;
+  typingUsers: Record<string, unknown>;
+  isChatOpen: boolean;
+  setIsChatOpen: (open: boolean) => void;
+  mutedConversations: Set<number>;
+  setMutedConversations: (next: Set<number>) => void;
+  onlineUsers: Record<string, unknown>;
+  requestOnlineStatus: (userIds: number[]) => void;
+  loadConversations: (options?: { syncUnread?: boolean }) => Promise<void>;
+  loadMessages: (userId: number) => Promise<void>;
+  sendMessage: (recipientId: number, content: string) => Promise<ChatMessage>;
+  closeConversation: () => void;
+  setActiveConversation: (userId: number | null) => void;
+  searchUsers: (query: string) => Promise<AvailableUser[]>;
+  sendTyping: (recipientId: number, isTyping: boolean) => void;
+  refreshUnreadCount: () => Promise<void>;
+  hasMore: boolean;
+  loadMoreMessages: () => Promise<void>;
+  toggleReaction: (messageId: number, reaction: string) => Promise<void>;
+  deleteMessage: (messageId: number) => Promise<void>;
+  uploadFile: (recipientId: number, file: File) => Promise<ChatMessage>;
+}
+
+interface ChatProviderProps {
+  children: ReactNode;
+}
+
+const ChatContext = createContext<ChatContextValue | null>(null);
+
+// window.setTimeout returns number under DOM, but vitest/globals injects
+// Node typings where setTimeout returns NodeJS.Timeout. Anchor refs to
+// number explicitly so we don't depend on which overload resolves.
+type TimeoutHandle = number;
+
+export const ChatProvider = ({ children }: ChatProviderProps) => {
   const location = useLocation();
-  const [authState, setAuthState] = useState(auth.getState());
+  const [authState, setAuthState] = useState<AuthState>(() => auth.getState() as AuthState);
   const user = authState.profile;
   const token = authState.token;
   const isBoardRoute = location.pathname.startsWith('/queue-board') || location.pathname.startsWith('/display-board');
   const isPublicRoute = isPublicRoutePath(location.pathname);
 
-  const [conversations, setConversations] = useState<unknown[]>([]);
-  const [messages, setMessages] = useState<unknown[]>([]);
-  const [activeConversation, setActiveConversation] = useState<unknown>(null);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [activeConversation, setActiveConversation] = useState<number | null>(null);
+  const [unreadCount, setUnreadCount] = useState<number>(0);
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [typingUsers, setTypingUsers] = useState<Record<string, unknown>>({});
   const [isChatOpen, setIsChatOpen] = useState<boolean>(false); // Track if chat window is open
   // PR-71: muted conversations (client-side, no sound/notification for these)
-  const [mutedConversations, setMutedConversations] = useState(new Set());
+  const [mutedConversations, setMutedConversations] = useState<Set<number>>(new Set());
   const [onlineUsers, setOnlineUsers] = useState<Record<string, unknown>>({}); // Track online status of users
 
-  const wsRef = useRef<unknown>(null);
-  const reconnectTimeoutRef = useRef<unknown>(null);
-  const activeConversationRef = useRef(activeConversation);
-  const retryCountRef = useRef(0);
-  const readSyncInFlightRef = useRef(new Set());
-  const contractVersionMismatchRef = useRef(false);
-  const initialConversationLoadUserRef = useRef<unknown>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+  const reconnectTimeoutRef = useRef<TimeoutHandle | null>(null);
+  const activeConversationRef = useRef<number | null>(activeConversation);
+  const retryCountRef = useRef<number>(0);
+  const readSyncInFlightRef = useRef<Set<number>>(new Set());
+  const contractVersionMismatchRef = useRef<boolean>(false);
+  const initialConversationLoadUserRef = useRef<number | null>(null);
   // PR-68 / P0-2: singleton AudioContext to prevent leak
-  const chatAudioContextRef = useRef<unknown>(null);
+  const chatAudioContextRef = useRef<AudioContext | null>(null);
 
   // Храним актуальные функции в ref
   // Это предотвращает разрыв соединения WebSocket при обновлении функций/стейта
-  const handleNewMessageRef = useRef<unknown>(null);
-  const loadConversationsRef = useRef<unknown>(null);
-  const chatSnapshotSyncUserRef = useRef<unknown>(null);
+  const handleNewMessageRef = useRef<((message: ChatMessage) => void) | null>(null);
+  const loadConversationsRef = useRef<((options?: { syncUnread?: boolean }) => Promise<void>) | null>(null);
+  const chatSnapshotSyncUserRef = useRef<number | null>(null);
 
   // Синхронизация ref activeConversation
   useEffect(() => {
@@ -74,11 +182,11 @@ export const ChatProvider = ({ children }) => {
 
   // Подписка на auth
   useEffect(() => {
-    const unsubscribe = auth.subscribe(setAuthState);
+    const unsubscribe = auth.subscribe(setAuthState) as () => void;
     return unsubscribe;
   }, []);
 
-  const markConversationLocallyRead = useCallback((userId) => {
+  const markConversationLocallyRead = useCallback((userId: number): void => {
     if (!userId) return;
 
     setConversations((prev) => {
@@ -108,16 +216,17 @@ export const ChatProvider = ({ children }) => {
   }, []);
 
   // Загрузка бесед
-  const loadConversations = useCallback(async ({ syncUnread = true } = {}) => {
+  const loadConversations = useCallback(async ({ syncUnread = true } = {}): Promise<void> => {
     if (!user || isBoardRoute || isPublicRoute) return;
     try {
-      const data = await messagesApi.getConversations();
+      const data = (await messagesApi.getConversations()) as ConversationsResponse;
       setConversations(data.conversations || []);
       if (syncUnread) {
         setUnreadCount(data.total_unread || 0);
       }
     } catch (error) {
-      const status = error?.response?.status;
+      const err = error as { response?: { status?: number } };
+      const status = err?.response?.status;
       if (status === 401 || status === 403) {
         logger.info('[FIX:CHAT] Skipping conversations load due to auth state', {
           status,
@@ -129,7 +238,7 @@ export const ChatProvider = ({ children }) => {
     }
   }, [isBoardRoute, isPublicRoute, location.pathname, user]);
 
-  const markMessageAsRead = useCallback(async (messageId) => {
+  const markMessageAsRead = useCallback(async (messageId: number): Promise<void> => {
     if (!messageId) return;
     if (readSyncInFlightRef.current.has(messageId)) return;
 
@@ -147,13 +256,14 @@ export const ChatProvider = ({ children }) => {
   }, []);
 
   // Обновить количество непрочитанных
-  const refreshUnreadCount = useCallback(async () => {
+  const refreshUnreadCount = useCallback(async (): Promise<void> => {
     if (isBoardRoute || isPublicRoute) return;
     try {
-      const count = await messagesApi.getUnreadCount();
-      setUnreadCount(count);
+      const count = (await messagesApi.getUnreadCount()) as number | UnreadCountResponse;
+      setUnreadCount(typeof count === 'number' ? count : (count?.count ?? 0));
     } catch (error) {
-      const status = error?.response?.status;
+      const err = error as { response?: { status?: number } };
+      const status = err?.response?.status;
       if (status === 401 || status === 403) {
         logger.info('[FIX:CHAT] Skipping unread count refresh due to auth state', {
           status,
@@ -166,22 +276,21 @@ export const ChatProvider = ({ children }) => {
   }, [isBoardRoute, isPublicRoute, location.pathname]);
 
   // Обработка сообщения
-  const handleNewMessage = useCallback((message) => {
+  const handleNewMessage = useCallback((message: ChatMessage): void => {
     if (isBoardRoute || isPublicRoute) {
       return;
     }
-
 
     const currentActive = activeConversationRef.current;
     const activeIdStr = currentActive ? String(currentActive) : null;
     const senderIdStr = String(message.sender_id);
     const recipientIdStr = String(message.recipient_id);
-    const currentUserIdStr = user ? String(user.id) : null;
+    const currentUserIdStr = user?.id != null ? String(user.id) : null;
     const hasFocus = typeof document?.hasFocus === 'function' ? document.hasFocus() : true;
 
-    const isIncoming = activeIdStr && senderIdStr === activeIdStr;
-    const isOutgoingSync = currentUserIdStr && senderIdStr === currentUserIdStr && activeIdStr && recipientIdStr === activeIdStr;
-    const isIncomingForCurrentUser = currentUserIdStr && recipientIdStr === currentUserIdStr;
+    const isIncoming = Boolean(activeIdStr && senderIdStr === activeIdStr);
+    const isOutgoingSync = Boolean(currentUserIdStr && senderIdStr === currentUserIdStr && activeIdStr && recipientIdStr === activeIdStr);
+    const isIncomingForCurrentUser = Boolean(currentUserIdStr && recipientIdStr === currentUserIdStr);
     const isConversationInView = Boolean(
       isIncomingForCurrentUser &&
       isIncoming &&
@@ -190,7 +299,6 @@ export const ChatProvider = ({ children }) => {
     );
 
     if (currentActive && (isIncoming || isOutgoingSync)) {
-
       setMessages((prev) => {
         if (prev.some((m) => m.id === message.id)) return prev;
         return [message, ...prev];
@@ -201,7 +309,7 @@ export const ChatProvider = ({ children }) => {
       // Keep sender receipts and unread badge in sync for active viewed conversation.
       void markMessageAsRead(message.id);
     } else {
-      loadConversations({ syncUnread: !isIncomingForCurrentUser });
+      void loadConversations({ syncUnread: !isIncomingForCurrentUser });
     }
 
     // Обновляем счетчик непрочитанных если нужно
@@ -221,12 +329,16 @@ export const ChatProvider = ({ children }) => {
           // PR-68 / P0-2: reuse singleton AudioContext to prevent leak
           // (browsers cap ~6 concurrent contexts; was creating one per message)
           if (!chatAudioContextRef.current) {
-            chatAudioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+            const Ctor = (window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext);
+            if (!Ctor) {
+              throw new Error('AudioContext not supported');
+            }
+            chatAudioContextRef.current = new Ctor();
           }
           const audioContext = chatAudioContextRef.current;
           // Resume if suspended (browsers auto-suspend after inactivity)
           if (audioContext.state === 'suspended') {
-            audioContext.resume();
+            void audioContext.resume();
           }
           const oscillator = audioContext.createOscillator();
           const gainNode = audioContext.createGain();
@@ -244,9 +356,9 @@ export const ChatProvider = ({ children }) => {
           oscillator.start(audioContext.currentTime);
           oscillator.stop(audioContext.currentTime + 0.3);
         } catch {
-
           // Sound not available
-        }}
+        }
+      }
 
       // Show browser push notification (when tab is not focused)
       pushNotifications.showMessageNotification(
@@ -254,7 +366,7 @@ export const ChatProvider = ({ children }) => {
         message.sender_name || `User ${message.sender_id}`
       );
     }
-  }, [isBoardRoute, isPublicRoute, user, loadConversations, isChatOpen, markMessageAsRead]);
+  }, [isBoardRoute, isPublicRoute, user, loadConversations, isChatOpen, markMessageAsRead, mutedConversations]);
 
   // Обновляем ref при изменении handleNewMessage
   useEffect(() => {
@@ -266,7 +378,7 @@ export const ChatProvider = ({ children }) => {
     loadConversationsRef.current = loadConversations;
   }, [loadConversations]);
 
-  const syncChatSnapshot = useCallback(async () => {
+  const syncChatSnapshot = useCallback(async (): Promise<boolean> => {
     if (!user || isBoardRoute || isPublicRoute) {
       return false;
     }
@@ -320,7 +432,7 @@ export const ChatProvider = ({ children }) => {
   }, [isBoardRoute, isPublicRoute, location.pathname, resetChatState, syncChatSnapshot, user?.id]);
 
   // Request online status of specific users
-  const requestOnlineStatus = useCallback((userIds) => {
+  const requestOnlineStatus = useCallback((userIds: number[]): void => {
     if (isBoardRoute || isPublicRoute) return;
     if (wsRef.current?.readyState === WebSocket.OPEN && userIds.length > 0) {
       wsRef.current.send(JSON.stringify({
@@ -342,9 +454,9 @@ export const ChatProvider = ({ children }) => {
     if (!initialToken) return;
 
     let isMounted = true;
-    let activeSocket = null;
+    let activeSocket: WebSocket | null = null;
 
-    const connect = () => {
+    const connect = (): void => {
       if (!isMounted) {
         return;
       }
@@ -356,7 +468,7 @@ export const ChatProvider = ({ children }) => {
 
       if (!tokenManager.isTokenValid()) {
         logger.info('[FIX:WS] Chat WebSocket is waiting for a valid auth token');
-        reconnectTimeoutRef.current = setTimeout(connect, 1500);
+        reconnectTimeoutRef.current = setTimeout(connect, 1500) as unknown as TimeoutHandle;
         return;
       }
 
@@ -395,9 +507,9 @@ export const ChatProvider = ({ children }) => {
         }
       };
 
-      ws.onmessage = (event) => {
+      ws.onmessage = (event: MessageEvent) => {
         try {
-          const data = JSON.parse(event.data);
+          const data = JSON.parse(event.data as string) as WsIncomingMessage;
           if (
             data.contract_version &&
             !isSupportedMessagingContractVersion(data.contract_version) &&
@@ -412,38 +524,41 @@ export const ChatProvider = ({ children }) => {
           }
           if (data.type === MESSAGE_EVENT_TYPES.NEW_MESSAGE) {
             // Используем ref для вызова актуальной версии функции
-            if (handleNewMessageRef.current) {
+            if (data.message && handleNewMessageRef.current) {
               handleNewMessageRef.current(data.message);
             }
           } else if (data.type === MESSAGE_EVENT_TYPES.TYPING) {
-            setTypingUsers((prev) => ({ ...prev, [data.sender_id]: data.is_typing }));
+            setTypingUsers((prev) => ({ ...prev, [String(data.sender_id)]: data.is_typing }));
           } else if (data.type === MESSAGE_EVENT_TYPES.MESSAGE_READ) {
-            setMessages((prev) => prev.map((msg) => msg.id === data.message_id ? { ...msg, is_read: true } : msg));
+            const readId = data.message_id;
+            setMessages((prev) => prev.map((msg) => msg.id === readId ? { ...msg, is_read: true } : msg));
             loadConversationsRef.current?.();
-            refreshUnreadCount();
+            void refreshUnreadCount();
           } else if (data.type === MESSAGE_EVENT_TYPES.MESSAGES_READ) {
-            const ids = new Set(data.message_ids);
+            const ids = new Set<number>(data.message_ids ?? []);
             setMessages((prev) => prev.map((msg) => ids.has(msg.id) ? { ...msg, is_read: true } : msg));
             loadConversationsRef.current?.();
-            refreshUnreadCount();
-      } else if (data.type === MESSAGE_EVENT_TYPES.PING) {
-        // Respond to server heartbeat
-        ws.send(JSON.stringify({
-          type: MESSAGE_EVENT_TYPES.PONG,
-          contract_version: MESSAGING_CONTRACT_VERSION,
-        }));
-      } else if (data.type === MESSAGE_EVENT_TYPES.ONLINE_STATUS) {
+            void refreshUnreadCount();
+          } else if (data.type === MESSAGE_EVENT_TYPES.PING) {
+            // Respond to server heartbeat
+            ws.send(JSON.stringify({
+              type: MESSAGE_EVENT_TYPES.PONG,
+              contract_version: MESSAGING_CONTRACT_VERSION,
+            }));
+          } else if (data.type === MESSAGE_EVENT_TYPES.ONLINE_STATUS) {
             // Update online status of users
-            // Update online status of users
-            setOnlineUsers((prev) => ({ ...prev, ...data.users }));
+            setOnlineUsers((prev) => ({ ...prev, ...(data.users ?? {}) }));
           } else if (data.type === MESSAGE_EVENT_TYPES.REACTION_UPDATE) {
+            const reactionMessageId = data.message_id;
+            const reactions = data.reactions ?? [];
             setMessages((prev) => prev.map((msg) =>
-            msg.id === data.message_id ?
-            { ...msg, reactions: data.reactions } :
-            msg
+              msg.id === reactionMessageId ?
+              { ...msg, reactions } :
+              msg
             ));
           } else if (data.type === MESSAGE_EVENT_TYPES.MESSAGE_DELETED) {
-            setMessages((prev) => prev.filter((msg) => msg.id !== data.message_id));
+            const deletedId = data.message_id;
+            setMessages((prev) => prev.filter((msg) => msg.id !== deletedId));
             loadConversationsRef.current?.();
           }
         } catch (e) {
@@ -451,7 +566,7 @@ export const ChatProvider = ({ children }) => {
         }
       };
 
-      ws.onclose = (e) => {
+      ws.onclose = (e: CloseEvent) => {
         if (wsRef.current === ws) {
           wsRef.current = null;
         }
@@ -463,9 +578,13 @@ export const ChatProvider = ({ children }) => {
         }
         // F-001: 4001 = auth rejected (invalid/expired token) — don't reconnect with same token
         if (e.code === 4001) {
-          logger.warning('[FIX:WS] Chat WebSocket auth rejected (4001), invalidating token');
-          if (tokenManager && typeof tokenManager.invalidateAccessToken === 'function') {
-            tokenManager.invalidateAccessToken();
+          logger.warn('[FIX:WS] Chat WebSocket auth rejected (4001), invalidating token');
+          // tokenManager may expose invalidateAccessToken() in some builds.
+          // Probe via structural cast to avoid coupling this file to the
+          // concrete tokenManager implementation.
+          const tm = tokenManager as typeof tokenManager & { invalidateAccessToken?: () => void };
+          if (tm && typeof tm.invalidateAccessToken === 'function') {
+            tm.invalidateAccessToken();
           }
           return;
         }
@@ -480,7 +599,7 @@ export const ChatProvider = ({ children }) => {
             code: e.code,
             delay,
           });
-          reconnectTimeoutRef.current = setTimeout(connect, delay);
+          reconnectTimeoutRef.current = setTimeout(connect, delay) as unknown as TimeoutHandle;
         } else {
           retryCountRef.current = 0;
         }
@@ -498,25 +617,25 @@ export const ChatProvider = ({ children }) => {
         if (activeSocket.readyState === WebSocket.OPEN) {
           activeSocket.close(1000, 'Unmount');
         } else if (activeSocket.readyState === WebSocket.CONNECTING) {
-          activeSocket.onopen = () => activeSocket.close(1000, 'Unmount before open');
+          activeSocket.onopen = () => activeSocket?.close(1000, 'Unmount before open');
           activeSocket.onclose = null;
           activeSocket.onerror = null;
           activeSocket.onmessage = null;
         }
       }
     };
-  }, [isBoardRoute, isPublicRoute, token, refreshUnreadCount, requestOnlineStatus]);
+  }, [isBoardRoute, isPublicRoute, token, refreshUnreadCount, requestOnlineStatus, syncChatSnapshot]);
 
   // Загрузка сообщений (при открытии чата)
   const [hasMore, setHasMore] = useState<boolean>(false);
 
-  const loadMessages = useCallback(async (userId) => {
+  const loadMessages = useCallback(async (userId: number): Promise<void> => {
     if (!user) return;
     setIsLoading(true);
     try {
-      const data = await messagesApi.getConversation(userId);
+      const data = (await messagesApi.getConversation(userId)) as ConversationResponse;
       setMessages(data.messages || []);
-      setHasMore(data.has_more);
+      setHasMore(Boolean(data.has_more));
 
       // Важно: обновляем и ref и state
       activeConversationRef.current = userId;
@@ -534,24 +653,24 @@ export const ChatProvider = ({ children }) => {
     }
   }, [user, markConversationLocallyRead]);
 
-  const loadMoreMessages = useCallback(async () => {
+  const loadMoreMessages = useCallback(async (): Promise<void> => {
     const userId = activeConversationRef.current;
     if (!userId || !hasMore || isLoading) return;
 
     // setIsLoading(true); // Не блокируем весь UI, можно отдельный стейт loadingMore
     try {
       const currentLength = messages.length;
-      const data = await messagesApi.getConversation(userId, currentLength);
+      const data = (await messagesApi.getConversation(userId, currentLength)) as ConversationResponse;
 
       setMessages((prev) => [...prev, ...(data.messages || [])]);
-      setHasMore(data.has_more);
+      setHasMore(Boolean(data.has_more));
     } catch (e) {
       logger.error('Failed to load more messages:', e);
     }
   }, [messages.length, hasMore, isLoading]);
 
-  const sendMessage = useCallback(async (recipientId, content) => {
-    const message = await messagesApi.sendMessage(recipientId, content);
+  const sendMessage = useCallback(async (recipientId: number, content: string): Promise<ChatMessage> => {
+    const message = (await messagesApi.sendMessage(recipientId, content)) as ChatMessage;
     if (activeConversationRef.current === recipientId) {
       // Проверка на дубликаты - сообщение может прийти через WebSocket раньше
       setMessages((prev) => {
@@ -559,12 +678,12 @@ export const ChatProvider = ({ children }) => {
         return [message, ...prev];
       });
     }
-    loadConversations();
+    void loadConversations();
     return message;
   }, [loadConversations]);
 
   // Закрыть активную беседу
-  const closeConversation = useCallback(() => {
+  const closeConversation = useCallback((): void => {
     activeConversationRef.current = null;
     setActiveConversation(null);
     setMessages([]);
@@ -573,9 +692,13 @@ export const ChatProvider = ({ children }) => {
   }, []);
 
   // Поиск пользователей
-  const searchUsers = useCallback(async (query) => {
+  const searchUsers = useCallback(async (query: string): Promise<AvailableUser[]> => {
     try {
-      return await messagesApi.getAvailableUsers(query);
+      const result = (await messagesApi.getAvailableUsers(query)) as AvailableUser[] | AvailableUsersResponse;
+      if (Array.isArray(result)) {
+        return result;
+      }
+      return result?.users ?? [];
     } catch (error) {
       logger.error('Failed to search users:', error);
       return [];
@@ -583,7 +706,7 @@ export const ChatProvider = ({ children }) => {
   }, []);
 
   // Отправка статуса набора текста
-  const sendTyping = useCallback((recipientId, isTyping) => {
+  const sendTyping = useCallback((recipientId: number, isTyping: boolean): void => {
     if (!isBoardRoute && !isPublicRoute && wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({
         type: MESSAGE_EVENT_TYPES.TYPING,
@@ -603,7 +726,7 @@ export const ChatProvider = ({ children }) => {
   }, [activeConversation, requestOnlineStatus]);
 
   // Toggle reaction
-  const toggleReaction = useCallback(async (messageId, reaction) => {
+  const toggleReaction = useCallback(async (messageId: number, reaction: string): Promise<void> => {
     try {
       await messagesApi.toggleReaction(messageId, reaction);
     } catch (error) {
@@ -612,7 +735,7 @@ export const ChatProvider = ({ children }) => {
   }, []);
 
   // Delete message
-  const deleteMessage = useCallback(async (messageId) => {
+  const deleteMessage = useCallback(async (messageId: number): Promise<void> => {
     try {
       await messagesApi.deleteMessage(messageId);
       // WebSocket will handle state update
@@ -623,9 +746,9 @@ export const ChatProvider = ({ children }) => {
   }, []);
 
   // Upload file
-  const uploadFile = useCallback(async (recipientId, file) => {
+  const uploadFile = useCallback(async (recipientId: number, file: File): Promise<ChatMessage> => {
     try {
-      const msg = await messagesApi.uploadFile(recipientId, file);
+      const msg = (await messagesApi.uploadFile(recipientId, file)) as ChatMessage;
       // WebSocket will handle state update (new_message)
       return msg;
     } catch (error) {
@@ -634,7 +757,7 @@ export const ChatProvider = ({ children }) => {
     }
   }, []);
 
-  const value = {
+  const value: ChatContextValue = {
     conversations,
     messages,
     activeConversation,
@@ -666,8 +789,9 @@ export const ChatProvider = ({ children }) => {
 
   return (
     <ChatContext.Provider value={value}>
-            {children}
-        </ChatContext.Provider>);
+      {children}
+    </ChatContext.Provider>
+  );
 
 };
 
@@ -675,7 +799,7 @@ ChatProvider.propTypes = {
   children: PropTypes.node.isRequired
 };
 
-export const useChat = () => {
+export const useChat = (): ChatContextValue => {
   const context = useContext(ChatContext);
   if (!context) {
     throw new Error('useChat must be used within a ChatProvider');
