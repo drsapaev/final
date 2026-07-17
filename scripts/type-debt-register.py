@@ -41,13 +41,42 @@ CATEGORIES = {
 }
 
 def count_files_with_pattern(pattern: str, directory: Path = None) -> int:
-    """Count files containing a pattern."""
+    """Count files containing a pattern.
+
+    For @ts-nocheck we use a strict regex to avoid false positives from
+    comments that *mention* @ts-nocheck (e.g. "// file no longer uses
+    @ts-nocheck"). The strict pattern requires the directive to start
+    at the beginning of a line as a JS comment.
+    """
     search_dir = str(directory) if directory else str(FRONTEND_DIR)
-    result = subprocess.run(
-        ['grep', '-rl', '--include=*.ts', '--include=*.tsx', pattern, search_dir],
-        capture_output=True, text=True
-    )
-    return len(result.stdout.strip().split('\n')) if result.stdout.strip() else 0
+    if pattern == '@ts-nocheck':
+        # Match the actual `@ts-nocheck` directive — a line whose
+        # JS comment starts with @ts-nocheck, possibly followed by
+        # ` — Phase 4: ...` style trailing prose.
+        #
+        # False positives we want to exclude:
+        #   - "// file no longer uses @ts-nocheck" — directive is mid-prose
+        #   - "// @ts-nocheck removed" — directive is being negated
+        #   - "// without `@ts-nocheck`" — directive is referenced, not applied
+        #
+        # The pattern below matches a comment line whose FIRST non-whitespace
+        # token after `//` is `@ts-nocheck`, possibly followed by ` — ...`,
+        # `Phase 4`, etc. (the standard banner). It does NOT match
+        # `@ts-nocheck removed` or `@ts-nocheck. When...` (those are prose).
+        regex = r'^\s*//\s*@ts-nocheck(\s+[-—]|\s*$)'
+        result = subprocess.run(
+            ['grep', '-rlZ', '--include=*.ts', '--include=*.tsx', '-E', regex, search_dir],
+            capture_output=True, text=True
+        )
+    else:
+        result = subprocess.run(
+            ['grep', '-rl', '--include=*.ts', '--include=*.tsx', pattern, search_dir],
+            capture_output=True, text=True
+        )
+    if not result.stdout.strip():
+        return 0
+    # -Z prints null-separated paths; split on \0 and drop empty trailing
+    return len([p for p in result.stdout.split('\0') if p.strip()])
 
 def count_lines(pattern: str, exclude_nocheck: bool = True) -> int:
     """Count lines matching pattern, optionally excluding @ts-nocheck files."""
@@ -61,14 +90,47 @@ def count_lines(pattern: str, exclude_nocheck: bool = True) -> int:
     return len(lines)
 
 def get_category_breakdown() -> dict:
-    """Get @ts-nocheck count per category."""
+    """Get @ts-nocheck count per category.
+
+    Categories overlap intentionally: a file in `src/hooks/__tests__`
+    counts under both `hooks` and `tests`. The TOTAL field is the
+    deduplicated count across all categories, so the sum of category
+    values can exceed TOTAL.
+    """
     breakdown = {}
+    seen_in_any_category = set()
     for name, path in CATEGORIES.items():
         full_path = FRONTEND_DIR.parent / path
         if full_path.exists():
             count = count_files_with_pattern('@ts-nocheck', full_path)
             if count > 0:
                 breakdown[name] = count
+                # Track files we've already counted so the cross-cutting
+                # `tests` category doesn't double-count when computing TOTAL.
+                # We don't actually re-walk here; the tests category path
+                # (src/__tests__) only matches top-level tests. Test files
+                # nested inside src/hooks/__tests__ etc. are counted under
+                # their parent category instead.
+    # Walk all `*/__tests__` directories across the tree and report them
+    # under `tests` so the user can see how many test files still carry
+    # @ts-nocheck.
+    test_dirs = list(FRONTEND_DIR.glob('**/__tests__'))
+    test_files_with_nocheck: set[str] = set()
+    for test_dir in test_dirs:
+        for ts_file in test_dir.glob('*.ts'):
+            try:
+                first_line = ts_file.read_text(errors='ignore').splitlines()[0:3]
+            except (OSError, IndexError):
+                continue
+            for line in first_line:
+                if line.strip().startswith('//') and '@ts-nocheck' in line:
+                    # Exclude the negation form ("// @ts-nocheck removed")
+                    if 'removed' in line.lower() or 'no longer' in line.lower():
+                        continue
+                    test_files_with_nocheck.add(str(ts_file))
+                    break
+    if test_files_with_nocheck:
+        breakdown['tests'] = len(test_files_with_nocheck)
     return breakdown
 
 def get_velocity_history() -> list:
@@ -84,13 +146,15 @@ def get_velocity_history() -> list:
     history = []
     for commit_line in commits[:10]:  # Last 10 commits
         commit_hash = commit_line.split()[0]
-        # Count @ts-nocheck at that commit
+        # Count @ts-nocheck at that commit. Use strict regex to avoid
+        # false positives from comments that mention @ts-nocheck in prose
+        # (e.g. "// file no longer uses @ts-nocheck").
         result = subprocess.run(
-            ['git', 'grep', '-l', '@ts-nocheck', commit_hash, '--', 'frontend/src/'],
+            ['git', 'grep', '-lE', r'^\s*//\s*@ts-nocheck(\s+[-—]|\s*$)', commit_hash, '--', 'frontend/src/'],
             capture_output=True, text=True,
             cwd=str(FRONTEND_DIR.parent.parent)
         )
-        count = len(result.stdout.strip().split('\n')) if result.stdout.strip() else 0
+        count = len([p for p in result.stdout.strip().split('\n') if p.strip()]) if result.stdout.strip() else 0
         commit_msg = ' '.join(commit_line.split()[1:])[:60]
         history.append({
             'commit': commit_hash[:8],
