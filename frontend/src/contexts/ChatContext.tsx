@@ -182,7 +182,9 @@ export const ChatProvider = ({ children }: ChatProviderProps) => {
 
   // Подписка на auth
   useEffect(() => {
-    const unsubscribe = auth.subscribe(setAuthState) as () => void;
+    const unsubscribe = auth.subscribe((state) => {
+      setAuthState(state as AuthState);
+    });
     return unsubscribe;
   }, []);
 
