@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 /**
  * useDoctorPhrases - хук для подсказок из истории врача
  * 
@@ -37,6 +34,15 @@ const READINESS_CACHE_TTL = 60000; // 1 минута
  * - Если not ready — suggestions отключены
  * - Если ready — работает как IDE autocomplete
  */
+interface UseDoctorPhrasesOptions {
+  doctorId?: string | number;
+  field?: string;
+  specialty?: string | null;
+  currentText?: string;
+  cursorPosition?: number;
+  config?: Record<string, unknown>;
+}
+
 export const useDoctorPhrases = ({
   doctorId,
   field = 'complaints',
@@ -44,10 +50,10 @@ export const useDoctorPhrases = ({
   currentText = '',
   cursorPosition = 0,
   config = {}
-} = {}) => {
-  const [suggestions, setSuggestions] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+}: UseDoctorPhrasesOptions = {}) => {
+  const [suggestions, setSuggestions] = useState<unknown[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<unknown>(null);
 
   // 🔥 READINESS STATE (automatic activation)
   const [readiness, setReadiness] = useState({
@@ -59,7 +65,7 @@ export const useDoctorPhrases = ({
 
   // 🔥 PER-FIELD PAUSE (hybrid control)
   // Доступно ТОЛЬКО после readiness=true
-  const [paused, setPaused] = useState(false);
+  const [paused, setPaused] = useState<boolean>(false);
 
   const abortControllerRef = useRef(null);
   const debounceRef = useRef(null);
@@ -106,7 +112,7 @@ export const useDoctorPhrases = ({
       });
 
       setReadiness(result);
-    } catch (err) {
+    } catch (err: unknown) {
       logger.warn('Failed to check readiness:', err);
       // Если не смогли проверить — отключаем
       setReadiness({ ready: false, checked: true, progress: null, message: 'Check failed' });
@@ -167,17 +173,17 @@ export const useDoctorPhrases = ({
       } else {
         setSuggestions([]);
       }
-    } catch (err) {
-      if (err.name !== 'AbortError' && err.name !== 'CanceledError') {
+    } catch (err: unknown) {
+      if ((err as Error).name !== 'AbortError' && (err as Error).name !== 'CanceledError') {
         const errorMessage = formatNetworkErrorMessage({
-          responseDetail: err?.response?.data?.detail,
-          responseMessage: err?.response?.data?.message,
-          rawMessage: err?.message,
+          responseDetail: (err as Error & { response?: { data?: Record<string, unknown> } })?.response?.data?.detail,
+          responseMessage: (err as Error & { response?: { data?: Record<string, unknown> } })?.response?.data?.message,
+          rawMessage: (err as Error)?.message,
           fallbackMessage: 'Не удалось получить подсказки из истории врача',
         });
         logger.warn('[DoctorPhrases] Не удалось получить подсказки из истории врача', {
           error: errorMessage,
-          rawMessage: err?.message,
+          rawMessage: (err as Error)?.message,
         });
         setError(String(errorMessage));
         setSuggestions([]);
@@ -188,7 +194,7 @@ export const useDoctorPhrases = ({
   }, [doctorId, field, specialty, maxSuggestions, readiness.ready, paused]);
 
   // Дебаунс для запросов
-  const debouncedFetch = useCallback((text, cursor) => {
+  const debouncedFetch = useCallback((text, cursor: Record<string, unknown>) => {
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
     }
@@ -217,7 +223,7 @@ export const useDoctorPhrases = ({
 
   // Эффект при изменении текста
   useEffect(() => {
-    debouncedFetch(currentText, cursorPosition);
+    debouncedFetch(currentText, cursorPosition as unknown as Record<string, unknown>);
 
     return () => {
       if (debounceRef.current) {
@@ -249,7 +255,7 @@ export const useDoctorPhrases = ({
   }, []);
 
   // Принять подсказку (вернёт полный текст с continuation)
-  const acceptSuggestion = useCallback((suggestion) => {
+  const acceptSuggestion = useCallback((suggestion: Record<string, unknown>) => {
     if (!suggestion?.text) return currentText;
 
     // Вставляем хвост после курсора
@@ -275,7 +281,7 @@ export const useDoctorPhrases = ({
 
       // Re-check readiness
       checkReadiness();
-    } catch (err) {
+    } catch (err: unknown) {
       logger.warn('Failed to index phrases:', err);
     }
   }, [doctorId, specialty, checkReadiness]);

@@ -4,7 +4,7 @@
 import PropTypes from 'prop-types';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useInRouterContext, useLocation } from 'react-router-dom';
-import tokens, { colors as tokenColors } from '../theme/tokens';
+import tokens, { colors as tokenColors } from '../theme/tokens-legacy';
 import {
   applyColorSchemeToDom,
   getStoredColorScheme,
