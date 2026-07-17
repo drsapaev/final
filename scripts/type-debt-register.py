@@ -1,101 +1,146 @@
 #!/usr/bin/env python3
 """
 Type Debt Register — автоматический подсчёт для CI.
-Генерирует отчёт, который можно использовать в CI pipeline для отслеживания прогресса.
+Генерирует отчёт с разбивкой по категориям и историей погашения долга.
 
 Usage:
     python3 scripts/type-debt-register.py          # print report
     python3 scripts/type-debt-register.py --json   # JSON output for CI
+    python3 scripts/type-debt-register.py --diff   # compare with last commit
 """
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / 'frontend' / 'src'
 
-def count_pattern(pattern: str, opts: str = '') -> int:
-    """Count occurrences of a grep pattern in src/ .ts/.tsx files."""
+# Categories for breakdown
+CATEGORIES = {
+    'hooks':         'src/hooks',
+    'contexts':      'src/contexts',
+    'ui':            'src/components/ui',
+    'components':    'src/components',
+    'pages':         'src/pages',
+    'providers':     'src/providers',
+    'routing':       'src/routing',
+    'stores':        'src/stores',
+    'utils':         'src/utils',
+    'api':           'src/api',
+    'services':      'src/services',
+    'reducers':      'src/reducers',
+    'i18n':          'src/i18n',
+    'types':         'src/types',
+    'core':          'src/core',
+    'constants':     'src/constants',
+    'config':        'src/config',
+    'theme':         'src/theme',
+    'assets':        'src/assets',
+    'tests':         'src/__tests__',
+}
+
+def count_files_with_pattern(pattern: str, directory: Path = None) -> int:
+    """Count files containing a pattern."""
+    search_dir = str(directory) if directory else str(FRONTEND_DIR)
     result = subprocess.run(
-        ['grep', '-rn', '--include=*.ts', '--include=*.tsx', pattern, str(FRONTEND_DIR)] + opts.split(),
+        ['grep', '-rl', '--include=*.ts', '--include=*.tsx', pattern, search_dir],
         capture_output=True, text=True
     )
     return len(result.stdout.strip().split('\n')) if result.stdout.strip() else 0
 
-def count_files_with_pattern(pattern: str) -> int:
-    """Count files containing a pattern."""
+def count_lines(pattern: str, exclude_nocheck: bool = True) -> int:
+    """Count lines matching pattern, optionally excluding @ts-nocheck files."""
     result = subprocess.run(
-        ['grep', '-rl', '--include=*.ts', '--include=*.tsx', pattern, str(FRONTEND_DIR)],
+        ['grep', '-rn', '--include=*.ts', '--include=*.tsx', pattern, str(FRONTEND_DIR)],
         capture_output=True, text=True
     )
-    return len(result.stdout.strip().split('\n')) if result.stdout.strip() else 0
+    lines = result.stdout.strip().split('\n') if result.stdout.strip() else []
+    if exclude_nocheck:
+        lines = [l for l in lines if l and '@ts-nocheck' not in l]
+    return len(lines)
+
+def get_category_breakdown() -> dict:
+    """Get @ts-nocheck count per category."""
+    breakdown = {}
+    for name, path in CATEGORIES.items():
+        full_path = FRONTEND_DIR.parent / path
+        if full_path.exists():
+            count = count_files_with_pattern('@ts-nocheck', full_path)
+            if count > 0:
+                breakdown[name] = count
+    return breakdown
+
+def get_velocity_history() -> list:
+    """Get @ts-nocheck count from recent git commits for velocity tracking."""
+    # Get last 10 commits that changed files in frontend/src
+    result = subprocess.run(
+        ['git', 'log', '--oneline', '-20', '--', 'frontend/src/'],
+        capture_output=True, text=True,
+        cwd=str(FRONTEND_DIR.parent.parent)
+    )
+    commits = result.stdout.strip().split('\n') if result.stdout.strip() else []
+    
+    history = []
+    for commit_line in commits[:10]:  # Last 10 commits
+        commit_hash = commit_line.split()[0]
+        # Count @ts-nocheck at that commit
+        result = subprocess.run(
+            ['git', 'grep', '-l', '@ts-nocheck', commit_hash, '--', 'frontend/src/'],
+            capture_output=True, text=True,
+            cwd=str(FRONTEND_DIR.parent.parent)
+        )
+        count = len(result.stdout.strip().split('\n')) if result.stdout.strip() else 0
+        commit_msg = ' '.join(commit_line.split()[1:])[:60]
+        history.append({
+            'commit': commit_hash[:8],
+            'message': commit_msg,
+            'ts_nocheck_count': count,
+        })
+    return history
 
 def generate_report() -> dict:
     """Generate the Type Debt Register report."""
-    # Count @ts-nocheck files (file-level, not line-level)
     ts_nocheck_files = count_files_with_pattern('@ts-nocheck')
     
-    # Count @ts-expect-error lines (excluding @ts-nocheck files)
-    result = subprocess.run(
-        ['grep', '-rn', '--include=*.ts', '--include=*.tsx', '@ts-expect-error', str(FRONTEND_DIR)],
-        capture_output=True, text=True
-    )
-    ts_expect_error_lines = len([l for l in result.stdout.strip().split('\n') if l and '@ts-nocheck' not in l])
-    
-    # Count @ts-ignore lines
-    result = subprocess.run(
-        ['grep', '-rn', '--include=*.ts', '--include=*.tsx', '@ts-ignore', str(FRONTEND_DIR)],
-        capture_output=True, text=True
-    )
-    ts_ignore_lines = len([l for l in result.stdout.strip().split('\n') if l and '@ts-nocheck' not in l])
+    ts_expect_error_lines = count_lines('@ts-expect-error')
+    ts_ignore_lines = count_lines('@ts-ignore')
     
     # Count `any` (real code, not JSDoc)
     result = subprocess.run(
         ['grep', '-rn', '--include=*.ts', '--include=*.tsx', '-E', ': any\\b|<any>|as any\\b', str(FRONTEND_DIR)],
         capture_output=True, text=True
     )
-    any_real = len([l for l in result.stdout.strip().split('\n') 
-                    if l and '@ts-nocheck' not in l and '* @' not in l])
+    all_any = result.stdout.strip().split('\n') if result.stdout.strip() else []
+    any_real = len([l for l in all_any if l and '@ts-nocheck' not in l and '* @' not in l])
+    any_jsdoc = len([l for l in all_any if l and '@ts-nocheck' not in l and '* @' in l])
     
-    # Count `any` in JSDoc only
-    any_jsdoc = len([l for l in result.stdout.strip().split('\n') 
-                     if l and '@ts-nocheck' not in l and '* @' in l])
+    as_unknown_as = count_lines('as unknown as')
+    eslint_disable = count_lines('eslint-disable')
     
-    # Count `as unknown as`
-    result = subprocess.run(
-        ['grep', '-rn', '--include=*.ts', '--include=*.tsx', 'as unknown as', str(FRONTEND_DIR)],
-        capture_output=True, text=True
-    )
-    as_unknown_as = len([l for l in result.stdout.strip().split('\n') if l and '@ts-nocheck' not in l])
+    # TODO and FIXME markers
+    todo_count = count_lines('TODO(TS-MIGRATION)')
+    fixme_count = count_lines('FIXME(TS)')
     
-    # Count eslint-disable
-    result = subprocess.run(
-        ['grep', '-rn', '--include=*.ts', '--include=*.tsx', 'eslint-disable', str(FRONTEND_DIR)],
-        capture_output=True, text=True
-    )
-    eslint_disable = len([l for l in result.stdout.strip().split('\n') if l and '@ts-nocheck' not in l])
-    
-    # Count TODO(TS-MIGRATION)
-    todo_count = count_pattern('TODO(TS-MIGRATION)')
-    
-    # Count FIXME(TS)
-    fixme_count = count_pattern('FIXME(TS)')
-    
-    # Count total files
-    total_files = subprocess.run(
+    # Total files
+    total_result = subprocess.run(
         ['find', str(FRONTEND_DIR), '-name', '*.ts', '-o', '-name', '*.tsx'],
         capture_output=True, text=True
     )
-    total_ts = len(total_files.stdout.strip().split('\n')) if total_files.stdout.strip() else 0
-    
-    # Count files WITHOUT @ts-nocheck
+    total_ts = len(total_result.stdout.strip().split('\n')) if total_result.stdout.strip() else 0
     no_ts_nocheck = total_ts - ts_nocheck_files
+    
+    # Category breakdown
+    categories = get_category_breakdown()
+    
+    # Velocity history
+    velocity = get_velocity_history()
     
     return {
         'timestamp': subprocess.run(['date', '-u', '+%Y-%m-%dT%H:%M:%SZ'], capture_output=True, text=True).stdout.strip(),
         'totals': {
             'ts_tsx_files': total_ts,
-            'js_jsx_files': 0,  # Should always be 0 after structural migration
+            'js_jsx_files': 0,
             'files_without_ts_nocheck': no_ts_nocheck,
             'files_with_ts_nocheck': ts_nocheck_files,
             'fully_typed_percentage': round(no_ts_nocheck / total_ts * 100, 1) if total_ts > 0 else 0,
@@ -111,10 +156,12 @@ def generate_report() -> dict:
             'TODO(TS-MIGRATION)': todo_count,
             'FIXME(TS)': fixme_count,
         },
+        'by_category': categories,
+        'velocity': velocity,
         'phase': {
             'structural_migration': 'COMPLETE',
             'type_migration': 'IN_PROGRESS',
-            'description': 'All .js/.jsx files converted to .ts/.tsx. 430 files still have @ts-nocheck (B5 Legacy). Type migration is ongoing.',
+            'description': f'All .js/.jsx files converted to .ts/.tsx. {ts_nocheck_files} files still have @ts-nocheck. Type migration is ongoing.',
         }
     }
 
@@ -147,6 +194,37 @@ def print_report(report: dict):
     print(f"  eslint-disable:           {d['eslint_disable']}")
     print(f"  TODO(TS-MIGRATION):       {d['TODO(TS-MIGRATION)']}")
     print(f"  FIXME(TS):                {d['FIXME(TS)']}")
+    print()
+    print('DEBT BY CATEGORY (@ts-nocheck files)')
+    cat = report['by_category']
+    if cat:
+        # Sort by count descending
+        for name, count in sorted(cat.items(), key=lambda x: -x[1]):
+            bar = '█' * min(count // 5, 30)
+            print(f"  {name:<20s} {count:>4d}  {bar}")
+    else:
+        print("  (none)")
+    total_cat = sum(cat.values())
+    print(f"  {'TOTAL':<20s} {total_cat:>4d}")
+    print()
+    print('VELOCITY (recent commits)')
+    vel = report['velocity']
+    if vel:
+        prev = None
+        for v in vel:
+            change = ''
+            if prev is not None:
+                diff = v['ts_nocheck_count'] - prev
+                if diff < 0:
+                    change = f'  ({diff}) ✓'
+                elif diff > 0:
+                    change = f'  (+{diff}) ⚠'
+                else:
+                    change = '  (0)'
+            print(f"  {v['commit']}  {v['ts_nocheck_count']:>4d}{change}  {v['message']}")
+            prev = v['ts_nocheck_count']
+    else:
+        print("  (no history available)")
     print()
     print('DESCRIPTION')
     print(f"  {report['phase']['description']}")
