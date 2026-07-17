@@ -144,48 +144,23 @@ export default [
         },
         // Stabilization Sprint B2: provide project so @typescript-eslint/parser
         // resolves TS DOM lib types (BodyInit, RequestInit, NotificationOptions,
-        // NotificationPermission, etc.). Without this, ESLint reports
-        // no-undef for TS DOM types because it doesn't read tsconfig.json.
+        // etc.) via lib.dom.d.ts. ESLint doesn't need these re-declared as
+        // globals — that would duplicate what tsc already knows and create
+        // a maintenance burden (the list drifts from lib.dom.d.ts).
         project: './tsconfig.json',
       },
       globals: {
         ...globals.browser,
         ...globals.es2022,
         ...globals.node,
-        // Stabilization Sprint B2: TS DOM lib types that ESLint doesn't
-        // know about by default. These are global types declared by
-        // "lib": ["DOM", "DOM.Iterable"] in tsconfig.json.
-        BodyInit: 'readonly',
-        RequestInit: 'readonly',
-        Response: 'readonly',
-        Request: 'readonly',
-        Headers: 'readonly',
-        FormData: 'readonly',
-        URLSearchParams: 'readonly',
-        AbortController: 'readonly',
-        AbortSignal: 'readonly',
-        NotificationOptions: 'readonly',
-        NotificationPermission: 'readonly',
-        Notification: 'readonly',
-        WebSocket: 'readonly',
-        FileReader: 'readonly',
-        Blob: 'readonly',
-        File: 'readonly',
-        AudioContext: 'readonly',
-        webkitAudioContext: 'readonly',
-        ServiceWorkerRegistration: 'readonly',
-        PublicKeyCredentialCreationOptions: 'readonly',
-        PublicKeyCredentialRequestOptions: 'readonly',
-        Credential: 'readonly',
-        AttestationConveyancePreference: 'readonly',
-        UserVerificationRequirement: 'readonly',
       },
     },
     rules: {
       'no-unused-vars': 'off',
       // Stabilization Sprint B2: turn off no-undef for .ts/.tsx — TypeScript
-      // already does this check via tsc. ESLint's no-undef doesn't understand
-      // TS type declarations (interfaces, types, DOM lib globals).
+      // already does this check via tsc (TS2304: Cannot find name). ESLint's
+      // no-undef doesn't understand TS type declarations (interfaces, types,
+      // DOM lib globals). Verified equivalent: see MIGRATION_BLOCKERS.md B2.
       'no-undef': 'off',
       // Phase 0 — TS rules (lenient at start; strict at Phase 9)
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
