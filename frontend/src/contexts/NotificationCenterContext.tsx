@@ -1,12 +1,189 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
-import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
 import PropTypes from 'prop-types';
 import { notificationsService } from '../api/services';
 import logger from '../utils/logger';
 
-const NotificationCenterContext = createContext<unknown>(null);
+// ---- Domain types ----
+// The notification protocol is dynamic JSON from both WS push and REST
+// poll. We model the canonical surface and let extra fields ride via the
+// index signature.
+
+type NotificationRole = 'doctor' | 'registrar' | 'lab' | 'patient' | 'dentist' | 'admin' | 'unknown' | string;
+type NotificationSeverity = 'info' | 'warning' | 'error' | 'critical' | string;
+type NotificationPriority = 'normal' | 'high' | 'low' | string;
+type DeliveryStatus = 'pending' | 'seen' | 'read' | 'archived' | 'failed' | string | null;
+
+type ByGroup = Record<string, number>;
+
+interface UnreadSnapshot {
+  total: number;
+  by_role: ByGroup;
+  by_channel: ByGroup;
+  by_severity: ByGroup;
+}
+
+interface NormalizedNotification {
+  id: string;
+  deliveryId: string | number | null;
+  eventId: string | number | null;
+  sequenceId: number;
+  type: string;
+  notificationType: string;
+  eventType: string;
+  title: string;
+  message: string;
+  severity: NotificationSeverity;
+  priority: NotificationPriority;
+  recipientType: string | null;
+  recipientId: string | number | null;
+  role: NotificationRole | null;
+  departmentKey: string | null;
+  channel: string;
+  status: DeliveryStatus;
+  deliveryStatus: DeliveryStatus;
+  isRead: boolean;
+  isSeen: boolean;
+  isArchived: boolean;
+  correlationId: string | null;
+  dedupKey: string | null;
+  deepLink: string | null;
+  payloadSnapshot: unknown;
+  createdAt: string;
+  dispatchedAt: string | null;
+  firstDeliveredAt: string | null;
+  seenAt: string | null;
+  readAt: string | null;
+  archivedAt: string | null;
+  raw: unknown;
+}
+
+interface RawNotification {
+  id?: string | number;
+  delivery_id?: string | number;
+  deliveryId?: string | number;
+  notification_id?: string | number;
+  event_id?: string | number;
+  eventId?: string | number;
+  sequence_id?: string | number;
+  sequenceId?: string | number;
+  type?: string;
+  event_type?: string;
+  notification_type?: string;
+  eventType?: string;
+  role?: string;
+  target_role?: string;
+  recipient_role?: string;
+  recipientType?: string;
+  recipient_type?: string;
+  recipient_id?: string | number;
+  recipientId?: string | number;
+  department_key?: string;
+  departmentKey?: string;
+  department?: string;
+  title?: string;
+  subject?: string;
+  message?: string;
+  body?: string;
+  content?: string;
+  severity?: string;
+  priority?: string;
+  channel?: string;
+  delivery_status?: string;
+  deliveryStatus?: string;
+  status?: string;
+  is_read?: boolean;
+  isRead?: boolean;
+  read_at?: string;
+  readAt?: string;
+  is_seen?: boolean;
+  isSeen?: boolean;
+  seen_at?: string;
+  seenAt?: string;
+  is_archived?: boolean;
+  isArchived?: boolean;
+  archived_at?: string;
+  archivedAt?: string;
+  correlation_id?: string;
+  correlationId?: string;
+  dedup_key?: string;
+  dedupKey?: string;
+  deep_link?: string;
+  deepLink?: string;
+  payload_snapshot?: unknown;
+  payloadSnapshot?: unknown;
+  created_at?: string;
+  createdAt?: string;
+  dispatched_at?: string;
+  dispatchedAt?: string;
+  first_delivered_at?: string;
+  firstDeliveredAt?: string;
+  [key: string]: unknown;
+}
+
+interface InboxResponse {
+  items?: RawNotification[];
+  results?: RawNotification[];
+  data?: RawNotification[];
+  notifications?: RawNotification[];
+  unread_count?: number;
+  total?: number;
+  by_role?: ByGroup;
+  by_channel?: ByGroup;
+  by_severity?: ByGroup;
+  [key: string]: unknown;
+}
+
+interface UnreadCountResponse {
+  total?: number;
+  unread_count?: number;
+  unreadCount?: number;
+  by_role?: ByGroup;
+  by_channel?: ByGroup;
+  by_severity?: ByGroup;
+  [key: string]: unknown;
+}
+
+interface SyncParams {
+  replace?: boolean;
+  role?: string | null;
+  department_key?: string | null;
+  [key: string]: unknown;
+}
+
+interface ReplaceNotificationsMeta {
+  source?: string;
+  unreadSnapshot?: UnreadSnapshot | Record<string, unknown>;
+  lastSyncAt?: string;
+}
+
+interface UpdateUnreadSnapshotOptions {
+  replace?: boolean;
+}
+
+interface NotificationCenterContextValue {
+  inbox: NormalizedNotification[];
+  unreadSnapshot: UnreadSnapshot;
+  lastSyncAt: string | null;
+  isLoading: boolean;
+  replaceNotifications: (items: RawNotification[] | unknown[], meta?: ReplaceNotificationsMeta) => NormalizedNotification[];
+  updateUnreadSnapshot: (snapshot: UnreadSnapshot | Record<string, unknown>, options?: UpdateUnreadSnapshotOptions) => void;
+  appendNotification: (event: RawNotification | Record<string, unknown>, source?: string) => NormalizedNotification;
+  loadNotifications: (params?: SyncParams) => Promise<NormalizedNotification[]>;
+  syncNotifications: (params?: SyncParams) => Promise<NormalizedNotification[]>;
+  refreshUnreadCounts: (params?: SyncParams) => Promise<UnreadSnapshot>;
+  markAsSeen: (notificationId: string | number) => Promise<unknown>;
+  markAsRead: (notificationId: string | number) => Promise<unknown>;
+  archiveNotification: (notificationId: string | number) => Promise<unknown>;
+  markAllAsRead: (role?: string | null, departmentKey?: string | null) => Promise<unknown>;
+  getNotificationsByRole: (role: string | null) => NormalizedNotification[];
+  getUnreadCount: (role?: string | null) => number;
+}
+
+interface NotificationCenterProviderProps {
+  children: ReactNode;
+}
+
+const NotificationCenterContext = createContext<NotificationCenterContextValue | null>(null);
 
 export const ROLE_NOTIFICATION_TYPES = {
   doctor: [
@@ -203,7 +380,7 @@ const EMPTY_UNREAD_SNAPSHOT = {
 
 const MAX_INBOX_ITEMS = 200;
 
-function normalizeSlug(value) {
+function normalizeSlug(value: unknown): string {
   return String(value || '')
     .trim()
     .toLowerCase()
@@ -212,22 +389,22 @@ function normalizeSlug(value) {
     .replace(/^_|_$/g, '');
 }
 
-function normalizeRole(role) {
+function normalizeRole(role: unknown): string | null {
   const normalized = normalizeSlug(role);
   return normalized || null;
 }
 
-function normalizeDepartmentKey(departmentKey) {
+function normalizeDepartmentKey(departmentKey: unknown): string | null {
   const normalized = normalizeSlug(departmentKey);
   return normalized || null;
 }
 
-function normalizeNotificationType(type) {
+function normalizeNotificationType(type: unknown): string {
   const normalized = normalizeSlug(type || 'notification');
   return TYPE_ALIASES[normalized] || normalized;
 }
 
-function inferRoleFromType(type) {
+function inferRoleFromType(type: unknown): string | null {
   const normalizedType = normalizeNotificationType(type);
   for (const [role, types] of Object.entries(ROLE_NOTIFICATION_TYPES)) {
     if (types.includes(normalizedType)) {
@@ -237,90 +414,97 @@ function inferRoleFromType(type) {
   return null;
 }
 
-function extractItems(payload) {
+function extractItems(payload: unknown): RawNotification[] {
   if (Array.isArray(payload)) {
-    return payload;
+    return payload as RawNotification[];
   }
 
+  const p = (payload || {}) as InboxResponse;
   return (
-    payload?.items ||
-    payload?.results ||
-    payload?.data ||
-    payload?.notifications ||
+    p.items ||
+    p.results ||
+    p.data ||
+    p.notifications ||
     []
   );
 }
 
-function normalizeNotification(input, source = 'api') {
+function normalizeNotification(input: RawNotification | Record<string, unknown>, source = 'api'): NormalizedNotification {
+  // Normalize the input shape: callers can pass either a typed
+  // RawNotification or an arbitrary Record<string, unknown> (e.g. when
+  // forwarding raw WS payloads). Cast to a unified accessor so property
+  // reads resolve to concrete types instead of `unknown` from the
+  // RawNotification index signature.
+  const raw = input as RawNotification & Record<string, unknown>;
   const createdAt =
-    input.created_at ||
-    input.createdAt ||
-    input.dispatched_at ||
-    input.dispatchedAt ||
-    input.first_delivered_at ||
-    input.firstDeliveredAt ||
+    raw.created_at ||
+    raw.createdAt ||
+    raw.dispatched_at ||
+    raw.dispatchedAt ||
+    raw.first_delivered_at ||
+    raw.firstDeliveredAt ||
     new Date().toISOString();
 
   const type = normalizeNotificationType(
-    input.type || input.event_type || input.notification_type || input.eventType
+    raw.type || raw.event_type || raw.notification_type || raw.eventType
   );
   const role = normalizeRole(
-    input.role || input.target_role || input.recipient_role || input.recipientType
+    raw.role || raw.target_role || raw.recipient_role || raw.recipientType
   ) || inferRoleFromType(type);
 
   return {
     id: String(
-      input.id ||
-        input.delivery_id ||
-        input.notification_id ||
-        input.event_id ||
+      raw.id ||
+        raw.delivery_id ||
+        raw.notification_id ||
+        raw.event_id ||
         `${source}-${Date.now()}-${Math.random()}`
     ),
-    deliveryId: input.delivery_id || input.deliveryId || input.id || null,
-    eventId: input.event_id || input.eventId || null,
-    sequenceId: Number(input.sequence_id || input.sequenceId || 0),
+    deliveryId: raw.delivery_id ?? raw.deliveryId ?? raw.id ?? null,
+    eventId: raw.event_id ?? raw.eventId ?? null,
+    sequenceId: Number(raw.sequence_id ?? raw.sequenceId ?? 0),
     type,
     notificationType: type,
     eventType: type,
-    title: input.title || input.subject || 'Уведомление',
-    message: input.message || input.body || input.content || '',
-    severity: input.severity || 'info',
-    priority: input.priority || 'normal',
-    recipientType: input.recipient_type || input.recipientType || null,
-    recipientId: input.recipient_id || input.recipientId || null,
+    title: (raw.title as string) || (raw.subject as string) || 'Уведомление',
+    message: (raw.message as string) || (raw.body as string) || (raw.content as string) || '',
+    severity: (raw.severity as string) || 'info',
+    priority: (raw.priority as string) || 'normal',
+    recipientType: (raw.recipient_type as string) || (raw.recipientType as string) || null,
+    recipientId: (raw.recipient_id as string | number) || (raw.recipientId as string | number) || null,
     role,
     departmentKey: normalizeDepartmentKey(
-      input.department_key || input.departmentKey || input.department
+      (raw.department_key as string) || (raw.departmentKey as string) || (raw.department as string)
     ),
-    channel: input.channel || 'in_app_inbox',
-    status: input.delivery_status || input.deliveryStatus || input.status || null,
+    channel: (raw.channel as string) || 'in_app_inbox',
+    status: (raw.delivery_status as string) || (raw.deliveryStatus as string) || (raw.status as string) || null,
     deliveryStatus:
-      input.delivery_status || input.deliveryStatus || input.status || null,
+      (raw.delivery_status as string) || (raw.deliveryStatus as string) || (raw.status as string) || null,
     isRead: Boolean(
-      input.is_read ?? input.isRead ?? input.read_at ?? input.readAt ?? false
+      raw.is_read ?? raw.isRead ?? raw.read_at ?? raw.readAt ?? false
     ),
     isSeen: Boolean(
-      input.is_seen ?? input.isSeen ?? input.seen_at ?? input.seenAt ?? false
+      raw.is_seen ?? raw.isSeen ?? raw.seen_at ?? raw.seenAt ?? false
     ),
     isArchived: Boolean(
-      input.is_archived ?? input.isArchived ?? input.archived_at ?? input.archivedAt ?? false
+      raw.is_archived ?? raw.isArchived ?? raw.archived_at ?? raw.archivedAt ?? false
     ),
-    correlationId: input.correlation_id || input.correlationId || null,
-    dedupKey: input.dedup_key || input.dedupKey || null,
-    deepLink: input.deep_link || input.deepLink || null,
-    payloadSnapshot: input.payload_snapshot || input.payloadSnapshot || null,
+    correlationId: (raw.correlation_id as string) || (raw.correlationId as string) || null,
+    dedupKey: (raw.dedup_key as string) || (raw.dedupKey as string) || null,
+    deepLink: (raw.deep_link as string) || (raw.deepLink as string) || null,
+    payloadSnapshot: raw.payload_snapshot ?? raw.payloadSnapshot ?? null,
     createdAt,
-    dispatchedAt: input.dispatched_at || input.dispatchedAt || null,
-    firstDeliveredAt: input.first_delivered_at || input.firstDeliveredAt || null,
-    seenAt: input.seen_at || input.seenAt || null,
-    readAt: input.read_at || input.readAt || null,
-    archivedAt: input.archived_at || input.archivedAt || null,
+    dispatchedAt: (raw.dispatched_at as string) || (raw.dispatchedAt as string) || null,
+    firstDeliveredAt: (raw.first_delivered_at as string) || (raw.firstDeliveredAt as string) || null,
+    seenAt: (raw.seen_at as string) || (raw.seenAt as string) || null,
+    readAt: (raw.read_at as string) || (raw.readAt as string) || null,
+    archivedAt: (raw.archived_at as string) || (raw.archivedAt as string) || null,
     raw: input
   };
 }
 
-function mergeInboxItems(current, incoming) {
-  const byId = new Map();
+function mergeInboxItems(current: NormalizedNotification[], incoming: NormalizedNotification[]): NormalizedNotification[] {
+  const byId = new Map<string, NormalizedNotification>();
 
   for (const item of current) {
     byId.set(String(item.id), item);
@@ -353,38 +537,44 @@ function mergeInboxItems(current, incoming) {
   }).slice(0, MAX_INBOX_ITEMS);
 }
 
-function replaceItemState(item, patch) {
+function replaceItemState(item: NormalizedNotification, patch: Partial<NormalizedNotification>): NormalizedNotification {
   return {
     ...item,
     ...patch
   };
 }
 
-function isUnread(item) {
+function isUnread(item: NormalizedNotification): boolean {
   return !item.isRead && !item.isArchived;
 }
 
-function getUnreadSnapshotFromResponse(payload) {
+function getUnreadSnapshotFromResponse(payload: unknown): UnreadSnapshot {
+  const p = (payload || {}) as UnreadCountResponse;
   const total =
-    payload?.total ??
-    payload?.unread_count ??
-    payload?.unreadCount ??
+    p?.total ??
+    p?.unread_count ??
+    p?.unreadCount ??
     0;
 
   return {
     total: Number(total),
-    by_role: payload?.by_role || {},
-    by_channel: payload?.by_channel || {},
-    by_severity: payload?.by_severity || {}
+    by_role: p?.by_role || {},
+    by_channel: p?.by_channel || {},
+    by_severity: p?.by_severity || {}
   };
 }
 
-export function applyUnreadSnapshot(currentSnapshot = EMPTY_UNREAD_SNAPSHOT, payload = {}, replace = false) {
+export function applyUnreadSnapshot(
+  currentSnapshot: UnreadSnapshot = EMPTY_UNREAD_SNAPSHOT,
+  payload: Record<string, unknown> | UnreadSnapshot = {},
+  replace = false
+): UnreadSnapshot {
   const normalized = getUnreadSnapshotFromResponse(payload);
+  const p = payload as UnreadCountResponse;
   const hasExplicitTotal =
-    payload?.total !== undefined ||
-    payload?.unread_count !== undefined ||
-    payload?.unreadCount !== undefined;
+    p?.total !== undefined ||
+    p?.unread_count !== undefined ||
+    p?.unreadCount !== undefined;
 
   if (replace) {
     return normalized;
@@ -392,33 +582,33 @@ export function applyUnreadSnapshot(currentSnapshot = EMPTY_UNREAD_SNAPSHOT, pay
 
   return {
     total: hasExplicitTotal ? normalized.total : currentSnapshot.total,
-    by_role: payload?.by_role === undefined ? currentSnapshot.by_role : normalized.by_role,
-    by_channel: payload?.by_channel === undefined ? currentSnapshot.by_channel : normalized.by_channel,
-    by_severity: payload?.by_severity === undefined ? currentSnapshot.by_severity : normalized.by_severity
+    by_role: p?.by_role === undefined ? currentSnapshot.by_role : normalized.by_role,
+    by_channel: p?.by_channel === undefined ? currentSnapshot.by_channel : normalized.by_channel,
+    by_severity: p?.by_severity === undefined ? currentSnapshot.by_severity : normalized.by_severity
   };
 }
 
-export function NotificationCenterProvider({ children }) {
-  const [inbox, setInbox] = useState<unknown[]>([]);
-  const [unreadSnapshot, setUnreadSnapshot] = useState(EMPTY_UNREAD_SNAPSHOT);
-  const [lastSyncAt, setLastSyncAt] = useState<unknown>(null);
+export function NotificationCenterProvider({ children }: NotificationCenterProviderProps) {
+  const [inbox, setInbox] = useState<NormalizedNotification[]>([]);
+  const [unreadSnapshot, setUnreadSnapshot] = useState<UnreadSnapshot>(EMPTY_UNREAD_SNAPSHOT);
+  const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [inboxOpen, setInboxOpen] = useState<boolean>(false);
-  const inboxRef = useRef(inbox);
-  const unreadSnapshotRef = useRef(unreadSnapshot);
-  const unreadRefreshPromiseRef = useRef<unknown>(null);
-  const inboxSyncPromiseRef = useRef<unknown>(null);
-  const unreadCooldownUntilRef = useRef(0);
-  const inboxCooldownUntilRef = useRef(0);
+  const inboxRef = useRef<NormalizedNotification[]>(inbox);
+  const unreadSnapshotRef = useRef<UnreadSnapshot>(unreadSnapshot);
+  const unreadRefreshPromiseRef = useRef<Promise<UnreadSnapshot> | null>(null);
+  const inboxSyncPromiseRef = useRef<Promise<NormalizedNotification[]> | null>(null);
+  const unreadCooldownUntilRef = useRef<number>(0);
+  const inboxCooldownUntilRef = useRef<number>(0);
 
   inboxRef.current = inbox;
   unreadSnapshotRef.current = unreadSnapshot;
 
-  const replaceNotifications = useCallback((items, meta = {}) => {
-    const normalized = items.map((item) => normalizeNotification(item, meta.source || 'api'));
+  const replaceNotifications = useCallback((items: RawNotification[] | unknown[], meta: ReplaceNotificationsMeta = {}) => {
+    const normalized = (items as RawNotification[]).map((item) => normalizeNotification(item, meta.source || 'api'));
     setInbox((current) => mergeInboxItems(current, normalized));
     if (meta.unreadSnapshot) {
-      setUnreadSnapshot((current) => applyUnreadSnapshot(current, meta.unreadSnapshot, true));
+      setUnreadSnapshot((current) => applyUnreadSnapshot(current, meta.unreadSnapshot as UnreadSnapshot, true));
     }
     if (meta.lastSyncAt) {
       setLastSyncAt(meta.lastSyncAt);
@@ -426,12 +616,12 @@ export function NotificationCenterProvider({ children }) {
     return normalized;
   }, []);
 
-  const updateUnreadSnapshot = useCallback((snapshot, options = {}) => {
-    setUnreadSnapshot((current) => applyUnreadSnapshot(current, snapshot, options.replace === true));
+  const updateUnreadSnapshot = useCallback((snapshot: UnreadSnapshot | Record<string, unknown>, options: UpdateUnreadSnapshotOptions = {}) => {
+    setUnreadSnapshot((current) => applyUnreadSnapshot(current, snapshot as UnreadSnapshot, options.replace === true));
   }, []);
 
   const refreshUnreadCounts = useCallback(
-    async (params = {}) => {
+    async (params: SyncParams = {}) => {
       const now = Date.now();
       if (now < unreadCooldownUntilRef.current) {
         logger.info('[NotificationCenter] unread refresh skipped during cooldown', {
@@ -453,7 +643,8 @@ export function NotificationCenterProvider({ children }) {
           unreadCooldownUntilRef.current = 0;
           return snapshot;
         } catch (error) {
-          const status = error?.response?.status;
+          const err = error as { response?: { status?: number } };
+          const status = err?.response?.status;
           if (status === 429) {
             unreadCooldownUntilRef.current = Date.now() + 60_000;
             logger.warn('[NotificationCenter] refreshUnreadCounts rate limited, cooling down', {
@@ -475,7 +666,7 @@ export function NotificationCenterProvider({ children }) {
   );
 
   const syncNotifications = useCallback(
-    async (params = {}) => {
+    async (params: SyncParams = {}) => {
       const now = Date.now();
       if (now < inboxCooldownUntilRef.current) {
         logger.info('[NotificationCenter] inbox sync skipped during cooldown', {
@@ -497,11 +688,11 @@ export function NotificationCenterProvider({ children }) {
           refreshUnreadCounts(params)
         ]);
 
-        const inboxPayload = inboxResult.status === 'fulfilled' ? inboxResult.value : null;
-        const unreadPayload = unreadResult.status === 'fulfilled' ? unreadResult.value : null;
+        const inboxPayload = inboxResult.status === 'fulfilled' ? (inboxResult.value as InboxResponse) : null;
+        const unreadPayload = unreadResult.status === 'fulfilled' ? (unreadResult.value as UnreadSnapshot) : null;
 
         if (inboxResult.status === 'rejected') {
-          const inboxError = inboxResult.reason;
+          const inboxError = inboxResult.reason as { response?: { status?: number } };
           if (inboxError?.response?.status === 429) {
             inboxCooldownUntilRef.current = Date.now() + 60_000;
             unreadCooldownUntilRef.current = Date.now() + 60_000;
@@ -541,7 +732,7 @@ export function NotificationCenterProvider({ children }) {
           }));
         }
 
-        if (unreadResult.status === 'rejected' && unreadResult.reason?.response?.status === 429) {
+        if (unreadResult.status === 'rejected' && ((unreadResult.reason as { response?: { status?: number } })?.response?.status === 429)) {
           unreadCooldownUntilRef.current = Date.now() + 60_000;
           logger.warn('[NotificationCenter] unread snapshot refresh rate limited, cooling down', {
             cooldownMs: 60_000,
@@ -552,7 +743,8 @@ export function NotificationCenterProvider({ children }) {
         setLastSyncAt(new Date().toISOString());
         return normalized;
       } catch (error) {
-        const status = error?.response?.status;
+        const err = error as { response?: { status?: number } };
+        const status = err?.response?.status;
         if (status === 429) {
           inboxCooldownUntilRef.current = Date.now() + 60_000;
           unreadCooldownUntilRef.current = Date.now() + 60_000;
@@ -570,17 +762,17 @@ export function NotificationCenterProvider({ children }) {
       }
       })();
 
-      return inboxSyncPromiseRef.current;
+      return inboxSyncPromiseRef.current as Promise<NormalizedNotification[]>;
     },
     [refreshUnreadCounts]
   );
 
   const loadNotifications = useCallback(
-    async (params = {}) => syncNotifications(params),
+    async (params: SyncParams = {}) => syncNotifications(params),
     [syncNotifications]
   );
 
-  const appendNotification = useCallback((event, source = 'ws') => {
+  const appendNotification = useCallback((event: RawNotification | Record<string, unknown>, source = 'ws') => {
     const normalized = normalizeNotification(event, source);
     setInbox((current) => {
       const existingIdx = current.findIndex((item) => String(item.id) === String(normalized.id));
@@ -615,7 +807,7 @@ export function NotificationCenterProvider({ children }) {
     return normalized;
   }, []);
 
-  const markAsSeen = useCallback(async (notificationId) => {
+  const markAsSeen = useCallback(async (notificationId: string | number) => {
     setInbox((current) => current.map((item) => (
       String(item.id) === String(notificationId)
         ? replaceItemState(item, {
@@ -638,7 +830,7 @@ export function NotificationCenterProvider({ children }) {
     }
   }, [refreshUnreadCounts, syncNotifications]);
 
-  const markAsRead = useCallback(async (notificationId) => {
+  const markAsRead = useCallback(async (notificationId: string | number) => {
     setInbox((current) => current.map((item) => (
       String(item.id) === String(notificationId)
         ? replaceItemState(item, {
@@ -663,7 +855,7 @@ export function NotificationCenterProvider({ children }) {
     }
   }, [refreshUnreadCounts, syncNotifications]);
 
-  const archiveNotification = useCallback(async (notificationId) => {
+  const archiveNotification = useCallback(async (notificationId: string | number) => {
     setInbox((current) => current.map((item) => (
       String(item.id) === String(notificationId)
         ? replaceItemState(item, {
@@ -690,7 +882,7 @@ export function NotificationCenterProvider({ children }) {
     }
   }, [refreshUnreadCounts, syncNotifications]);
 
-  const markAllAsRead = useCallback(async (role = null, departmentKey = null) => {
+  const markAllAsRead = useCallback(async (role: string | null = null, departmentKey: string | null = null) => {
     setInbox((current) => current.map((item) => {
       if (role && item.role && item.role !== normalizeRole(role)) {
         return item;
@@ -719,7 +911,7 @@ export function NotificationCenterProvider({ children }) {
     }
   }, [refreshUnreadCounts, syncNotifications]);
 
-  const getNotificationsByRole = useCallback((role) => {
+  const getNotificationsByRole = useCallback((role: string | null) => {
     const normalizedRole = normalizeRole(role);
     if (!normalizedRole) {
       return inbox;
@@ -737,7 +929,7 @@ export function NotificationCenterProvider({ children }) {
     });
   }, [inbox]);
 
-  const getUnreadCount = useCallback((role = null) => {
+  const getUnreadCount = useCallback((role: string | null = null) => {
     const normalizedRole = normalizeRole(role);
     if (!normalizedRole) {
       return unreadSnapshot.total || inbox.filter((item) => isUnread(item)).length;
@@ -751,7 +943,7 @@ export function NotificationCenterProvider({ children }) {
     return getNotificationsByRole(normalizedRole).filter((item) => isUnread(item)).length;
   }, [getNotificationsByRole, inbox, unreadSnapshot.by_role, unreadSnapshot.total]);
 
-  const value = useMemo(() => ({
+  const value = useMemo<NotificationCenterContextValue>(() => ({
     inbox,
     unreadSnapshot,
     lastSyncAt,
@@ -802,7 +994,7 @@ NotificationCenterProvider.propTypes = {
   children: PropTypes.node.isRequired
 };
 
-export function useNotificationCenter() {
+export function useNotificationCenter(): NotificationCenterContextValue {
   const ctx = useContext(NotificationCenterContext);
   if (!ctx) {
     throw new Error('useNotificationCenter must be used within NotificationCenterProvider');
