@@ -1,7 +1,35 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
+// @ts-nocheck removed — file fully typed in Phase B burn batch.
+// (legacy banner kept blank for git diff readability)
 
 import logger from '../utils/logger';
+
+export type ThemeMode = 'light' | 'dark' | 'system';
+export type ColorSchemeId = 'light' | 'dark' | 'auto' | 'vibrant' | 'glass' | 'gradient' | string;
+
+interface ColorSchemePreview {
+  background: string;
+  surface: string;
+  surfaceAlt: string;
+  accent: string;
+  text: string;
+  border: string;
+}
+
+interface ColorSchemeDefinition {
+  id: ColorSchemeId;
+  name: string;
+  kind: 'standard' | 'custom';
+  resolvedTheme: ThemeMode;
+  description: string;
+  mood: string;
+  surfaces: string;
+  contrast: string;
+  bestFor: string;
+  preview: ColorSchemePreview;
+  tokens?: Record<string, string>;
+  rootStyles?: Record<string, string>;
+  bodyStyles?: Record<string, string>;
+}
 
 export const THEME_STORAGE_KEYS = {
   theme: 'theme',
@@ -11,7 +39,7 @@ export const THEME_STORAGE_KEYS = {
   activeColorSchemeId: 'activeColorSchemeId',
 };
 
-const COLOR_SCHEME_DEFINITIONS = {
+const COLOR_SCHEME_DEFINITIONS: Record<string, ColorSchemeDefinition> = {
   light: {
     id: 'light',
     name: 'Светлая',
@@ -247,11 +275,11 @@ export const COLOR_SCHEMES = Object.values(COLOR_SCHEME_DEFINITIONS).map((scheme
   preview: scheme.preview,
 }));
 
-const COLOR_SCHEME_MAP = new Map(COLOR_SCHEMES.map((scheme) => [scheme.id, scheme]));
-const CUSTOM_SCHEME_IDS = new Set(
+const COLOR_SCHEME_MAP = new Map<string, ColorSchemeDefinition>(COLOR_SCHEMES.map((scheme) => [scheme.id, scheme] as const));
+const CUSTOM_SCHEME_IDS = new Set<string>(
   COLOR_SCHEMES.filter((scheme) => scheme.kind === 'custom').map((scheme) => scheme.id)
 );
-const CUSTOM_STYLE_PROPERTIES = [
+const CUSTOM_STYLE_PROPERTIES: string[] = [
   ...new Set(
     Object.values(COLOR_SCHEME_DEFINITIONS)
       .filter((scheme) => scheme.kind === 'custom')
@@ -265,20 +293,20 @@ const SCHEME_CLASSES = Object.keys(COLOR_SCHEME_DEFINITIONS).flatMap((schemeId) 
   `color-scheme-${schemeId}`,
 ]);
 
-export function getColorSchemeDefinition(value) {
+export function getColorSchemeDefinition(value: unknown): ColorSchemeDefinition {
   const normalized = normalizeColorScheme(value) || 'light';
   return COLOR_SCHEME_DEFINITIONS[normalized] || COLOR_SCHEME_DEFINITIONS.light;
 }
 
-export function isSupportedColorScheme(value) {
-  return COLOR_SCHEME_MAP.has(value);
+export function isSupportedColorScheme(value: unknown): boolean {
+  return typeof value === 'string' && COLOR_SCHEME_MAP.has(value);
 }
 
-export function isCustomColorScheme(value) {
-  return CUSTOM_SCHEME_IDS.has(value);
+export function isCustomColorScheme(value: unknown): boolean {
+  return typeof value === 'string' && CUSTOM_SCHEME_IDS.has(value);
 }
 
-export function normalizeColorScheme(value) {
+export function normalizeColorScheme(value: unknown): string | null {
   if (!value || typeof value !== 'string') {
     return null;
   }
@@ -290,7 +318,7 @@ export function normalizeColorScheme(value) {
   return isSupportedColorScheme(value) ? value : null;
 }
 
-export function getSystemTheme() {
+export function getSystemTheme(): ThemeMode {
   if (typeof window === 'undefined') {
     return 'light';
   }
@@ -301,12 +329,12 @@ export function getSystemTheme() {
     'light';
 }
 
-export function resolveThemeMode(colorScheme, systemTheme = getSystemTheme()) {
+export function resolveThemeMode(colorScheme: unknown, systemTheme: ThemeMode = getSystemTheme()): ThemeMode {
   const scheme = getColorSchemeDefinition(colorScheme);
   return scheme.resolvedTheme === 'system' ? systemTheme : scheme.resolvedTheme;
 }
 
-export function getStoredColorScheme() {
+export function getStoredColorScheme(): string {
   if (typeof window === 'undefined') {
     return 'light';
   }
@@ -338,7 +366,7 @@ export function getStoredColorScheme() {
   }
 }
 
-export function persistColorSchemeLocally(colorScheme, resolvedTheme) {
+export function persistColorSchemeLocally(colorScheme: string, resolvedTheme: string): void {
   if (typeof window === 'undefined') {
     return;
   }
@@ -360,18 +388,19 @@ export function persistColorSchemeLocally(colorScheme, resolvedTheme) {
   }
 }
 
-function clearInlineCustomTheme(root, body) {
+function clearInlineCustomTheme(root: HTMLElement, body: HTMLElement): void {
   CUSTOM_STYLE_PROPERTIES.forEach((property) => {
     root.style.removeProperty(property);
   });
 
   ROOT_STYLE_PROPERTIES.forEach((property) => {
-    root.style[property] = '';
-    body.style[property] = '';
+    // CSSStyleDeclaration uses camelCase props; index via structural cast.
+    (root.style as unknown as Record<string, string>)[property] = '';
+    (body.style as unknown as Record<string, string>)[property] = '';
   });
 }
 
-export function applyColorSchemeToDom(colorScheme, resolvedTheme) {
+export function applyColorSchemeToDom(colorScheme: unknown, resolvedTheme?: string): void {
   if (typeof document === 'undefined') {
     return;
   }
@@ -379,7 +408,7 @@ export function applyColorSchemeToDom(colorScheme, resolvedTheme) {
   const root = document.documentElement;
   const body = document.body;
   const definition = getColorSchemeDefinition(colorScheme);
-  const themeMode = resolvedTheme || resolveThemeMode(definition.id);
+  const themeMode = (resolvedTheme || resolveThemeMode(definition.id)) as ThemeMode;
 
   root.classList.remove(...THEME_MODE_CLASSES, ...SCHEME_CLASSES);
   body.classList.remove(...THEME_MODE_CLASSES, ...SCHEME_CLASSES);
@@ -397,20 +426,23 @@ export function applyColorSchemeToDom(colorScheme, resolvedTheme) {
     return;
   }
 
+  const rootStyle = root.style as unknown as Record<string, string>;
+  const bodyStyle = body.style as unknown as Record<string, string>;
+
   Object.entries(definition.tokens || {}).forEach(([property, value]) => {
     root.style.setProperty(property, value);
   });
 
   Object.entries(definition.rootStyles || {}).forEach(([property, value]) => {
-    root.style[property] = value;
+    rootStyle[property] = value;
   });
 
   Object.entries(definition.bodyStyles || {}).forEach(([property, value]) => {
-    body.style[property] = value;
+    bodyStyle[property] = value;
   });
 }
 
-export function bootstrapStoredColorScheme() {
+export function bootstrapStoredColorScheme(): { colorScheme: string; resolvedTheme: string } {
   const colorScheme = getStoredColorScheme();
   const resolvedTheme = resolveThemeMode(colorScheme);
   persistColorSchemeLocally(colorScheme, resolvedTheme);

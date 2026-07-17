@@ -1,11 +1,22 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
+interface RgbaColor {
+  r: number;
+  g: number;
+  b: number;
+  a: number;
+}
 
-function clampChannel(value) {
+type ColorInput = RgbaColor | string;
+
+interface ReadableTextOptions {
+  light?: string;
+  dark?: string;
+}
+
+function clampChannel(value: number): number {
   return Math.max(0, Math.min(255, Math.round(value)));
 }
 
-export function parseCssColor(value) {
+export function parseCssColor(value: unknown): RgbaColor | null {
   if (!value || typeof value !== 'string') {
     return null;
   }
@@ -35,9 +46,11 @@ export function parseCssColor(value) {
     return null;
   }
 
-  const [r = '0', g = '0', b = '0', a = '1'] = rgbMatch[1]
-    .split(',')
-    .map((part) => part.trim());
+  const parts = rgbMatch[1].split(',').map((part) => part.trim());
+  const r = parts[0] ?? '0';
+  const g = parts[1] ?? '0';
+  const b = parts[2] ?? '0';
+  const a = parts[3] ?? '1';
 
   return {
     r: Number.parseFloat(r),
@@ -47,8 +60,8 @@ export function parseCssColor(value) {
   };
 }
 
-export function toHexString(color) {
-  const parsed = typeof color === 'string' ? parseCssColor(color) : color;
+export function toHexString(color: ColorInput): string {
+  const parsed: RgbaColor | null = typeof color === 'string' ? parseCssColor(color) : color;
   if (!parsed) {
     return '#000000';
   }
@@ -58,8 +71,8 @@ export function toHexString(color) {
     .join('')}`;
 }
 
-export function toRgbaString(color, alpha = 1) {
-  const parsed = typeof color === 'string' ? parseCssColor(color) : color;
+export function toRgbaString(color: ColorInput, alpha = 1): string {
+  const parsed: RgbaColor | null = typeof color === 'string' ? parseCssColor(color) : color;
   if (!parsed) {
     return `rgba(0, 0, 0, ${alpha})`;
   }
@@ -67,9 +80,9 @@ export function toRgbaString(color, alpha = 1) {
   return `rgba(${clampChannel(parsed.r)}, ${clampChannel(parsed.g)}, ${clampChannel(parsed.b)}, ${alpha})`;
 }
 
-export function mixColors(source, target, ratio = 0.5) {
-  const from = typeof source === 'string' ? parseCssColor(source) : source;
-  const to = typeof target === 'string' ? parseCssColor(target) : target;
+export function mixColors(source: ColorInput, target: ColorInput, ratio = 0.5): string {
+  const from: RgbaColor | null = typeof source === 'string' ? parseCssColor(source) : source;
+  const to: RgbaColor | null = typeof target === 'string' ? parseCssColor(target) : target;
 
   if (!from || !to) {
     return typeof source === 'string' ? source : '#000000';
@@ -83,8 +96,8 @@ export function mixColors(source, target, ratio = 0.5) {
   });
 }
 
-export function getLuminance(color) {
-  const parsed = typeof color === 'string' ? parseCssColor(color) : color;
+export function getLuminance(color: ColorInput): number {
+  const parsed: RgbaColor | null = typeof color === 'string' ? parseCssColor(color) : color;
   if (!parsed) {
     return 0;
   }
@@ -99,21 +112,21 @@ export function getLuminance(color) {
   return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
 }
 
-export function contrastRatio(foreground, background) {
+export function contrastRatio(foreground: ColorInput, background: ColorInput): number {
   const lighter = getLuminance(foreground) + 0.05;
   const darker = getLuminance(background) + 0.05;
 
   return lighter > darker ? lighter / darker : darker / lighter;
 }
 
-export function getReadableTextColor(background, options = {}) {
+export function getReadableTextColor(background: ColorInput, options: ReadableTextOptions = {}): string {
   const light = options.light || '#ffffff';
   const dark = options.dark || '#111315';
 
   return contrastRatio(light, background) >= contrastRatio(dark, background) ? light : dark;
 }
 
-export function ensureMinContrast(foreground, background, min = 4.5) {
+export function ensureMinContrast(foreground: ColorInput, background: ColorInput, min = 4.5): string {
   const initial = toHexString(foreground);
   if (contrastRatio(initial, background) >= min) {
     return initial;
