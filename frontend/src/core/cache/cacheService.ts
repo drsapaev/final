@@ -1,29 +1,58 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 /**
  * Cache Service - Централизованный сервис кэширования для EMR v2
- * 
+ *
  * Features:
  * - Memory cache с TTL
  * - Инвалидация по visitId/patientId
  * - Поддержка AI-запросов
  * - Автоочистка просроченных записей
- * 
+ *
  * @module core/cache/cacheService
  */
 
 import { CACHE_CONFIG } from './cacheConfig';
 
+interface CacheEntry<T = unknown> {
+    value: T;
+    expiresAt: number | null;
+    tags: string[];
+    createdAt: number;
+}
+
+interface CacheStats {
+    hits: number;
+    misses: number;
+    sets: number;
+    invalidations: number;
+}
+
+interface CacheStatsReport extends CacheStats {
+    size: number;
+    hitRate: number;
+}
+
+interface SetOptions {
+    ttl?: number;
+    tags?: string[];
+}
+
+type CacheFactory<T> = () => Promise<T> | T;
+
 class CacheService {
+    // Основное хранилище: Map<key, { value, expiresAt, tags }>
+    private cache: Map<string, CacheEntry>;
+
+    // Индекс тегов для быстрой инвалидации: Map<tag, Set<key>>
+    private tagIndex: Map<string, Set<string>>;
+
+    // Статистика
+    private stats: CacheStats;
+
     constructor() {
-        // Основное хранилище: Map<key, { value, expiresAt, tags }>
-        this.cache = new Map();
+        this.cache = new Map<string, CacheEntry>();
 
-        // Индекс тегов для быстрой инвалидации: Map<tag, Set<key>>
-        this.tagIndex = new Map();
+        this.tagIndex = new Map<string, Set<string>>();
 
-        // Статистика
         this.stats = {
             hits: 0,
             misses: 0,
@@ -38,18 +67,18 @@ class CacheService {
     /**
      * Генерирует ключ кэша
      */
-    generateKey(namespace, ...parts) {
+    generateKey(namespace: string, ...parts: Array<string | number | null | undefined>): string {
         return `${namespace}:${parts.filter(Boolean).join(':')}`;
     }
 
     /**
      * Получает значение из кэша
-     * 
-     * @param {string} key - Ключ кэша
-     * @returns {any|null} - Значение или null если не найдено/просрочено
+     *
+     * @param key Ключ кэша
+     * @returns Значение или null если не найдено/просрочено
      */
-    get(key) {
-        const entry = this.cache.get(key);
+    get<T = unknown>(key: string): T | null {
+        const entry = this.cache.get(key) as CacheEntry<T> | undefined;
 
         if (!entry) {
             this.stats.misses++;
@@ -69,20 +98,20 @@ class CacheService {
 
     /**
      * Сохраняет значение в кэш
-     * 
-     * @param {string} key - Ключ кэша
-     * @param {any} value - Значение
-     * @param {Object} options - Настройки
-     * @param {number} options.ttl - Time-to-live в миллисекундах
-     * @param {string[]} options.tags - Теги для групповой инвалидации
+     *
+     * @param key Ключ кэша
+     * @param value Значение
+     * @param options Настройки:
+     *   - ttl: Time-to-live в миллисекундах
+     *   - tags: Теги для групповой инвалидации
      */
-    set(key, value, options = {}) {
+    set<T = unknown>(key: string, value: T, options: SetOptions = {}): void {
         const {
             ttl = CACHE_CONFIG.defaultTTL,
             tags = []
         } = options;
 
-        const entry = {
+        const entry: CacheEntry<T> = {
             value,
             expiresAt: ttl ? Date.now() + ttl : null,
             tags,
@@ -93,14 +122,14 @@ class CacheService {
         this.removeFromTagIndex(key);
 
         // Сохраняем
-        this.cache.set(key, entry);
+        this.cache.set(key, entry as CacheEntry);
 
         // Обновляем индекс тегов
         tags.forEach(tag => {
             if (!this.tagIndex.has(tag)) {
-                this.tagIndex.set(tag, new Set());
+                this.tagIndex.set(tag, new Set<string>());
             }
-            this.tagIndex.get(tag).add(key);
+            this.tagIndex.get(tag)?.add(key);
         });
 
         this.stats.sets++;
@@ -109,7 +138,7 @@ class CacheService {
     /**
      * Удаляет запись из кэша
      */
-    delete(key) {
+    delete(key: string): boolean {
         this.removeFromTagIndex(key);
         return this.cache.delete(key);
     }
@@ -117,7 +146,7 @@ class CacheService {
     /**
      * Удаляет ключ из индекса тегов
      */
-    removeFromTagIndex(key) {
+    private removeFromTagIndex(key: string): void {
         const entry = this.cache.get(key);
         if (entry?.tags) {
             entry.tags.forEach(tag => {
@@ -135,7 +164,7 @@ class CacheService {
     /**
      * Инвалидирует все записи с указанным тегом
      */
-    invalidateByTag(tag) {
+    invalidateByTag(tag: string): void {
         const keys = this.tagIndex.get(tag);
         if (keys) {
             keys.forEach(key => this.cache.delete(key));
@@ -147,7 +176,7 @@ class CacheService {
     /**
      * Инвалидирует кэш по visitId
      */
-    invalidateByVisit(visitId) {
+    invalidateByVisit(visitId: string | number | null | undefined): void {
         if (!visitId) return;
         this.invalidateByTag(`visit:${visitId}`);
     }
@@ -155,7 +184,7 @@ class CacheService {
     /**
      * Инвалидирует кэш по patientId
      */
-    invalidateByPatient(patientId) {
+    invalidateByPatient(patientId: string | number | null | undefined): void {
         if (!patientId) return;
         this.invalidateByTag(`patient:${patientId}`);
     }
@@ -163,7 +192,7 @@ class CacheService {
     /**
      * Полная очистка кэша
      */
-    clear() {
+    clear(): void {
         this.cache.clear();
         this.tagIndex.clear();
         this.stats.invalidations++;
@@ -171,13 +200,13 @@ class CacheService {
 
     /**
      * Получает или создаёт кэшированное значение
-     * 
-     * @param {string} key - Ключ
-     * @param {Function} factory - Функция создания значения
-     * @param {Object} options - Настройки кэширования
+     *
+     * @param key Ключ
+     * @param factory Функция создания значения
+     * @param options Настройки кэширования
      */
-    async getOrSet(key, factory, options = {}) {
-        const cached = this.get(key);
+    async getOrSet<T = unknown>(key: string, factory: CacheFactory<T>, options: SetOptions = {}): Promise<T> {
+        const cached = this.get<T>(key);
         if (cached !== null) {
             return cached;
         }
@@ -190,7 +219,7 @@ class CacheService {
     /**
      * Кэширует AI-запрос
      */
-    cacheAIRequest(complaintsHash, specialty, result) {
+    cacheAIRequest<T = unknown>(complaintsHash: string, specialty: string, result: T): void {
         const key = this.generateKey('ai', 'analysis', complaintsHash, specialty);
         this.set(key, result, {
             ttl: CACHE_CONFIG.aiTTL,
@@ -201,15 +230,15 @@ class CacheService {
     /**
      * Получает кэшированный AI-результат
      */
-    getAIRequest(complaintsHash, specialty) {
+    getAIRequest<T = unknown>(complaintsHash: string, specialty: string): T | null {
         const key = this.generateKey('ai', 'analysis', complaintsHash, specialty);
-        return this.get(key);
+        return this.get<T>(key);
     }
 
     /**
      * Кэширует EMR данные
      */
-    cacheEMR(visitId, emrData) {
+    cacheEMR<T = unknown>(visitId: string | number, emrData: T): void {
         const key = this.generateKey('emr', visitId);
         this.set(key, emrData, {
             ttl: CACHE_CONFIG.emrTTL,
@@ -220,15 +249,15 @@ class CacheService {
     /**
      * Получает кэшированные EMR данные
      */
-    getEMR(visitId) {
+    getEMR<T = unknown>(visitId: string | number): T | null {
         const key = this.generateKey('emr', visitId);
-        return this.get(key);
+        return this.get<T>(key);
     }
 
     /**
      * Автоматическая очистка просроченных записей
      */
-    startAutoCleanup() {
+    private startAutoCleanup(): void {
         setInterval(() => {
             const now = Date.now();
             for (const [key, entry] of this.cache.entries()) {
@@ -242,7 +271,7 @@ class CacheService {
     /**
      * Возвращает статистику кэша
      */
-    getStats() {
+    getStats(): CacheStatsReport {
         return {
             ...this.stats,
             size: this.cache.size,
