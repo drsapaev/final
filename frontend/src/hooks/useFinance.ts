@@ -5,39 +5,39 @@ import logger from '../utils/logger';
 
 const FINANCE_CACHE_KEY = 'admin_finance_transactions_cache';
 
-const normalizeTransaction = (transaction = {}) => ({
-  id: transaction.id,
-  type: transaction.type || 'income',
-  category: transaction.category || '',
-  amount: Number(transaction.amount ?? 0),
-  description: transaction.description || '',
-  patientId: transaction.patient_id ?? transaction.patientId ?? null,
-  doctorId: transaction.doctor_id ?? transaction.doctorId ?? null,
-  patientName: transaction.patient_name ?? transaction.patientName ?? null,
-  doctorName: transaction.doctor_name ?? transaction.doctorName ?? null,
-  paymentMethod: transaction.payment_method || transaction.paymentMethod || 'cash',
-  status: transaction.status ?? null,
-  transactionDate: transaction.transaction_date || transaction.transactionDate || '',
-  notes: transaction.notes || '',
-  reference: transaction.reference || '',
-  createdAt: transaction.created_at || transaction.createdAt || null,
-  updatedAt: transaction.updated_at || transaction.updatedAt || null
+const normalizeTransaction = (transaction: Record<string, unknown> = {}) => ({
+  id: (transaction as Record<string, unknown>).id,
+  type: (transaction as Record<string, unknown>).type || 'income',
+  category: (transaction as Record<string, unknown>).category || '',
+  amount: Number((transaction as Record<string, unknown>).amount ?? 0),
+  description: (transaction as Record<string, unknown>).description || '',
+  patientId: (transaction as Record<string, unknown>).patient_id ?? (transaction as Record<string, unknown>).patientId ?? null,
+  doctorId: (transaction as Record<string, unknown>).doctor_id ?? (transaction as Record<string, unknown>).doctorId ?? null,
+  patientName: (transaction as Record<string, unknown>).patient_name ?? (transaction as Record<string, unknown>).patientName ?? null,
+  doctorName: (transaction as Record<string, unknown>).doctor_name ?? (transaction as Record<string, unknown>).doctorName ?? null,
+  paymentMethod: (transaction as Record<string, unknown>).payment_method || (transaction as Record<string, unknown>).paymentMethod || 'cash',
+  status: (transaction as Record<string, unknown>).status ?? null,
+  transactionDate: (transaction as Record<string, unknown>).transaction_date || (transaction as Record<string, unknown>).transactionDate || '',
+  notes: (transaction as Record<string, unknown>).notes || '',
+  reference: (transaction as Record<string, unknown>).reference || '',
+  createdAt: (transaction as Record<string, unknown>).created_at || (transaction as Record<string, unknown>).createdAt || null,
+  updatedAt: (transaction as Record<string, unknown>).updated_at || (transaction as Record<string, unknown>).updatedAt || null
 });
 
-const sortTransactions = (transactions = []) => {
+const sortTransactions = (transactions: unknown[] = []) => {
   return [...transactions].sort((left, right) => {
-    const leftTime = new Date(left.transactionDate || 0).getTime() || 0;
-    const rightTime = new Date(right.transactionDate || 0).getTime() || 0;
+    const leftTime = new Date(((left as Record<string, unknown>).transactionDate as string | number) || 0).getTime() || 0;
+    const rightTime = new Date(((right as Record<string, unknown>).transactionDate as string | number) || 0).getTime() || 0;
 
     if (rightTime !== leftTime) {
       return rightTime - leftTime;
     }
 
-    return Number(right.id || 0) - Number(left.id || 0);
+    return Number((right as Record<string, unknown>).id || 0) - Number((left as Record<string, unknown>).id || 0);
   });
 };
 
-const normalizeDeletedIds = (deletedIds = []) => {
+const normalizeDeletedIds = (deletedIds: unknown[] = []): number[] => {
   return [...new Set(deletedIds.map((id) => Number(id)).filter((id) => Number.isFinite(id)))];
 };
 
@@ -54,11 +54,11 @@ const readFinanceCache = () => {
       : Array.isArray(parsed?.transactions)
         ? parsed.transactions
         : [];
-    const deletedIds = Array.isArray(parsed?.deletedIds) ? parsed.deletedIds : [];
+    const deletedIds = new Set<number>(Array.isArray(parsed?.deletedIds) ? (parsed.deletedIds as number[]) : []);
 
     return {
       transactions: sortTransactions(cachedTransactions.map(normalizeTransaction)),
-      deletedIds: normalizeDeletedIds(deletedIds)
+      deletedIds: normalizeDeletedIds(Array.from(deletedIds as Set<number> | unknown[]))
     };
   } catch (error) {
     logger.warn('[FIX:FINANCE] Не удалось прочитать локальный кэш финансов:', error);
@@ -66,14 +66,14 @@ const readFinanceCache = () => {
   }
 };
 
-const writeFinanceCache = (transactions, deletedIds = []) => {
+const writeFinanceCache = (transactions, deletedIds: unknown[] = []) => {
   try {
     localStorage.setItem(
       FINANCE_CACHE_KEY,
       JSON.stringify({
         updatedAt: new Date().toISOString(),
         transactions: sortTransactions(transactions.map(normalizeTransaction)),
-        deletedIds: normalizeDeletedIds(deletedIds)
+        deletedIds: normalizeDeletedIds(Array.from(deletedIds as Set<number> | unknown[]))
       })
     );
   } catch (error) {
@@ -81,24 +81,24 @@ const writeFinanceCache = (transactions, deletedIds = []) => {
   }
 };
 
-const mergeTransactions = (serverTransactions = [], cacheState = { transactions: [], deletedIds: [] }) => {
-  const deletedIds = new Set(normalizeDeletedIds(cacheState.deletedIds));
+const mergeTransactions = (serverTransactions: unknown[] = [], cacheState = { transactions: [], deletedIds: [] }) => {
+  const deletedIds = new Set<number>(normalizeDeletedIds(cacheState.deletedIds as unknown[]));
   const merged = new Map();
 
   serverTransactions.forEach((transaction) => {
-    const normalized = normalizeTransaction(transaction);
-    if (normalized.id == null || deletedIds.has(Number(normalized.id))) {
+    const normalized = normalizeTransaction(transaction as Record<string, unknown>);
+    if ((normalized as Record<string, unknown>).id == null || (deletedIds as Set<number>).has(Number((normalized as Record<string, unknown>).id))) {
       return;
     }
-    merged.set(Number(normalized.id), normalized);
+    merged.set(Number((normalized as Record<string, unknown>).id), normalized);
   });
 
   (cacheState.transactions || []).forEach((transaction) => {
-    const normalized = normalizeTransaction(transaction);
-    if (normalized.id == null || deletedIds.has(Number(normalized.id))) {
+    const normalized = normalizeTransaction(transaction as Record<string, unknown>);
+    if ((normalized as Record<string, unknown>).id == null || (deletedIds as Set<number>).has(Number((normalized as Record<string, unknown>).id))) {
       return;
     }
-    merged.set(Number(normalized.id), normalized);
+    merged.set(Number((normalized as Record<string, unknown>).id), normalized);
   });
 
   return sortTransactions(Array.from(merged.values()));
@@ -129,14 +129,14 @@ const useFinance = () => {
   const [filterDateRange, setFilterDateRange] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
 
-  const transactionsRef = useRef(initialCache.transactions);
-  const deletedIdsRef = useRef(new Set(initialCache.deletedIds));
+  const transactionsRef = useRef<unknown[]>(initialCache.transactions);
+  const deletedIdsRef = useRef<Set<number>>(new Set(initialCache.deletedIds));
 
   useEffect(() => {
     transactionsRef.current = transactions;
   }, [transactions]);
 
-  const persistTransactions = useCallback((nextTransactions, nextDeletedIds = deletedIdsRef.current) => {
+  const persistTransactions = useCallback((nextTransactions: unknown[], nextDeletedIds: unknown[] | Set<number> = deletedIdsRef.current) => {
     const normalizedTransactions = sortTransactions(nextTransactions.map(normalizeTransaction));
     const normalizedDeletedIds = normalizeDeletedIds(Array.isArray(nextDeletedIds) ? nextDeletedIds : Array.from(nextDeletedIds || []));
 
@@ -163,10 +163,10 @@ const useFinance = () => {
       const rawTransactions = Array.isArray(response.data) ? response.data : [];
       const mergedTransactions = mergeTransactions(rawTransactions, {
         transactions: transactionsRef.current,
-        deletedIds: Array.from(deletedIdsRef.current)
+        deletedIds: Array.from(deletedIdsRef.current as Set<number>)
       });
 
-      persistTransactions(mergedTransactions, Array.from(deletedIdsRef.current));
+      persistTransactions(mergedTransactions, Array.from(deletedIdsRef.current as Set<number>) as unknown[]);
       return mergedTransactions;
     } catch (err) {
       logger.error('Ошибка загрузки финансовых транзакций:', err);
@@ -180,7 +180,7 @@ const useFinance = () => {
       const cachedState = readFinanceCache();
       if (cachedState.transactions.length > 0) {
         logger.info('[FIX:FINANCE] Восстановили финансовые транзакции из локального кэша');
-        persistTransactions(cachedState.transactions, cachedState.deletedIds);
+        persistTransactions(cachedState.transactions, (cachedState.deletedIds as unknown[]));
         return cachedState.transactions;
       }
 
@@ -197,7 +197,7 @@ const useFinance = () => {
     try {
       const response = await api.post('/admin/finance/transactions', toApiPayload(transactionData));
       const createdTransaction = normalizeTransaction(response.data);
-      const nextDeletedIds = Array.from(deletedIdsRef.current).filter(
+      const nextDeletedIds = Array.from(deletedIdsRef.current as Set<number>).filter(
         (deletedId) => Number(deletedId) !== Number(createdTransaction.id)
       );
       const nextTransactions = mergeTransactions(
@@ -208,7 +208,7 @@ const useFinance = () => {
         }
       );
 
-      persistTransactions(nextTransactions, nextDeletedIds);
+      persistTransactions(nextTransactions, nextDeletedIds as unknown[]);
       await loadTransactions();
       return createdTransaction;
     } catch (err) {
@@ -227,12 +227,12 @@ const useFinance = () => {
     try {
       const response = await api.put(`/admin/finance/transactions/${id}`, toApiPayload(transactionData));
       const updatedTransaction = normalizeTransaction(response.data);
-      const nextDeletedIds = Array.from(deletedIdsRef.current).filter(
+      const nextDeletedIds = Array.from(deletedIdsRef.current as Set<number>).filter(
         (deletedId) => Number(deletedId) !== Number(updatedTransaction.id)
       );
       const nextTransactions = mergeTransactions(
         [
-          ...transactionsRef.current.filter((transaction) => Number(transaction.id) !== Number(id)),
+          ...transactionsRef.current.filter((transaction) => Number((transaction as Record<string, unknown>).id) !== Number(id)),
           updatedTransaction
         ],
         {
@@ -241,7 +241,7 @@ const useFinance = () => {
         }
       );
 
-      persistTransactions(nextTransactions, nextDeletedIds);
+      persistTransactions(nextTransactions, nextDeletedIds as unknown[]);
       await loadTransactions();
       return updatedTransaction;
     } catch (err) {
@@ -260,12 +260,12 @@ const useFinance = () => {
     try {
       await api.delete(`/admin/finance/transactions/${id}`);
       const nextDeletedIds = normalizeDeletedIds([
-        ...Array.from(deletedIdsRef.current),
+        ...Array.from(deletedIdsRef.current as Set<number>),
         Number(id)
       ]);
-      const nextTransactions = transactionsRef.current.filter((transaction) => Number(transaction.id) !== Number(id));
+      const nextTransactions = transactionsRef.current.filter((transaction) => Number((transaction as Record<string, unknown>).id) !== Number(id));
 
-      persistTransactions(nextTransactions, nextDeletedIds);
+      persistTransactions(nextTransactions, nextDeletedIds as unknown[]);
       await loadTransactions();
     } catch (err) {
       logger.error('Ошибка удаления финансовой транзакции:', err);
@@ -281,18 +281,18 @@ const useFinance = () => {
       const search = searchTerm.toLowerCase();
       const matchesSearch =
         !searchTerm ||
-        transaction.description.toLowerCase().includes(search) ||
-        transaction.category.toLowerCase().includes(search) ||
-        transaction.patientName?.toLowerCase().includes(search) ||
-        transaction.doctorName?.toLowerCase().includes(search) ||
-        transaction.reference?.toLowerCase().includes(search);
+        String((transaction as Record<string, unknown>).description).toLowerCase().includes(search) ||
+        String((transaction as Record<string, unknown>).category).toLowerCase().includes(search) ||
+        String((transaction as Record<string, unknown>).patientName).toLowerCase().includes(search) ||
+        String((transaction as Record<string, unknown>).doctorName).toLowerCase().includes(search) ||
+        String((transaction as Record<string, unknown>).reference).toLowerCase().includes(search);
 
-      const matchesType = !filterType || transaction.type === filterType;
-      const matchesCategory = !filterCategory || transaction.category === filterCategory;
-      const matchesStatus = !filterStatus || transaction.status === filterStatus;
+      const matchesType = !filterType || (transaction as Record<string, unknown>).type === filterType;
+      const matchesCategory = !filterCategory || (transaction as Record<string, unknown>).category === filterCategory;
+      const matchesStatus = !filterStatus || (transaction as Record<string, unknown>).status === filterStatus;
 
       const matchesDateRange = !filterDateRange || (() => {
-        const transactionDate = new Date(transaction.transactionDate);
+        const transactionDate = new Date((transaction as Record<string, unknown>).transactionDate as string | number);
         const today = new Date();
 
         switch (filterDateRange) {
@@ -330,11 +330,11 @@ const useFinance = () => {
     };
 
     transactions.forEach((transaction) => {
-      if (transaction.type === 'income') {
-        stats.totalIncome += transaction.amount;
+      if ((transaction as Record<string, unknown>).type === 'income') {
+        stats.totalIncome += Number((transaction as Record<string, unknown>).amount);
         stats.incomeCount += 1;
       } else {
-        stats.totalExpense += transaction.amount;
+        stats.totalExpense += Number((transaction as Record<string, unknown>).amount);
         stats.expenseCount += 1;
       }
     });
@@ -348,21 +348,21 @@ const useFinance = () => {
     const categoryStats = {};
 
     transactions.forEach((transaction) => {
-      if (!categoryStats[transaction.category]) {
-        categoryStats[transaction.category] = {
+      if (!categoryStats[String((transaction as Record<string, unknown>).category)]) {
+        categoryStats[String((transaction as Record<string, unknown>).category)] = {
           income: 0,
           expense: 0,
           count: 0
         };
       }
 
-      if (transaction.type === 'income') {
-        categoryStats[transaction.category].income += transaction.amount;
+      if ((transaction as Record<string, unknown>).type === 'income') {
+        categoryStats[String((transaction as Record<string, unknown>).category)].income += Number((transaction as Record<string, unknown>).amount);
       } else {
-        categoryStats[transaction.category].expense += transaction.amount;
+        categoryStats[String((transaction as Record<string, unknown>).category)].expense += Number((transaction as Record<string, unknown>).amount);
       }
 
-      categoryStats[transaction.category].count += 1;
+      categoryStats[String((transaction as Record<string, unknown>).category)].count += 1;
     });
 
     return categoryStats;
@@ -379,14 +379,14 @@ const useFinance = () => {
     }
 
     transactions.forEach((transaction) => {
-      const transactionDate = transaction.transactionDate;
-      if (dailyStats[transactionDate]) {
-        if (transaction.type === 'income') {
-          dailyStats[transactionDate].income += transaction.amount;
+      const transactionDate = (transaction as Record<string, unknown>).transactionDate;
+      if (dailyStats[transactionDate as string]) {
+        if ((transaction as Record<string, unknown>).type === 'income') {
+          dailyStats[transactionDate as string].income += Number((transaction as Record<string, unknown>).amount);
         } else {
-          dailyStats[transactionDate].expense += transaction.amount;
+          dailyStats[transactionDate as string].expense += Number((transaction as Record<string, unknown>).amount);
         }
-        dailyStats[transactionDate].count += 1;
+        dailyStats[transactionDate as string].count += 1;
       }
     });
 
