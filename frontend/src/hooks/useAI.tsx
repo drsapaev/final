@@ -1,30 +1,183 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 /**
  * Улучшенная система ИИ для медицинских интерфейсов
  * Основана на принципах доступности и медицинских стандартах UX
  */
 
-import PropTypes from 'prop-types';
 import { useState, useCallback } from 'react';
 import { useReducedMotion } from './useEnhancedMediaQuery';
 import { mcpAPI } from '../utils/mcp';
 import { validateAIChatMessage, detectPromptInjection } from '../utils/aiValidator';
 
 import logger from '../utils/logger';
-// @ts-expect-error — module not yet migrated or path issue
-import { Input } from '../../ui/macos';
+
+// TypeScript doesn't ship SpeechRecognition types in lib.dom. Declare a
+// minimal structural type so consumers of useAIAssistant can compile
+// without `@ts-nocheck`. This mirrors the W3C SpeechRecognition surface
+// used by Chromium-based browsers (`webkitSpeechRecognition`).
+interface SpeechRecognitionResult {
+  transcript: string;
+  confidence: number;
+}
+
+interface SpeechRecognitionResultList {
+  readonly length: number;
+  item(index: number): SpeechRecognitionResult;
+  [index: number]: SpeechRecognitionResult;
+}
+
+interface SpeechRecognitionEvent extends Event {
+  readonly resultIndex: number;
+  readonly results: SpeechRecognitionResultList;
+}
+
+interface SpeechRecognitionErrorEvent extends Event {
+  readonly error: string;
+  readonly message: string;
+}
+
+interface SpeechRecognitionLike {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  maxAlternatives: number;
+  onresult: ((event: SpeechRecognitionEvent) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
+  onend: (() => void) | null;
+  start(): void;
+  stop(): void;
+  abort(): void;
+}
+
+type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
+
+interface WindowWithSpeechRecognition extends Window {
+  SpeechRecognition?: SpeechRecognitionConstructor;
+  webkitSpeechRecognition?: SpeechRecognitionConstructor;
+}
+
 // Основные настройки ИИ
 const AI_CONFIG = {
   defaultProvider: 'mcp',
   timeout: 30000,
   retryAttempts: 3,
   retryDelay: 1000
-};
+} as const;
+
+type AIProvider = string;
+type AIContext = string;
+
+interface ChatMessage {
+  id: number;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  timestamp: Date;
+  type: 'text' | 'error';
+  metadata?: unknown;
+}
+
+interface AISuggestion {
+  id: number;
+  text: string;
+  confidence: number;
+  category: string;
+  timestamp: Date;
+}
+
+interface SuggestionHistoryEntry {
+  context: string;
+  suggestions: AISuggestion[];
+  timestamp: Date;
+}
+
+interface TranslationEntry {
+  id: number;
+  original: string;
+  translated: string;
+  from: string;
+  to: string;
+  timestamp: Date;
+}
+
+interface BatchTranslationResult {
+  original: string;
+  translated: string;
+  error?: string;
+}
+
+interface UseAIAssistantOptions {
+  provider?: AIProvider;
+  model?: string;
+  temperature?: number;
+  maxTokens?: number;
+  systemPrompt?: string;
+  context?: AIContext;
+}
+
+interface UseAIAssistantReturn {
+  messages: ChatMessage[];
+  loading: boolean;
+  error: string | null;
+  isListening: boolean;
+  sendMessage: (message: string, options?: Record<string, unknown>) => Promise<ChatMessage | undefined>;
+  clearMessages: () => void;
+  startListening: () => void;
+}
+
+interface UseAISuggestionsOptions {
+  provider?: AIProvider;
+  model?: string;
+  type?: string;
+  maxSuggestions?: number;
+}
+
+interface UseAISuggestionsReturn {
+  suggestions: AISuggestion[];
+  loading: boolean;
+  error: string | null;
+  history: SuggestionHistoryEntry[];
+  generateSuggestions: (context: string, options?: Record<string, unknown>) => Promise<AISuggestion[] | undefined>;
+  filterByConfidence: (minConfidence?: number) => AISuggestion[];
+  groupByCategory: () => Record<string, AISuggestion[]>;
+  clearSuggestions: () => void;
+  clearHistory: () => void;
+}
+
+interface UseAITranslationOptions {
+  provider?: AIProvider;
+  sourceLanguage?: string;
+  targetLanguage?: string;
+}
+
+interface UseAITranslationReturn {
+  translations: TranslationEntry[];
+  loading: boolean;
+  error: string | null;
+  translate: (text: string, fromLang?: string, toLang?: string) => Promise<string>;
+  translateBatch: (texts: string[], fromLang?: string, toLang?: string) => Promise<BatchTranslationResult[]>;
+  clearTranslations: () => void;
+}
+
+interface UseAIImageAnalysisOptions {
+  provider?: AIProvider;
+  useMCP?: boolean;
+}
+
+interface UseAIImageAnalysisReturn {
+  analysis: unknown;
+  loading: boolean;
+  error: string | null;
+  history: unknown[];
+  analyzeImage: (imageFile: File | Blob, imageType?: string, options?: Record<string, unknown>) => Promise<unknown>;
+  analyzeMedicalImage: (imageFile: File | Blob, options?: Record<string, unknown>) => Promise<unknown>;
+  analyzeDocument: (imageFile: File | Blob, options?: Record<string, unknown>) => Promise<unknown>;
+  clearResults: () => void;
+  clearHistory: () => void;
+  setAnalysis: (value: unknown) => void;
+  setError: (value: string | null) => void;
+}
 
 // Хук для ИИ помощника
-export const useAIAssistant = (options: Record<string, unknown> = {}) => {
+export const useAIAssistant = (options: UseAIAssistantOptions = {}): UseAIAssistantReturn => {
   const {
     provider = AI_CONFIG.defaultProvider,
     model = 'gpt-4',
@@ -34,14 +187,14 @@ export const useAIAssistant = (options: Record<string, unknown> = {}) => {
     context = 'medical'
   } = options;
 
-  const [messages, setMessages] = useState([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   const [isListening, setIsListening] = useState(false);
   useReducedMotion();
 
   // Отправка сообщения
-  const sendMessage = useCallback(async (message, options: Record<string, unknown> = {}) => {
+  const sendMessage = useCallback(async (message: string, options: Record<string, unknown> = {}): Promise<ChatMessage | undefined> => {
     void options;
     if (!message || message.trim() === '') return;
 
@@ -55,7 +208,7 @@ export const useAIAssistant = (options: Record<string, unknown> = {}) => {
     setLoading(true);
     setError(null);
 
-    const userMessage = {
+    const userMessage: ChatMessage = {
       id: Date.now(),
       role: 'user',
       content: message,
@@ -85,7 +238,7 @@ export const useAIAssistant = (options: Record<string, unknown> = {}) => {
           timestamp: new Date(),
           type: 'text',
           metadata: response.data.metadata
-        });
+        }) as ChatMessage | null;
 
         if (!validatedMessage) {
           throw new Error('AI response validation failed');
@@ -98,9 +251,10 @@ export const useAIAssistant = (options: Record<string, unknown> = {}) => {
       }
     } catch (err) {
       logger.error('AI assistant error:', err);
-      setError(err.message);
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
 
-      const errorMessage = {
+      const errorMessage: ChatMessage = {
         id: Date.now() + 2,
         role: 'assistant',
         content: 'Извините, произошла ошибка. Попробуйте еще раз.',
@@ -122,26 +276,27 @@ export const useAIAssistant = (options: Record<string, unknown> = {}) => {
 
   // Голосовой ввод
   const startListening = useCallback(() => {
-    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    const win = window as WindowWithSpeechRecognition;
+    if (!win.SpeechRecognition && !win.webkitSpeechRecognition) {
       setError('Голосовой ввод не поддерживается в вашем браузере');
       return;
     }
 
     setIsListening(true);
 
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const recognition = new SpeechRecognition();
+    const SpeechRecognitionCtor = (win.SpeechRecognition || win.webkitSpeechRecognition) as SpeechRecognitionConstructor;
+    const recognition = new SpeechRecognitionCtor();
 
     recognition.continuous = false;
     recognition.interimResults = false;
     recognition.lang = 'ru-RU';
 
-    recognition.onresult = (event) => {
-      const transcript = event.results[0][0].transcript;
-      sendMessage(transcript);
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      const transcript = event.results[0]?.transcript ?? '';
+      void sendMessage(transcript);
     };
 
-    recognition.onerror = (event) => {
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
       setError(`Ошибка распознавания речи: ${event.error}`);
       setIsListening(false);
     };
@@ -165,7 +320,7 @@ export const useAIAssistant = (options: Record<string, unknown> = {}) => {
 };
 
 // Хук для ИИ предложений
-export const useAISuggestions = (options: Record<string, unknown> = {}) => {
+export const useAISuggestions = (options: UseAISuggestionsOptions = {}): UseAISuggestionsReturn => {
   const {
     provider = AI_CONFIG.defaultProvider,
     model = 'gpt-3.5-turbo',
@@ -173,13 +328,13 @@ export const useAISuggestions = (options: Record<string, unknown> = {}) => {
     maxSuggestions = 5
   } = options;
 
-  const [suggestions, setSuggestions] = useState([]);
+  const [suggestions, setSuggestions] = useState<AISuggestion[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [history, setHistory] = useState([]);
+  const [error, setError] = useState<string | null>(null);
+  const [history, setHistory] = useState<SuggestionHistoryEntry[]>([]);
 
   // Генерация предложений
-  const generateSuggestions = useCallback(async (context, options: Record<string, unknown> = {}) => {
+  const generateSuggestions = useCallback(async (context: string, options: Record<string, unknown> = {}): Promise<AISuggestion[] | undefined> => {
     setLoading(true);
     setError(null);
 
@@ -194,7 +349,7 @@ export const useAISuggestions = (options: Record<string, unknown> = {}) => {
       });
 
       if (response.status === 'success') {
-        const newSuggestions = response.data.suggestions.map((suggestion, index) => ({
+        const newSuggestions: AISuggestion[] = (response.data.suggestions as Array<{ text: string; confidence: number; category: string }>).map((suggestion, index) => ({
           id: Date.now() + index,
           text: suggestion.text,
           confidence: suggestion.confidence,
@@ -210,20 +365,21 @@ export const useAISuggestions = (options: Record<string, unknown> = {}) => {
       }
     } catch (err) {
       logger.error('AI suggestions error:', err);
-      setError(err.message);
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
     } finally {
       setLoading(false);
     }
   }, [type, provider, model, maxSuggestions]);
 
   // Фильтрация по уверенности
-  const filterByConfidence = useCallback((minConfidence = 0.5) => {
+  const filterByConfidence = useCallback((minConfidence = 0.5): AISuggestion[] => {
     return suggestions.filter((suggestion) => suggestion.confidence >= minConfidence);
   }, [suggestions]);
 
   // Группировка по категориям
-  const groupByCategory = useCallback(() => {
-    return suggestions.reduce((groups, suggestion) => {
+  const groupByCategory = useCallback((): Record<string, AISuggestion[]> => {
+    return suggestions.reduce<Record<string, AISuggestion[]>>((groups, suggestion) => {
       const category = suggestion.category || 'other';
       if (!groups[category]) {
         groups[category] = [];
@@ -258,19 +414,19 @@ export const useAISuggestions = (options: Record<string, unknown> = {}) => {
 };
 
 // Хук для ИИ перевода
-export const useAITranslation = (options: Record<string, unknown> = {}) => {
+export const useAITranslation = (options: UseAITranslationOptions = {}): UseAITranslationReturn => {
   const {
     provider = AI_CONFIG.defaultProvider,
     sourceLanguage = 'ru',
     targetLanguage = 'en'
   } = options;
 
-  const [translations, setTranslations] = useState([]);
+  const [translations, setTranslations] = useState<TranslationEntry[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Перевод текста
-  const translate = useCallback(async (text, fromLang = sourceLanguage, toLang = targetLanguage) => {
+  const translate = useCallback(async (text: string, fromLang = sourceLanguage, toLang = targetLanguage): Promise<string> => {
     if (!text || text.trim() === '') return '';
 
     setLoading(true);
@@ -286,7 +442,7 @@ export const useAITranslation = (options: Record<string, unknown> = {}) => {
       });
 
       if (response.status === 'success') {
-        const translation = {
+        const translation: TranslationEntry = {
           id: Date.now(),
           original: text,
           translated: response.data.translation,
@@ -302,7 +458,8 @@ export const useAITranslation = (options: Record<string, unknown> = {}) => {
       }
     } catch (err) {
       logger.error('AI translation error:', err);
-      setError(err.message);
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
       return text; // Возвращаем оригинальный текст при ошибке
     } finally {
       setLoading(false);
@@ -310,15 +467,16 @@ export const useAITranslation = (options: Record<string, unknown> = {}) => {
   }, [sourceLanguage, targetLanguage, provider]);
 
   // Пакетный перевод
-  const translateBatch = useCallback(async (texts, fromLang = sourceLanguage, toLang = targetLanguage) => {
-    const results = [];
+  const translateBatch = useCallback(async (texts: string[], fromLang = sourceLanguage, toLang = targetLanguage): Promise<BatchTranslationResult[]> => {
+    const results: BatchTranslationResult[] = [];
 
     for (const text of texts) {
       try {
         const translated = await translate(text, fromLang, toLang);
         results.push({ original: text, translated });
       } catch (err) {
-        results.push({ original: text, translated: text, error: err.message });
+        const message = err instanceof Error ? err.message : String(err);
+        results.push({ original: text, translated: text, error: message });
       }
     }
 
@@ -342,20 +500,19 @@ export const useAITranslation = (options: Record<string, unknown> = {}) => {
 };
 
 // Хук для анализа изображений ИИ
-export const useAIImageAnalysis = (options: Record<string, unknown> = {}) => {
+export const useAIImageAnalysis = (options: UseAIImageAnalysisOptions = {}): UseAIImageAnalysisReturn => {
   const {
     provider = AI_CONFIG.defaultProvider,
-
-    useMCP = true as boolean
+    useMCP = true
   } = options;
 
-  const [analysis, setAnalysis] = useState(null);
+  const [analysis, setAnalysis] = useState<unknown>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [history, setHistory] = useState([]);
+  const [error, setError] = useState<string | null>(null);
+  const [history, setHistory] = useState<unknown[]>([]);
 
   // Анализ изображения
-  const analyzeImage = useCallback(async (imageFile, imageType = 'general', options: Record<string, unknown> = {}) => {
+  const analyzeImage = useCallback(async (imageFile: File | Blob, imageType = 'general', options: Record<string, unknown> = {}): Promise<unknown> => {
     setLoading(true);
     setError('');
 
@@ -376,7 +533,8 @@ export const useAIImageAnalysis = (options: Record<string, unknown> = {}) => {
       }
     } catch (err) {
       logger.error('AI image analysis error:', err);
-      setError(err.message);
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
       throw err;
     } finally {
       setLoading(false);
@@ -384,12 +542,12 @@ export const useAIImageAnalysis = (options: Record<string, unknown> = {}) => {
   }, [provider, useMCP]);
 
   // Анализ медицинских изображений
-  const analyzeMedicalImage = useCallback(async (imageFile, options: Record<string, unknown> = {}) => {
+  const analyzeMedicalImage = useCallback((imageFile: File | Blob, options: Record<string, unknown> = {}): Promise<unknown> => {
     return analyzeImage(imageFile, 'medical', options);
   }, [analyzeImage]);
 
   // Анализ документов
-  const analyzeDocument = useCallback(async (imageFile, options: Record<string, unknown> = {}) => {
+  const analyzeDocument = useCallback((imageFile: File | Blob, options: Record<string, unknown> = {}): Promise<unknown> => {
     return analyzeImage(imageFile, 'document', options);
   }, [analyzeImage]);
 
