@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 /**
  * useDoctorSectionTemplates - Universal hook for doctor's section templates
  * 
@@ -68,12 +65,16 @@ export const SECTION_LABELS = {
  */
 export function useDoctorSectionTemplates({
     section,
-    icd10Code = null as unknown,
+    icd10Code = null,
     limit = 10,
-}) {
-    const [templates, setTemplates] = useState([]);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
+}: {
+    section?: string;
+    icd10Code?: string | null;
+    limit?: number;
+} = {}) {
+    const [templates, setTemplates] = useState<unknown[]>([]);
+    const [loading, setLoading] = useState<boolean>(false);
+    const [error, setError] = useState<unknown>(null);
     const isMountedRef = useRef(true);
 
     useEffect(() => {
@@ -116,7 +117,7 @@ export function useDoctorSectionTemplates({
 
         const loadPromise = (async () => {
             const params = new URLSearchParams();
-            if (icd10Code) params.append('icd10_code', icd10Code);
+            if (icd10Code) params.append('icd10_code', String(icd10Code));
             params.append('limit', limit.toString());
 
             try {
@@ -124,21 +125,21 @@ export function useDoctorSectionTemplates({
                     `/section-templates/${section}?${params.toString()}`
                 );
 
-                const templatesData = response.data.templates || [];
+                const templatesData = (response.data as Record<string, unknown>).templates || [];
                 sectionTemplateCache.set(cacheKey, {
                     data: templatesData,
                     promise: null,
                 });
 
                 if (isMountedRef.current) {
-                    setTemplates(templatesData);
+                    setTemplates(templatesData as unknown[]);
                 }
 
                 return templatesData;
-            } catch (err) {
+            } catch (err: unknown) {
                 logger.error('[useDoctorSectionTemplates] Fetch error:', err);
                 if (isMountedRef.current) {
-                    setError(err.message || 'Failed to load templates');
+                    setError((err as Error).message || 'Failed to load templates');
                     setTemplates([]);
                 }
                 sectionTemplateCache.delete(cacheKey);
@@ -182,9 +183,9 @@ export function useDoctorSectionTemplates({
             await apiClient.post(`/section-templates/${section}/${templateId}/pin`);
             await fetchTemplates(true); // Refresh list
             return { success: true };
-        } catch (err) {
+        } catch (err: unknown) {
             logger.error('[useDoctorSectionTemplates] Pin error:', err);
-            return { success: false, error: err.message };
+            return { success: false, error: (err as Error).message };
         }
     }, [section, fetchTemplates]);
 
@@ -197,9 +198,9 @@ export function useDoctorSectionTemplates({
             await apiClient.delete(`/section-templates/${section}/${templateId}/pin`);
             await fetchTemplates(true);
             return { success: true };
-        } catch (err) {
+        } catch (err: unknown) {
             logger.error('[useDoctorSectionTemplates] Unpin error:', err);
-            return { success: false, error: err.message };
+            return { success: false, error: (err as Error).message };
         }
     }, [section, fetchTemplates]);
 
@@ -217,9 +218,9 @@ export function useDoctorSectionTemplates({
             );
             await fetchTemplates(true);
             return { success: true, template: response.data };
-        } catch (err) {
+        } catch (err: unknown) {
             logger.error('[useDoctorSectionTemplates] Update error:', err);
-            return { success: false, error: err.message };
+            return { success: false, error: (err as Error).message };
         }
     }, [section, fetchTemplates]);
 
@@ -232,9 +233,9 @@ export function useDoctorSectionTemplates({
             await apiClient.delete(`/section-templates/${section}/${templateId}`);
             await fetchTemplates(true);
             return { success: true };
-        } catch (err) {
+        } catch (err: unknown) {
             logger.error('[useDoctorSectionTemplates] Delete error:', err);
-            return { success: false, error: err.message };
+            return { success: false, error: (err as Error).message };
         }
     }, [section, fetchTemplates]);
 
