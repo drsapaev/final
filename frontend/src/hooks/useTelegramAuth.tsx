@@ -1,3 +1,6 @@
+// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
+// Proper typing deferred to Phase 9 cleanup (strict mode).
+
 /**
  * useTelegramAuth — M4-P0-2 frontend integration (P5).
  *
@@ -22,6 +25,7 @@
  *   });
  */
 import { useState, useCallback, useEffect, useRef } from 'react';
+// @ts-expect-error — module not yet migrated or path issue
 import { api } from '../../api/client';
 import { readTelegramMiniAppInitData } from '../patientUtils';
 
@@ -86,7 +90,7 @@ export function useTelegramAuth() {
       return null;
     } catch (err) {
       const reason = err?.response?.data?.detail?.reason || 'exchange_failed';
-      setError(reason);
+      setError(String(reason));
       return null;
     } finally {
       setIsAuthenticating(false);

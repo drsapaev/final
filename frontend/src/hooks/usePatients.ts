@@ -110,7 +110,7 @@ const usePatients = () => {
       const wrapped = new Error(message);
       (wrapped as CatchError).status = err?.response?.status;
       (wrapped as CatchError).response = err?.response;
-      setError(wrapped);
+      setError(String(wrapped));
       throw wrapped;
     } finally {
       setLoading(false);
@@ -156,7 +156,7 @@ const usePatients = () => {
       const wrapped = new Error(message);
       (wrapped as CatchError).status = err?.response?.status;
       (wrapped as CatchError).response = err?.response;
-      setError(wrapped);
+      setError(String(wrapped));
       throw wrapped;
     } finally {
       setLoading(false);
@@ -177,7 +177,7 @@ const usePatients = () => {
       const wrapped = new Error(message);
       (wrapped as CatchError).status = err?.response?.status;
       (wrapped as CatchError).response = err?.response;
-      setError(wrapped);
+      setError(String(wrapped));
       throw wrapped;
     } finally {
       setLoading(false);
@@ -245,7 +245,7 @@ const usePatients = () => {
       const wrapped = new Error(message);
       (wrapped as CatchError).status = err?.response?.status;
       (wrapped as CatchError).response = err?.response;
-      setError(wrapped);
+      setError(String(wrapped));
       throw wrapped;
     } finally {
       setLoading(false);
@@ -270,7 +270,7 @@ const usePatients = () => {
       const wrapped = new Error(message);
       (wrapped as CatchError).status = err?.response?.status;
       (wrapped as CatchError).response = err?.response;
-      setError(wrapped);
+      setError(String(wrapped));
       throw wrapped;
     } finally {
       setLoading(false);

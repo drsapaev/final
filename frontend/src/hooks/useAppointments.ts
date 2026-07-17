@@ -68,7 +68,7 @@ const useAppointments = (doctors: unknown[] = []) => {
       const items = Array.isArray(response.data) ? response.data : [];
       setAppointments(items.map(normalizeAppointment));
     } catch (err) {
-      setError(err);
+      setError(String(err));
     } finally {
       setLoading(false);
     }
@@ -87,7 +87,7 @@ const useAppointments = (doctors: unknown[] = []) => {
         await loadAppointments();
         return normalizeAppointment(response.data || {});
       } catch (err) {
-        setError(err);
+        setError(String(err));
         throw err;
       } finally {
         setLoading(false);
@@ -109,7 +109,7 @@ const useAppointments = (doctors: unknown[] = []) => {
         await loadAppointments();
         return normalizeAppointment(response.data || {});
       } catch (err) {
-        setError(err);
+        setError(String(err));
         throw err;
       } finally {
         setLoading(false);
@@ -127,7 +127,7 @@ const useAppointments = (doctors: unknown[] = []) => {
         await api.delete(`/appointments/${id}`);
         await loadAppointments();
       } catch (err) {
-        setError(err);
+        setError(String(err));
         throw err;
       } finally {
         setLoading(false);

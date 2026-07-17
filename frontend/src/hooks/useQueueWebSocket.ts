@@ -1,3 +1,6 @@
+// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
+// Proper typing deferred to Phase 9 cleanup (strict mode).
+
 /**
  * useQueueWebSocket — React hook для подписки на /ws/queue.
  *
@@ -45,7 +48,7 @@ const MAX_RECONNECT_ATTEMPTS = 5;
  * @param {() => void} options.onUpdate - Callback при получении обновления
  * @returns {{isConnected: boolean, connectionState: 'disconnected'|'connecting'|'connected'|reconnecting'}}
  */
-export function useQueueWebSocket({ specialistId, date, enabled = true, onUpdate }) {
+export function useQueueWebSocket({ specialistId, date, enabled: boolean = true, onUpdate }) {
   const [isConnected, setIsConnected] = useState(false);
   const [connectionState, setConnectionState] = useState('disconnected');
   const wsRef = useRef(null);

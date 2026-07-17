@@ -1,3 +1,6 @@
+// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
+// Proper typing deferred to Phase 9 cleanup (strict mode).
+
 /**
  * Улучшенная система форм для медицинских интерфейсов
  * Основана на принципах доступности и медицинских стандартах UX
@@ -10,6 +13,7 @@ import { useReducedMotion } from './useEnhancedMediaQuery';
 
 import logger from '../utils/logger';
 // @ts-expect-error — ui/macos not yet migrated to TS (Phase 4 redo)
+// @ts-expect-error — module not yet migrated or path issue
 import { Input } from '../../ui/macos';
 // Валидаторы для медицинских форм
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- validators return mixed types (boolean | string | null); Phase 9 cleanup

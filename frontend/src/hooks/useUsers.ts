@@ -50,7 +50,7 @@ const useUsers = () => {
         err,
         'Не удалось загрузить пользователей. Проверьте соединение и попробуйте снова.'
       );
-      setError(errorMessage);
+      setError(String(errorMessage));
       toast.error(errorMessage);
     } finally {
       setLoading(false);
@@ -77,7 +77,7 @@ const useUsers = () => {
         err,
         'Не удалось создать пользователя. Проверьте соединение и попробуйте снова.'
       );
-      setError(errorMessage);
+      setError(String(errorMessage));
       toast.error(errorMessage);
       throw err;
     } finally {
@@ -105,7 +105,7 @@ const useUsers = () => {
         err,
         'Не удалось обновить пользователя. Проверьте соединение и попробуйте снова.'
       );
-      setError(errorMessage);
+      setError(String(errorMessage));
       toast.error(errorMessage);
       throw err;
     } finally {
@@ -130,7 +130,7 @@ const useUsers = () => {
         err,
         'Не удалось удалить пользователя. Проверьте соединение и попробуйте снова.'
       );
-      setError(errorMessage);
+      setError(String(errorMessage));
       toast.error(errorMessage);
       throw err;
     } finally {

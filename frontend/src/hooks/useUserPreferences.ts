@@ -30,7 +30,7 @@ const LOCAL_STORAGE_KEY = 'user_preferences_cache';
  * @param {number} userId - ID пользователя (опционально, берётся из auth)
  * @param {boolean} autoLoad - автоматически загружать при mount
  */
-export const useUserPreferences = (userId = null, autoLoad = true) => {
+export const useUserPreferences = (userId: unknown = null, autoLoad: boolean = true) => {
     const [preferences, setPreferences] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
@@ -40,7 +40,7 @@ export const useUserPreferences = (userId = null, autoLoad = true) => {
     const loadedRef = useRef(false);
 
     // Загрузка preferences из API
-    const loadPreferences = useCallback(async (forceReload = false) => {
+    const loadPreferences = useCallback(async (forceReload: boolean = false) => {
         if (loadedRef.current && !forceReload) return preferences;
 
         // Проверяем наличие токена авторизации - если нет, используем дефолты
@@ -114,7 +114,7 @@ export const useUserPreferences = (userId = null, autoLoad = true) => {
     }, [userId, preferences]);
 
     // Сохранение preferences в API
-    const savePreferences = useCallback(async (updates = {}) => {
+    const savePreferences = useCallback(async (updates: Record<string, unknown> = {}) => {
         if (!preferences) return false;
 
         const newPrefs = { ...preferences, ...updates };
@@ -144,7 +144,7 @@ export const useUserPreferences = (userId = null, autoLoad = true) => {
     }, [preferences, userId]);
 
     // Обновить одно поле (с дебаунсом сохранения)
-    const updatePreference = useCallback((key, value, saveImmediately = false) => {
+    const updatePreference = useCallback((key, value, saveImmediately: boolean = false) => {
         setPreferences(prev => {
             const updated = { ...prev, [key]: value };
             localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({ ...updated, _cachedAt: Date.now() }));

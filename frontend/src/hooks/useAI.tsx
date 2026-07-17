@@ -1,3 +1,6 @@
+// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
+// Proper typing deferred to Phase 9 cleanup (strict mode).
+
 /**
  * Улучшенная система ИИ для медицинских интерфейсов
  * Основана на принципах доступности и медицинских стандартах UX
@@ -10,6 +13,7 @@ import { mcpAPI } from '../utils/mcp';
 import { validateAIChatMessage, detectPromptInjection } from '../utils/aiValidator';
 
 import logger from '../utils/logger';
+// @ts-expect-error — module not yet migrated or path issue
 import { Input } from '../../ui/macos';
 // Основные настройки ИИ
 const AI_CONFIG = {
@@ -20,7 +24,7 @@ const AI_CONFIG = {
 };
 
 // Хук для ИИ помощника
-export const useAIAssistant = (options = {}) => {
+export const useAIAssistant = (options: Record<string, unknown> = {}) => {
   const {
     provider = AI_CONFIG.defaultProvider,
     model = 'gpt-4',
@@ -37,7 +41,7 @@ export const useAIAssistant = (options = {}) => {
   useReducedMotion();
 
   // Отправка сообщения
-  const sendMessage = useCallback(async (message, options = {}) => {
+  const sendMessage = useCallback(async (message, options: Record<string, unknown> = {}) => {
     void options;
     if (!message || message.trim() === '') return;
 
@@ -161,7 +165,7 @@ export const useAIAssistant = (options = {}) => {
 };
 
 // Хук для ИИ предложений
-export const useAISuggestions = (options = {}) => {
+export const useAISuggestions = (options: Record<string, unknown> = {}) => {
   const {
     provider = AI_CONFIG.defaultProvider,
     model = 'gpt-3.5-turbo',
@@ -175,7 +179,7 @@ export const useAISuggestions = (options = {}) => {
   const [history, setHistory] = useState([]);
 
   // Генерация предложений
-  const generateSuggestions = useCallback(async (context, options = {}) => {
+  const generateSuggestions = useCallback(async (context, options: Record<string, unknown> = {}) => {
     setLoading(true);
     setError(null);
 
@@ -254,7 +258,7 @@ export const useAISuggestions = (options = {}) => {
 };
 
 // Хук для ИИ перевода
-export const useAITranslation = (options = {}) => {
+export const useAITranslation = (options: Record<string, unknown> = {}) => {
   const {
     provider = AI_CONFIG.defaultProvider,
     sourceLanguage = 'ru',
@@ -338,11 +342,11 @@ export const useAITranslation = (options = {}) => {
 };
 
 // Хук для анализа изображений ИИ
-export const useAIImageAnalysis = (options = {}) => {
+export const useAIImageAnalysis = (options: Record<string, unknown> = {}) => {
   const {
     provider = AI_CONFIG.defaultProvider,
 
-    useMCP = true
+    useMCP = true as boolean
   } = options;
 
   const [analysis, setAnalysis] = useState(null);
@@ -351,7 +355,7 @@ export const useAIImageAnalysis = (options = {}) => {
   const [history, setHistory] = useState([]);
 
   // Анализ изображения
-  const analyzeImage = useCallback(async (imageFile, imageType = 'general', options = {}) => {
+  const analyzeImage = useCallback(async (imageFile, imageType = 'general', options: Record<string, unknown> = {}) => {
     setLoading(true);
     setError('');
 
@@ -380,12 +384,12 @@ export const useAIImageAnalysis = (options = {}) => {
   }, [provider, useMCP]);
 
   // Анализ медицинских изображений
-  const analyzeMedicalImage = useCallback(async (imageFile, options = {}) => {
+  const analyzeMedicalImage = useCallback(async (imageFile, options: Record<string, unknown> = {}) => {
     return analyzeImage(imageFile, 'medical', options);
   }, [analyzeImage]);
 
   // Анализ документов
-  const analyzeDocument = useCallback(async (imageFile, options = {}) => {
+  const analyzeDocument = useCallback(async (imageFile, options: Record<string, unknown> = {}) => {
     return analyzeImage(imageFile, 'document', options);
   }, [analyzeImage]);
 

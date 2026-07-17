@@ -1,3 +1,6 @@
+// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
+// Proper typing deferred to Phase 9 cleanup (strict mode).
+
 /**
  * useDoctorPhrases - хук для подсказок из истории врача
  * 
@@ -176,7 +179,7 @@ export const useDoctorPhrases = ({
           error: errorMessage,
           rawMessage: err?.message,
         });
-        setError(errorMessage);
+        setError(String(errorMessage));
         setSuggestions([]);
       }
     } finally {

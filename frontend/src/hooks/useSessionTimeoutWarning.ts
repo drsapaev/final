@@ -9,8 +9,8 @@
  * (isTokenExpiringSoon + refreshTokenIfNeeded) — this hook only adds
  * the user-facing warning UI. It polls the token's `exp` claim every
  * 30 seconds; when the remaining time drops below the warning threshold,
- * it calls `onWarning(expiresAt)` so the parent can show a dialog.
- * When the token actually expires, it calls `onExpired()`.
+ * it calls `(onWarning as (...args: unknown[]) => void)(expiresAt)` so the parent can show a dialog.
+ * When the token actually expires, it calls `(onExpired as (...args: unknown[]) => void)()`.
  *
  * Usage:
  *   useSessionTimeoutWarning({
@@ -94,7 +94,7 @@ export function useSessionTimeoutWarning({
             expiredFiredRef.current = true;
             warningFiredRef.current = true; // no point warning after expiry
             logger.info('[useSessionTimeoutWarning] session expired');
-            if (typeof onExpired === 'function') onExpired();
+            if (typeof onExpired === 'function') (onExpired as (...args: unknown[]) => void)();
           }
           return;
         }
@@ -105,7 +105,7 @@ export function useSessionTimeoutWarning({
             logger.info(
               `[useSessionTimeoutWarning] session expiring in ${Math.round(remaining / 1000)}s`
             );
-            if (typeof onWarning === 'function') onWarning(new Date(expiresAt));
+            if (typeof onWarning === 'function') (onWarning as (...args: unknown[]) => void)(new Date(expiresAt));
           }
         } else {
           // Token was refreshed (or user logged in anew) — reset the flags

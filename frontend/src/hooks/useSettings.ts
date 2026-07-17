@@ -91,7 +91,7 @@ const useSettings = () => {
       await new Promise(resolve => setTimeout(resolve, 500));
       setSettings(mockSettingsRef.current);
     } catch (err) {
-      setError(err);
+      setError(String(err));
     } finally {
       setLoading(false);
     }
@@ -113,7 +113,7 @@ const useSettings = () => {
       
       return newSettings;
     } catch (err) {
-      setError(err);
+      setError(String(err));
       throw err;
     } finally {
       setLoading(false);
@@ -133,7 +133,7 @@ const useSettings = () => {
       
       return mockSettingsRef.current;
     } catch (err) {
-      setError(err);
+      setError(String(err));
       throw err;
     } finally {
       setLoading(false);
@@ -156,7 +156,7 @@ const useSettings = () => {
       
       URL.revokeObjectURL(url);
     } catch (err) {
-      setError(err);
+      setError(String(err));
       throw err;
     }
   }, [settings]);
@@ -179,7 +179,7 @@ const useSettings = () => {
       
       return importedSettings;
     } catch (err) {
-      setError(err);
+      setError(String(err));
       throw err;
     } finally {
       setLoading(false);

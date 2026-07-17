@@ -230,7 +230,7 @@ const useSecurity = () => {
       await new Promise(resolve => setTimeout(resolve, 500));
       setSecurityData(mockSecurityDataRef.current);
     } catch (err) {
-      setError(err);
+      setError(String(err));
     } finally {
       setLoading(false);
     }
@@ -268,7 +268,7 @@ const useSecurity = () => {
       
       return newBlockedIP;
     } catch (err) {
-      setError(err);
+      setError(String(err));
       throw err;
     } finally {
       setLoading(false);
@@ -293,7 +293,7 @@ const useSecurity = () => {
         }
       }));
     } catch (err) {
-      setError(err);
+      setError(String(err));
       throw err;
     } finally {
       setLoading(false);
@@ -318,7 +318,7 @@ const useSecurity = () => {
         }
       }));
     } catch (err) {
-      setError(err);
+      setError(String(err));
       throw err;
     } finally {
       setLoading(false);
@@ -343,7 +343,7 @@ const useSecurity = () => {
         }
       }));
     } catch (err) {
-      setError(err);
+      setError(String(err));
       throw err;
     } finally {
       setLoading(false);
@@ -368,7 +368,7 @@ const useSecurity = () => {
         )
       }));
     } catch (err) {
-      setError(err);
+      setError(String(err));
       throw err;
     } finally {
       setLoading(false);
@@ -521,7 +521,7 @@ const useSecurity = () => {
       
       URL.revokeObjectURL(url);
     } catch (err) {
-      setError(err);
+      setError(String(err));
       throw err;
     }
   }, [filteredLogs]);

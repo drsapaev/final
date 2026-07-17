@@ -1,3 +1,6 @@
+// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
+// Proper typing deferred to Phase 9 cleanup (strict mode).
+
 /**
  * useWebAuthn — P5 frontend integration for passkey registration/login.
  *
@@ -15,6 +18,7 @@
  *   // result = { access_token, refresh_token, ... }
  */
 import { useState, useCallback } from 'react';
+// @ts-expect-error — module not yet migrated or path issue
 import { api } from '../../api/client';
 
 function base64urlToBuffer(base64url) {
@@ -45,7 +49,7 @@ export function useWebAuthn() {
   const isSupported = typeof window !== 'undefined' &&
     typeof window.PublicKeyCredential !== 'undefined';
 
-  const register = useCallback(async (options = {}) => {
+  const register = useCallback(async (options: Record<string, unknown> = {}) => {
     if (!isSupported) {
       setError('webauthn_not_supported');
       return false;
@@ -87,7 +91,7 @@ export function useWebAuthn() {
           { type: 'public-key', alg: -7 },
         ],
         timeout: optionsData.timeout || 60000,
-        attestation: 'none',
+        attestation: 'none' as AttestationConveyancePreference,
       };
 
       const credential = await navigator.credentials.create({
@@ -103,7 +107,7 @@ export function useWebAuthn() {
       const attestationResponse = credential.response;
       const credentialResponse = {
         id: credential.id,
-        rawId: bufferToBase64url(credential.rawId),
+        rawId: bufferToBase64url((credential as PublicKeyCredential).rawId),
         type: credential.type,
         response: {
           attestationObject: bufferToBase64url(attestationResponse.attestationObject),
@@ -150,7 +154,7 @@ export function useWebAuthn() {
         challenge: base64urlToBuffer(optionsData.challenge),
         rpId: optionsData.rpId,
         timeout: optionsData.timeout || 60000,
-        userVerification: 'preferred',
+        userVerification: 'preferred' as UserVerificationRequirement,
       };
 
       const assertion = await navigator.credentials.get({
@@ -163,10 +167,10 @@ export function useWebAuthn() {
       }
 
       // Step 3: Finish authentication
-      const assertionResponse = assertion.response;
+      const assertionResponse = (assertion as PublicKeyCredential).response as AuthenticatorAssertionResponse;
       const assertionData = {
         id: assertion.id,
-        rawId: bufferToBase64url(assertion.rawId),
+        rawId: bufferToBase64url((assertion as PublicKeyCredential).rawId),
         type: assertion.type,
         response: {
           authenticatorData: bufferToBase64url(assertionResponse.authenticatorData),

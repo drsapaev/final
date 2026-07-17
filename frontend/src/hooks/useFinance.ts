@@ -170,7 +170,7 @@ const useFinance = () => {
       return mergedTransactions;
     } catch (err) {
       logger.error('Ошибка загрузки финансовых транзакций:', err);
-      setError(err);
+      setError(String(err));
 
       if (transactionsRef.current.length > 0) {
         logger.warn('[FIX:FINANCE] Используем локальный кэш финансовых транзакций после ошибки загрузки');
@@ -213,7 +213,7 @@ const useFinance = () => {
       return createdTransaction;
     } catch (err) {
       logger.error('Ошибка создания финансовой транзакции:', err);
-      setError(err);
+      setError(String(err));
       throw err;
     } finally {
       setLoading(false);
@@ -246,7 +246,7 @@ const useFinance = () => {
       return updatedTransaction;
     } catch (err) {
       logger.error('Ошибка обновления финансовой транзакции:', err);
-      setError(err);
+      setError(String(err));
       throw err;
     } finally {
       setLoading(false);
@@ -269,7 +269,7 @@ const useFinance = () => {
       await loadTransactions();
     } catch (err) {
       logger.error('Ошибка удаления финансовой транзакции:', err);
-      setError(err);
+      setError(String(err));
       throw err;
     } finally {
       setLoading(false);

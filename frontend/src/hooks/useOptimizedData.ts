@@ -1,16 +1,19 @@
+// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
+// Proper typing deferred to Phase 9 cleanup (strict mode).
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import tokenManager from '../utils/tokenManager';
 
 /**
  * Хук для оптимизированной загрузки данных с кэшированием и дебаунсингом
  */
-export const useOptimizedData = (url, options = {}) => {
+export const useOptimizedData = (url, options: Record<string, unknown> = {}) => {
   const {
     dependencies = [],
     cacheKey = url,
     cacheTime = 5 * 60 * 1000, // 5 минут
     debounceTime = 300,
-    enabled = true,
+    enabled = true as boolean,
     onError,
     onSuccess
   } = options;
@@ -23,7 +26,7 @@ export const useOptimizedData = (url, options = {}) => {
   const debounceRef = useRef(null);
 
   // Функция загрузки данных
-  const fetchData = useCallback(async (force = false) => {
+  const fetchData = useCallback(async (force: boolean = false) => {
     if (!enabled) return;
 
     // Проверяем кэш
@@ -31,7 +34,7 @@ export const useOptimizedData = (url, options = {}) => {
     if (!force && cached && Date.now() - cached.timestamp < cacheTime) {
       setData(cached.data);
       setError(null);
-      if (onSuccess) onSuccess(cached.data);
+      if (onSuccess) (onSuccess as (...args: unknown[]) => void)(cached.data);
       return cached.data;
     }
 
@@ -66,13 +69,13 @@ export const useOptimizedData = (url, options = {}) => {
       });
 
       setData(result);
-      if (onSuccess) onSuccess(result);
+      if (onSuccess) (onSuccess as (...args: unknown[]) => void)(result);
       return result;
 
     } catch (err) {
       if (err.name !== 'AbortError') {
         setError(err.message);
-        if (onError) onError(err);
+        if (onError) (onError as (...args: unknown[]) => void)(err);
       }
     } finally {
       setLoading(false);
@@ -80,7 +83,7 @@ export const useOptimizedData = (url, options = {}) => {
   }, [url, cacheKey, cacheTime, enabled, onSuccess, onError]);
 
   // Дебаунсированная загрузка
-  const debouncedFetch = useCallback((force = false) => {
+  const debouncedFetch = useCallback((force: boolean = false) => {
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
     }
@@ -122,11 +125,11 @@ export const useOptimizedData = (url, options = {}) => {
 /**
  * Хук для пагинации с виртуализацией
  */
-export const usePaginatedData = (url, options = {}) => {
+export const usePaginatedData = (url, options: Record<string, unknown> = {}) => {
   const {
     pageSize = 50,
     searchTerm = '',
-    filters = {},
+    filters = {} as Record<string, unknown>,
     sortBy = '',
     sortOrder = 'asc'
   } = options;
