@@ -1,15 +1,59 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
-import React from 'react';
+import React, { type ReactNode, type CSSProperties } from 'react';
 import PropTypes from 'prop-types';
 import { useTheme } from '../../../contexts/ThemeContext';
+
+type GridSize = number | boolean | string;
+type GridSpacing = number | string;
+type GridDirection = 'row' | 'column' | 'row-reverse' | 'column-reverse';
+type GridJustify = 'flex-start' | 'flex-end' | 'center' | 'space-between' | 'space-around' | 'space-evenly';
+type GridAlign = 'flex-start' | 'flex-end' | 'center' | 'stretch' | 'baseline';
+type GridWrap = 'wrap' | 'nowrap' | 'wrap-reverse';
+
+interface GridProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'children' | 'style'> {
+  children?: ReactNode;
+  className?: string;
+  style?: CSSProperties;
+  container?: boolean;
+  item?: boolean;
+  xs?: GridSize;
+  sm?: GridSize;
+  md?: GridSize;
+  lg?: GridSize;
+  xl?: GridSize;
+  spacing?: GridSpacing;
+  direction?: GridDirection;
+  justify?: GridJustify;
+  alignItems?: GridAlign;
+  wrap?: GridWrap;
+}
+
+interface GridContainerProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'children' | 'style'> {
+  children?: ReactNode;
+  className?: string;
+  style?: CSSProperties;
+  spacing?: GridSpacing;
+  direction?: GridDirection;
+  justify?: GridJustify;
+  alignItems?: GridAlign;
+  wrap?: GridWrap;
+}
+
+interface GridItemProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'children' | 'style'> {
+  children?: ReactNode;
+  className?: string;
+  style?: CSSProperties;
+  xs?: GridSize;
+  sm?: GridSize;
+  md?: GridSize;
+  lg?: GridSize;
+  xl?: GridSize;
+}
 
 /**
  * macOS-style Grid Component
  * Implements Apple's Human Interface Guidelines for grid layouts
  */
-const Grid = React.forwardRef(({
+const Grid = React.forwardRef<HTMLDivElement, GridProps>(({
   children,
   className = '',
   style = {},
@@ -33,7 +77,7 @@ const Grid = React.forwardRef(({
   void lg;
   void xl;
 
-  const getGridStyles = () => {
+  const getGridStyles = (): CSSProperties => {
     if (container) {
       return {
         display: 'flex',
@@ -47,7 +91,7 @@ const Grid = React.forwardRef(({
     }
 
     if (item) {
-      const getFlexBasis = (size) => {
+      const getFlexBasis = (size: GridSize | undefined): string => {
         if (typeof size === 'number') {
           return `${size / 12 * 100}%`;
         }
@@ -57,7 +101,7 @@ const Grid = React.forwardRef(({
         return 'auto';
       };
 
-      const getMaxWidth = (size) => {
+      const getMaxWidth = (size: GridSize | undefined): string => {
         if (typeof size === 'number') {
           return `${size / 12 * 100}%`;
         }
@@ -84,7 +128,7 @@ const Grid = React.forwardRef(({
       className={`mac-grid ${container ? 'mac-grid--container' : ''} ${item ? 'mac-grid--item' : ''} ${className}`}
       style={gridStyles}
       {...props}>
-      
+
       {children}
     </div>);
 
@@ -93,7 +137,7 @@ const Grid = React.forwardRef(({
 /**
  * macOS-style GridContainer Component
  */
-const GridContainer = React.forwardRef(({
+const GridContainer = React.forwardRef<HTMLDivElement, GridContainerProps>(({
   children,
   className = '',
   style = {},
@@ -116,7 +160,7 @@ const GridContainer = React.forwardRef(({
       className={className}
       style={style}
       {...props}>
-      
+
       {children}
     </Grid>);
 
@@ -125,7 +169,7 @@ const GridContainer = React.forwardRef(({
 /**
  * macOS-style GridItem Component
  */
-const GridItem = React.forwardRef(({
+const GridItem = React.forwardRef<HTMLDivElement, GridItemProps>(({
   children,
   className = '',
   style = {},
@@ -148,7 +192,7 @@ const GridItem = React.forwardRef(({
       className={className}
       style={style}
       {...props}>
-      
+
       {children}
     </Grid>);
 

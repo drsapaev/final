@@ -1,8 +1,47 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import PropTypes from 'prop-types';
 import { useTranslation } from '../../../i18n/useTranslation';
+import type { CSSProperties, ReactNode, ComponentType, KeyboardEvent, MouseEvent as ReactMouseEvent, FocusEvent } from 'react';
+
+type TabSize = 'sm' | 'md' | 'lg';
+type TabVariant = 'default' | 'filled' | 'pills';
+type TabOrientation = 'horizontal' | 'vertical';
+type TabId = string | number;
+
+interface TabIconProps {
+  style?: CSSProperties;
+}
+
+interface TabDefinition {
+  id: TabId;
+  label: ReactNode;
+  icon?: ComponentType<TabIconProps>;
+  badge?: ReactNode;
+  disabled?: boolean;
+}
+
+interface MacOSTabProps {
+  tabs: TabDefinition[];
+  activeTab: TabId;
+  onTabChange: (id: TabId) => void;
+  size?: TabSize;
+  variant?: TabVariant;
+  orientation?: TabOrientation;
+  className?: string;
+  style?: CSSProperties;
+}
+
+interface TabSizeStyle extends CSSProperties {
+  gap?: string;
+}
+
+interface TabVariantStyle extends CSSProperties {
+  gap?: string;
+}
+
+interface TabButtonStyle extends CSSProperties {
+  transition?: string;
+}
+
 const MacOSTab = ({
   tabs,
   activeTab,
@@ -12,9 +51,11 @@ const MacOSTab = ({
   orientation = 'horizontal',
   className,
   style
-}) => {
+}: MacOSTabProps) => {
+  const { t } = useTranslation();
+  void t;
   void orientation;
-  const sizeStyles = {
+  const sizeStyles: Record<TabSize, TabSizeStyle> = {
     sm: {
       padding: '6px 12px',
       fontSize: 'var(--mac-font-size-xs)',
@@ -32,7 +73,7 @@ const MacOSTab = ({
     }
   };
 
-  const variantStyles = {
+  const variantStyles: Record<TabVariant, TabVariantStyle> = {
     default: {
       borderBottom: '1px solid var(--mac-separator)',
       background: 'transparent'
@@ -53,7 +94,7 @@ const MacOSTab = ({
   const currentSize = sizeStyles[size];
   const currentVariant = variantStyles[variant];
 
-  const containerStyle = {
+  const containerStyle: CSSProperties = {
     display: 'flex',
     flexDirection: 'column',
     marginBottom: variant === 'default' ? '24px' : '0',
@@ -61,14 +102,14 @@ const MacOSTab = ({
     ...style
   };
 
-  const tabButtonStyle = (isActive) => ({
+  const tabButtonStyle = (isActive: boolean): TabButtonStyle => ({
     padding: currentSize.padding,
     border: 'none',
     borderRadius: variant === 'filled' ? 'var(--mac-radius-sm)' : variant === 'pills' ? 'var(--mac-radius-lg)' : '0',
     fontSize: currentSize.fontSize,
     fontWeight: isActive ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
     color: isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)',
-    background: variant === 'filled' ? isActive ? 'var(--mac-bg-primary)' : 'transparent' : 'transparent',
+    background: variant === 'filled' ? (isActive ? 'var(--mac-bg-primary)' : 'transparent') : 'transparent',
     cursor: 'pointer',
     transition: 'all var(--mac-duration-normal) var(--mac-ease)',
     display: 'flex',
@@ -82,41 +123,39 @@ const MacOSTab = ({
     boxShadow: 'none'
   });
 
-  const handleTabClick = (tabId) => {
+  const handleTabClick = (tabId: TabId) => {
     onTabChange(tabId);
   };
 
-  const handleKeyDown = (e, tabId) => {
+  const handleKeyDown = (e: KeyboardEvent<HTMLButtonElement>, tabId: TabId) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       onTabChange(tabId);
     }
   };
 
-  const handleMouseEnter = (e, isActive) => {
+  const handleMouseEnter = (e: ReactMouseEvent<HTMLButtonElement>, isActive: boolean) => {
     if (!isActive) {
-      e.target.style.color = 'var(--mac-text-primary)';
+      e.currentTarget.style.color = 'var(--mac-text-primary)';
       if (variant === 'filled') {
-        e.target.style.background = 'var(--mac-bg-tertiary)';
+        e.currentTarget.style.background = 'var(--mac-bg-tertiary)';
       }
     }
   };
 
-  const handleMouseLeave = (e, isActive) => {
+  const handleMouseLeave = (e: ReactMouseEvent<HTMLButtonElement>, isActive: boolean) => {
     if (!isActive) {
-      e.target.style.color = 'var(--mac-text-secondary)';
+      e.currentTarget.style.color = 'var(--mac-text-secondary)';
       if (variant === 'filled') {
-        e.target.style.background = 'transparent';
+        e.currentTarget.style.background = 'transparent';
       }
     }
   };
 
-  const handleFocus = () => {
-
+  const handleFocus = (_e: FocusEvent<HTMLButtonElement>) => {
     // Ничего не делаем - убираем все эффекты фокуса
   };
-  const handleBlur = () => {
-
+  const handleBlur = (_e: FocusEvent<HTMLButtonElement>) => {
     // Ничего не делаем - убираем все эффекты фокуса
   };
   return (

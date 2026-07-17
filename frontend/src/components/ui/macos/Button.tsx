@@ -1,15 +1,39 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
-import React from 'react';
+import React, { type ReactNode, type CSSProperties, type MouseEvent } from 'react';
 import PropTypes from 'prop-types';
 import { useTranslation } from '../../../i18n/useTranslation';
+
+type ButtonVariant = 'default' | 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'ghost' | 'outline' | 'link';
+type ButtonSize = 'small' | 'default' | 'large';
+
+interface ButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'children' | 'style' | 'onClick'> {
+  children?: ReactNode;
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+  disabled?: boolean;
+  loading?: boolean;
+  fullWidth?: boolean;
+  className?: string;
+  style?: CSSProperties;
+  onClick?: (e: MouseEvent<HTMLButtonElement>) => void;
+}
+
+type ButtonStyle = CSSProperties & {
+  transition?: string;
+  WebkitUserSelect?: string;
+  WebkitAppearance?: string;
+  MozAppearance?: string;
+  WebkitBackdropFilter?: string;
+};
+
+interface SizeStyle extends CSSProperties {
+  gap?: string;
+}
 
 /**
  * macOS-style Button Component
  * Implements Apple's Human Interface Guidelines for buttons
  */
-const Button = React.forwardRef(({
+const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({
   children,
   variant = 'default',
   size = 'default',
@@ -21,10 +45,12 @@ const Button = React.forwardRef(({
   onClick,
   ...props
 }, ref) => {
+  const { t } = useTranslation();
+  void t;
 
   // macOS button styles based on variant
-  const getButtonStyles = () => {
-    const baseStyles = {
+  const getButtonStyles = (): ButtonStyle => {
+    const baseStyles: ButtonStyle = {
       display: 'inline-flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -44,7 +70,7 @@ const Button = React.forwardRef(({
       appearance: 'none'
     };
 
-    const sizeStyles = {
+    const sizeStyles: Record<ButtonSize, SizeStyle> = {
       small: {
         padding: '6px 12px',
         fontSize: 'var(--mac-font-size-xs)',
@@ -65,7 +91,7 @@ const Button = React.forwardRef(({
       }
     };
 
-    const variantStyles = {
+    const variantStyles: Record<ButtonVariant, CSSProperties> = {
       default: {
         backgroundColor: 'rgba(0, 0, 0, 0.05)',
         color: 'var(--mac-text-primary)',
@@ -137,14 +163,14 @@ const Button = React.forwardRef(({
         pointerEvents: 'none'
       }),
       ...style
-    };
+    } as ButtonStyle;
   };
 
-  const handleClick = (e) => {
+  const handleClick = (e: MouseEvent<HTMLButtonElement>) => {
     if (disabled || loading) return;
 
     // Add subtle haptic feedback simulation
-    if (navigator.vibrate) {
+    if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
       navigator.vibrate(10);
     }
 

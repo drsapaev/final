@@ -1,7 +1,4 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
-import React from 'react';
+import React, { type ReactNode, type CSSProperties, type ComponentType, type ReactElement } from 'react';
 import PropTypes from 'prop-types';
 
 import Alert from './Alert';
@@ -10,7 +7,21 @@ import { useTranslation } from '../../../i18n/useTranslation';
 
 const fontFamily = '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif';
 
-const loadingSizes = {
+type LoadingSize = 'sm' | 'small' | 'md' | 'medium' | 'lg' | 'large';
+type AppErrorSeverity = 'info' | 'success' | 'warning' | 'error';
+
+interface LoadingSizeStyle {
+  spinner: number;
+  padding: string;
+  title: string;
+  gap: string;
+}
+
+interface IconWrapperProps {
+  style?: CSSProperties;
+}
+
+const loadingSizes: Record<LoadingSize, LoadingSizeStyle> = {
   sm: { spinner: 20, padding: '24px', title: 'var(--mac-font-size-base)', gap: '10px' },
   small: { spinner: 20, padding: '24px', title: 'var(--mac-font-size-base)', gap: '10px' },
   md: { spinner: 28, padding: '32px', title: 'var(--mac-font-size-lg)', gap: '12px' },
@@ -19,25 +30,58 @@ const loadingSizes = {
   large: { spinner: 40, padding: '48px', title: 'var(--mac-font-size-xl)', gap: '16px' }
 };
 
-const getLoadingSize = (size) => loadingSizes[size] || loadingSizes.md;
+const getLoadingSize = (size: LoadingSize): LoadingSizeStyle => loadingSizes[size] || loadingSizes.md;
 
-const normalizeIcon = (icon) => {
+// Wrap a React element (an icon rendered with props) into a function
+// component so MacOSEmptyState can clone+merge styles. When the icon is
+// already a component type or anything else, pass through unchanged.
+const normalizeIcon = (
+  icon: ReactNode | ComponentType<IconWrapperProps> | undefined
+): ReactNode | ComponentType<IconWrapperProps> | undefined => {
   if (!React.isValidElement(icon)) {
     return icon;
   }
 
-  return function AppEmptyIcon(props) {
-    return React.cloneElement(icon, {
+  const iconElement = icon as ReactElement<{ style?: CSSProperties }>;
+  return function AppEmptyIcon(props: IconWrapperProps) {
+    return React.cloneElement(iconElement, {
       ...props,
       style: {
         ...props.style,
-        ...icon.props.style
+        ...iconElement.props.style
       }
     });
   };
 };
 
-export const AppLoading = React.forwardRef(({
+interface AppLoadingProps {
+  title?: ReactNode;
+  description?: ReactNode;
+  size?: LoadingSize;
+  ariaLabel?: string;
+  className?: string;
+  style?: CSSProperties;
+}
+
+interface AppEmptyProps {
+  title?: string;
+  description?: ReactNode;
+  action?: ReactNode;
+  icon?: ReactNode | ComponentType<IconWrapperProps>;
+  className?: string;
+  style?: CSSProperties;
+}
+
+interface AppErrorProps {
+  title?: ReactNode;
+  description?: ReactNode;
+  action?: ReactNode;
+  severity?: AppErrorSeverity;
+  className?: string;
+  style?: CSSProperties;
+}
+
+export const AppLoading = React.forwardRef<HTMLElement, AppLoadingProps>(({
   title = 'Загрузка…',
   description,
   size = 'md',
@@ -45,6 +89,8 @@ export const AppLoading = React.forwardRef(({
   className = '',
   style = {}
 }, ref) => {
+  const { t } = useTranslation();
+  void t;
   const currentSize = getLoadingSize(size);
 
   return (
@@ -53,7 +99,7 @@ export const AppLoading = React.forwardRef(({
       className={`mac-app-loading ${className}`.trim()}
       role="status"
       aria-live="polite"
-      aria-label={ariaLabel || title}
+      aria-label={ariaLabel || (typeof title === 'string' ? title : undefined)}
       style={{
         display: 'flex',
         flexDirection: 'column',
@@ -137,7 +183,14 @@ export const AppLoading = React.forwardRef(({
 
 AppLoading.displayName = 'AppLoading';
 
-export const AppEmpty = React.forwardRef(({
+// Alert and MacOSEmptyState are still implicit-any components. Cast them
+// to permissive signatures so this file can pass strict tsc without
+// waiting for those two components to be migrated.
+type AnyComponent = React.ComponentType<Record<string, unknown>>;
+const AlertAny = Alert as unknown as AnyComponent;
+const MacOSEmptyStateAny = MacOSEmptyState as unknown as AnyComponent;
+
+export const AppEmpty = React.forwardRef<HTMLElement, AppEmptyProps>(({
   title = 'Нет данных',
   description = 'Здесь пока нет данных для отображения.',
   action,
@@ -151,7 +204,7 @@ export const AppEmpty = React.forwardRef(({
     aria-label={title}
     style={style}
   >
-    <MacOSEmptyState
+    <MacOSEmptyStateAny
       title={title}
       description={description}
       action={action}
@@ -163,7 +216,7 @@ export const AppEmpty = React.forwardRef(({
 
 AppEmpty.displayName = 'AppEmpty';
 
-export const AppError = React.forwardRef(({
+export const AppError = React.forwardRef<HTMLElement, AppErrorProps>(({
   title = 'Не удалось загрузить данные',
   description = 'Проверьте соединение и попробуйте еще раз.',
   action,
@@ -176,7 +229,7 @@ export const AppError = React.forwardRef(({
     className={`mac-app-error ${className}`.trim()}
     style={style}
   >
-    <Alert
+    <AlertAny
       type={severity}
       title={title}
       description={description}
