@@ -1,12 +1,50 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
-import React from 'react';
+import React, { type ReactNode, type CSSProperties } from 'react';
 import PropTypes from 'prop-types';
 
+type SpacingValue = number | string;
+
+interface BoxProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'children' | 'style'> {
+  children?: ReactNode;
+  style?: CSSProperties;
+  sx?: CSSProperties;
+  display?: CSSProperties['display'];
+  alignItems?: CSSProperties['alignItems'];
+  justifyContent?: CSSProperties['justifyContent'];
+  gap?: SpacingValue;
+  mt?: SpacingValue;
+  mb?: SpacingValue;
+  mx?: SpacingValue;
+  my?: SpacingValue;
+  px?: SpacingValue;
+  py?: SpacingValue;
+  p?: SpacingValue;
+  m?: SpacingValue;
+  maxWidth?: SpacingValue;
+  textAlign?: CSSProperties['textAlign'];
+}
+
 // Simple macOS-style Box (container) that maps common MUI Box props
-const Box = React.forwardRef(({ children, style = {}, sx = {}, display, alignItems, justifyContent, gap, mt, mb, mx, my, px, py, p, m, maxWidth, textAlign, ...props }, ref) => {
-  const spacing = (v) => (typeof v === 'number' ? v * 8 : v);
+const Box = React.forwardRef<HTMLDivElement, BoxProps>(({
+  children,
+  style = {},
+  sx = {},
+  display,
+  alignItems,
+  justifyContent,
+  gap,
+  mt,
+  mb,
+  mx,
+  my,
+  px,
+  py,
+  p,
+  m,
+  maxWidth,
+  textAlign,
+  ...props
+}, ref) => {
+  const spacing = (v: SpacingValue): string | number => (typeof v === 'number' ? v * 8 : v);
 
   // Calculate padding values - px/py override p for their respective axes
   const pValue = p !== undefined ? spacing(p) : undefined;
@@ -20,7 +58,7 @@ const Box = React.forwardRef(({ children, style = {}, sx = {}, display, alignIte
   const myValue = my !== undefined ? spacing(my) : mValue;
   const mxValue = mx !== undefined ? spacing(mx) : mValue;
 
-  const computedStyle = {
+  const computedStyle: Record<string, unknown> = {
     display,
     alignItems,
     justifyContent,
@@ -47,7 +85,7 @@ const Box = React.forwardRef(({ children, style = {}, sx = {}, display, alignIte
     }
   });
 
-  return <div ref={ref} style={computedStyle} {...props}>{children}</div>;
+  return <div ref={ref} style={computedStyle as CSSProperties} {...props}>{children}</div>;
 });
 
 
@@ -76,5 +114,3 @@ Box.propTypes = {
 };
 
 export default Box;
-
-

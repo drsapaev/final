@@ -1,15 +1,28 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
-import React from 'react';
+import React, { type ReactNode, type CSSProperties } from 'react';
 import { useTheme } from '../../../contexts/ThemeContext';
 import PropTypes from 'prop-types';
+
+type PaperVariant = 'elevation' | 'outlined' | 'filled';
+type PaperElevation = 0 | 1 | 2 | 3 | 4 | 5;
+
+interface PaperProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'children' | 'style'> {
+  children?: ReactNode;
+  className?: string;
+  style?: CSSProperties;
+  elevation?: PaperElevation;
+  variant?: PaperVariant;
+  square?: boolean;
+}
+
+interface ElevationStyle extends CSSProperties {
+  boxShadow?: string;
+}
 
 /**
  * macOS-style Paper Component
  * Implements Apple's Human Interface Guidelines for paper surfaces
  */
-const Paper = React.forwardRef(({
+const Paper = React.forwardRef<HTMLDivElement, PaperProps>(({
   children,
   className = '',
   style = {},
@@ -20,8 +33,8 @@ const Paper = React.forwardRef(({
 }, ref) => {
   useTheme();
 
-  const getElevationStyles = (elevation) => {
-    const elevations = {
+  const getElevationStyles = (e: PaperElevation): ElevationStyle => {
+    const elevations: Record<PaperElevation, ElevationStyle> = {
       0: {
         boxShadow: 'none',
         border: '1px solid var(--mac-border)'
@@ -48,10 +61,10 @@ const Paper = React.forwardRef(({
       }
     };
 
-    return elevations[elevation] || elevations[1];
+    return elevations[e] || elevations[1];
   };
 
-  const paperStyles = {
+  const paperStyles: CSSProperties = {
     backgroundColor: 'var(--mac-bg-primary)',
     borderRadius: square ? '0' : '8px',
     fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif',
@@ -65,7 +78,7 @@ const Paper = React.forwardRef(({
       className={`mac-paper mac-paper--${variant} mac-paper--elevation-${elevation} ${square ? 'mac-paper--square' : ''} ${className}`}
       style={paperStyles}
       {...props}>
-      
+
       {children}
     </div>);
 
