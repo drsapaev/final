@@ -1,27 +1,13 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 /**
  * useWebAuthn — P5 frontend integration for passkey registration/login.
  *
  * Uses Web Authentication API (navigator.credentials) to register
  * and authenticate with passkeys. Requires HTTPS (or localhost).
- *
- * Usage:
- *   const { isSupported, register, authenticate, listCredentials } = useWebAuthn();
- *
- *   // Register new passkey:
- *   await register({ name: 'iPhone 15' });
- *
- *   // Authenticate with existing passkey:
- *   const result = await authenticate();
- *   // result = { access_token, refresh_token, ... }
  */
-import { useState, useCallback } from 'react';
-// @ts-expect-error — module not yet migrated or path issue
-import { api } from '../../api/client';
+import { useCallback, useState } from 'react';
+import { api } from '../api/client';
 
-function base64urlToBuffer(base64url) {
+function base64urlToBuffer(base64url: string): ArrayBuffer {
   const padding = '='.repeat((4 - (base64url.length % 4)) % 4);
   const base64 = (base64url + padding).replace(/-/g, '+').replace(/_/g, '/');
   const binary = atob(base64);
@@ -32,7 +18,7 @@ function base64urlToBuffer(base64url) {
   return buffer.buffer;
 }
 
-function bufferToBase64url(buffer) {
+function bufferToBase64url(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
   let binary = '';
   for (let i = 0; i < bytes.length; i++) {
@@ -41,191 +27,247 @@ function bufferToBase64url(buffer) {
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 }
 
-export function useWebAuthn() {
-  const [isRegistering, setIsRegistering] = useState(false);
-  const [isAuthenticating, setIsAuthenticating] = useState(false);
-  const [error, setError] = useState('');
+interface RegisterOptions {
+  name?: string;
+  rpId?: string;
+  rpName?: string;
+}
 
-  const isSupported = typeof window !== 'undefined' &&
-    typeof window.PublicKeyCredential !== 'undefined';
+interface AuthenticateOptions {
+  patientId: string;
+  rpId?: string;
+}
 
-  const register = useCallback(async (options: Record<string, unknown> = {}) => {
-    if (!isSupported) {
-      setError('webauthn_not_supported');
-      return false;
-    }
+interface AuthResponseData {
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
+  [key: string]: unknown;
+}
 
-    setIsRegistering(true);
-    setError('');
+interface WebAuthnErrorResponse {
+  response?: {
+    data?: {
+      detail?: {
+        reason?: string;
+      };
+    };
+  };
+}
 
-    try {
-      // Get JWT token for auth
-      const token = sessionStorage.getItem('patient_jwt_token');
-      if (!token) {
-        setError('not_authenticated');
+export interface UseWebAuthnReturn {
+  isSupported: boolean;
+  isRegistering: boolean;
+  isAuthenticating: boolean;
+  error: string;
+  register: (options?: RegisterOptions) => Promise<boolean>;
+  authenticate: (options: AuthenticateOptions) => Promise<AuthResponseData | null>;
+  listCredentials: () => Promise<unknown[]>;
+  deactivateCredential: (credentialId: string) => Promise<boolean>;
+}
+
+export function useWebAuthn(): UseWebAuthnReturn {
+  const [isRegistering, setIsRegistering] = useState<boolean>(false);
+  const [isAuthenticating, setIsAuthenticating] = useState<boolean>(false);
+  const [error, setError] = useState<string>('');
+
+  const isSupported =
+    typeof window !== 'undefined' && typeof window.PublicKeyCredential !== 'undefined';
+
+  const register = useCallback(
+    async (options: RegisterOptions = {}): Promise<boolean> => {
+      if (!isSupported) {
+        setError('webauthn_not_supported');
         return false;
       }
 
-      // Step 1: Begin registration
-      const beginResponse = await api.post('/webauthn/register/begin', {
-        credential_name: options.name,
-        rp_id: options.rpId || window.location.hostname,
-        rp_name: options.rpName || 'Medical Clinic',
-      });
+      setIsRegistering(true);
+      setError('');
 
-      const optionsData = beginResponse.data.options;
+      try {
+        const token = sessionStorage.getItem('patient_jwt_token');
+        if (!token) {
+          setError('not_authenticated');
+          return false;
+        }
 
-      // Step 2: Create credential via browser
-      const publicKeyOptions = {
-        challenge: base64urlToBuffer(optionsData.challenge),
-        rp: {
-          id: optionsData.rp.id,
-          name: optionsData.rp.name,
-        },
-        user: {
-          id: base64urlToBuffer(optionsData.user.id),
-          name: optionsData.user.name,
-          displayName: optionsData.user.displayName,
-        },
-        pubKeyCredParams: optionsData.pubKeyCredParams || [
-          { type: 'public-key', alg: -7 },
-        ],
-        timeout: optionsData.timeout || 60000,
-        attestation: 'none' as AttestationConveyancePreference,
-      };
+        const beginResponse = await api.post('/webauthn/register/begin', {
+          credential_name: options.name,
+          rp_id: options.rpId || window.location.hostname,
+          rp_name: options.rpName || 'Medical Clinic',
+        });
 
-      const credential = await navigator.credentials.create({
-        publicKey: publicKeyOptions,
-      });
+        const optionsData = beginResponse.data as {
+          options: {
+            challenge: string;
+            rp: { id: string; name: string };
+            user: { id: string; name: string; displayName: string };
+            pubKeyCredParams?: Array<{ type: string; alg: number }>;
+            timeout?: number;
+          };
+        };
 
-      if (!credential) {
-        setError('registration_cancelled');
+        const publicKeyOptions: PublicKeyCredentialCreationOptions = {
+          challenge: base64urlToBuffer(optionsData.options.challenge),
+          rp: {
+            id: optionsData.options.rp.id,
+            name: optionsData.options.rp.name,
+          },
+          user: {
+            id: base64urlToBuffer(optionsData.options.user.id),
+            name: optionsData.options.user.name,
+            displayName: optionsData.options.user.displayName,
+          },
+          pubKeyCredParams: (optionsData.options.pubKeyCredParams || [
+            { type: 'public-key' as const, alg: -7 },
+          ]) as PublicKeyCredentialParameters[],
+          timeout: optionsData.options.timeout || 60000,
+          attestation: 'none' as AttestationConveyancePreference,
+        };
+
+        const credential = (await navigator.credentials.create({
+          publicKey: publicKeyOptions,
+        })) as PublicKeyCredential | null;
+
+        if (!credential) {
+          setError('registration_cancelled');
+          return false;
+        }
+
+        const attestationResponse = credential.response as AuthenticatorAttestationResponse;
+        const credentialResponse = {
+          id: credential.id,
+          rawId: bufferToBase64url(credential.rawId),
+          type: credential.type,
+          response: {
+            attestationObject: bufferToBase64url(attestationResponse.attestationObject),
+            clientDataJSON: bufferToBase64url(attestationResponse.clientDataJSON),
+          },
+        };
+
+        await api.post('/webauthn/register/finish', {
+          credential_response: credentialResponse,
+          rp_id: options.rpId || window.location.hostname,
+          origin: window.location.origin,
+          credential_name: options.name,
+        });
+
+        return true;
+      } catch (err) {
+        const e = err as WebAuthnErrorResponse;
+        setError(e?.response?.data?.detail?.reason || 'registration_failed');
         return false;
+      } finally {
+        setIsRegistering(false);
       }
+    },
+    [isSupported],
+  );
 
-      // Step 3: Finish registration
-      const attestationResponse = credential.response;
-      const credentialResponse = {
-        id: credential.id,
-        rawId: bufferToBase64url((credential as PublicKeyCredential).rawId),
-        type: credential.type,
-        response: {
-          attestationObject: bufferToBase64url(attestationResponse.attestationObject),
-          clientDataJSON: bufferToBase64url(attestationResponse.clientDataJSON),
-        },
-      };
-
-      await api.post('/webauthn/register/finish', {
-        credential_response: credentialResponse,
-        rp_id: options.rpId || window.location.hostname,
-        origin: window.location.origin,
-        credential_name: options.name,
-      });
-
-      return true;
-    } catch (err) {
-      setError(err?.response?.data?.detail?.reason || 'registration_failed');
-      return false;
-    } finally {
-      setIsRegistering(false);
-    }
-  }, [isSupported]);
-
-  const authenticate = useCallback(async (options) => {
-    if (!isSupported) {
-      setError('webauthn_not_supported');
-      return null;
-    }
-
-    setIsAuthenticating(true);
-    setError('');
-
-    try {
-      // Step 1: Begin authentication
-      const beginResponse = await api.post('/webauthn/login/begin', {
-        patient_id: options.patientId,
-        rp_id: options.rpId || window.location.hostname,
-      });
-
-      const optionsData = beginResponse.data.options;
-
-      // Step 2: Get credential via browser
-      const publicKeyOptions = {
-        challenge: base64urlToBuffer(optionsData.challenge),
-        rpId: optionsData.rpId,
-        timeout: optionsData.timeout || 60000,
-        userVerification: 'preferred' as UserVerificationRequirement,
-      };
-
-      const assertion = await navigator.credentials.get({
-        publicKey: publicKeyOptions,
-      });
-
-      if (!assertion) {
-        setError('authentication_cancelled');
+  const authenticate = useCallback(
+    async (options: AuthenticateOptions): Promise<AuthResponseData | null> => {
+      if (!isSupported) {
+        setError('webauthn_not_supported');
         return null;
       }
 
-      // Step 3: Finish authentication
-      const assertionResponse = (assertion as PublicKeyCredential).response as AuthenticatorAssertionResponse;
-      const assertionData = {
-        id: assertion.id,
-        rawId: bufferToBase64url((assertion as PublicKeyCredential).rawId),
-        type: assertion.type,
-        response: {
-          authenticatorData: bufferToBase64url(assertionResponse.authenticatorData),
-          clientDataJSON: bufferToBase64url(assertionResponse.clientDataJSON),
-          signature: bufferToBase64url(assertionResponse.signature),
-          userHandle: assertionResponse.userHandle
-            ? bufferToBase64url(assertionResponse.userHandle)
-            : null,
-        },
-      };
+      setIsAuthenticating(true);
+      setError('');
 
-      const finishResponse = await api.post('/webauthn/login/finish', {
-        patient_id: options.patientId,
-        assertion_response: assertionData,
-        rp_id: options.rpId || window.location.hostname,
-        origin: window.location.origin,
-      });
+      try {
+        const beginResponse = await api.post('/webauthn/login/begin', {
+          patient_id: options.patientId,
+          rp_id: options.rpId || window.location.hostname,
+        });
 
-      // Store JWT tokens
-      const data = finishResponse.data;
-      if (data?.access_token) {
-        sessionStorage.setItem('patient_jwt_token', data.access_token);
-        sessionStorage.setItem('patient_refresh_token', data.refresh_token);
-        sessionStorage.setItem(
-          'patient_token_expires_at',
-          String(Date.now() + (data.expires_in * 1000))
-        );
+        const optionsData = beginResponse.data as {
+          options: {
+            challenge: string;
+            rpId: string;
+            timeout?: number;
+          };
+        };
+
+        const publicKeyOptions: PublicKeyCredentialRequestOptions = {
+          challenge: base64urlToBuffer(optionsData.options.challenge),
+          rpId: optionsData.options.rpId,
+          timeout: optionsData.options.timeout || 60000,
+          userVerification: 'preferred' as UserVerificationRequirement,
+        };
+
+        const assertion = (await navigator.credentials.get({
+          publicKey: publicKeyOptions,
+        })) as PublicKeyCredential | null;
+
+        if (!assertion) {
+          setError('authentication_cancelled');
+          return null;
+        }
+
+        const assertionResponse = assertion.response as AuthenticatorAssertionResponse;
+        const assertionData = {
+          id: assertion.id,
+          rawId: bufferToBase64url(assertion.rawId),
+          type: assertion.type,
+          response: {
+            authenticatorData: bufferToBase64url(assertionResponse.authenticatorData),
+            clientDataJSON: bufferToBase64url(assertionResponse.clientDataJSON),
+            signature: bufferToBase64url(assertionResponse.signature),
+            userHandle: assertionResponse.userHandle
+              ? bufferToBase64url(assertionResponse.userHandle)
+              : null,
+          },
+        };
+
+        const finishResponse = await api.post('/webauthn/login/finish', {
+          patient_id: options.patientId,
+          assertion_response: assertionData,
+          rp_id: options.rpId || window.location.hostname,
+          origin: window.location.origin,
+        });
+
+        const data = finishResponse.data as AuthResponseData | undefined;
+        if (data?.access_token) {
+          sessionStorage.setItem('patient_jwt_token', data.access_token);
+          sessionStorage.setItem('patient_refresh_token', data.refresh_token);
+          sessionStorage.setItem(
+            'patient_token_expires_at',
+            String(Date.now() + data.expires_in * 1000),
+          );
+        }
+
+        return data ?? null;
+      } catch (err) {
+        const e = err as WebAuthnErrorResponse;
+        setError(e?.response?.data?.detail?.reason || 'authentication_failed');
+        return null;
+      } finally {
+        setIsAuthenticating(false);
       }
+    },
+    [isSupported],
+  );
 
-      return data;
-    } catch (err) {
-      setError(err?.response?.data?.detail?.reason || 'authentication_failed');
-      return null;
-    } finally {
-      setIsAuthenticating(false);
-    }
-  }, [isSupported]);
-
-  const listCredentials = useCallback(async () => {
+  const listCredentials = useCallback(async (): Promise<unknown[]> => {
     try {
       const response = await api.post('/webauthn/credentials/list', {});
-      return response.data?.credentials || [];
+      return (response.data as { credentials?: unknown[] })?.credentials || [];
     } catch {
       return [];
     }
   }, []);
 
-  const deactivateCredential = useCallback(async (credentialId) => {
-    try {
-      await api.post(`/webauthn/credentials/${credentialId}/deactivate`, {});
-      return true;
-    } catch {
-      return false;
-    }
-  }, []);
+  const deactivateCredential = useCallback(
+    async (credentialId: string): Promise<boolean> => {
+      try {
+        await api.post(`/webauthn/credentials/${credentialId}/deactivate`, {});
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    [],
+  );
 
   return {
     isSupported,
