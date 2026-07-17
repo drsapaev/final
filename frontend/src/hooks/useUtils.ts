@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 /**
  * Улучшенная система утилит для медицинских интерфейсов
  * Основана на принципах производительности и медицинских стандартах
@@ -10,7 +7,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 
 import logger from '../utils/logger';
 // Хук для дебаунса
-export const useDebounce = (value, delay) => {
+export const useDebounce = <T,>(value: T, delay: number) => {
   const [debouncedValue, setDebouncedValue] = useState(value);
 
   useEffect(() => {
@@ -27,7 +24,7 @@ export const useDebounce = (value, delay) => {
 };
 
 // Хук для троттлинга
-export const useThrottle = (value, delay) => {
+export const useThrottle = <T,>(value: T, delay: number) => {
   const [throttledValue, setThrottledValue] = useState(value);
   const lastExecuted = useRef(Date.now());
 
@@ -49,8 +46,8 @@ export const useThrottle = (value, delay) => {
 };
 
 // Хук для предыдущего значения
-export const usePrevious = (value) => {
-  const ref = useRef();
+export const usePrevious = <T,>(value: T) => {
+  const ref = useRef<T | undefined>(undefined);
   
   useEffect(() => {
     ref.current = value;
@@ -60,7 +57,7 @@ export const usePrevious = (value) => {
 };
 
 // Хук для проверки первого рендера
-export const useIsFirstRender = () => {
+export const useIsFirstRender = (): boolean => {
   const isFirstRender = useRef(true);
   
   useEffect(() => {
@@ -85,7 +82,7 @@ export const useIsMounted = () => {
 };
 
 // Хук для локального хранилища
-export const useLocalStorage = (key, initialValue) => {
+export const useLocalStorage = <T,>(key: string, initialValue: T) => {
   const [storedValue, setStoredValue] = useState(() => {
     try {
       const item = window.localStorage.getItem(key);
@@ -110,7 +107,7 @@ export const useLocalStorage = (key, initialValue) => {
 };
 
 // Хук для сессионного хранилища
-export const useSessionStorage = (key, initialValue) => {
+export const useSessionStorage = <T,>(key: string, initialValue: T) => {
   const [storedValue, setStoredValue] = useState(() => {
     try {
       const item = window.sessionStorage.getItem(key);
@@ -136,12 +133,12 @@ export const useSessionStorage = (key, initialValue) => {
 
 // Хук для копирования в буфер обмена
 export const useClipboard = () => {
-  const [copied, setCopied] = useState(false);
-  const [error, setError] = useState(null);
+  const [copied, setCopied] = useState<boolean>(false);
+  const [error, setError] = useState<unknown>(null);
 
   const copyToClipboard = useCallback(async (text) => {
     try {
-      await navigator.clipboard.writeText(text);
+      await navigator.clipboard.writeText(String(text));
       setCopied(true);
       setError(null);
       
@@ -149,8 +146,8 @@ export const useClipboard = () => {
       setTimeout(() => {
         setCopied(false);
       }, 2000);
-    } catch (err) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError((err as unknown as Error).message);
       setCopied(false);
     }
   }, []);
@@ -160,9 +157,9 @@ export const useClipboard = () => {
 
 // Хук для геолокации
 export const useGeolocation = () => {
-  const [location, setLocation] = useState(null);
-  const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [location, setLocation] = useState<unknown>(null);
+  const [error, setError] = useState<unknown>(null);
+  const [loading, setLoading] = useState<boolean>(false);
 
   const getCurrentPosition = useCallback(() => {
     if (!navigator.geolocation) {
@@ -184,7 +181,7 @@ export const useGeolocation = () => {
         setLoading(false);
       },
       (err) => {
-        setError(err.message);
+        setError((err as unknown as Error).message);
         setLoading(false);
       },
       {
@@ -199,7 +196,7 @@ export const useGeolocation = () => {
 };
 
 // Хук для онлайн статуса
-export const useOnlineStatus = () => {
+export const useOnlineStatus = (): boolean => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   useEffect(() => {
@@ -219,7 +216,7 @@ export const useOnlineStatus = () => {
 };
 
 // Хук для видимости страницы
-export const usePageVisibility = () => {
+export const usePageVisibility = (): boolean => {
   const [isVisible, setIsVisible] = useState(!document.hidden);
 
   useEffect(() => {
@@ -239,13 +236,13 @@ export const usePageVisibility = () => {
 
 // Хук для размера окна
 export const useWindowSize = () => {
-  const [windowSize, setWindowSize] = useState({
+  const [windowSize, setWindowSize] = useState<{ width: number; height: number }>({
     width: window.innerWidth,
     height: window.innerHeight
   });
 
   useEffect(() => {
-    const handleResize = () => {
+    const handleResize = (): void => {
       setWindowSize({
         width: window.innerWidth,
         height: window.innerHeight
@@ -270,7 +267,7 @@ export const useScroll = () => {
   });
 
   useEffect(() => {
-    const handleScroll = () => {
+    const handleScroll = (): void => {
       setScrollPosition({
         x: window.pageXOffset,
         y: window.pageYOffset
@@ -289,18 +286,18 @@ export const useScroll = () => {
 
 // Хук для фокуса элемента
 export const useFocus = () => {
-  const [isFocused, setIsFocused] = useState(false);
-  const ref = useRef(null);
+  const [isFocused, setIsFocused] = useState<boolean>(false);
+  const ref = useRef<HTMLElement | null>(null);
 
   const focus = useCallback(() => {
     if (ref.current) {
-      ref.current.focus();
+      (ref.current as HTMLElement).focus();
     }
   }, []);
 
   const blur = useCallback(() => {
     if (ref.current) {
-      ref.current.blur();
+      (ref.current as HTMLElement).blur();
     }
   }, []);
 
@@ -325,15 +322,15 @@ export const useFocus = () => {
 
 // Хук для ховера элемента
 export const useHover = () => {
-  const [isHovered, setIsHovered] = useState(false);
-  const ref = useRef(null);
+  const [isHovered, setIsHovered] = useState<boolean>(false);
+  const ref = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     const element = ref.current;
     if (!element) return;
 
-    const handleMouseEnter = () => setIsHovered(true);
-    const handleMouseLeave = () => setIsHovered(false);
+    const handleMouseEnter = (): void => setIsHovered(true);
+    const handleMouseLeave = (): void => setIsHovered(false);
 
     element.addEventListener('mouseenter', handleMouseEnter);
     element.addEventListener('mouseleave', handleMouseLeave);
@@ -348,13 +345,13 @@ export const useHover = () => {
 };
 
 // Хук для клика вне элемента
-export const useClickOutside = (callback) => {
-  const ref = useRef(null);
+export const useClickOutside = (callback: () => void) => {
+  const ref = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (ref.current && !ref.current.contains(event.target)) {
-        callback(event);
+    const handleClickOutside = (event: MouseEvent) => {
+      if (ref.current && !ref.current.contains(event.target as Node)) {
+        callback();
       }
     };
 
@@ -369,11 +366,11 @@ export const useClickOutside = (callback) => {
 };
 
 // Хук для клавиш
-export const useKeyPress = (targetKey, callback) => {
+export const useKeyPress = (targetKey: string, callback: () => void) => {
   useEffect(() => {
-    const handleKeyPress = (event) => {
+    const handleKeyPress = (event: KeyboardEvent) => {
       if (event.key === targetKey) {
-        callback(event);
+        callback();
       }
     };
 
@@ -386,15 +383,15 @@ export const useKeyPress = (targetKey, callback) => {
 };
 
 // Хук для комбинации клавиш
-export const useKeyCombo = (keys, callback) => {
+export const useKeyCombo = (keys: string[], callback: () => void) => {
   const [pressedKeys, setPressedKeys] = useState(new Set());
 
   useEffect(() => {
-    const handleKeyDown = (event) => {
+    const handleKeyDown = (event: KeyboardEvent) => {
       setPressedKeys(prev => new Set([...prev, event.key]));
     };
 
-    const handleKeyUp = (event) => {
+    const handleKeyUp = (event: KeyboardEvent) => {
       setPressedKeys(prev => {
         const newSet = new Set(prev);
         newSet.delete(event.key);
@@ -420,8 +417,8 @@ export const useKeyCombo = (keys, callback) => {
 };
 
 // Хук для интервала
-export const useInterval = (callback, delay) => {
-  const savedCallback = useRef();
+export const useInterval = (callback: () => void, delay: number | null) => {
+  const savedCallback = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     savedCallback.current = callback;
@@ -431,7 +428,7 @@ export const useInterval = (callback, delay) => {
     if (delay === null) return;
 
     const id = setInterval(() => {
-      savedCallback.current();
+      savedCallback.current?.();
     }, delay);
 
     return () => clearInterval(id);
@@ -439,8 +436,8 @@ export const useInterval = (callback, delay) => {
 };
 
 // Хук для таймаута
-export const useTimeout = (callback, delay) => {
-  const savedCallback = useRef();
+export const useTimeout = (callback: () => void, delay: number) => {
+  const savedCallback = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     savedCallback.current = callback;
@@ -450,7 +447,7 @@ export const useTimeout = (callback, delay) => {
     if (delay === null) return;
 
     const id = setTimeout(() => {
-      savedCallback.current();
+      savedCallback.current?.();
     }, delay);
 
     return () => clearTimeout(id);
@@ -511,17 +508,17 @@ export const useDateUtils = () => {
     return format
       .replace('DD', day)
       .replace('MM', month)
-      .replace('YYYY', year)
+      .replace('YYYY', String(year))
       .replace('HH', hours)
       .replace('mm', minutes);
   }, []);
 
-  const getRelativeTime = useCallback((date) => {
+  const getRelativeTime = useCallback((date: string | Date) => {
     if (!date) return '';
     
     const now = new Date();
     const target = new Date(date);
-    const diff = now - target;
+    const diff = now.getTime() - target.getTime();
     
     const seconds = Math.floor(diff / 1000);
     const minutes = Math.floor(seconds / 60);
@@ -568,14 +565,14 @@ export const useNumberUtils = () => {
     
     const {
       decimals = 2,
-      thousandsSeparator = ' ',
-      decimalSeparator = ','
+      thousandsSeparator = ' ' as string,
+      decimalSeparator = ',' as string
     } = options;
     
-    const parts = Number(number).toFixed(decimals).split('.');
-    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, thousandsSeparator);
+    const parts = Number(number).toFixed(Number(decimals)).split('.');
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, String(thousandsSeparator));
     
-    return parts.join(decimalSeparator);
+    return parts.join(String(decimalSeparator));
   }, []);
 
   const formatCurrency = useCallback((amount, currency = 'UZS') => {
