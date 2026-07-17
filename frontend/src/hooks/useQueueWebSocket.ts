@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 /**
  * useQueueWebSocket — React hook для подписки на /ws/queue.
  *
@@ -48,12 +45,12 @@ const MAX_RECONNECT_ATTEMPTS = 5;
  * @param {() => void} options.onUpdate - Callback при получении обновления
  * @returns {{isConnected: boolean, connectionState: 'disconnected'|'connecting'|'connected'|reconnecting'}}
  */
-export function useQueueWebSocket({ specialistId, date, enabled: boolean = true, onUpdate }) {
-  const [isConnected, setIsConnected] = useState(false);
+export function useQueueWebSocket({ specialistId, date, enabled = true, onUpdate }: { specialistId?: string; date?: string; enabled?: boolean; onUpdate?: (() => void) | null } = {}) {
+  const [isConnected, setIsConnected] = useState<boolean>(false);
   const [connectionState, setConnectionState] = useState('disconnected');
-  const wsRef = useRef(null);
+  const wsRef = useRef<WebSocket | null>(null);
   const reconnectAttemptRef = useRef(0);
-  const reconnectTimerRef = useRef(null);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onUpdateRef = useRef(onUpdate);
 
   // Keep onUpdate ref current without re-triggering effect
@@ -141,7 +138,7 @@ export function useQueueWebSocket({ specialistId, date, enabled: boolean = true,
         // onclose will handle reconnection
       };
 
-      ws.onclose = (event) => {
+      wsRef.current.onclose = (event) => {
         logger.info('[useQueueWebSocket] Disconnected', { code: event.code, reason: event.reason });
         setIsConnected(false);
         wsRef.current = null;
