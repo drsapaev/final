@@ -1,11 +1,28 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
-import React from 'react';
+import React, { type ReactNode, type CSSProperties, type KeyboardEvent } from 'react';
 import { Check } from 'lucide-react';
 import PropTypes from 'prop-types';
 
-const Checkbox = React.forwardRef(({
+type CheckboxSize = 'sm' | 'md' | 'lg';
+type CheckboxVariant = 'default' | 'filled' | 'error';
+
+interface CheckboxProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'children' | 'style' | 'onChange'> {
+  className?: string;
+  style?: CSSProperties;
+  size?: CheckboxSize;
+  variant?: CheckboxVariant;
+  error?: boolean;
+  disabled?: boolean;
+  label?: ReactNode;
+  description?: ReactNode;
+  checked?: boolean;
+  onChange?: (checked: boolean) => void;
+}
+
+interface CheckboxStyle extends CSSProperties {
+  transition?: string;
+}
+
+const Checkbox = React.forwardRef<HTMLDivElement, CheckboxProps>(({
   className,
   style,
   size = 'md',
@@ -18,7 +35,7 @@ const Checkbox = React.forwardRef(({
   onChange,
   ...props
 }, ref) => {
-  const sizeStyles = {
+  const sizeStyles: Record<CheckboxSize, CSSProperties> = {
     sm: {
       width: '16px',
       height: '16px',
@@ -36,7 +53,7 @@ const Checkbox = React.forwardRef(({
     }
   };
 
-  const variantStyles = {
+  const variantStyles: Record<CheckboxVariant, CSSProperties> = {
     default: {
       border: '2px solid var(--mac-border)',
       background: checked ? 'var(--mac-accent-blue)' : 'var(--mac-bg-primary)',
@@ -54,11 +71,11 @@ const Checkbox = React.forwardRef(({
     }
   };
 
-  const currentVariant = error ? 'error' : variant;
+  const currentVariant: CheckboxVariant = error ? 'error' : variant;
   const currentSize = sizeStyles[size];
   const currentVariantStyle = variantStyles[currentVariant];
 
-  const checkboxStyle = {
+  const checkboxStyle: CheckboxStyle = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -74,7 +91,7 @@ const Checkbox = React.forwardRef(({
     ...style
   };
 
-  const labelStyle = {
+  const labelStyle: CSSProperties = {
     marginLeft: '8px',
     fontSize: currentSize.fontSize,
     fontWeight: 'var(--mac-font-weight-medium)',
@@ -83,7 +100,7 @@ const Checkbox = React.forwardRef(({
     userSelect: 'none'
   };
 
-  const descriptionStyle = {
+  const descriptionStyle: CSSProperties = {
     marginLeft: '28px',
     fontSize: 'var(--mac-font-size-xs)',
     color: 'var(--mac-text-secondary)',
@@ -97,7 +114,7 @@ const Checkbox = React.forwardRef(({
     }
   };
 
-  const handleKeyDown = (e) => {
+  const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if ((e.key === ' ' || e.key === 'Enter') && !disabled) {
       e.preventDefault();
       onChange && onChange(!checked);
@@ -116,13 +133,13 @@ const Checkbox = React.forwardRef(({
         role="checkbox"
         aria-checked={checked}
         aria-disabled={disabled}>
-        
+
         <div
           ref={ref}
           className={className}
           style={checkboxStyle}
           {...props}>
-          
+
           {checked &&
           <Check
             size={iconSize}

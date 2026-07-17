@@ -1,10 +1,47 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, type CSSProperties, type ReactNode } from 'react';
 import PropTypes from 'prop-types';
 
-const SegmentedControl = React.forwardRef(({ 
+type SegmentedSize = 'small' | 'default' | 'large';
+type SegmentedVariant = 'default' | 'filled' | 'outline';
+type SegmentedValue = string | number;
+
+interface SegmentedOption {
+  value: SegmentedValue;
+  label: ReactNode;
+  disabled?: boolean;
+}
+
+interface SegmentedControlProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'children' | 'style' | 'onChange'> {
+  options?: Array<SegmentedOption | SegmentedValue>;
+  value?: SegmentedValue;
+  defaultValue?: SegmentedValue;
+  onChange?: (value: SegmentedValue) => void;
+  disabled?: boolean;
+  size?: SegmentedSize;
+  variant?: SegmentedVariant;
+  className?: string;
+  style?: CSSProperties;
+}
+
+interface SegmentedStyle extends CSSProperties {
+  transition?: string;
+}
+
+interface SegmentedDimensions {
+  height: number;
+  fontSize: number;
+  padding: string;
+}
+
+function normalizeOption(option: SegmentedOption | SegmentedValue): SegmentedOption {
+  if (option !== null && typeof option === 'object' && 'value' in (option as SegmentedOption)) {
+    return option as SegmentedOption;
+  }
+  const v = option as SegmentedValue;
+  return { value: v, label: String(v) };
+}
+
+const SegmentedControl = React.forwardRef<HTMLDivElement, SegmentedControlProps>(({
   options = [],
   value: valueProp,
   defaultValue,
@@ -17,13 +54,15 @@ const SegmentedControl = React.forwardRef(({
   ...props
 }, ref) => {
   void variant;
-  const [value, setValue] = useState(valueProp ?? defaultValue ?? (options[0]?.value ?? options[0]));
+  const normalizedOptions = options.map(normalizeOption);
+  const firstValue = normalizedOptions[0]?.value;
+  const [value, setValue] = useState<SegmentedValue | undefined>(valueProp ?? defaultValue ?? firstValue);
 
   useEffect(() => {
     if (valueProp !== undefined) setValue(valueProp);
   }, [valueProp]);
 
-  const sizes = {
+  const sizes: Record<SegmentedSize, SegmentedDimensions> = {
     small: { height: 24, fontSize: 11, padding: '4px 8px' },
     default: { height: 28, fontSize: 12, padding: '6px 12px' },
     large: { height: 32, fontSize: 13, padding: '8px 16px' }
@@ -31,13 +70,13 @@ const SegmentedControl = React.forwardRef(({
 
   const s = sizes[size] || sizes.default;
 
-  const handleSelect = (optionValue) => {
+  const handleSelect = (optionValue: SegmentedValue) => {
     if (disabled) return;
     if (valueProp === undefined) setValue(optionValue);
     onChange && onChange(optionValue);
   };
 
-  const containerStyles = {
+  const containerStyles: CSSProperties = {
     display: 'inline-flex',
     alignItems: 'center',
     background: 'var(--mac-bg-tertiary)',
@@ -48,7 +87,7 @@ const SegmentedControl = React.forwardRef(({
     ...style
   };
 
-  const segmentStyles = {
+  const segmentStyles: SegmentedStyle = {
     height: s.height,
     fontSize: `${s.fontSize}px`,
     padding: s.padding,
@@ -64,20 +103,20 @@ const SegmentedControl = React.forwardRef(({
     outline: 'none'
   };
 
-  const activeSegmentStyles = {
+  const activeSegmentStyles: CSSProperties = {
     background: 'var(--mac-bg-primary)',
     color: 'var(--mac-text-primary)',
     boxShadow: 'var(--mac-shadow-2)',
     fontWeight: '600'
   };
 
-  const disabledStyles = {
+  const disabledStyles: CSSProperties = {
     opacity: 0.5,
     cursor: 'not-allowed'
   };
 
   return (
-    <div 
+    <div
       ref={ref}
       className={`mac-segmented-control ${className}`}
       style={containerStyles}
@@ -85,20 +124,20 @@ const SegmentedControl = React.forwardRef(({
       aria-orientation="horizontal"
       {...props}
     >
-      {options.map((option, index) => {
-        const optionValue = option?.value ?? option;
-        const optionLabel = option?.label ?? String(option);
+      {normalizedOptions.map((option, index) => {
+        const optionValue = option.value;
+        const optionLabel = option.label;
         const isActive = optionValue === value;
         const isFirst = index === 0;
-        const isLast = index === options.length - 1;
+        const isLast = index === normalizedOptions.length - 1;
 
         return (
           <button
-            key={optionValue}
+            key={String(optionValue)}
             type="button"
             role="tab"
             aria-selected={isActive}
-            aria-controls={`panel-${optionValue}`}
+            aria-controls={`panel-${String(optionValue)}`}
             className="mac-segment"
             style={{
               ...segmentStyles,
@@ -113,7 +152,7 @@ const SegmentedControl = React.forwardRef(({
           >
             {optionLabel}
             {isActive && (
-              <div 
+              <div
                 className="mac-segment-indicator"
                 style={{
                   position: 'absolute',
