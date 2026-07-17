@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { createContext, useContext, useReducer, useCallback } from 'react';
 import PropTypes from 'prop-types';
 /**
@@ -260,7 +257,7 @@ function appDataReducer(state, action) {
 }
 
 // Создаем контекст
-const AppDataContext = createContext();
+const AppDataContext = createContext<unknown>(null);
 
 // Провайдер контекста
 export const AppDataProvider = ({ children }) => {

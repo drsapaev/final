@@ -12,7 +12,7 @@ import { useNotificationCenter } from './NotificationCenterContext';
 import { clearNotificationQueryCache } from '../api/services';
 import { isPublicRoutePath } from '../routing/routeSelectors';
 
-const NotificationWebSocketContext = createContext(null);
+const NotificationWebSocketContext = createContext<unknown>(null);
 
 function normalizePayload(payload = {}) {
   const nested = payload.notification || payload.payload || payload.data || payload;
@@ -41,14 +41,14 @@ function normalizePayload(payload = {}) {
 }
 
 export function NotificationWebSocketProvider({ children }) {
-  const ws = useRef(null);
+  const ws = useRef<unknown>(null);
   const handleMessageRef = useRef(() => {});
-  const connectRef = useRef(null);
-  const connectTimerRef = useRef(null);
-  const disconnectRef = useRef(null);
-  const closeOnOpenRef = useRef(null);
+  const connectRef = useRef<unknown>(null);
+  const connectTimerRef = useRef<unknown>(null);
+  const disconnectRef = useRef<unknown>(null);
+  const closeOnOpenRef = useRef<unknown>(null);
   const closeOnOpenReasonRef = useRef('');
-  const reconnectTimeout = useRef(null);
+  const reconnectTimeout = useRef<unknown>(null);
   const shouldReconnect = useRef(true);
   const location = useLocation();
   const { appendNotification, replaceNotifications, updateUnreadSnapshot } = useNotificationCenter();
