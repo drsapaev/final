@@ -1,12 +1,58 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, type CSSProperties, type ReactNode, type KeyboardEvent } from 'react';
 import PropTypes from 'prop-types';
 import { createPortal } from 'react-dom';
 import { useTranslation } from '../../../i18n/useTranslation';
 
-const Select = React.forwardRef(({ 
+type SelectSize = 'small' | 'default' | 'large';
+type SelectValue = string | number;
+type SelectPlacement = 'bottom' | 'top';
+
+interface SelectOption {
+  value: SelectValue;
+  label?: ReactNode;
+}
+
+interface DropdownRect {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+interface SelectProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'children' | 'style' | 'onChange' | 'size' | 'value' | 'defaultValue' | 'label'> {
+  options?: Array<SelectOption | SelectValue>;
+  value?: SelectValue;
+  defaultValue?: SelectValue;
+  onChange?: (value: SelectValue) => void;
+  placeholder?: ReactNode;
+  disabled?: boolean;
+  size?: SelectSize;
+  label?: ReactNode;
+  error?: ReactNode;
+  className?: string;
+  style?: CSSProperties;
+  id?: string;
+}
+
+interface SelectStyle extends CSSProperties {
+  transition?: string;
+}
+
+interface SelectDimensions {
+  h: number;
+  fs: number;
+  pad: string;
+}
+
+function normalizeOption(opt: SelectOption | SelectValue): SelectOption {
+  if (opt !== null && typeof opt === 'object' && 'value' in (opt as SelectOption)) {
+    return opt as SelectOption;
+  }
+  const v = opt as SelectValue;
+  return { value: v, label: String(v) };
+}
+
+const Select = React.forwardRef<HTMLButtonElement, SelectProps>(({
   options = [],
   value: valueProp,
   defaultValue,
@@ -21,19 +67,22 @@ const Select = React.forwardRef(({
   id,
   ...props
 }, ref) => {
+  const { t } = useTranslation();
+  void t;
   const [isOpen, setIsOpen] = useState<boolean>(false);
-  const [value, setValue] = useState(valueProp ?? defaultValue ?? null);
-  const triggerRef = useRef<unknown>(null);
-  const listRef = useRef<unknown>(null);
-  const [dropdownRect, setDropdownRect] = useState<unknown>(null);
-  const [dropdownPlacement, setDropdownPlacement] = useState('bottom');
+  const [value, setValue] = useState<SelectValue | undefined>(valueProp ?? defaultValue);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const [dropdownRect, setDropdownRect] = useState<DropdownRect | null>(null);
+  const [dropdownPlacement, setDropdownPlacement] = useState<SelectPlacement>('bottom');
 
   useEffect(() => { if (valueProp !== undefined) setValue(valueProp); }, [valueProp]);
 
   useEffect(() => {
-    const onDoc = (e) => {
+    const onDoc = (e: MouseEvent) => {
+      const target = e.target as Node | null;
       if (!triggerRef.current || !listRef.current) return;
-      if (!triggerRef.current.contains(e.target) && !listRef.current.contains(e.target)) setIsOpen(false);
+      if (!triggerRef.current.contains(target) && !listRef.current.contains(target)) setIsOpen(false);
     };
     document.addEventListener('mousedown', onDoc);
     return () => document.removeEventListener('mousedown', onDoc);
@@ -46,12 +95,13 @@ const Select = React.forwardRef(({
       if (!triggerRef.current) return;
       const r = triggerRef.current.getBoundingClientRect();
       const itemHeight = 32;
-      const totalItems = Math.max(1, options?.length || 0);
+      const normalizedOptions = options.map(normalizeOption);
+      const totalItems = Math.max(1, normalizedOptions.length);
       const listHeight = totalItems * itemHeight + 8; // без скролла, с внутренним отступом
 
       // Default bottom placement
       let top = r.bottom + 6;
-      let placement = 'bottom';
+      let placement: SelectPlacement = 'bottom';
       // Flip above if not enough space below
       if (top + listHeight + 8 > window.innerHeight) {
         const maybeTop = r.top - listHeight - 6;
@@ -79,7 +129,7 @@ const Select = React.forwardRef(({
     };
   }, [isOpen, options]);
 
-  const sizes = {
+  const sizes: Record<SelectSize, SelectDimensions> = {
     small: { h: 28, fs: 12, pad: '6px 8px' },
     default: { h: 32, fs: 13, pad: '8px 10px' },
     large: { h: 36, fs: 14, pad: '10px 12px' }
@@ -87,19 +137,20 @@ const Select = React.forwardRef(({
   const s = sizes[size] || sizes.default;
   const controlId = id || `sel_${Math.random().toString(36).slice(2)}`;
 
-  const selected = options.find(o => (o?.value ?? o) === value);
+  const normalizedOptions = options.map(normalizeOption);
+  const selected = normalizedOptions.find(o => o.value === value);
 
-  const setAndClose = (val) => {
+  const setAndClose = (val: SelectValue) => {
     if (disabled) return;
     if (valueProp === undefined) setValue(val);
     onChange && onChange(val);
     setIsOpen(false);
   };
 
-  const wrapper = { display: 'flex', flexDirection: 'column', gap: '4px', ...style };
-  const labelStyles = { fontSize: '12px', color: 'var(--mac-text-secondary)' };
+  const wrapper: CSSProperties = { display: 'flex', flexDirection: 'column', gap: '4px', ...style };
+  const labelStyles: CSSProperties = { fontSize: '12px', color: 'var(--mac-text-secondary)' };
 
-  const trigger = {
+  const trigger: SelectStyle = {
     height: s.h,
     fontSize: `${s.fs}px`,
     padding: s.pad,
@@ -118,7 +169,7 @@ const Select = React.forwardRef(({
     transition: 'all 160ms cubic-bezier(0.2,0.8,0.2,1)'
   };
 
-  const list = dropdownRect ? {
+  const list: CSSProperties = dropdownRect ? {
     position: 'fixed',
     left: `${dropdownRect.left}px`,
     top: `${dropdownRect.top}px`,
@@ -147,7 +198,7 @@ const Select = React.forwardRef(({
     boxSizing: 'border-box'
   };
 
-  const item = (isActive) => ({
+  const item = (isActive: boolean): CSSProperties => ({
     padding: '8px 12px',
     fontSize: '13px',
     color: isActive ? 'var(--mac-bg-primary)' : 'var(--mac-text-primary)',
@@ -156,14 +207,20 @@ const Select = React.forwardRef(({
     display: 'block'
   });
 
-  const errorText = { fontSize: '11px', color: 'var(--mac-danger-600)' };
+  const errorText: CSSProperties = { fontSize: '11px', color: 'var(--mac-danger-600)' };
+
+  const setTriggerRef = (node: HTMLButtonElement | null) => {
+    triggerRef.current = node;
+    if (typeof ref === 'function') ref(node);
+    else if (ref) (ref as React.MutableRefObject<HTMLButtonElement | null>).current = node;
+  };
 
   return (
     <div className={`mac-select ${className}`} style={wrapper}>
       {label && <label htmlFor={controlId} style={labelStyles}>{label}</label>}
       <div style={{ position: 'relative' }}>
         <button
-          ref={(node) => { triggerRef.current = node; if (typeof ref === 'function') ref(node); else if (ref) ref.current = node; }}
+          ref={setTriggerRef}
           id={controlId}
           type="button"
           className="mac-select-trigger"
@@ -174,16 +231,16 @@ const Select = React.forwardRef(({
           disabled={disabled}
           {...props}
         >
-          <span>{selected ? (selected.label ?? selected.value ?? selected) : <span style={{ color: 'var(--mac-text-secondary)' }}>{placeholder}</span>}</span>
+          <span>{selected ? (selected.label ?? String(selected.value)) : <span style={{ color: 'var(--mac-text-secondary)' }}>{placeholder}</span>}</span>
           <svg width="16" height="16" viewBox="0 0 20 20" aria-hidden>
             <path d="M6 8l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
         {isOpen && createPortal(
           <div ref={listRef} role="listbox" className="mac-select-list" style={list} data-placement={dropdownPlacement}>
-            {options.map((opt) => {
-              const val = opt?.value ?? opt;
-              const label = opt?.label ?? String(val);
+            {normalizedOptions.map((opt) => {
+              const val = opt.value;
+              const lbl = opt.label ?? String(val);
               const active = val === value;
               return (
                 <div
@@ -193,10 +250,10 @@ const Select = React.forwardRef(({
                   className="mac-select-item"
                   style={item(active)}
                   onClick={() => setAndClose(val)}
-                  onKeyDown={(e) => e.key === 'Enter' && setAndClose(val)}
+                  onKeyDown={(e: KeyboardEvent<HTMLDivElement>) => { if (e.key === 'Enter') setAndClose(val); }}
                   tabIndex={0}
                 >
-                  {label}
+                  {lbl}
                 </div>
               );
             })}

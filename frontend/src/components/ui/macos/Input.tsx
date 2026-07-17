@@ -1,11 +1,36 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
-import React from 'react';
+import React, { type CSSProperties, type FocusEvent, type MouseEvent, type ComponentType } from 'react';
 import { XCircle } from 'lucide-react';
 import PropTypes from 'prop-types';
 
-const Input = React.forwardRef(({
+type InputSize = 'sm' | 'md' | 'lg';
+type InputVariant = 'default' | 'filled' | 'error';
+type IconPosition = 'left' | 'right';
+
+interface IconProps {
+  style?: CSSProperties;
+  size?: number | string;
+}
+
+type IconComponent = ComponentType<IconProps>;
+
+interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'children' | 'style' | 'size'> {
+  className?: string;
+  style?: CSSProperties;
+  icon?: IconComponent;
+  iconPosition?: IconPosition;
+  size?: InputSize;
+  variant?: InputVariant;
+  error?: boolean;
+  disabled?: boolean;
+  clearable?: boolean;
+  onClear?: () => void;
+}
+
+interface InputStyle extends CSSProperties {
+  transition?: string;
+}
+
+const Input = React.forwardRef<HTMLInputElement, InputProps>(({
   className,
   style,
   icon: Icon,
@@ -19,7 +44,7 @@ const Input = React.forwardRef(({
   ...props
 }, ref) => {
   const [isFocused, setIsFocused] = React.useState<boolean>(false);
-  const sizeStyles = {
+  const sizeStyles: Record<InputSize, CSSProperties> = {
     sm: {
       padding: '6px 12px',
       fontSize: 'var(--mac-font-size-sm)',
@@ -37,7 +62,7 @@ const Input = React.forwardRef(({
     }
   };
 
-  const variantStyles = {
+  const variantStyles: Record<InputVariant, CSSProperties> = {
     default: {
       border: '1px solid var(--mac-border)',
       background: 'var(--mac-bg-primary)',
@@ -55,13 +80,13 @@ const Input = React.forwardRef(({
     }
   };
 
-  const currentVariant = error ? 'error' : variant;
+  const currentVariant: InputVariant = error ? 'error' : variant;
   const currentSize = sizeStyles[size];
   const currentVariantStyle = variantStyles[currentVariant];
-  const hasRightIcon = Icon && iconPosition === 'right';
+  const hasRightIcon = Boolean(Icon) && iconPosition === 'right';
   const hasValue = props.value !== undefined && props.value !== null && String(props.value).length > 0;
   const showClearButton = clearable && typeof onClear === 'function' && hasValue && !disabled;
-  let paddingRight = currentSize.padding.split(' ')[1];
+  let paddingRight: string | number = (currentSize.padding as string).split(' ')[1];
 
   if (hasRightIcon && showClearButton) {
     paddingRight = '60px';
@@ -69,13 +94,13 @@ const Input = React.forwardRef(({
     paddingRight = '40px';
   }
 
-  const inputStyle = {
+  const inputStyle: InputStyle = {
     width: '100%',
     boxSizing: 'border-box',
-    paddingLeft: Icon && iconPosition === 'left' ? '40px' : currentSize.padding.split(' ')[1],
+    paddingLeft: Icon && iconPosition === 'left' ? '40px' : (currentSize.padding as string).split(' ')[1],
     paddingRight,
-    paddingTop: currentSize.padding.split(' ')[0],
-    paddingBottom: currentSize.padding.split(' ')[0],
+    paddingTop: (currentSize.padding as string).split(' ')[0],
+    paddingBottom: (currentSize.padding as string).split(' ')[0],
     borderRadius: 'var(--mac-radius-md)',
     fontSize: currentSize.fontSize,
     height: currentSize.height,
@@ -91,7 +116,7 @@ const Input = React.forwardRef(({
     ...style
   };
 
-  const iconStyle = {
+  const iconStyle: CSSProperties = {
     position: 'absolute',
     top: '50%',
     transform: 'translateY(-50%)',
@@ -102,23 +127,24 @@ const Input = React.forwardRef(({
     ...(iconPosition === 'left' ? { left: '12px' } : { right: '12px' })
   };
 
-  const handleFocus = (e) => {
+  const handleFocus = (e: FocusEvent<HTMLInputElement>) => {
     setIsFocused(true);
     if (!disabled) {
-      e.target.style.borderColor = error ? 'var(--mac-error)' : 'var(--mac-accent-blue)';
-      e.target.style.boxShadow = `0 0 0 3px ${error ? 'rgba(255, 59, 48, 0.1)' : 'rgba(0, 122, 255, 0.1)'}`;
+      e.currentTarget.style.borderColor = error ? 'var(--mac-error)' : 'var(--mac-accent-blue)';
+      e.currentTarget.style.boxShadow = `0 0 0 3px ${error ? 'rgba(255, 59, 48, 0.1)' : 'rgba(0, 122, 255, 0.1)'}`;
     }
     if (props.onFocus) props.onFocus(e);
   };
 
-  const handleBlur = (e) => {
+  const handleBlur = (e: FocusEvent<HTMLInputElement>) => {
     setIsFocused(false);
-    e.target.style.borderColor = currentVariantStyle.border.split(' ')[2];
-    e.target.style.boxShadow = 'none';
+    const borderVal = (currentVariantStyle.border as string | undefined) || '';
+    e.currentTarget.style.borderColor = borderVal.split(' ')[2] || '';
+    e.currentTarget.style.boxShadow = 'none';
     if (props.onBlur) props.onBlur(e);
   };
 
-  const clearButtonStyle = {
+  const clearButtonStyle: CSSProperties = {
     position: 'absolute',
     top: '50%',
     transform: 'translateY(-50%)',
@@ -157,23 +183,23 @@ const Input = React.forwardRef(({
           aria-label="Clear input"
           title="Clear input"
           style={clearButtonStyle}
-          onClick={(e) => {
+          onClick={(e: MouseEvent<HTMLButtonElement>) => {
             e.stopPropagation();
-            onClear();
+            onClear?.();
           }}
-          onMouseEnter={(e) => {
+          onMouseEnter={(e: MouseEvent<HTMLButtonElement>) => {
             e.currentTarget.style.color = 'var(--mac-text-secondary)';
             e.currentTarget.style.opacity = '1';
           }}
-          onMouseLeave={(e) => {
+          onMouseLeave={(e: MouseEvent<HTMLButtonElement>) => {
             e.currentTarget.style.color = 'var(--mac-text-tertiary)';
             e.currentTarget.style.opacity = '0.7';
           }}
-          onFocus={(e) => {
+          onFocus={(e: FocusEvent<HTMLButtonElement>) => {
             e.currentTarget.style.boxShadow = '0 0 0 2px var(--mac-accent-blue)';
             e.currentTarget.style.opacity = '1';
           }}
-          onBlur={(e) => {
+          onBlur={(e: FocusEvent<HTMLButtonElement>) => {
             e.currentTarget.style.boxShadow = 'none';
             e.currentTarget.style.opacity = '0.7';
           }}
