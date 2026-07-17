@@ -111,14 +111,121 @@ error path, options destructuring.
 
 ---
 
+### 🟡 Medium — type debt tracking
+
+#### B5: Type Debt Register
+
+**Status:** Open. Baseline measured at Phase 1 (2026-07-17).
+
+Any new occurrence of the following patterns must either:
+1. Be entered into the Type Debt Register (this section), OR
+2. Be eliminated before merge.
+
+**Tracked patterns:**
+- `any` (type annotation or cast)
+- `as unknown as` (double cast — usually a sign of wrong types)
+- `@ts-expect-error`
+- `@ts-ignore`
+- `eslint-disable` (any rule)
+- `// TODO(TS-MIGRATION)` (explicit marker for migration debt)
+
+**Baseline at Phase 1 (2026-07-17):**
+
+| Pattern | Count | Files (top 3) |
+|---------|-------|---------------|
+| `any` | 21 | `services/panelPrint.ts` (pragmatic — 1140 lines, heterogeneous shapes), `types/*.ts`, `api/client.ts` |
+| `as unknown as` | 9 | `services/panelPrint.ts`, `utils/mcpTest.ts` (dead test code) |
+| `@ts-expect-error` | 0 | — |
+| `@ts-ignore` | 0 | — |
+| `eslint-disable` | 6 | `services/panelPrint.ts`, `utils/registrarAggregation.ts` |
+| `TODO(TS-MIGRATION)` | 0 | — |
+| `@ts-nocheck` | 0 | — |
+
+**Policy:**
+- New PRs must not INCREASE these counts without a register entry.
+- Each entry must include: file, line, reason, expected resolution date.
+- The register is reviewed at the end of each sprint.
+
+**Register (live entries):**
+
+| File:Line | Pattern | Reason | Resolution |
+|-----------|---------|--------|------------|
+| `services/panelPrint.ts:*` | `any` (21×) | 1140-line file with heterogeneous print payload shapes; proper typing requires modeling the full print pipeline | Phase 9 cleanup (after decomposition) |
+| `utils/registrarAggregation.ts:178` | `any` | Heterogeneous aggregation result shape; tightening requires modeling the full aggregation pipeline | Phase 9 cleanup |
+| `utils/mcpTest.ts:18` | `as unknown as` | Dead test code (manual integration scaffold); method names don't match actual mcpClient API — pre-existing inconsistency | Delete file in Phase 9 (verify no consumers first) |
+
+**Verification (run before each PR merge):**
+```bash
+echo "=== Type Debt Register check ==="
+echo "any: $(grep -rn ': any\b\|<any>\|as any\b' src/ --include='*.ts' --include='*.tsx' | grep -v '@ts-nocheck' | wc -l)"
+echo "as unknown as: $(grep -rn 'as unknown as' src/ --include='*.ts' --include='*.tsx' | grep -v '@ts-nocheck' | wc -l)"
+echo "@ts-expect-error: $(grep -rn '@ts-expect-error' src/ --include='*.ts' --include='*.tsx' | wc -l)"
+echo "@ts-ignore: $(grep -rn '@ts-ignore' src/ --include='*.ts' --include='*.tsx' | wc -l)"
+echo "eslint-disable: $(grep -rn 'eslint-disable' src/ --include='*.ts' --include='*.tsx' | grep -v '@ts-nocheck' | wc -l)"
+echo "@ts-nocheck: $(grep -rl '@ts-nocheck' src/ | wc -l)"
+```
+If any count is HIGHER than the baseline above, the PR must either:
+- Add a register entry explaining the increase, OR
+- Refactor to avoid the new debt.
+
+---
+
+## Definition of Done (per PR)
+
+Every PR in the migration must satisfy ALL of the following before merge:
+
+- [ ] **`tsc --noEmit` passes** — 0 errors. Paste the actual command output in the PR description.
+- [ ] **`npm run lint:check` passes** — 0 errors (warnings are OK if unchanged from baseline). Paste the `✖ N problems (0 errors, M warnings)` line.
+- [ ] **No new `@ts-nocheck`** — `grep -rl "@ts-nocheck" src/ | wc -l` must not increase.
+- [ ] **No new `any` without a comment** — each new `any` must have an inline `// reason: ...` comment or a register entry in B5.
+- [ ] **No new `as unknown as` without a comment** — same as above.
+- [ ] **All existing tests pass** — `npm run test:run` must show `864/864` (or whatever the current count is).
+- [ ] **Tests added for uncovered critical code** — if the PR migrates a hook/utility/component that has no tests, add at least 3 tests (happy path, error path, options destructuring).
+- [ ] **No mass automatic replacements without manual diff review** — if a script was used to apply changes across multiple files, the PR description must explain what the script does and confirm each file was reviewed.
+- [ ] **PR size ≤ 30 files** — if more, split into multiple PRs. Exceptions require justification.
+- [ ] **No regex patches that touch destructuring syntax** — the pattern `paramName = value` → `paramName: Type = value` is FORBIDDEN in destructuring context. Use `paramName = value as Type` or type the parent object.
+
+**PR description template:**
+```
+## What this PR does
+[1-3 sentences]
+
+## Verification
+- `tsc --noEmit`: [paste output]
+- `npm run lint:check`: [paste ✖ line]
+- `npm run test:run`: [paste Test Files / Tests line]
+
+## Type Debt Register impact
+- `any`: [baseline] → [new count] ([change])
+- `as unknown as`: [baseline] → [new count] ([change])
+- `@ts-nocheck`: 0 → 0 (no change)
+- New register entries: [list or "none"]
+
+## Definition of Done checklist
+- [ ] tsc --noEmit passes
+- [ ] ESLint 0 errors
+- [ ] No new @ts-nocheck
+- [ ] No new any without comment
+- [ ] All tests pass
+- [ ] Tests added for uncovered code
+- [ ] No mass auto-replacements without review
+- [ ] PR size ≤ 30 files
+- [ ] No destructuring regex patches
+```
+
+---
+
 ## Sprint goals
 
-1. **Fix B2** — bring ESLint errors at Phase 1 from 13 → 0
-2. **Establish migration rules** — document the regex patterns that are
-   forbidden and the patterns that are safe
-3. **Re-plan Phase 2** — instead of 61 hooks at once, do 5-10 hooks per PR
-   with real typing and tests
-4. **Update this document** after each goal is closed
+1. **Fix B2** — bring ESLint errors at Phase 1 from 13 → 0 ✅ CLOSED (2026-07-17)
+   - Verified: 11 no-undef errors compensated by `tsc` (TS2304 Cannot find name)
+   - Verified: 2 no-console errors resolved by infrastructure allowlist (.ts variant added)
+   - No errors were masked without compensation
+2. **Establish migration rules** — documented in "Forbidden patterns" and "Definition of Done" sections ✅
+3. **Establish Type Debt Register (B5)** — baseline measured, policy documented ✅
+4. **Re-plan Phase 2** — instead of 61 hooks at once, do 5-10 hooks per PR
+   with real typing and tests (next sprint)
+5. **Update this document** after each goal is closed
 
 ## Forbidden patterns (learned from Phase 2-9 mistakes)
 
