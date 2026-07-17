@@ -1,205 +1,181 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 /**
  * useVisitLifecycle - Централизованное управление жизненным циклом визита
- * 
+ *
  * Критический хук для EMR v2:
  * - Отмена запросов при смене visitId (AbortController)
  * - Инвалидация кэша при смене визита
  * - Сброс состояния компонентов
  * - Предотвращение утечек данных между пациентами
- * 
+ *
  * @module hooks/useVisitLifecycle
  */
 
-import { useRef, useEffect, useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { cacheService } from '../core/cache/cacheService';
+
+export interface VisitChangeInfo {
+  prevVisitId: string | number;
+  prevPatientId: string | number;
+  newVisitId: string | number;
+  newPatientId: string | number;
+}
+
+export interface UseVisitLifecycleOptions {
+  invalidateCacheOnChange?: boolean;
+  onVisitChange?: (info: VisitChangeInfo) => void;
+  onCleanup?: () => void;
+}
+
+export interface UseVisitLifecycleReturn {
+  isCleaningUp: boolean;
+  activeRequests: number;
+  hasActiveRequests: boolean;
+  getAbortSignal: () => AbortSignal;
+  abortAllRequests: () => void;
+  invalidateVisitCache: () => void;
+  performCleanup: () => void;
+  trackRequest: <T>(promise: Promise<T>) => Promise<T>;
+  createAbortableFetch: (url: string, options?: RequestInit) => Promise<unknown>;
+  currentVisitId: string | number;
+  currentPatientId: string | number;
+}
 
 /**
  * Hook для управления жизненным циклом визита в EMR
- * 
- * @param {number|string} visitId - ID текущего визита
- * @param {number|string} patientId - ID пациента
- * @param {Object} options - Настройки
- * @param {boolean} options.invalidateCacheOnChange - Очищать кэш при смене визита (default: true)
- * @param {Function} options.onVisitChange - Callback при смене визита
- * @param {Function} options.onCleanup - Callback при очистке
- * 
- * @returns {Object} - API для управления жизненным циклом
  */
-export function useVisitLifecycle(visitId, patientId, options: Record<string, unknown> = {}) {
-    const {
-        invalidateCacheOnChange = true,
-        onVisitChange,
-        onCleanup,
-    } = options;
+export function useVisitLifecycle(
+  visitId: string | number,
+  patientId: string | number,
+  options: UseVisitLifecycleOptions = {},
+): UseVisitLifecycleReturn {
+  const {
+    invalidateCacheOnChange = true,
+    onVisitChange,
+    onCleanup,
+  } = options;
 
-    // AbortController для отмены запросов
-    const abortControllerRef = useRef(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const prevVisitIdRef = useRef<string | number>(visitId);
+  const prevPatientIdRef = useRef<string | number>(patientId);
+  const isFirstRenderRef = useRef<boolean>(true);
+  const [activeRequests, setActiveRequests] = useState<number>(0);
+  const [isCleaningUp, setIsCleaningUp] = useState<boolean>(false);
 
-    // Предыдущие значения для отслеживания изменений
-    const prevVisitIdRef = useRef(visitId);
-    const prevPatientIdRef = useRef(patientId);
+  const onVisitChangeRef = useRef(onVisitChange);
+  const onCleanupRef = useRef(onCleanup);
 
-    // Флаг первого рендера
-    const isFirstRenderRef = useRef(true);
+  useEffect(() => {
+    onVisitChangeRef.current = onVisitChange;
+    onCleanupRef.current = onCleanup;
+  });
 
-    // Счётчик активных запросов
-    const [activeRequests, setActiveRequests] = useState(0);
+  const getAbortSignal = useCallback((): AbortSignal => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+    return abortControllerRef.current.signal;
+  }, []);
 
-    // Флаг очистки
-    const [isCleaningUp, setIsCleaningUp] = useState(false);
+  const abortAllRequests = useCallback((): void => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+  }, []);
 
-    /**
-     * Создаёт новый AbortController и возвращает signal
-     */
-    const getAbortSignal = useCallback(() => {
-        // Если есть старый контроллер — отменяем его запросы
-        if (abortControllerRef.current) {
-            abortControllerRef.current.abort();
-        }
+  const invalidateVisitCache = useCallback((): void => {
+    if (cacheService && typeof cacheService.invalidateByVisit === 'function') {
+      cacheService.invalidateByVisit(prevVisitIdRef.current);
+    }
+    if (cacheService && typeof cacheService.invalidateByPatient === 'function') {
+      cacheService.invalidateByPatient(prevPatientIdRef.current);
+    }
+  }, []);
 
-        // Создаём новый
-        abortControllerRef.current = new AbortController();
-        return abortControllerRef.current.signal;
-    }, []);
+  const performCleanup = useCallback((): void => {
+    setIsCleaningUp(true);
+    abortAllRequests();
+    if (invalidateCacheOnChange) {
+      invalidateVisitCache();
+    }
+    onCleanupRef.current?.();
+    setIsCleaningUp(false);
+  }, [abortAllRequests, invalidateVisitCache, invalidateCacheOnChange]);
 
-    /**
-     * Отменяет все активные запросы
-     */
-    const abortAllRequests = useCallback(() => {
-        if (abortControllerRef.current) {
-            abortControllerRef.current.abort();
-            abortControllerRef.current = null;
-        }
-    }, []);
+  const trackRequest = useCallback(<T,>(promise: Promise<T>): Promise<T> => {
+    setActiveRequests((prev) => prev + 1);
+    return promise.finally(() => {
+      setActiveRequests((prev) => Math.max(0, prev - 1));
+    });
+  }, []);
 
-    /**
-     * Инвалидирует кэш для текущего визита
-     */
-    const invalidateVisitCache = useCallback(() => {
-        if (cacheService && typeof cacheService.invalidateByVisit === 'function') {
-            cacheService.invalidateByVisit(prevVisitIdRef.current);
-        }
-        if (cacheService && typeof cacheService.invalidateByPatient === 'function') {
-            cacheService.invalidateByPatient(prevPatientIdRef.current);
-        }
-    }, []);
-
-    /**
-     * Полная очистка при смене визита
-     */
-    const performCleanup = useCallback(() => {
-        setIsCleaningUp(true);
-
-        // 1. Отменяем все запросы
-        abortAllRequests();
-
-        // 2. Инвалидируем кэш
-        if (invalidateCacheOnChange) {
-            invalidateVisitCache();
-        }
-
-        // 3. Вызываем callback очистки
-        onCleanup?.();
-
-        setIsCleaningUp(false);
-    }, [abortAllRequests, invalidateVisitCache, invalidateCacheOnChange, onCleanup]);
-
-    /**
-     * Трекер активных запросов
-     */
-    const trackRequest = useCallback((promise) => {
-        setActiveRequests(prev => prev + 1);
-
-        return promise.finally(() => {
-            setActiveRequests(prev => Math.max(0, prev - 1));
-        });
-    }, []);
-
-    /**
-     * Создаёт fetch-обёртку с автоматической отменой
-     */
-    const createAbortableFetch = useCallback((url, options: Record<string, unknown> = {}) => {
-        const signal = getAbortSignal();
-
-        return trackRequest(
-            fetch(url, { ...options, signal })
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`HTTP ${response.status}`);
-                    }
-                    return response.json();
-                })
-                .catch(error => {
-                    if (error.name === 'AbortError') {
-                        // Запрос отменён — это нормально
-                        return null;
-                    }
-                    throw error;
-                })
-        );
-    }, [getAbortSignal, trackRequest]);
-
-    // Эффект отслеживания смены visitId
-    useEffect(() => {
-        // Пропускаем первый рендер
-        if (isFirstRenderRef.current) {
-            isFirstRenderRef.current = false;
-            return;
-        }
-
-        // Проверяем, изменился ли visitId или patientId
-        const visitChanged = visitId !== prevVisitIdRef.current;
-        const patientChanged = patientId !== prevPatientIdRef.current;
-
-        if (visitChanged || patientChanged) {
-            // Выполняем очистку
-            performCleanup();
-
-            // Уведомляем о смене визита
-            onVisitChange?.({
-                prevVisitId: prevVisitIdRef.current,
-                prevPatientId: prevPatientIdRef.current,
-                newVisitId: visitId,
-                newPatientId: patientId,
-            });
-
-            // Обновляем refs
-            prevVisitIdRef.current = visitId;
-            prevPatientIdRef.current = patientId;
-        }
-    }, [visitId, patientId, performCleanup, onVisitChange]);
-
-    // Очистка при размонтировании
-    useEffect(() => {
-        return () => {
-            abortAllRequests();
-            if (invalidateCacheOnChange) {
-                invalidateVisitCache();
+  const createAbortableFetch = useCallback(
+    (url: string, options: RequestInit = {}): Promise<unknown> => {
+      const signal = getAbortSignal();
+      return trackRequest(
+        fetch(url, { ...options, signal })
+          .then((response: Response) => {
+            if (!response.ok) {
+              throw new Error(`HTTP ${response.status}`);
             }
-        };
-    }, [abortAllRequests, invalidateVisitCache, invalidateCacheOnChange]);
+            return response.json();
+          })
+          .catch((error: Error) => {
+            if (error.name === 'AbortError') {
+              return null;
+            }
+            throw error;
+          }),
+      );
+    },
+    [getAbortSignal, trackRequest],
+  );
 
-    return {
-        // Состояние
-        isCleaningUp,
-        activeRequests,
-        hasActiveRequests: activeRequests > 0,
+  useEffect(() => {
+    if (isFirstRenderRef.current) {
+      isFirstRenderRef.current = false;
+      return;
+    }
 
-        // Методы
-        getAbortSignal,
-        abortAllRequests,
-        invalidateVisitCache,
-        performCleanup,
-        trackRequest,
-        createAbortableFetch,
+    const visitChanged = visitId !== prevVisitIdRef.current;
+    const patientChanged = patientId !== prevPatientIdRef.current;
 
-        // Утилиты
-        currentVisitId: visitId,
-        currentPatientId: patientId,
+    if (visitChanged || patientChanged) {
+      performCleanup();
+      onVisitChangeRef.current?.({
+        prevVisitId: prevVisitIdRef.current,
+        prevPatientId: prevPatientIdRef.current,
+        newVisitId: visitId,
+        newPatientId: patientId,
+      });
+      prevVisitIdRef.current = visitId;
+      prevPatientIdRef.current = patientId;
+    }
+  }, [visitId, patientId, performCleanup]);
+
+  useEffect(() => {
+    return () => {
+      abortAllRequests();
+      if (invalidateCacheOnChange) {
+        invalidateVisitCache();
+      }
     };
+  }, [abortAllRequests, invalidateVisitCache, invalidateCacheOnChange]);
+
+  return {
+    isCleaningUp,
+    activeRequests,
+    hasActiveRequests: activeRequests > 0,
+    getAbortSignal,
+    abortAllRequests,
+    invalidateVisitCache,
+    performCleanup,
+    trackRequest,
+    createAbortableFetch,
+    currentVisitId: visitId,
+    currentPatientId: patientId,
+  };
 }
 
 export default useVisitLifecycle;
