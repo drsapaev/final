@@ -28,29 +28,29 @@ const normalizeAppointment = (appointment) => ({
     appointment.hasIntegrityWarnings ?? appointment.has_integrity_warnings ?? false,
 });
 
-const buildAppointmentPayload = (appointmentData, doctors = []) => {
+const buildAppointmentPayload = (appointmentData: Record<string, unknown>, doctors: unknown[] = []) => {
   const selectedDoctor = doctors.find(
-    (doctor) => doctor.id === Number(appointmentData.doctorId)
+    (doctor) => (doctor as Record<string, unknown>).id === Number((appointmentData as Record<string, unknown>).doctorId)
   );
 
   const payload = {
-    patient_id: Number(appointmentData.patientId),
-    doctor_id: Number(appointmentData.doctorId),
-    department: selectedDoctor?.specialty || null,
+    patient_id: Number((appointmentData as Record<string, unknown>).patientId),
+    doctor_id: Number((appointmentData as Record<string, unknown>).doctorId),
+    department: (selectedDoctor as Record<string, unknown> | null)?.specialty || null,
     appointment_date: appointmentData.appointmentDate,
     appointment_time: appointmentData.appointmentTime,
-    notes: appointmentData.reason?.trim() || appointmentData.notes?.trim() || '',
+    notes: String(appointmentData.reason ?? "").trim() || String(appointmentData.notes ?? "").trim() || '',
     services: [],
   };
 
-  if (appointmentData.status) {
-    payload.status = appointmentData.status;
+  if ((appointmentData as Record<string, unknown>).status) {
+    (payload as Record<string, unknown>).status = (appointmentData as Record<string, unknown>).status;
   }
 
   return payload;
 };
 
-const useAppointments = (doctors = []) => {
+const useAppointments = (doctors: unknown[] = []) => {
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);

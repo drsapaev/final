@@ -4,6 +4,12 @@ import { api } from '../api/client';  // PR-38 / High-21: centralized axios clie
 import { buildPatientDocumentFields } from '../utils/patientDocument';
 import logger from '../utils/logger';
 
+interface CatchError {
+  status?: number;
+  response?: { status?: number; data?: unknown };
+  message?: string;
+}
+
 /**
  * usePatients hook — patient CRUD operations.
  *
@@ -30,14 +36,14 @@ const usePatients = () => {
   // Transform API snake_case → component camelCase
   const transformPatient = (p) => ({
     id: p.id,
-    firstName: p.first_name,
-    lastName: p.last_name,
-    middleName: p.middle_name,
-    email: p.email || '',
-    phone: p.phone || '',
-    birthDate: p.birth_date || '',
-    gender: p.sex === 'M' ? 'male' : p.sex === 'F' ? 'female' : '',
-    address: p.address || '',
+    firstName: (p as Record<string, unknown>).first_name,
+    lastName: (p as Record<string, unknown>).last_name,
+    middleName: (p as Record<string, unknown>).middle_name,
+    email: (p as Record<string, unknown>).email || '',
+    phone: (p as Record<string, unknown>).phone || '',
+    birthDate: (p as Record<string, unknown>).birth_date || '',
+    gender: (p as Record<string, unknown>).sex === 'M' ? 'male' : (p as Record<string, unknown>).sex === 'F' ? 'female' : '',
+    address: (p as Record<string, unknown>).address || '',
     passport: p.doc_number || '',
     insuranceNumber: '',
     emergencyContact: '',
@@ -82,14 +88,14 @@ const usePatients = () => {
       );
 
       const apiData = {
-        last_name: patientData.lastName || patientData.last_name,
-        first_name: patientData.firstName || patientData.first_name,
-        middle_name: patientData.middleName || patientData.middle_name || null,
-        birth_date: patientData.birthDate || patientData.birth_date || null,
+        last_name: patientData.lastName || (patientData as Record<string, unknown>).last_name,
+        first_name: patientData.firstName || (patientData as Record<string, unknown>).first_name,
+        middle_name: patientData.middleName || (patientData as Record<string, unknown>).middle_name || null,
+        birth_date: patientData.birthDate || (patientData as Record<string, unknown>).birth_date || null,
         sex: patientData.gender === 'male' ? 'M' : patientData.gender === 'female' ? 'F' : null,
-        phone: patientData.phone || null,
-        email: patientData.email || null,
-        address: patientData.address || null,
+        phone: (patientData as Record<string, unknown>).phone || null,
+        email: (patientData as Record<string, unknown>).email || null,
+        address: (patientData as Record<string, unknown>).address || null,
         ...documentFields
       };
 
@@ -102,8 +108,8 @@ const usePatients = () => {
     } catch (err) {
       const message = err?.response?.data?.detail || err?.message || 'Ошибка создания пациента';
       const wrapped = new Error(message);
-      wrapped.status = err?.response?.status;
-      wrapped.response = err?.response;
+      (wrapped as CatchError).status = err?.response?.status;
+      (wrapped as CatchError).response = err?.response;
       setError(wrapped);
       throw wrapped;
     } finally {
@@ -118,20 +124,20 @@ const usePatients = () => {
 
     try {
       const apiData = {};
-      if (patientData.lastName !== undefined) apiData.last_name = patientData.lastName;
-      if (patientData.firstName !== undefined) apiData.first_name = patientData.firstName;
-      if (patientData.middleName !== undefined) apiData.middle_name = patientData.middleName;
-      if (patientData.birthDate !== undefined) apiData.birth_date = patientData.birthDate;
-      if (patientData.gender !== undefined) apiData.sex = patientData.gender === 'male' ? 'M' : patientData.gender === 'female' ? 'F' : null;
-      if (patientData.phone !== undefined) apiData.phone = patientData.phone;
-      if (patientData.email !== undefined) apiData.email = patientData.email;
+      if (patientData.lastName !== undefined) (apiData as Record<string, unknown>).last_name = patientData.lastName;
+      if (patientData.firstName !== undefined) (apiData as Record<string, unknown>).first_name = patientData.firstName;
+      if (patientData.middleName !== undefined) (apiData as Record<string, unknown>).middle_name = patientData.middleName;
+      if (patientData.birthDate !== undefined) (apiData as Record<string, unknown>).birth_date = patientData.birthDate;
+      if (patientData.gender !== undefined) (apiData as Record<string, unknown>).sex = patientData.gender === 'male' ? 'M' : patientData.gender === 'female' ? 'F' : null;
+      if ((patientData as Record<string, unknown>).phone !== undefined) (apiData as Record<string, unknown>).phone = (patientData as Record<string, unknown>).phone;
+      if ((patientData as Record<string, unknown>).email !== undefined) (apiData as Record<string, unknown>).email = (patientData as Record<string, unknown>).email;
       if (patientData.passport !== undefined || patientData.doc_number !== undefined) {
         Object.assign(
           apiData,
           buildPatientDocumentFields(patientData.passport ?? patientData.doc_number)
         );
       }
-      if (patientData.address !== undefined) apiData.address = patientData.address;
+      if ((patientData as Record<string, unknown>).address !== undefined) (apiData as Record<string, unknown>).address = (patientData as Record<string, unknown>).address;
 
       // PR-38 / High-21: axios client
       const response = await api.put(`/patients/${id}`, apiData);
@@ -148,8 +154,8 @@ const usePatients = () => {
     } catch (err) {
       const message = err?.response?.data?.detail || err?.message || 'Ошибка обновления пациента';
       const wrapped = new Error(message);
-      wrapped.status = err?.response?.status;
-      wrapped.response = err?.response;
+      (wrapped as CatchError).status = err?.response?.status;
+      (wrapped as CatchError).response = err?.response;
       setError(wrapped);
       throw wrapped;
     } finally {
@@ -169,8 +175,8 @@ const usePatients = () => {
     } catch (err) {
       const message = err?.response?.data?.detail || err?.message || 'Ошибка удаления пациента';
       const wrapped = new Error(message);
-      wrapped.status = err?.response?.status;
-      wrapped.response = err?.response;
+      (wrapped as CatchError).status = err?.response?.status;
+      (wrapped as CatchError).response = err?.response;
       setError(wrapped);
       throw wrapped;
     } finally {
@@ -195,12 +201,12 @@ const usePatients = () => {
   // Фильтрация пациентов
   const filteredPatients = patients.filter(patient => {
     const matchesSearch = !searchTerm ||
-      patient.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      patient.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      patient.middleName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      patient.phone.includes(searchTerm) ||
-      patient.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      patient.passport.toLowerCase().includes(searchTerm.toLowerCase());
+      String((patient as Record<string, unknown>).firstName).toLowerCase().includes(String(searchTerm).toLowerCase()) ||
+      String((patient as Record<string, unknown>).lastName).toLowerCase().includes(String(searchTerm).toLowerCase()) ||
+      String((patient as Record<string, unknown>).middleName).toLowerCase().includes(String(searchTerm).toLowerCase()) ||
+      String((patient as Record<string, unknown>).phone).includes(String(searchTerm)) ||
+      String((patient as Record<string, unknown>).email).toLowerCase().includes(String(searchTerm).toLowerCase()) ||
+      String((patient as Record<string, unknown>).passport).toLowerCase().includes(String(searchTerm).toLowerCase());
 
     const matchesGender = !filterGender || patient.gender === filterGender;
 
@@ -237,8 +243,8 @@ const usePatients = () => {
     } catch (err) {
       const message = err?.response?.data?.detail || err?.message || 'Ошибка архивирования пациента';
       const wrapped = new Error(message);
-      wrapped.status = err?.response?.status;
-      wrapped.response = err?.response;
+      (wrapped as CatchError).status = err?.response?.status;
+      (wrapped as CatchError).response = err?.response;
       setError(wrapped);
       throw wrapped;
     } finally {
@@ -262,8 +268,8 @@ const usePatients = () => {
     } catch (err) {
       const message = err?.response?.data?.detail || err?.message || 'Ошибка восстановления пациента';
       const wrapped = new Error(message);
-      wrapped.status = err?.response?.status;
-      wrapped.response = err?.response;
+      (wrapped as CatchError).status = err?.response?.status;
+      (wrapped as CatchError).response = err?.response;
       setError(wrapped);
       throw wrapped;
     } finally {

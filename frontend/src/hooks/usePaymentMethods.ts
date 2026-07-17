@@ -20,7 +20,7 @@ import { DEFAULT_PAYMENT_METHODS, mapBackendPaymentMethods } from '../config/pay
 import { api } from '../api/client';
 import logger from '../utils/logger';
 
-export function usePaymentMethods(options = {}) {
+export function usePaymentMethods(options: Record<string, unknown> = {}) {
   const { enableBackendFetch = false } = options;
 
   const [paymentMethods, setPaymentMethods] = useState(DEFAULT_PAYMENT_METHODS);

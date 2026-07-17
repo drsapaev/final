@@ -24,7 +24,7 @@ const useUsers = () => {
     setError(null);
     
     try {
-      const params = {
+      const params: Record<string, unknown> = {
         page,
         per_page: pagination.per_page,
       };
