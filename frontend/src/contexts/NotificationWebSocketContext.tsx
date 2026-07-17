@@ -1,7 +1,4 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
-import { createContext, useCallback, useContext, useEffect, useRef } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, type ReactNode, type MutableRefObject } from 'react';
 import PropTypes from 'prop-types';
 import { useLocation } from 'react-router-dom';
 import { buildWsUrl } from '../api/runtime';
@@ -12,10 +9,81 @@ import { useNotificationCenter } from './NotificationCenterContext';
 import { clearNotificationQueryCache } from '../api/services';
 import { isPublicRoutePath } from '../routing/routeSelectors';
 
-const NotificationWebSocketContext = createContext<unknown>(null);
+// Inbound WS payloads are dynamic JSON — they share the wire shape of
+// { type, title, message, ... } but the backend may extend fields. We
+// model the canonical surface and stash the raw payload for debug.
+interface WsPayload {
+  notification?: WsPayload;
+  payload?: WsPayload;
+  data?: WsPayload;
+  type?: unknown;
+  event_type?: unknown;
+  notification_type?: unknown;
+  title?: unknown;
+  subject?: unknown;
+  message?: unknown;
+  content?: unknown;
+  user_id?: unknown;
+  role?: unknown;
+  unread_count?: unknown;
+  unreadCount?: unknown;
+  by_role?: Record<string, unknown> | null;
+  by_channel?: Record<string, unknown> | null;
+  by_severity?: Record<string, unknown> | null;
+  items?: unknown[];
+  [key: string]: unknown;
+}
 
-function normalizePayload(payload = {}) {
-  const nested = payload.notification || payload.payload || payload.data || payload;
+interface NormalizedNotification {
+  type: string;
+  title: string;
+  message: string;
+  raw: WsPayload;
+  nested: WsPayload;
+}
+
+interface UnreadSnapshot {
+  total: number;
+  by_role?: Record<string, unknown> | null;
+  by_channel?: Record<string, unknown> | null;
+  by_severity?: Record<string, unknown> | null;
+}
+
+interface AppendMeta {
+  replace?: boolean;
+}
+
+interface ReplaceMeta {
+  source?: string;
+  unreadSnapshot?: UnreadSnapshot;
+  lastSyncAt?: string;
+}
+
+// NotificationCenterContext is still @ts-nocheck. Cast its return type to
+// a structural interface here so we get strong typing on the three methods
+// we actually depend on. When NotificationCenterContext is migrated, the
+// cast can be removed.
+interface NotificationCenterHandle {
+  appendNotification: (event: WsPayload | Record<string, unknown>, source?: string) => unknown;
+  replaceNotifications: (items: unknown[], meta?: ReplaceMeta) => void;
+  updateUnreadSnapshot: (snapshot: UnreadSnapshot, options?: AppendMeta) => void;
+}
+
+type ToastType = 'error' | 'warning' | 'success' | 'info';
+
+interface NotificationWebSocketContextValue {
+  ws: WebSocket | null;
+}
+
+const NotificationWebSocketContext = createContext<NotificationWebSocketContextValue | null>(null);
+
+const TYPE_ALIASES: Record<string, string> = {
+  queue_changed: 'queue_update',
+  diagnostics_return: 'diagnostics_return_needed'
+};
+
+function normalizePayload(payload: WsPayload = {}): NormalizedNotification {
+  const nested = (payload.notification || payload.payload || payload.data || payload) as WsPayload;
   const rawType =
     nested.type ||
     nested.event_type ||
@@ -25,35 +93,41 @@ function normalizePayload(payload = {}) {
     payload.notification_type ||
     'notification';
   const normalizedRawType = String(rawType).toLowerCase();
-  const typeAliases = {
-    queue_changed: 'queue_update',
-    diagnostics_return: 'diagnostics_return_needed',
-  };
-  const type = typeAliases[normalizedRawType] || normalizedRawType;
+  const type = TYPE_ALIASES[normalizedRawType] || normalizedRawType;
 
   const title =
-    nested.title ||
-    nested.subject ||
+    (nested.title as string) ||
+    (nested.subject as string) ||
     (type === 'queue_update' ? 'Обновление очереди' : 'Уведомление');
-  const message = nested.message || nested.content || payload.message || payload.content || '';
+  const message =
+    (nested.message as string) ||
+    (nested.content as string) ||
+    (payload.message as string) ||
+    (payload.content as string) ||
+    '';
 
   return { type, title, message, raw: payload, nested };
 }
 
-export function NotificationWebSocketProvider({ children }) {
-  const ws = useRef<unknown>(null);
-  const handleMessageRef = useRef(() => {});
-  const connectRef = useRef<unknown>(null);
-  const connectTimerRef = useRef<unknown>(null);
-  const disconnectRef = useRef<unknown>(null);
-  const closeOnOpenRef = useRef<unknown>(null);
-  const closeOnOpenReasonRef = useRef('');
-  const reconnectTimeout = useRef<unknown>(null);
-  const shouldReconnect = useRef(true);
-  const location = useLocation();
-  const { appendNotification, replaceNotifications, updateUnreadSnapshot } = useNotificationCenter();
+interface NotificationWebSocketProviderProps {
+  children: ReactNode;
+}
 
-  const closeSocketSafely = useCallback((socket, reason) => {
+export function NotificationWebSocketProvider({ children }: NotificationWebSocketProviderProps) {
+  const ws = useRef<WebSocket | null>(null);
+  const handleMessageRef = useRef<(data: WsPayload) => void>(() => {});
+  const connectRef = useRef<(() => (() => void) | undefined) | null>(null);
+  const connectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const disconnectRef = useRef<(() => void) | null>(null);
+  const closeOnOpenRef = useRef<WebSocket | null>(null);
+  const closeOnOpenReasonRef = useRef<string>('');
+  const reconnectTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const shouldReconnect = useRef<boolean>(true);
+  const location = useLocation();
+  const { appendNotification, replaceNotifications, updateUnreadSnapshot } =
+    useNotificationCenter() as NotificationCenterHandle;
+
+  const closeSocketSafely = useCallback((socket: WebSocket | null, reason: string) => {
     if (!socket) {
       return;
     }
@@ -83,11 +157,11 @@ export function NotificationWebSocketProvider({ children }) {
     }
 
     reconnectTimeout.current = setTimeout(() => {
-      void connectRef.current?.();
+      connectRef.current?.();
     }, 3000);
   }, []);
 
-  const applyUnreadSnapshot = useCallback((data) => {
+  const applyUnreadSnapshot = useCallback((data: WsPayload) => {
     if (
       typeof data?.unread_count === 'number' ||
       typeof data?.unreadCount === 'number' ||
@@ -95,20 +169,18 @@ export function NotificationWebSocketProvider({ children }) {
       data?.by_channel ||
       data?.by_severity
     ) {
-      updateUnreadSnapshot(
-        {
-          total: Number(data?.unread_count ?? data?.unreadCount ?? 0),
-          by_role: data?.by_role,
-          by_channel: data?.by_channel,
-          by_severity: data?.by_severity
-        },
-        { replace: false }
-      );
+      const snapshot: UnreadSnapshot = {
+        total: Number(data?.unread_count ?? data?.unreadCount ?? 0),
+        by_role: data?.by_role ?? null,
+        by_channel: data?.by_channel ?? null,
+        by_severity: data?.by_severity ?? null
+      };
+      updateUnreadSnapshot(snapshot, { replace: false });
     }
   }, [updateUnreadSnapshot]);
 
   useEffect(() => {
-    handleMessageRef.current = (data) => {
+    handleMessageRef.current = (data: WsPayload) => {
       const normalized = normalizePayload(data);
 
       const invalidateNotificationCache = () => {
@@ -168,16 +240,16 @@ export function NotificationWebSocketProvider({ children }) {
             message: normalized.message
           },
           'ws'
-        );
+        ) as { message?: string; title?: string; type?: string };
 
         const toastMessage = notification.message
           ? `${notification.title}: ${notification.message}`
-          : notification.title;
-        const toastType = notification.type.includes('error')
+          : (notification.title ?? '');
+        const toastType: ToastType = (notification.type ?? '').includes('error')
           ? 'error'
-          : notification.type.includes('warning') || notification.type.includes('alert')
+          : (notification.type ?? '').includes('warning') || (notification.type ?? '').includes('alert')
             ? 'warning'
-            : notification.type.includes('success')
+            : (notification.type ?? '').includes('success')
               ? 'success'
               : 'info';
 
@@ -188,13 +260,13 @@ export function NotificationWebSocketProvider({ children }) {
           document.hidden &&
           Notification.permission === 'granted'
         ) {
-          new Notification(notification.title, { body: notification.message });
+          new Notification(notification.title ?? '', { body: notification.message ?? '' });
         }
       }
     };
   }, [appendNotification, applyUnreadSnapshot, replaceNotifications]);
 
-  const connect = useCallback(() => {
+  const connect = useCallback((): (() => void) | undefined => {
     if (reconnectTimeout.current) {
       clearTimeout(reconnectTimeout.current);
       reconnectTimeout.current = null;
@@ -233,16 +305,16 @@ export function NotificationWebSocketProvider({ children }) {
       logger.info('[NotificationWS] connected');
     };
 
-    socket.onmessage = (event) => {
+    socket.onmessage = (event: MessageEvent) => {
       try {
-        const data = JSON.parse(event.data);
+        const data = JSON.parse(event.data as string) as WsPayload;
         handleMessageRef.current(data);
       } catch (error) {
         logger.error('[NotificationWS] failed to parse message', error);
       }
     };
 
-    socket.onclose = (event) => {
+    socket.onclose = (event: CloseEvent) => {
       if (ws.current === socket) {
         ws.current = null;
       }
@@ -271,7 +343,7 @@ export function NotificationWebSocketProvider({ children }) {
     };
   }, [closeSocketSafely, scheduleReconnect]);
 
-  connectRef.current = connect;
+  (connectRef as MutableRefObject<typeof connect | null>).current = connect;
 
   useEffect(() => {
     const isPublicRoute = isPublicRoutePath(location.pathname);
@@ -329,6 +401,6 @@ NotificationWebSocketProvider.propTypes = {
   children: PropTypes.node.isRequired
 };
 
-export function useNotificationWebSocket() {
+export function useNotificationWebSocket(): NotificationWebSocketContextValue | null {
   return useContext(NotificationWebSocketContext);
 }
