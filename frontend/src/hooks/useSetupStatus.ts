@@ -3,10 +3,16 @@ import logger from '../utils/logger';
 import { fetchSetupStatus } from '../api/setup';
 
 export function useSetupStatus() {
-  const [status, setStatus] = useState({
+  interface SetupStatus {
+  initialized: boolean;
+  isLoading: boolean;
+  error: string | null;
+}
+
+  const [status, setStatus] = useState<SetupStatus>({
     initialized: true,
     isLoading: true,
-    error: null
+    error: null as string | null
   });
 
   useEffect(() => {
@@ -22,7 +28,7 @@ export function useSetupStatus() {
         setStatus({
           initialized: Boolean(payload?.initialized),
           isLoading: false,
-          error: null
+          error: null as string | null
         });
       } catch (error) {
         logger.warn('[setup] failed to load setup status', {

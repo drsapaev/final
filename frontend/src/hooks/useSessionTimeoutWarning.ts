@@ -45,13 +45,21 @@ function getTokenExpiryMs(token) {
   }
 }
 
+export interface UseSessionTimeoutWarningOptions {
+  onWarning?: (expiresAt: Date) => void;
+  onExpired?: () => void;
+  warningThresholdMs?: number;
+  pollIntervalMs?: number;
+  enabled?: boolean;
+}
+
 export function useSessionTimeoutWarning({
   onWarning,
   onExpired,
   warningThresholdMs = DEFAULT_WARNING_THRESHOLD,
   pollIntervalMs = DEFAULT_POLL_INTERVAL,
   enabled = true,
-} = {}) {
+}: UseSessionTimeoutWarningOptions = {}) {
   const warningFiredRef = useRef(false);
   const expiredFiredRef = useRef(false);
 
@@ -97,7 +105,7 @@ export function useSessionTimeoutWarning({
             logger.info(
               `[useSessionTimeoutWarning] session expiring in ${Math.round(remaining / 1000)}s`
             );
-            if (typeof onWarning === 'function') onWarning(expiresAt);
+            if (typeof onWarning === 'function') onWarning(new Date(expiresAt));
           }
         } else {
           // Token was refreshed (or user logged in anew) — reset the flags

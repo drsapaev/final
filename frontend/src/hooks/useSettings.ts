@@ -2,10 +2,10 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 
 import logger from '../utils/logger';
 const useSettings = () => {
-  const [settings, setSettings] = useState({});
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [activeTab, setActiveTab] = useState('general');
+  const [settings, setSettings] = useState<Record<string, unknown>>({});
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<string>('general');
 
   // Моковые данные для настроек
   const mockSettingsRef = useRef({
@@ -214,40 +214,40 @@ const useSettings = () => {
 
   // Валидация настроек
   const validateSettings = useCallback((settingsToValidate) => {
-    const errors = {};
+    const errors: Record<string, string> = {};
     
     // Валидация общих настроек
-    if (settingsToValidate.name && !settingsToValidate.name.trim()) {
+    if ((settingsToValidate as Record<string, unknown>).name && !String((settingsToValidate as Record<string, unknown>).name).trim()) {
       errors.name = 'Название клиники обязательно';
     }
     
-    if (settingsToValidate.email && !/\S+@\S+\.\S+/.test(settingsToValidate.email)) {
+    if ((settingsToValidate as Record<string, unknown>).email && !/\S+@\S+\.\S+/.test((settingsToValidate as Record<string, unknown>).email as string)) {
       errors.email = 'Некорректный email';
     }
     
-    if (settingsToValidate.phone && !/^\+?[\d\s-()]+$/.test(settingsToValidate.phone)) {
+    if ((settingsToValidate as Record<string, unknown>).phone && !/^\+?[\d\s-()]+$/.test((settingsToValidate as Record<string, unknown>).phone as string)) {
       errors.phone = 'Некорректный номер телефона';
     }
     
-    if (settingsToValidate.website && !/^https?:\/\/.+/.test(settingsToValidate.website)) {
+    if ((settingsToValidate as Record<string, unknown>).website && !/^https?:\/\/.+/.test((settingsToValidate as Record<string, unknown>).website as string)) {
       errors.website = 'Некорректный URL сайта';
     }
     
     // Валидация медицинских настроек
-    if (settingsToValidate.appointmentDuration && (settingsToValidate.appointmentDuration < 15 || settingsToValidate.appointmentDuration > 120)) {
+    if (Number((settingsToValidate as Record<string, unknown>).appointmentDuration) && (Number((settingsToValidate as Record<string, unknown>).appointmentDuration) < 15 || Number((settingsToValidate as Record<string, unknown>).appointmentDuration) > 120)) {
       errors.appointmentDuration = 'Длительность приема должна быть от 15 до 120 минут';
     }
     
-    if (settingsToValidate.maxAppointmentsPerDay && (settingsToValidate.maxAppointmentsPerDay < 1 || settingsToValidate.maxAppointmentsPerDay > 200)) {
+    if ((settingsToValidate as Record<string, unknown>).maxAppointmentsPerDay && (Number((settingsToValidate as Record<string, unknown>).maxAppointmentsPerDay) < 1 || Number((settingsToValidate as Record<string, unknown>).maxAppointmentsPerDay) > 200)) {
       errors.maxAppointmentsPerDay = 'Максимум записей в день должен быть от 1 до 200';
     }
     
     // Валидация настроек безопасности
-    if (settingsToValidate.passwordMinLength && (settingsToValidate.passwordMinLength < 6 || settingsToValidate.passwordMinLength > 32)) {
+    if ((settingsToValidate as Record<string, unknown>).passwordMinLength && (Number((settingsToValidate as Record<string, unknown>).passwordMinLength) < 6 || Number((settingsToValidate as Record<string, unknown>).passwordMinLength) > 32)) {
       errors.passwordMinLength = 'Минимальная длина пароля должна быть от 6 до 32 символов';
     }
     
-    if (settingsToValidate.maxLoginAttempts && (settingsToValidate.maxLoginAttempts < 3 || settingsToValidate.maxLoginAttempts > 10)) {
+    if ((settingsToValidate as Record<string, unknown>).maxLoginAttempts && (Number((settingsToValidate as Record<string, unknown>).maxLoginAttempts) < 3 || Number((settingsToValidate as Record<string, unknown>).maxLoginAttempts) > 10)) {
       errors.maxLoginAttempts = 'Максимум попыток входа должен быть от 3 до 10';
     }
     
@@ -261,12 +261,12 @@ const useSettings = () => {
       configuredSettings: Object.values(settings).filter(value => 
         value !== null && value !== undefined && value !== ''
       ).length,
-      securityEnabled: settings.twoFactorEnabled || false,
-      notificationsEnabled: settings.emailNotifications || settings.smsNotifications || settings.pushNotifications || false,
-      autoBackupEnabled: settings.autoBackup || false
+      securityEnabled: (settings as Record<string, unknown>).twoFactorEnabled || false,
+      notificationsEnabled: (settings as Record<string, unknown>).emailNotifications || (settings as Record<string, unknown>).smsNotifications || (settings as Record<string, unknown>).pushNotifications || false,
+      autoBackupEnabled: (settings as Record<string, unknown>).autoBackup || false
     };
     
-    stats.configurationPercentage = Math.round((stats.configuredSettings / stats.totalSettings) * 100);
+    (stats as Record<string, unknown>).configurationPercentage = Math.round((stats.configuredSettings / stats.totalSettings) * 100);
     
     return stats;
   }, [settings]);
