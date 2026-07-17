@@ -17,6 +17,7 @@ export const useNavigation = (initialRoute = '/') => {
 
   // Навигация к маршруту
   const navigate = useCallback((route, options = {}) => {
+// @ts-expect-error — destructuring from unknown options; Phase 9 cleanup
     const { replace = false, state = null } = options;
 
     setIsNavigating(true);
@@ -38,7 +39,7 @@ export const useNavigation = (initialRoute = '/') => {
 
     // Обновляем URL в браузере
     if (typeof window !== 'undefined') {
-      const url = new URL(window.location);
+      const url = new URL(window.location.href);
       url.pathname = route;
       window.history.pushState({ route, state }, '', url);
     }
@@ -174,12 +175,12 @@ export const Tab = ({
       }}
       onMouseEnter={(e) => {
         if (!active && !disabled && !prefersReducedMotion) {
-          e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
+          (e.target as HTMLElement).style.backgroundColor = 'var(--mac-bg-secondary)';
         }
       }}
       onMouseLeave={(e) => {
         if (!active && !disabled && !prefersReducedMotion) {
-          e.target.style.backgroundColor = 'transparent';
+          (e.target as HTMLElement).style.backgroundColor = 'transparent';
         }
       }}
       {...props}>
@@ -225,13 +226,13 @@ export const TabPanel = ({
   className = '',
   ...props
 }) => {
-  const { shouldRender, animationClasses } = useAnimation(active, 'fade', 200);
+  const { shouldRender, animationStyles } = useAnimation(active, 'fade', 200);
 
   if (!shouldRender) return null;
 
   return (
     <div
-      className={`tab-panel ${animationClasses} ${className}`}
+      className={`tab-panel ${animationStyles} ${className}`}
       style={{
         padding: 'var(--mac-spacing-5)',
         backgroundColor: 'var(--mac-bg-primary)'
@@ -299,12 +300,12 @@ export const NavigationMenu = ({
         }}
         onMouseEnter={(e) => {
           if (activeItem !== item.id && !item.disabled && !prefersReducedMotion) {
-            e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
+            (e.target as HTMLElement).style.backgroundColor = 'var(--mac-bg-secondary)';
           }
         }}
         onMouseLeave={(e) => {
           if (activeItem !== item.id && !item.disabled && !prefersReducedMotion) {
-            e.target.style.backgroundColor = 'transparent';
+            (e.target as HTMLElement).style.backgroundColor = 'transparent';
           }
         }}>
         
@@ -373,10 +374,10 @@ export const Breadcrumbs = ({
             fontSize: 'inherit'
           }}
           onMouseEnter={(e) => {
-            e.target.style.textDecoration = 'underline';
+            (e.target as HTMLElement).style.textDecoration = 'underline';
           }}
           onMouseLeave={(e) => {
-            e.target.style.textDecoration = 'none';
+            (e.target as HTMLElement).style.textDecoration = 'none';
           }}>
           
               {item.label}
@@ -470,12 +471,12 @@ export const Pagination = ({
           }}
           onMouseEnter={(e) => {
             if (currentPage !== 1 && !prefersReducedMotion) {
-              e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
+              (e.target as HTMLElement).style.backgroundColor = 'var(--mac-bg-secondary)';
             }
           }}
           onMouseLeave={(e) => {
             if (currentPage !== 1 && !prefersReducedMotion) {
-              e.target.style.backgroundColor = 'var(--mac-bg-primary)';
+              (e.target as HTMLElement).style.backgroundColor = 'var(--mac-bg-primary)';
             }
           }}>
           
@@ -504,12 +505,12 @@ export const Pagination = ({
             }}
             onMouseEnter={(e) => {
               if (typeof page === 'number' && page !== currentPage && !prefersReducedMotion) {
-                e.target.style.backgroundColor = page === currentPage ? 'var(--mac-accent-blue-hover)' : 'var(--mac-bg-secondary)';
+                (e.target as HTMLElement).style.backgroundColor = page === currentPage ? 'var(--mac-accent-blue-hover)' : 'var(--mac-bg-secondary)';
               }
             }}
             onMouseLeave={(e) => {
               if (typeof page === 'number' && page !== currentPage && !prefersReducedMotion) {
-                e.target.style.backgroundColor = page === currentPage ? 'var(--mac-accent-blue)' : 'var(--mac-bg-primary)';
+                (e.target as HTMLElement).style.backgroundColor = page === currentPage ? 'var(--mac-accent-blue)' : 'var(--mac-bg-primary)';
               }
             }}>
             
@@ -535,12 +536,12 @@ export const Pagination = ({
           }}
           onMouseEnter={(e) => {
             if (currentPage !== totalPages && !prefersReducedMotion) {
-              e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
+              (e.target as HTMLElement).style.backgroundColor = 'var(--mac-bg-secondary)';
             }
           }}
           onMouseLeave={(e) => {
             if (currentPage !== totalPages && !prefersReducedMotion) {
-              e.target.style.backgroundColor = 'var(--mac-bg-primary)';
+              (e.target as HTMLElement).style.backgroundColor = 'var(--mac-bg-primary)';
             }
           }}>
           

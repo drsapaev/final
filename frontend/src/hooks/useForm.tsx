@@ -9,29 +9,31 @@ import { useAnimation } from './useAnimation';
 import { useReducedMotion } from './useEnhancedMediaQuery';
 
 import logger from '../utils/logger';
+// @ts-expect-error — ui/macos not yet migrated to TS (Phase 4 redo)
 import { Input } from '../../ui/macos';
 // Валидаторы для медицинских форм
-export const validators = {
-  required: (value) => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- validators return mixed types (boolean | string | null); Phase 9 cleanup
+export const validators: Record<string, (...args: any[]) => any> = {
+  required: (value: unknown) => {
     if (typeof value === 'string') {
       return value.trim() !== '';
     }
     return value != null && value !== '';
   },
 
-  email: (value) => {
+  email: (value: unknown) => {
     if (!value) return true;
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(value);
+    return emailRegex.test(String(value));
   },
 
-  phone: (value) => {
+  phone: (value: unknown) => {
     if (!value) return true;
     const phoneRegex = /^\+?[\d\s-()]{10,}$/;
-    return phoneRegex.test(value.replace(/\s/g, ''));
+    return phoneRegex.test(String(value).replace(/\s/g, ''));
   },
 
-  minLength: (min) => (value) => {
+  minLength: (min: number) => (value) => {
     if (!value) return true;
     return String(value).length >= min;
   },
@@ -83,7 +85,7 @@ export const validators = {
 };
 
 // Хук для управления формой
-export const useForm = (initialValues = {}, options = {}) => {
+export const useForm = <T extends Record<string, unknown> = Record<string, unknown>>(initialValues: T = {} as T, options: Record<string, unknown> = {}) => {
   const {
     validateOnChange = true,
     validateOnBlur = true,
@@ -93,7 +95,7 @@ export const useForm = (initialValues = {}, options = {}) => {
     onSubmit = null
   } = options;
 
-  const [values, setValues] = useState(initialValues);
+  const [values, setValues] = useState<T>(initialValues as T);
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -108,7 +110,7 @@ export const useForm = (initialValues = {}, options = {}) => {
       if (validator) {
         const result = validator(ruleValue)(value);
         if (!result) {
-          fieldErrors.push(ruleValue.message || `Ошибка валидации: ${ruleName}`);
+          fieldErrors.push((ruleValue as { message?: string }).message || `Ошибка валидации: ${ruleName}`);
         }
       }
     });
@@ -206,7 +208,7 @@ export const useForm = (initialValues = {}, options = {}) => {
 
     try {
       if (onSubmit) {
-        await onSubmit(values);
+        await (onSubmit as (values: T) => void | Promise<void>)(values);
       }
 
       if (resetOnSubmit) {
@@ -226,6 +228,7 @@ export const useForm = (initialValues = {}, options = {}) => {
       value: values[name] || '',
       onChange: (value) => handleChange(name, value),
       onBlur: () => handleBlur(name),
+// @ts-expect-error — callback signature mismatch; Phase 9 cleanup
       onFocus: () => handleFocus(name),
       error: errors[name]?.[0],
       touched: touched[name],
@@ -288,7 +291,7 @@ export const FormField = ({
   ...props
 }) => {
   const { prefersReducedMotion } = useReducedMotion();
-  const { shouldRender, animationClasses } = useAnimation(!!error, 'slideDown', 200);
+  const { shouldRender, animationStyles } = useAnimation(!!error, 'slideDown', 200);
 
   const handleChange = (e) => {
     const newValue = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
@@ -337,14 +340,14 @@ export const FormField = ({
         }}
         onFocus={(e) => {
           if (!prefersReducedMotion) {
-            e.target.style.borderColor = error ? 'var(--mac-error)' : 'var(--mac-accent-blue)';
-            e.target.style.boxShadow = `0 0 0 3px ${error ? 'var(--mac-error-bg)' : 'var(--mac-accent-bg)'}`;
+            (e.target as HTMLElement).style.borderColor = error ? 'var(--mac-error)' : 'var(--mac-accent-blue)';
+            (e.target as HTMLElement).style.boxShadow = `0 0 0 3px ${error ? 'var(--mac-error-bg)' : 'var(--mac-accent-bg)'}`;
           }
         }}
         onBlur={(e) => {
           if (!prefersReducedMotion) {
-            e.target.style.borderColor = error ? 'var(--mac-error)' : 'var(--mac-border)';
-            e.target.style.boxShadow = 'none';
+            (e.target as HTMLElement).style.borderColor = error ? 'var(--mac-error)' : 'var(--mac-border)';
+            (e.target as HTMLElement).style.boxShadow = 'none';
           }
           if (onBlur) onBlur(e);
         }}
@@ -353,7 +356,7 @@ export const FormField = ({
 
       {shouldRender && error &&
       <div
-        className={`form-field-error ${animationClasses}`}
+        className={`form-field-error ${animationStyles}`}
         style={{
           marginTop: 'var(--mac-spacing-1)',
           fontSize: 'var(--mac-font-size-xs)',
@@ -432,14 +435,14 @@ export const FormTextarea = ({
         }}
         onFocus={(e) => {
           if (!prefersReducedMotion) {
-            e.target.style.borderColor = error ? 'var(--mac-error)' : 'var(--mac-accent-blue)';
-            e.target.style.boxShadow = `0 0 0 3px ${error ? 'var(--mac-error-bg)' : 'var(--mac-accent-bg)'}`;
+            (e.target as HTMLElement).style.borderColor = error ? 'var(--mac-error)' : 'var(--mac-accent-blue)';
+            (e.target as HTMLElement).style.boxShadow = `0 0 0 3px ${error ? 'var(--mac-error-bg)' : 'var(--mac-accent-bg)'}`;
           }
         }}
         onBlur={(e) => {
           if (!prefersReducedMotion) {
-            e.target.style.borderColor = error ? 'var(--mac-error)' : 'var(--mac-border)';
-            e.target.style.boxShadow = 'none';
+            (e.target as HTMLElement).style.borderColor = error ? 'var(--mac-error)' : 'var(--mac-border)';
+            (e.target as HTMLElement).style.boxShadow = 'none';
           }
           if (onBlur) onBlur(e);
         }}
@@ -523,14 +526,14 @@ export const FormSelect = ({
         }}
         onFocus={(e) => {
           if (!prefersReducedMotion) {
-            e.target.style.borderColor = error ? 'var(--mac-error)' : 'var(--mac-accent-blue)';
-            e.target.style.boxShadow = `0 0 0 3px ${error ? 'var(--mac-error-bg)' : 'var(--mac-accent-bg)'}`;
+            (e.target as HTMLElement).style.borderColor = error ? 'var(--mac-error)' : 'var(--mac-accent-blue)';
+            (e.target as HTMLElement).style.boxShadow = `0 0 0 3px ${error ? 'var(--mac-error-bg)' : 'var(--mac-accent-bg)'}`;
           }
         }}
         onBlur={(e) => {
           if (!prefersReducedMotion) {
-            e.target.style.borderColor = error ? 'var(--mac-error)' : 'var(--mac-border)';
-            e.target.style.boxShadow = 'none';
+            (e.target as HTMLElement).style.borderColor = error ? 'var(--mac-error)' : 'var(--mac-border)';
+            (e.target as HTMLElement).style.boxShadow = 'none';
           }
           if (onBlur) onBlur(e);
         }}
