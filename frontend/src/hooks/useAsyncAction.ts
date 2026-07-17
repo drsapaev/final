@@ -1,74 +1,92 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
-import { useState, useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { toast } from 'react-toastify';
 
 import logger from '../utils/logger';
+
+interface AsyncActionOptions {
+  loadingMessage?: string | null;
+  successMessage?: string | null;
+  errorMessage?: string;
+  onSuccess?: (result: unknown) => void;
+  onError?: (err: unknown) => void;
+  showToast?: boolean;
+}
+
+interface UseAsyncActionReturn {
+  loading: boolean;
+  error: string | null;
+  executeAction: (
+    actionFn: () => Promise<unknown>,
+    options?: AsyncActionOptions,
+  ) => Promise<unknown>;
+}
+
 /**
- * Универсальный хук для async действий с обработкой ошибок
- * Устраняет дублирование async обработчиков в панелях
+ * Универсальный хук для async действий с обработкой ошибок.
+ * Устраняет дублирование async обработчиков в панелях.
  */
-export const useAsyncAction = () => {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+export const useAsyncAction = (): UseAsyncActionReturn => {
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const executeAction = useCallback(async (
-    actionFn, 
-    {
-      loadingMessage = null,
-      successMessage = null as unknown,
-      errorMessage = 'Произошла ошибка',
-      onSuccess = null as unknown,
-      onError = null as unknown,
-      showToast = true as boolean
-    } = {}
-  ) => {
-    setLoading(true);
-    setError(null);
+  const executeAction = useCallback(
+    async (
+      actionFn: () => Promise<unknown>,
+      {
+        loadingMessage = null,
+        successMessage = null,
+        errorMessage = 'Произошла ошибка',
+        onSuccess,
+        onError,
+        showToast = true,
+      }: AsyncActionOptions = {},
+    ): Promise<unknown> => {
+      setLoading(true);
+      setError(null);
 
-    if (loadingMessage && showToast) {
-      toast.loading(loadingMessage);
-    }
-
-    try {
-      const result = await actionFn();
-      
-      if (successMessage && showToast) {
-        toast.dismiss();
-        toast.success(successMessage);
+      if (loadingMessage && showToast) {
+        toast.loading(loadingMessage);
       }
 
-      if (onSuccess) {
-        (onSuccess as (...args: unknown[]) => void)(result);
+      try {
+        const result = await actionFn();
+
+        if (successMessage && showToast) {
+          toast.dismiss();
+          toast.success(successMessage);
+        }
+
+        if (onSuccess) {
+          onSuccess(result);
+        }
+
+        return result;
+      } catch (err) {
+        logger.error('AsyncAction error:', err);
+        setError(String(err));
+
+        if (showToast) {
+          toast.dismiss();
+          toast.error(errorMessage);
+        }
+
+        if (onError) {
+          onError(err);
+        }
+
+        throw err;
+      } finally {
+        setLoading(false);
       }
-
-      return result;
-    } catch (err) {
-      logger.error('AsyncAction error:', err);
-      setError(String(err));
-
-      if (showToast) {
-        toast.dismiss();
-        toast.error(errorMessage);
-      }
-
-      if (onError) {
-        (onError as (...args: unknown[]) => void)(err);
-      }
-
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    },
+    [],
+  );
 
   return {
     loading,
     error,
-    executeAction
+    executeAction,
   };
 };
 
 export default useAsyncAction;
-

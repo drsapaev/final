@@ -1,40 +1,53 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../api/client';
 import axios from 'axios';
 
-const useAdminData = (url, options: Record<string, unknown> = {}) => {
+interface UseAdminDataOptions {
+  refreshInterval?: number;
+  onError?: (err: unknown) => void;
+  onSuccess?: (data: unknown) => void;
+  initialData?: unknown;
+  enabled?: boolean;
+}
+
+interface UseAdminDataReturn {
+  data: unknown;
+  loading: boolean;
+  error: string | null;
+  refresh: () => void;
+  refetch: () => void;
+}
+
+const useAdminData = (
+  url: string,
+  options: UseAdminDataOptions = {},
+): UseAdminDataReturn => {
   const {
     refreshInterval = 0,
     onError = () => {},
     onSuccess = () => {},
-    initialData = null as unknown,
-    enabled = true as boolean
+    initialData = null,
+    enabled = true,
   } = options;
 
-  const [data, setData] = useState(initialData);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const intervalRef = useRef(null);
-  const abortControllerRef = useRef(null);
-  const mountedRef = useRef(true);
+  const [data, setData] = useState<unknown>(initialData);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const mountedRef = useRef<boolean>(true);
 
-  // Стабильные ссылки на колбэки
   const onErrorRef = useRef(onError);
   const onSuccessRef = useRef(onSuccess);
 
-  // Обновляем ссылки на колбэки
   useEffect(() => {
     onErrorRef.current = onError;
     onSuccessRef.current = onSuccess;
   });
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (): Promise<void> => {
     if (!enabled || !url || !mountedRef.current) return;
 
-    // Создаем новый AbortController для этого конкретного запроса
     const currentAbortController = new AbortController();
     abortControllerRef.current = currentAbortController;
 
@@ -42,20 +55,21 @@ const useAdminData = (url, options: Record<string, unknown> = {}) => {
       setLoading(true);
       setError(null);
 
-      // Убираем префикс /api/v1 если он есть, так как baseURL уже содержит его
       const cleanUrl = url.startsWith('/api/v1') ? url.replace('/api/v1', '') : url;
-
       const response = await api.get(cleanUrl);
 
-      // Устанавливаем данные - React сам проверит, смонтирован ли компонент
       setData(response.data);
       onSuccessRef.current(response.data);
     } catch (err) {
-      // Игнорируем ошибки отмены запроса
-      if (err.name === 'AbortError' || err.name === 'CanceledError' || axios.isCancel(err)) {
-        return; // Игнорируем ошибку отмены
+      const errorObj = err as Error & { name: string };
+      if (
+        errorObj?.name === 'AbortError' ||
+        errorObj?.name === 'CanceledError' ||
+        axios.isCancel(err)
+      ) {
+        return;
       }
-      
+
       setError(String(err));
       onErrorRef.current(err);
     } finally {
@@ -63,11 +77,10 @@ const useAdminData = (url, options: Record<string, unknown> = {}) => {
     }
   }, [url, enabled]);
 
-  const refresh = useCallback(() => {
+  const refresh = useCallback((): void => {
     fetchData();
   }, [fetchData]);
 
-  // Первоначальная загрузка
   useEffect(() => {
     if (enabled && url) {
       fetchData();
@@ -75,7 +88,6 @@ const useAdminData = (url, options: Record<string, unknown> = {}) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, url]);
 
-  // Настройка интервала обновления
   useEffect(() => {
     if (refreshInterval > 0 && enabled) {
       intervalRef.current = setInterval(() => {
@@ -90,7 +102,6 @@ const useAdminData = (url, options: Record<string, unknown> = {}) => {
     }
   }, [refreshInterval, enabled, fetchData]);
 
-  // Очистка при размонтировании
   useEffect(() => {
     return () => {
       mountedRef.current = false;
@@ -108,7 +119,7 @@ const useAdminData = (url, options: Record<string, unknown> = {}) => {
     loading,
     error,
     refresh,
-    refetch: refresh // Алиас для совместимости
+    refetch: refresh,
   };
 };
 

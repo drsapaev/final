@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useState, useEffect, useCallback } from 'react';
 import logger from '../utils/logger';
 import {
@@ -13,16 +10,16 @@ import {
   callNextQueuePatient,
 } from '../api/queue';
 
-const toError = (err, fallback) => {
+const toError = (err: unknown, fallback: string): Error => {
   if (err instanceof Error) {
     return err;
   }
   if (typeof err === 'string') {
     return new Error(err);
   }
-  if (err?.detail) {
+  if (err && typeof err === 'object' && 'detail' in err) {
     return new Error(
-      typeof err.detail === 'string' ? err.detail : JSON.stringify(err.detail)
+      typeof (err as Record<string, unknown>).detail === 'string' ? (err as Record<string, unknown>).detail as string : JSON.stringify((err as Record<string, unknown>).detail)
     );
   }
   return new Error(fallback);
@@ -85,16 +82,16 @@ const pickQueueForDoctor = (payload, specialistId, doctor) => {
 
 const buildStatsFromEntries = (entries: unknown[] = []) => ({
   total_entries: entries.length,
-  waiting: entries.filter((entry) => entry.status === 'waiting').length,
-  completed: entries.filter((entry) => entry.status === 'completed').length,
+  waiting: entries.filter((entry: Record<string, unknown>) => entry.status === 'waiting').length,
+  completed: entries.filter((entry: Record<string, unknown>) => entry.status === 'completed').length,
 });
 
 export const useQueueManager = () => {
-  const [loading, setLoading] = useState(false);
-  const [specialists, setSpecialists] = useState([]);
-  const [queueData, setQueueData] = useState(null);
-  const [statistics, setStatistics] = useState(null);
-  const [qrData, setQrData] = useState(null);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [specialists, setSpecialists] = useState<unknown[]>([]);
+  const [queueData, setQueueData] = useState<unknown>(null);
+  const [statistics, setStatistics] = useState<unknown>(null);
+  const [qrData, setQrData] = useState<unknown>(null);
 
   const loadSpecialists = useCallback(async () => {
     setLoading(true);
@@ -102,7 +99,7 @@ export const useQueueManager = () => {
       const data = await fetchAvailableSpecialists();
       setSpecialists(data);
       return data;
-    } catch (err) {
+    } catch (err: unknown) {
       throw toError(err, 'Не удалось загрузить список доступных специалистов');
     } finally {
       setLoading(false);
@@ -152,7 +149,7 @@ export const useQueueManager = () => {
         });
 
         return queue;
-      } catch (err) {
+      } catch (err: unknown) {
         throw toError(err, 'Ошибка загрузки очереди');
       } finally {
         setLoading(false);
@@ -188,7 +185,7 @@ export const useQueueManager = () => {
           is_clinic_wide: false,
         });
         return payload;
-      } catch (err) {
+      } catch (err: unknown) {
         throw toError(err, 'Ошибка генерации QR кода');
       } finally {
         setLoading(false);
@@ -216,7 +213,7 @@ export const useQueueManager = () => {
           is_clinic_wide: true,
         });
         return payload;
-      } catch (err) {
+      } catch (err: unknown) {
         throw toError(err, 'Ошибка генерации общего QR кода');
       } finally {
         setLoading(false);
@@ -237,7 +234,7 @@ export const useQueueManager = () => {
           day: targetDate,
           specialistId,
         });
-      } catch (err) {
+      } catch (err: unknown) {
         throw toError(err, 'Ошибка открытия приема');
       } finally {
         setLoading(false);
@@ -259,7 +256,7 @@ export const useQueueManager = () => {
           day: targetDate,
           specialistId,
         });
-      } catch (err) {
+      } catch (err: unknown) {
         throw toError(err, 'Ошибка закрытия приема');
       } finally {
         setLoading(false);
@@ -280,7 +277,7 @@ export const useQueueManager = () => {
           specialistId,
           targetDate,
         });
-      } catch (err) {
+      } catch (err: unknown) {
         throw toError(err, 'Ошибка вызова пациента');
       } finally {
         setLoading(false);
