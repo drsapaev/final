@@ -18,7 +18,7 @@ const PhoneInput = ({
   ...props 
 }) => {
   const [displayValue, setDisplayValue] = useState('');
-  const inputRef = useRef(null);
+  const inputRef = useRef<unknown>(null);
 
   // Форматирование номера телефона
   const formatPhoneNumber = (input) => {

@@ -25,7 +25,7 @@ const Table = ({
   style,
   children // ✅ Добавляем поддержку children для legacy использования
 }) => {
-  const [sortColumn, setSortColumn] = useState(null);
+  const [sortColumn, setSortColumn] = useState<unknown>(null);
   const [sortDirection, setSortDirection] = useState('asc');
 
   const sizeStyles = {

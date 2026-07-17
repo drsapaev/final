@@ -21,11 +21,11 @@ const Select = React.forwardRef(({
   id,
   ...props
 }, ref) => {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState<boolean>(false);
   const [value, setValue] = useState(valueProp ?? defaultValue ?? null);
-  const triggerRef = useRef(null);
-  const listRef = useRef(null);
-  const [dropdownRect, setDropdownRect] = useState(null);
+  const triggerRef = useRef<unknown>(null);
+  const listRef = useRef<unknown>(null);
+  const [dropdownRect, setDropdownRect] = useState<unknown>(null);
   const [dropdownPlacement, setDropdownPlacement] = useState('bottom');
 
   useEffect(() => { if (valueProp !== undefined) setValue(valueProp); }, [valueProp]);
