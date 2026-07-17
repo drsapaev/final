@@ -18,7 +18,7 @@ import { mixColors, toRgbaString } from '../theme/colorUtils.js';
 import logger from '../utils/logger';
 import { isPublicRoutePath } from '../routing/routeSelectors.js';
 
-const ThemeContext = createContext();
+const ThemeContext = createContext<unknown>(null);
 const THEME_PREFERENCE_SAVE_DEBOUNCE_MS = 400;
 const THEME_PREFERENCE_CACHE_MS = 30_000;
 const AUTH_TOKEN_STORAGE_KEY = 'auth_token';
@@ -100,10 +100,10 @@ export const ThemeProvider = ({ children }) => {
   const [colorScheme, setColorSchemeState] = useState(() => getStoredColorScheme());
   const [authToken, setAuthToken] = useState(() => getAuthTokenSnapshot());
   const [preferencesReady, setPreferencesReady] = useState(() => !getAuthTokenSnapshot());
-  const hydratedTokenRef = useRef(null);
+  const hydratedTokenRef = useRef<unknown>(null);
   const skipNextRemoteSaveRef = useRef(false);
-  const lastSavedPreferenceRef = useRef(null);
-  const saveTimeoutRef = useRef(null);
+  const lastSavedPreferenceRef = useRef<unknown>(null);
+  const saveTimeoutRef = useRef<unknown>(null);
   const routerFallbackLoggedRef = useRef(false);
 
   const theme = resolveThemeMode(colorScheme, systemTheme);

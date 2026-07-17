@@ -17,7 +17,7 @@ import {
 } from '../constants/messagingContract';
 import { isPublicRoutePath } from '../routing/routeSelectors';
 
-const ChatContext = createContext(null);
+const ChatContext = createContext<unknown>(null);
 
 export const ChatProvider = ({ children }) => {
   const location = useLocation();
@@ -27,33 +27,33 @@ export const ChatProvider = ({ children }) => {
   const isBoardRoute = location.pathname.startsWith('/queue-board') || location.pathname.startsWith('/display-board');
   const isPublicRoute = isPublicRoutePath(location.pathname);
 
-  const [conversations, setConversations] = useState([]);
-  const [messages, setMessages] = useState([]);
-  const [activeConversation, setActiveConversation] = useState(null);
+  const [conversations, setConversations] = useState<unknown[]>([]);
+  const [messages, setMessages] = useState<unknown[]>([]);
+  const [activeConversation, setActiveConversation] = useState<unknown>(null);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [isConnected, setIsConnected] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [typingUsers, setTypingUsers] = useState({});
-  const [isChatOpen, setIsChatOpen] = useState(false); // Track if chat window is open
+  const [isConnected, setIsConnected] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [typingUsers, setTypingUsers] = useState<Record<string, unknown>>({});
+  const [isChatOpen, setIsChatOpen] = useState<boolean>(false); // Track if chat window is open
   // PR-71: muted conversations (client-side, no sound/notification for these)
   const [mutedConversations, setMutedConversations] = useState(new Set());
-  const [onlineUsers, setOnlineUsers] = useState({}); // Track online status of users
+  const [onlineUsers, setOnlineUsers] = useState<Record<string, unknown>>({}); // Track online status of users
 
-  const wsRef = useRef(null);
-  const reconnectTimeoutRef = useRef(null);
+  const wsRef = useRef<unknown>(null);
+  const reconnectTimeoutRef = useRef<unknown>(null);
   const activeConversationRef = useRef(activeConversation);
   const retryCountRef = useRef(0);
   const readSyncInFlightRef = useRef(new Set());
   const contractVersionMismatchRef = useRef(false);
-  const initialConversationLoadUserRef = useRef(null);
+  const initialConversationLoadUserRef = useRef<unknown>(null);
   // PR-68 / P0-2: singleton AudioContext to prevent leak
-  const chatAudioContextRef = useRef(null);
+  const chatAudioContextRef = useRef<unknown>(null);
 
   // Храним актуальные функции в ref
   // Это предотвращает разрыв соединения WebSocket при обновлении функций/стейта
-  const handleNewMessageRef = useRef(null);
-  const loadConversationsRef = useRef(null);
-  const chatSnapshotSyncUserRef = useRef(null);
+  const handleNewMessageRef = useRef<unknown>(null);
+  const loadConversationsRef = useRef<unknown>(null);
+  const chatSnapshotSyncUserRef = useRef<unknown>(null);
 
   // Синхронизация ref activeConversation
   useEffect(() => {
@@ -508,7 +508,7 @@ export const ChatProvider = ({ children }) => {
   }, [isBoardRoute, isPublicRoute, token, refreshUnreadCount, requestOnlineStatus]);
 
   // Загрузка сообщений (при открытии чата)
-  const [hasMore, setHasMore] = useState(false);
+  const [hasMore, setHasMore] = useState<boolean>(false);
 
   const loadMessages = useCallback(async (userId) => {
     if (!user) return;

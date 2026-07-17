@@ -6,7 +6,7 @@ import PropTypes from 'prop-types';
 import { notificationsService } from '../api/services';
 import logger from '../utils/logger';
 
-const NotificationCenterContext = createContext(null);
+const NotificationCenterContext = createContext<unknown>(null);
 
 export const ROLE_NOTIFICATION_TYPES = {
   doctor: [
@@ -399,14 +399,14 @@ export function applyUnreadSnapshot(currentSnapshot = EMPTY_UNREAD_SNAPSHOT, pay
 }
 
 export function NotificationCenterProvider({ children }) {
-  const [inbox, setInbox] = useState([]);
+  const [inbox, setInbox] = useState<unknown[]>([]);
   const [unreadSnapshot, setUnreadSnapshot] = useState(EMPTY_UNREAD_SNAPSHOT);
-  const [lastSyncAt, setLastSyncAt] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [lastSyncAt, setLastSyncAt] = useState<unknown>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const inboxRef = useRef(inbox);
   const unreadSnapshotRef = useRef(unreadSnapshot);
-  const unreadRefreshPromiseRef = useRef(null);
-  const inboxSyncPromiseRef = useRef(null);
+  const unreadRefreshPromiseRef = useRef<unknown>(null);
+  const inboxSyncPromiseRef = useRef<unknown>(null);
   const unreadCooldownUntilRef = useRef(0);
   const inboxCooldownUntilRef = useRef(0);
 
