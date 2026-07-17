@@ -22,20 +22,25 @@
 import { useCallback, useState } from 'react';
 import logger from '../utils/logger';
 
-const safeGet = (key, fallback) => {
+/** Updater function shape — same as React's setState updater. */
+type SetValueAction<T> = T | ((prev: T) => T);
+
+const safeGet = <T,>(key: string, fallback: T): T => {
   try {
     const raw = window.localStorage.getItem(key);
     if (raw === null) {
       return fallback;
     }
-    return JSON.parse(raw);
+    // JSON.parse возвращает unknown — приводим к T. Это безопасно на уровне
+    // вызова: caller контролирует тип T и fallback.
+    return JSON.parse(raw) as T;
   } catch (err) {
     logger.warn(`useLocalStorage: failed to read key "${key}"`, err);
     return fallback;
   }
 };
 
-const safeSet = (key, value) => {
+const safeSet = <T,>(key: string, value: T): void => {
   try {
     window.localStorage.setItem(key, JSON.stringify(value));
   } catch (err) {
@@ -44,18 +49,21 @@ const safeSet = (key, value) => {
   }
 };
 
-export function useLocalStorage(key, initialValue) {
-  const [storedValue, setStoredValue] = useState(() => safeGet(key, initialValue));
+export function useLocalStorage<T>(
+  key: string,
+  initialValue: T,
+): [T, (value: SetValueAction<T>) => void] {
+  const [storedValue, setStoredValue] = useState<T>(() => safeGet(key, initialValue));
 
   const setValue = useCallback(
-    (value) => {
+    (value: SetValueAction<T>): void => {
       setStoredValue((prev) => {
-        const next = value instanceof Function ? value(prev) : value;
+        const next = value instanceof Function ? (value as (prev: T) => T)(prev) : value;
         safeSet(key, next);
         return next;
       });
     },
-    [key]
+    [key],
   );
 
   return [storedValue, setValue];
