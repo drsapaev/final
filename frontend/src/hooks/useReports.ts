@@ -108,7 +108,7 @@ const useReports = () => {
       await new Promise(resolve => setTimeout(resolve, 500));
       setReports(mockReports);
     } catch (err) {
-      setError(err);
+      setError(String(err));
     } finally {
       setLoading(false);
     }
@@ -156,7 +156,7 @@ const useReports = () => {
       
       return newReport;
     } catch (err) {
-      setError(err);
+      setError(String(err));
       throw err;
     } finally {
       setLoading(false);
@@ -185,7 +185,7 @@ const useReports = () => {
         document.body.removeChild(link);
       }
     } catch (err) {
-      setError(err);
+      setError(String(err));
       throw err;
     }
   }, [reports]);
@@ -201,7 +201,7 @@ const useReports = () => {
       
       setReports(prev => prev.filter(report => report.id !== reportId));
     } catch (err) {
-      setError(err);
+      setError(String(err));
       throw err;
     } finally {
       setLoading(false);
@@ -242,7 +242,7 @@ const useReports = () => {
         ));
       }, 3000);
     } catch (err) {
-      setError(err);
+      setError(String(err));
       throw err;
     } finally {
       setLoading(false);

@@ -41,7 +41,7 @@ const useDoctors = () => {
       setDoctors(Array.isArray(response.data) ? response.data : []);
     } catch (err) {
       logger.error('Ошибка загрузки врачей:', err);
-      setError(err);
+      setError(String(err));
     } finally {
       setLoading(false);
     }
@@ -75,7 +75,7 @@ const useDoctors = () => {
         logger.error('Ошибка создания врача:', err);
         const errorMessage =
           err.response?.data?.detail || err.message || 'Ошибка создания врача';
-        setError(err);
+        setError(String(err));
         throw new Error(errorMessage);
       } finally {
         setLoading(false);
@@ -97,7 +97,7 @@ const useDoctors = () => {
         logger.error('Ошибка обновления врача:', err);
         const errorMessage =
           err.response?.data?.detail || err.message || 'Ошибка обновления врача';
-        setError(err);
+        setError(String(err));
         throw new Error(errorMessage);
       } finally {
         setLoading(false);
@@ -118,7 +118,7 @@ const useDoctors = () => {
         logger.error('Ошибка удаления врача:', err);
         const errorMessage =
           err.response?.data?.detail || err.message || 'Ошибка удаления врача';
-        setError(err);
+        setError(String(err));
         throw new Error(errorMessage);
       } finally {
         setLoading(false);

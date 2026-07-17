@@ -43,7 +43,7 @@ export function usePaymentMethods(options: Record<string, unknown> = {}) {
       } catch (err) {
         if (!cancelled) {
           logger.warn('[usePaymentMethods] Failed to fetch from backend, using defaults:', err);
-          setError(err);
+          setError(String(err));
           // Fallback to defaults on error
           setPaymentMethods(DEFAULT_PAYMENT_METHODS);
         }

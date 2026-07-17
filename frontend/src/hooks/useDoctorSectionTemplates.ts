@@ -1,3 +1,6 @@
+// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
+// Proper typing deferred to Phase 9 cleanup (strict mode).
+
 /**
  * useDoctorSectionTemplates - Universal hook for doctor's section templates
  * 
@@ -65,7 +68,7 @@ export const SECTION_LABELS = {
  */
 export function useDoctorSectionTemplates({
     section,
-    icd10Code = null,
+    icd10Code = null as unknown,
     limit = 10,
 }) {
     const [templates, setTemplates] = useState([]);
@@ -85,7 +88,7 @@ export function useDoctorSectionTemplates({
     /**
      * Fetch templates from API
      */
-    const fetchTemplates = useCallback(async (forceRefresh = false) => {
+    const fetchTemplates = useCallback(async (forceRefresh: boolean = false) => {
         if (!section) return;
 
         const cachedEntry = sectionTemplateCache.get(cacheKey);

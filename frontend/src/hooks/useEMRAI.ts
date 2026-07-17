@@ -84,7 +84,7 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
     } catch (err) {
       logger.error('AI error:', err);
       const errorMessage = err.response?.data?.detail || err.message || 'Ошибка получения AI подсказок';
-      setError(errorMessage);
+      setError(String(errorMessage));
       return [];
     } finally {
       setLoading(false);
@@ -134,7 +134,7 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
     } catch (err) {
       logger.error('AI analysis error:', err);
       const errorMessage = err.response?.data?.detail || err.message || 'Ошибка анализа жалоб';
-      setError(errorMessage);
+      setError(String(errorMessage));
       return null;
     } finally {
       setLoading(false);
@@ -152,7 +152,7 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
     } catch (err) {
       logger.error('AI recommendations error:', err);
       const errorMessage = err.response?.data?.detail || 'Ошибка получения рекомендаций';
-      setError(errorMessage);
+      setError(String(errorMessage));
       return null;
     } finally {
       setLoading(false);
@@ -197,7 +197,7 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
     } catch (err) {
       logger.error('AI lab interpretation error:', err);
       const errorMessage = err.response?.data?.detail || err.message || 'Ошибка интерпретации анализов';
-      setError(errorMessage);
+      setError(String(errorMessage));
       return null;
     } finally {
       setLoading(false);
@@ -219,7 +219,7 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
     } catch (err) {
       logger.error('AI lab suggestions error:', err);
       const errorMessage = err.response?.data?.detail || err.message || 'Ошибка получения предложений по анализам';
-      setError(errorMessage);
+      setError(String(errorMessage));
       return [];
     } finally {
       setLoading(false);
@@ -264,7 +264,7 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
     } catch (err) {
       logger.error('AI image analysis error:', err);
       const errorMessage = err.response?.data?.detail || err.message || 'Ошибка анализа изображения';
-      setError(errorMessage);
+      setError(String(errorMessage));
       return null;
     } finally {
       setLoading(false);
@@ -297,7 +297,7 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
     } catch (err) {
       logger.error('AI skin lesion analysis error:', err);
       const errorMessage = err.response?.data?.detail || err.message || 'Ошибка анализа кожного образования';
-      setError(errorMessage);
+      setError(String(errorMessage));
       return null;
     } finally {
       setLoading(false);

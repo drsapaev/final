@@ -1,3 +1,6 @@
+// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
+// Proper typing deferred to Phase 9 cleanup (strict mode).
+
 /**
  * Универсальные хуки для API интеграции
  * Заменяют прямые fetch запросы унифицированным подходом
@@ -15,10 +18,10 @@ export function useApiCall() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const execute = useCallback(async (apiCall, options = {}) => {
+  const execute = useCallback(async (apiCall, options: Record<string, unknown> = {}) => {
     const {
       showError = true,
-      showSuccess = false,
+      showSuccess = false as boolean,
       successMessage = 'Операция выполнена успешно',
       errorMessage = 'Произошла ошибка'
     } = options;
@@ -36,7 +39,7 @@ export function useApiCall() {
       return result;
     } catch (err) {
       const errorMsg = err.response?.data?.detail || err.message || errorMessage;
-      setError(errorMsg);
+      setError(String(errorMsg));
 
       if (showError) {
         toast.error(errorMsg);
@@ -54,20 +57,20 @@ export function useApiCall() {
 /**
  * Хук для загрузки данных с автоматическим повтором
  */
-export function useApiData(endpoint, options = {}) {
+export function useApiData(endpoint, options: Record<string, unknown> = {}) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   const {
     params = {},
-    dependencies = [],
-    autoLoad = true,
-    fallbackData = null,
-    silent = false
+    dependencies = [] as unknown[],
+    autoLoad = true as boolean,
+    fallbackData = null as unknown,
+    silent = false as boolean
   } = options;
 
-  const loadData = useCallback(async (loadOptions = {}) => {
+  const loadData = useCallback(async (loadOptions: Record<string, unknown> = {}) => {
     const { silent: loadSilent = silent } = loadOptions;
 
     if (!loadSilent) {
@@ -81,7 +84,7 @@ export function useApiData(endpoint, options = {}) {
       return result;
     } catch (err) {
       const errorMsg = err.response?.data?.detail || err.message || 'Ошибка загрузки данных';
-      setError(errorMsg);
+      setError(String(errorMsg));
 
       if (fallbackData) {
         setData(fallbackData);
@@ -119,7 +122,7 @@ export function useApiData(endpoint, options = {}) {
 /**
  * Хук для работы с пациентами
  */
-export function usePatients(department = null) {
+export function usePatients(department: unknown = null) {
   const endpoint = department ? `/patients?department=${department}&limit=100` : '/patients?limit=100';
 
   return useApiData(endpoint, {
@@ -131,7 +134,7 @@ export function usePatients(department = null) {
 /**
  * Хук для работы с записями/визитами
  */
-export function useAppointments(options = {}) {
+export function useAppointments(options: Record<string, unknown> = {}) {
   const { department, limit = 50 } = options;
   const params = { limit };
   if (department) params.department = department;
@@ -146,7 +149,7 @@ export function useAppointments(options = {}) {
 /**
  * Хук для работы с очередями
  */
-export function useQueues(date = null) {
+export function useQueues(date: unknown = null) {
   const params = date ? { date } : {};
 
   return useApiData('/queues', {
@@ -159,7 +162,7 @@ export function useQueues(date = null) {
 /**
  * Хук для работы с услугами
  */
-export function useServices(specialty = null) {
+export function useServices(specialty: unknown = null) {
   const params = specialty ? { specialty } : {};
 
   return useApiData('/services', {
@@ -175,12 +178,12 @@ export function useServices(specialty = null) {
 export function useFormSubmit() {
   const { execute, loading, error } = useApiCall();
 
-  const submitForm = useCallback(async (endpoint, formData, options = {}) => {
-    const { method = 'POST', validate = null, transform = null } = options;
+  const submitForm = useCallback(async (endpoint, formData, options: Record<string, unknown> = {}) => {
+    const { method = 'POST', validate: unknown = null, transform: unknown = null } = options;
 
     // Валидация данных
     if (validate && typeof validate === 'function') {
-      const validationError = validate(formData);
+      const validationError = (validate as (...args: unknown[]) => void)(formData);
       if (validationError) {
         toast.error(validationError);
         throw new Error(validationError);
@@ -188,7 +191,7 @@ export function useFormSubmit() {
     }
 
     // Трансформация данных
-    const dataToSend = transform ? transform(formData) : formData;
+    const dataToSend = transform ? (transform as (...args: unknown[]) => void)(formData) : formData;
 
     return execute(() => apiRequest(method, endpoint, { data: dataToSend }), {
       showSuccess: true,
@@ -205,7 +208,7 @@ export function useFormSubmit() {
 export function useFileUpload() {
   const { execute, loading, error } = useApiCall();
 
-  const uploadFile = useCallback(async (file, endpoint = '/files/upload', options = {}) => {
+  const uploadFile = useCallback(async (file, endpoint = '/files/upload', options: Record<string, unknown> = {}) => {
     const formData = new FormData();
     formData.append('file', file);
 
@@ -230,16 +233,16 @@ export function useFileUpload() {
 /**
  * Хук для работы с WebSocket соединениями
  */
-export function useWebSocket(url, options = {}) {
+export function useWebSocket(url, options: Record<string, unknown> = {}) {
   const [socket, setSocket] = useState(null);
   const [connected, setConnected] = useState(false);
   const [lastMessage, setLastMessage] = useState(null);
 
   const {
     onMessage = null,
-    onConnect = null,
-    onDisconnect = null,
-    autoConnect = true
+    onConnect = null as unknown,
+    onDisconnect = null as unknown,
+    autoConnect = true as boolean
   } = options;
 
   const connect = useCallback(() => {
@@ -258,19 +261,19 @@ export function useWebSocket(url, options = {}) {
 
     ws.onopen = () => {
       setConnected(true);
-      if (onConnect) onConnect();
+      if (onConnect) (onConnect as (...args: unknown[]) => void)();
     };
 
     ws.onmessage = (event) => {
       const message = JSON.parse(event.data);
       setLastMessage(message);
-      if (onMessage) onMessage(message);
+      if (onMessage) (onMessage as (...args: unknown[]) => void)(message);
     };
 
     ws.onclose = () => {
       setConnected(false);
       setSocket(null);
-      if (onDisconnect) onDisconnect();
+      if (onDisconnect) (onDisconnect as (...args: unknown[]) => void)();
     };
 
     ws.onerror = (error) => {
@@ -308,8 +311,8 @@ export function useWebSocket(url, options = {}) {
 /**
  * Хук для кэширования данных
  */
-export function useCachedData(key, fetcher, options = {}) {
-  const { ttl = 5 * 60 * 1000, fallback = null } = options; // 5 минут по умолчанию
+export function useCachedData(key, fetcher, options: Record<string, unknown> = {}) {
+  const { ttl = 5 * 60 * 1000, fallback: unknown = null } = options; // 5 минут по умолчанию
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 

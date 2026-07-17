@@ -56,7 +56,7 @@ export function useRoles({ includeAll = false }: UseRolesOptions = {}): UseRoles
         err,
         'Не удалось загрузить роли. Проверьте соединение и попробуйте снова.',
       );
-      setError(errorMessage);
+      setError(String(errorMessage));
       logger.error('Error fetching role options:', err);
 
       const fallbackRoles: RoleOption[] = [
@@ -92,7 +92,7 @@ export function useRoles({ includeAll = false }: UseRolesOptions = {}): UseRoles
         err,
         'Не удалось загрузить роли. Проверьте соединение и попробуйте снова.',
       );
-      setError(errorMessage);
+      setError(String(errorMessage));
       logger.error('Error fetching roles:', err);
     } finally {
       setLoading(false);
