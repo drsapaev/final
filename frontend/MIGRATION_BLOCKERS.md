@@ -6,19 +6,66 @@
 damage via regex-patches and masked 96 ESLint errors via mass `@ts-nocheck`.
 This sprint stabilizes the migration before continuing.
 
+**Related documents:**
+- [`docs/migration/DECISIONS.md`](./docs/migration/DECISIONS.md) — chronological decision log (WHY decisions were made)
+- [`docs/migration/ADR-001`](./docs/migration/ADR-001-backend-ssot.md) — Backend = SSOT
+- [`docs/migration/ADR-002`](./docs/migration/ADR-002-generated-dto-immutable.md) — Generated DTO immutable
+- [`docs/migration/ADR-003`](./docs/migration/ADR-003-dto-mapper-domain.md) — DTO → Mapper → Domain
+- [`docs/migration/ADR-004`](./docs/migration/ADR-004-no-ts-nocheck-policy.md) — No @ts-nocheck policy
+
+**⚠️ PROCESS FROZEN (2026-07-17):** This document, the Definition of Done,
+and the Migration Cycle are FROZEN. No more process changes until 3-5 PRs
+are completed by the current rules. Only then evaluate what works and what
+needs adjustment. (Per reviewer recommendation: avoid infinitely improving
+the process instead of migrating code.)
+
 ---
 
 ## Baseline at Phase 1 (2026-07-17)
 
-| Metric | Value | Status |
-|--------|-------|--------|
-| TS/TSX files | 110 | ✅ |
-| JS/JSX files | 663 | (not yet migrated — intentional) |
-| `@ts-nocheck` files | 0 | ✅ |
-| `tsc --noEmit` errors | 0 | ✅ |
-| ESLint errors | **0** | ✅ (was 13, fixed in B2) |
-| ESLint warnings | 2810 | (unchanged from main) |
-| Tests passing | 864/864 | ✅ |
+**Quality metrics (not file counts):**
+
+| Metric | Current | Target | Status |
+|--------|---------|--------|--------|
+| Migrated files | 110 / 773 (14.2%) | 773 / 773 (100%) | 🟡 In progress |
+| Fully typed (of migrated) | 110 / 110 (100%) | 100% | ✅ |
+| Legacy exceptions (of migrated) | 0 / 110 (0%) | < 8% | ✅ |
+| `@ts-nocheck` files | 0 | 0 (always) | ✅ |
+
+**Type Debt (categorized):**
+
+| Pattern | ✅ External | ⚠️ Legacy | ❌ To-compile | Total | Target |
+|---------|-------------|-----------|---------------|-------|--------|
+| `any` (real code) | 0 | 17 | 0 | 17 | ↓ 0 |
+| `any` (JSDoc only) | 4 | 0 | 0 | 4 | ↓ 0 |
+| `as unknown as` | 0 | 9 | 0 | 9 | ↓ 0 |
+| `@ts-expect-error` | 0 | 0 | 0 | 0 | 0 |
+| `@ts-ignore` | 0 | 0 | 0 | 0 | 0 |
+| `eslint-disable` | 0 | 6 | 0 | 6 | ↓ 0 |
+| `TODO(TS-MIGRATION)` | 0 | 0 | 0 | 0 | 0 |
+| `FIXME(TS)` | 0 | 0 | 0 | 0 | 0 |
+| `@ts-nocheck` | 0 | 0 | 0 | 0 | 0 (always) |
+
+**Test coverage:**
+
+| Metric | Current | Target |
+|--------|---------|--------|
+| Total hooks | 61 (still .js) | 61 migrated to .ts |
+| Hooks with unit tests | 5 / 61 | 61 / 61 |
+| Total tests passing | 864 | 864+ (no regressions) |
+
+**Process health:**
+
+| Metric | Current | Target |
+|--------|---------|--------|
+| `tsc --noEmit` errors | 0 | 0 (always) |
+| ESLint errors | 0 | 0 (always) |
+| Files with semantic damage (regex) | 0 | 0 (always) |
+
+> **Note on metrics:** Success is NOT measured by the number of `.ts` files.
+> A file renamed to `.ts` with `@ts-nocheck` is NOT migrated — it's
+> disguised JS. The real metrics are: % fully typed, % legacy exceptions,
+> and Type Debt counts trending to 0.
 
 ---
 
