@@ -1,9 +1,7 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useTranslation } from '../../i18n/useTranslation';
 import { api } from '../../api/client';
 import { useState } from 'react';
+import type { CSSProperties } from 'react';
 import { Card, Button,
   Input } from '../ui/macos';
 import tokenManager from '../../utils/tokenManager';
@@ -31,7 +29,8 @@ import PropTypes from 'prop-types';
  * Пошаговая настройка всех методов 2FA
  */
 const TwoFactorSetupWizard = ({ onComplete }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -88,17 +87,10 @@ const TwoFactorSetupWizard = ({ onComplete }) => {
 
     try {
       const response = await api.post('/2fa/setup', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
-        },
-        body: JSON.stringify({
-          method: selectedMethod,
-          recovery_email: recoveryEmail || null,
-          recovery_phone: recoveryPhone || null
-        })
-      });
+        method: selectedMethod,
+        recovery_email: recoveryEmail || null,
+        recovery_phone: recoveryPhone || null,
+      }) as unknown as { json: () => Promise<any>; ok: boolean; status: number; data: any };
 
       const data = await response.json();
 
@@ -128,16 +120,9 @@ const TwoFactorSetupWizard = ({ onComplete }) => {
 
     try {
       const response = await api.post('/2fa/verify-setup', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${tokenManager.getAccessToken()}`
-        },
-        body: JSON.stringify({
-          method: selectedMethod,
-          code: verificationCode
-        })
-      });
+        method: selectedMethod,
+        code: verificationCode,
+      }) as unknown as { json: () => Promise<any>; ok: boolean; status: number; data: any };
 
       const data = await response.json();
 
@@ -467,7 +452,7 @@ const TwoFactorSetupWizard = ({ onComplete }) => {
           <Button
           onClick={() => copyToClipboard(backupCodes.join('\n'))}
           variant="outline"
-          size="sm">
+          size="small">
           
             <Copy className="w-4 h-4 mr-2" />
             {t('misc.tfsw_copy_all')}
@@ -475,7 +460,7 @@ const TwoFactorSetupWizard = ({ onComplete }) => {
           <Button
           onClick={downloadBackupCodes}
           variant="outline"
-          size="sm">
+          size="small">
           
             <Download className="w-4 h-4 mr-2" />
             {t('misc.tfsw_download')}

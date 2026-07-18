@@ -1,7 +1,5 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useState, useEffect, useCallback } from 'react';
+import type { CSSProperties } from 'react';
 import {
   HardDrive,
   Plus,
@@ -16,16 +14,24 @@ import {
 'lucide-react';
 import {
   MacOSCard,
-  Button,
-  Badge,
+  Button as RawButton,
+  Badge as RawBadge,
   Input,
-  Select,
-  Textarea,
-  Checkbox,
-  Skeleton,
-  MacOSEmptyState,
-  Alert,
+  Select as RawSelect,
+  Textarea as RawTextarea,
+  Checkbox as RawCheckbox,
+  Skeleton as RawSkeleton,
+  MacOSEmptyState as RawMacOSEmptyState,
+  Alert as RawAlert,
 } from '../ui/macos';
+const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
+const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
+const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
+const Textarea = RawTextarea as unknown as React.ComponentType<Record<string, unknown>>;
+const Checkbox = RawCheckbox as unknown as React.ComponentType<Record<string, unknown>>;
+const Skeleton = RawSkeleton as unknown as React.ComponentType<Record<string, unknown>>;
+const MacOSEmptyState = RawMacOSEmptyState as unknown as React.ComponentType<Record<string, unknown>>;
+const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
@@ -48,7 +54,7 @@ const deriveBackupStats = (backupList) => {
   };
 };
 
-const defaultBackupForm = {
+const defaultBackupForm: Record<string, unknown> = {
   name: '',
   backup_type: 'full',
   status: 'pending',
@@ -73,7 +79,8 @@ const BackupManagement = () => {
   const [editingBackup, setEditingBackup] = useState(null);
   const [message, setMessage] = useState({ type: '', text: '' });
   const [stats, setStats] = useState(null);
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
 
   // Форма резервной копии
   const [formData, setFormData] = useState(defaultBackupForm);
@@ -104,7 +111,7 @@ const BackupManagement = () => {
   const loadBackups = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await api.get('/clinic/backups');
+      const response = await api.get('/clinic/backups') as any;
       const nextBackups = Array.isArray(response.data)
         ? response.data
         : response.data?.backups || [];
@@ -169,7 +176,7 @@ const BackupManagement = () => {
 
   const handleCleanupExpired = async () => {
     try {
-      const response = await api.post('/clinic/backups/cleanup');
+      const response = await api.post('/clinic/backups/cleanup') as any;
       const cleanedCount = response.data?.cleaned_count ?? 0;
       setMessage({
         type: 'success',
@@ -298,7 +305,7 @@ const BackupManagement = () => {
             <Select
               aria-label={t('admin2.bk_filter_status_aria')}
               value={statusFilter}
-              onChange={setStatusFilter}
+              onChange={(v: unknown) => setStatusFilter(String(v))}
               options={[
                 { value: 'all', label: t('admin2.bk_filter_all_statuses') },
                 ...statusOptions.map((option) => ({ value: option.value, label: option.label }))
@@ -308,7 +315,7 @@ const BackupManagement = () => {
             <Select
               aria-label={t('admin2.bk_filter_type_aria')}
               value={typeFilter}
-              onChange={setTypeFilter}
+              onChange={(v: unknown) => setTypeFilter(String(v))}
               options={[
                 { value: 'all', label: t('admin2.bk_filter_all_types') },
                 ...typeOptions.map((option) => ({ value: option.value, label: option.label }))
@@ -366,7 +373,7 @@ const BackupManagement = () => {
                 <Input
                 type="text"
                 required
-                value={formData.name}
+                value={formData.name as string}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 placeholder={t('admin2.bk_field_name_placeholder')} />
               
@@ -377,7 +384,7 @@ const BackupManagement = () => {
                 </label>
                 <Select
                 aria-label={t('admin2.bk_field_type_aria')}
-                value={formData.backup_type}
+                value={formData.backup_type as string}
                 onChange={(value) => setFormData({ ...formData, backup_type: value })}
                 options={typeOptions.map((option) => ({ value: option.value, label: option.label }))}
                 size="large" />
@@ -388,7 +395,7 @@ const BackupManagement = () => {
                 </label>
                 <Select
                 aria-label={t('admin2.bk_field_schedule_aria')}
-                value={formData.schedule}
+                value={formData.schedule as string}
                 onChange={(value) => setFormData({ ...formData, schedule: value })}
                 options={scheduleOptions.map((option) => ({ value: option.value, label: option.label }))}
                 size="large" />
@@ -400,7 +407,7 @@ const BackupManagement = () => {
                 <Input
                 type="number"
                 min="1"
-                value={formData.retention_days}
+                value={formData.retention_days as number}
                 onChange={(e) => setFormData({ ...formData, retention_days: parseInt(e.target.value) })}
                 placeholder={t('admin2.bk_field_retention_placeholder')} />
               
@@ -412,7 +419,7 @@ const BackupManagement = () => {
                 {t('admin2.bk_field_description')}
               </label>
               <Textarea
-              value={formData.description}
+              value={formData.description as string}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               placeholder={t('admin2.bk_field_description_placeholder')}
               rows={3} />

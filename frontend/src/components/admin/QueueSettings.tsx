@@ -3,6 +3,7 @@
 
 import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect, useCallback } from 'react';
+import type { CSSProperties } from 'react';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import {
@@ -104,7 +105,8 @@ const pickCanonicalDoctorForSpecialty = (doctorsList, specialtyKey) => {
 };
 
 const QueueSettings = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);

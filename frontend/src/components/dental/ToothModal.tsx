@@ -8,6 +8,7 @@ import { useTranslation } from '../../i18n/useTranslation';
  * Согласно MASTER_TODO_LIST строка 285
  */
 import { useEffect, useState } from 'react';
+import type { CSSProperties } from 'react';
 import {
   Alert,
   Badge,
@@ -222,7 +223,8 @@ const ToothModal = ({
   onSave,
   visitId
 }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [formData, setFormData] = useState({
     status: '',
     procedures: [],

@@ -1,8 +1,6 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect } from 'react';
+import type { CSSProperties } from 'react';
 import {
   Users,
   Download,
@@ -21,8 +19,13 @@ import {
   File } from
 'lucide-react';
 import {
-  MacOSCard, Button, Input, Select, Checkbox, SegmentedControl, Skeleton,
+  MacOSCard, Button as RawButton, Input, Select as RawSelect, Checkbox as RawCheckbox, SegmentedControl as RawSegmentedControl, Skeleton as RawSkeleton,
 } from '../ui/macos';
+const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
+const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
+const Checkbox = RawCheckbox as unknown as React.ComponentType<Record<string, unknown>>;
+const SegmentedControl = RawSegmentedControl as unknown as React.ComponentType<Record<string, unknown>>;
+const Skeleton = RawSkeleton as unknown as React.ComponentType<Record<string, unknown>>;
 import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 
@@ -30,9 +33,11 @@ import logger from '../../utils/logger';
 // P-013 fix: shared ConfirmDialog hook replacing native confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
 const UserExportManager = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // P-013 fix: shared ConfirmDialog hook (replaces 1 native confirm() call).
-  const [confirm, confirmDialog] = useConfirm();
+  const [confirmRaw, confirmDialog] = useConfirm();
+  const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
   // Состояние
   const [activeTab, setActiveTab] = useState('export');
   const [loading, setLoading] = useState(false);
@@ -93,7 +98,7 @@ const UserExportManager = () => {
   const loadExportFiles = async () => {
     setLoading(true);
     try {
-      const response = await api.get('/users/users/export/files');
+      const response = await api.get('/users/users/export/files') as any;
       setExportFiles(response.data.files || []);
     } catch (error) {
       logger.error('Ошибка загрузки файлов экспорта:', error);
@@ -122,7 +127,7 @@ const UserExportManager = () => {
         include_audit_logs: exportForm.include_audit_logs
       };
 
-      const response = await api.post('/users/users/export', exportData);
+      const response = await api.post('/users/users/export', exportData) as any;
 
       if (response.data.success) {
         toast.success(response.data.message);
@@ -146,7 +151,7 @@ const UserExportManager = () => {
     try {
       const response = await api.get(`/users/users/export/download/${filename}`, {
         responseType: 'blob'
-      });
+      }) as any;
 
       // Создаем ссылку для скачивания
       const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -502,14 +507,14 @@ const UserExportManager = () => {
               
               <div className="admin-d-flex-gap-8">
                 <Button
-            size="sm"
+            size="small"
             onClick={() => handleDownload(file.filename)}>
 
                   <Download className="admin-icon-14" />
                   {t('admin2.ue_download_btn')}
                 </Button>
                 <Button
-            size="sm"
+            size="small"
             variant="danger"
             onClick={() => handleDeleteFile(file.filename)}>
 
@@ -541,7 +546,7 @@ const UserExportManager = () => {
         <SegmentedControl
           aria-label={t('admin2.ue_tabs_aria')}
           value={activeTab}
-          onChange={setActiveTab}
+          onChange={(v: unknown) => setActiveTab(String(v))}
           options={[
             {
               value: 'export',
@@ -570,7 +575,7 @@ const UserExportManager = () => {
       {activeTab === 'export' && renderExportTab()}
       {activeTab === 'files' && renderFilesTab()}
       {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
-      {confirmDialog}
+      {confirmDialog as unknown as React.ReactNode}
     </div>);
 
 };

@@ -1,7 +1,5 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useState } from 'react';
+import type { CSSProperties } from 'react';
 import { api } from '../api/client';
 import { Shield, Smartphone, Download, Copy, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
 import PropTypes from 'prop-types';
@@ -9,7 +7,8 @@ import { Input } from './ui/macos';
 import { useTranslation } from '../i18n/useTranslation';
 
 const TwoFactorSetup = ({ onComplete, onCancel }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [step, setStep] = useState(1); // 1: Setup, 2: Verify, 3: Complete
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -33,7 +32,7 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
       const response = await api.post('/2fa/setup', {
         recovery_email: recoveryEmail || null,
         recovery_phone: recoveryPhone || null
-      });
+      }) as any;
 
       setSetupData(response);
       setBackupCodes(response.backup_codes);
@@ -57,7 +56,7 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
     try {
       const response = await api.post('/2fa/verify-setup', null, {
         params: { totp_code: totpCode }
-      });
+      }) as any;
 
       if (response.success) {
         setSuccess(t('misc.tfs_2fa_uspeshno_nastroena'));
