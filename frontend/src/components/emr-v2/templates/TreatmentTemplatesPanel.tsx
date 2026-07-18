@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 /**
  * TreatmentTemplatesPanel v2
@@ -20,15 +18,16 @@ import './TreatmentTemplatesPanel.css';
 import { Input } from '../../ui/macos';
 import { useTranslation } from '../../../i18n/useTranslation';
 import i18n from '../../../i18n';
+const t18 = i18n.t as unknown as (key: string, options?: Record<string, unknown>) => string;
 
 /**
  * Category metadata
  */
 const getCategoryMeta = (t) => ({
-    medications: { icon: '💊', label: i18n.t('misc.ttp_cat_medications') },
-    examinations: { icon: '🔬', label: i18n.t('misc.ttp_cat_examinations') },
-    labs: { icon: '🧪', label: i18n.t('misc.ttp_cat_labs') },
-    followup: { icon: '📅', label: i18n.t('misc.ttp_cat_followup') },
+    medications: { icon: '💊', label: t18('misc.ttp_cat_medications') },
+    examinations: { icon: '🔬', label: t18('misc.ttp_cat_examinations') },
+    labs: { icon: '🧪', label: t18('misc.ttp_cat_labs') },
+    followup: { icon: '📅', label: t18('misc.ttp_cat_followup') },
 });
 
 /**
@@ -52,7 +51,7 @@ export function TreatmentTemplatesButton({ onClick, disabled = false }) {
             type="button"
             className="treatment-templates-btn"
             onClick={onClick}
-            title={i18n.t('misc.ttp_otkryt_shablony')}
+            title={t18('misc.ttp_otkryt_shablony')}
         >
             📋 Шаблоны
         </button>
@@ -76,7 +75,7 @@ export function TreatmentTemplatesPanel({
     onClose,
     isOpen = false,
 }) {
-    const { t } = useTranslation();
+    const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
     const [activeCategory, setActiveCategory] = useState('medications');
     const [searchQuery, setSearchQuery] = useState('');
     const [previewTemplate, setPreviewTemplate] = useState(null);
@@ -136,7 +135,7 @@ export function TreatmentTemplatesPanel({
                 className="treatment-templates-backdrop"
                 role="button"
                 tabIndex={0}
-                aria-label={i18n.t('misc.ttp_zakryt_panel_shablonov_leche')}
+                aria-label={t18('misc.ttp_zakryt_panel_shablonov_leche')}
                 onClick={handleClose}
                 onKeyDown={(event) => handleActivationKeyDown(event, handleClose)} />
 
@@ -154,8 +153,8 @@ export function TreatmentTemplatesPanel({
                 <div className="treatment-templates-search">
                     <Input
                         type="text"
-                        aria-label={i18n.t('misc.ttp_poisk_shablona_lecheniya')}
-                        placeholder={i18n.t('misc.ttp_poisk_shablona')}
+                        aria-label={t18('misc.ttp_poisk_shablona_lecheniya')}
+                        placeholder={t18('misc.ttp_poisk_shablona')}
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         autoFocus
@@ -204,7 +203,7 @@ export function TreatmentTemplatesPanel({
                                 <button
                                     className="treatment-templates-insert-btn"
                                     onClick={() => handleInsert(template)}
-                                    title={i18n.t('misc.ttp_vstavit_v_pole')}
+                                    title={t18('misc.ttp_vstavit_v_pole')}
                                 >
                                     ➕ Вставить
                                 </button>

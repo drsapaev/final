@@ -1,10 +1,10 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { Check, Printer } from 'lucide-react';
-import ModernDialog from './ModernDialog';
+import ModernDialogRaw from './ModernDialog';
+import React from 'react';
+const ModernDialog = ModernDialogRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import { toast } from 'react-toastify';
 // UX Audit R-4.3 (Phase 2): usePaymentMethods hook (future: backend-driven).
 import { usePaymentMethods } from '../../hooks/usePaymentMethods';
@@ -23,12 +23,12 @@ const PaymentDialog = ({
   onPaymentSuccess,
   onPrintTicket,
 }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState(t('misc.pd_karta'));
   const [isProcessing, setIsProcessing] = useState(false);
   const [isPaid, setIsPaid] = useState(false);
-  const [errors, setErrors] = useState({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Инициализация данных при открытии
   useEffect(() => {
@@ -42,7 +42,7 @@ const PaymentDialog = ({
   }, [isOpen, appointment]);
 
   const validateForm = () => {
-    const newErrors = {};
+    const newErrors: Record<string, string> = {};
 
     if (!paymentAmount || !Number.isFinite(parseFloat(paymentAmount)) || parseFloat(paymentAmount) <= 0) {
       newErrors.amount = t('misc.pd_ukazhite_korrektnuyu_summu');
@@ -220,7 +220,7 @@ const PaymentDialog = ({
                 {paymentMethods.map((method) => {
                   // FIX (paymentMethods-jsx): config теперь хранит компонент
                   // Icon, а не React-элемент. Рендерим как компонент.
-                  const MethodIcon = method.Icon || method.icon;
+                  const MethodIcon = method.Icon || method.Icon;
                   return (
                   <button
                     key={method.value}

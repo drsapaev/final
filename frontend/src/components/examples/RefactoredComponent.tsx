@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 /**
  * Пример рефакторинга компонента с использованием новых API хуков
@@ -26,9 +24,10 @@ import tokenManager from '../../utils/tokenManager';
 import { Input } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
 import i18n from '../../i18n';
+const t18 = i18n.t as unknown as (key: string, options?: Record<string, unknown>) => string;
 // ❌ СТАРЫЙ ПОДХОД - НЕ ИСПОЛЬЗУЙТЕ
 function OldPatientComponent() {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [, setPatients] = useState([]);
   const [, setLoading] = useState(false);
   const [, setError] = useState(null);
@@ -50,7 +49,7 @@ function OldPatientComponent() {
         const data = await response.json();
         setPatients(Array.isArray(data) ? data : []);
       } else {
-        throw new Error(i18n.t('misc.rc_oshibka_zagruzki_patsientov'));
+        throw new Error(t18('misc.rc_oshibka_zagruzki_patsientov'));
       }
     } catch (error) {
       setError(error.message);
@@ -137,8 +136,8 @@ function NewPatientComponent() {
       await submitForm('/patients', formData, {
         validate: (data) => {
           // Дополнительная валидация
-          if (!data.full_name.trim()) {
-            return i18n.t('misc.rc_imya_patsienta_obyazatelno');
+          if (!(data as Record<string, string>).full_name.trim()) {
+            return t18('misc.rc_imya_patsienta_obyazatelno');
           }
           return null;
         },
@@ -146,8 +145,8 @@ function NewPatientComponent() {
           // Трансформация данных перед отправкой
           return {
             ...data,
-            full_name: data.full_name.trim(),
-            phone: data.phone.replace(/\D/g, '') // Только цифры
+            full_name: (data as Record<string, string>).full_name.trim(),
+            phone: (data as Record<string, string>).phone.replace(/\D/g, '') // Только цифры
           };
         }
       });
@@ -163,13 +162,13 @@ function NewPatientComponent() {
 
       // Ошибка уже обработана в submitForm
     }};return <div className="patient-component">
-      <h2>{i18n.t('misc.rc_patsienty_kardiologii')}</h2>
+      <h2>{t18('misc.rc_patsienty_kardiologii')}</h2>
 
       {/* Форма создания пациента */}
       <form onSubmit={handleSubmit} className="patient-form">
         <Input type="text"
       aria-label="Patient full name"
-      placeholder={i18n.t('misc.rc_fio_patsienta')}
+      placeholder={t18('misc.rc_fio_patsienta')}
       value={formData.full_name}
       onChange={(e) => setFormData((prev) => ({ ...prev, full_name: e.target.value }))}
       disabled={submitting} />
@@ -178,7 +177,7 @@ function NewPatientComponent() {
         <Input
         type="tel"
         aria-label="Patient phone"
-        placeholder={i18n.t('misc.rc_telefon')}
+        placeholder={t18('misc.rc_telefon')}
         value={formData.phone}
         onChange={(e) => setFormData((prev) => ({ ...prev, phone: e.target.value }))}
         disabled={submitting} />
@@ -202,33 +201,33 @@ function NewPatientComponent() {
         
 
         <button type="submit" disabled={submitting}>
-          {submitting ? i18n.t('misc.rc_sozdanie') : i18n.t('misc.rc_sozdat_patsienta')}
+          {submitting ? t18('misc.rc_sozdanie') : t18('misc.rc_sozdat_patsienta')}
         </button>
       </form>
 
       {/* Список пациентов */}
       <div className="patients-list">
-        {patientsLoading && <div>{i18n.t('misc.rc_zagruzka_patsientov')}</div>}
+        {patientsLoading && <div>{t18('misc.rc_zagruzka_patsientov')}</div>}
 
         {patientsError &&
       <div className="error">
             Ошибка загрузки: {patientsError}
-            <button onClick={refreshPatients}>{i18n.t('misc.rc_povtorit')}</button>
+            <button onClick={refreshPatients}>{t18('misc.rc_povtorit')}</button>
           </div>
       }
 
-        {patients && patients.length > 0 ?
+        {patients && (patients as unknown[]).length > 0 ?
       <ul>
-            {patients.map((patient) =>
-        <li key={patient.id}>
-                <strong>{patient.full_name}</strong>
-                <span>{patient.phone}</span>
-                <span>{patient.email}</span>
+            {(patients as Array<Record<string, unknown>>).map((patient) =>
+        <li key={String(patient.id)}>
+                <strong>{String(patient.full_name)}</strong>
+                <span>{String(patient.phone)}</span>
+                <span>{String(patient.email)}</span>
               </li>
         )}
           </ul> :
 
-      !patientsLoading && <div>{i18n.t('misc.rc_patsienty_ne_naydeny')}</div>
+      !patientsLoading && <div>{t18('misc.rc_patsienty_ne_naydeny')}</div>
       }
       </div>
     </div>;
@@ -252,12 +251,12 @@ function RealtimeQueueComponent() {
   return (
     <div className="realtime-queue">
       <div className="connection-status">
-        Статус: {connected ? i18n.t('misc.rc_podklyuchen') : i18n.t('misc.rc_otklyuchen')}
+        Статус: {connected ? t18('misc.rc_podklyuchen') : t18('misc.rc_otklyuchen')}
       </div>
 
       {lastMessage &&
       <div className="last-message">
-          <h3>{i18n.t('misc.rc_poslednee_obnovlenie')}</h3>
+          <h3>{t18('misc.rc_poslednee_obnovlenie')}</h3>
           <pre>{JSON.stringify(lastMessage, null, 2)}</pre>
         </div>
       }

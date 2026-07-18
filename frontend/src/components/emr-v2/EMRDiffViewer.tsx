@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 /**
  * EMRDiffViewer - Field-level comparison of two EMR versions
@@ -104,7 +102,7 @@ export function EMRDiffViewer({
     versionTo,
     onClose,
 }) {
-    const { t } = useTranslation();
+    const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
     const [diff, setDiff] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);

@@ -1,5 +1,4 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
+import type { CSSProperties } from "react";
 
 // Компонент для ролевых ограничений маршрутов
 import PropTypes from 'prop-types';
@@ -201,9 +200,9 @@ export function UnauthorizedPage() {
   };
 
   return (
-    <div style={containerStyle}>
-      <div style={iconStyle}>🚫</div>
-      <h1 style={titleStyle}>Доступ запрещен</h1>
+    <div style={containerStyle as CSSProperties}>
+      <div style={iconStyle as CSSProperties}>🚫</div>
+      <h1 style={titleStyle as CSSProperties}>Доступ запрещен</h1>
       <p style={messageStyle}>
         У вас нет прав для доступа к этой странице. 
         Обратитесь к администратору для получения необходимых разрешений.
