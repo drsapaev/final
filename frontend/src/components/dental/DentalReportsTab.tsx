@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 /**
  * DentalReportsTab — R-15: extracted from DentistPanelUnified.
@@ -11,9 +9,9 @@ import { BarChart3 } from 'lucide-react';
 import { useTranslation } from '../../i18n/useTranslation';
 
 const ReportsAndAnalytics = ({ patients, diagnoses, prosthetics }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   return (
-    <Card padding="lg">
+    <Card padding="large">
       <div className="dental-flex-between-16">
         <div>
           <h3 className="dental-text-primary">{t('dental.dental_drt_analytics_title')}</h3>
@@ -22,15 +20,15 @@ const ReportsAndAnalytics = ({ patients, diagnoses, prosthetics }) => {
         <BarChart3 size={24} className="dental-text-secondary" />
       </div>
       <div className="dental-grid-3 dental-gap-16 dental-mt-16">
-        <Card padding="md">
+        <Card padding="default">
           <div className="dental-text-desc dental-text-secondary">{t('dental.dental_drt_stat_patients')}</div>
           <div className="dental-text-value dental-text-primary">{patients?.length || 0}</div>
         </Card>
-        <Card padding="md">
+        <Card padding="default">
           <div className="dental-text-desc dental-text-secondary">{t('dental.dental_drt_stat_diagnoses')}</div>
           <div className="dental-text-value dental-text-primary">{diagnoses?.length || 0}</div>
         </Card>
-        <Card padding="md">
+        <Card padding="default">
           <div className="dental-text-desc dental-text-secondary">{t('dental.dental_drt_stat_prosthetics')}</div>
           <div className="dental-text-value dental-text-primary">{prosthetics?.length || 0}</div>
         </Card>
@@ -52,11 +50,11 @@ export function DentalReportsTab({
   diagnoses = [],
   prosthetics = [],
 }) {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   return (
     <div className="dental-flex-col dental-gap-24">
       {savedVisitProtocols.length > 0 && (
-        <Card padding="lg">
+        <Card padding="large">
           <div className="dental-flex-between-16">
             <div>
               <h3 className="dental-text-primary">{t('dental.dental_drt_saved_title')}</h3>

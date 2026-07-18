@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
@@ -14,7 +12,7 @@ import { useTranslation } from '../../i18n/useTranslation';
  * Используется во всех панелях для единообразия
  */
 const UnifiedLayout = ({ children, showSidebar = true }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   useLocation();
