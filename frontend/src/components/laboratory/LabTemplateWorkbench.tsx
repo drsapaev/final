@@ -1,11 +1,12 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useEffect, useMemo, useState, useId } from 'react';
 import PropTypes from 'prop-types';
 import {
-  Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Icon,
+  Alert as RawAlert, Badge as RawBadge, Button as RawButton, Card as RawCard, CardContent, CardHeader, CardTitle, Icon,
 } from '../ui/macos';
+const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
+const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
+const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
+const Card = RawCard as unknown as React.ComponentType<Record<string, unknown>>;
 import { useConfirm } from '../common/ConfirmDialog';
 import { labReportingApi } from '../../api/labReporting';
 import './LabTemplateWorkbench.css';
@@ -38,12 +39,14 @@ export default function LabTemplateWorkbench({
   onSelectTemplate,
   onTemplatesChanged,
   notify
-}) {
-  const { t } = useTranslation();
+}: any) {
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // L-H-1 fix: useConfirm() для всех destructive actions (вместо native confirm()).
   // Согласованность с LabReportWorkbench — единый стилизованный portal-dialog
   // с focus-trap, Esc-to-cancel, явным описанием последствий.
-  const [confirm, confirmDialog] = useConfirm();
+  const [confirmRaw, confirmDialog] = useConfirm();
+  const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
 
   // UX-AUDIT-FIX14: useId() для уникальных ID <datalist>. Ранее ID были
   // захардкожены как 'lab-analyte-catalog' / 'lab-unit-catalog' —
@@ -117,7 +120,7 @@ export default function LabTemplateWorkbench({
         const [units, analytes] = await Promise.all([
           labReportingApi.listCatalogUnits(),
           labReportingApi.listCatalogAnalytes()
-        ]);
+        ]) as [any[], any[]];
         if (cancelled) {
           return;
         }
@@ -167,7 +170,7 @@ export default function LabTemplateWorkbench({
     if (!hasTemplateVersionAction(activeVersion, 'create_draft')) {
       throw new Error(t('misc.ltw_server_ne_razreshil_sozdat_c'));
     }
-    const version = await labReportingApi.createTemplateVersion(selectedTemplate.id, activeVersion?.id || null);
+    const version = await labReportingApi.createTemplateVersion(selectedTemplate.id, activeVersion?.id || null) as any;
     await onTemplatesChanged(selectedTemplate.id);
     return version.id;
   }
@@ -304,11 +307,12 @@ export default function LabTemplateWorkbench({
     }
     setSaving(true);
     try {
-      const cloned = await labReportingApi.cloneTemplate(selectedTemplate.id);
+      const cloned = await labReportingApi.cloneTemplate(selectedTemplate.id) as any;
       notify('success', t('success.template_cloned'));
       await onTemplatesChanged(cloned.id);
     } catch (error) {
-      notify('error', error.message);
+      const err = error as { message?: string };
+      notify('error', err?.message || '');
     } finally {
       setSaving(false);
     }
@@ -381,7 +385,7 @@ export default function LabTemplateWorkbench({
 
   async function loadCatalogReferenceRange(sectionIndex, fieldIndex, analyteCode) {
     try {
-      const ranges = await labReportingApi.listCatalogReferenceRanges(analyteCode);
+      const ranges = await labReportingApi.listCatalogReferenceRanges(analyteCode) as any[];
       if (ranges && ranges.length > 0) {
         const range = ranges[0];
         updateField(sectionIndex, fieldIndex, 'reference_text',
@@ -486,11 +490,11 @@ export default function LabTemplateWorkbench({
         <CardHeader className="ltw-card-header">
           <CardTitle className="ltw-card-title">
             <span className="ltw-flex-center">
-              <Icon name="rectangle.stack.badge.plus" size={20} />
+              <Icon name="rectangle.stack.badge.plus" size={20 as never} />
               {t('template.title')}
             </span>
             <Button variant="primary" size="small" onClick={() => setShowNewTemplateDialog(true)} disabled={saving}>
-              <Icon name="plus" size={14} />
+              <Icon name="plus" size={14 as never} />
               {t('template.new_template')}
             </Button>
           </CardTitle>
@@ -548,13 +552,13 @@ export default function LabTemplateWorkbench({
         <CardHeader className="ltw-card-header">
           <CardTitle className="ltw-card-title-gap-12">
             <span className="ltw-flex-center">
-              <Icon name="slider.horizontal.3" size={20} />
+              <Icon name="slider.horizontal.3" size={20 as never} />
               Редактор бланка
             </span>
             {selectedTemplate && (
               <div className="ltw-flex-gap-8">
                 <Button variant="outline" onClick={handleCloneTemplate} disabled={saving}>
-                  <Icon name="doc.on.doc" size={16} />
+                  <Icon name="doc.on.doc" size={16 as never} />
                   {t('template.clone')}
                 </Button>
                 <Button
@@ -582,19 +586,19 @@ export default function LabTemplateWorkbench({
                   disabled={saving || !activeVersion}
                   title={t('misc.ltw_otmenit_izmeneniya_i_vosstan')}
                 >
-                  <Icon name="arrow.counterclockwise" size={16} />
+                  <Icon name="arrow.counterclockwise" size={16 as never} />
                   Отменить
                 </Button>
                 <Button variant="outline" onClick={handleSaveTemplate} disabled={saving}>
-                  <Icon name="square.and.arrow.down" size={16} />
+                  <Icon name="square.and.arrow.down" size={16 as never} />
                   {t('common.save_draft')}
                 </Button>
                 <Button variant="primary" onClick={handlePublishVersion} disabled={saving}>
-                  <Icon name="checkmark.seal" size={16} />
+                  <Icon name="checkmark.seal" size={16 as never} />
                   {t('template.publish')}
                 </Button>
                 <Button variant="outline" onClick={handleArchiveTemplate} disabled={saving || !activeVersion} title={t('template.archive')}>
-                  <Icon name="archivebox" size={16} />
+                  <Icon name="archivebox" size={16 as never} />
                   {t('template.archive')}
                 </Button>
               </div>
@@ -729,7 +733,7 @@ export default function LabTemplateWorkbench({
       </datalist>
 
       {/* L-H-1 fix: portal-mounted ConfirmDialog для destructive actions */}
-      {confirmDialog}
+      {confirmDialog as unknown as React.ReactNode}
     </div>
   );
 }

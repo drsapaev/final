@@ -1,10 +1,9 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import type { CSSProperties } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import ModernDialog from '../dialogs/ModernDialog';
+import ModernDialogRaw from '../dialogs/ModernDialog';
+const ModernDialog = ModernDialogRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import { toast } from 'react-toastify';
 import PropTypes from 'prop-types';
 // UX Audit Registrar #2: useConfirm hook для замены window.confirm().
@@ -23,7 +22,8 @@ import { useQueueManager } from '../../hooks/useQueueManager';
 // UX Audit Stage 3 (Queue issue 7.1):
 // WebSocket подписка для мгновенных обновлений очереди вместо 30s polling.
 import { useQueueWebSocket } from '../../hooks/useQueueWebSocket';
-import QueueTable from './QueueTable';
+import QueueTableRaw from './QueueTable';
+const QueueTable = QueueTableRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import logger from '../../utils/logger';
 import './ModernQueueManager.css';
 
@@ -35,7 +35,7 @@ const ModernQueueManager = ({
   doctors = [],
   onDoctorChange,
   onDateChange
-}) => {
+}: any) => {
   const {
     loading,
     queueData,
@@ -49,7 +49,7 @@ const ModernQueueManager = ({
     closeReceptionForDoctor,
     callNextPatientInQueue
 
-  } = useQueueManager();
+  } = useQueueManager() as any;
 
   const [internalDoctor, setInternalDoctor] = useState('');
   const [internalDate, setInternalDate] = useState(getLocalDateString());
@@ -60,10 +60,12 @@ const ModernQueueManager = ({
 
   // UX Audit Registrar #2: useConfirm hook для замены window.confirm().
   // Возвращает [confirm, dialog]; dialog должен быть отрендерен в JSX.
-  const [confirm, confirmDialog] = useConfirm();
+  const [confirmRaw, confirmDialog] = useConfirm();
+  const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
 
   // i18next translation function.
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
 
   // Compatibility object passed to <QueueTable t={...} /> — QueueTable still
   // expects an object with named keys (selectDoctor, patient, phone, etc.),
@@ -419,10 +421,11 @@ const ModernQueueManager = ({
                 id="modern-queue-doctor"
                 aria-label={t('misc.mqm_select_doctor')}
                 value={effectiveDoctor === '' ? '' : String(effectiveDoctor)}
-                onChange={(newDoctor) => {
-                  setInternalDoctor(newDoctor);
+                onChange={(newDoctor: unknown) => {
+                  const v = String(newDoctor);
+                  setInternalDoctor(v);
                   if (onDoctorChange) {
-                    onDoctorChange(newDoctor);
+                    onDoctorChange(v);
                   }
                 }}
                 options={[
@@ -733,7 +736,7 @@ const ModernQueueManager = ({
       </ModernDialog>
 
       {/* UX Audit Registrar #2: ConfirmDialog (useConfirm hook). */}
-      {confirmDialog}
+      {confirmDialog as unknown as React.ReactNode}
     </div>);
 
 };

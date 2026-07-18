@@ -1,7 +1,5 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useState, useCallback, useEffect } from 'react';
+import type { CSSProperties } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { getVisit } from '../api/visits';
@@ -9,14 +7,15 @@ import logger from '../utils/logger';  // PR-38 / Medium-23: log instead of sile
 import {
   AppEmpty, AppError, Button,
   Input } from '../components/ui/macos';
-import { getRoleHomeRoute } from '../routing/routeSelectors.js';
+import { getRoleHomeRoute } from '../routing/routeSelectors';
 import { useTranslation } from '../i18n/useTranslation';
 
 const registrarHomeRoute = getRoleHomeRoute('registrar');
 
 // Modern Search Page with Full Functionality
 export default function Search() {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [patients, setPatients] = useState([]);
@@ -66,7 +65,7 @@ export default function Search() {
 
         // Also get visits for patient with this ID
         try {
-          const patientVisitsRes = await api.get(`/visits/visits?patient_id=${visitId}&limit=20`);
+          const patientVisitsRes = await api.get(`/visits/visits?patient_id=${visitId}&limit=20`) as any;
           if (Array.isArray(patientVisitsRes.data)) {
             // Merge without duplicates
             const existingIds = new Set(visitsData.map(v => v.id));
@@ -471,7 +470,7 @@ export default function Search() {
 }
 
 // Styles
-const styles = {
+const styles: Record<string, CSSProperties> = {
   container: {
     maxWidth: 1200,
     margin: '0 auto',

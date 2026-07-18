@@ -1,7 +1,5 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useMemo, useRef, useState } from 'react';
+import type { CSSProperties } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Check, X, ArrowLeft, AlertTriangle } from 'lucide-react';
 import {
@@ -190,7 +188,8 @@ export default function Setup() {
   // UX Audit Stage 1 (Setup issue 2.3): SPA-навигация вместо window.location.assign.
   const navigate = useNavigate();
   const loginRoute = getCanonicalRouteById('login')?.path || '/login';
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
 
   const requiredFieldRefs = useRef({});
   // UX Audit Stage 2 (Setup issue 2.2): track touched fields для real-time валидации.

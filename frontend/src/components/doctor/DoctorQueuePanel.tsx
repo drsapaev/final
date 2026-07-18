@@ -1,7 +1,5 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useState, useEffect, useRef } from 'react';
+import type { CSSProperties } from 'react';
 import PropTypes from 'prop-types';
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
@@ -22,12 +20,17 @@ import {
 'lucide-react';
 import {
   MacOSCard,
-  Button,
-  Badge,
-  Skeleton,
-  MacOSEmptyState,
-  Alert,
+  Button as RawButton,
+  Badge as RawBadge,
+  Skeleton as RawSkeleton,
+  MacOSEmptyState as RawMacOSEmptyState,
+  Alert as RawAlert,
 } from '../ui/macos';
+const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
+const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
+const Skeleton = RawSkeleton as unknown as React.ComponentType<Record<string, unknown>>;
+const MacOSEmptyState = RawMacOSEmptyState as unknown as React.ComponentType<Record<string, unknown>>;
+const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
 import {
   formatRegistrarTime,
   getRegistrarTimestampDisplay,
@@ -59,7 +62,8 @@ const DoctorQueuePanel = ({
   onPatientSelect,
   className = ''
 }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // Проверяем демо-режим в самом начале (в демо не скрываем компонент, а показываем моковые данные)
   const isDemoMode = import.meta.env.MODE === 'development' && window.location.hostname === 'localhost';
 

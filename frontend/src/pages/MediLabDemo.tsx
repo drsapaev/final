@@ -1,14 +1,15 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useState, useEffect } from 'react';
+import type { CSSProperties } from 'react';
 import { useLocation } from 'react-router-dom';
 import Icon from '../components/Icon';
 import { Plus, Search, Filter, Calendar, Stethoscope, Edit, Trash2 } from 'lucide-react';
 
 // Компоненты
 import UnifiedLayout from '../components/layout/UnifiedLayout';
-import { PatientCard, MetricCard, MedicalTable } from '../components/medical';
+import { PatientCard as RawPatientCard, MetricCard as RawMetricCard, MedicalTable as RawMedicalTable } from '../components/medical';
+const PatientCard = RawPatientCard as unknown as React.ComponentType<Record<string, unknown>>;
+const MetricCard = RawMetricCard as unknown as React.ComponentType<Record<string, unknown>>;
+const MedicalTable = RawMedicalTable as unknown as React.ComponentType<Record<string, unknown>>;
 import MedicalCard from '../components/medical/MedicalCard';
 import logger from '../utils/logger';
 import '../styles/full-width.css';

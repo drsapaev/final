@@ -1,23 +1,27 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useState } from 'react';
+import type { CSSProperties } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowRight, Eye, EyeOff, LogIn, CircleHelp, UserPlus, UserRound, AlertTriangle } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { api, setToken, setRefreshToken } from '../../api/client';
 import { setProfile } from '../../stores/auth';
 import { getRouteForProfile } from '../../constants/routes';
-import { getCanonicalRouteById, getEffectiveRouteByPath } from '../../routing/routeSelectors.js';
-import { useSetupStatus } from '../../hooks/useSetupStatus.js';
-import { colors } from '../../theme/tokens';
+import { getCanonicalRouteById, getEffectiveRouteByPath } from '../../routing/routeSelectors';
+import { useSetupStatus } from '../../hooks/useSetupStatus';
+import * as _tokens from '../../theme/tokens';
+const colors = (_tokens as any).colors || {};
 import { BRAND } from '../../config/brand';
-import TwoFactorVerify from '../TwoFactorVerify.jsx';
+import TwoFactorVerify from '../TwoFactorVerify';
 import ForgotPassword from './ForgotPassword';
 import { formatLoginErrorMessage, LOGIN_ERROR_MESSAGES } from './loginErrorUtils';
 import {
-  Button, Card, CardHeader, CardTitle, CardContent, Input, Checkbox, Alert,
+  Button as RawButton, Card as RawCard, CardHeader, CardTitle, CardContent, Input as RawInput, Checkbox as RawCheckbox, Alert as RawAlert,
 } from '../ui/macos';
+const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
+const Card = RawCard as unknown as React.ComponentType<Record<string, unknown>>;
+const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
+const Checkbox = RawCheckbox as unknown as React.ComponentType<Record<string, unknown>>;
+const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 
@@ -35,7 +39,8 @@ const setupRoute = getCanonicalRouteById('setup')?.path || '/setup';
 // `void useTheme();` заменён на нормальный вызов — мы подписываемся
 // на смену темы, чтобы карточка логина перерисовывалась.
 const LoginFormStyled = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // UX Audit: useTheme — используем isDark для conditional styles.
   const { isDark } = useTheme();
   const navigate = useNavigate();
@@ -89,7 +94,7 @@ const LoginFormStyled = () => {
   const [formData, setFormData] = useState({
     username: '',
     password: '',
-  });
+  } as any);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -137,11 +142,11 @@ const LoginFormStyled = () => {
       // обрабатывает CSRF, refresh-token и rate-limit — всё в одном месте.
       let data;
       try {
-        const response = await api.post('/authentication/login', credentials);
+        const response = await api.post('/authentication/login', credentials) as any;
         data = response.data;
-      } catch (apiErr) {
+      } catch (apiErr: any) {
         // Нормализуем ошибку axios и пробрасываем дальше.
-        const normalizedError = new Error(formatLoginErrorMessage({
+        const normalizedError: any = new Error(formatLoginErrorMessage({
           responseStatus: apiErr?.response?.status,
           responseDetail: apiErr?.response?.data?.detail,
           responseMessage: apiErr?.response?.data?.message,
@@ -272,7 +277,7 @@ const LoginFormStyled = () => {
           setRefreshToken(response.data.refresh_token);
         }
 
-        const profileResponse = await api.get('/auth/me');
+        const profileResponse = await api.get('/auth/me') as any;
         setProfile(profileResponse.data);
 
         // UX Audit Stage 1 (Login issue 3.7):
