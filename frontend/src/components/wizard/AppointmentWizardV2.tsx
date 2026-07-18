@@ -158,6 +158,7 @@ const AppointmentWizardV2 = ({
     },
     doctors: [] as any[]
   } as any);
+  // wizardData typed as any — see Type Debt Register
 
   // Состояние UI
   const [errors, setErrors] = useState({} as any);
@@ -1206,7 +1207,7 @@ const AppointmentWizardV2 = ({
   // ===================== НАВИГАЦИЯ =====================
 
   const validateStep = (step) => {
-    const newErrors = {};
+    const newErrors: Record<string, string> = {};
 
     if (step === 1) {
       const fioError = validatePatientFio(wizardData.patient.fio);
@@ -1501,7 +1502,7 @@ const AppointmentWizardV2 = ({
 
           if (needsUpdate) {
             logger.log('🔄 Updating patient data...');
-            const updateData = {};
+            const updateData: any = {};
 
             if (wizardData.patient.birth_date) updateData.birth_date = wizardData.patient.birth_date;
             if (wizardData.patient.address) updateData.address = wizardData.patient.address;
@@ -1520,7 +1521,7 @@ const AppointmentWizardV2 = ({
           // создаем НОВОГО пациента с данными из формы, чтобы не блокировать завершение мастера.
           logger.warn(`⚠️ Пациент с телефоном ${wizardData.patient.phone} не найден. Создаем нового пациента (editMode + QR).`);
 
-          const patientData = {
+          const patientData: any = {
             full_name: wizardData.patient.fio.trim(),
             sex: selectedPatientSex,
             last_name: wizardData.patient.lastName || '',
@@ -1561,7 +1562,7 @@ const AppointmentWizardV2 = ({
         logger.log('📊 Длина токена:', token ? token.length : 0);
 
         // Подготовка данных пациента - отправляем полное ФИО, backend нормализует
-        const patientData = {
+        const patientData: any = {
           full_name: wizardData.patient.fio.trim(),
           sex: selectedPatientSex,
           // Для обратной совместимости также отправляем отдельные поля (если есть)
@@ -1703,7 +1704,7 @@ const AppointmentWizardV2 = ({
 
           try {
             // Подготавливаем данные пациента
-            const patientData = {
+            const patientData: any = {
               patient_name: wizardData.patient.fio || wizardData.patient.name,
               phone: normalizedPhone,
               birth_year: wizardData.patient.birth_date ?
@@ -2392,7 +2393,7 @@ const AppointmentWizardV2 = ({
 
   // Группировка элементов корзины по визитам
   const groupCartItemsByVisit = () => {
-    const visits = {};
+    const visits: any[] = [];
 
     // ✅ ИСПРАВЛЕНО: Фильтруем элементы корзины без service_id
     const validItems = wizardData.cart.items.filter((item) => {
