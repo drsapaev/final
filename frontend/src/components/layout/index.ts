@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import React from 'react';
 
@@ -113,7 +111,7 @@ export const layoutUtils = {
   },
 
   // Создание Flexbox стилей
-  createFlexStyles: (options = {}) => {
+  createFlexStyles: (options: Record<string, unknown> = {}) => {
     const {
       direction = 'row',
       wrap = 'nowrap',

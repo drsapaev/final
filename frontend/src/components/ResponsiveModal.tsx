@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useEffect } from 'react';
 import { useBreakpoint } from '../hooks/useEnhancedMediaQuery';
@@ -146,7 +144,7 @@ const ResponsiveModal = ({
             </h2>
             <Button
             variant="ghost"
-            size="sm"
+            size="small"
             onClick={onClose}
             type="button"
             title="Закрыть модальное окно"
@@ -185,7 +183,7 @@ const ResponsiveModal = ({
           
             <Button
             variant="primary"
-            size="lg"
+            size="large"
             onClick={onClose}
             style={{ width: '100%' }}>
             

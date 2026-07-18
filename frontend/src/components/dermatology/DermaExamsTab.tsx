@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 /**
  * DermaExamsTab — R-15: extracted from DermatologistPanelUnified.
@@ -8,8 +6,10 @@
  * Each tab shows a form + history list.
  */
 import PropTypes from 'prop-types';
-import { MacOSCard, Button, Input, Select, Textarea, Badge } from '../ui/macos';
+import { MacOSCard, Button, Input, Select as SelectRaw, Textarea, Badge } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
+import React from "react";
+const Select = SelectRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 export function DermaExamsTab({
   activeTab,
@@ -34,7 +34,7 @@ export function DermaExamsTab({
   getFontSize,
   getSpacing,
 }) {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   if (activeTab === 'skin') {
     return (
       <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: getSpacing('xl') }}>

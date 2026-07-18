@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 /**
  * PhraseSuggestions - Contextual phrase suggestions
@@ -100,10 +98,10 @@ function findMatchingPhrases(text, fieldName, t, maxResults = 5) {
     const words = text.toLowerCase().split(/\s+/);
     const matches = [];
 
-    for (const [keyword, phraseKeys] of Object.entries(fieldPhrases)) {
+    for (const [keyword, phraseKeys] of Object.entries(fieldPhrases as Record<string, unknown[]>)) {
         const keywordLower = keyword.toLowerCase();
         if (words.some(word => keywordLower.includes(word) || word.includes(keywordLower))) {
-            for (const key of phraseKeys) {
+            for (const key of phraseKeys as unknown[]) {
                 const phraseText = t(`misc.${key}`);
                 // Don't suggest what's already in the text
                 if (!text.includes(phraseText)) {
@@ -113,7 +111,7 @@ function findMatchingPhrases(text, fieldName, t, maxResults = 5) {
         }
     }
 
-    return [...new Map(matches.map(m => [m.key, m])).values()].slice(0, maxResults);
+    return [...new Map((matches as Array<Record<string, unknown>>).map(m => [m.key, m])).values()].slice(0, maxResults);
 }
 
 /**
@@ -133,7 +131,7 @@ export function PhraseSuggestions({
     disabled = false,
     isOpen = true,
 }) {
-    const { t } = useTranslation();
+    const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
     const [selectedPhrases, setSelectedPhrases] = useState(new Set());
 
     // Find matching phrases
@@ -176,17 +174,17 @@ export function PhraseSuggestions({
             </div>
 
             <div className="phrase-suggestions__list">
-                {phrases.map((phrase) => {
+                {phrases.map((phrase: Record<string, unknown>) => {
                     const isSelected = selectedPhrases.has(phrase.key);
                     return (
                         <label
-                            key={phrase.key}
+                            key={String(phrase.key)}
                             className={`phrase-suggestions__item ${isSelected ? 'phrase-suggestions__item--selected' : ''}`}
                         >
                             <Checkbox aria-label={t('misc.ph_select_phrase', { phrase: phrase.text })} checked={isSelected} onChange={() => togglePhrase(phrase.key)}
                                 disabled={disabled}
                             />
-                            <span className="phrase-suggestions__text">{phrase.text}</span>
+                            <span className="phrase-suggestions__text">{String(phrase.text)}</span>
                         </label>
                     );
                 })}

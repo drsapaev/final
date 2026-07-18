@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 /**
  * HistoryTab — R-15 (UX audit): extracted from CardiologistPanelUnified.
@@ -16,9 +14,11 @@
 
 import PropTypes from 'prop-types';
 import { Calendar, Eye, Download, FileText } from 'lucide-react';
-import { Button, Badge, MacOSCard, MacOSEmptyState } from '../ui/macos';
+import { Button, Badge, MacOSCard, MacOSEmptyState as MacOSEmptyStateRaw } from '../ui/macos';
 import { formatRegistrarDate } from '../../utils/dateUtils';
 import { useTranslation } from '../../i18n/useTranslation';
+import React from "react";
+const MacOSEmptyState = MacOSEmptyStateRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 /**
  * @param {Object} props
@@ -49,7 +49,7 @@ export function HistoryTab({
   getFontSize,
   getSpacing,
 }) {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // Empty state: no patient selected
   if (!selectedPatient) {
     return (
