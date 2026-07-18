@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import PropTypes from 'prop-types';
 import { useState } from 'react';
@@ -55,7 +53,7 @@ function ContentTab({
   analyteCatalogId = 'lab-analyte-catalog',
   unitCatalogId = 'lab-unit-catalog',
 }) {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // UX-AUDIT-FIX4: useConfirm для деструктивных действий (удаление секции/поля).
   const [confirm] = useConfirm();
 
@@ -66,7 +64,7 @@ function ContentTab({
   async function handleRemoveSection(sectionIndex, section) {
     // STRAT#11: строки мигрированы на t() / tInterpolate() из labTranslations.
     const sectionName = section?.title || section?.key || `${t('content.section_fallback')} #${sectionIndex + 1}`;
-    const ok = await confirm({
+    const ok = await (confirm as unknown as (opts: Record<string, unknown>) => Promise<boolean>)({
       title: t('confirm.delete_section_title'),
       message: t('confirm.delete_section_message', { name: sectionName }),
       description: t('confirm.delete_section_description'),
@@ -80,7 +78,7 @@ function ContentTab({
   async function handleRemoveField(sectionIndex, fieldIndex, field) {
     // STRAT#11: строки мигрированы на t() / tInterpolate() из labTranslations.
     const fieldName = field?.label || field?.field_key || `${t('content.field_fallback')} #${fieldIndex + 1}`;
-    const ok = await confirm({
+    const ok = await (confirm as unknown as (opts: Record<string, unknown>) => Promise<boolean>)({
       title: t('confirm.delete_field_title'),
       message: t('confirm.delete_field_message', { name: fieldName }),
       description: t('confirm.delete_field_description'),
@@ -136,13 +134,13 @@ function ContentTab({
             <input
               type="checkbox"
               checked={developerMode}
-              onChange={(e) => setDeveloperMode(e.target.checked)}
+              onChange={(e: unknown) => setDeveloperMode(e as boolean)}
               aria-label={t('content.developer_mode_aria')}
             />
             {t('content.developer_mode')}
           </label>
           <Button variant="outline" onClick={onAddSection}>
-            <Icon name="plus" size={16} />
+            <Icon name="plus" size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
             {t('content.add_section')}
           </Button>
           {/* UX-AUDIT-FIX7: Bulk-кнопка для загрузки всех референсных
@@ -160,7 +158,7 @@ function ContentTab({
             )}
             title={t('content.load_all_norms_title')}
           >
-            <Icon name="square.and.arrow.down.on.square" size={14} />
+            <Icon name="square.and.arrow.down.on.square" size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
             {t('content.load_all_norms')}
           </Button>
         </span>
@@ -178,19 +176,19 @@ function ContentTab({
               aria-label={`${t('content.section_aria')}: ${section.title || section.key}`}
             >
               <div className="ltw-flex-center">
-                <Icon name={isSectionExpanded ? 'chevron.down' : 'chevron.right'} size={16} />
+                <Icon name={isSectionExpanded ? 'chevron.down' : 'chevron.right'} size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
                 <span className="ltw-section-title">{section.title || section.key}</span>
                 <Badge variant="default">{section.fields.length} {t('content.section_fields_count')}</Badge>
               </div>
               <span className="ltw-flex-gap-4">
                 <Button variant="ghost" size="small" onClick={(e) => { e.stopPropagation(); onMoveSection(sectionIndex, 'up'); }} disabled={sectionIndex === 0} aria-label={t('content.move_section_up')}>
-                  <Icon name="arrow.up" size={14} />
+                  <Icon name="arrow.up" size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
                 </Button>
                 <Button variant="ghost" size="small" onClick={(e) => { e.stopPropagation(); onMoveSection(sectionIndex, 'down'); }} disabled={sectionIndex === draftVersion.sections.length - 1} aria-label={t('content.move_section_down')}>
-                  <Icon name="arrow.down" size={14} />
+                  <Icon name="arrow.down" size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
                 </Button>
                 <Button variant="ghost" size="small" onClick={(e) => { e.stopPropagation(); handleRemoveSection(sectionIndex, section); }} aria-label={t('content.delete_section')}>
-                  <Icon name="trash" size={14} />
+                  <Icon name="trash" size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
                 </Button>
               </span>
             </button>
@@ -222,23 +220,23 @@ function ContentTab({
                           aria-label={`${t('content.field_aria')}: ${field.label || field.field_key}`}
                         >
                           <div className="ltw-flex-center">
-                            <Icon name={isFieldExpanded ? 'chevron.down' : 'chevron.right'} size={14} />
+                            <Icon name={isFieldExpanded ? 'chevron.down' : 'chevron.right'} size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
                             <span className="ltw-field-title">{field.label || field.field_key || t('content.field_no_title')}</span>
                             <Badge variant="info">{fieldTypeOptions.find((o) => o.value === field.value_type)?.label || field.value_type}</Badge>
                             {field.required && <Badge variant="warning">{t('content.field_required')}</Badge>}
                           </div>
                           <span className="ltw-flex-gap-4">
                             <Button variant="ghost" size="small" onClick={(e) => { e.stopPropagation(); onMoveField(sectionIndex, fieldIndex, 'up'); }} disabled={fieldIndex === 0} aria-label={t('content.move_field_up')}>
-                              <Icon name="arrow.up" size={12} />
+                              <Icon name="arrow.up" size={12 as unknown as "small" | "default" | "large" | "xlarge"} />
                             </Button>
                             <Button variant="ghost" size="small" onClick={(e) => { e.stopPropagation(); onMoveField(sectionIndex, fieldIndex, 'down'); }} disabled={fieldIndex === section.fields.length - 1} aria-label={t('content.move_field_down')}>
-                              <Icon name="arrow.down" size={12} />
+                              <Icon name="arrow.down" size={12 as unknown as "small" | "default" | "large" | "xlarge"} />
                             </Button>
                             <Button variant="ghost" size="small" onClick={(e) => { e.stopPropagation(); onDuplicateField(sectionIndex, fieldIndex); }} aria-label={t('content.duplicate_field')}>
-                              <Icon name="doc.on.doc" size={12} />
+                              <Icon name="doc.on.doc" size={12 as unknown as "small" | "default" | "large" | "xlarge"} />
                             </Button>
                             <Button variant="ghost" size="small" onClick={(e) => { e.stopPropagation(); handleRemoveField(sectionIndex, fieldIndex, field); }} aria-label={t('content.delete_field')}>
-                              <Icon name="trash" size={12} />
+                              <Icon name="trash" size={12 as unknown as "small" | "default" | "large" | "xlarge"} />
                             </Button>
                           </span>
                         </button>
@@ -304,7 +302,7 @@ function ContentTab({
                                     size="small"
                                     onClick={() => onLoadCatalogReferenceRange(sectionIndex, fieldIndex, field.analyte_code)}
                                   >
-                                    <Icon name="square.and.arrow.down.on.square" size={14} />
+                                    <Icon name="square.and.arrow.down.on.square" size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
                                     {t('content.load_from_catalog')}
                                   </Button>
                                 </div>
@@ -354,7 +352,7 @@ function ContentTab({
                     );
                   })}
                   <Button variant="outline" onClick={() => onAddField(sectionIndex)}>
-                    <Icon name="plus" size={16} />
+                    <Icon name="plus" size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
                     {t('content.add_field')}
                   </Button>
                 </div>

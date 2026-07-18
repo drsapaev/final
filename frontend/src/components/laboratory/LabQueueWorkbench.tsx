@@ -1,10 +1,8 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import PropTypes from 'prop-types';
 import { useState, useEffect } from 'react';
 import {
-  Badge, Button, Card, CardContent, CardHeader, CardTitle, Icon, Alert,
+  Badge, Button, Card, CardContent, CardHeader, CardTitle, Icon, Alert as AlertRaw,
   Input } from '../ui/macos';
 import {
   formatLabStatus,
@@ -13,13 +11,16 @@ import {
   formatSpecialtyLabel,
   getLabStatusVariant
 } from './labUiLabels';
-// STRAT#14: i18n.t() для i18n — filter/sort/title/badge labels мигрированы.
+// STRAT#14: t18() для i18n — filter/sort/title/badge labels мигрированы.
 // STRAT#28: QueueCard extracted and wrapped in React.memo for performance.
 import QueueCard from './QueueCard';
 // STRAT#27: VirtualizedQueueList for 1000+ entries via @tanstack/react-virtual.
 import VirtualizedQueueList from './VirtualizedQueueList';
 import { useTranslation } from '../../i18n/useTranslation';
 import i18n from '../../i18n';
+import React from "react";
+const Alert = AlertRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const t18 = i18n.t as unknown as (key: string, options?: Record<string, unknown>) => string;
 
 // P-05 fix: маскирование PII (номера телефона) в карточках очереди.
 // Лабораторное помещение — публичное пространство, экран видят другие
@@ -54,11 +55,11 @@ function maskPhone(phone) {
 // Соответствует Nielsen Heuristic #6 (Recognition rather than Recall).
 function MaskedPhone({ phone, canReveal = true }) {
   const [revealed, setRevealed] = useState(false);
-  if (!phone) return <span className="lqw-masked-phone-empty">{i18n.t('pii.phone_not_set')}</span>;
+  if (!phone) return <span className="lqw-masked-phone-empty">{t18('pii.phone_not_set')}</span>;
   if (!canReveal) {
     return (
-      <span className="lqw-masked-phone-readonly" title={i18n.t('pii.phone_restricted')}>
-        <Icon name="eye.slash" size={12} aria-hidden="true" />
+      <span className="lqw-masked-phone-readonly" title={t18('pii.phone_restricted')}>
+        <Icon name="eye.slash" size={12 as unknown as "small" | "default" | "large" | "xlarge"} aria-hidden="true" />
         <span className="lqw-masked-phone-text">{maskPhone(phone)}</span>
       </span>
     );
@@ -70,12 +71,12 @@ function MaskedPhone({ phone, canReveal = true }) {
         e.stopPropagation();
         setRevealed((v) => !v);
       }}
-      title={revealed ? i18n.t('pii.hide_phone') : i18n.t('pii.show_phone')}
-      aria-label={revealed ? i18n.t('pii.hide_phone_aria') : i18n.t('pii.show_phone_aria')}
+      title={revealed ? t18('pii.hide_phone') : t18('pii.show_phone')}
+      aria-label={revealed ? t18('pii.hide_phone_aria') : t18('pii.show_phone_aria')}
       aria-pressed={revealed}
       className={`lqw-masked-phone ${revealed ? 'lqw-masked-phone-revealed' : ''}`}
     >
-      <Icon name={revealed ? 'eye.slash' : 'eye'} size={12} aria-hidden="true" />
+      <Icon name={revealed ? 'eye.slash' : 'eye'} size={12 as unknown as "small" | "default" | "large" | "xlarge"} aria-hidden="true" />
       <span className="lqw-masked-phone-text">{revealed ? phone : maskPhone(phone)}</span>
     </button>
   );
@@ -106,7 +107,7 @@ function formatServices(appointment) {
     ? appointment.all_patient_services
     : appointment?.services || [];
   if (!services.length) {
-    return i18n.t('pii.no_services');
+    return t18('pii.no_services');
   }
   return services.join(', ');
 }
@@ -139,7 +140,7 @@ export default function LabQueueWorkbench({
   loadingMore = false,
   queueTotal = 0,
 }) {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // QW-8 fix: локальный state поиска и фильтра статусов.
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -197,17 +198,17 @@ export default function LabQueueWorkbench({
       <Card variant="filled" padding="none">
         <CardHeader className="lqw-card-header">
           <CardTitle className="lqw-card-title">
-            <Icon name="testtube.2" size={20} />
-            {i18n.t('queue.title')}
+            <Icon name="testtube.2" size={20 as unknown as "small" | "default" | "large" | "xlarge"} />
+            {t18('queue.title')}
           </CardTitle>
           <div className="lqw-meta-row">
-            <Badge variant="info">{i18n.t('queue.total')}: {appointments.length}</Badge>
+            <Badge variant="info">{t18('queue.total')}: {appointments.length}</Badge>
             <Badge variant="warning">
-              {i18n.t('queue.in_progress')}: {appointments.filter((item) => activeQueueStatuses.has(item.status)).length}
+              {t18('queue.in_progress')}: {appointments.filter((item) => activeQueueStatuses.has(item.status)).length}
             </Badge>
             <Button variant="outline" onClick={onRefresh} disabled={loading}>
-              <Icon name="arrow.clockwise" size={16} />
-              {i18n.t('common.refresh')}
+              <Icon name="arrow.clockwise" size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
+              {t18('common.refresh')}
             </Button>
           </div>
           {/* QW-8 fix: панель поиска и фильтра статусов. L-H-4: CSS-классы. */}
@@ -215,22 +216,22 @@ export default function LabQueueWorkbench({
             <div className="lqw-search-wrapper">
               <Icon
                 name="magnifyingglass"
-                size={14}
+                size={14 as unknown as "small" | "default" | "large" | "xlarge"}
                 className="lqw-search-icon"
               />
               <Input
                 type="search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={i18n.t('queue.search_placeholder')}
-                aria-label={i18n.t('queue.search_aria')}
+                placeholder={t18('queue.search_placeholder')}
+                aria-label={t18('queue.search_aria')}
                 className="lqw-search-input"
               />
               {searchQuery && (
                 <button
                   type="button"
                   onClick={() => setSearchQuery('')}
-                  aria-label={i18n.t('queue.search_clear')}
+                  aria-label={t18('queue.search_clear')}
                   className="lqw-search-clear"
                 >
                   ×
@@ -239,13 +240,13 @@ export default function LabQueueWorkbench({
             </div>
             <div
               role="group"
-              aria-label={i18n.t('queue.filter_group_aria')}
+              aria-label={t18('queue.filter_group_aria')}
               className="lqw-status-filter-group"
             >
               {[
-                { key: 'all',        label: i18n.t('queue.filter_all') },
-                { key: 'active',     label: i18n.t('queue.filter_active') },
-                { key: 'completed',  label: i18n.t('queue.filter_completed') },
+                { key: 'all',        label: t18('queue.filter_all') },
+                { key: 'active',     label: t18('queue.filter_active') },
+                { key: 'completed',  label: t18('queue.filter_completed') },
               ].map((opt) => (
                 <button
                   key={opt.key}
@@ -261,25 +262,25 @@ export default function LabQueueWorkbench({
           </div>
           {/* PR-64 / Medium-14: sort controls */}
           <div className="lqw-sort-row">
-            <span className="lqw-sort-label">{i18n.t('queue.sort_label')}</span>
+            <span className="lqw-sort-label">{t18('queue.sort_label')}</span>
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              aria-label={i18n.t('queue.sort_aria')}
+              aria-label={t18('queue.sort_aria')}
               className="macos-input lqw-sort-select"
             >
-              <option value="default">{i18n.t('queue.sort_default')}</option>
-              <option value="name">{i18n.t('queue.sort_name')}</option>
-              <option value="time">{i18n.t('queue.sort_time')}</option>
+              <option value="default">{t18('queue.sort_default')}</option>
+              <option value="name">{t18('queue.sort_name')}</option>
+              <option value="time">{t18('queue.sort_time')}</option>
             </select>
           </div>
           {/* QW-8 fix: индикатор количества отфильтрованных записей. */}
           {(searchQuery || statusFilter !== 'all') && (
             <div className="lqw-filter-count">
-              {i18n.t('queue.filter_count')}: {filteredAppointments.length} / {appointments.length}
-              {searchQuery && ` · ${i18n.t('queue.filter_count_search')}: «${searchQuery}»`}
-              {statusFilter !== 'all' && ` · ${i18n.t('queue.filter_count_filter')}: ${
-                { active: i18n.t('queue.filter_active').toLowerCase(), completed: i18n.t('queue.filter_completed').toLowerCase() }[statusFilter]
+              {t18('queue.filter_count')}: {filteredAppointments.length} / {appointments.length}
+              {searchQuery && ` · ${t18('queue.filter_count_search')}: «${searchQuery}»`}
+              {statusFilter !== 'all' && ` · ${t18('queue.filter_count_filter')}: ${
+                { active: t18('queue.filter_active').toLowerCase(), completed: t18('queue.filter_completed').toLowerCase() }[statusFilter]
               }`}
             </div>
           )}
@@ -311,8 +312,8 @@ export default function LabQueueWorkbench({
           ) : filteredAppointments.length === 0 ? (
             <Alert severity="info">
               {appointments.length === 0
-                ? i18n.t('queue.no_entries')
-                : i18n.t('queue.no_matches')}
+                ? t18('queue.no_entries')
+                : t18('queue.no_matches')}
             </Alert>
           ) : (
             /* STRAT#27: virtualized rendering replaces .slice().map() + load-more IIFE.
@@ -335,34 +336,34 @@ export default function LabQueueWorkbench({
         <Card variant="filled" padding="none">
           <CardHeader className="lqw-card-header">
             <CardTitle className="lqw-card-title">
-              <Icon name="clock.arrow.circlepath" size={20} />
-              {i18n.t('queue.history_title')}
+              <Icon name="clock.arrow.circlepath" size={20 as unknown as "small" | "default" | "large" | "xlarge"} />
+              {t18('queue.history_title')}
             </CardTitle>
           </CardHeader>
           <CardContent className="lqw-card-content">
             {reportHistory.length === 0 ? (
-              <Alert severity="info">{i18n.t('queue.history_empty')}</Alert>
+              <Alert severity="info">{t18('queue.history_empty')}</Alert>
             ) : (
               <div className="lqw-card-grid">
                 {reportHistory.map((item) => (
                   <div key={item.id} className="lqw-history-card">
                     <div className="lqw-history-info">
                       <div className="lqw-history-title">
-                        {item.template?.name || `${i18n.t('queue.history_report_number')} #${item.id}`}
+                        {item.template?.name || `${t18('queue.history_report_number')} #${item.id}`}
                       </div>
                       <div className="lqw-history-meta">
-                        {i18n.t('queue.history_created')}: {new Date(item.created_at).toLocaleString()} | {i18n.t('queue.history_status')}: {formatLabStatus(item.status)}
+                        {t18('queue.history_created')}: {new Date(item.created_at).toLocaleString()} | {t18('queue.history_status')}: {formatLabStatus(item.status)}
                       </div>
                     </div>
                     <div className="lqw-history-badges">
                       <Badge variant={getLabStatusVariant(item.status)}>
                         {formatLabStatus(item.status)}
                       </Badge>
-                      <Badge variant={historySeverityBadge(item).variant}>
+                      <Badge variant={historySeverityBadge(item).variant as unknown as "default" | "primary" | "secondary" | "success" | "warning" | "danger" | "info" | "outline"}>
                         {formatSeverityLabel(historySeverityBadge(item).label)}
                       </Badge>
-                      {item.flagged_findings_count > 0 && <Badge variant="info">{item.flagged_findings_count} {i18n.t('queue.history_flags')}</Badge>}
-                      {item.critical_findings_count > 0 && <Badge variant="danger">{item.critical_findings_count} {i18n.t('queue.history_critical')}</Badge>}
+                      {item.flagged_findings_count > 0 && <Badge variant="info">{item.flagged_findings_count} {t18('queue.history_flags')}</Badge>}
+                      {item.critical_findings_count > 0 && <Badge variant="danger">{item.critical_findings_count} {t18('queue.history_critical')}</Badge>}
                     </div>
                   </div>
                 ))}

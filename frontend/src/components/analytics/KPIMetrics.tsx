@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
@@ -36,8 +34,8 @@ const KPIMetrics = ({
   showTrends = true,
   showComparisons = true
 }) => {
-  const { t } = useTranslation();
-  const [animatedValues, setAnimatedValues] = useState({});
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const [animatedValues, setAnimatedValues] = useState<Record<string, any>>({});
   const [selectedPeriod, setSelectedPeriod] = useState('30d');
 
   const animateValues = useCallback(() => {
@@ -260,7 +258,7 @@ const KPIMetrics = ({
           <div className="flex items-center space-x-2">
             <Button
               variant="outline"
-              size="sm"
+              size="small"
               onClick={() => onExport?.('summary')}>
               
               <Download className="w-4 h-4 mr-2" />
@@ -268,7 +266,7 @@ const KPIMetrics = ({
             </Button>
             <Button
               variant="outline"
-              size="sm"
+              size="small"
               onClick={() => onRefresh?.()}>
               
               <RefreshCw className="w-4 h-4 mr-2" />

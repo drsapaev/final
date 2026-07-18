@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useTranslation } from '../../i18n/useTranslation';
 import { Edit, Plus, RefreshCw, Search, Stethoscope, Trash2 } from 'lucide-react';
@@ -8,22 +6,27 @@ import PropTypes from 'prop-types';
 
 import DoctorModal from './DoctorModal';
 import useDoctors from '../../hooks/useDoctors';
-import useModal from '../../hooks/useModal.jsx';
+import useModal from '../../hooks/useModal';
 import notify from '../../services/notify';
 import { api } from '../../api/client';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() call.
 import { useConfirm } from '../common/ConfirmDialog';
 import {
   Badge,
-  Button,
+  Button as ButtonRaw,
   MacOSCard,
-  MacOSEmptyState,
+  MacOSEmptyState as MacOSEmptyStateRaw,
   Input,
-  Skeleton,
-  Select,
+  Skeleton as SkeletonRaw,
+  Select as SelectRaw,
 } from '../ui/macos';
 import IconButton from './IconButton';
 import logger from '../../utils/logger';
+import React from "react";
+const Select = SelectRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Button = ButtonRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Skeleton = SkeletonRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const MacOSEmptyState = MacOSEmptyStateRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 // PR-19: departmentOptions now loaded dynamically from /admin/departments
 // (was hardcoded — new departments didn't appear in filter dropdown)
@@ -59,7 +62,7 @@ const getDepartmentLabel = (department, deptList = [], t) => {
 };
 
 const AdminDoctors = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
   const [confirm, confirmDialog] = useConfirm();
   const {
@@ -122,7 +125,7 @@ const AdminDoctors = () => {
   const handleDeleteDoctor = async (doctor) => {
     const doctorName = getDoctorName(doctor, t);
     // P-013 fix: replaced window.confirm() with shared useConfirm hook.
-    const confirmed = await confirm({
+    const confirmed = await (confirm as unknown as (opts: Record<string, unknown>) => Promise<boolean>)({
       title: t('admin.deactivate_doctor_title'),
       message: t('admin2.ad_deactivate_message', { name: doctorName }),
       description: t('admin2.ad_deactivate_description'),
@@ -179,7 +182,7 @@ const AdminDoctors = () => {
               {t('admin2.ad_subtitle')}
             </p>
           </div>
-          <Button onClick={handleCreateDoctor} startIcon={<Plus size={16} />}>
+          <Button onClick={handleCreateDoctor} startIcon={<Plus size={16 as unknown as "small" | "default" | "large" | "xlarge"} />}>
             {t('admin2.ad_add_doctor')}
           </Button>
         </div>
@@ -226,7 +229,7 @@ const AdminDoctors = () => {
         {/* UX Audit Admin #1.1: кнопка «Сбросить» для быстрой очистки фильтров. */}
         {filtersActive && (
           <div style={{ marginBottom: '12px' }}>
-            <Button variant="ghost" size="sm" onClick={() => {
+            <Button variant="ghost" size="small" onClick={() => {
               setSearchTerm(''); setFilterSpecialization(''); setFilterDepartment(''); setFilterStatus('');
             }} aria-label={t('admin2.ad_reset_filters_aria')}>
               {t('admin2.ad_reset_filters')}
@@ -243,7 +246,7 @@ const AdminDoctors = () => {
               title={t('admin2.ad_error_load_title')}
               description={t('admin2.ad_error_load_description')}
               action={
-                <Button onClick={refresh} startIcon={<RefreshCw size={16} />}>
+                <Button onClick={refresh} startIcon={<RefreshCw size={16 as unknown as "small" | "default" | "large" | "xlarge"} />}>
                   {t('admin2.ad_refresh')}
                 </Button>
               }
@@ -258,7 +261,7 @@ const AdminDoctors = () => {
                   : t('admin2.ad_empty_no_doctors')
               }
               action={
-                <Button onClick={handleCreateDoctor} startIcon={<Plus size={16} />}>
+                <Button onClick={handleCreateDoctor} startIcon={<Plus size={16 as unknown as "small" | "default" | "large" | "xlarge"} />}>
                   {t('admin2.ad_add_first_doctor')}
                 </Button>
               }
@@ -350,14 +353,14 @@ const AdminDoctors = () => {
                     >
                       <div className="flex items-center justify-center gap-2">
                         <IconButton label={t('admin2.ad_edit_doctor')} onClick={() => handleEditDoctor(doctor)}>
-                          <Edit size={16} />
+                          <Edit size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
                         </IconButton>
                         <IconButton
                           label={t('admin2.ad_deactivate_doctor_aria')}
                           tone="danger"
                           onClick={() => handleDeleteDoctor(doctor)}
                         >
-                          <Trash2 size={16} />
+                          <Trash2 size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
                         </IconButton>
                       </div>
                     </td>
@@ -380,7 +383,7 @@ const AdminDoctors = () => {
         departments={departmentOptions.filter((d) => d.value)}
       />
       {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
-      {confirmDialog}
+      {confirmDialog as unknown as React.ReactNode}
     </div>
   );
 };

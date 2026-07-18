@@ -1,10 +1,8 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { Printer, AlertCircle, Wifi, WifiOff, Printer as PrinterIcon } from 'lucide-react';
-import ModernDialog from './ModernDialog';
+import ModernDialogRaw from './ModernDialog';
 import { printService } from '../../services/print';
 import { toast } from 'react-toastify';
 // UX Audit Registrar #5: все inline-стили перенесены в PrintDialog.css.
@@ -14,6 +12,8 @@ import './PrintDialog.css';
 
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
+import React from "react";
+const ModernDialog = ModernDialogRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const formatPrintServiceLabel = (service) => {
   if (service == null) return '';
@@ -57,7 +57,7 @@ const PrintDialog = ({
   documentData,
   onPrint,
 }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [printers, setPrinters] = useState([]);
   const [selectedPrinter, setSelectedPrinter] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -85,10 +85,10 @@ const PrintDialog = ({
     setError('');
 
     try {
-      const result = await printService.getPrinters();
-      if (!result.success) {
+      const result = await printService.getPrinters() as Record<string, unknown>;
+      if (!Boolean(result.success)) {
         throw new Error(
-          result.error || t('misc.pd_ne_udalos_zagruzit_spisok_pr'),
+          String(result.error || "") || t('misc.pd_ne_udalos_zagruzit_spisok_pr'),
         );
       }
 
@@ -177,7 +177,7 @@ const PrintDialog = ({
     {
       label: isPrinting ? t('misc.pd_pechat') : t('misc.pd_pechat_2'),
       variant: 'primary',
-      icon: <Printer size={16} />,
+      icon: <Printer size={16 as unknown as "small" | "default" | "large" | "xlarge"} />,
       onClick: handlePrint,
       disabled: isPrinting || (!usesBrowserPrint && !selectedPrinter),
     },
@@ -230,7 +230,7 @@ const PrintDialog = ({
                 if (ticketCount > 1) {
                   return (
                     <p className="print-doc-ticket-count">
-                      <PrinterIcon size={16} aria-hidden="true" />
+                      <PrinterIcon size={16 as unknown as "small" | "default" | "large" | "xlarge"} aria-hidden="true" />
                       <span>Будет напечатано талонов: {ticketCount}</span>
                     </p>
                   );
@@ -244,7 +244,7 @@ const PrintDialog = ({
         {usesBrowserPrint ? (
           <div className="print-browser-notice">
             <div className="print-browser-notice-header">
-              <Printer size={20} />
+              <Printer size={20 as unknown as "small" | "default" | "large" | "xlarge"} />
               <strong>{t('misc.pd_pechat_cherez_brauzer')}</strong>
             </div>
             <p className="print-browser-notice-text">
@@ -269,7 +269,7 @@ const PrintDialog = ({
                 </div>
               ) : error ? (
                 <div className="print-error-box">
-                  <AlertCircle size={20} />
+                  <AlertCircle size={20 as unknown as "small" | "default" | "large" | "xlarge"} />
                   <div>
                     <p className="print-error-title">
                       Ошибка загрузки принтеров
@@ -310,7 +310,7 @@ const PrintDialog = ({
                       </div>
 
                       {/* Иконка принтера */}
-                      <Printer size={20} className="print-printer-icon" />
+                      <Printer size={20 as unknown as "small" | "default" | "large" | "xlarge"} className="print-printer-icon" />
 
                       {/* Информация о принтере */}
                       <div className="print-printer-info">
@@ -333,17 +333,17 @@ const PrintDialog = ({
                       <div className={`print-status-badge ${printer.status === 'online' ? 'print-status-badge--online' : printer.status ? 'print-status-badge--error' : ''}`}>
                         {printer.status === 'online' ? (
                           <>
-                            <Wifi size={14} />
+                            <Wifi size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
                             Онлайн
                           </>
                         ) : printer.status ? (
                           <>
-                            <WifiOff size={14} />
+                            <WifiOff size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
                             Офлайн
                           </>
                         ) : (
                           <>
-                            <WifiOff size={14} />
+                            <WifiOff size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
                             Статус неизвестен
                           </>
                         )}

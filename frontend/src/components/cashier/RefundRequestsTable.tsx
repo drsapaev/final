@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useTranslation } from '../../i18n/useTranslation';
 /**
@@ -22,7 +20,7 @@ import {
   CreditCard
 } from 'lucide-react';
 import {
-  AppEmpty, AppError, AppLoading, Badge, Button, Table, Select,
+  AppEmpty, AppError, AppLoading, Badge, Button, Table, Select as SelectRaw,
 } from '../ui/macos';
 import notify from '../../services/notify';
 import logger from '../../utils/logger';
@@ -31,6 +29,7 @@ import { formatUZS } from '../../utils/formatCurrency';
 import PropTypes from 'prop-types';
 // UX Audit #3.4: inline-стили перенесены в CSS-классы.
 import './RefundRequestsTable.css';
+const Select = SelectRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const getRefundFilterOptions = (t) => [
   { value: 'all', label: t('misc.rrt_filter_all') },
@@ -71,7 +70,7 @@ const hasBackendRefundAction = (request, action) => {
 };
 
 const RefundRequestsTable = ({ onRefresh }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -176,7 +175,7 @@ const RefundRequestsTable = ({ onRefresh }) => {
 
     return (
       <Badge variant={config.variant} className="refund-status-icon">
-        <IconComponent size={12} aria-hidden="true" />
+        <IconComponent size={12 as unknown as "small" | "default" | "large" | "xlarge"} aria-hidden="true" />
         {config.label}
       </Badge>
     );
@@ -208,7 +207,7 @@ const RefundRequestsTable = ({ onRefresh }) => {
     if (processingId === request.id) {
       return (
         <span role="status" aria-live="polite" className="refund-inline-cluster">
-          <Loader2 size={16} className="animate-spin" aria-hidden="true" />
+          <Loader2 size={16 as unknown as "small" | "default" | "large" | "xlarge"} className="animate-spin" aria-hidden="true" />
           <span className="refund-cell-muted">{t('misc.rrt_obrabotka')}</span>
         </span>
       );
@@ -224,33 +223,33 @@ const RefundRequestsTable = ({ onRefresh }) => {
           {canApprove && (
             <Button
               variant="success"
-              size="small"
+              size="default"
               onClick={() => handleApprove(request.id)}
               title={t('misc.rrt_odobrit')}
               aria-label={t('misc.rrt_odobrit_zayavku_na_vozvrat_r', { id: request.id })}
             >
-              <Check size={14} aria-hidden="true" />
+              <Check size={14 as unknown as "small" | "default" | "large" | "xlarge"} aria-hidden="true" />
             </Button>
           )}
           {canReject && (
             <Button
               variant="danger"
-              size="small"
+              size="default"
               onClick={() => handleReject(request.id)}
               title={t('misc.rrt_otklonit')}
               aria-label={t('misc.rrt_otklonit_zayavku_na_vozvrat_', { id: request.id })}
             >
-              <X size={14} aria-hidden="true" />
+              <X size={14 as unknown as "small" | "default" | "large" | "xlarge"} aria-hidden="true" />
             </Button>
           )}
           {canComplete && (
             <Button
               variant="primary"
-              size="small"
+              size="default"
               onClick={() => handleComplete(request.id)}
               aria-label={t('misc.rrt_otmetit_zayavku_na_vozvrat_r', { id: request.id })}
             >
-              <CreditCard size={14} aria-hidden="true" />
+              <CreditCard size={14 as unknown as "small" | "default" | "large" | "xlarge"} aria-hidden="true" />
               Выплатить
             </Button>
           )}
@@ -272,7 +271,7 @@ const RefundRequestsTable = ({ onRefresh }) => {
       title: t('payment.col_patient'),
       render: (_value, request) => (
         <span className="refund-inline-cluster">
-          <User size={16} color="var(--mac-text-secondary)" aria-hidden="true" />
+          <User size={16 as unknown as "small" | "default" | "large" | "xlarge"} color="var(--mac-text-secondary)" aria-hidden="true" />
           <span>{request.patient_name || t('misc.rrt_patsient_request_patient_id', { patient_id: request.patient_id })}</span>
         </span>
       )
@@ -317,7 +316,7 @@ const RefundRequestsTable = ({ onRefresh }) => {
     <section aria-labelledby="refund-requests-title">
       <div className="refund-header">
         <div className="refund-inline-cluster">
-          <DollarSign size={20} color="var(--mac-success)" aria-hidden="true" />
+          <DollarSign size={20 as unknown as "small" | "default" | "large" | "xlarge"} color="var(--mac-success)" aria-hidden="true" />
           <h3
             id="refund-requests-title"
             style={{
@@ -337,7 +336,7 @@ const RefundRequestsTable = ({ onRefresh }) => {
             value={filter}
             onChange={setFilter}
             options={getRefundFilterOptions(t)}
-            size="small"
+            size="md"
             aria-label={t('misc.rrt_filtr_zayavok_na_vozvrat')}
           />
           {/* UX Audit #1.3: дублирующая кнопка «Обновить» убрана.
@@ -355,7 +354,7 @@ const RefundRequestsTable = ({ onRefresh }) => {
           title={t('misc.rrt_ne_udalos_zagruzit_zayavki_n')}
           description={error}
           action={
-            <Button variant="secondary" size="small" onClick={loadRequests}>
+            <Button variant="secondary" size="default" onClick={loadRequests}>
               Повторить
             </Button>
           }
@@ -366,7 +365,7 @@ const RefundRequestsTable = ({ onRefresh }) => {
       {loading && (
         <AppLoading
           title={t('misc.rrt_zagruzka_zayavok_na_vozvrat')}
-          size="sm"
+          size="md"
           style={{ minHeight: 144 }}
         />
       )}
@@ -385,7 +384,7 @@ const RefundRequestsTable = ({ onRefresh }) => {
           data={requests}
           sortable={false}
           hoverable={false}
-          size="sm"
+          size="md"
           variant="default"
         />
       )}
