@@ -159,7 +159,7 @@ function miniAppKeyToI18nKey(key) {
   return `final.tgs_${flatKey}`;
 }
 
-function translateMiniAppText(languageCode, key, params = {}) {
+function translateMiniAppText(languageCode: string, key: string, params: Record<string, unknown> = {}) {
   const language = normalizeMiniAppLanguage(languageCode);
   const i18nKey = miniAppKeyToI18nKey(key);
   const fixedT = i18n.getFixedT(language);
@@ -459,7 +459,7 @@ function TelegramMiniAppPatientShell() {
   const languageCode = normalizeMiniAppLanguage(
     state.manifest?.language?.code || getTelegramMiniAppClientLanguage()
   );
-  const t = (key, params) => translateMiniAppText(languageCode, key, params);
+  const t = (key: string, params?: Record<string, unknown>) => translateMiniAppText(languageCode, key, params);
   const manifestOnboardingRequest = state.manifest?.onboarding?.request || null;
   const onboardingRequest = onboardingSubmit.payload?.request || manifestOnboardingRequest || null;
   const onboardingStatus = onboardingRequest?.status || 'not_found';
