@@ -113,7 +113,7 @@ const MacOSCardiologistPanelUnified = () => {
     ldlThreshold: 100,
     showEcgEchoTogether: true,
   });
-  const [emr, setEmr] = useState(null);
+  const [emr, setEmr] = useState(null as any);
 
   // Ref для отслеживания предыдущего пациента для очистки EMR
   const prevSelectedPatientRef = useRef(null);
@@ -121,11 +121,11 @@ const MacOSCardiologistPanelUnified = () => {
   // Состояния для таблицы записей
   const [appointments, setAppointments] = useState([]);
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
-  const [services, setServices] = useState({}); // ✅ Добавлено: состояние для услуг
+  const [services, setServices] = useState({} as any); // ✅ Добавлено: состояние для услуг
 
   // P-021 (UX audit): session timeout warning state. When the JWT is
   // about to expire, we show a dialog so the doctor can save their work.
-  const [sessionWarning, setSessionWarning] = useState(null); // { expiresAt } | null
+  const [sessionWarning, setSessionWarning] = useState(null as any); // { expiresAt } | null
 
   useSessionTimeoutWarning({
     onWarning: (expiresAt) => setSessionWarning({ expiresAt }),

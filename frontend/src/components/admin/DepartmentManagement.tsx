@@ -137,15 +137,15 @@ const DepartmentManagement = () => {
   const sortOptions = getSortOptions(t);
   const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [, setError] = useState(null);
+  const [, setError] = useState(null as any);
 
   const [formData, setFormData] = useState(DEFAULT_FORM);
   const [integrationForm, setIntegrationForm] = useState(DEFAULT_INTEGRATION_OPTIONS);
   const [serviceMapping, setServiceMapping] = useState(DEFAULT_SERVICE_MAPPING);
   const [showAddForm, setShowAddForm] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editingDepartment, setEditingDepartment] = useState(null);
-  const [validationErrors, setValidationErrors] = useState({});
+  const [editingDepartment, setEditingDepartment] = useState(null as any);
+  const [validationErrors, setValidationErrors] = useState({} as any);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');

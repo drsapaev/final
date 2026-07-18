@@ -186,12 +186,12 @@ const DentistPanelUnified = () => {
     () => loadStoredDentistDocuments().visitProtocols
   );
   const [scheduleNextModal, setScheduleNextModal] = useState({ open: false, patient: null });
-  const [protocolTemplateDraft, setProtocolTemplateDraft] = useState(null);
+  const [protocolTemplateDraft, setProtocolTemplateDraft] = useState(null as any);
 
   // Состояния для таблицы записей
   const [appointmentsTableData, setAppointmentsTableData] = useState([]);
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
-  const [services, setServices] = useState({});
+  const [services, setServices] = useState({} as any);
   const appointmentsTableDataRef = useRef([]);
   const appointmentsLoadPromiseRef = useRef(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -206,7 +206,7 @@ const DentistPanelUnified = () => {
   const [showProtocolTemplates, setShowProtocolTemplates] = useState(false);
   const [showReports, setShowReports] = useState(false);
   // Phase 4+ cleanup: showTreatmentForm/showProstheticForm removed (dead UI).
-  const [dentalChartData, setDentalChartData] = useState(null);
+  const [dentalChartData, setDentalChartData] = useState(null as any);
 
   // P-022 (workflow audit): wire useVisitLifecycle so the in-memory cache
   // is invalidated when the doctor switches between visits or patients.
@@ -240,8 +240,8 @@ const DentistPanelUnified = () => {
   });
   // Состояние для DentalPriceManager
   const [showPriceManager, setShowPriceManager] = useState(false);
-  const [selectedServiceForPrice, setSelectedServiceForPrice] = useState(null);
-  const [selectedTooth, setSelectedTooth] = useState(null);
+  const [selectedServiceForPrice, setSelectedServiceForPrice] = useState(null as any);
+  const [selectedTooth, setSelectedTooth] = useState(null as any);
   const [toothModalOpen, setToothModalOpen] = useState(false);
 
   useEffect(() => {
@@ -410,7 +410,7 @@ const DentistPanelUnified = () => {
   // STRAT#34: useTranslation adapter for confirm/notify i18n.
   const { t: tI18n } = useTranslation();
   // C-2 (UX audit): session timeout warning
-  const [sessionWarning, setSessionWarning] = useState(null);
+  const [sessionWarning, setSessionWarning] = useState(null as any);
 
   useSessionTimeoutWarning({
     onWarning: () => setSessionWarning({ active: true }),
@@ -1587,10 +1587,10 @@ const DentistPanelUnified = () => {
           className="dental-card-btn"
           onClick={() => handleExamination(patient)}
           onKeyDown={(event) => handleCardKeyDown(event, () => handleExamination(patient))}
-          onMouseEnter={(e) => {
+          onMouseEnter={(e: any) => {
             e.currentTarget.style.background = 'var(--mac-bg-secondary)';
           }}
-          onMouseLeave={(e) => {
+          onMouseLeave={(e: any) => {
             e.currentTarget.style.background = 'transparent';
           }}>
 
@@ -1631,10 +1631,10 @@ const DentistPanelUnified = () => {
           className="dental-card-btn"
           onClick={() => handleDiagnosis(patient)}
           onKeyDown={(event) => handleCardKeyDown(event, () => handleDiagnosis(patient))}
-          onMouseEnter={(e) => {
+          onMouseEnter={(e: any) => {
             e.currentTarget.style.background = 'var(--mac-bg-secondary)';
           }}
-          onMouseLeave={(e) => {
+          onMouseLeave={(e: any) => {
             e.currentTarget.style.background = 'transparent';
           }}>
 
@@ -1692,10 +1692,10 @@ const DentistPanelUnified = () => {
               className="dental-card-btn"
               onClick={() => handleVisitProtocol(patient)}
               onKeyDown={(event) => handleCardKeyDown(event, () => handleVisitProtocol(patient))}
-              onMouseEnter={(e) => {
+              onMouseEnter={(e: any) => {
                 e.currentTarget.style.background = 'var(--mac-bg-secondary)';
               }}
-              onMouseLeave={(e) => {
+              onMouseLeave={(e: any) => {
                 e.currentTarget.style.background = 'transparent';
               }}>
 
@@ -1737,10 +1737,10 @@ const DentistPanelUnified = () => {
           className="dental-card-btn"
           onClick={() => handlePhotoArchive(patient)}
           onKeyDown={(event) => handleCardKeyDown(event, () => handlePhotoArchive(patient))}
-          onMouseEnter={(e) => {
+          onMouseEnter={(e: any) => {
             e.currentTarget.style.background = 'var(--mac-bg-secondary)';
           }}
-          onMouseLeave={(e) => {
+          onMouseLeave={(e: any) => {
             e.currentTarget.style.background = 'transparent';
           }}>
 
@@ -1794,10 +1794,10 @@ const DentistPanelUnified = () => {
           className="dental-card-btn"
           onClick={() => handleDentalChart(patient)}
           onKeyDown={(event) => handleCardKeyDown(event, () => handleDentalChart(patient))}
-          onMouseEnter={(e) => {
+          onMouseEnter={(e: any) => {
             e.currentTarget.style.background = 'var(--mac-bg-secondary)';
           }}
-          onMouseLeave={(e) => {
+          onMouseLeave={(e: any) => {
             e.currentTarget.style.background = 'transparent';
           }}>
 
@@ -2007,13 +2007,13 @@ const DentistPanelUnified = () => {
               onClick={() => setShowDentalChart(false)}
               aria-label={tI18n('dental.dental_panel_chart_modal_close', { name: selectedPatientDisplayName })}
               className="dental-text-desc dental-text-secondary"
-              onMouseEnter={(e) => {
-                e.target.style.color = 'var(--mac-text-primary)';
-                e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
+              onMouseEnter={(e: any) => {
+                e.currentTarget.style.color = 'var(--mac-text-primary)';
+                e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)';
               }}
-              onMouseLeave={(e) => {
-                e.target.style.color = 'var(--mac-text-secondary)';
-                e.target.style.backgroundColor = 'transparent';
+              onMouseLeave={(e: any) => {
+                e.currentTarget.style.color = 'var(--mac-text-secondary)';
+                e.currentTarget.style.backgroundColor = 'transparent';
               }}>
 
                 <XCircle className="dental-icon-20" />
@@ -2044,13 +2044,13 @@ const DentistPanelUnified = () => {
               onClick={() => setShowTreatmentPlanner(false)}
               aria-label={tI18n('dental.dental_panel_plan_modal_close', { name: selectedPatientDisplayName })}
               className="dental-text-desc dental-text-secondary"
-              onMouseEnter={(e) => {
-                e.target.style.color = 'var(--mac-text-primary)';
-                e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
+              onMouseEnter={(e: any) => {
+                e.currentTarget.style.color = 'var(--mac-text-primary)';
+                e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)';
               }}
-              onMouseLeave={(e) => {
-                e.target.style.color = 'var(--mac-text-secondary)';
-                e.target.style.backgroundColor = 'transparent';
+              onMouseLeave={(e: any) => {
+                e.currentTarget.style.color = 'var(--mac-text-secondary)';
+                e.currentTarget.style.backgroundColor = 'transparent';
               }}>
 
                 <XCircle className="dental-icon-20" />

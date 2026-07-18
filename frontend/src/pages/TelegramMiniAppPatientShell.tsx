@@ -440,7 +440,7 @@ function TelegramMiniAppPatientShell() {
     payload: null,
     error: null,
   });
-  const [formAnswers, setFormAnswers] = useState({});
+  const [formAnswers, setFormAnswers] = useState({} as any);
   const [formSubmit, setFormSubmit] = useState({
     status: 'idle',
     formId: null,

@@ -211,7 +211,7 @@ const RegistrarPanel = () => {
   const [paymentDialog, setPaymentDialog] = useState({ open: false, row: null, paid: false, source: null });
   const [recordPreviewDialog, setRecordPreviewDialog] = useState({ open: false, row: null });
   // ✅ State for rescheduling
-  const [rescheduleData, setRescheduleData] = useState(null);
+  const [rescheduleData, setRescheduleData] = useState(null as any);
 
   // ✅ State for Force Majeure modal
   const [forceMajeureModal, setForceMajeureModal] = useState({ open: false, specialistId: null, specialistName: '' });
@@ -237,7 +237,7 @@ const RegistrarPanel = () => {
   // ✅ Используется только новый мастер (V2)
   const [showWizard, setShowWizard] = useState(false);
   const [wizardEditMode, setWizardEditMode] = useState(false); // ✨ НОВОЕ: Режим редактирования
-  const [wizardInitialData, setWizardInitialData] = useState(null); // ✨ НОВОЕ: Данные для редактирования
+  const [wizardInitialData, setWizardInitialData] = useState(null as any); // ✨ НОВОЕ: Данные для редактирования
   const [showPaymentManager, setShowPaymentManager] = useState(false); // Для модуля оплаты
   const [isProcessing, setIsProcessing] = useState(false); // Состояние обработки
 
@@ -261,7 +261,7 @@ const RegistrarPanel = () => {
     resolveRescheduleVisitId,
     removeRescheduledAppointmentFromView,
   } = useRegistrarReschedule({ setAppointments });
-  const [doctors, setDoctors] = useState([]);const [services, setServices] = useState({});const [showCalendar, setShowCalendar] = useState(false);const [historyDate, setHistoryDate] = useState(getLocalDateString());const [tempDateInput, setTempDateInput] = useState(getLocalDateString()); // Выбор врача остаётся явным: URL-параметр или ручной выбор в очереди
+  const [doctors, setDoctors] = useState([]);const [services, setServices] = useState({} as any);const [showCalendar, setShowCalendar] = useState(false);const [historyDate, setHistoryDate] = useState(getLocalDateString());const [tempDateInput, setTempDateInput] = useState(getLocalDateString()); // Выбор врача остаётся явным: URL-параметр или ручной выбор в очереди
   // Unified i18n hook: single source of truth for all translations.
   // - registrarPanel.* — flat UI keys (tabs, statuses, headings, buttons)
   // - registrar.*      — confirm dialog titles/messages + notify messages
@@ -1407,10 +1407,10 @@ const RegistrarPanel = () => {
         href="#main-content"
         className="registrar-hidden-visually"
         onFocus={(e) => {
-          e.target.style.left = '0';
+          e.currentTarget.style.left = '0';
         }}
         onBlur={(e) => {
-          e.target.style.left = '-9999px';
+          e.currentTarget.style.left = '-9999px';
         }}>
 
         {tI18n('registrarPanel.rp_skip_to_content')}
