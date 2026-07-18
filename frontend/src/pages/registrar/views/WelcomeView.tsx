@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 // i18n-unification: `t` is now passed as a prop from RegistrarPanel (wrapper
 // around tI18n that routes flat keys to registrarPanel.* namespace).
 // No direct import needed.
@@ -57,11 +54,15 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import {
-  Button, Card, CardHeader, CardContent, Badge, Icon, Input,
+  Button as RawButton, Card, CardHeader, CardContent, Badge as RawBadge, Icon, Input as RawInput,
 } from '../../../components/ui/macos';
+const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
+const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
+const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
 import { AnimatedTransition } from '../../../components/ui';
 import ModernStatistics from '../../../components/statistics/ModernStatistics';
-import EnhancedAppointmentsTable from '../../../components/tables/EnhancedAppointmentsTable';
+import EnhancedAppointmentsTableRaw from '../../../components/tables/EnhancedAppointmentsTable';
+const EnhancedAppointmentsTable = EnhancedAppointmentsTableRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import { getLocalDateString, getYesterdayDateString } from '../../../utils/dateUtils';
 import logger from '../../../utils/logger';
 import notify from '../../../services/notify';
@@ -102,7 +103,7 @@ const WelcomeView = React.memo(({
   generateCSV,
   downloadCSV,
   DataSourceIndicator,
-}) => {
+}: any) => {
   return (
     <AnimatedTransition type="fade" delay={100}>
       <Card variant="default" className="registrar-card-surface">
@@ -618,7 +619,7 @@ const WelcomeView = React.memo(({
 WelcomeView.displayName = 'WelcomeView';
 
 // UX Audit: PropTypes for all props used in WelcomeView.
-WelcomeView.propTypes = {
+(WelcomeView as unknown as { propTypes: unknown }).propTypes = {
   t: PropTypes.func,
   language: PropTypes.string,
   theme: PropTypes.string,

@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect } from 'react';
 import {
@@ -59,7 +56,8 @@ const normalizeStatistics = (payload) => ({
 });
 
 const UserDataTransferManager = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [activeTab, setActiveTab] = useState('transfer');
   const [sourceUser, setSourceUser] = useState(null);
   const [targetUser, setTargetUser] = useState(null);
@@ -80,7 +78,7 @@ const UserDataTransferManager = () => {
 
   const loadAvailableDataTypes = async () => {
     try {
-      const response = await api.get('/admin/user-data/transfer/data-types');
+      const response = await api.get('/admin/user-data/transfer/data-types') as any;
       setAvailableDataTypes(normalizeDataTypes(response.data));
     } catch (error) {
       logger.error('Ошибка загрузки типов данных:', error);
@@ -109,7 +107,7 @@ const UserDataTransferManager = () => {
 
   const getUserDataSummary = async (userId) => {
     try {
-      const response = await api.get(`/admin/user-data/users/${userId}/data-summary`);
+      const response = await api.get(`/admin/user-data/users/${userId}/data-summary`) as any;
       setUserDataSummary(normalizeDataSummary(response.data));
     } catch (error) {
       logger.error('Ошибка получения сводки данных:', error);
@@ -124,7 +122,7 @@ const UserDataTransferManager = () => {
     }
 
     try {
-      const response = await api.post(`/admin/user-data/transfer/validate?source_user_id=${sourceUser.id}&target_user_id=${targetUser.id}`);
+      const response = await api.post(`/admin/user-data/transfer/validate?source_user_id=${sourceUser.id}&target_user_id=${targetUser.id}`) as any;
       const validation = response.data || {};
 
       if (!validation.valid) {
@@ -152,7 +150,7 @@ const UserDataTransferManager = () => {
         target_user_id: targetUser.id,
         data_types: selectedDataTypes,
         confirmation_required: false
-      });
+      }) as any;
       const transferResult = response.data || {};
 
       if (transferResult.success) {
@@ -196,7 +194,7 @@ const UserDataTransferManager = () => {
 
   const loadTransferHistory = async () => {
     try {
-      const response = await api.get('/admin/user-data/transfer/history?limit=50');
+      const response = await api.get('/admin/user-data/transfer/history?limit=50') as any;
       setTransferHistory(toArray(response.data, ['history', 'items', 'results']));
     } catch (error) {
       logger.error('Ошибка загрузки истории:', error);
@@ -206,7 +204,7 @@ const UserDataTransferManager = () => {
 
   const loadStatistics = async () => {
     try {
-      const response = await api.get('/admin/user-data/transfer/statistics?period_days=30');
+      const response = await api.get('/admin/user-data/transfer/statistics?period_days=30') as any;
       setStatistics(normalizeStatistics(response.data));
     } catch (error) {
       logger.error('Ошибка загрузки статистики:', error);
@@ -279,7 +277,7 @@ const UserDataTransferManager = () => {
                     </div>
                     <div className="admin-flex-gap-8">
                       <Button
-                  size="sm"
+                  size="small"
                   variant="outline"
                   onClick={() => selectUser(user, 'source')}
                   disabled={targetUser?.id === user.id}>
@@ -287,7 +285,7 @@ const UserDataTransferManager = () => {
                         {t('admin2.udtm_btn_source')}
                       </Button>
                       <Button
-                  size="sm"
+                  size="small"
                   variant="outline"
                   onClick={() => selectUser(user, 'target')}
                   disabled={sourceUser?.id === user.id}>
@@ -321,7 +319,7 @@ const UserDataTransferManager = () => {
                 {sourceUser.email}
               </div>
               <Button
-            size="sm"
+            size="small"
             variant="outline"
             onClick={() => {
               setSourceUser(null);
@@ -355,7 +353,7 @@ const UserDataTransferManager = () => {
                 {targetUser.email}
               </div>
               <Button
-            size="sm"
+            size="small"
             variant="outline"
             onClick={() => setTargetUser(null)}
             className="admin-mt-8-alignself-0e92fc">
@@ -414,8 +412,8 @@ const UserDataTransferManager = () => {
         <div className="admin-flex-col-12">
           {availableDataTypes.map((dataType) =>
         <label key={dataType.key} className="admin-flex-ai-center-gap-12-cursor-pointer-p-8-radius-var--mac-radius-sm-transit-87a65602"
-        onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--mac-bg-secondary)'}
-        onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}>
+        onMouseEnter={(e: any) => e.target.style.backgroundColor = 'var(--mac-bg-secondary)'}
+        onMouseLeave={(e: any) => e.target.style.backgroundColor = 'transparent'}>
           
               <Checkbox
             checked={selectedDataTypes.includes(dataType.key)}
@@ -574,12 +572,13 @@ const UserDataTransferManager = () => {
         <SegmentedControl
           aria-label={t('admin2.udtm_tabs_aria')}
           value={activeTab}
-          onChange={(value) => {
-            setActiveTab(value);
-            if (value === 'history') {
+          onChange={(value: unknown) => {
+            const v = String(value);
+            setActiveTab(v);
+            if (v === 'history') {
               loadTransferHistory();
             }
-            if (value === 'statistics') {
+            if (v === 'statistics') {
               loadStatistics();
             }
           }}

@@ -1,8 +1,6 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { api } from '../../api/client';
 import { useState, useEffect } from 'react';
+import type { CSSProperties } from 'react';
 import PropTypes from 'prop-types';
 import logger from '../../utils/logger';
 import { getApiOrigin } from '../../api/runtime';
@@ -36,7 +34,8 @@ const ScheduleNextModal = ({
   specialtyFilter = null // Фильтр услуг по специальности
 }) => {
   const { getColor, getSpacing, getFontSize } = theme;
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
 
   // Состояния формы
   const [formData, setFormData] = useState({
@@ -261,7 +260,7 @@ const ScheduleNextModal = ({
   if (!isOpen) return null;
 
   // Стили
-  const overlayStyle = {
+  const overlayStyle: CSSProperties = {
     position: 'fixed',
     top: 0,
     left: 0,
@@ -275,7 +274,7 @@ const ScheduleNextModal = ({
     padding: getSpacing('md')
   };
 
-  const modalStyle = {
+  const modalStyle: CSSProperties = {
     backgroundColor: getColor('background'),
     borderRadius: 'var(--mac-radius-xl)',
     padding: getSpacing('xl'),
@@ -286,7 +285,7 @@ const ScheduleNextModal = ({
     boxShadow: 'var(--mac-shadow-lg)'
   };
 
-  const headerStyle = {
+  const headerStyle: CSSProperties = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -295,14 +294,14 @@ const ScheduleNextModal = ({
     borderBottom: `1px solid ${getColor('border')}`
   };
 
-  const titleStyle = {
+  const titleStyle: CSSProperties = {
     fontSize: getFontSize('xl'),
     fontWeight: 'var(--mac-font-weight-bold)',
     color: getColor('text'),
     margin: 0
   };
 
-  const closeButtonStyle = {
+  const closeButtonStyle: CSSProperties = {
     background: 'none',
     border: 'none',
     color: getColor('text-secondary'),
@@ -314,11 +313,11 @@ const ScheduleNextModal = ({
     justifyContent: 'center'
   };
 
-  const formGroupStyle = {
+  const formGroupStyle: CSSProperties = {
     marginBottom: getSpacing('lg')
   };
 
-  const labelStyle = {
+  const labelStyle: CSSProperties = {
     display: 'block',
     fontSize: getFontSize('sm'),
     fontWeight: 'var(--mac-font-weight-semibold)',
@@ -326,7 +325,7 @@ const ScheduleNextModal = ({
     marginBottom: getSpacing('sm')
   };
 
-  const inputStyle = {
+  const inputStyle: CSSProperties = {
     width: '100%',
     padding: getSpacing('md'),
     border: `1px solid ${getColor('border')}`,
@@ -336,12 +335,12 @@ const ScheduleNextModal = ({
     color: getColor('text')
   };
 
-  const selectStyle = {
+  const selectStyle: CSSProperties = {
     ...inputStyle,
     cursor: 'pointer'
   };
 
-  const buttonStyle = {
+  const buttonStyle: CSSProperties = {
     padding: `${getSpacing('md')} ${getSpacing('lg')}`,
     border: 'none',
     borderRadius: 'var(--mac-radius-md)',
@@ -353,32 +352,32 @@ const ScheduleNextModal = ({
     gap: getSpacing('sm')
   };
 
-  const primaryButtonStyle = {
+  const primaryButtonStyle: CSSProperties = {
     ...buttonStyle,
     backgroundColor: getColor('primary'),
     color: 'white'
   };
 
-  const secondaryButtonStyle = {
+  const secondaryButtonStyle: CSSProperties = {
     ...buttonStyle,
     backgroundColor: getColor('secondary'),
     color: getColor('text')
   };
 
-  const dangerButtonStyle = {
+  const dangerButtonStyle: CSSProperties = {
     ...buttonStyle,
     backgroundColor: getColor('danger'),
     color: 'white'
   };
 
-  const serviceRowStyle = {
+  const serviceRowStyle: CSSProperties = {
     display: 'flex',
     gap: getSpacing('md'),
     alignItems: 'end',
     marginBottom: getSpacing('md')
   };
 
-  const alertStyle = {
+  const alertStyle: CSSProperties = {
     padding: getSpacing('md'),
     borderRadius: 'var(--mac-radius-md)',
     marginBottom: getSpacing('lg'),
@@ -387,14 +386,14 @@ const ScheduleNextModal = ({
     gap: getSpacing('sm')
   };
 
-  const errorStyle = {
+  const errorStyle: CSSProperties = {
     ...alertStyle,
     backgroundColor: getColor('danger-light'),
     color: getColor('danger'),
     border: `1px solid ${getColor('danger')}`
   };
 
-  const successStyle = {
+  const successStyle: CSSProperties = {
     ...alertStyle,
     backgroundColor: getColor('success-light'),
     color: getColor('success'),

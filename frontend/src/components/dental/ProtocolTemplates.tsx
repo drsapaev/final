@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useEffect, useState } from 'react';
 import {
   FileText,
@@ -36,7 +33,8 @@ const ProtocolTemplates = ({
   onSelectTemplate,
   onClose
 }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [templates, setTemplates] = useState([
   // Шаблоны процедур
   {

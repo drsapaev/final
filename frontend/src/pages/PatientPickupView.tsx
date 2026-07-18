@@ -1,33 +1,33 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 /**
  * PatientPickupView - Read-only view for registrar/cashier to issue lab results
  * Shows patient info and lab results without clinical data
  */
 import { useState, useEffect, useCallback } from 'react';
+import type { CSSProperties } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { labReportingApi } from '../api/labReporting';
 import auth from '../stores/auth';
 import logger from '../utils/logger';
 import { openPrintableWindow } from '../utils/printWindow';
-import FamilyRelationsCard from '../components/patient/FamilyRelationsCard';
+import FamilyRelationsCardRaw from '../components/patient/FamilyRelationsCard';
+const FamilyRelationsCard = FamilyRelationsCardRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import {
   AppEmpty, AppError, AppLoading, Button,
 } from '../components/ui/macos';
-import { notify } from '../services/notify.js';
+import { notify } from '../services/notify';
 import { useTranslation } from '../i18n/useTranslation';
 
 // Get user role for role-based UI
 const getUserRole = () => {
-  const st = auth.getState();
+  const st = auth.getState() as any;
   const profile = st.profile || st.user || {};
   return String(profile?.role || profile?.role_name || '').toLowerCase();
 };
 
 export default function PatientPickupView() {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const { patientId } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -69,12 +69,12 @@ export default function PatientPickupView() {
 
     try {
       // Load patient info
-      const patientRes = await api.get(`/patients/${patientId}`);
+      const patientRes = await api.get(`/patients/${patientId}`) as any;
       setPatient(patientRes.data);
 
       // Load lab results
       try {
-        const labReportInstances = await labReportingApi.listInstances({ patient_id: patientId, limit: 100 });
+        const labReportInstances = await labReportingApi.listInstances({ patient_id: patientId, limit: 100 }) as any[];
         setLabResults(labReportInstances || []);
       } catch {
         setLabResults([]);
@@ -82,7 +82,7 @@ export default function PatientPickupView() {
 
       // Load visit history
       try {
-        const visitsRes = await api.get('/registrar/visits', { params: { patient_id: patientId } });
+        const visitsRes = await api.get('/registrar/visits', { params: { patient_id: patientId } }) as any;
         setVisits(visitsRes.data || []);
       } catch {
         setVisits([]);
@@ -152,7 +152,7 @@ export default function PatientPickupView() {
   };
 
   // Handle print
-  const handlePrint = () => {
+  const handlePrint = (_lab?: any) => {
     const visitsHtml = visits.length
       ? visits.map((visit) => `
         <tr>
@@ -246,7 +246,7 @@ export default function PatientPickupView() {
   };
 
   // Styles
-  const styles = {
+  const styles: Record<string, CSSProperties> = {
     container: {
       minHeight: '100vh',
       background: 'var(--mac-gradient-window, linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%))',

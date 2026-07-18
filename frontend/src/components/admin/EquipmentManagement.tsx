@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useState, useEffect, useCallback } from 'react';
 import {
   Wrench,
@@ -22,15 +19,23 @@ import {
 'lucide-react';
 import {
   MacOSCard,
-  Button,
-  Badge,
-  Input,
-  Select,
-  Textarea,
-  Skeleton,
-  MacOSEmptyState,
-  Alert,
+  Button as RawButton,
+  Badge as RawBadge,
+  Input as RawInput,
+  Select as RawSelect,
+  Textarea as RawTextarea,
+  Skeleton as RawSkeleton,
+  MacOSEmptyState as RawMacOSEmptyState,
+  Alert as RawAlert,
 } from '../ui/macos';
+const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
+const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
+const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
+const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
+const Textarea = RawTextarea as unknown as React.ComponentType<Record<string, unknown>>;
+const Skeleton = RawSkeleton as unknown as React.ComponentType<Record<string, unknown>>;
+const MacOSEmptyState = RawMacOSEmptyState as unknown as React.ComponentType<Record<string, unknown>>;
+const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
@@ -82,7 +87,8 @@ const getTypeOptions = (t) => EQUIPMENT_TYPE_KEYS.map((option) => ({
 }));
 
 const EquipmentManagement = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [equipment, setEquipment] = useState([]);
@@ -109,7 +115,7 @@ const EquipmentManagement = () => {
     maintenance_date: '',
     cost: 0,
     description: ''
-  });
+  } as any);
 
   const statusOptions = getStatusOptions(t);
   const typeOptions = getTypeOptions(t);
@@ -118,7 +124,7 @@ const EquipmentManagement = () => {
   const loadEquipment = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await api.get('/clinic/equipment');
+      const response = await api.get('/clinic/equipment') as any;
       const nextEquipment = Array.isArray(response.data)
         ? response.data
         : response.data?.equipment || [];
@@ -135,7 +141,7 @@ const EquipmentManagement = () => {
 
   const loadBranches = useCallback(async () => {
     try {
-      const response = await api.get('/clinic/branches');
+      const response = await api.get('/clinic/branches') as any;
       const nextBranches = Array.isArray(response.data)
         ? response.data
         : response.data?.branches || [];
@@ -309,7 +315,7 @@ const EquipmentManagement = () => {
             <Select
               aria-label={t('admin2.em_filter_status_aria')}
               value={statusFilter}
-              onChange={setStatusFilter}
+              onChange={(v: unknown) => setStatusFilter(String(v))}
               options={[
                 { value: 'all', label: t('admin2.em_filter_status_all') },
                 ...statusOptions.map((option) => ({ value: option.value, label: option.label }))
@@ -319,7 +325,7 @@ const EquipmentManagement = () => {
             <Select
               aria-label={t('admin2.em_filter_type_aria')}
               value={typeFilter}
-              onChange={setTypeFilter}
+              onChange={(v: unknown) => setTypeFilter(String(v))}
               options={[
                 { value: 'all', label: t('admin2.em_filter_type_all') },
                 ...typeOptions.map((option) => ({ value: option.value, label: option.label }))
@@ -329,7 +335,7 @@ const EquipmentManagement = () => {
             <Select
               aria-label={t('admin2.em_filter_branch_aria')}
               value={branchFilter}
-              onChange={setBranchFilter}
+              onChange={(v: unknown) => setBranchFilter(String(v))}
               options={[
                 { value: 'all', label: t('admin2.em_filter_branch_all') },
                 ...branches.map((branch) => ({ value: String(branch.id), label: branch.name }))
@@ -390,7 +396,7 @@ const EquipmentManagement = () => {
                 <Select
                 aria-label={t('admin2.em_type_aria')}
                 value={formData.type}
-                onChange={(value) => setFormData({ ...formData, type: value })}
+                onChange={(value: unknown) => setFormData({ ...formData, type: String(value) })}
                 options={[
                   { value: '', label: t('admin2.em_select_type') },
                   ...typeOptions.map((option) => ({ value: option.value, label: option.label }))
@@ -426,7 +432,7 @@ const EquipmentManagement = () => {
                 <Select
                 aria-label={t('admin2.em_branch_aria')}
                 value={formData.branch_id ? String(formData.branch_id) : ''}
-                onChange={(value) => setFormData({ ...formData, branch_id: value ? Number(value) : null })}
+                onChange={(value: unknown) => setFormData({ ...formData, branch_id: value ? Number(value) : null })}
                 options={[
                   { value: '', label: t('admin2.em_select_branch') },
                   ...branches.map((branch) => ({ value: String(branch.id), label: branch.name }))
@@ -440,7 +446,7 @@ const EquipmentManagement = () => {
                 <Select
                 aria-label={t('admin2.em_status_aria')}
                 value={formData.status}
-                onChange={(value) => setFormData({ ...formData, status: value })}
+                onChange={(value: unknown) => setFormData({ ...formData, status: String(value) })}
                 options={statusOptions.map((option) => ({ value: option.value, label: option.label }))}
                 size="large" />
               </div>
