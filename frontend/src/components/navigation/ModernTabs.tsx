@@ -1,5 +1,4 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
+import React, { type CSSProperties } from 'react';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import {
@@ -59,8 +58,8 @@ const ModernTabs = ({
   departmentStats = {},
   language = 'ru'
 }) => {
-  const { t } = useTranslation();
-  const [indicatorStyle, setIndicatorStyle] = useState({});
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const [indicatorStyle, setIndicatorStyle] = useState<Record<string, any>>({});
   const [tabs, setTabs] = useState([]);
   const [loading, setLoading] = useState(true);
   const tabsRef = useRef(null);
@@ -227,7 +226,7 @@ const ModernTabs = ({
         <div
           key="queue"
           className="status-indicator queue"
-          title={`${t.queue}: ${stats.todayCount}`}>
+          title={`${t('queue.queue')}: ${stats.todayCount}`}>
 
           <Clock size={10} />
         </div>
@@ -239,7 +238,7 @@ const ModernTabs = ({
         <div
           key="pending"
           className="status-indicator pending"
-          title={t.pending}>
+          title={t('queue.pending')}>
 
           <AlertCircle size={10} />
         </div>
@@ -251,7 +250,7 @@ const ModernTabs = ({
         <div
           key="count"
           className="status-indicator count"
-          title={`${t.today}: ${stats.todayCount}`}>
+          title={`${t('queue.today')}: ${stats.todayCount}`}>
 
           {stats.todayCount}
         </div>
@@ -312,9 +311,9 @@ const ModernTabs = ({
           }}>
 
           <div className="tab-icon">
-            <TrendingUp size={16} />
+            <TrendingUp size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
           </div>
-          <span className="tab-label">{t.all}</span>
+          <span className="tab-label">{t('queue.all')}</span>
         </button>
 
         {/* Разделитель */}
@@ -350,11 +349,11 @@ const ModernTabs = ({
                   backgroundColor: isActive ? 'color-mix(in srgb, var(--mac-nav-item-active), transparent 70%)' : 'transparent',
                   '--tab-color': tab.color,
                   '--tab-gradient': tab.gradient
-                }}>
+                } as CSSProperties}>
 
                 <div className="tab-content">
                   <div className="tab-icon">
-                    <Icon size={16} />
+                    <Icon size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
                   </div>
                   <span className="tab-label">{tab.label}</span>
 

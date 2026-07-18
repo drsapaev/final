@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 /**
  * Teeth Chart Component
@@ -11,10 +9,10 @@
  */
 import { useState } from 'react';
 import {
-  Box,
+  Box as BoxRaw,
   Card,
   CardContent,
-  Typography,
+  Typography as TypographyRaw,
   Button,
   Badge,
 } from '../ui/macos';
@@ -41,12 +39,15 @@ import {
   DECIDUOUS_TEETH,
 } from './dentalConstants';
 import { useTranslation } from '../../i18n/useTranslation';
+import React from "react";
+const Box = BoxRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Typography = TypographyRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [teethData, setTeethData] = useState(initialData);
   const [selectedTooth, setSelectedTooth] = useState(null);
-  const [selectedStatus, setSelectedStatus] = useState(TOOTH_STATUS.CARIES);
+  const [selectedStatus, setSelectedStatus] = useState<string>(TOOTH_STATUS.CARIES);
   const [viewMode, setViewMode] = useState('adult'); // adult, child
   const [zoom, setZoom] = useState(1);
 
@@ -347,8 +348,8 @@ const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }) => {
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
               {Object.entries(
               Object.values(teethData).reduce((acc, tooth) => {
-                const status = tooth.status || TOOTH_STATUS.HEALTHY;
-                acc[status] = (acc[status] || 0) + 1;
+                const status = (tooth as Record<string, unknown>).status || TOOTH_STATUS.HEALTHY;
+                acc[String(status)] = (acc[String(status)] || 0) + 1;
                 return acc;
               }, {})
             ).map(([status, count]) =>

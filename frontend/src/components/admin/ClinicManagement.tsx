@@ -1,5 +1,4 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
+import type { CSSProperties } from 'react';
 
 import { useState, useEffect } from 'react';
 import { api } from '../../api/client';
@@ -22,12 +21,12 @@ import {
 import {
   MacOSCard,
   Button,
-  SegmentedControl,
-  MacOSStatCard,
-  Skeleton,
-  MacOSEmptyState,
-  Alert,
-  Badge,
+  SegmentedControl as SegmentedControlRaw,
+  MacOSStatCard as MacOSStatCardRaw,
+  Skeleton as SkeletonRaw,
+  MacOSEmptyState as MacOSEmptyStateRaw,
+  Alert as AlertRaw,
+  Badge as BadgeRaw,
   Modal,
 } from '../ui/macos';
 import BranchManagement from './BranchManagement';
@@ -39,8 +38,15 @@ import ClinicSettings from './ClinicSettings';
 
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
+import React from "react";
+const Badge = BadgeRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const SegmentedControl = SegmentedControlRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const MacOSStatCard = MacOSStatCardRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Skeleton = SkeletonRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const MacOSEmptyState = MacOSEmptyStateRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Alert = AlertRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const ClinicManagement = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [activeTab, setActiveTab] = useState('overview');
   const [systemHealth, setSystemHealth] = useState(null);
   const [stats, setStats] = useState(null);
@@ -146,7 +152,7 @@ const ClinicManagement = () => {
           aria-label="Refresh system status"
           className="admin-p-6px-12px-minw-auto">
           
-            <RefreshCw className="admin-w-16-h-16-anim-dyn" style={{ '--admin-anim0': loading ? 'spin 1s linear infinite' : 'none' }} />
+            <RefreshCw className="admin-w-16-h-16-anim-dyn" style={{ '--admin-anim0': loading ? 'spin 1s linear infinite' : 'none' } as CSSProperties} />
           </Button>
         </div>
         
@@ -368,7 +374,7 @@ const ClinicManagement = () => {
                 value: tab.id,
                 label: (
                   <span className="admin-d-inline-flex-ai-center-gap-8">
-                    {IconComponent && <IconComponent size={14} aria-hidden="true" />}
+                    {IconComponent && <IconComponent size={14 as unknown as "small" | "default" | "large" | "xlarge"} aria-hidden="true" />}
                     {tab.label}
                   </span>
                 )

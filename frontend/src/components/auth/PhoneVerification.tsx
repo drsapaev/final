@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, Button, Input, Label } from '../ui/macos';
@@ -28,7 +26,7 @@ const PhoneVerification = ({
   showPhoneInput = false,
   title  // PR-44 / P0-19: default now comes from useTranslation
 }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // PR-44 / P0-19: title defaults to translated string instead of hardcoded RU
   const displayTitle = title || t('verificationTitle');
   const [currentPhone, setCurrentPhone] = useState(phone || '');
@@ -112,7 +110,7 @@ const PhoneVerification = ({
 
     setLoading(true);
     try {
-      const payload = {
+      const payload: Record<string, unknown> = {
         phone: currentPhone,
         purpose: purpose
       };
