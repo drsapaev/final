@@ -1,14 +1,34 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
-import React, { useState, useCallback } from 'react';
-import { useDropzone } from 'react-dropzone';
+import React, { useState, useCallback, useEffect, type CSSProperties, type MouseEvent } from 'react';
+import { useDropzone, type FileRejection, type DropzoneRootProps, type DropzoneInputProps, type Accept } from 'react-dropzone';
 import { Upload, X, File as FileIcon, AlertCircle, Loader } from 'lucide-react';
 import logger from '../../utils/logger';
 import { convertHEICToJPEG, isHEICFile } from '../../utils/heicConverter';
 import '../../styles/animations.css';
 import PropTypes from 'prop-types';
 import { Input } from '../ui/macos';
+
+interface FilePreview {
+  id: string;
+  file: File | Blob;
+  url: string | null;
+  originalName: string;
+}
+
+interface FileUploadProps {
+  onFilesSelected?: (files: Array<File | Blob>) => void;
+  maxSize?: number;
+  accept?: Accept;
+  multiple?: boolean;
+  disabled?: boolean;
+  showPreviews?: boolean;
+  clearOnSelect?: boolean;
+  className?: string;
+  style?: CSSProperties;
+}
+
+interface ContainerStyle extends CSSProperties {
+  transition?: string;
+}
 
 const FileUpload = ({
   onFilesSelected,
@@ -17,25 +37,25 @@ const FileUpload = ({
     'image/*': ['.jpeg', '.jpg', '.png', '.gif', '.webp'],
     'image/heic': ['.heic'],
     'image/heif': ['.heif']
-  },
+  } as Accept,
   multiple = true,
   disabled = false,
   showPreviews = true,
   clearOnSelect = false,
   className,
   style
-}) => {
+}: FileUploadProps) => {
   const [converting, setConverting] = useState<boolean>(false);
-  const [error, setError] = useState<unknown>(null);
-  const [previews, setPreviews] = useState<unknown[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [previews, setPreviews] = useState<FilePreview[]>([]);
 
-  const handleDrop = useCallback(async (acceptedFiles, rejectedFiles) => {
+  const handleDrop = useCallback(async (acceptedFiles: Array<File | Blob>, rejectedFiles: FileRejection[]) => {
     setError(null);
     setConverting(true);
 
     if (rejectedFiles && rejectedFiles.length > 0) {
-      const rejectedFile = rejectedFiles[0].file || rejectedFiles[0];
-      if (rejectedFile.size > maxSize) {
+      const rejectedFile = rejectedFiles[0].file || (rejectedFiles[0] as unknown as File);
+      if ((rejectedFile as File).size > maxSize) {
         setError(`File size too large (max ${maxSize / 1024 / 1024}MB)`);
       } else {
         setError('File type not supported or invalid');
@@ -45,38 +65,38 @@ const FileUpload = ({
     }
 
     try {
-      const processedFiles = [];
-      const newPreviews = [];
+      const processedFiles: Array<File | Blob> = [];
+      const newPreviews: FilePreview[] = [];
 
       for (const file of acceptedFiles) {
-        let fileToProcess = file;
+        let fileToProcess: File | Blob = file;
 
         // Check if HEIC/HEIF
         if (isHEICFile(file)) {
           try {
             fileToProcess = await convertHEICToJPEG(file, 0.9);
           } catch {
-            logger.warn(`Could not convert ${file.name}, using original`);
+            logger.warn(`Could not convert ${(file as File).name}, using original`);
           }
         }
 
         processedFiles.push(fileToProcess);
 
         // Generate preview for images
-        if (fileToProcess.type.startsWith('image/')) {
+        if ((fileToProcess as File).type && (fileToProcess as File).type.startsWith('image/')) {
           const previewUrl = URL.createObjectURL(fileToProcess);
           newPreviews.push({
-            id: Math.random().toString(36).substr(2, 9),
+            id: Math.random().toString(36).substring(2, 11),
             file: fileToProcess,
             url: previewUrl,
-            originalName: file.name
+            originalName: (file as File).name
           });
         } else {
           newPreviews.push({
-            id: Math.random().toString(36).substr(2, 9),
+            id: Math.random().toString(36).substring(2, 11),
             file: fileToProcess,
             url: null,
-            originalName: file.name
+            originalName: (file as File).name
           });
         }
       }
@@ -94,7 +114,8 @@ const FileUpload = ({
         onFilesSelected(processedFiles);
       }
     } catch (err) {
-      setError(err.message || 'Error processing files');
+      const message = err instanceof Error ? err.message : 'Error processing files';
+      setError(message);
     } finally {
       setConverting(false);
     }
@@ -108,7 +129,7 @@ const FileUpload = ({
     disabled: disabled || converting
   });
 
-  const removeFile = (id) => {
+  const removeFile = (id: string) => {
     setPreviews((prev) => {
       const newPreviews = prev.filter((p) => p.id !== id);
       // Revoke URL to avoid memory leaks
@@ -120,7 +141,7 @@ const FileUpload = ({
   };
 
   // Cleanup URLs on unmount
-  React.useEffect(() => {
+  useEffect(() => {
     return () => {
       previews.forEach((p) => {
         if (p.url) URL.revokeObjectURL(p.url);
@@ -128,7 +149,7 @@ const FileUpload = ({
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const containerStyle = {
+  const containerStyle: ContainerStyle = {
     padding: 'var(--mac-spacing-6)',
     border: `2px dashed ${
       isDragActive || isFocused
@@ -145,11 +166,19 @@ const FileUpload = ({
     ...style
   };
 
+  const rootProps = getRootProps() as DropzoneRootProps;
+  const inputProps = getInputProps() as DropzoneInputProps & Record<string, unknown>;
+  // The macos Input component narrows its prop surface (icon?, clearable?,
+  // onClear?) which conflicts with the spread of DropzoneInputProps.
+  // Cast through unknown so we pass the dropzone wiring as a plain input.
+  const inputSpread = inputProps as unknown as React.InputHTMLAttributes<HTMLInputElement>;
+  const MacInput = Input as unknown as React.ComponentType<React.InputHTMLAttributes<HTMLInputElement>>;
+
   return (
     <div className={className}>
-            <div {...getRootProps()} style={containerStyle} aria-label="File upload dropzone">
-                <Input
-                  {...getInputProps()}
+            <div {...rootProps} style={containerStyle} aria-label="File upload dropzone">
+                <MacInput
+                  {...inputSpread}
                   aria-describedby={error ? 'file-upload-error' : undefined}
                 />
 
@@ -211,7 +240,7 @@ const FileUpload = ({
         marginTop: 'var(--mac-spacing-4)'
       }}>
                     {previews.map((preview) =>
-        <div key={preview.id} style={{ position: 'relative', group: 'preview-item' }}>
+        <div key={preview.id} style={{ position: 'relative' } as CSSProperties}>
                             <div style={{
             width: '100%',
             paddingTop: '100%',
@@ -253,7 +282,7 @@ const FileUpload = ({
                             </div>
 
                             <button
-            onClick={(e) => {
+            onClick={(e: MouseEvent<HTMLButtonElement>) => {
               e.stopPropagation();
               removeFile(preview.id);
             }}
