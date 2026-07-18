@@ -365,7 +365,7 @@ const AppointmentWizardV2 = ({
     try {
       // UX Audit Stage 3 (Wizard issue 5.1):
       // Заменён raw fetch() на searchPatientsByPhone() из api/patients.
-      const data = await searchPatientsByPhone(normalizedPhone);
+      const data: any = await searchPatientsByPhone(normalizedPhone);
       // Если найден пациент и это не тот же самый пациент (если мы редактируем, но тут мы создаем/ищем)
       // В мастере мы всегда предполагаем, что если ID не выбран, то это новый.
       // Если ID выбран, то мы не проверяем (или проверяем, не занят ли другим).
@@ -473,7 +473,7 @@ const AppointmentWizardV2 = ({
     try {
       // UX Audit Stage 3 (Wizard issue 5.1):
       // Заменён raw fetch() на searchPatientsApi() из api/patients.
-      const data = await searchPatientsApi(query);
+      const data: any = await searchPatientsApi(query);
 
       // ✅ Формируем fio из отдельных полей, если его нет
       const patientsWithFio = data.map((patient) => {

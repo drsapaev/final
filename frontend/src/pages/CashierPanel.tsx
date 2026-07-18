@@ -718,7 +718,7 @@ const CashierPanel = () => {
       if (groupedPayment) {
         await createGroupedCashierPayment(appointment, paymentData);
       } else {
-        const result = await paymentsHook.createPayment({
+        const result: any = await paymentsHook.createPayment({
           visit_id: visitId,
           amount: paymentData.amount,
           method: paymentData.method,
@@ -802,7 +802,7 @@ const CashierPanel = () => {
     try {
       // UX Audit #4.5: anti-double-click protection.
       setProcessingAction({ type: 'cancel', id: cancelPaymentContext.id });
-      const result = await paymentsHook.cancelPayment(cancelPaymentContext.id, cancelReason.trim());
+      const result: any = await paymentsHook.cancelPayment(cancelPaymentContext.id, cancelReason.trim());
       if (result.success) {
         setCancelDialogOpen(false);
         setCancelPaymentContext(null);
@@ -822,7 +822,7 @@ const CashierPanel = () => {
   // ✅ УЛУЧШЕНИЕ: Экспорт в CSV через серверный endpoint
   const exportToCSV = async () => {
     const { date_from, date_to } = getDateParams();
-    const result = await paymentsHook.exportPayments({
+    const result: any = await paymentsHook.exportPayments({
       date_from: date_from || undefined,
       date_to: date_to || undefined
     });
@@ -871,7 +871,7 @@ const CashierPanel = () => {
     try {
       // UX Audit #4.5: anti-double-click protection.
       setProcessingAction({ type: 'refund', id: refundPaymentId });
-      const result = await paymentsHook.refundPayment(refundPaymentId, {
+      const result: any = await paymentsHook.refundPayment(refundPaymentId, {
         amount: parseFloat(refundAmount),
         reason: refundReason
       });
@@ -920,7 +920,7 @@ const CashierPanel = () => {
         }
       }
 
-      const result = await paymentsHook.getReceipt(paymentId);
+      const result: any = await paymentsHook.getReceipt(paymentId);
       if (!result.success) {
         notify.error(getErrorMessage(result.error, tI18n('cashier.receipt_load_failed')));
         return;
@@ -938,7 +938,7 @@ const CashierPanel = () => {
 
   // ✅ v2.0: Загрузка почасовой статистики
   const loadHourlyStats = async () => {
-    const result = await paymentsHook.getHourlyStats({ target_date: selectedDate });
+    const result: any = await paymentsHook.getHourlyStats({ target_date: selectedDate });
     if (result.success) {
       setHourlyStats(result.data);
       setShowHourlyChart(true);

@@ -719,16 +719,16 @@ const QueueJoin = () => {
             <button
               onClick={() => navigate('/')}
               className="qj-btn-secondary"
-              onMouseEnter={(e) => e.target.style.background = 'color-mix(in srgb, var(--mac-text-tertiary), transparent 82%)'}
-              onMouseLeave={(e) => e.target.style.background = 'color-mix(in srgb, var(--mac-text-tertiary), transparent 88%)'}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'color-mix(in srgb, var(--mac-text-tertiary), transparent 82%)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'color-mix(in srgb, var(--mac-text-tertiary), transparent 88%)'}
             >
               {t('misc.qj_home_btn')}
             </button>
             <button
               onClick={loadTokenInfo}
               className="qj-btn-primary"
-              onMouseEnter={(e) => e.target.style.background = 'var(--mac-accent-blue-hover)'}
-              onMouseLeave={(e) => e.target.style.background = 'var(--mac-accent-blue)'}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'var(--mac-accent-blue-hover)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'var(--mac-accent-blue)'}
             >
               {t('misc.qj_refresh_btn')}
             </button>
@@ -1124,12 +1124,12 @@ const QueueJoin = () => {
               }}
               onMouseEnter={(e) => {
                 if (selectedSpecialists.length > 0) {
-                  e.target.style.background = 'var(--mac-accent-blue-hover)';
+                  e.currentTarget.style.background = 'var(--mac-accent-blue-hover)';
                 }
               }}
               onMouseLeave={(e) => {
                 if (selectedSpecialists.length > 0) {
-                  e.target.style.background = 'var(--mac-accent-blue)';
+                  e.currentTarget.style.background = 'var(--mac-accent-blue)';
                 }
               }}
             >
@@ -1250,8 +1250,8 @@ const QueueJoin = () => {
                   transition: 'all 0.2s ease',
                   boxShadow: '0 4px 12px color-mix(in srgb, var(--mac-accent), transparent 70%)'
                 }}
-                onMouseEnter={(e) => e.target.style.background = 'var(--mac-accent-blue-hover)'}
-                onMouseLeave={(e) => e.target.style.background = 'var(--mac-accent-blue)'}
+                onMouseEnter={(e) => e.currentTarget.style.background = 'var(--mac-accent-blue-hover)'}
+                onMouseLeave={(e) => e.currentTarget.style.background = 'var(--mac-accent-blue)'}
               >
                 {t('misc.qj_continue_btn')}
               </button>
@@ -1295,12 +1295,12 @@ const QueueJoin = () => {
                       color: 'var(--mac-text-primary)'
                     }}
                     onFocus={(e) => {
-                      e.target.style.border = '1px solid var(--mac-accent)';
-                      e.target.style.boxShadow = '0 0 0 3px color-mix(in srgb, var(--mac-accent), transparent 86%)';
+                      e.currentTarget.style.border = '1px solid var(--mac-accent)';
+                      e.currentTarget.style.boxShadow = '0 0 0 3px color-mix(in srgb, var(--mac-accent), transparent 86%)';
                     }}
                     onBlur={(e) => {
-                      e.target.style.border = '1px solid color-mix(in srgb, var(--mac-text-secondary), transparent 76%)';
-                      e.target.style.boxShadow = 'none';
+                      e.currentTarget.style.border = '1px solid color-mix(in srgb, var(--mac-text-secondary), transparent 76%)';
+                      e.currentTarget.style.boxShadow = 'none';
                     }}
                     placeholder={t('misc.qj_form_placeholder_full_name')}
                     autoComplete="name"
@@ -1371,12 +1371,12 @@ const QueueJoin = () => {
                       color: 'var(--mac-text-primary)'
                     }}
                     onFocus={(e) => {
-                      e.target.style.border = '1px solid var(--mac-accent)';
-                      e.target.style.boxShadow = '0 0 0 3px color-mix(in srgb, var(--mac-accent), transparent 86%)';
+                      e.currentTarget.style.border = '1px solid var(--mac-accent)';
+                      e.currentTarget.style.boxShadow = '0 0 0 3px color-mix(in srgb, var(--mac-accent), transparent 86%)';
                     }}
                     onBlur={(e) => {
-                      e.target.style.border = '1px solid color-mix(in srgb, var(--mac-text-secondary), transparent 76%)';
-                      e.target.style.boxShadow = 'none';
+                      e.currentTarget.style.border = '1px solid color-mix(in srgb, var(--mac-text-secondary), transparent 76%)';
+                      e.currentTarget.style.boxShadow = 'none';
                     }}
                     placeholder="+998 (90) 123-45-67"
                     autoComplete="tel"
@@ -1423,12 +1423,12 @@ const QueueJoin = () => {
                     color: 'var(--mac-text-primary)'
                   }}
                   onFocus={(e) => {
-                    e.target.style.border = '1px solid var(--mac-accent)';
-                    e.target.style.boxShadow = '0 0 0 3px color-mix(in srgb, var(--mac-accent), transparent 86%)';
+                    e.currentTarget.style.border = '1px solid var(--mac-accent)';
+                    e.currentTarget.style.boxShadow = '0 0 0 3px color-mix(in srgb, var(--mac-accent), transparent 86%)';
                   }}
                   onBlur={(e) => {
-                    e.target.style.border = '1px solid color-mix(in srgb, var(--mac-text-secondary), transparent 76%)';
-                    e.target.style.boxShadow = 'none';
+                    e.currentTarget.style.border = '1px solid color-mix(in srgb, var(--mac-text-secondary), transparent 76%)';
+                    e.currentTarget.style.boxShadow = 'none';
                   }}
                   placeholder={t('misc.qj_form_placeholder_optional')}
                 />
@@ -1465,8 +1465,8 @@ const QueueJoin = () => {
                     cursor: 'pointer',
                     transition: 'all 0.2s ease'
                   }}
-                  onMouseEnter={(e) => e.target.style.background = 'color-mix(in srgb, var(--mac-text-tertiary), transparent 82%)'}
-                  onMouseLeave={(e) => e.target.style.background = 'color-mix(in srgb, var(--mac-text-tertiary), transparent 88%)'}
+                  onMouseEnter={(e) => e.currentTarget.style.background = 'color-mix(in srgb, var(--mac-text-tertiary), transparent 82%)'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'color-mix(in srgb, var(--mac-text-tertiary), transparent 88%)'}
                 >
                   {t('misc.qj_back_btn')}
                 </button>
@@ -1486,8 +1486,8 @@ const QueueJoin = () => {
                     transition: 'all 0.2s ease',
                     boxShadow: loading ? 'none' : '0 4px 12px color-mix(in srgb, var(--mac-accent), transparent 70%)'
                   }}
-                  onMouseEnter={(e) => !loading && (e.target.style.background = 'var(--mac-accent-blue-hover)')}
-                  onMouseLeave={(e) => !loading && (e.target.style.background = 'var(--mac-accent-blue)')}
+                  onMouseEnter={(e) => !loading && (e.currentTarget.style.background = 'var(--mac-accent-blue-hover)')}
+                  onMouseLeave={(e) => !loading && (e.currentTarget.style.background = 'var(--mac-accent-blue)')}
                 >
                   {loading ? t('misc.qj_joining_btn') : t('misc.qj_join_btn')}
                 </button>
