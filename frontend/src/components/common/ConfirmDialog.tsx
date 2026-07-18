@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useTranslation } from '../../i18n/useTranslation';
 import i18n from '../../i18n';
@@ -38,9 +36,11 @@ import i18n from '../../i18n';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertTriangle, Trash2, AlertOctagon, CheckCircle2 } from 'lucide-react';
-import { Modal } from '../ui/macos';
+import { Modal as ModalRaw } from '../ui/macos';
 import { Button } from '../ui/macos';
 import { Input } from '../ui/macos';
+import React from "react";
+const Modal = ModalRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const INTENT_CONFIG = {
   danger: {
@@ -109,7 +109,7 @@ export function ConfirmDialog({
       isOpen={isOpen}
       onClose={handleCancel}
       title={title}
-      size="sm"
+      size="small"
       closable
     >
       <div style={{
@@ -209,14 +209,14 @@ export function ConfirmDialog({
       }}>
         <Button
           variant="outline"
-          size="md"
+          size="default"
           onClick={handleCancel}
         >
           {cancelLabel}
         </Button>
         <Button
           variant={config.confirmVariant}
-          size="md"
+          size="default"
           onClick={handleConfirm}
           disabled={isConfirmDisabled}
         >
@@ -291,8 +291,9 @@ export function useConfirm() {
   }, []);
 
   // Render the dialog via portal to document.body so it overlays everything
+  const ConfirmDialogSelf = ConfirmDialog as unknown as React.ComponentType<Record<string, unknown>>;
   const dialog = typeof document !== 'undefined' ? createPortal(
-    <ConfirmDialog
+    <ConfirmDialogSelf
       isOpen={state.isOpen}
       onClose={handleClose}
       onConfirm={handleConfirm}

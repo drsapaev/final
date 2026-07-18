@@ -1,5 +1,4 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
+import type { CSSProperties } from 'react';
 
 // Система уведомлений (Toast)
 import PropTypes from 'prop-types';
@@ -9,14 +8,14 @@ import { useTranslation } from '../../i18n/useTranslation';
 
 
 // Контекст для уведомлений
-const ToastContext = createContext();
-let addToastExternal = null;
+const ToastContext = createContext<unknown>(null);
+let addToastExternal: ((toast: unknown) => void) | null = null;
 
 /**
  * Провайдер контекста уведомлений
  */
 export function ToastProvider({ children }) {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [toasts, setToasts] = useState([]);
   const theme = useTheme();
 
@@ -102,9 +101,9 @@ function ToastContainer({ toasts, onRemove, theme }) {
   };
 
   return (
-    <div style={containerStyle}>
+    <div style={containerStyle as CSSProperties}>
       {toasts.map((toast) =>
-      <ToastItem
+      <ToastItemAny
         key={toast.id}
         toast={toast}
         onRemove={onRemove}
@@ -118,6 +117,8 @@ function ToastContainer({ toasts, onRemove, theme }) {
 /**
  * Отдельное уведомление
  */
+const ToastItemAny = ToastItem as unknown as React.ComponentType<Record<string, unknown>>;
+
 function ToastItem({ toast, onRemove }) {
   const [isVisible, setIsVisible] = useState(false);
 
@@ -228,22 +229,22 @@ function ToastItem({ toast, onRemove }) {
   };
 
   return (
-    <div style={getToastStyles(toast.type)}>
+    <div style={getToastStyles(toast.type) as unknown as CSSProperties}>
       {getIcon(toast.type)}
-      <div style={contentStyle}>
-        {toast.title && <div style={titleStyle}>{toast.title}</div>}
+      <div style={contentStyle as unknown as CSSProperties}>
+        {toast.title && <div style={titleStyle as unknown as CSSProperties}>{toast.title}</div>}
         {toast.message && <div style={messageStyle}>{toast.message}</div>}
       </div>
       <button
         style={closeButtonStyle}
         onClick={() => onRemove(toast.id)}
-        onMouseOver={(e) => e.target.style.opacity = '1'}
-        onMouseOut={(e) => e.target.style.opacity = '0.7'}>
+        onMouseOver={(e) => e.currentTarget.style.opacity = '1'}
+        onMouseOut={(e) => e.currentTarget.style.opacity = '0.7'}>
 
         ×
       </button>
       {toast.duration > 0 &&
-      <div style={progressBarStyle} />
+      <div style={progressBarStyle as unknown as CSSProperties} />
       }
     </div>);
 

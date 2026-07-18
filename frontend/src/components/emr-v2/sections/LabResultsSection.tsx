@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 /**
  * LabResultsSection — displays lab report instances for the current patient/visit.
@@ -22,7 +20,9 @@ import PropTypes from 'prop-types';
 // всеми остальными lab-компонентами. Смешивание двух библиотек иконок
 // (lucide + macos SF-Symbol-style) нарушало Nielsen Heuristic #4
 // (Consistency & Standards) — разные stroke-width, optical size, padding.
-import EMRSection from './EMRSection';
+import EMRSectionRaw from './EMRSection';
+import React from 'react';
+const EMRSection = EMRSectionRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import { labReportingApi } from '../../../api/labReporting';
 import { Badge, Button, Dialog, DialogTitle, DialogContent, DialogActions, Icon } from '../../ui/macos';
 import { useConfirm } from '../../common/ConfirmDialog';
@@ -54,7 +54,7 @@ function formatDate(dateStr) {
 }
 
 export function LabResultsSection({ patientId, visitId, disabled = false }) {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [instances, setInstances] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -79,14 +79,14 @@ export function LabResultsSection({ patientId, visitId, disabled = false }) {
     setLoading(true);
     setError(null);
     try {
-      const params = { limit: 20 };
+      const params: Record<string, unknown> = { limit: 20 };
       if (visitId) params.visit_id = visitId;
       else if (patientId) params.patient_id = patientId;
 
       const result = await labReportingApi.listInstances(params);
-      const list = Array.isArray(result) ? result : (result?.items || []);
+      const list = Array.isArray(result) ? result : ((result as Record<string, unknown>)?.items || []);
       // Only show finalized/printed — drafts are lab-internal.
-      setInstances(list.filter((r) => r.status === 'FINALIZED' || r.status === 'PRINTED'));
+      setInstances((list as Array<Record<string, unknown>>).filter((r) => r.status === 'FINALIZED' || r.status === 'PRINTED'));
     } catch (err) {
       logger.warn('[LabResultsSection] Failed to load lab instances', { error: err?.message });
       setError('Не удалось загрузить результаты анализов.');
@@ -117,9 +117,9 @@ export function LabResultsSection({ patientId, visitId, disabled = false }) {
     setTemplatesLoading(true);
     try {
       const result = await labReportingApi.listTemplates();
-      const list = Array.isArray(result) ? result : (result?.items || []);
+      const list = Array.isArray(result) ? result : ((result as Record<string, unknown>)?.items || []);
       // Only show templates that have a published version.
-      setTemplates(list.filter((t) => t.published_version_id));
+      setTemplates((list as Array<Record<string, unknown>>).filter((t) => t.published_version_id));
     } catch (err) {
       logger.warn('[LabResultsSection] Failed to load templates', { error: err?.message });
       setTemplates([]);
@@ -131,7 +131,7 @@ export function LabResultsSection({ patientId, visitId, disabled = false }) {
   const handleOrder = async (templateId, templateName) => {
     // UX-AUDIT-FIX9: подтверждение перед созданием заказа.
     // STRAT#12: строки мигрированы на t() / tInterpolate() из labTranslations.
-    const ok = await confirm({
+    const ok = await (confirm as unknown as (opts: Record<string, unknown>) => Promise<boolean>)({
       title: t('confirm.order_title'),
       message: t('confirm.order_message', { name: templateName }),
       description: t('confirm.order_description'),
@@ -190,7 +190,7 @@ export function LabResultsSection({ patientId, visitId, disabled = false }) {
               background: 'var(--mac-bg-secondary)',
             }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
-              <Icon name="testtube.2" size={16} color="secondary" aria-hidden="true" />
+              <Icon name="testtube.2" size={16 as unknown as "small" | "default" | "large" | "xlarge"} color="secondary" aria-hidden="true" />
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontWeight: 500, fontSize: '14px', color: 'var(--mac-text-primary)' }}>
                   {instance.template_name || instance.template_code || 'Лабораторный отчёт'}
@@ -215,7 +215,7 @@ export function LabResultsSection({ patientId, visitId, disabled = false }) {
                   size="small"
                   onClick={() => handleDownload(instance.id)}
                   aria-label={`Скачать PDF: ${instance.template_name || 'лабораторный отчёт'}`}>
-                  <Icon name="square.and.arrow.down" size={14} style={{ marginRight: 4 }} aria-hidden="true" />
+                  <Icon name="square.and.arrow.down" size={14 as unknown as "small" | "default" | "large" | "xlarge"} style={{ marginRight: 4 }} aria-hidden="true" />
                   PDF
                 </Button>
               )}
@@ -230,12 +230,12 @@ export function LabResultsSection({ patientId, visitId, disabled = false }) {
     <>
       <EMRSection
         title="Результаты анализов"
-        icon={<Icon name="doc.text" size={16} aria-hidden="true" />}
+        icon={<Icon name="doc.text" size={16 as unknown as "small" | "default" | "large" | "xlarge"} aria-hidden="true" />}
         disabled={disabled}
         defaultOpen={instances.length > 0}
         headerAction={!disabled && patientId ? (
           <Button variant="outline" size="small" onClick={handleOpenOrderModal}>
-            <Icon name="plus" size={14} style={{ marginRight: 4 }} aria-hidden="true" />
+            <Icon name="plus" size={14 as unknown as "small" | "default" | "large" | "xlarge"} style={{ marginRight: 4 }} aria-hidden="true" />
             Заказать анализы
           </Button>
         ) : null}
@@ -282,7 +282,7 @@ export function LabResultsSection({ patientId, visitId, disabled = false }) {
                         {template.code} • {template.family}
                       </div>
                     </div>
-                    <Icon name="testtube.2" size={20} color="secondary" aria-hidden="true" />
+                    <Icon name="testtube.2" size={20 as unknown as "small" | "default" | "large" | "xlarge"} color="secondary" aria-hidden="true" />
                   </button>
                 ))
               )}

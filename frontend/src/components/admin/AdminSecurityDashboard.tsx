@@ -1,13 +1,13 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import {
-  Card, CardContent, CardHeader, CardTitle, Badge, Button, Icon, Alert, Input,
+  Card, CardContent, CardHeader, CardTitle, Badge, Button, Icon, Alert as AlertRaw, Input,
 } from '../ui/macos';
 import { api } from '../../api/client';
 import { useTranslation } from '../../i18n/useTranslation';
+import React from "react";
+const Alert = AlertRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 /**
  * Admin Security Dashboard — M5.6 frontend integration.
@@ -16,7 +16,7 @@ import { useTranslation } from '../../i18n/useTranslation';
  * Also shows: compliance report, secrets rotation status, backup status.
  */
 export default function AdminSecurityDashboard() {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [dashboard, setDashboard] = useState(null);
   const [compliance, setCompliance] = useState(null);
   const [secrets, setSecrets] = useState(null);
@@ -71,7 +71,7 @@ export default function AdminSecurityDashboard() {
         <CardContent>
           <Alert severity="error">{error}</Alert>
           <Button variant="outline" onClick={loadData} style={{ marginTop: 12 }}>
-            <Icon name="arrow.clockwise" size={16} />
+            <Icon name="arrow.clockwise" size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
             {t('admin2.asd_retry')}
           </Button>
         </CardContent>
@@ -98,7 +98,7 @@ export default function AdminSecurityDashboard() {
               fontWeight: activeTab === tab.id ? 600 : 400,
             }}
           >
-            <Icon name={tab.icon} size={14} />
+            <Icon name={tab.icon} size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
             {tab.label}
           </button>
         ))}
@@ -121,7 +121,7 @@ export default function AdminSecurityDashboard() {
 }
 
 function DashboardTab({ data }) {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const { summary, recent_logins, failed_logins, suspicious_ips, recent_downloads, recent_exports } = data;
   return (
     <div style={{ display: 'grid', gap: 'var(--mac-spacing-4)' }}>
@@ -137,14 +137,14 @@ function DashboardTab({ data }) {
         <Card variant="filled" padding="none">
           <CardHeader style={{ background: 'var(--mac-bg-tertiary)', borderBottom: '1px solid var(--mac-border)', padding: '12px 16px' }}>
             <CardTitle style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Icon name="exclamationmark.triangle" size={18} />
+              <Icon name="exclamationmark.triangle" size={18 as unknown as "small" | "default" | "large" | "xlarge"} />
               {t('admin2.asd_failed_logins', { count: failed_logins.length })}
             </CardTitle>
           </CardHeader>
           <CardContent style={{ padding: '12px 16px' }}>
             {failed_logins.slice(0, 10).map((entry) => (
               <div key={entry.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--mac-border)' }}>
-                <span>{entry.ip_address || 'N/A'} · {entry.actor_role || 'unknown'}</span>
+                <span>{(entry as Record<string, unknown>).ip_address || 'N/A'} · {entry.actor_role || 'unknown'}</span>
                 <span style={{ color: 'var(--mac-text-muted)', fontSize: '12px' }}>
                   {entry.timestamp ? new Date(entry.timestamp).toLocaleString('ru-RU') : ''}
                 </span>
@@ -180,7 +180,7 @@ function DashboardTab({ data }) {
           <CardContent style={{ padding: '12px 16px' }}>
             {recent_logins.slice(0, 10).map((entry) => (
               <div key={entry.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--mac-border)' }}>
-                <span>{entry.actor_role || 'user'} · {entry.ip_address || 'N/A'}</span>
+                <span>{entry.actor_role || 'user'} · {(entry as Record<string, unknown>).ip_address || 'N/A'}</span>
                 <Badge variant={entry.outcome === 'success' ? 'success' : 'danger'}>
                   {entry.outcome}
                 </Badge>
@@ -194,7 +194,7 @@ function DashboardTab({ data }) {
 }
 
 function ComplianceTab({ data }) {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   return (
     <Card variant="filled" padding="default">
       <CardHeader>
@@ -211,7 +211,7 @@ function ComplianceTab({ data }) {
         </div>
         {data.checks?.map((check) => (
           <div key={check.name} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: '1px solid var(--mac-border)' }}>
-            <Icon name={check.passed ? 'checkmark.circle.fill' : 'exclamationmark.triangle'} size={16} />
+            <Icon name={check.passed ? 'checkmark.circle.fill' : 'exclamationmark.triangle'} size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
             <div>
               <div style={{ fontWeight: 500, color: 'var(--mac-text-primary)' }}>{check.label}</div>
               <div style={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>{check.details}</div>
@@ -224,24 +224,24 @@ function ComplianceTab({ data }) {
 }
 
 function SecretsTab({ data }) {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   return (
     <Card variant="filled" padding="default">
       <CardHeader>
         <CardTitle>{t('admin2.asd_secrets_status', { days: data.rotation_interval_days })}</CardTitle>
       </CardHeader>
       <CardContent>
-        {Object.entries(data.secrets || {}).map(([name, status]) => (
+        {Object.entries((data as Record<string, unknown>).secrets || {}).map(([name, status]) => (
           <div key={name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--mac-border)' }}>
             <div>
               <div style={{ fontWeight: 500 }}>{name}</div>
               <div style={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>
-                {status.last_rotated ? t('admin2.asd_secrets_rotation', { date: new Date(status.last_rotated).toLocaleDateString('ru-RU') }) : t('admin2.asd_secrets_never_rotated')}
-                {status.days_since_rotation != null ? t('admin2.asd_secrets_days_ago', { days: status.days_since_rotation }) : ''}
+                {(status as Record<string, unknown>).last_rotated ? (t as unknown as (key: string, opts?: Record<string, unknown>) => string)('admin2.asd_secrets_rotation', { date: new Date((status as Record<string, unknown>).last_rotated as string).toLocaleDateString('ru-RU') }) : t('admin2.asd_secrets_never_rotated')}
+                {(status as Record<string, unknown>).days_since_rotation != null ? (t as unknown as (key: string, opts?: Record<string, unknown>) => string)('admin2.asd_secrets_days_ago', { days: (status as Record<string, unknown>).days_since_rotation }) : ''}
               </div>
             </div>
-            <Badge variant={status.overdue ? 'danger' : 'success'}>
-              {status.overdue ? t('admin2.asd_secrets_overdue') : t('admin2.asd_secrets_actual')}
+            <Badge variant={(status as Record<string, unknown>).overdue ? 'danger' : 'success'}>
+              {(status as Record<string, unknown>).overdue ? t('admin2.asd_secrets_overdue') : t('admin2.asd_secrets_actual')}
             </Badge>
           </div>
         ))}
@@ -251,7 +251,7 @@ function SecretsTab({ data }) {
 }
 
 function BackupTab({ data, onVerify }) {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [verifying, setVerifying] = useState(false);
   const handleVerify = async () => {
     setVerifying(true);
@@ -286,7 +286,7 @@ function BackupTab({ data, onVerify }) {
           </Badge>
         </div>
         <Button variant="outline" onClick={handleVerify} loading={verifying}>
-          <Icon name="checkmark.circle" size={16} />
+          <Icon name="checkmark.circle" size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
           {t('admin2.asd_backup_mark_verified')}
         </Button>
       </CardContent>
@@ -294,7 +294,7 @@ function BackupTab({ data, onVerify }) {
   );
 }
 
-function SummaryCard({ label, value, variant }) {
+function SummaryCardRaw({ label, value, variant }: Record<string, unknown>) {
   const colors = {
     default: 'var(--mac-text-primary)',
     warning: 'var(--mac-warning, #f59e0b)',
@@ -307,16 +307,18 @@ function SummaryCard({ label, value, variant }) {
       border: '1px solid var(--mac-border)',
       background: 'var(--mac-bg-tertiary)',
     }}>
-      <div style={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>{label}</div>
-      <div style={{ fontSize: '24px', fontWeight: 600, color: colors[variant] || colors.default }}>
-        {value}
+      <div style={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>{String(label)}</div>
+      <div style={{ fontSize: '24px', fontWeight: 600, color: colors[variant as string] || colors.default }}>
+        {String(value)}
       </div>
     </div>
   );
 }
 
-SummaryCard.propTypes = {
+SummaryCardRaw.propTypes = {
   label: PropTypes.string.isRequired,
   value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
   variant: PropTypes.oneOf(['default', 'warning', 'danger']),
 };
+
+const SummaryCard = SummaryCardRaw as unknown as React.ComponentType<Record<string, unknown>>;

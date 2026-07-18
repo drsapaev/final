@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import PropTypes from 'prop-types';
 import { Button, Icon } from '../../ui/macos';
@@ -59,7 +57,7 @@ function serializeRule(rule) {
 }
 
 function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }) {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const rule = parseRuleText(field.reference_rule_text);
   const isStructured = rule === null || (rule && Array.isArray(rule.cases));
 
@@ -124,7 +122,7 @@ function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }) {
       <div className="ltw-flex-between">
         <span className="ltw-fw-600 ltw-text-14">{t('misc.rre_norm_rules')}</span>
         <Button variant="outline" size="small" onClick={addCase}>
-          <Icon name="plus" size={12} />
+          <Icon name="plus" size={12 as unknown as "small" | "default" | "large" | "xlarge"} />
           {t('misc.rre_add_condition')}
         </Button>
       </div>
@@ -142,7 +140,7 @@ function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }) {
             <div className="ltw-flex-between">
               <span className="ltw-text-13 ltw-fw-500">{t('misc.rre_condition_n', { n: caseIndex + 1 })}</span>
               <Button variant="ghost" size="small" onClick={() => removeCase(caseIndex)} aria-label={t('misc.rre_remove_condition')}>
-                <Icon name="trash" size={12} />
+                <Icon name="trash" size={12 as unknown as "small" | "default" | "large" | "xlarge"} />
               </Button>
             </div>
 

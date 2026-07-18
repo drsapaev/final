@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 /**
  * BloodTestsTab — R-15 (UX audit): extracted from CardiologistPanelUnified.
@@ -56,7 +54,7 @@ export function BloodTestsTab({
   getFontSize,
   getSpacing,
 }) {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // Helper: compute average of a field across all blood tests
   const avg = (key) => {
     const nums = bloodTests

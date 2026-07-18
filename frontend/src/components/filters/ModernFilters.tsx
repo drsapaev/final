@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useState, useEffect, useRef } from 'react';
 import {
@@ -20,8 +18,12 @@ import './ModernFilters.css';
 import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 import i18n from '../../i18n';
-import { Input,
-  Checkbox } from '../ui/macos';
+import {
+  Input,
+  Checkbox
+} from '../ui/macos';
+
+const t18 = i18n.t as unknown as (key: string, options?: Record<string, unknown>) => string;
 
 const ModernFilters = ({
   searchParams,
@@ -32,7 +34,7 @@ const ModernFilters = ({
   className = '',
   ...props
 }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const { getColor } = useTheme();
   const [isExpanded, setIsExpanded] = useState(false);
   const [searchValue, setSearchValue] = useState(searchParams.get('q') || '');
@@ -82,13 +84,13 @@ const ModernFilters = ({
   const hasActiveFilters = searchValue || dateValue || statusValue;
 
   const statusOptions = [
-  { value: '', label: i18n.t('misc.mf_vse_statusy'), icon: null },
-  { value: 'confirmed', label: i18n.t('misc.mf_podtverzhdeno'), icon: '✓' },
-  { value: 'queued', label: i18n.t('misc.mf_v_ocheredi'), icon: '⏳' },
-  { value: 'paid_pending', label: i18n.t('misc.mf_ozhidaet_oplaty'), icon: '💳' },
-  { value: 'paid', label: i18n.t('misc.mf_oplacheno'), icon: '✅' },
-  { value: 'canceled', label: i18n.t('misc.mf_otmeneno'), icon: '❌' },
-  { value: 'completed', label: i18n.t('misc.mf_zaversheno'), icon: '🏁' }];
+  { value: '', label: t18('misc.mf_vse_statusy'), icon: null },
+  { value: 'confirmed', label: t18('misc.mf_podtverzhdeno'), icon: '✓' },
+  { value: 'queued', label: t18('misc.mf_v_ocheredi'), icon: '⏳' },
+  { value: 'paid_pending', label: t18('misc.mf_ozhidaet_oplaty'), icon: '💳' },
+  { value: 'paid', label: t18('misc.mf_oplacheno'), icon: '✅' },
+  { value: 'canceled', label: t18('misc.mf_otmeneno'), icon: '❌' },
+  { value: 'completed', label: t18('misc.mf_zaversheno'), icon: '🏁' }];
 
 
   return (
@@ -101,7 +103,7 @@ const ModernFilters = ({
             ref={searchInputRef}
             type="text"
             aria-label="Search appointments"
-            placeholder={i18n.t('misc.mf_poisk_po_fio_telefonu_usluga')}
+            placeholder={t18('misc.mf_poisk_po_fio_telefonu_usluga')}
             value={searchValue}
             onChange={(e) => handleSearchChange(e.target.value)}
             className="search-input"
@@ -116,7 +118,7 @@ const ModernFilters = ({
             type="button"
             className="search-clear"
             onClick={() => handleSearchChange('')}
-            aria-label={i18n.t('misc.mf_ochistit_poisk')}>
+            aria-label={t18('misc.mf_ochistit_poisk')}>
             
               <X size={16} />
             </button>
@@ -156,7 +158,7 @@ const ModernFilters = ({
             }}>
             
             <Filter size={18} />
-            <span>{i18n.t('misc.mf_filtry')}</span>
+            <span>{t18('misc.mf_filtry')}</span>
             {hasActiveFilters && <span className="filters-count">•</span>}
             <ChevronDown className={`toggle-icon ${isExpanded ? 'rotated' : ''}`} size={16} />
           </button>
@@ -267,10 +269,10 @@ const ModernFilters = ({
             <div className="filters-controls">
               {/* Автообновление */}
               <label className="auto-refresh-toggle">
-                <Checkbox aria-label="Toggle auto refresh" checked={autoRefresh} onChange={(e) => onAutoRefreshChange(e.target.checked)} />
+                <Checkbox aria-label="Toggle auto refresh" checked={autoRefresh} onChange={(e) => onAutoRefreshChange(e)} />
               
                 <RefreshCw size={16} className={autoRefresh ? 'spinning' : ''} />
-                <span>{i18n.t('misc.mf_avtoobnovlenie')}</span>
+                <span>{t18('misc.mf_avtoobnovlenie')}</span>
               </label>
 
               {/* Очистить фильтры */}
