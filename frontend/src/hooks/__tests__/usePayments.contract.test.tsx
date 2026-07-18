@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 
@@ -23,13 +20,21 @@ vi.mock('../../utils/logger', () => ({
   },
 }));
 
+// Cast api through unknown so we can call vitest mock methods on its
+// members (the hoisted stub is replaced at runtime; the static type
+// doesn't include mockResolvedValueOnce).
+const apiMock = api as unknown as {
+  get: ReturnType<typeof vi.fn>;
+  post: ReturnType<typeof vi.fn>;
+};
+
 describe('usePayments cashier payment history contract', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it('passes the backend status query alias for payment history filters', async () => {
-    api.get.mockResolvedValueOnce({
+    apiMock.get.mockResolvedValueOnce({
       data: {
         items: [],
         total: 0,
@@ -51,7 +56,7 @@ describe('usePayments cashier payment history contract', () => {
       });
     });
 
-    expect(api.get).toHaveBeenCalledWith('/cashier/payments', {
+    expect(apiMock.get).toHaveBeenCalledWith('/cashier/payments', {
       params: {
         page: 2,
         size: 20,

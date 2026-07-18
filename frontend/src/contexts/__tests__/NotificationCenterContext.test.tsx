@@ -1,8 +1,5 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { describe, expect, it } from 'vitest';
-import { applyUnreadSnapshot } from '../NotificationCenterContext.tsx';
+import { applyUnreadSnapshot } from '../NotificationCenterContext';
 
 describe('NotificationCenterContext unread snapshot helpers', () => {
   it('merges websocket unread totals without discarding existing breakdowns', () => {
