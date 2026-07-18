@@ -947,7 +947,7 @@ const DepartmentManagement = () => {
                                 <div className="mb-4">
                                     <Checkbox
                   checked={serviceMapping.create_service}
-                  onChange={(e) => setServiceMapping({ ...serviceMapping, create_service: e.target.checked })}
+                  onChange={(e: any) => setServiceMapping({ ...serviceMapping, create_service: e?.target?.checked ?? e })}
                   label={t('admin2.dept_create_service_label')} />
                 
                                 </div>
@@ -1340,7 +1340,7 @@ const DepartmentManagement = () => {
                     <div className="mb-4">
                         <Checkbox
               checked={serviceMapping.create_service}
-              onChange={(e) => setServiceMapping({ ...serviceMapping, create_service: e.target.checked })}
+              onChange={(e: any) => setServiceMapping({ ...serviceMapping, create_service: e?.target?.checked ?? e })}
               label={t('admin2.dept_create_service_short')} />
             
                     </div>

@@ -1495,7 +1495,7 @@ const EnhancedAppointmentsTable = ({
                     className="eat-td-base"
                     aria-label={`${t('misc.eat_select_all')}: ${row.patient_fio || row.patient_name || row.id}`}>
                         <Checkbox aria-label={`${t('misc.eat_select_all')}: ${row.patient_fio || row.patient_name || row.id}`} checked={selectedRows.has(row.id)} onChange={(e) => {
-                        e.stopPropagation();
+                        e?.stopPropagation();
                         handleRowSelect(row.id, e.target.checked);
                       }}
                       />
@@ -1889,11 +1889,11 @@ const EnhancedAppointmentsTable = ({
                     }}
                     onClick={(e: any) => {
                       // Блокируем клик на строку при клике в ячейке действий
-                      e.stopPropagation();
+                      e?.stopPropagation();
                     }}
                     onMouseDown={(e: any) => {
                       // Блокируем mousedown на строку при клике в ячейке действий
-                      e.stopPropagation();
+                      e?.stopPropagation();
                     }}>
 
                       <div
@@ -1913,11 +1913,11 @@ const EnhancedAppointmentsTable = ({
                         className="action-button action-button--success"
                         onMouseDown={(e: any) => {
                           e.preventDefault();
-                          e.stopPropagation();
+                          e?.stopPropagation();
                         }}
                         onClick={(e: any) => {
                           e.preventDefault();
-                          e.stopPropagation();
+                          e?.stopPropagation();
                           onActionClick?.('payment', row, e);
                         }}
                         title={t('misc.eat_payment')}>
@@ -1932,11 +1932,11 @@ const EnhancedAppointmentsTable = ({
                         className="action-button action-button--primary"
                         onMouseDown={(e: any) => {
                           e.preventDefault();
-                          e.stopPropagation();
+                          e?.stopPropagation();
                         }}
                         onClick={(e: any) => {
                           e.preventDefault();
-                          e.stopPropagation();
+                          e?.stopPropagation();
                           onActionClick?.('call', row, e);
                         }}
                         title={t('misc.eat_call_action')}>
@@ -1951,11 +1951,11 @@ const EnhancedAppointmentsTable = ({
                         className="action-button"
                         onMouseDown={(e: any) => {
                           e.preventDefault();
-                          e.stopPropagation();
+                          e?.stopPropagation();
                         }}
                         onClick={(e: any) => {
                           e.preventDefault();
-                          e.stopPropagation();
+                          e?.stopPropagation();
                           onActionClick?.('print', row, e);
                         }}
                         title={t('misc.eat_print')}
@@ -1971,11 +1971,11 @@ const EnhancedAppointmentsTable = ({
                         className="action-button"
                         onMouseDown={(e: any) => {
                           e.preventDefault();
-                          e.stopPropagation();
+                          e?.stopPropagation();
                         }}
                         onClick={(e: any) => {
                           e.preventDefault();
-                          e.stopPropagation();
+                          e?.stopPropagation();
                           onActionClick?.('complete', row, e);
                         }}
                         title={t('misc.eat_complete')}>
@@ -2013,12 +2013,12 @@ const EnhancedAppointmentsTable = ({
                         className="action-button"
                         onMouseDown={(e: any) => {
                           e.preventDefault();
-                          e.stopPropagation();
+                          e?.stopPropagation();
                           logger.log('[EnhancedAppointmentsTable] Кнопка Просмотр нажата:', row);
                         }}
                         onClick={(e: any) => {
                           e.preventDefault();
-                          e.stopPropagation();
+                          e?.stopPropagation();
                           onActionClick?.('view', row, e);
                         }}
                         title={t('misc.eat_view')}
@@ -2032,12 +2032,12 @@ const EnhancedAppointmentsTable = ({
                         className="action-button"
                         onMouseDown={(e: any) => {
                           e.preventDefault();
-                          e.stopPropagation();
+                          e?.stopPropagation();
                           logger.log('[EnhancedAppointmentsTable] Кнопка Редактировать нажата:', row);
                         }}
                         onClick={(e: any) => {
                           e.preventDefault();
-                          e.stopPropagation();
+                          e?.stopPropagation();
                           onActionClick?.('edit', row, e);
                         }}
                         title={t('misc.eat_edit')}
@@ -2052,11 +2052,11 @@ const EnhancedAppointmentsTable = ({
                         className="action-button action-button--primary"
                         onMouseDown={(e: any) => {
                           e.preventDefault();
-                          e.stopPropagation();
+                          e?.stopPropagation();
                         }}
                         onClick={(e: any) => {
                           e.preventDefault();
-                          e.stopPropagation();
+                          e?.stopPropagation();
                           onActionClick?.('view_emr', row, e);
                         }}
                         title={t('misc.eat_view_emr')}
@@ -2073,11 +2073,11 @@ const EnhancedAppointmentsTable = ({
                         className="action-button"
                         onMouseDown={(e: any) => {
                           e.preventDefault();
-                          e.stopPropagation();
+                          e?.stopPropagation();
                         }}
                         onClick={(e: any) => {
                           e.preventDefault();
-                          e.stopPropagation();
+                          e?.stopPropagation();
                           onActionClick?.('reschedule', row, e);
                         }}
                         title={t('misc.eat_reschedule')}
@@ -2091,11 +2091,11 @@ const EnhancedAppointmentsTable = ({
                         className="action-button"
                         onMouseDown={(e: any) => {
                           e.preventDefault();
-                          e.stopPropagation();
+                          e?.stopPropagation();
                         }}
                         onClick={(e: any) => {
                           e.preventDefault();
-                          e.stopPropagation();
+                          e?.stopPropagation();
                           onActionClick?.('cancel', row, e);
                         }}
                         title={t('misc.eat_cancel')}
@@ -2109,11 +2109,11 @@ const EnhancedAppointmentsTable = ({
                         className="action-button"
                         onMouseDown={(e: any) => {
                           e.preventDefault();
-                          e.stopPropagation();
+                          e?.stopPropagation();
                         }}
                         onClick={(e: any) => {
                           e.preventDefault();
-                          e.stopPropagation();
+                          e?.stopPropagation();
                           onActionClick?.('more', row, e);
                         }}
                         title={t('misc.eat_more')}
@@ -2128,11 +2128,11 @@ const EnhancedAppointmentsTable = ({
                         className="action-button action-button--primary"
                         onMouseDown={(e: any) => {
                           e.preventDefault();
-                          e.stopPropagation();
+                          e?.stopPropagation();
                         }}
                         onClick={(e: any) => {
                           e.preventDefault();
-                          e.stopPropagation();
+                          e?.stopPropagation();
                           onActionClick?.('schedule_next', row, e);
                         }}
                         title={t('misc.eat_schedule_next_title')}>
