@@ -1,5 +1,4 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
+import type { CSSProperties } from 'react';
 
 import { useTranslation } from '../../i18n/useTranslation';
 import {
@@ -17,22 +16,28 @@ import {
 import {
   Card as MacOSCard,
   Badge,
-  Button,
-  MacOSEmptyState,
-  Input,
-  Skeleton,
-  Select,
+  Button as ButtonRaw,
+  MacOSEmptyState as MacOSEmptyStateRaw,
+  Input as InputRaw,
+  Skeleton as SkeletonRaw,
+  Select as SelectRaw,
 } from '../ui/macos';
 import useDoctors from '../../hooks/useDoctors';
 import useFinance from '../../hooks/useFinance';
 import usePatients from '../../hooks/usePatients';
-import { useModal } from '../../hooks/useModal.jsx';
+import { useModal } from '../../hooks/useModal';
 import notify from '../../services/notify';
 import logger from '../../utils/logger';
 import formatCurrency from '../../utils/formatCurrency';
 import FinanceModal from './FinanceModal';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
+import React from "react";
+const Input = InputRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Select = SelectRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Button = ButtonRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Skeleton = SkeletonRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const MacOSEmptyState = MacOSEmptyStateRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 function getCategoryOptions(t) {
   return [
@@ -71,7 +76,7 @@ function getTransactionStatusVariant(status) {
   const variantMap = {
     pending: 'warning',
     completed: 'success',
-    cancelled: 'error',
+    cancelled: 'danger',
     refunded: 'info',
   };
   return variantMap[status] || 'secondary';
@@ -99,7 +104,7 @@ function truncateDescription(description = '') {
 }
 
 const AdminFinanceOverview = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
   const [confirm, confirmDialog] = useConfirm();
   const {
@@ -139,7 +144,7 @@ const AdminFinanceOverview = () => {
 
   const handleDeleteTransaction = async (transaction) => {
     // P-013 fix: replaced window.confirm() with shared useConfirm hook.
-    const ok = await confirm({
+    const ok = await (confirm as unknown as (opts: Record<string, unknown>) => Promise<boolean>)({
       title: t('admin.delete_transaction_title'),
       message: t('admin2.fo_delete_transaction_message', { description: transaction.description }),
       description: t('admin2.fo_action_irreversible'),
@@ -215,11 +220,11 @@ const AdminFinanceOverview = () => {
               <p className="admin-fs-sm-fw-med-secondary-m-0">
                 {t('admin2.fo_net_profit')}
               </p>
-              <p className="admin-fs-2xl-fw-bold-m-4px-0-0-0-col-dyn" style={{ '--admin-col0': financialStats.netProfit >= 0 ? 'var(--mac-success)' : 'var(--mac-error)' }}>
+              <p className="admin-fs-2xl-fw-bold-m-4px-0-0-0-col-dyn" style={{ '--admin-col0': financialStats.netProfit >= 0 ? 'var(--mac-success)' : 'var(--mac-error)' } as CSSProperties}>
                 {formatCurrency(financialStats.netProfit)}
               </p>
             </div>
-            <Calendar className="admin-w-32-h-32-col-dyn" style={{ '--admin-col0': financialStats.netProfit >= 0 ? 'var(--mac-success)' : 'var(--mac-error)' }} />
+            <Calendar className="admin-w-32-h-32-col-dyn" style={{ '--admin-col0': financialStats.netProfit >= 0 ? 'var(--mac-success)' : 'var(--mac-error)' } as CSSProperties} />
           </div>
         </MacOSCard>
 
@@ -352,7 +357,7 @@ const AdminFinanceOverview = () => {
                 </tr>
               </thead>
               <tbody>
-                {transactions.map((transaction) => (
+                {(transactions as Array<Record<string, any>>).map((transaction) => (
                   <tr
                     key={transaction.id}
                     className="admin-bd-b-1px-solid-var-mac-se-tr-all-var-mac-duration"
@@ -364,7 +369,7 @@ const AdminFinanceOverview = () => {
                     }}
                   >
                     <td className="admin-p-var-mac-spacing-3-va">
-                      <Badge variant={transaction.type === 'income' ? 'success' : 'error'}>
+                      <Badge variant={(String(transaction.type) === 'income' ? 'success' : 'danger') as "default" | "primary" | "secondary" | "success" | "warning" | "danger" | "info" | "outline"}>
                         {getTransactionTypeLabel(transaction.type, t)}
                       </Badge>
                     </td>
@@ -381,7 +386,7 @@ const AdminFinanceOverview = () => {
                       </div>
                     </td>
                     <td className="admin-p-var-mac-spacing-3-va">
-                      <p className="admin-fw-med-m-0-col-dyn" style={{ '--admin-col0': transaction.type === 'income' ? 'var(--mac-success)' : 'var(--mac-danger)' }}>
+                      <p className="admin-fw-med-m-0-col-dyn" style={{ '--admin-col0': transaction.type === 'income' ? 'var(--mac-success)' : 'var(--mac-danger)' } as CSSProperties}>
                         {transaction.type === 'income' ? '+' : '-'}{formatCurrency(transaction.amount)}
                       </p>
                       <p className="admin-fs-sm-secondary-m-4px-0-0-0">
@@ -459,7 +464,7 @@ const AdminFinanceOverview = () => {
         doctors={activeDoctors}
       />
       {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
-      {confirmDialog}
+      {confirmDialog as unknown as React.ReactNode}
     </div>
   );
 };

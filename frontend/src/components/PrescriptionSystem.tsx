@@ -1,13 +1,14 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { Pill, Plus, X, Save, Printer, AlertCircle, CheckCircle } from 'lucide-react';
-import { Card, Button, Badge,
-  Input } from './ui/macos';
+import { Card, Button as ButtonRaw, Badge,
+  Input as InputRaw } from './ui/macos';
 import logger from '../utils/logger';
 import { useTranslation } from '../i18n/useTranslation';
+import React from "react";
+const Input = InputRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Button = ButtonRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const createEmptyPrescription = () => ({
   medications: [], // Список препаратов
   instructions: '', // Общие инструкции
@@ -25,7 +26,7 @@ const PrescriptionSystem = ({
   onSave,
   onPrint
 }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [prescription, setPrescription] = useState(() => createEmptyPrescription());
 
   const [isSaving, setIsSaving] = useState(false);
@@ -212,7 +213,7 @@ const PrescriptionSystem = ({
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold">{t('misc.ps_medications_title')}</h3>
           <Button
-            size="sm"
+            size="small"
             onClick={handleMedicationAdd}
             disabled={!canEdit}>
 
@@ -232,7 +233,7 @@ const PrescriptionSystem = ({
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="font-medium">{t('misc.ps_medication_n', { n: index + 1 })}</h4>
                   <Button
-                size="sm"
+                size="small"
                 variant="danger"
                 onClick={() => handleMedicationRemove(medication.id)}
                 type="button"

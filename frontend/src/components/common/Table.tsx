@@ -1,12 +1,12 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 // Система таблиц с сортировкой, фильтрацией и пагинацией
 import PropTypes from 'prop-types';
 import { useState, useMemo, useCallback } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
-import { Input } from '../ui/macos';
+import { Input as InputRaw } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
+import React, { type CSSProperties } from "react";
+const Input = InputRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 /**
  * Компонент таблицы
@@ -30,7 +30,7 @@ export function Table({
   
   const [sortField, setSortField] = useState('');
   const [sortDirection, setSortDirection] = useState('asc');
-  const [filters, setFilters] = useState({});
+  const [filters, setFilters] = useState<Record<string, any>>({});
   const [currentPage, setCurrentPage] = useState(1);
 
   // Сортировка данных
@@ -198,18 +198,18 @@ export function Table({
   return (
     <div>
       <div className="admin-table-wrapper">
-<table style={tableStyle} {...props}>
-        <thead style={headerStyle}>
+<table style={tableStyle as CSSProperties} {...props}>
+        <thead style={headerStyle as CSSProperties}>
           <tr>
             {columns.map((column) => (
               <th
                 key={column.key}
-                style={headerCellStyle}
+                style={headerCellStyle as CSSProperties}
                 onClick={() => handleSort(column.key)}
               >
                 {column.title}
                 {sortable && (
-                  <span style={sortIconStyle}>
+                  <span style={sortIconStyle as CSSProperties}>
                     {getSortIcon(column.key)}
                   </span>
                 )}
@@ -220,7 +220,7 @@ export function Table({
           {filterable && (
             <tr>
               {columns.map((column) => (
-                <th key={`filter-${column.key}`} style={headerCellStyle}>
+                <th key={`filter-${column.key}`} style={headerCellStyle as CSSProperties}>
                   {column.filterable !== false && (
                     <Input
                       type="text"
@@ -228,7 +228,7 @@ export function Table({
                       placeholder={`Фильтр по ${column.title.toLowerCase()}`}
                       value={filters[column.key] || ''}
                       onChange={(e) => handleFilter(column.key, e.target.value)}
-                      style={filterInputStyle}
+                      style={filterInputStyle as CSSProperties}
                     />
                   )}
                 </th>
@@ -240,7 +240,7 @@ export function Table({
         <tbody>
           {paginatedData.length === 0 ? (
             <tr>
-              <td colSpan={columns.length} style={emptyStyle}>
+              <td colSpan={columns.length} style={emptyStyle as CSSProperties}>
                 {emptyMessage}
               </td>
             </tr>
@@ -248,16 +248,16 @@ export function Table({
             paginatedData.map((row, index) => (
               <tr
                 key={row.id || index}
-                style={rowStyle}
+                style={rowStyle as CSSProperties}
                 onMouseEnter={(e) => {
-                  e.target.style.backgroundColor = getColor('background', 'tertiary');
+                  e.currentTarget.style.backgroundColor = getColor('background', 'tertiary');
                 }}
                 onMouseLeave={(e) => {
-                  e.target.style.backgroundColor = 'transparent';
+                  e.currentTarget.style.backgroundColor = 'transparent';
                 }}
               >
                 {columns.map((column) => (
-                  <td key={column.key} style={cellStyle}>
+                  <td key={column.key} style={cellStyle as CSSProperties}>
                     {column.render ? column.render(row[column.key], row) : row[column.key]}
                   </td>
                 ))}
@@ -269,14 +269,14 @@ export function Table({
 </div>
       
       {pagination && totalPages > 1 && (
-        <div style={paginationStyle}>
+        <div style={paginationStyle as CSSProperties}>
           <div>
             Показано {((currentPage - 1) * pageSize) + 1} - {Math.min(currentPage * pageSize, filteredData.length)} из {filteredData.length}
           </div>
           
           <div>
             <button
-              style={pageButtonStyle}
+              style={pageButtonStyle as CSSProperties}
               aria-label="Previous table page"
               onClick={() => handlePageChange(currentPage - 1)}
               disabled={currentPage === 1}
@@ -298,7 +298,7 @@ export function Table({
             })}
             
             <button
-              style={pageButtonStyle}
+              style={pageButtonStyle as CSSProperties}
               aria-label="Next table page"
               onClick={() => handlePageChange(currentPage + 1)}
               disabled={currentPage === totalPages}
@@ -340,12 +340,12 @@ function TableLoading({ columns = 3, rows = 5 }) {
   };
 
   return (
-    <table style={tableStyle}>
+    <table style={tableStyle as CSSProperties}>
       <thead>
         <tr>
           {Array.from({ length: columns }).map((_, i) => (
-            <th key={i} style={cellStyle} aria-label={`Loading table column ${i + 1}`}>
-              <div style={skeletonStyle} />
+            <th key={i} style={cellStyle as CSSProperties} aria-label={`Loading table column ${i + 1}`}>
+              <div style={skeletonStyle as CSSProperties} />
             </th>
           ))}
         </tr>
@@ -356,10 +356,10 @@ function TableLoading({ columns = 3, rows = 5 }) {
             {Array.from({ length: columns }).map((_, colIndex) => (
               <td
                 key={colIndex}
-                style={cellStyle}
+                style={cellStyle as CSSProperties}
                 aria-label={`Loading table row ${rowIndex + 1} column ${colIndex + 1}`}
               >
-                <div style={skeletonStyle} />
+                <div style={skeletonStyle as CSSProperties} />
               </td>
             ))}
           </tr>
@@ -410,7 +410,7 @@ export function TableExport({ data, columns, filename = 'export.csv' }) {
   };
 
   return (
-    <button style={buttonStyle} onClick={handleExport}>
+    <button style={buttonStyle as CSSProperties} onClick={handleExport}>
       Экспорт CSV
     </button>
   );

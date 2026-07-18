@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 /**
  * CommandPalette — global Cmd+K / Ctrl+K command palette for admin navigation.
@@ -24,8 +22,10 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Search, ArrowRight, Clock } from 'lucide-react';
 import { getCanonicalRoutes, isRouteAccessibleToProfile } from '../../routing/routeSelectors';
-import { Input } from '../ui/macos';
+import { Input as InputRaw } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
+import React from "react";
+const Input = InputRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const MAX_RESULTS = 8;
 const MAX_RECENT = 5;
@@ -130,7 +130,7 @@ function scoreResult(query, item) {
 }
 
 export function CommandPalette({ profile, navigate }) {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -150,11 +150,11 @@ export function CommandPalette({ profile, navigate }) {
 
     const routeItems = accessibleRoutes.map(route => ({
       id: route.id,
-      label: route.nav?.label || route.title || route.id,
-      description: route.nav?.section || route.group || '',
+      label: (typeof route.nav === 'object' && route.nav ? (route.nav as { label?: string }).label : null) || route.title || route.id,
+      description: (typeof route.nav === 'object' && route.nav ? (route.nav as { section?: string }).section : null) || route.group || '',
       path: route.path,
-      icon: route.nav?.icon,
-      section: route.nav?.section || t('misc.cp_marshruty'),
+      icon: (typeof route.nav === 'object' && route.nav ? (route.nav as { icon?: string }).icon : undefined),
+      section: (typeof route.nav === 'object' && route.nav ? (route.nav as { section?: string }).section : null) || t('misc.cp_marshruty'),
       keywords: [route.id, route.path, route.title],
       action: 'navigate',
       target: route.path,
@@ -321,7 +321,7 @@ export function CommandPalette({ profile, navigate }) {
           padding: '14px 16px',
           borderBottom: '1px solid var(--mac-border, rgba(0,0,0,0.08))',
         }}>
-          <Search size={18} style={{ color: 'var(--mac-text-secondary, #6b7280)', flexShrink: 0 }} />
+          <Search size={18 as unknown as "small" | "default" | "large" | "xlarge"} style={{ color: 'var(--mac-text-secondary, #6b7280)', flexShrink: 0 }} />
           <Input
             ref={inputRef}
             type="text"
@@ -398,7 +398,7 @@ export function CommandPalette({ profile, navigate }) {
                 }}
               >
                 {isRecent && (
-                  <Clock size={14} style={{
+                  <Clock size={14 as unknown as "small" | "default" | "large" | "xlarge"} style={{
                     color: isSelected ? 'color-mix(in srgb, white, transparent 30%)' : 'var(--mac-text-secondary, #6b7280)',
                     flexShrink: 0,
                   }} />
@@ -426,7 +426,7 @@ export function CommandPalette({ profile, navigate }) {
                   )}
                 </div>
                 {isSelected && (
-                  <ArrowRight size={14} style={{ color: 'color-mix(in srgb, white, transparent 30%)', flexShrink: 0 }} />
+                  <ArrowRight size={14 as unknown as "small" | "default" | "large" | "xlarge"} style={{ color: 'color-mix(in srgb, white, transparent 30%)', flexShrink: 0 }} />
                 )}
               </div>
             );
