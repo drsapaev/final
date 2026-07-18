@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 /**
  * Echo Form Component
@@ -10,10 +8,10 @@ import { useState, useEffect } from 'react';
 import {
   Card,
   CardContent,
-  Typography,
+  Typography as TypographyRaw,
   Button,
-  Alert,
-  Input,
+  Alert as AlertRaw,
+  Input as InputRaw,
   Textarea,
 } from '../ui/macos';
 import {
@@ -29,6 +27,10 @@ import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
+import React from "react";
+const Input = InputRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Typography = TypographyRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Alert = AlertRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const DEFAULT_ECHO_DATA = {
   // Левый желудочек
@@ -146,7 +148,7 @@ function buildEchoEmrPayload(existingEmr, echoData) {
 }
 
 const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [echoData, setEchoData] = useState(DEFAULT_ECHO_DATA);
 
   const [loading, setLoading] = useState(false);

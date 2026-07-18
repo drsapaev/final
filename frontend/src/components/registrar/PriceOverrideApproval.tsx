@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useState, useEffect, useCallback } from 'react';
 import {
@@ -57,7 +55,7 @@ const hasBackendPriceOverrideAction = (override, action) => {
  * Компонент для одобрения/отклонения изменений цен врачами
  */
 const PriceOverrideApproval = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   useTheme();
   const [priceOverrides, setPriceOverrides] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -129,10 +127,10 @@ const PriceOverrideApproval = () => {
 
   const getStatusIcon = (status) => {
     switch (status) {
-      case 'pending':return <Clock size={16} />;
-      case 'approved':return <CheckCircle size={16} />;
-      case 'rejected':return <XCircle size={16} />;
-      default:return <AlertCircle size={16} />;
+      case 'pending':return <Clock size={16 as unknown as "small" | "default" | "large" | "xlarge"} />;
+      case 'approved':return <CheckCircle size={16 as unknown as "small" | "default" | "large" | "xlarge"} />;
+      case 'rejected':return <XCircle size={16 as unknown as "small" | "default" | "large" | "xlarge"} />;
+      default:return <AlertCircle size={16 as unknown as "small" | "default" | "large" | "xlarge"} />;
     }
   };
 
@@ -172,7 +170,7 @@ const PriceOverrideApproval = () => {
         <div className="flex items-center gap-3">
           {/* Фильтр по статусу */}
           <div className="flex items-center gap-2">
-            <Filter size={16} className="text-gray-500" />
+            <Filter size={16 as unknown as "small" | "default" | "large" | "xlarge"} className="text-gray-500" />
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
@@ -191,7 +189,7 @@ const PriceOverrideApproval = () => {
             disabled={loading}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50">
             
-            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+            <RefreshCw size={16 as unknown as "small" | "default" | "large" | "xlarge"} className={loading ? 'animate-spin' : ''} />
             Обновить
           </button>
         </div>
@@ -229,7 +227,7 @@ const PriceOverrideApproval = () => {
                 </div>
                 
                 <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-                  <Calendar size={14} />
+                  <Calendar size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
                   {new Date(override.created_at).toLocaleDateString('ru-RU')}
                 </div>
               </div>
@@ -241,7 +239,7 @@ const PriceOverrideApproval = () => {
                     Пациент
                   </label>
                   <div className="flex items-center gap-2">
-                    <User size={16} className="text-gray-400" />
+                    <User size={16 as unknown as "small" | "default" | "large" | "xlarge"} className="text-gray-400" />
                     <span className="text-sm">{override.patient_name || t('misc.poa_ne_ukazan')}</span>
                   </div>
                 </div>
@@ -271,7 +269,7 @@ const PriceOverrideApproval = () => {
                     Базовая цена
                   </label>
                   <div className="flex items-center gap-2">
-                    <DollarSign size={16} className="text-gray-400" />
+                    <DollarSign size={16 as unknown as "small" | "default" | "large" | "xlarge"} className="text-gray-400" />
                     <span className="text-lg font-medium">{formatPrice(override.original_price)}</span>
                   </div>
                 </div>
@@ -281,7 +279,7 @@ const PriceOverrideApproval = () => {
                     Новая цена
                   </label>
                   <div className="flex items-center gap-2">
-                    <DollarSign size={16} className="text-blue-600" />
+                    <DollarSign size={16 as unknown as "small" | "default" | "large" | "xlarge"} className="text-blue-600" />
                     <span className="text-lg font-medium text-blue-600">{formatPrice(override.new_price)}</span>
                     <span className="text-sm text-gray-500">
                       ({override.new_price > override.original_price ? '+' : ''}
@@ -311,7 +309,7 @@ const PriceOverrideApproval = () => {
               disabled={isProcessing}
               className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50">
               
-                    <CheckCircle size={16} />
+                    <CheckCircle size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
                     Одобрить
                   </button>
             }
@@ -325,7 +323,7 @@ const PriceOverrideApproval = () => {
               disabled={isProcessing}
               className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50">
               
-                    <XCircle size={16} />
+                    <XCircle size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
                     Отклонить
                   </button>
             }
@@ -378,7 +376,7 @@ const PriceOverrideApproval = () => {
                   {isProcessing ?
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" /> :
 
-                <XCircle size={16} />
+                <XCircle size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
                 }
                   Отклонить
                 </button>

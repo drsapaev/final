@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useState } from 'react';
 import PropTypes from 'prop-types';
@@ -32,7 +30,7 @@ const PredictiveAnalytics = ({
   onExport,
   showRecommendations = true
 }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [selectedMetric, setSelectedMetric] = useState('revenue');
   const [forecastPeriod, setForecastPeriod] = useState('30d');
   const [showDetails, setShowDetails] = useState(false);
@@ -166,7 +164,7 @@ const PredictiveAnalytics = ({
           <div className="flex items-center space-x-2">
             <Button
               variant="outline"
-              size="sm"
+              size="small"
               onClick={() => onExport?.('recommendations')}>
               
               <Download className="w-4 h-4 mr-2" />
@@ -323,7 +321,7 @@ const PredictiveAnalytics = ({
           <div className="flex items-center space-x-2">
             <Button
               variant="outline"
-              size="sm"
+              size="small"
               onClick={() => setShowDetails(!showDetails)}>
               
               <Eye className="w-4 h-4 mr-2" />
@@ -331,7 +329,7 @@ const PredictiveAnalytics = ({
             </Button>
             <Button
               variant="outline"
-              size="sm"
+              size="small"
               onClick={() => onRefresh?.()}>
               
               <RefreshCw className="w-4 h-4 mr-2" />

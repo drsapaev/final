@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
@@ -35,9 +33,9 @@ const IntegratedServiceSelector = ({
   simple = false,
   onNext
 }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [loading, setLoading] = useState(true);
-  const [services, setServices] = useState({});
+  const [services, setServices] = useState<Record<string, any>>({});
   const [, setCategories] = useState([]);
   const [error, setError] = useState('');
   const [retryCount, setRetryCount] = useState(0);
@@ -218,7 +216,7 @@ const IntegratedServiceSelector = ({
   const getServicesByGroup = () => {
     // Если services пустой, используем DEMO_SERVICES
     const sourceServices = Object.keys(services).length > 0 ? services : DEMO_SERVICES;
-    const filteredServices = {};
+    const filteredServices: Record<string, any[]> = {};
 
     Object.keys(sourceServices).forEach((group) => {
       const groupServices = sourceServices[group] || [];
