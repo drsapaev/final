@@ -1,11 +1,11 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
-import ModernQueueManager from './queue/ModernQueueManager';
+import ModernQueueManagerRaw from './queue/ModernQueueManager';
+import React from 'react';
+const ModernQueueManager = ModernQueueManagerRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import { fetchAvailableSpecialists } from '../api/queue';
-import auth from '../stores/auth.js';
+import auth from '../stores/auth';
 import logger from '../utils/logger';
 
 const QUEUE_SPECIALTY_ALIASES = {

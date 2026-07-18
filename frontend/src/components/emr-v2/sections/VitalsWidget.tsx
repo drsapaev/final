@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import PropTypes from 'prop-types';
 import './VitalsWidget.css';
@@ -13,8 +11,9 @@ import { useTranslation } from '../../../i18n/useTranslation';
  * - BMI Calculation
  * - BP Warning/Critical thresholds
  */
-const VitalsWidget = ({ vitals = {}, onChange, onFieldTouch, disabled }) => {
-  const { t } = useTranslation();
+const VitalsWidget = ({ vitals: vitalsRaw = {}, onChange, onFieldTouch, disabled }: { vitals?: Record<string, unknown>; onChange?: (v: Record<string, any>) => void; onFieldTouch?: (field: string) => void; disabled?: boolean }) => {
+  const vitals = vitalsRaw as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
     const handleChange = (field, value) => {
         onChange?.({ ...vitals, [field]: value });
         onFieldTouch?.(`vitals.${field}`);

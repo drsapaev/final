@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 /**
  * ComplaintsSection - Жалобы с "Мой опыт"
@@ -14,13 +12,17 @@
 
 import { useState, useCallback } from 'react';
 import PropTypes from 'prop-types';
-import EMRSection from './EMRSection';
-import ComplaintsField from './ComplaintsField';
+import EMRSectionRaw from './EMRSection';
+import React from 'react';
+import ComplaintsFieldRaw from './ComplaintsField';
 import { api } from '../../../api/client';
 import { DoctorTemplatesPanel, DoctorTemplatesButton } from '../DoctorTemplatesPanel';
 import { useDoctorSectionTemplates } from '../../../hooks/useDoctorSectionTemplates';
 import logger from '../../../utils/logger';
 import { useTranslation } from '../../../i18n/useTranslation';
+
+const EMRSection = EMRSectionRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const ComplaintsField = ComplaintsFieldRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 /**
  * ComplaintsSection Component

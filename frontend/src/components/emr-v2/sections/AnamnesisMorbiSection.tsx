@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 /**
  * AnamnesisMorbiSection - Анамнез заболевания с "Мой опыт"
@@ -11,12 +9,18 @@
 import { useState, useMemo, useCallback } from 'react';
 import PropTypes from 'prop-types';
 
-import EMRSection from './EMRSection';
-import EMRSmartFieldV2 from './EMRSmartFieldV2';
+import EMRSectionRaw from './EMRSection';
+import React from 'react';
+import EMRSmartFieldV2Raw from './EMRSmartFieldV2';
 import { useDoctorPhrases } from '../../../hooks/useDoctorPhrases';
-import { DoctorTemplatesPanel, DoctorTemplatesButton } from '../DoctorTemplatesPanel';
+import { DoctorTemplatesPanel as DTPRaw, DoctorTemplatesButton as DTBRaw } from '../DoctorTemplatesPanel';
 import { useDoctorSectionTemplates } from '../../../hooks/useDoctorSectionTemplates';
 import { useTranslation } from '../../../i18n/useTranslation';
+
+const EMRSection = EMRSectionRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const EMRSmartFieldV2 = EMRSmartFieldV2Raw as unknown as React.ComponentType<Record<string, unknown>>;
+const DoctorTemplatesPanel = DTPRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const DoctorTemplatesButton = DTBRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 /**
  * AnamnesisMorbiSection Component
@@ -63,7 +67,7 @@ export function AnamnesisMorbiSection({
 
   // History suggestions only - no AI for this field
   const allSuggestions = useMemo(() => {
-    return doctorSuggestions.map((s) => ({
+    return doctorSuggestions.map((s: Record<string, unknown>) => ({
       id: s.id,
       content: s.text,
       source: 'history', // Badge shows "📜 История"
