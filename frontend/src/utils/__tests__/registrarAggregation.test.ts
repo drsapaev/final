@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { describe, expect, it } from 'vitest';
 
@@ -9,11 +7,11 @@ import {
   sortRegistrarRowsForPresentation
 } from '../registrarAggregation';
 
-const pickOverride = (overrides, key, fallback) => (
+const pickOverride = (overrides: Record<string, unknown>, key: string, fallback: unknown): unknown => (
   Object.prototype.hasOwnProperty.call(overrides, key) ? overrides[key] : fallback
 );
 
-const makeAppointment = (overrides = {}) => ({
+const makeAppointment = (overrides: Record<string, unknown> = {}) => ({
   id: overrides.id ?? 1,
   patient_id: overrides.patient_id ?? 10,
   patient_fio: overrides.patient_fio ?? 'Тест Пациент',
