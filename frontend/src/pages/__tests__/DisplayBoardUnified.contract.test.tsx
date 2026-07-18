@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import React from 'react';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -34,7 +31,7 @@ import DisplayBoardUnified from '../DisplayBoardUnified';
 describe('DisplayBoardUnified contract', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    window.localStorage.getItem.mockReturnValue(null);
+    (window.localStorage.getItem as unknown as { mockReturnValue: (v: unknown) => void }).mockReturnValue(null);
     window.HTMLMediaElement.prototype.play = vi.fn().mockResolvedValue(undefined);
   });
 

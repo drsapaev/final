@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import React from 'react';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -10,7 +7,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import Landing from '../Landing';
 import { ThemeProvider } from '../../contexts/ThemeContext';
 import { TranslationProvider } from '../../i18n/useTranslation';
-import { MacOSThemeProvider } from '../../theme/macosTheme.tsx';
+import { MacOSThemeProvider } from '../../theme/macosTheme';
 
 function renderLanding() {
   let root = document.getElementById('root');
@@ -36,8 +33,8 @@ function renderLanding() {
 
 describe('Landing', () => {
   beforeEach(() => {
-    localStorage.getItem.mockImplementation(() => null);
-    localStorage.setItem.mockImplementation(() => undefined);
+    (localStorage.getItem as unknown as { mockImplementation: (cb: () => null) => void }).mockImplementation(() => null);
+    (localStorage.setItem as unknown as { mockImplementation: (cb: () => undefined) => void }).mockImplementation(() => undefined);
   });
 
   it('renders a multi-section SaaS landing with hero, modules, pricing and contacts', () => {

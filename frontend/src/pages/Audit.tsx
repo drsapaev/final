@@ -1,20 +1,20 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import RoleGate from '../components/RoleGate.jsx';
-import { api } from '../api/client.js';
+import RoleGateRaw from '../components/RoleGate';
+const RoleGate = RoleGateRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import { api } from '../api/client';
 import {
   AppEmpty, AppError, AppLoading, Button, Card, CardContent, CardHeader, Input,
 } from '../components/ui/macos';
 import { useTranslation } from '../i18n/useTranslation';
+import type { CSSProperties } from 'react';
 
 /**
  * Аудит: список последних действий пользователей.
  * Совместимо с GET /audit?limit=...&offset=...
  */
 export default function Audit() {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [rows, setRows] = useState([]);
   const [limit, setLimit] = useState(100);
   const [q, setQ] = useState('');
@@ -30,7 +30,8 @@ export default function Audit() {
       const items = Array.isArray(payload) ? payload : Array.isArray(res) ? res : [];
       setRows(items);
     } catch (e) {
-      setErr(e?.data?.detail || e?.message || t('misc.a_oshibka_zagruzki_audita'));
+      const err = e as { data?: { detail?: string }; message?: string };
+      setErr(err?.data?.detail || err?.message || t('misc.a_oshibka_zagruzki_audita'));
     } finally {
       setBusy(false);
     }
@@ -50,7 +51,7 @@ export default function Audit() {
   }, [q, rows]);
 
   const stateCellStyle = { minHeight: '96px', padding: 'var(--mac-spacing-4)' };
-  const visuallyHiddenStyle = {
+  const visuallyHiddenStyle: CSSProperties = {
     position: 'absolute',
     width: '1px',
     height: '1px',
@@ -64,27 +65,27 @@ export default function Audit() {
   const limitInputId = 'audit-limit';
   const searchInputId = 'audit-search';
   const tableCaptionId = 'audit-table-caption';
-  const toolbarStyle = {
+  const toolbarStyle: CSSProperties = {
     display: 'flex',
     alignItems: 'center',
     gap: 12,
     flexWrap: 'wrap'
   };
-  const fieldStyle = {
+  const fieldStyle: CSSProperties = {
     display: 'flex',
     alignItems: 'center',
     gap: 8,
     color: 'var(--mac-text-secondary)',
     fontSize: 13
   };
-  const tableWrapStyle = {
+  const tableWrapStyle: CSSProperties = {
     overflowX: 'auto',
     border: '1px solid var(--mac-card-border)',
     borderRadius: 8,
     background: 'var(--mac-card-bg)',
     marginTop: 16
   };
-  const tableStyle = {
+  const tableStyle: CSSProperties = {
     width: '100%',
     borderCollapse: 'collapse'
   };

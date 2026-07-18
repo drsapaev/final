@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';  // PR-54: replace raw fetch
 import { useNavigate } from 'react-router-dom';
@@ -12,7 +9,8 @@ import {
 import { useTranslation } from '../i18n/useTranslation';
 
 export default function UserSelect() {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [items, setItems] = useState([]);
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(false);
@@ -29,7 +27,8 @@ export default function UserSelect() {
         const data = r.data;
         setItems(Array.isArray(data) ? data : []);
       } catch (e) {
-        setErr(e.message || t('misc.us_oshibka_zagruzki'));
+        const err = e as { message?: string };
+        setErr(err.message || t('misc.us_oshibka_zagruzki'));
       } finally {
         setLoading(false);
       }
@@ -49,7 +48,7 @@ export default function UserSelect() {
           title={t('misc.us_zagruzka_polzovateley')}
           description={t('misc.us_poluchaem_spisok_dostupnyh_p')}
           ariaLabel={t('misc.us_zagruzhaem_spisok_polzovatel')}
-          size="sm"
+          size="small"
         />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

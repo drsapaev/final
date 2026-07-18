@@ -1,9 +1,7 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import RoleGate from '../components/RoleGate.jsx';
-import { api } from '../api/client.js';
+import RoleGateRaw from '../components/RoleGate';
+const RoleGate = RoleGateRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import { api } from '../api/client';
 import { Input } from '../components/ui/macos';
 import { useTranslation } from '../i18n/useTranslation';
 
@@ -20,7 +18,8 @@ function todayStr() {
  * Совместимо с GET /schedule?date=YYYY-MM-DD&limit=...
  */
 export default function Scheduler() {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [date, setDate] = useState(todayStr());
   const [rows, setRows] = useState([]);
   const [q, setQ] = useState('');
@@ -32,14 +31,15 @@ export default function Scheduler() {
     setErr('');
     try {
       // Пытаемся обеими формами параметров: date и d — поддержка разных реализаций.
-      let res = await api.get('/schedule', { params: { date, limit: 200 } });
+      let res: any = await api.get('/schedule', { params: { date, limit: 200 } });
       if (!res || !Array.isArray(res) && !Array.isArray(res?.items)) {
         res = await api.get('/schedule', { params: { d: date, limit: 200 } });
       }
       const items = Array.isArray(res?.items) ? res.items : Array.isArray(res) ? res : [];
       setRows(items);
     } catch (e) {
-      setErr(e?.data?.detail || e?.message || t('misc.sche_oshibka_zagruzki_raspisaniya'));
+      const err = e as { data?: { detail?: string }; message?: string };
+      setErr(err?.data?.detail || err?.message || t('misc.sche_oshibka_zagruzki_raspisaniya'));
     } finally {
       setBusy(false);
     }

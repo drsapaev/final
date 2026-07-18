@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 /**
  * CSV generation and download utilities for Registrar Panel.
  *
@@ -17,12 +14,13 @@
  * Mask phone number for CSV export (PHI protection).
  * Example: +998 90 123 45 67 → +998 ***-**-67
  */
-function maskPhoneForCSV(phone) {
+function maskPhoneForCSV(phone: unknown): string {
   if (!phone) return '';
-  const digits = phone.replace(/\D/g, '');
+  const phoneStr = String(phone);
+  const digits = phoneStr.replace(/\D/g, '');
   if (digits.length < 4) return '***';
   const lastTwo = digits.slice(-2);
-  const countryMatch = phone.match(/^\+\d{1,3}/);
+  const countryMatch = phoneStr.match(/^\+\d{1,3}/);
   const country = countryMatch ? countryMatch[0] : '+';
   return `${country} ***-**-${lastTwo}`;
 }
@@ -36,17 +34,19 @@ function maskPhoneForCSV(phone) {
  * @param {boolean} options.includeTimestamps - include date/time/changed columns (default: false)
  * @returns {string} CSV content with BOM-safe headers
  */
-export function generateCSV(data, options = {}) {
+export function generateCSV(data: any[], options: Record<string, unknown> = {}) {
   const {
     maskPhone = true,
     includeAddress = false,
     includeTimestamps = false,
-  } = options;
+  } = options as { maskPhone?: boolean; includeAddress?: boolean; includeTimestamps?: boolean };
 
   // UX Audit R-3.1: unified CSV generation with PHI masking.
   // Раньше: handleExport в EnhancedAppointmentsTable использовал formatPhoneNumber
   // (БЕЗ маски) — PHI leak. Теперь: единая функция с maskPhone=true по умолчанию.
-  const phoneFormatter = maskPhone ? maskPhoneForCSV : (p) => p || '';
+  const phoneFormatter = maskPhone
+    ? (p: unknown) => maskPhoneForCSV(p)
+    : (p: unknown) => (p ? String(p) : '');
 
   const headers = ['№', 'ФИО', 'Год рождения', 'Телефон'];
   if (includeAddress) headers.push('Адрес');
@@ -80,7 +80,7 @@ export function generateCSV(data, options = {}) {
   });
 
   // R-23 fix: CSV injection protection (CWE-1236).
-  const escapeCSVCell = (value) => {
+  const escapeCSVCell = (value: unknown) => {
     const str = String(value ?? '');
     let escaped = str.replace(/"/g, '""');
     if (/^[=+\-@]/.test(escaped)) {
@@ -102,7 +102,7 @@ export function generateCSV(data, options = {}) {
  * @param {string} content - CSV content string
  * @param {string} filename - download filename
  */
-export function downloadCSV(content, filename) {
+export function downloadCSV(content: string, filename: string) {
   const blob = new Blob(['\ufeff' + content], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement('a');
   const url = URL.createObjectURL(blob);

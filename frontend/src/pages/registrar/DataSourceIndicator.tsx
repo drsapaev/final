@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 /**
  * DataSourceIndicator — inline indicator showing data loading state.
  *
@@ -14,8 +11,16 @@ import PropTypes from 'prop-types';
 import { Icon } from '../../components/ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
 
-const DataSourceIndicator = memo(({ dataSource, count, paginationInfo, onRetry }) => {
-  const { t: tI18n } = useTranslation();
+interface DataSourceIndicatorProps {
+  dataSource?: 'loading' | 'api' | 'error' | string;
+  count?: number;
+  paginationInfo?: { total?: number; hasMore?: boolean } | null;
+  onRetry?: (opts?: Record<string, unknown>) => void;
+}
+
+const DataSourceIndicator = memo(({ dataSource, count, paginationInfo, onRetry }: DataSourceIndicatorProps) => {
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // QW-03 fix: 'demo' state replaced with 'error' state — no more fake data.
   // DS-3: inline styles replaced with .registrar-ds-* CSS classes
   // i18n-unification: hardcoded Russian strings migrated to registrarPanel.* namespace
@@ -23,11 +28,11 @@ const DataSourceIndicator = memo(({ dataSource, count, paginationInfo, onRetry }
     return (
       <div className="registrar-ds-indicator registrar-ds-error">
         <Icon name="exclamationmark.triangle" size="small" className="registrar-text-white" />
-        <span>{tI18n('registrarPanel.ds_error_message')}</span>
+        <span>{t('registrarPanel.ds_error_message')}</span>
         <button
           onClick={() => onRetry?.({ source: 'error_refresh_button', force: true })}
           className="registrar-ds-retry-btn">
-          {tI18n('registrarPanel.ds_retry')}
+          {t('registrarPanel.ds_retry')}
         </button>
       </div>
     );
@@ -37,7 +42,7 @@ const DataSourceIndicator = memo(({ dataSource, count, paginationInfo, onRetry }
     return (
       <div className="registrar-ds-indicator registrar-ds-success">
         <Icon name="checkmark.circle" size="small" className="registrar-text-white" />
-        <span>{tI18n('registrarPanel.data_source_api')}</span>
+        <span>{t('registrarPanel.data_source_api')}</span>
         <span className="registrar-ds-count">
           {count} / {paginationInfo?.total ?? count}
         </span>
@@ -49,7 +54,7 @@ const DataSourceIndicator = memo(({ dataSource, count, paginationInfo, onRetry }
     return (
       <div className="registrar-ds-indicator registrar-ds-loading">
         <Icon name="arrow.up.arrow.down" size="small" className="registrar-text-white" />
-        <span>{tI18n('registrarPanel.loading')}</span>
+        <span>{t('registrarPanel.loading')}</span>
       </div>
     );
   }
@@ -58,7 +63,7 @@ const DataSourceIndicator = memo(({ dataSource, count, paginationInfo, onRetry }
 });
 
 DataSourceIndicator.displayName = 'DataSourceIndicator';
-DataSourceIndicator.propTypes = {
+(DataSourceIndicator as unknown as { propTypes: unknown }).propTypes = {
   count: PropTypes.number.isRequired,
   dataSource: PropTypes.oneOf(['loading', 'api', 'error']),
   paginationInfo: PropTypes.shape({

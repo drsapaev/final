@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { describe, expect, it } from 'vitest';
 
 import { formatLoginErrorMessage, LOGIN_ERROR_MESSAGES } from '../loginErrorUtils';

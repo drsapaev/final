@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 /**
  * Registrar Panel — Queue View.
  *
@@ -23,11 +20,24 @@
 import React from 'react';
 import { Card, CardHeader, CardContent } from '../../../components/ui/macos';
 import { AnimatedTransition } from '../../../components/ui';
-import ModernQueueManager from '../../../components/queue/ModernQueueManager';
+import ModernQueueManagerRaw from '../../../components/queue/ModernQueueManager';
+const ModernQueueManager = ModernQueueManagerRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import { getLocalDateString } from '../../../utils/dateUtils';
 import logger from '../../../utils/logger';
 // i18n-unification: use unified useTranslation instead of getRegistrarTranslator
 import { useTranslation } from '../../../i18n/useTranslation';
+
+interface QueueViewProps {
+  searchParams: URLSearchParams;
+  setSearchParams: (params: URLSearchParams) => void;
+  loadAppointments: () => void | Promise<void>;
+  getSpacing: (key: string) => string;
+  getFontSize: (key: string) => string;
+  getColor: (key: string) => string;
+  language: string;
+  theme: string;
+  doctors: unknown[];
+}
 
 const QueueView = React.memo(({
   searchParams,
@@ -39,11 +49,11 @@ const QueueView = React.memo(({
   language,
   theme,
   doctors,
-}) => {
+}: QueueViewProps) => {
   // UX Audit R-3.8: используем t() для локализации заголовка и подзаголовка.
   // i18n-unification: t() now routes flat keys to registrarPanel.* namespace.
   const { t: tI18n } = useTranslation();
-  const t = (key) => tI18n('registrarPanel.' + key);
+  const t = ((key: string) => (tI18n as unknown as (k: string) => string)('registrarPanel.' + key)) as (key: string) => string;
   return (
     <AnimatedTransition type="fade" delay={100}>
       <Card variant="default" style={{ margin: `0 ${getSpacing('xl')} ${getSpacing('xl')} ${getSpacing('xl')}` }}>
@@ -81,13 +91,13 @@ const QueueView = React.memo(({
             selectedDoctor={searchParams.get('doctor') || ''}
             searchQuery={searchParams.get('q') || ''}
             onQueueUpdate={loadAppointments}
-            onDateChange={(newDate) => {
+            onDateChange={(newDate: string) => {
               logger.info('RegistrarPanel received date change:', newDate);
               const newParams = new URLSearchParams(searchParams);
               newParams.set('date', newDate);
               setSearchParams(newParams);
             }}
-            onDoctorChange={(newDoctorId) => {
+            onDoctorChange={(newDoctorId: string) => {
               logger.info('RegistrarPanel received doctor change:', newDoctorId);
               const newParams = new URLSearchParams(searchParams);
               newParams.set('doctor', newDoctorId);
@@ -95,7 +105,7 @@ const QueueView = React.memo(({
             }}
             language={language}
             theme={theme}
-            doctors={doctors}
+            doctors={doctors as never}
           />
         </CardContent>
       </Card>
