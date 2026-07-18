@@ -1,18 +1,15 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { API_ENDPOINTS } from '../endpoints.ts';
+import { API_ENDPOINTS } from '../endpoints';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const apiDir = path.resolve(__dirname, '..');
 
-const readSource = (fileName) => fs.readFileSync(path.join(apiDir, fileName), 'utf8');
+const readSource = (fileName: string): string => fs.readFileSync(path.join(apiDir, fileName), 'utf8');
 
 describe('auth refresh API contract', () => {
   it('uses the canonical authentication refresh route for proactive refresh', () => {

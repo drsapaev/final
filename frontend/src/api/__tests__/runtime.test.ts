@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -11,6 +8,16 @@ import {
   getRuntimeResolution,
   getWsBaseUrl,
 } from '../runtime';
+
+interface RuntimeResolutionWindow {
+  location: { origin: string };
+  __CLINIC_RUNTIME__?: {
+    currentOrigin: string;
+    apiOrigin: string;
+    apiBaseUrl: string;
+    wsOrigin: string;
+  };
+}
 
 describe('api runtime resolution', () => {
   afterEach(() => {
@@ -52,7 +59,7 @@ describe('api runtime resolution', () => {
   });
 
   it('publishes runtime resolution onto window for smoke probes', () => {
-    const windowStub = { location: { origin: 'https://clinic.example.com' } };
+    const windowStub: RuntimeResolutionWindow = { location: { origin: 'https://clinic.example.com' } };
     vi.stubGlobal('window', windowStub);
 
     expect(getRuntimeResolution()).toEqual({

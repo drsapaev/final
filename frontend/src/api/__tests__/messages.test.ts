@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { apiMock } = vi.hoisted(() => {
@@ -26,6 +23,18 @@ import {
   sendMessage,
 } from '../messages';
 
+// The mock replaces `api` at runtime; cast it through unknown so we can
+// call vitest mock methods (mockImplementationOnce / mockResolvedValueOnce)
+// without fighting the real AxiosInstance type.
+const apiMockTyped = api as unknown as {
+  get: ReturnType<typeof vi.fn>;
+  post: ReturnType<typeof vi.fn>;
+  patch: ReturnType<typeof vi.fn>;
+  delete: ReturnType<typeof vi.fn>;
+};
+
+type ResolveFn = (value: unknown) => void;
+
 describe('messages service cache', () => {
   beforeEach(() => {
     clearMessageQueryCache();
@@ -33,15 +42,15 @@ describe('messages service cache', () => {
   });
 
   it('deduplicates concurrent conversation requests and reuses fresh cache', async () => {
-    let resolveRequest;
-    api.get.mockImplementationOnce(() => new Promise((resolve) => {
-      resolveRequest = resolve;
+    let resolveRequest: ResolveFn | undefined;
+    apiMockTyped.get.mockImplementationOnce(() => new Promise((resolve) => {
+      resolveRequest = resolve as ResolveFn;
     }));
 
     const first = getConversations();
     const second = getConversations();
 
-    expect(api.get).toHaveBeenCalledTimes(1);
+    expect(apiMockTyped.get).toHaveBeenCalledTimes(1);
 
     resolveRequest?.({ data: { conversations: [{ id: 1 }], total_unread: 2 } });
 
@@ -50,30 +59,30 @@ describe('messages service cache', () => {
 
     const cached = await getConversations();
     expect(cached).toEqual({ conversations: [{ id: 1 }], total_unread: 2 });
-    expect(api.get).toHaveBeenCalledTimes(1);
+    expect(apiMockTyped.get).toHaveBeenCalledTimes(1);
   });
 
   it('deduplicates unread count requests and clears cache after sending a message', async () => {
-    let resolveUnread;
-    api.get.mockImplementationOnce(() => new Promise((resolve) => {
-      resolveUnread = resolve;
+    let resolveUnread: ResolveFn | undefined;
+    apiMockTyped.get.mockImplementationOnce(() => new Promise((resolve) => {
+      resolveUnread = resolve as ResolveFn;
     }));
 
     const unreadFirst = getUnreadCount();
     const unreadSecond = getUnreadCount();
 
-    expect(api.get).toHaveBeenCalledTimes(1);
+    expect(apiMockTyped.get).toHaveBeenCalledTimes(1);
 
     resolveUnread?.({ data: { unread_count: 4 } });
 
     await expect(unreadFirst).resolves.toBe(4);
     await expect(unreadSecond).resolves.toBe(4);
 
-    api.post.mockResolvedValueOnce({ data: { id: 9, content: 'ok' } });
+    apiMockTyped.post.mockResolvedValueOnce({ data: { id: 9, content: 'ok' } });
     await sendMessage(2, 'Hello');
 
-    api.get.mockResolvedValueOnce({ data: { unread_count: 1 } });
+    apiMockTyped.get.mockResolvedValueOnce({ data: { unread_count: 1 } });
     await expect(getUnreadCount()).resolves.toBe(1);
-    expect(api.get).toHaveBeenCalledTimes(2);
+    expect(apiMockTyped.get).toHaveBeenCalledTimes(2);
   });
 });
