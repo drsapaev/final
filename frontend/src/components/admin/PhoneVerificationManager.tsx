@@ -7,7 +7,7 @@ import {
   Badge,
   Skeleton as SkeletonRaw,
   Input,
-  Select as SelectRaw,
+  Select,
   Textarea,
 } from '../ui/macos';
 import {
@@ -29,7 +29,6 @@ import { toast } from 'react-toastify';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
-const Select = SelectRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const Skeleton = SkeletonRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const PhoneVerificationManager = () => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;

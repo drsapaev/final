@@ -18,12 +18,11 @@ import {
   MacOSEmptyState,
   Input,
   Skeleton as SkeletonRaw,
-  Select as SelectRaw,
+  Select,
 } from '../ui/macos';
 import IconButton from './IconButton';
 import logger from '../../utils/logger';
 import React from "react";
-const Select = SelectRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const Skeleton = SkeletonRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 // PR-19: departmentOptions now loaded dynamically from /admin/departments
@@ -200,7 +199,7 @@ const AdminDoctors = () => {
           {/* UX Audit Admin #4.7: фильтр специализации — Select вместо текстового инпута. */}
           <Select
             value={filterSpecialization}
-            onChange={setFilterSpecialization}
+            onChange={(v: any) => setFilterSpecialization(String(v))}
             options={[
               { value: '', label: t('admin2.ad_specialization_all') },
               ...[...new Set(doctors.map((d) => d.specialty).filter(Boolean))].map((s) => ({ value: s, label: s })),
@@ -210,14 +209,14 @@ const AdminDoctors = () => {
           />
           <Select
             value={filterDepartment}
-            onChange={setFilterDepartment}
+            onChange={(v: any) => setFilterDepartment(String(v))}
             options={departmentOptions}
             size="large"
             aria-label={t('admin2.ad_filter_department_aria')}
           />
           <Select
             value={filterStatus}
-            onChange={setFilterStatus}
+            onChange={(v: any) => setFilterStatus(String(v))}
             options={statusOptions}
             size="large"
             aria-label={t('admin2.ad_filter_status_aria')}

@@ -9,13 +9,12 @@ import {
   Sparkles
 } from 'lucide-react';
 import {
-  Select as SelectRaw,
+  Select,
   Input } from '../ui/macos';
 import { useNotificationCenter } from '../../contexts/NotificationCenterContext';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
-const Select = SelectRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const STATUS_FILTER_OPTIONS = [
   { value: 'all', label: '\u0412\u0441\u0435' },
@@ -331,7 +330,7 @@ export default function NotificationInbox({ userRole, onClose }) {
 
           <Select
             value={statusFilter}
-            onChange={setStatusFilter}
+            onChange={(v: any) => setStatusFilter(String(v))}
             options={STATUS_FILTER_OPTIONS}
             size="small"
             style={{ minWidth: 190 }}

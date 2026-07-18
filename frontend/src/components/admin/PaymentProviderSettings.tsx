@@ -19,7 +19,7 @@ import {
   Button,
   Input,
   Checkbox,
-  Select as SelectRaw,
+  Select,
 } from '../ui/macos';
 import {
   fetchPaymentProviderSettings,
@@ -28,7 +28,6 @@ import {
 } from '../../api/adminSettings';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
-const Select = SelectRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const PaymentProviderSettings = () => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;

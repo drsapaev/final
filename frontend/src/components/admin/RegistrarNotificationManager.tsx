@@ -2,7 +2,7 @@ import type { CSSProperties } from 'react';
 
 import { useState, useEffect } from 'react';
 import {
-  MacOSCard, Button, Badge, Input, Select as SelectRaw, Textarea,
+  MacOSCard, Button, Badge, Input, Select, Textarea,
 } from '../ui/macos';
 import {
   Bell,
@@ -27,7 +27,6 @@ import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
-const Select = SelectRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const RegistrarNotificationManager = () => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [activeTab, setActiveTab] = useState('send');
@@ -164,7 +163,7 @@ const RegistrarNotificationManager = () => {
             </label>
             <Select
             value={notificationForm.alert_type}
-            onChange={(value) => setNotificationForm({ ...notificationForm, alert_type: value })}
+            onChange={(value: any) => setNotificationForm({ ...notificationForm, alert_type: String(value) })}
             options={[
             { value: 'system_error', label: t('admin2.rnm_type_system_error') },
             { value: 'payment_issue', label: t('admin2.rnm_type_payment_issue') },
@@ -184,7 +183,7 @@ const RegistrarNotificationManager = () => {
             </label>
             <Select
             value={notificationForm.priority}
-            onChange={(value) => setNotificationForm({ ...notificationForm, priority: value })}
+            onChange={(value: any) => setNotificationForm({ ...notificationForm, priority: String(value) })}
             options={[
             { value: 'normal', label: t('admin2.rnm_priority_normal') },
             { value: 'warning', label: t('admin2.rnm_priority_warning') },

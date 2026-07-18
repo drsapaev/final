@@ -6,7 +6,7 @@ import {
   Button,
   Badge,
   Input,
-  Select as SelectRaw,
+  Select,
   Textarea,
   Modal as ModalRaw,
   Alert,
@@ -15,7 +15,6 @@ import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
 const Modal = ModalRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const Select = SelectRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const AppointmentModal = ({
   isOpen,

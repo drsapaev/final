@@ -18,7 +18,7 @@ import {
   Bell } from
 'lucide-react';
 import {
-  MacOSCard, Badge, Button, Select as SelectRaw,
+  MacOSCard, Badge, Button, Select,
 } from '../ui/macos';
 import { useTheme } from '../../contexts/ThemeContext';
 import { toast } from 'react-toastify';
@@ -27,7 +27,6 @@ import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
-const Select = SelectRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const ALL_FREE_ACTION_CAN_FIELD = {
   approve: 'can_approve',
@@ -209,7 +208,7 @@ const AllFreeApproval = () => {
               <Select
                 aria-label={t('admin2.af_filter_aria')}
                 value={statusFilter}
-                onChange={setStatusFilter}
+                onChange={(v: any) => setStatusFilter(String(v))}
                 options={[
                   { value: 'pending', label: t('admin2.af_filter_pending') },
                   { value: 'approved', label: t('admin2.af_filter_approved') },

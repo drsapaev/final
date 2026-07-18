@@ -29,13 +29,12 @@ import {
   MacOSCard,
   Button,
   Input,
-  Select as SelectRaw,
+  Select,
   Textarea,
   Checkbox,
 } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
-const Select = SelectRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const ClinicSettings = () => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;

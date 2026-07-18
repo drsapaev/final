@@ -7,7 +7,7 @@ import {
   Badge,
   Skeleton as SkeletonRaw,
   Input,
-  Select as SelectRaw,
+  Select,
   Textarea,
   Checkbox,
 } from '../ui/macos';
@@ -31,7 +31,6 @@ import { toast } from 'react-toastify';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
-const Select = SelectRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const Skeleton = SkeletonRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const formatFcmTokenStatus = (user, t) => {
   const fallbackLength = typeof user.fcm_token === 'string' ? user.fcm_token.length : 0;

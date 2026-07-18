@@ -14,14 +14,13 @@ import {
   MacOSEmptyState,
   Input,
   Skeleton as SkeletonRaw,
-  Select as SelectRaw,
+  Select,
 } from '../ui/macos';
 import IconButton from './IconButton';
 import logger from '../../utils/logger';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
 import React from "react";
-const Select = SelectRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const Skeleton = SkeletonRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const GENDER_OPTION_KEYS = [
@@ -229,14 +228,14 @@ const AdminPatients = () => {
           />
           <Select
             value={filterGender}
-            onChange={setFilterGender}
+            onChange={(v: any) => setFilterGender(String(v))}
             options={genderOptions}
             size="large"
             aria-label={t('admin2.ap_filter_gender_aria')}
           />
           <Select
             value={filterAgeRange}
-            onChange={setFilterAgeRange}
+            onChange={(v: any) => setFilterAgeRange(String(v))}
             options={ageOptions}
             size="large"
             aria-label={t('admin2.ap_filter_age_aria')}
@@ -250,7 +249,7 @@ const AdminPatients = () => {
             <div style={{ marginTop: '8px' }}>
               <Select
                 value={filterBloodType}
-                onChange={setFilterBloodType}
+                onChange={(v: any) => setFilterBloodType(String(v))}
                 options={bloodTypeOptions}
                 size="large"
                 aria-label={t('admin2.ap_filter_blood_type_aria')}
