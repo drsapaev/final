@@ -426,9 +426,9 @@ async function requestNotificationPolicy(userId: any) {
   }
 }
 
-async function persistNotificationPolicy(userId, payload) {
+async function persistNotificationPolicy(userId: any, payload: any) {
   try {
-    const response = await notificationsService.updatePolicy(userId, payload);
+    const response = await notificationsService.updatePolicy(userId, payload) as any;
     return response?.policy || payload;
   } catch (error) {
     if (!shouldFallbackToDirectApi(error)) {

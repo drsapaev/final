@@ -7,10 +7,15 @@ import KPIMetrics from '../components/analytics/KPIMetrics';
 import AdvancedCharts from '../components/analytics/AdvancedCharts';
 
 import PredictiveAnalytics from '../components/analytics/PredictiveAnalytics';
-import AdminRouteSwitcher from '../components/admin/AdminRouteSwitcher';
+import AdminRouteSwitcherRaw from '../components/admin/AdminRouteSwitcher';
+const AdminRouteSwitcher = AdminRouteSwitcherRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import {
-  Input, Button, Select, SegmentedControl,
+  Input as RawInput, Button as RawButton, Select as RawSelect, SegmentedControl as RawSegmentedControl,
 } from '../components/ui/macos';
+const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
+const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
+const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
+const SegmentedControl = RawSegmentedControl as unknown as React.ComponentType<Record<string, unknown>>;
 import logger from '../utils/logger';
 import {
   Calendar,
@@ -80,7 +85,7 @@ function formatMetricValue(value, format = 'count') {
 function getActivePreset(start, end) {
   const startDate = new Date(`${start}T00:00:00`);
   const endDate = new Date(`${end}T00:00:00`);
-  const diff = Math.round((endDate - startDate) / DAY_MS) + 1;
+  const diff = Math.round((endDate.getTime() - startDate.getTime()) / DAY_MS) + 1;
   if ([7, 30, 90].includes(diff)) {
     return diff;
   }
