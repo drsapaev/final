@@ -374,7 +374,7 @@ const TelegramManager = () => {
     let payload = { reasonCode, safeNote: safeNote || undefined };
 
     if (action === 'link-existing') {
-      const candidateId = options.candidateId || form.selectedCandidateId || onboardingDialog.candidateId;
+      const candidateId = (options as any).candidateId || form.selectedCandidateId || onboardingDialog.candidateId;
       if (!candidateId) {
         setError('Select a duplicate candidate before linking.');
         return;

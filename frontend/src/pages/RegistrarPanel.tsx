@@ -309,7 +309,7 @@ const RegistrarPanel = () => {
 
 
   // Улучшенная загрузка записей с поддержкой тихого режима
-  const loadAppointments = useCallback(async (options = {}) => {
+  const loadAppointments = useCallback(async (options: any = {}) => {
     const { silent = false } = options || {};
     const callSource = String(options?.source || 'unknown');
     const isAutoRefreshCall = callSource === 'auto_refresh';

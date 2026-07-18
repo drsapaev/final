@@ -1429,7 +1429,7 @@ const AppointmentWizardV2 = ({
       }
 
       // ✅ ИСПРАВЛЕНО: Сначала группируем услуги по визитам
-      let visits = groupCartItemsByVisit();
+      let visits: any[] = groupCartItemsByVisit();
       if (!visits || visits.length === 0) {
         toast.error(t('misc.aw_cart_empty_or_invalid'));
         return;
