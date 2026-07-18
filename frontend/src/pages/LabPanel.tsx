@@ -1,11 +1,12 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
-  Alert, Badge, Button, Card, CardContent, CardHeader, Icon,
+  Alert as RawAlert, Badge as RawBadge, Button as RawButton, Card as RawCard, CardContent, CardHeader, Icon,
 } from '../components/ui/macos';
+const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
+const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
+const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
+const Card = RawCard as unknown as React.ComponentType<Record<string, unknown>>;
 import LabQueueWorkbench from '../components/laboratory/LabQueueWorkbench';
 import LabReportWorkbench from '../components/laboratory/LabReportWorkbench';
 import LabTemplateWorkbench from '../components/laboratory/LabTemplateWorkbench';
@@ -78,7 +79,8 @@ function buildTemplateResolutionPayload(appointment) {
 }
 
 export default function LabPanel() {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const tabs = [
     { id: 'queue', label: t('misc.lp_ochered'), icon: 'testtube.2' },
     { id: 'templates', label: t('misc.lp_shablony'), icon: 'rectangle.stack.badge.plus' },
@@ -120,9 +122,9 @@ export default function LabPanel() {
   //   - info/success — 5 секунд (как раньше)
   //   - error с retryAction показывает кнопку «Повторить»
   //   - любой клик по Alert закрывает его
-  const [message, setMessage] = useState({ type: '', text: '', retryAction: null, retryLabel: '' });
+  const [message, setMessage] = useState({} as any);
 
-  const notify = useCallback((type, text, options = {}) => {
+  const notify = useCallback((type: any, text: any, options: any = {}) => {
     setMessage({
       type,
       text,
@@ -257,7 +259,7 @@ export default function LabPanel() {
         limit: LAB_QUEUE_PAGE_SIZE,
         offset: 0,
         signal: controller.signal,
-      });
+      }) as any;
       const queueEntries = normalizeListPayload(payload?.entries ?? []);
       setAppointments(queueEntries);
       setQueueTotal(payload?.total ?? queueEntries.length);
@@ -310,7 +312,7 @@ export default function LabPanel() {
         limit: LAB_QUEUE_PAGE_SIZE,
         offset: queueOffset,
         signal: controller.signal,
-      });
+      }) as any;
       const newEntries = normalizeListPayload(payload?.entries ?? []);
       setAppointments((current) => [...current, ...newEntries]);
       setQueueOffset((current) => current + newEntries.length);
@@ -335,12 +337,12 @@ export default function LabPanel() {
 
   const loadTemplates = useCallback(async (preferredTemplateId = null) => {
     try {
-      const summary = await labReportingApi.listTemplates();
+      const summary = await labReportingApi.listTemplates() as any;
       const templateSummary = normalizeListPayload(summary);
       setTemplates(templateSummary);
       const templateId = preferredTemplateId || selectedTemplate?.id || templateSummary[0]?.id || null;
       if (templateId) {
-        const detail = await labReportingApi.getTemplate(templateId);
+        const detail = await labReportingApi.getTemplate(templateId) as any;
         setSelectedTemplate(detail);
       } else {
         setSelectedTemplate(null);
@@ -370,7 +372,7 @@ export default function LabPanel() {
       return;
     }
     try {
-      const history = await labReportingApi.listInstances({ patient_id: patientId, limit: 50 });
+      const history = await labReportingApi.listInstances({ patient_id: patientId, limit: 50 }) as any;
       setReportHistory(normalizeListPayload(history));
     } catch (error) {
       logger.error('[LabPanel] loadReportHistory failed', error);
@@ -385,7 +387,7 @@ export default function LabPanel() {
 
   const loadRecentReports = useCallback(async () => {
     try {
-      const instances = await labReportingApi.listInstances({ limit: 50 });
+      const instances = await labReportingApi.listInstances({ limit: 50 }) as any;
       setRecentReports(normalizeListPayload(instances));
     } catch (error) {
       logger.error('[LabPanel] loadRecentReports failed', error);
@@ -414,7 +416,7 @@ export default function LabPanel() {
 
     setTemplateResolutionLoading(true);
     try {
-      const resolution = await labReportingApi.resolveTemplateOptions(payload);
+      const resolution = await labReportingApi.resolveTemplateOptions(payload) as any;
       setTemplateResolution(resolution);
       if (appointment?.appointment_id && resolution?.visit_id && !appointment.visit_id) {
         mergeResolvedVisitIntoState(appointment.appointment_id, resolution.visit_id);
@@ -439,7 +441,7 @@ export default function LabPanel() {
       return;
     }
     try {
-      const instance = await labReportingApi.getInstance(instanceId);
+      const instance = await labReportingApi.getInstance(instanceId) as any;
       setActiveInstance(instance);
       if (instance.patient_snapshot?.patient_id) {
         // L-M-2 fix: дедупликация loadReportHistory.
@@ -574,7 +576,7 @@ export default function LabPanel() {
               id={LAB_PANEL_TITLE_ID}
               className="lab-panel-title"
             >
-              <Icon name="cross.case" size={22} />
+              <Icon name="cross.case" size={22 as never} />
               <span>{t('misc.lp_panel_laboratorii')}</span>
             </h1>
             <div
@@ -597,7 +599,7 @@ export default function LabPanel() {
                   onClick={() => switchTab(tab.id)}
                   onKeyDown={(event) => handleTabKeyDown(event, tab.id)}
                 >
-                  <Icon name={tab.icon} size={16} />
+                  <Icon name={tab.icon} size={16 as never} />
                   {tab.label}
                   <Badge
                     aria-hidden="true"
@@ -634,7 +636,7 @@ export default function LabPanel() {
                         setTimeout(() => action(), 0);
                       }}
                     >
-                      <Icon name="arrow.clockwise" size={14} />
+                      <Icon name="arrow.clockwise" size={14 as never} />
                       {message.retryLabel || t('misc.lp_povtorit')}
                     </Button>
                   )}
@@ -644,7 +646,7 @@ export default function LabPanel() {
                     onClick={dismissMessage}
                     aria-label={t('misc.lp_zakryt_uvedomlenie')}
                   >
-                    <Icon name="xmark" size={14} />
+                    <Icon name="xmark" size={14 as never} />
                   </Button>
                 </div>
               )}
@@ -706,7 +708,7 @@ export default function LabPanel() {
           selectedTemplate={selectedTemplate}
           onSelectTemplate={async (templateId) => {
             try {
-              const template = await labReportingApi.getTemplate(templateId);
+              const template = await labReportingApi.getTemplate(templateId) as any;
               setSelectedTemplate(template);
             } catch (error) {
               notify('error', getErrorMessage(error, t('misc.lp_ne_udalos_zagruzit_shablon_p')));

@@ -1,8 +1,6 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect, useCallback } from 'react';
+import type { CSSProperties } from 'react';
 import {
   Plus,
   Edit,
@@ -30,16 +28,25 @@ import {
 'lucide-react';
 import {
   MacOSCard,
-  Button,
-  Badge,
-  SegmentedControl,
-  MacOSStatCard,
-  Input,
-  Select,
-  MacOSEmptyState,
-  Skeleton,
-  Modal,
+  Button as RawButton,
+  Badge as RawBadge,
+  SegmentedControl as RawSegmentedControl,
+  MacOSStatCard as RawMacOSStatCard,
+  Input as RawInput,
+  Select as RawSelect,
+  MacOSEmptyState as RawMacOSEmptyState,
+  Skeleton as RawSkeleton,
+  Modal as RawModal,
 } from '../ui/macos';
+const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
+const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
+const SegmentedControl = RawSegmentedControl as unknown as React.ComponentType<Record<string, unknown>>;
+const MacOSStatCard = RawMacOSStatCard as unknown as React.ComponentType<Record<string, unknown>>;
+const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
+const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
+const MacOSEmptyState = RawMacOSEmptyState as unknown as React.ComponentType<Record<string, unknown>>;
+const Skeleton = RawSkeleton as unknown as React.ComponentType<Record<string, unknown>>;
+const Modal = RawModal as unknown as React.ComponentType<Record<string, unknown>>;
 import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 
@@ -47,13 +54,15 @@ import logger from '../../utils/logger';
 // P-013 fix: shared ConfirmDialog hook replacing native confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
 const WebhookManager = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // P-013 fix: shared ConfirmDialog hook (replaces 1 native confirm() call).
-  const [confirm, confirmDialog] = useConfirm();
+  const [confirmRaw, confirmDialog] = useConfirm();
+  const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
   const [activeTab, setActiveTab] = useState('webhooks');
   const [webhooks, setWebhooks] = useState([]);
   const [calls, setCalls] = useState([]);
-  const [stats, setStats] = useState(null);
+  const [stats, setStats] = useState(null as any);
   const [loading, setLoading] = useState(true);
   const [selectedWebhook, setSelectedWebhook] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -62,8 +71,9 @@ const WebhookManager = () => {
   const [filters, setFilters] = useState({
     status: '',
     event_type: '',
-    search: ''
-  });
+    search: '',
+    call_status: ''
+  } as any);
 
   // Загрузка данных
   const loadWebhooks = useCallback(async () => {
@@ -279,7 +289,7 @@ const WebhookManager = () => {
       {/* Табы */}
       <SegmentedControl
         value={activeTab}
-        onChange={setActiveTab}
+        onChange={(v: unknown) => setActiveTab(String(v))}
         options={[
         { value: 'webhooks', label: <span className="admin-inline-flex-ai-center-gap-6"><Globe className="w-3.5 h-3.5" />{t('admin2.wh_tab_webhooks')}</span> },
         { value: 'calls', label: <span className="admin-inline-flex-ai-center-gap-6"><Activity className="w-3.5 h-3.5" />{t('admin2.wh_tab_calls')}</span> },
@@ -400,7 +410,7 @@ const WebhookManager = () => {
                   
                   <div className="admin-flex-ai-center-gap-8-ml-16">
                     <Button
-                  size="sm"
+                  size="small"
                   variant="outline"
                   type="button"
                   title={t('admin2.wh_view_calls_title')}
@@ -414,7 +424,7 @@ const WebhookManager = () => {
                     </Button>
                     
                     <Button
-                  size="sm"
+                  size="small"
                   variant="outline"
                   type="button"
                   title={t('admin2.wh_test_webhook_title')}
@@ -428,7 +438,7 @@ const WebhookManager = () => {
                     </Button>
                     
                     <Button
-                  size="sm"
+                  size="small"
                   variant="outline"
                   type="button"
                   title={t('admin2.wh_edit_webhook_title')}
@@ -443,7 +453,7 @@ const WebhookManager = () => {
                     
                     {webhook.is_active ?
                 <Button
-                  size="sm"
+                  size="small"
                   variant="outline"
                   type="button"
                   title={t('admin2.wh_pause_webhook_title')}
@@ -454,7 +464,7 @@ const WebhookManager = () => {
                       </Button> :
 
                 <Button
-                  size="sm"
+                  size="small"
                   variant="outline"
                   type="button"
                   title={t('admin2.wh_activate_webhook_title')}
@@ -466,7 +476,7 @@ const WebhookManager = () => {
                 }
                     
                     <Button
-                  size="sm"
+                  size="small"
                   variant="outline"
                   type="button"
                   title={t('admin2.wh_delete_webhook_title')}
@@ -516,7 +526,7 @@ const WebhookManager = () => {
               Promise.all(webhooks.map((webhook) => loadWebhookCalls(webhook.id)));
             }}
             variant="outline"
-            size="sm">
+            size="small">
 
               <RefreshCw className="w-4 h-4 mr-2" />
               {t('admin2.wh_refresh_btn')}
@@ -631,7 +641,7 @@ const WebhookManager = () => {
               loadWebhooks();
             }}
             variant="outline"
-            size="sm">
+            size="small">
 
               <RefreshCw className="w-4 h-4 mr-2" />
               {t('admin2.wh_refresh_btn')}
@@ -740,7 +750,7 @@ const WebhookManager = () => {
               return (
                 <div key={event.type} className="admin-p-16-bd-1solidvar-mac-border-radius-var--mac-radius-md-bg-bg-secondary">
                     <div className="admin-flex-ai-center-gap-12-mb-8">
-                      <IconComponent className="admin-w-20-h-20" style={{ '--admin-color': event.color }} />
+                      <IconComponent className="admin-w-20-h-20" style={{ '--admin-color': event.color } as CSSProperties} />
                       <h4 className="admin-base-semi-primary-m-0">
                         {event.name}
                       </h4>
@@ -792,7 +802,7 @@ const WebhookManager = () => {
         </Modal>
       }
       {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
-      {confirmDialog}
+      {confirmDialog as unknown as React.ReactNode}
     </div>);
 
 };

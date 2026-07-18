@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect } from 'react';
 import logger from '../../utils/logger';
@@ -44,7 +41,8 @@ const PhotoArchive = ({
   onSave,
   onClose
 }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [formData, setFormData] = useState({
     // Основные данные
     patientId,
@@ -106,10 +104,10 @@ const PhotoArchive = ({
     }
   };
 
-  const handleFileUpload = (files) => {
-    Array.from(files).forEach((file) => {
+  const handleFileUpload = (files: any) => {
+    Array.from(files).forEach((file: any) => {
       const reader = new FileReader();
-      reader.onload = (e) => {
+      reader.onload = (e: any) => {
         const mediaFile = {
           id: Date.now() + Math.random(),
           name: file.name,
@@ -208,7 +206,7 @@ const PhotoArchive = ({
   const sortedFiles = [...filteredFiles].sort((a, b) => {
     switch (sortBy) {
       case 'date':
-        return new Date(b.date) - new Date(a.date);
+        return new Date(b.date).getTime() - new Date(a.date).getTime();
       case 'tooth':
         return a.tooth.localeCompare(b.tooth);
       case 'category':
@@ -457,7 +455,7 @@ const PhotoArchive = ({
 
     return (
       <div className="space-y-6">
-        {Object.entries(groupedFiles).map(([date, files]) =>
+        {Object.entries(groupedFiles).map(([date, files]: [string, any]) =>
         <div key={date}>
             <div className="flex items-center gap-4 mb-4">
               <div className="w-4 h-4 bg-blue-500 rounded-full"></div>

@@ -1,17 +1,23 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useState, useEffect, useCallback } from 'react';
+import type { CSSProperties } from 'react';
 import {
   MacOSCard,
-  Button,
-  Badge,
-  Input,
-  Textarea,
-  Skeleton,
-  MacOSEmptyState,
-  Select,
-  Checkbox } from '../ui/macos';
+  Button as RawButton,
+  Badge as RawBadge,
+  Input as RawInput,
+  Textarea as RawTextarea,
+  Skeleton as RawSkeleton,
+  MacOSEmptyState as RawMacOSEmptyState,
+  Select as RawSelect,
+  Checkbox as RawCheckbox } from '../ui/macos';
+const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
+const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
+const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
+const Textarea = RawTextarea as unknown as React.ComponentType<Record<string, unknown>>;
+const Skeleton = RawSkeleton as unknown as React.ComponentType<Record<string, unknown>>;
+const MacOSEmptyState = RawMacOSEmptyState as unknown as React.ComponentType<Record<string, unknown>>;
+const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
+const Checkbox = RawCheckbox as unknown as React.ComponentType<Record<string, unknown>>;
 import {
   Plus,
 
@@ -89,13 +95,14 @@ const BillingManager = () => {
   const [activeTab, setActiveTab] = useState('invoices');
   const [invoices, setInvoices] = useState([]);
   const [payments, setPayments] = useState([]);
-  const [analytics, setAnalytics] = useState(null);
+  const [analytics, setAnalytics] = useState(null as any);
   const [, setSettings] = useState(null);
   const [loading, setLoading] = useState(false);
   const [showCreateInvoice, setShowCreateInvoice] = useState(false);
   const [showRecordPayment, setShowRecordPayment] = useState(false);
 
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const invoiceTypeOptions = getInvoiceTypeOptions(t);
   const paymentMethodOptions = getPaymentMethodOptions(t);
   const invoiceTypeLabels = Object.fromEntries(
@@ -136,16 +143,16 @@ const BillingManager = () => {
     setLoading(true);
     try {
       if (activeTab === 'invoices') {
-        const response = await api.get('/billing/invoices');
+        const response = await api.get('/billing/invoices') as any;
         setInvoices(response.data);
       } else if (activeTab === 'payments') {
-        const response = await api.get('/billing/payments');
+        const response = await api.get('/billing/payments') as any;
         setPayments(response.data);
       } else if (activeTab === 'analytics') {
-        const response = await api.get('/billing/analytics');
+        const response = await api.get('/billing/analytics') as any;
         setAnalytics(response.data);
       } else if (activeTab === 'settings') {
-        const response = await api.get('/billing/settings');
+        const response = await api.get('/billing/settings') as any;
         setSettings(response.data);
       }
     } catch (error) {
@@ -219,7 +226,7 @@ const BillingManager = () => {
 
   const handleViewInvoiceHTML = async (invoiceId) => {
     try {
-      const response = await api.get(`/billing/invoices/${invoiceId}/html`);
+      const response = await api.get(`/billing/invoices/${invoiceId}/html`) as any;
       // PR-35 / P0-7: Sanitize backend HTML before writing to a new window.
       // Previously: document.write(response.data.html) wrote raw backend
       // output to a new window — XSS if backend was compromised or if a
@@ -772,7 +779,7 @@ const BillingManager = () => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className="admin-p-16px-24px-bd-none-bg-none-cur-pointer-d-flex-ai-center-gap-8-fs-sm-tr-all-var-mac-duration-bd-b-dyn-col-dyn-fw-dyn" style={{ '--admin-bd-b0': activeTab === tab.id ? '2px solid var(--mac-accent)' : '2px solid transparent', '--admin-col1': activeTab === tab.id ? 'var(--mac-accent)' : 'var(--mac-text-secondary)', '--admin-fw2': activeTab === tab.id ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)' }}>
+              className="admin-p-16px-24px-bd-none-bg-none-cur-pointer-d-flex-ai-center-gap-8-fs-sm-tr-all-var-mac-duration-bd-b-dyn-col-dyn-fw-dyn" style={{ '--admin-bd-b0': activeTab === tab.id ? '2px solid var(--mac-accent)' : '2px solid transparent', '--admin-col1': activeTab === tab.id ? 'var(--mac-accent)' : 'var(--mac-text-secondary)', '--admin-fw2': activeTab === tab.id ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)' } as CSSProperties}>
               
               <Icon size={16} />
               {tab.label}

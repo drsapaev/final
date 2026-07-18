@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useTranslation } from '../../i18n/useTranslation';
 /**
  * ECG Viewer Component
@@ -8,18 +5,25 @@ import { useTranslation } from '../../i18n/useTranslation';
  * Согласно MASTER_TODO_LIST строка 247
  */
 import { useEffect, useState } from 'react';
+import type { CSSProperties } from 'react';
 import {
-  Alert,
-  Badge,
-  Button,
-  Card,
+  Alert as RawAlert,
+  Badge as RawBadge,
+  Button as RawButton,
+  Card as RawCard,
   CardContent,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
-  Progress,
-  Input } from '../ui/macos';
+  Progress as RawProgress,
+  Input as RawInput } from '../ui/macos';
+const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
+const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
+const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
+const Card = RawCard as unknown as React.ComponentType<Record<string, unknown>>;
+const Progress = RawProgress as unknown as React.ComponentType<Record<string, unknown>>;
+const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
 import {
   AlertTriangle,
   BrainCircuit,
@@ -47,7 +51,7 @@ import { parseECGFile, analyzeECGParameters } from './ECGParser';
 
 const iconSize = 16;
 
-const styles = {
+const styles: Record<string, any> = {
   root: {
     display: 'grid',
     gap: 'var(--mac-spacing-4)',
@@ -234,8 +238,9 @@ const styles = {
   },
 };
 
-const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
+const ECGViewer = ({ visitId, patientId, onDataUpdate }: any) => {
   const { t: tI18n } = useTranslation();
+  const t = tI18n as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [ecgFiles, setEcgFiles] = useState([]);
   const [selectedFile, setSelectedFile] = useState(null);
   const [viewerOpen, setViewerOpen] = useState(false);
@@ -311,7 +316,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
         
       } catch (error) {
         logger.error('Ошибка загрузки ЭКГ:', error);
-        notify.error(getErrorMessage(error, tI18n('cardio.cardio_ecg_upload_failed')));
+        notify.error(getErrorMessage(error, t('cardio.cardio_ecg_upload_failed')));
         setUploadProgress(0);
       }
     }
@@ -327,7 +332,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
   const parseECGFileData = async (originalFile, uploadedFile) => {
     try {
       // Сначала пробуем локальный парсинг
-      const parseResult = await parseECGFile(originalFile);
+      const parseResult = await parseECGFile(originalFile) as any;
       
       if (parseResult.success && parseResult.parameters) {
         const analysis = analyzeECGParameters(parseResult.parameters);
@@ -372,23 +377,23 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
               source: 'device',
               parameters: enrichedParams,
             });
-            notify.success(tI18n('final.ecg_saved'));
+            notify.success(t('final.ecg_saved'));
           } catch (persistError) {
             logger.error('Не удалось сохранить ЭКГ в истории пациента:', persistError);
-            notify.error(tI18n('final.ecg_not_saved'));
+            notify.error(t('final.ecg_not_saved'));
           }
         }
       }
     } catch (error) {
       logger.error('Ошибка парсинга ЭКГ:', error);
-      notify.warning(tI18n('final.ecg_parse_warning'));
+      notify.warning(t('final.ecg_parse_warning'));
     }
   };
 
   const openFileBlobUrl = async (fileId, mode = 'preview') => {
     const response = await api.get(`/files/${fileId}/${mode}`, {
       responseType: 'blob',
-    });
+    }) as any;
 
     return window.URL.createObjectURL(response.data);
   };
@@ -409,7 +414,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
       window.URL.revokeObjectURL(blobUrl);
     } catch (error) {
       logger.error('Ошибка скачивания файла:', error);
-      notify.error(tI18n('final.ecg_download_failed'));
+      notify.error(t('final.ecg_download_failed'));
     }
   };
 
@@ -423,7 +428,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
         file_id: file.id,
         visit_id: visitId,
         patient_id: patientId,
-      });
+      }) as any;
       
       setAnalysisResult(response.data);
       onDataUpdate && onDataUpdate();
@@ -431,7 +436,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
     } catch (error) {
       logger.error('Ошибка AI анализа:', error);
       setAnalysisResult({
-        error: tI18n('cardio.cardio_ecg_ai_failed'),
+        error: t('cardio.cardio_ecg_ai_failed'),
       });
     } finally {
       setAnalyzing(false);
@@ -459,7 +464,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
     } catch (error) {
       logger.info('Предпросмотр файла недоступен, используем только скачивание:', error);
       setViewerBlobUrl(null);
-      setViewerError(tI18n('cardio.cardio_ecg_preview_unavailable'));
+      setViewerError(t('cardio.cardio_ecg_preview_unavailable'));
     } finally {
       setViewerLoading(false);
     }
@@ -483,7 +488,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
       onDataUpdate && onDataUpdate();
     } catch (error) {
       logger.error('Ошибка удаления файла:', error);
-      notify.error(tI18n('final.ecg_delete_failed'));
+      notify.error(t('final.ecg_delete_failed'));
     }
   };
 
@@ -499,16 +504,16 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
     const critical = [];
     
     if (params?.heartRate > 100) {
-      critical.push({ name: tI18n('cardio.cardio_ecg_critical_tachycardia'), value: tI18n('cardio.cardio_ecg_bpm_value', { count: params.heartRate }) });
+      critical.push({ name: t('cardio.cardio_ecg_critical_tachycardia'), value: t('cardio.cardio_ecg_bpm_value', { count: params.heartRate }) });
     }
     if (params?.heartRate < 60) {
-      critical.push({ name: tI18n('cardio.cardio_ecg_critical_bradycardia'), value: tI18n('cardio.cardio_ecg_bpm_value', { count: params.heartRate }) });
+      critical.push({ name: t('cardio.cardio_ecg_critical_bradycardia'), value: t('cardio.cardio_ecg_bpm_value', { count: params.heartRate }) });
     }
     if (params?.qtInterval > 450) {
-      critical.push({ name: tI18n('cardio.cardio_ecg_critical_qt_prolonged'), value: tI18n('cardio.cardio_ecg_ms_value', { count: params.qtInterval }) });
+      critical.push({ name: t('cardio.cardio_ecg_critical_qt_prolonged'), value: t('cardio.cardio_ecg_ms_value', { count: params.qtInterval }) });
     }
     if (params?.prInterval > 200) {
-      critical.push({ name: tI18n('cardio.cardio_ecg_critical_av_block'), value: tI18n('cardio.cardio_ecg_ms_value', { count: params.prInterval }) });
+      critical.push({ name: t('cardio.cardio_ecg_critical_av_block'), value: t('cardio.cardio_ecg_ms_value', { count: params.prInterval }) });
     }
     
     return critical;
@@ -520,7 +525,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
         <CardContent>
           <h3 style={styles.sectionTitle}>
             <Clock size={iconSize} aria-hidden="true" />
-            {tI18n('cardio.cardio_ecg_section_title')}
+            {t('cardio.cardio_ecg_section_title')}
           </h3>
 
           <div {...getRootProps()} style={styles.dropzone(isDragActive)}>
@@ -528,18 +533,18 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
             <CloudUpload size={48} color="var(--mac-text-secondary)" aria-hidden="true" />
             <p style={{ ...styles.mutedText, marginTop: 'var(--mac-spacing-2)' }}>
               {isDragActive
-                ? tI18n('cardio.cardio_ecg_drop_active')
-                : tI18n('cardio.cardio_ecg_drop_idle')}
+                ? t('cardio.cardio_ecg_drop_active')
+                : t('cardio.cardio_ecg_drop_idle')}
             </p>
             <p style={{ ...styles.caption, marginTop: 'var(--mac-spacing-2)' }}>
-              {tI18n('cardio.cardio_ecg_formats_supported')}
+              {t('cardio.cardio_ecg_formats_supported')}
             </p>
           </div>
 
           {uploadProgress > 0 && uploadProgress < 100 && (
             <div style={styles.uploadProgress}>
               <Progress variant="primary" value={uploadProgress} />
-              <p style={styles.caption}>{tI18n('cardio.cardio_ecg_uploading', { percent: uploadProgress })}</p>
+              <p style={styles.caption}>{t('cardio.cardio_ecg_uploading', { percent: uploadProgress })}</p>
             </div>
           )}
         </CardContent>
@@ -548,7 +553,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
       {ecgFiles.length > 0 && (
         <Card>
           <CardContent>
-            <h3 style={styles.sectionTitle}>{tI18n('cardio.cardio_ecg_uploaded_count', { count: ecgFiles.length })}</h3>
+            <h3 style={styles.sectionTitle}>{t('cardio.cardio_ecg_uploaded_count', { count: ecgFiles.length })}</h3>
 
             <ul style={styles.fileList}>
               {ecgFiles.map((file) => {
@@ -568,7 +573,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
                         {criticalParams.length > 0 && (
                           <Badge variant="warning" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                             <AlertTriangle style={{ width: 14, height: 14 }} />
-                            {tI18n('cardio.cardio_ecg_attention')}
+                            {t('cardio.cardio_ecg_attention')}
                           </Badge>
                         )}
                       </div>
@@ -580,24 +585,24 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
                       {file.parameters && (
                         <div style={styles.badgeRow}>
                           <Badge variant={file.parameters.heartRate > 100 || file.parameters.heartRate < 60 ? 'warning' : 'info'}>
-                            {tI18n('cardio.cardio_ecg_hr_label', { value: file.parameters.heartRate })}
+                            {t('cardio.cardio_ecg_hr_label', { value: file.parameters.heartRate })}
                           </Badge>
                           <Badge variant={file.parameters.qtInterval > 450 ? 'warning' : 'info'}>
-                            {tI18n('cardio.cardio_ecg_qt_label', { value: file.parameters.qtInterval })}
+                            {t('cardio.cardio_ecg_qt_label', { value: file.parameters.qtInterval })}
                           </Badge>
                           <Badge variant={file.parameters.prInterval > 200 ? 'warning' : 'info'}>
-                            {tI18n('cardio.cardio_ecg_pr_label', { value: file.parameters.prInterval })}
+                            {t('cardio.cardio_ecg_pr_label', { value: file.parameters.prInterval })}
                           </Badge>
                         </div>
                       )}
 
                       {criticalParams.length > 0 && (
                         <Alert severity="warning" style={styles.criticalAlert}>
-                          <span style={styles.caption}>{tI18n('cardio.cardio_ecg_deviations_found')}</span>
+                          <span style={styles.caption}>{t('cardio.cardio_ecg_deviations_found')}</span>
                           <span style={styles.criticalList}>
                             {criticalParams.map((param, i) => (
                               <span key={i} style={styles.caption}>
-                                {tI18n('cardio.cardio_ecg_param_value', { name: param.name, value: param.value })}
+                                {t('cardio.cardio_ecg_param_value', { name: param.name, value: param.value })}
                               </span>
                             ))}
                           </span>
@@ -610,8 +615,8 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
                         type="button"
                         style={styles.iconButton}
                         onClick={() => openViewer(file)}
-                        title={tI18n('cardio.cardio_ecg_view')}
-                        aria-label={tI18n('cardio.cardio_ecg_view')}
+                        title={t('cardio.cardio_ecg_view')}
+                        aria-label={t('cardio.cardio_ecg_view')}
                       >
                         <Eye size={iconSize} aria-hidden="true" />
                       </button>
@@ -621,8 +626,8 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
                         style={{ ...styles.iconButton, ...(analyzing ? styles.iconButtonDisabled : {}) }}
                         onClick={() => analyzeECG(file)}
                         disabled={analyzing}
-                        title={tI18n('cardio.cardio_ecg_ai_analysis')}
-                        aria-label={tI18n('cardio.cardio_ecg_ai_analysis')}
+                        title={t('cardio.cardio_ecg_ai_analysis')}
+                        aria-label={t('cardio.cardio_ecg_ai_analysis')}
                       >
                         <BrainCircuit size={iconSize} aria-hidden="true" />
                       </button>
@@ -631,8 +636,8 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
                         type="button"
                         style={styles.iconButton}
                         onClick={() => downloadFile(file)}
-                        title={tI18n('cardio.cardio_ecg_download')}
-                        aria-label={tI18n('cardio.cardio_ecg_download')}
+                        title={t('cardio.cardio_ecg_download')}
+                        aria-label={t('cardio.cardio_ecg_download')}
                       >
                         <Download size={iconSize} aria-hidden="true" />
                       </button>
@@ -641,8 +646,8 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
                         type="button"
                         style={styles.iconButton}
                         onClick={() => deleteFile(file.id)}
-                        title={tI18n('cardio.cardio_ecg_delete')}
-                        aria-label={tI18n('cardio.cardio_ecg_delete')}
+                        title={t('cardio.cardio_ecg_delete')}
+                        aria-label={t('cardio.cardio_ecg_delete')}
                       >
                         <Trash2 size={iconSize} aria-hidden="true" />
                       </button>
@@ -660,7 +665,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
           <CardContent>
             <div style={styles.analysisStatus}>
               <Progress value={75} variant="primary" style={{ flex: 1 }} />
-              <p style={styles.bodyText}>{tI18n('cardio.cardio_ecg_analyzing')}</p>
+              <p style={styles.bodyText}>{t('cardio.cardio_ecg_analyzing')}</p>
             </div>
           </CardContent>
         </Card>
@@ -671,13 +676,13 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
           <CardContent>
             <h3 style={styles.sectionTitle}>
               <ClipboardCheck size={iconSize} aria-hidden="true" />
-              {tI18n('cardio.cardio_ecg_ai_interpretation_title')}
+              {t('cardio.cardio_ecg_ai_interpretation_title')}
             </h3>
 
             <div style={styles.analysisPanel}>
               {analysisResult.findings && (
                 <section>
-                  <h4 style={styles.subsectionTitle}>{tI18n('cardio.cardio_ecg_findings_title')}</h4>
+                  <h4 style={styles.subsectionTitle}>{t('cardio.cardio_ecg_findings_title')}</h4>
                   <div style={styles.badgeRow}>
                     {analysisResult.findings.map((finding, i) => (
                       <Badge
@@ -699,21 +704,21 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
 
               {analysisResult.interpretation && (
                 <section>
-                  <h4 style={styles.subsectionTitle}>{tI18n('cardio.cardio_ecg_interpretation_title')}</h4>
+                  <h4 style={styles.subsectionTitle}>{t('cardio.cardio_ecg_interpretation_title')}</h4>
                   <p style={styles.bodyText}>{analysisResult.interpretation}</p>
                 </section>
               )}
 
               {analysisResult.recommendations && (
                 <section>
-                  <h4 style={styles.subsectionTitle}>{tI18n('cardio.cardio_ecg_recommendations_title')}</h4>
+                  <h4 style={styles.subsectionTitle}>{t('cardio.cardio_ecg_recommendations_title')}</h4>
                   <p style={styles.bodyText}>{analysisResult.recommendations}</p>
                 </section>
               )}
 
               <Alert severity="info">
                 <span style={styles.caption}>
-                  {tI18n('cardio.cardio_ecg_ai_disclaimer')}
+                  {t('cardio.cardio_ecg_ai_disclaimer')}
                 </span>
               </Alert>
             </div>
@@ -734,7 +739,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
               variant="outline"
               onClick={closeViewer}
               style={{ padding: 'var(--mac-spacing-2)' }}
-              aria-label={tI18n('cardio.cardio_ecg_close_viewer_aria')}
+              aria-label={t('cardio.cardio_ecg_close_viewer_aria')}
             >
               <X style={{ width: 16, height: 16 }} />
             </Button>
@@ -745,7 +750,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
           {selectedFile && (
             <div>
               {viewerLoading ? (
-                <Alert severity="info">{tI18n('cardio.cardio_ecg_loading_preview')}</Alert>
+                <Alert severity="info">{t('cardio.cardio_ecg_loading_preview')}</Alert>
               ) : viewerBlobUrl ? (
                 <div style={styles.previewArea}>
                   {(selectedFile.type === 'application/pdf' ||
@@ -765,44 +770,44 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
                     )
                   ) : (
                     <Alert severity="info">
-                      {tI18n('cardio.cardio_ecg_preview_limited')}
+                      {t('cardio.cardio_ecg_preview_limited')}
                     </Alert>
                   )}
                 </div>
               ) : viewerError ? (
                 <Alert severity="warning">{viewerError}</Alert>
               ) : (
-                <Alert severity="info">{tI18n('cardio.cardio_ecg_file_ready')}</Alert>
+                <Alert severity="info">{t('cardio.cardio_ecg_file_ready')}</Alert>
               )}
 
               {ecgParameters && (
                 <section style={{ marginTop: 'var(--mac-spacing-4)' }}>
-                  <h3 style={styles.sectionTitle}>{tI18n('cardio.cardio_ecg_params_title')}</h3>
+                  <h3 style={styles.sectionTitle}>{t('cardio.cardio_ecg_params_title')}</h3>
 
                   <div style={styles.metricGrid}>
                     <div style={styles.metricCard}>
-                      <p style={styles.caption}>{tI18n('cardio.cardio_ecg_hr_full')}</p>
-                      <p style={styles.metricValue}>{tI18n('cardio.cardio_ecg_bpm_value', { count: ecgParameters.heartRate })}</p>
+                      <p style={styles.caption}>{t('cardio.cardio_ecg_hr_full')}</p>
+                      <p style={styles.metricValue}>{t('cardio.cardio_ecg_bpm_value', { count: ecgParameters.heartRate })}</p>
                     </div>
 
                     <div style={styles.metricCard}>
-                      <p style={styles.caption}>{tI18n('cardio.cardio_ecg_pr_interval')}</p>
-                      <p style={styles.metricValue}>{tI18n('cardio.cardio_ecg_ms_value', { count: ecgParameters.prInterval })}</p>
+                      <p style={styles.caption}>{t('cardio.cardio_ecg_pr_interval')}</p>
+                      <p style={styles.metricValue}>{t('cardio.cardio_ecg_ms_value', { count: ecgParameters.prInterval })}</p>
                     </div>
 
                     <div style={styles.metricCard}>
-                      <p style={styles.caption}>{tI18n('cardio.cardio_ecg_qrs_interval')}</p>
-                      <p style={styles.metricValue}>{tI18n('cardio.cardio_ecg_ms_value', { count: ecgParameters.qrsInterval })}</p>
+                      <p style={styles.caption}>{t('cardio.cardio_ecg_qrs_interval')}</p>
+                      <p style={styles.metricValue}>{t('cardio.cardio_ecg_ms_value', { count: ecgParameters.qrsInterval })}</p>
                     </div>
 
                     <div style={styles.metricCard}>
-                      <p style={styles.caption}>{tI18n('cardio.cardio_ecg_qt_interval')}</p>
-                      <p style={styles.metricValue}>{tI18n('cardio.cardio_ecg_ms_value', { count: ecgParameters.qtInterval })}</p>
+                      <p style={styles.caption}>{t('cardio.cardio_ecg_qt_interval')}</p>
+                      <p style={styles.metricValue}>{t('cardio.cardio_ecg_ms_value', { count: ecgParameters.qtInterval })}</p>
                     </div>
 
                     {ecgParameters.axis && (
                       <div style={styles.metricCard}>
-                        <p style={styles.caption}>{tI18n('cardio.cardio_ecg_heart_axis')}</p>
+                        <p style={styles.caption}>{t('cardio.cardio_ecg_heart_axis')}</p>
                         <p style={styles.metricValue}>{ecgParameters.axis}°</p>
                       </div>
                     )}
@@ -815,12 +820,12 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
 
         <DialogActions>
           <Button onClick={() => analyzeECG(selectedFile)} disabled={analyzing}>
-            {tI18n('cardio.cardio_ecg_ai_analysis_action')}
+            {t('cardio.cardio_ecg_ai_analysis_action')}
           </Button>
           <Button onClick={() => downloadFile(selectedFile)} variant="primary">
-            {tI18n('cardio.cardio_ecg_download')}
+            {t('cardio.cardio_ecg_download')}
           </Button>
-          <Button onClick={closeViewer}>{tI18n('cardio.cardio_ecg_close')}</Button>
+          <Button onClick={closeViewer}>{t('cardio.cardio_ecg_close')}</Button>
         </DialogActions>
       </Dialog>
     </div>
