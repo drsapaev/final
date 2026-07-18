@@ -1,18 +1,15 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { API_ENDPOINTS } from '../../api/endpoints.ts';
+import { API_ENDPOINTS } from '../../api/endpoints';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const printServicePath = path.resolve(__dirname, '../print.ts');
 
-const readPrintServiceSource = () => fs.readFileSync(printServicePath, 'utf8');
+const readPrintServiceSource = (): string => fs.readFileSync(printServicePath, 'utf8');
 
 describe('print service route contract', () => {
   it('uses the canonical mounted print-template list route', () => {

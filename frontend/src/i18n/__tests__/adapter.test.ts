@@ -1,8 +1,13 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { describe, expect, it } from 'vitest';
-import { t, tInterpolate, i18n } from '../useTranslation';
+import { t as rawT, tInterpolate as rawTInterpolate, i18n } from '../useTranslation';
+
+// react-i18next's t() has a typed-keys signature that requires options
+// or a defaultValue. The adapter re-exports it directly, so we cast to
+// a permissive signature for the test's call sites (which pass only a
+// key). The runtime behavior is unchanged.
+const t = rawT as unknown as (key: string) => string;
+const tInterpolate = rawTInterpolate as unknown as (key: string, params: Record<string, unknown>) => string;
+const i18nT = i18n.t as unknown as (key: string) => string;
 
 /**
  * STRAT#49: Updated tests for react-i18next-backed adapter.
@@ -45,7 +50,7 @@ describe('i18n adapter (STRAT#29 + STRAT#49)', () => {
     });
 
     it('t() works as standalone function', () => {
-      expect(i18n.t('common.save')).toBe('Сохранить');
+      expect(i18nT('common.save')).toBe('Сохранить');
     });
 
     it('changeLanguage is available (react-i18next)', () => {
