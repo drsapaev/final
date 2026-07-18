@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useState } from 'react';
 import { Card, Button,
@@ -43,7 +41,7 @@ const DataExporter = ({
   const [exportStatus, setExportStatus] = useState(null);
   const [showAdvancedPanel, setShowAdvancedPanel] = useState(showAdvanced);
 
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
 
   const formatOptions = [
   {
@@ -176,7 +174,7 @@ const DataExporter = ({
           <div className="flex items-center space-x-2">
             <Button
               variant="outline"
-              size="sm"
+              size="small"
               onClick={() => setShowAdvancedPanel((prev) => !prev)}>
 
               <Settings className="w-4 h-4 mr-2" />
@@ -238,7 +236,7 @@ const DataExporter = ({
             
             <div className="space-y-3">
               <label className="flex items-center space-x-3">
-                <Checkbox aria-label="Include charts in export" checked={includeCharts} onChange={(e) => setIncludeCharts(e.target.checked)}
+                <Checkbox aria-label="Include charts in export" checked={includeCharts} onChange={(e) => setIncludeCharts(e)}
                 className="rounded" />
               
                 <div>
@@ -248,7 +246,7 @@ const DataExporter = ({
               </label>
 
               <label className="flex items-center space-x-3">
-                <Checkbox aria-label="Include raw data in export" checked={includeRawData} onChange={(e) => setIncludeRawData(e.target.checked)}
+                <Checkbox aria-label="Include raw data in export" checked={includeRawData} onChange={(e) => setIncludeRawData(e)}
                 className="rounded" />
               
                 <div>
@@ -258,7 +256,7 @@ const DataExporter = ({
               </label>
 
               <label className="flex items-center space-x-3">
-                <Checkbox aria-label="Send export by email" checked={emailExport} onChange={(e) => setEmailExport(e.target.checked)}
+                <Checkbox aria-label="Send export by email" checked={emailExport} onChange={(e) => setEmailExport(e)}
                 className="rounded" />
               
                 <div>

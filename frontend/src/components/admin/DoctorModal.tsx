@@ -1,20 +1,22 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, Save, User, Mail, Phone, MapPin } from 'lucide-react';
 import {
   Label,
-  Alert,
-  Button,
+  Alert as AlertRaw,
+  Button as ButtonRaw,
   Checkbox,
   Badge,
   Input,
-  Modal,
+  Modal as ModalRaw,
   Select,
 } from '../ui/macos';
 import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
+import React from "react";
+const Button = ButtonRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Modal = ModalRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Alert = AlertRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const DoctorModal = ({
   isOpen,
@@ -25,8 +27,8 @@ const DoctorModal = ({
   availableUsers = [],
   departments = [],
 }) => {
-  const { t } = useTranslation();
-  const [formData, setFormData] = useState({
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const [formData, setFormData] = useState<Record<string, any>>({
     userId: '',
     specialty: '',
     cabinet: '',
@@ -35,8 +37,8 @@ const DoctorModal = ({
     maxOnlinePerDay: '15',
     active: true,
   });
-  const [errors, setErrors] = useState({});
-  const [submitError, setSubmitError] = useState(null);
+  const [errors, setErrors] = useState<Record<string, any>>({});
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen) {
@@ -96,7 +98,7 @@ const DoctorModal = ({
   );
 
   const validateForm = () => {
-    const nextErrors = {};
+    const nextErrors: Record<string, string> = {};
     if (!formData.userId) {
       nextErrors.userId = t('admin2.dmdl_err_user_required');
     }
@@ -166,7 +168,7 @@ const DoctorModal = ({
       isOpen={isOpen}
       onClose={onClose}
       title={doctor ? t('admin2.dmdl_title_edit') : t('admin2.dmdl_title_add')}
-      size="lg"
+      size="large"
     >
       <form
         onSubmit={handleSubmit}
@@ -214,7 +216,7 @@ const DoctorModal = ({
         </div>
 
         <div className="admin-flex-wrap-8">
-          <Badge variant={selectedUserStatus.variant}>
+          <Badge variant={selectedUserStatus.variant as unknown as "default" | "primary" | "secondary" | "success" | "warning" | "danger" | "info" | "outline"}>
             {selectedUserStatus.label}
           </Badge>
           <Badge variant={formData.cabinet ? 'info' : 'warning'}>

@@ -1,5 +1,4 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
+import type { CSSProperties } from "react";
 
 import { useState } from 'react';
 import { Card, Button, Badge } from '../ui/macos';
@@ -54,39 +53,39 @@ const InteractivePanel = ({
       className={className}
     >
       <Card
-        ref={ref}
+        ref={ref as unknown as React.Ref<HTMLDivElement>}
         onClick={onClick}
         style={{
           padding: getSpacing('lg'),
           borderRadius: 'var(--mac-radius-lg)',
           marginBottom: getSpacing('md'),
           ...panelStyle
-        }}
+        } as React.CSSProperties}
         {...props}
       >
         {/* Градиентный overlay эффект */}
-        <div style={gradientOverlay} />
+        <div style={gradientOverlay as unknown as CSSProperties} />
 
         {/* Основное содержимое */}
-        <div style={{ position: 'relative', zIndex: 1 }}>
+        <div style={{ position: 'relative', zIndex: 1 } as React.CSSProperties}>
           {/* Заголовок панели */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             marginBottom: getSpacing('md')
-          }}>
+          } as React.CSSProperties}>
             <div style={{
               display: 'flex',
               alignItems: 'center',
               gap: getSpacing('md')
-            }}>
+            } as React.CSSProperties}>
               <h3 style={{
                 fontSize: getFontSize('lg'),
                 fontWeight: 'var(--mac-font-weight-semibold)',
                 color: getColor('text'),
                 margin: 0
-              }}>
+              } as React.CSSProperties}>
                 {title}
               </h3>
 
@@ -102,7 +101,7 @@ const InteractivePanel = ({
                 display: 'flex',
                 alignItems: 'center',
                 gap: getSpacing('sm')
-              }}>
+              } as React.CSSProperties}>
                 {actions}
               </div>
             )}
@@ -114,14 +113,14 @@ const InteractivePanel = ({
             color: getColor('textSecondary'),
             fontSize: getFontSize('base'),
             lineHeight: '1.5'
-          }}>
+          } as React.CSSProperties}>
             {children}
           </div>
 
           {/* Кнопка развертывания */}
           <Button
             variant="ghost"
-            size="sm"
+            size="small"
             onClick={(e) => {
               e.stopPropagation();
               setIsExpanded(!isExpanded);
@@ -129,7 +128,7 @@ const InteractivePanel = ({
             style={{
               color: getColor('primary', 500),
               fontSize: getFontSize('sm')
-            }}
+            } as React.CSSProperties}
           >
             {isExpanded ? 'Свернуть' : 'Развернуть'}
           </Button>
@@ -138,19 +137,19 @@ const InteractivePanel = ({
           <AnimatedTransition
             isVisible={isExpanded}
             animationType="slideDown"
-            style={{ marginTop: getSpacing('md') }}
+            style={{ marginTop: getSpacing('md') } as React.CSSProperties}
           >
             <div style={{
               padding: getSpacing('md'),
               backgroundColor: getColor('background'),
               borderRadius: 'var(--mac-radius-md)',
               border: `1px solid ${getColor('border')}`
-            }}>
+            } as React.CSSProperties}>
               <p style={{
                 fontSize: getFontSize('sm'),
                 color: getColor('textSecondary'),
                 margin: 0
-              }}>
+              } as React.CSSProperties}>
                 Дополнительная информация появляется при развертывании панели.
                 Здесь могут быть детали, графики или дополнительные элементы управления.
               </p>
@@ -171,7 +170,7 @@ const InteractivePanel = ({
             zIndex: -1,
             opacity: 0.08,
             filter: 'blur(12px)'
-          }} />
+          } as React.CSSProperties} />
         )}
       </Card>
     </AnimatedTransition>
@@ -224,7 +223,7 @@ export const StateInteractivePanel = ({
         transition: 'all 0.3s ease',
         position: 'relative',
         overflow: 'hidden'
-      }}
+      } as React.CSSProperties}
     >
       {/* Анимированный индикатор состояния */}
       <div style={{
@@ -234,20 +233,20 @@ export const StateInteractivePanel = ({
         height: '4px',
         width: '100%',
         background: `linear-gradient(90deg, ${getColor('primary', 500)}, ${getColor('primary', 600)})`
-      }} />
+      } as React.CSSProperties} />
 
       <div style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         marginBottom: getSpacing('md')
-      }}>
+      } as React.CSSProperties}>
         <h3 style={{
           fontSize: getFontSize('lg'),
           fontWeight: 'var(--mac-font-weight-semibold)',
           color: stateColors.text,
           margin: 0
-        }}>
+        } as React.CSSProperties}>
           {title}
         </h3>
 
@@ -260,12 +259,12 @@ export const StateInteractivePanel = ({
         display: 'flex',
         gap: getSpacing('sm'),
         flexWrap: 'wrap'
-      }}>
+      } as React.CSSProperties}>
         {states.map((state) => (
           <Button
             key={state}
             variant={currentState === state ? 'primary' : 'outline'}
-            size="sm"
+            size="small"
             onClick={() => setCurrentState(state)}
           >
             {state}
@@ -283,7 +282,7 @@ export const StateInteractivePanel = ({
           display: 'flex',
           alignItems: 'center',
           gap: getSpacing('sm')
-        }}>
+        } as React.CSSProperties}>
           <div style={{
             width: '20px',
             height: '20px',
@@ -291,11 +290,11 @@ export const StateInteractivePanel = ({
             borderTop: `2px solid ${getColor('primary', 500)}`,
             borderRadius: '50%',
             animation: 'spin 1s linear infinite'
-          }} />
+          } as React.CSSProperties} />
           <span style={{
             fontSize: getFontSize('sm'),
             color: getColor('primary', 600)
-          }}>
+          } as React.CSSProperties}>
             Загрузка данных...
           </span>
         </div>

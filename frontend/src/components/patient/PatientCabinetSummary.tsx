@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
@@ -29,7 +27,7 @@ import { useTranslation } from '../../i18n/useTranslation';
  *   - mode='reports': только отчёты с PDF-download
  */
 function PatientCabinetSummary({ mode = 'cabinet' }) {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [cabinetStatus, setCabinetStatus] = useState('idle');
   const [cabinetSummary, setCabinetSummary] = useState(null);
   const [cabinetError, setCabinetError] = useState('');
@@ -202,7 +200,7 @@ function PatientCabinetSummary({ mode = 'cabinet' }) {
                       <div className="pp-report-date">{report.ready_at || t('patient.pat_cab_report_date_default')}</div>
                       {reportDownloads[report.id] === 'error' && (
                         <div className="pp-message pp-message--error" role="alert">
-                          <Icon name="exclamationmark.triangle" size={14} />
+                          <Icon name="exclamationmark.triangle" size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
                           {t('patient.pat_cab_report_error')}
                         </div>
                       )}
@@ -214,7 +212,7 @@ function PatientCabinetSummary({ mode = 'cabinet' }) {
                         size="small"
                         onClick={() => downloadReport(report)}
                       >
-                        <Icon name="arrow.clockwise" size={16} />
+                        <Icon name="arrow.clockwise" size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
                         {t('patient.pat_cab_retry')}
                       </Button>
                     ) : (
@@ -225,7 +223,7 @@ function PatientCabinetSummary({ mode = 'cabinet' }) {
                         disabled={reportDownloads[report.id] === 'loading'}
                         onClick={() => downloadReport(report)}
                       >
-                        <Icon name="doc.text" size={16} />
+                        <Icon name="doc.text" size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
                         {t('patient.pat_cab_open_pdf')}
                       </Button>
                     )}
