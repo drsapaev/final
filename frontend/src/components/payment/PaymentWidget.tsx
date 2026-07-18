@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 /**
  * PaymentWidget - Виджет для обработки платежей
  * Поддерживает провайдеры: Click, Payme, Kaspi
@@ -9,15 +6,22 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Box,
-  Badge,
-  Card,
+  Badge as RawBadge,
+  Card as RawCard,
   CardContent,
-  Typography,
-  Button,
-  Alert,
-  CircularProgress,
-  Select,
+  Typography as RawTypography,
+  Button as RawButton,
+  Alert as RawAlert,
+  CircularProgress as RawCircularProgress,
+  Select as RawSelect,
 } from '../ui/macos';
+const Card = RawCard as unknown as React.ComponentType<Record<string, unknown>>;
+const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
+const Typography = RawTypography as unknown as React.ComponentType<Record<string, unknown>>;
+const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
+const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
+const CircularProgress = RawCircularProgress as unknown as React.ComponentType<Record<string, unknown>>;
+const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
 
 import {
   CreditCard,
@@ -50,7 +54,8 @@ const PaymentWidget = ({
   onError,
   onCancel
 }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // UX Audit #4 regression fix: useTheme() удалён — больше не нужен.
   // i18n: fallback description is resolved at render time so t() is available.
   const effectiveDescription = description ?? t('payment.pay_widg_default_description');
@@ -234,7 +239,7 @@ const PaymentWidget = ({
       logger.log('Sending payment request', {
         endpoint,
         hasAuthHeader: !!apiClient.defaults.headers.common['Authorization'],
-        authHeaderLength: apiClient.defaults.headers.common['Authorization']?.length || 0,
+        authHeaderLength: (apiClient.defaults.headers.common['Authorization'] as string | undefined)?.length || 0,
       });
 
       const response = await apiClient.post(endpoint, paymentRequest);
@@ -394,14 +399,14 @@ const PaymentWidget = ({
                 {pollingRef.current ? (
                   <Button
                     size="small"
-                    variant="outlined"
+                    variant="outline"
                     onClick={clearPolling}>
                     {t('payment.pay_widg_stop_tracking')}
                   </Button>
                 ) : (
                   <Button
                     size="small"
-                    variant="outlined"
+                    variant="outline"
                     onClick={startPolling}>
                     {t('payment.pay_widg_start_tracking')}
                   </Button>
@@ -569,7 +574,7 @@ const PaymentWidget = ({
 
           {paymentStatus !== 'pending' &&
           <Button
-            variant="outlined"
+            variant="outline"
             color="secondary"
             size="large"
             onClick={cancelPayment}

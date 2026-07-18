@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect, useRef } from 'react';
 import {
@@ -16,7 +13,8 @@ import {
 import MultipleTicketsPrinter from '../tickets/MultipleTicketsPrinter';
 import { useAsyncAction } from '../../hooks/useAsyncAction';
 import { api } from '../../api/client';
-import ModernDialog from '../dialogs/ModernDialog';
+import ModernDialogRaw from '../dialogs/ModernDialog';
+const ModernDialog = ModernDialogRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import logger from '../../utils/logger';
 import { printPanelTicketInBrowser } from '../../services/panelPrint';
 import notify from '../../services/notify';
@@ -50,7 +48,8 @@ const PaymentProviderDialog = ({
   onSuccess,
   onError
 }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const { executeAction, loading } = useAsyncAction();
 
   const [paymentState, setPaymentState] = useState('init'); // init|processing|polling|success|failed
@@ -113,7 +112,7 @@ const PaymentProviderDialog = ({
           provider,
           return_url: `${window.location.origin}/payment/success`,
           cancel_url: `${window.location.origin}/payment/cancel`
-        });
+        }) as any;
 
         const data = response.data;
 
@@ -141,8 +140,8 @@ const PaymentProviderDialog = ({
         loadingMessage: t('payment.pay_dlg_loading_init'),
         successMessage: t('payment.pay_dlg_success_created'),
         errorMessage: t('payment.pay_dlg_error_create'),
-        onError: (err) => {
-          setError(err.message);
+        onError: (err: { message?: string }) => {
+          setError(err?.message || '');
           setPaymentState('failed');
         }
       }
@@ -176,7 +175,7 @@ const PaymentProviderDialog = ({
   };
 
   const checkPaymentStatus = async () => {
-    const response = await api.get(`/registrar/invoice/${invoiceId}/status`);
+    const response = await api.get(`/registrar/invoice/${invoiceId}/status`) as any;
 
     if (response.status >= 200 && response.status < 300) {
       const data = response.data;
