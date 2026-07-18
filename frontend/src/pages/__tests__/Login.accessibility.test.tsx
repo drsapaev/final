@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import React from 'react';
 import { fireEvent, render } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
@@ -8,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import Login from '../Login';
 import { ThemeProvider } from '../../contexts/ThemeContext';
-import { MacOSThemeProvider } from '../../theme/macosTheme.tsx';
+import { MacOSThemeProvider } from '../../theme/macosTheme';
 
 vi.mock('../../api/client', () => ({
   api: {
