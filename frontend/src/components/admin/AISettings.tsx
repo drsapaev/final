@@ -1,8 +1,6 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect } from 'react';
+import type { CSSProperties } from 'react';
 import PropTypes from 'prop-types';
 import {
   Brain,
@@ -31,13 +29,14 @@ import {
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
-import { notify } from '../../services/notify.js';
+import { notify } from '../../services/notify';
 const AISettings = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [loading, setLoading] = useState(true);
   const [providers, setProviders] = useState([]);
   const [systemSettings, setSystemSettings] = useState({});
-  const [stats, setStats] = useState({});
+  const [stats, setStats] = useState({} as any);
   const [editingProvider, setEditingProvider] = useState(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [showApiKeys, setShowApiKeys] = useState({});
@@ -209,7 +208,7 @@ const AISettings = () => {
         '--admin-msg-bg': message.type === 'success' ? 'var(--mac-success-bg)' : 'var(--mac-error-bg)',
         '--admin-msg-color': message.type === 'success' ? 'var(--mac-success)' : 'var(--mac-error)',
         '--admin-msg-border': message.type === 'success' ? 'var(--mac-success-border)' : 'var(--mac-error-border)'
-      }}>
+      } as CSSProperties}>
           {message.type === 'success' ?
         <CheckCircle className="w-5 h-5 mr-2" /> :
 
@@ -267,7 +266,7 @@ const AISettings = () => {
             <MacOSCard key={provider.id} className="p-6">
               <div className="admin-flex-between-mb-16">
                 <div className="flex items-center justify-center">
-                  <div className="admin-status-dot-12" style={{ '--admin-dot-bg': provider.active ? 'var(--mac-success)' : 'var(--mac-text-tertiary)' }} />
+                  <div className="admin-status-dot-12" style={{ '--admin-dot-bg': provider.active ? 'var(--mac-success)' : 'var(--mac-text-tertiary)' } as CSSProperties} />
                   <div>
                     <h3 className="admin-heading-lg admin-text-med text-[var(--mac-text-primary)] admin-m-0">
                       {provider.display_name}
@@ -317,7 +316,7 @@ const AISettings = () => {
                     </span>
                     <Button
                       type="button"
-                      size="sm"
+                      size="small"
                       variant="ghost"
                       title={showApiKeys[provider.id] ? `Hide API key for ${provider.display_name}` : `Show API key for ${provider.display_name}`}
                       aria-label={showApiKeys[provider.id] ? `Hide API key for ${provider.display_name}` : `Show API key for ${provider.display_name}`}
@@ -347,7 +346,7 @@ const AISettings = () => {
               <div className="mt-4 p-3 admin-test-result-dynamic" style={{
                 '--admin-tr-bg': testResult.success ? 'var(--mac-success-bg)' : 'var(--mac-error-bg)',
                 '--admin-tr-border': testResult.success ? 'var(--mac-success-border)' : 'var(--mac-error-border)'
-              }}>
+              } as CSSProperties}>
                   <div className="text-sm">
                     {testResult.testing ?
                   <div className="flex items-center justify-center">
@@ -381,7 +380,7 @@ const AISettings = () => {
               {/* Действия */}
               <div className="admin-flex-gap-8-mt-16">
                 <Button
-                  size="sm"
+                  size="small"
                   variant="outline"
                   onClick={() => setEditingProvider(provider)}
                   className="admin-flex-1">
@@ -391,7 +390,7 @@ const AISettings = () => {
                 </Button>
                 <Button
                   type="button"
-                  size="sm"
+                  size="small"
                   variant="outline"
                   title={`Test ${provider.display_name} provider`}
                   aria-label={`Test ${provider.display_name} provider`}
@@ -454,7 +453,8 @@ const AISettings = () => {
 
 // Компонент формы провайдера
 const ProviderForm = ({ provider, providerConfigs, onSave, onCancel }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [formData, setFormData] = useState({
     name: provider?.name || '',
     display_name: provider?.display_name || '',
@@ -466,7 +466,7 @@ const ProviderForm = ({ provider, providerConfigs, onSave, onCancel }) => {
     active: provider?.active || false,
     is_default: provider?.is_default || false,
     capabilities: provider?.capabilities || ['text']
-  });
+  } as any);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -505,11 +505,11 @@ const ProviderForm = ({ provider, providerConfigs, onSave, onCancel }) => {
             {t('admin2.ais_quick_settings')}
           </label>
           <div className="admin-flex-gap-8-wrap">
-            {Object.entries(providerConfigs).map(([key, config]) =>
+            {Object.entries(providerConfigs).map(([key, config]: [string, any]) =>
           <Button
             key={key}
             variant="outline"
-            size="sm"
+            size="small"
             onClick={() => handlePresetSelect(key)}>
             
                 {config.displayName}
@@ -643,7 +643,8 @@ const ProviderForm = ({ provider, providerConfigs, onSave, onCancel }) => {
 
 // Компонент системных настроек
 const SystemSettingsForm = ({ settings, onSave }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [formData, setFormData] = useState(settings);
 
   useEffect(() => {

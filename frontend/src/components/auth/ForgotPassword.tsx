@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useTranslation } from '../../i18n/useTranslation';
 /**
  * ForgotPassword — password recovery component.
@@ -21,6 +18,7 @@ import { useTranslation } from '../../i18n/useTranslation';
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import type { CSSProperties } from 'react';
 import PropTypes from 'prop-types';
 import {
   Mail, Phone, ArrowLeft, Send, CheckCircle, RefreshCw, Shield, Key,
@@ -56,7 +54,8 @@ function getPasswordStrength(password, t) {
 const RESEND_COOLDOWN_SECONDS = 30;
 
 const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // All state at the top (UX Audit #15 — was scattered)
   const [step, setStep] = useState('method');
   const [method, setMethod] = useState('phone');
@@ -156,7 +155,7 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
     setLoading(true);
     setInlineError('');
     try {
-      const response = await api.post('/password-reset/initiate', { phone: contact });
+      const response = await api.post('/password-reset/initiate', { phone: contact }) as any;
       if (response.data.success) {
         toast.success(t('final.fp_sms_sent'));
         setStep('phone-verify');
@@ -175,7 +174,7 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
     setLoading(true);
     setInlineError('');
     try {
-      const response = await api.post('/password-reset/initiate', { email: contact });
+      const response = await api.post('/password-reset/initiate', { email: contact }) as any;
       if (response.data.success) {
         toast.success(t('final.fp_email_sent_to') + ' ' + contact);
         setStep('email-verify');
@@ -221,7 +220,7 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
       const response = await api.post('/password-reset/verify-phone', {
         phone: contact,
         verification_code: verificationCode,
-      });
+      }) as any;
       if (response.data.success) {
         setResetToken(response.data.reset_token);
         setStep('reset-password');
@@ -240,7 +239,7 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
     setLoading(true);
     setInlineError('');
     try {
-      const response = await api.post('/password-reset/initiate', { phone: contact });
+      const response = await api.post('/password-reset/initiate', { phone: contact }) as any;
       if (response.data.success) {
         toast.success(t('final.fp_sms_sent'));
         startResendCountdown();
@@ -269,7 +268,7 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
       const response = await api.post('/password-reset/confirm', {
         token: resetToken,
         new_password: newPassword,
-      });
+      }) as any;
       if (response.data.success) {
         setStep('success');
         toast.success(t('final.fp_success'));

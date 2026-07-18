@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useTranslation } from '../../i18n/useTranslation';
 /**
  * DentalVisitScreen — Phase 4+ minimalist visit screen for dentistry.
@@ -36,12 +33,22 @@ import { useTranslation } from '../../i18n/useTranslation';
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import type { CSSProperties } from 'react';
 import PropTypes from 'prop-types';
 import {
-  Button, Card, Badge, Input, Textarea, Label,
+  Button as RawButton, Card as RawCard, Badge as RawBadge, Input as RawInput, Textarea as RawTextarea, Label,
   Dialog, DialogTitle, DialogContent, DialogActions,
-  Typography, Box, Alert, Skeleton,
+  Typography as RawTypography, Box as RawBox, Alert as RawAlert, Skeleton as RawSkeleton,
 } from '../ui/macos';
+const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
+const Card = RawCard as unknown as React.ComponentType<Record<string, unknown>>;
+const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
+const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
+const Textarea = RawTextarea as unknown as React.ComponentType<Record<string, unknown>>;
+const Typography = RawTypography as unknown as React.ComponentType<Record<string, unknown>>;
+const Box = RawBox as unknown as React.ComponentType<Record<string, unknown>>;
+const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
+const Skeleton = RawSkeleton as unknown as React.ComponentType<Record<string, unknown>>;
 import {
   Stethoscope, CheckCircle, ChevronDown, ChevronUp,
   Brain,
@@ -56,7 +63,8 @@ import {
   TOOTH_STATUS_COLORS,
   getToothName,
 } from '../dental/dentalConstants';
-import AIAssistant from '../ai/AIAssistant';
+import AIAssistantRaw from '../ai/AIAssistant';
+const AIAssistant = AIAssistantRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 // =============================================================================
 // Helpers
@@ -80,22 +88,23 @@ const EMPTY_EMR_DATA = {
   notes: '',
 };
 
-const loadExistingEMR = async (visitId) => {
+const loadExistingEMR = async (visitId: string | number) => {
   if (!visitId) return null;
   try {
     const response = await apiClient.get(`/v2/emr/${visitId}`, {
       silent: true,
-      validateStatus: (status) => status === 404 || (status >= 200 && status < 300),
-    });
+      validateStatus: (status: number) => status === 404 || (status >= 200 && status < 300),
+    } as Record<string, unknown>) as any;
     if (response.status === 404) return null;
     return response.data;
   } catch (error) {
-    logger.warn('[DentalVisitScreen] Failed to load EMR', { visitId, error: error?.message });
+    const err = error as { message?: string };
+    logger.warn('[DentalVisitScreen] Failed to load EMR', { visitId, error: err?.message });
     return null;
   }
 };
 
-const saveEMR = async (visitId, data, rowVersion, isDraft = true) => {
+const saveEMR = async (visitId: string | number, data: unknown, rowVersion: unknown, isDraft = true) => {
   const response = await apiClient.post(`/v2/emr/${visitId}`, {
     data,
     row_version: rowVersion ?? 0,
@@ -109,7 +118,8 @@ const saveEMR = async (visitId, data, rowVersion, isDraft = true) => {
 // =============================================================================
 
 const PatientHeader = ({ patient, onCompleteVisit, loading }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const patientName =
     patient?.patient_name ||
     patient?.name ||
@@ -159,7 +169,8 @@ PatientHeader.propTypes = {
 };
 
 const AnamnesisSection = ({ value, onChange, disabled }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   return (
     <div style={{ marginBottom: 16 }}>
       <Label htmlFor="dental-anamnesis" style={{ display: 'block', marginBottom: 6 }}>
@@ -189,7 +200,8 @@ AnamnesisSection.propTypes = {
 };
 
 const ToothSummary = ({ toothStatus }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const teeth = Object.entries(toothStatus || {});
   if (teeth.length === 0) {
     return (
@@ -201,7 +213,7 @@ const ToothSummary = ({ toothStatus }) => {
 
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
-      {teeth.map(([toothNum, data]) => {
+      {teeth.map(([toothNum, data]: [string, any]) => {
         const status = data?.status || 'healthy';
         const label = TOOTH_STATUS_LABELS[status] || status;
         const color = TOOTH_STATUS_COLORS[status] || 'var(--mac-text-tertiary)';
@@ -232,7 +244,8 @@ ToothSummary.propTypes = {
 };
 
 const DiagnosisSection = ({ diagnosis, icd10, onDiagnosisChange, onIcd10Change, onAISuggestion, disabled }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 200px', gap: 12, marginBottom: 16 }}>
       <div>
@@ -296,7 +309,8 @@ DiagnosisSection.propTypes = {
 };
 
 const CollapsibleExtras = ({ hygieneIndices, onHygieneChange, disabled }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [open, setOpen] = useState(false);
 
   return (
@@ -397,7 +411,8 @@ CollapsibleExtras.propTypes = {
 };
 
 const VisitHistory = ({ history, loading }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   if (loading) {
     return <Skeleton style={{ height: 80, borderRadius: 8 }} />;
   }
@@ -453,7 +468,8 @@ VisitHistory.propTypes = {
 // =============================================================================
 
 const AISuggestionDialog = ({ open, onClose, onApply, anamnesis }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>
@@ -510,7 +526,8 @@ const DentalVisitScreen = ({
   onCompleteVisit,
   loading: parentLoading,
 }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [emrData, setEmrData] = useState(EMPTY_EMR_DATA);
   const [rowVersion, setRowVersion] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -567,8 +584,8 @@ const DentalVisitScreen = ({
     try {
       const response = await apiClient.get(`/v2/emr/patient/${patientId}`, {
         silent: true,
-        validateStatus: (status) => status === 404 || (status >= 200 && status < 300),
-      });
+        validateStatus: (status: number) => status === 404 || (status >= 200 && status < 300),
+      } as Record<string, unknown>) as any;
       if (response.status === 404) {
         setHistory([]);
       } else {
