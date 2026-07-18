@@ -1,26 +1,18 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import PropTypes from 'prop-types';
 import { Icon } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
+import type { ReactNode } from 'react';
 
-/**
- * L-H-4 fix: PanelEmptyState выделен в отдельный файл.
- *
- * L-L-1 fix (bonus): lucide-direct заменён на macos <Icon> для консистентности.
- *
- * Empty-state renderer для PatientPanel. Используется когда:
- *   - initData отсутствует (Mini App не открыт)
- *   - данные грузятся
- *   - данные не найдены
- *   - ошибка загрузки
- *
- * L-H-5 fix: добавлен optional `variant` prop — 'empty' | 'loading' | 'error'.
- * 'loading' добавляет aria-busy + skeleton-подобный shimmer.
- */
-function PanelEmptyState({ icon, title, description, variant = 'empty' }) {
+interface PanelEmptyStateProps {
+  icon: string;
+  title: ReactNode;
+  description?: ReactNode;
+  variant?: 'empty' | 'loading' | 'error';
+}
+
+function PanelEmptyState({ icon, title, description, variant = 'empty' }: PanelEmptyStateProps) {
   const { t } = useTranslation();
+  void t;
   const iconSize = 24;
   return (
     <div
@@ -29,7 +21,7 @@ function PanelEmptyState({ icon, title, description, variant = 'empty' }) {
       aria-live={variant === 'loading' ? 'polite' : undefined}
       aria-busy={variant === 'loading' ? 'true' : undefined}
     >
-      <Icon name={icon} size={iconSize} className="pp-empty-state-icon" />
+      <Icon name={icon} size={iconSize as unknown as "small" | "default" | "large" | "xlarge"} className="pp-empty-state-icon" />
       <div className="pp-empty-state-title">{title}</div>
       {description && <p className="pp-empty-state-description">{description}</p>}
       {variant === 'loading' && (
@@ -46,7 +38,7 @@ function PanelEmptyState({ icon, title, description, variant = 'empty' }) {
 PanelEmptyState.propTypes = {
   icon: PropTypes.string.isRequired,
   title: PropTypes.string.isRequired,
-  description: PropTypes.string,
+  description: PropTypes.node,
   variant: PropTypes.oneOf(['empty', 'loading', 'error']),
 };
 

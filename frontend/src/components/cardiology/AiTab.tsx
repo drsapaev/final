@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 /**
  * AiTab — R-15 (UX audit): extracted from CardiologistPanelUnified.
  *
@@ -11,16 +8,17 @@
  */
 
 import PropTypes from 'prop-types';
-import AIAssistant from '../ai/AIAssistant';
+import AIAssistantRaw from '../ai/AIAssistant';
+const AIAssistant = AIAssistantRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import { useTranslation } from '../../i18n/useTranslation';
 
-/**
- * @param {Object} props
- * @param {Function} props.onSuggestionSelect - Callback when AI suggests
- *   an ICD-10 code or diagnosis text
- */
-export function AiTab({ onSuggestionSelect }) {
+interface AiTabProps {
+  onSuggestionSelect: (suggestion: unknown) => void;
+}
+
+export function AiTab({ onSuggestionSelect }: AiTabProps) {
   const { t } = useTranslation();
+  void t;
   return (
     <div className="cardio-w-full-visible">
       <AIAssistant

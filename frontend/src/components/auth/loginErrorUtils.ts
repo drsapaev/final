@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { formatNetworkErrorMessage, isNetworkFetchError } from '../../utils/networkErrorMessages';
 
 const NETWORK_LOGIN_ERROR_MESSAGE =
@@ -9,13 +6,21 @@ const NETWORK_LOGIN_ERROR_MESSAGE =
 const DEFAULT_LOGIN_ERROR_MESSAGE =
   'Не удалось войти в систему. Проверьте логин, пароль и доступность backend.';
 
+interface FormatLoginErrorMessageArgs {
+  responseStatus?: number | null;
+  responseDetail?: string | null;
+  responseMessage?: string | null;
+  rawMessage?: string | null;
+  fallbackMessage?: string;
+}
+
 export function formatLoginErrorMessage({
   responseStatus,
   responseDetail,
   responseMessage,
   rawMessage,
   fallbackMessage = DEFAULT_LOGIN_ERROR_MESSAGE,
-} = {}) {
+}: FormatLoginErrorMessageArgs = {}): string {
   if (responseStatus === 401) {
     return 'Неверный логин или пароль';
   }

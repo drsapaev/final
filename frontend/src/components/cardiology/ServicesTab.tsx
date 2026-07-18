@@ -1,5 +1,4 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
+import React from 'react';
 
 /**
  * ServicesTab — R-15 (UX audit): extracted from CardiologistPanelUnified.
@@ -10,7 +9,8 @@
  * All state stays in the parent. This is a presentational wrapper.
  */
 
-import DoctorServiceSelector from '../doctor/DoctorServiceSelector';
+import DoctorServiceSelectorRaw from '../doctor/DoctorServiceSelector';
+const DoctorServiceSelector = DoctorServiceSelectorRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import { useTranslation } from '../../i18n/useTranslation';
 
 export function ServicesTab() {

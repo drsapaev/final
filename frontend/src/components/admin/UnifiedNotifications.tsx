@@ -1,35 +1,34 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
+import React from "react";
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import FCMManager from './FCMManager';
 import RegistrarNotificationManager from './RegistrarNotificationManager';
 import ErrorBoundary from '../common/ErrorBoundary';
-import { MacOSTab } from '../ui/macos';
+import { MacOSTab as MacOSTabRaw } from '../ui/macos';
+const MacOSTab = MacOSTabRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import { useTranslation } from '../../i18n/useTranslation';
 
+type NotificationSection = 'fcm' | 'registrar';
 
 const UnifiedNotifications = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string) => string;
   const [searchParams] = useSearchParams();
   const section = searchParams.get('section') || 'fcm';
 
-  const getActiveTab = (section) => {
-    return section === 'registrar-notifications' ? 'registrar' : 'fcm';
+  const getActiveTab = (s: string): NotificationSection => {
+    return s === 'registrar-notifications' ? 'registrar' : 'fcm';
   };
 
-  const [activeTab, setActiveTab] = useState(getActiveTab(section));
+  const [activeTab, setActiveTab] = useState<NotificationSection>(getActiveTab(section));
 
-  // Обновляем активную вкладку при изменении секции
   useEffect(() => {
     setActiveTab(getActiveTab(section));
   }, [section]);
 
   const tabs = [
-  { id: 'fcm', label: 'Push (FCM)', icon: 'Bell' },
-  { id: 'registrar', label: t('admin2.un_tab_registrar'), icon: 'Users' }];
-
+    { id: 'fcm' as const, label: 'Push (FCM)', icon: 'Bell' },
+    { id: 'registrar' as const, label: t('admin2.un_tab_registrar'), icon: 'Users' }
+  ];
 
   const renderContent = () => {
     switch (activeTab) {
@@ -45,9 +44,9 @@ const UnifiedNotifications = () => {
   return (
     <div className="admin-unified-root-no-color">
       <MacOSTab
-        tabs={tabs}
-        activeTab={activeTab}
-        onTabChange={setActiveTab} />
+        tabs={tabs as unknown as Array<{ id: string; label: string; icon: string; badge?: unknown }>}
+        activeTab={activeTab as unknown as string | number}
+        onTabChange={(id) => setActiveTab(id as NotificationSection)} />
       
       <div
         id={`notifications-panel-${activeTab}`}
@@ -56,12 +55,10 @@ const UnifiedNotifications = () => {
         className="admin-unified-content"
       >
         <ErrorBoundary>
-          {/* P-025 fix: catch runtime errors in child panels */}
           {renderContent()}
         </ErrorBoundary>
       </div>
     </div>);
-
 };
 
 export default UnifiedNotifications;

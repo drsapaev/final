@@ -1,16 +1,22 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useState } from 'react';
 import { Sun, Moon } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import PropTypes from 'prop-types';
+import type { CSSProperties } from 'react';
 
-const ThemeToggle = ({ size = 'md', className = '', style = {} }) => {
+type ToggleSize = 'sm' | 'md' | 'lg';
+
+interface ThemeToggleProps {
+  size?: ToggleSize;
+  className?: string;
+  style?: CSSProperties;
+}
+
+const ThemeToggle = ({ size = 'md', className = '', style = {} }: ThemeToggleProps) => {
   const { isDark, toggleTheme } = useTheme();
   const [isHovered, setIsHovered] = useState(false);
 
-  const sizes = {
+  const sizes: Record<ToggleSize, { iconSize: number; padding: string }> = {
     sm: { iconSize: 16, padding: 'var(--mac-spacing-1)' },
     md: { iconSize: 20, padding: 'var(--mac-spacing-2)' },
     lg: { iconSize: 24, padding: 'var(--mac-spacing-3)' }
@@ -18,7 +24,7 @@ const ThemeToggle = ({ size = 'md', className = '', style = {} }) => {
 
   const { iconSize, padding } = sizes[size] || sizes.md;
 
-  const buttonStyle = {
+  const buttonStyle: CSSProperties = {
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -33,13 +39,13 @@ const ThemeToggle = ({ size = 'md', className = '', style = {} }) => {
     ...style
   };
 
-  const hoverStyle = {
+  const hoverStyle: CSSProperties = {
     transform: 'scale(1.05)',
     background: 'var(--mac-bg-secondary)',
     boxShadow: 'var(--mac-shadow-md)',
   };
 
-  const activeStyle = {
+  const activeStyle: CSSProperties = {
     ...buttonStyle,
     ...(isHovered ? hoverStyle : {})
   };

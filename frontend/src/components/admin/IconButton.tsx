@@ -1,17 +1,15 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import PropTypes from 'prop-types';
 import { Button } from '../ui/macos';
+import type { ReactNode, CSSProperties, MouseEvent } from 'react';
 
-/**
- * IconButton — shared icon-only button for admin tables (P2 dedup, Sprint 4).
- *
- * Replaces 3 byte-identical copies that lived in AdminAppointments,
- * AdminDoctors, and AdminPatients. Keeps the same className/style/props
- * so behavior is unchanged.
- */
-const IconButton = ({ label, tone = 'default', onClick, children }) => (
+interface IconButtonProps {
+  label: string;
+  tone?: 'default' | 'danger';
+  onClick: (e: MouseEvent<HTMLButtonElement>) => void;
+  children: ReactNode;
+}
+
+const IconButton = ({ label, tone = 'default', onClick, children }: IconButtonProps) => (
   <Button
     type="button"
     variant="ghost"
@@ -20,7 +18,7 @@ const IconButton = ({ label, tone = 'default', onClick, children }) => (
     aria-label={label}
     title={label}
     className="admin-w-32-h-32-p-0-radius-var-mac-radius-sm-col-dyn"
-    style={{ '--admin-col0': tone === 'danger' ? 'var(--mac-error)' : 'var(--mac-text-secondary)' }}
+    style={{ '--admin-col0': tone === 'danger' ? 'var(--mac-error)' : 'var(--mac-text-secondary)' } as CSSProperties}
   >
     {children}
   </Button>
