@@ -1,44 +1,64 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, type CSSProperties, type ChangeEvent, type ClipboardEvent, type KeyboardEvent, type RefObject } from 'react';
 import PropTypes from 'prop-types';
 import { Input } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
+
+interface SyntheticPhoneTarget extends HTMLInputElement {
+  rawValue?: string;
+}
+
+interface SyntheticPhoneEvent extends Omit<ChangeEvent<HTMLInputElement>, 'target'> {
+  target: SyntheticPhoneTarget;
+}
+
+interface PhoneInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'children' | 'style' | 'onChange' | 'value' | 'size'> {
+  value?: string;
+  onChange?: (e: SyntheticPhoneEvent) => void;
+  placeholder?: string;
+  style?: CSSProperties;
+  className?: string;
+}
+
+interface InputStyle extends CSSProperties {
+  transition?: string;
+}
+
 /**
  * Современный компонент для ввода телефона с маской
  * Заменяет react-input-mask для избежания findDOMNode warnings
  */
-const PhoneInput = ({ 
-  value = '', 
-  onChange, 
+const PhoneInput = ({
+  value = '',
+  onChange,
   placeholder = '+7 (999) 123-45-67',
   style = {},
   className = '',
-  ...props 
-}) => {
-  const [displayValue, setDisplayValue] = useState('');
-  const inputRef = useRef<unknown>(null);
+  ...props
+}: PhoneInputProps) => {
+  const { t } = useTranslation();
+  void t;
+  const [displayValue, setDisplayValue] = useState<string>('');
+  const inputRef: RefObject<HTMLInputElement | null> = useRef<HTMLInputElement | null>(null);
 
   // Форматирование номера телефона
-  const formatPhoneNumber = (input) => {
+  const formatPhoneNumber = (input: string): string => {
     // Удаляем все нецифровые символы
     const numbers = input.replace(/\D/g, '');
-    
+
     // Если начинается с 8, заменяем на 7
     let cleanNumber = numbers;
     if (cleanNumber.startsWith('8')) {
       cleanNumber = '7' + cleanNumber.slice(1);
     }
-    
+
     // Если не начинается с 7, добавляем 7
     if (!cleanNumber.startsWith('7') && cleanNumber.length > 0) {
       cleanNumber = '7' + cleanNumber;
     }
-    
+
     // Ограничиваем до 11 цифр
     cleanNumber = cleanNumber.slice(0, 11);
-    
+
     // Форматируем в маску +7 (999) 999-99-99
     if (cleanNumber.length === 0) return '';
     if (cleanNumber.length <= 1) return `+${cleanNumber}`;
@@ -49,28 +69,28 @@ const PhoneInput = ({
   };
 
   // Обработка изменений
-  const handleChange = (e) => {
+  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     const input = e.target.value;
     const formatted = formatPhoneNumber(input);
-    
+
     setDisplayValue(formatted);
-    
+
     // Извлекаем только цифры для передачи в onChange
     const numbers = input.replace(/\D/g, '');
     let cleanNumber = numbers;
-    
+
     if (cleanNumber.startsWith('8')) {
       cleanNumber = '7' + cleanNumber.slice(1);
     }
-    
+
     if (!cleanNumber.startsWith('7') && cleanNumber.length > 0) {
       cleanNumber = '7' + cleanNumber;
     }
-    
+
     cleanNumber = cleanNumber.slice(0, 11);
-    
+
     // Создаем событие с отформатированным значением
-    const syntheticEvent = {
+    const syntheticEvent: SyntheticPhoneEvent = {
       ...e,
       target: {
         ...e.target,
@@ -78,39 +98,39 @@ const PhoneInput = ({
         rawValue: cleanNumber
       }
     };
-    
+
     onChange?.(syntheticEvent);
   };
 
   // Обработка вставки из буфера обмена
-  const handlePaste = (e) => {
+  const handlePaste = (e: ClipboardEvent<HTMLInputElement>) => {
     e.preventDefault();
     const pastedText = e.clipboardData.getData('text');
     const formatted = formatPhoneNumber(pastedText);
     setDisplayValue(formatted);
-    
+
     const numbers = pastedText.replace(/\D/g, '');
     let cleanNumber = numbers;
-    
+
     if (cleanNumber.startsWith('8')) {
       cleanNumber = '7' + cleanNumber.slice(1);
     }
-    
+
     if (!cleanNumber.startsWith('7') && cleanNumber.length > 0) {
       cleanNumber = '7' + cleanNumber;
     }
-    
+
     cleanNumber = cleanNumber.slice(0, 11);
-    
-    const syntheticEvent = {
-      ...e,
+
+    const syntheticEvent: SyntheticPhoneEvent = {
+      ...(e as unknown as ChangeEvent<HTMLInputElement>),
       target: {
-        ...e.target,
+        ...(e.target as HTMLInputElement),
         value: formatted,
         rawValue: cleanNumber
       }
     };
-    
+
     onChange?.(syntheticEvent);
   };
 
@@ -122,17 +142,17 @@ const PhoneInput = ({
   }, [value, displayValue]);
 
   // Обработка клавиш
-  const handleKeyDown = (e) => {
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     // Разрешаем: цифры, Backspace, Delete, стрелки, Tab, Enter
     const allowedKeys = [
-      'Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 
+      'Backspace', 'Delete', 'ArrowLeft', 'ArrowRight',
       'ArrowUp', 'ArrowDown', 'Tab', 'Enter', 'Home', 'End'
     ];
-    
+
     if (allowedKeys.includes(e.key) || e.ctrlKey || e.metaKey) {
       return;
     }
-    
+
     // Разрешаем только цифры
     if (!/\d/.test(e.key)) {
       e.preventDefault();
@@ -158,7 +178,7 @@ const PhoneInput = ({
         outline: 'none',
         transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
         ...style
-      }}
+      } as InputStyle}
       className={className}
       {...props}
     />
@@ -176,4 +196,3 @@ PhoneInput.propTypes = {
 };
 
 export default PhoneInput;
-
