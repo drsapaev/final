@@ -162,7 +162,7 @@ function miniAppKeyToI18nKey(key) {
 function translateMiniAppText(languageCode: string, key: string, params: Record<string, unknown> = {}) {
   const language = normalizeMiniAppLanguage(languageCode);
   const i18nKey = miniAppKeyToI18nKey(key);
-  const fixedT = i18n.getFixedT(language);
+  const fixedT = i18n.getFixedT(language) as unknown as (key: string, options?: Record<string, unknown>) => string;
   const result = fixedT(i18nKey, params);
   // i18next returns the i18n key itself when the translation is missing.
   // Preserve the original "return key" fallback so callers can detect
@@ -179,7 +179,7 @@ function localizeMiniAppCapabilityStatus(languageCode, status) {
 
 function localizeMiniAppPatientForm(languageCode, form) {
   const language = normalizeMiniAppLanguage(languageCode);
-  const fixedT = i18n.getFixedT(language);
+  const fixedT = i18n.getFixedT(language) as unknown as (key: string, options?: Record<string, unknown>) => string;
   const titleKey = `final.tgs_forms_${form.id}_title`;
   const descriptionKey = `final.tgs_forms_${form.id}_description`;
   const fieldsPrefix = `final.tgs_forms_${form.id}_fields_`;
@@ -1833,7 +1833,7 @@ function TelegramMiniAppPatientShell() {
                     {(form.fields || []).map((field) => (
                       field.type === 'boolean' ? (
                         <label key={field.key} style={miniAppCheckboxRowStyle}>
-                          <Checkbox aria-label={field.label || field.key} checked={getMiniAppFormFieldValue(formAnswers, form.id, field)} onChange={handlePatientFormFieldChange(form.id, field)} style={miniAppCheckboxStyle} />
+                          <Checkbox aria-label={field.label || field.key} checked={Boolean(getMiniAppFormFieldValue(formAnswers, form.id, field))} onChange={handlePatientFormFieldChange(form.id, field)} style={miniAppCheckboxStyle} />
                           <span>{field.label}</span>
                         </label>
                       ) : (
@@ -1958,7 +1958,7 @@ function TelegramMiniAppPatientShell() {
                       <div style={miniAppCapabilityHeaderStyle}>
                         <h2 style={miniAppCapabilityTitleStyle}>{label}</h2>
                         <Badge variant={enabled ? 'primary' : 'secondary'} size="small">
-                          {enabled ? t('available') : t('statusOnly')}
+                          {String(enabled ? t("available") : t("statusOnly"))}
                         </Badge>
                       </div>
                       <p style={miniAppCapabilityTextStyle}>
