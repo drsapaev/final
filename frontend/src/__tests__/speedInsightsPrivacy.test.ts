@@ -1,10 +1,7 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { describe, expect, it } from 'vitest';
 
-import { ROUTE_REGISTRY } from '../routing/routeRegistry.ts';
-import { sanitizeSpeedInsightsEvent } from '../utils/speedInsightsPrivacy.ts';
+import { ROUTE_REGISTRY } from '../routing/routeRegistry';
+import { sanitizeSpeedInsightsEvent } from '../utils/speedInsightsPrivacy';
 
 describe('Speed Insights privacy sanitizer', () => {
   it('drops query strings and hashes that can contain patient workflow identifiers', () => {

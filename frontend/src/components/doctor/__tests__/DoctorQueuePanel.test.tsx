@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 /* eslint-disable react/prop-types */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -73,7 +70,8 @@ vi.mock('../../ui/macos', () => ({
   Alert: DoctorQueuePanelTestMacOSAlert,
 }));
 
-import DoctorQueuePanel from '../DoctorQueuePanel.tsx';
+import DoctorQueuePanelRaw from '../DoctorQueuePanel';
+const DoctorQueuePanel = DoctorQueuePanelRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 describe('DoctorQueuePanel', () => {
   beforeEach(() => {

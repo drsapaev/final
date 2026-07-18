@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 /**
  * Registrar Panel — data loading hook (partial extraction).
  *
@@ -70,19 +67,21 @@ export const useRegistrarData = ({
           api.get('/registrar/departments?active_only=true'),
         ]);
 
-        const doctorsRes = doctorsResult.status === 'fulfilled' ? doctorsResult.value : { ok: false };
-        const servicesRes = servicesResult.status === 'fulfilled' ? servicesResult.value : { ok: false };
-        const departmentsRes = departmentsResult.status === 'fulfilled' ? departmentsResult.value : { success: false };
+        const doctorsRes = (doctorsResult.status === 'fulfilled' ? doctorsResult.value : { ok: false }) as any;
+        const servicesRes = (servicesResult.status === 'fulfilled' ? servicesResult.value : { ok: false }) as any;
+        const departmentsRes = (departmentsResult.status === 'fulfilled' ? departmentsResult.value : { success: false }) as any;
 
         if (doctorsResult.status === 'fulfilled') {
           logger.info('📊 Ответ врачей: OK');
         } else {
-          logger.error('❌ Ошибка загрузки врачей:', doctorsResult.reason?.message);
+          const reason = doctorsResult.reason as { message?: string };
+          logger.error('❌ Ошибка загрузки врачей:', reason?.message);
         }
         if (servicesResult.status === 'fulfilled') {
           logger.info('📊 Ответ услуг: OK');
         } else {
-          logger.error('❌ Ошибка загрузки услуг:', servicesResult.reason?.message);
+          const reason = servicesResult.reason as { message?: string };
+          logger.error('❌ Ошибка загрузки услуг:', reason?.message);
         }
         if (departmentsResult.status === 'fulfilled') {
           logger.info('📊 Ответ отделений: OK', departmentsRes.data);
@@ -113,7 +112,8 @@ export const useRegistrarData = ({
               logger.info('✅ Врачи обновлены из API');
             }
           } catch (error) {
-            logger.warn('Ошибка обработки данных врачей:', error.message);
+            const err = error as { message?: string };
+            logger.warn('Ошибка обработки данных врачей:', err?.message);
           }
         } else {
           logger.warn('❌ API врачей недоступен, оставляем пустое состояние');
@@ -138,7 +138,8 @@ export const useRegistrarData = ({
               logger.info('✅ Услуги обновлены из API');
             }
           } catch (error) {
-            logger.warn('Ошибка обработки данных услуг:', error.message);
+            const err = error as { message?: string };
+            logger.warn('Ошибка обработки данных услуг:', err?.message);
           }
         } else {
           logger.warn('❌ API услуг недоступен, оставляем пустое состояние');
@@ -157,9 +158,10 @@ export const useRegistrarData = ({
   // ───────────────────────────────────────────────────────────
   // fetchPatientData: fetch single patient by ID
   // ───────────────────────────────────────────────────────────
-  const fetchPatientData = useCallback(async (patientId) => {
+  const fetchPatientData = useCallback(async (patientId: number | string) => {
+    const pid = Number(patientId);
     // Проверяем, является ли это демо-пациентом (ID >= 1000)
-    if (patientId >= 1000) {
+    if (pid >= 1000) {
       // Возвращаем null для демо-пациентов, так как их данные уже есть в записи
       return null;
     }
@@ -169,10 +171,11 @@ export const useRegistrarData = ({
       // заменён на getPatient() из api/patients.
       // Auth-token добавляется автоматически axios-interceptor'ом в api/client.js.
       // 401/403 обрабатываются интерсептором (redirect to login или refresh).
-      return await getPatient(patientId);
+      return await getPatient(pid);
     } catch (error) {
-      const status = error?.response?.status;
-      const rawMessage = error?.message || '';
+      const err = error as { response?: { status?: number }; message?: string };
+      const status = err?.response?.status;
+      const rawMessage = err?.message || '';
 
       // 404 — пациент не найден. Не логируем как ошибку, просто возвращаем null.
       if (status === 404) {
@@ -201,15 +204,15 @@ export const useRegistrarData = ({
   // ───────────────────────────────────────────────────────────
   // enrichAppointmentsWithPatientData: enrich records with patient display fields
   // ───────────────────────────────────────────────────────────
-  const enrichAppointmentsWithPatientData = useCallback(async (appointments) => {
-    const enrichedAppointments = await Promise.all(appointments.map(async (apt) => {
+  const enrichAppointmentsWithPatientData = useCallback(async (appointments: any[]) => {
+    const enrichedAppointments = await Promise.all(appointments.map(async (apt: any) => {
       let enrichedApt = { ...apt };
 
       // Обогащаем данными пациента
       if (apt.patient_id && (!hasBackendPatientDisplayContract(apt) || !hasBackendPatientGenderContract(apt))) {
-        const patient = await fetchPatientData(apt.patient_id);
+        const patient: any = await fetchPatientData(apt.patient_id);
         if (patient) {
-          let patient_fio = '';
+          let patient_fio: string = '';
           if (patient.last_name && patient.first_name) {
             patient_fio = `${patient.last_name} ${patient.first_name}`;
             if (patient.middle_name) {

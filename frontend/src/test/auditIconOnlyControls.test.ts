@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 // @vitest-environment node
 
 import fs from 'node:fs';
@@ -13,7 +10,7 @@ import { describe, expect, it } from 'vitest';
 const frontendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const scriptPath = path.join(frontendRoot, 'scripts', 'audit-icon-only-controls.mjs');
 
-function runAudit(source, extraArgs = [], extraFiles = {}) {
+function runAudit(source: string, extraArgs: string[] = [], extraFiles: Record<string, string> = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'icon-audit-'));
 
   try {
@@ -46,7 +43,7 @@ function runAudit(source, extraArgs = [], extraFiles = {}) {
   }
 }
 
-function runAuditRoot(root, extraArgs = []) {
+function runAuditRoot(root: string, extraArgs: string[] = []) {
   const result = spawnSync(
     process.execPath,
     [scriptPath, `--root=${root}`, '--format=json', ...extraArgs],
