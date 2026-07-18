@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 /**
  * EMR v2 Components
@@ -65,7 +63,6 @@ export { emrReducer, emrActions, EMR_ACTIONS } from '../../reducers/emrReducer';
 // AI (suggestion only - doctor must confirm)
 // ============================================
 export {
-    useEMRAI,
     AISuggestionCard,
     AISuggestionPanel,
     AISuggestionPopover,

@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
@@ -9,12 +7,14 @@ import DynamicPricingManager from './DynamicPricingManager';
 import DiscountBenefitsManager from './DiscountBenefitsManager';
 import AdminFinanceOverview from './AdminFinanceOverview';
 import ErrorBoundary from '../common/ErrorBoundary';
-import { MacOSTab } from '../ui/macos';
+import { MacOSTab as MacOSTabRaw } from '../ui/macos';
+import React from 'react';
+const MacOSTab = MacOSTabRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import { useTranslation } from '../../i18n/useTranslation';
 
 
 const UnifiedFinance = ({ renderFinance }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [searchParams] = useSearchParams();
   const section = searchParams.get('section') || 'finance';
 

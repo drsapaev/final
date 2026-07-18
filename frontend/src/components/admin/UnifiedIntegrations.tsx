@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -29,7 +27,7 @@ const INTEGRATION_TABS = (t) => [
 ];
 
 const UnifiedIntegrations = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [searchParams, setSearchParams] = useSearchParams();
   const section = searchParams.get('tab') || 'webhooks';
   const [activeTab, setActiveTab] = useState(section);

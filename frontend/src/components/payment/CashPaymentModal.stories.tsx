@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 /**
  * CashPaymentModal Stories
@@ -12,7 +10,7 @@ import i18n from '../../i18n';
 
 // i18n: stories use the i18n singleton directly (no hook available at module-level).
 // Storybook args are resolved at module-load time using the current language.
-const t = (key, params) => i18n.t(key, params);
+const t = ((key: string, params?: Record<string, unknown>) => i18n.t(key, params as never)) as unknown as (key: string, params?: Record<string, unknown>) => string;
 
 export default {
   title: 'Payment/CashPaymentModal',
