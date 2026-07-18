@@ -8,6 +8,7 @@ import { useTranslation } from '../../i18n/useTranslation';
  * Согласно MASTER_TODO_LIST строка 286
  */
 import { Fragment, useState } from 'react';
+import type { CSSProperties } from 'react';
 import {
   Alert,
   Badge,
@@ -224,7 +225,8 @@ const priorityBadgeVariant = {
 };
 
 const TreatmentPlanner = ({ visitId, onUpdate }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [treatmentPlan, setTreatmentPlan] = useState({
     name: '',
     stages: [],

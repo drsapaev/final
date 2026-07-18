@@ -1,7 +1,5 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useState } from 'react';
+import type { CSSProperties } from 'react';
 import {
   BarChart3,
 
@@ -101,7 +99,8 @@ const ReportsAndAnalytics = ({
   initialData = null,
   onClose
 }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [activeTab, setActiveTab] = useState('overview');
   const [dateRange, setDateRange] = useState('30d');
   const analyticsData = initialData || EMPTY_ANALYTICS_DATA;
@@ -113,7 +112,7 @@ const ReportsAndAnalytics = ({
     // Здесь можно добавить логику загрузки данных для выбранного периода
   };
 
-  const handleExportReport = () => {};
+  const handleExportReport = (_format?: string) => {};
 
   // Рендер карточки метрики
   const renderMetricCard = (title, value, change, icon, color = 'blue') =>

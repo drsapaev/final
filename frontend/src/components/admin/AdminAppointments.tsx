@@ -1,6 +1,4 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
+import type { CSSProperties } from "react";
 import { Calendar, Clock, Edit, Plus, RefreshCw, Search, Trash2 } from 'lucide-react';
 import PropTypes from 'prop-types';
 
@@ -8,25 +6,31 @@ import AppointmentModal from './AppointmentModal';
 import useAppointments from '../../hooks/useAppointments';
 import useDoctors from '../../hooks/useDoctors';
 import usePatients from '../../hooks/usePatients';
-import useModal from '../../hooks/useModal.jsx';
+import useModal from '../../hooks/useModal';
 import notify from '../../services/notify';
 import { useTranslation } from '../../i18n/useTranslation';
 import {
   Badge,
-  Button,
+  Button as RawButton,
   MacOSCard,
-  MacOSStatCard,
-  MacOSEmptyState,
+  MacOSStatCard as RawMacOSStatCard,
+  MacOSEmptyState as RawMacOSEmptyState,
   Input,
-  Skeleton,
-  Select,
+  Skeleton as RawSkeleton,
+  Select as RawSelect,
 } from '../ui/macos';
-import IconButton from './IconButton';
+const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
+const MacOSStatCard = RawMacOSStatCard as unknown as React.ComponentType<Record<string, unknown>>;
+const MacOSEmptyState = RawMacOSEmptyState as unknown as React.ComponentType<Record<string, unknown>>;
+const Skeleton = RawSkeleton as unknown as React.ComponentType<Record<string, unknown>>;
+const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
+import IconButtonRaw from './IconButton';
+const IconButton = IconButtonRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import logger from '../../utils/logger';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
 
-const getStatusOptions = (t) => [
+const getStatusOptions = (t: (key: string) => string) => [
   { value: '', label: t('admin2.appt_filter_all_statuses') },
   { value: 'pending', label: t('admin2.appt_status_pending') },
   { value: 'confirmed', label: t('admin2.appt_status_confirmed') },
@@ -37,7 +41,7 @@ const getStatusOptions = (t) => [
   { value: 'no_show', label: t('admin2.appt_status_no_show') },
 ];
 
-const tableHeaderStyle = {
+const tableHeaderStyle: CSSProperties = {
   textAlign: 'left',
   padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
   color: 'var(--mac-text-secondary)',
@@ -159,8 +163,10 @@ const getDoctorOptionLabel = (doctor, t) => {
 
 const AdminAppointments = () => {
   // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
-  const [confirm, confirmDialog] = useConfirm();
-  const { t } = useTranslation();
+  const [confirmRaw, confirmDialog] = useConfirm();
+  const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const { allDoctors } = useDoctors();
   const { patients } = usePatients();
   const {
@@ -321,7 +327,7 @@ const AdminAppointments = () => {
         {/* UX Audit Admin #1.1: кнопка «Сбросить» для быстрой очистки фильтров. */}
         {filtersActive && (
           <div style={{ marginBottom: '12px' }}>
-            <Button variant="ghost" size="sm" onClick={() => {
+            <Button variant="ghost" size="small" onClick={() => {
               setSearchTerm(''); setFilterStatus(''); setFilterDate(''); setFilterDoctor('');
             }} aria-label={t('admin2.appt_reset_filters_aria')}>
               ✕ {t('admin2.appt_reset_filters_btn')}
@@ -455,7 +461,7 @@ const AdminAppointments = () => {
                                 ? 'warning'
                                 : 'success'
                             }
-                            size="sm"
+                            size="small"
                           >
                             {appointment.doctor?.active === false
                               ? t('admin2.appt_doctor_inactive')
@@ -547,7 +553,7 @@ const AdminAppointments = () => {
         patients={patients}
       />
       {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
-      {confirmDialog}
+      {confirmDialog as unknown as React.ReactNode}
     </div>
   );
 };

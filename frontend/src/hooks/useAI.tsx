@@ -4,6 +4,7 @@
  */
 
 import { useState, useCallback } from 'react';
+import type { CSSProperties } from 'react';
 import { useReducedMotion } from './useEnhancedMediaQuery';
 import { mcpAPI } from '../utils/mcp';
 import { validateAIChatMessage, detectPromptInjection } from '../utils/aiValidator';
