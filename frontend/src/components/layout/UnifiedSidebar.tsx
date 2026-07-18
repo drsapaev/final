@@ -1,11 +1,10 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
+import React, { type CSSProperties } from 'react';
 
 import { useEffect, useRef, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import Icon from '../Icon';
 import { useTheme } from '../../contexts/ThemeContext';
-import auth from '../../stores/auth.js';
+import auth from '../../stores/auth';
 import '../../styles/sidebar-buttons.css';
 import '../../styles/cursor-effects.css';
 import logger from '../../utils/logger';
@@ -17,7 +16,7 @@ import { useTranslation } from '../../i18n/useTranslation';
  * Используется во всех панелях для единообразия
  */
 const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const asideRef = useRef(null);
   const location = useLocation();
   const { isDark, toggleTheme } = useTheme();
@@ -68,7 +67,7 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
   };
 
   const st = auth.getState();
-  const profile = st.profile || st.user || {};
+  const profile = (st as Record<string, any>).profile || (st as Record<string, any>).user || {};
 
   // Для демо-страницы используем роль admin по умолчанию
   const isDemoPage = location.pathname.startsWith('/medilab-demo');
@@ -263,12 +262,12 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
             minHeight: '28px'
           }}
           onMouseEnter={(e) => {
-            e.target.style.color = isDark ? 'var(--mac-warning)' : 'var(--mac-accent-blue-active)';
-            e.target.style.filter = 'brightness(1.2)';
+            e.currentTarget.style.color = isDark ? 'var(--mac-warning)' : 'var(--mac-accent-blue-active)';
+            e.currentTarget.style.filter = 'brightness(1.2)';
           }}
           onMouseLeave={(e) => {
-            e.target.style.color = isDark ? 'var(--mac-text-tertiary)' : 'var(--mac-text-secondary)';
-            e.target.style.filter = 'brightness(1)';
+            e.currentTarget.style.color = isDark ? 'var(--mac-text-tertiary)' : 'var(--mac-text-secondary)';
+            e.currentTarget.style.filter = 'brightness(1)';
           }}
           title={isCollapsed ? 'Развернуть сайдбар' : 'Свернуть сайдбар'}
           aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
@@ -308,11 +307,11 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
               key={item.id}
               to={item.path}
               className="interactive-element hover-lift ripple-effect nav-item-hover focus-ring"
-              style={({ isHovered }) => ({
+              style={({ isActive }) => ({
                 ...navItemStyle(active),
-                ...(isHovered && !active ? hoverStyle : {}),
+                ...(isActive && !active ? hoverStyle : {}),
                 ...inlineStyle
-              })}
+              }) as unknown as CSSProperties}
               title={isCollapsed ? item.label : ''}>
 
               <Icon name={item.iconName} size={isCollapsed ? 24 : 16} />
@@ -351,12 +350,12 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
                 key={item.id}
                 to={item.path}
                 className="interactive-element hover-lift ripple-effect nav-item-hover focus-ring"
-                style={({ isHovered }) => ({
+                style={({ isActive }) => ({
                   ...navItemStyle(active),
-                  ...(isHovered && !active ? hoverStyle : {}),
+                  ...(isActive && !active ? hoverStyle : {}),
                   ...inlineStyle
-                })}
-                title={isCollapsed ? item.label : ''}>
+                }) as unknown as CSSProperties}
+              title={isCollapsed ? item.label : ''}>
 
                 <Icon name={item.iconName} size={isCollapsed ? 24 : 16} />
                 {!isCollapsed && <span>{item.label}</span>}
@@ -395,12 +394,12 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
             width: isCollapsed ? '32px' : 'auto'
           }}
           onMouseEnter={(e) => {
-            e.target.style.color = isDark ? 'var(--mac-warning)' : 'var(--mac-accent-blue-active)';
-            e.target.style.filter = 'brightness(1.2)';
+            e.currentTarget.style.color = isDark ? 'var(--mac-warning)' : 'var(--mac-accent-blue-active)';
+            e.currentTarget.style.filter = 'brightness(1.2)';
           }}
           onMouseLeave={(e) => {
-            e.target.style.color = isDark ? '#f8fafb' : 'var(--mac-text-primary)';
-            e.target.style.filter = 'brightness(1)';
+            e.currentTarget.style.color = isDark ? '#f8fafb' : 'var(--mac-text-primary)';
+            e.currentTarget.style.filter = 'brightness(1)';
           }}
           title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}>
 
@@ -426,12 +425,12 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
             width: isCollapsed ? '32px' : 'auto'
           }}
           onMouseEnter={(e) => {
-            e.target.style.color = isDark ? 'var(--mac-success)' : 'var(--mac-success)';
-            e.target.style.filter = 'brightness(1.2)';
+            e.currentTarget.style.color = isDark ? 'var(--mac-success)' : 'var(--mac-success)';
+            e.currentTarget.style.filter = 'brightness(1.2)';
           }}
           onMouseLeave={(e) => {
-            e.target.style.color = isDark ? '#f8fafb' : 'var(--mac-text-primary)';
-            e.target.style.filter = 'brightness(1)';
+            e.currentTarget.style.color = isDark ? '#f8fafb' : 'var(--mac-text-primary)';
+            e.currentTarget.style.filter = 'brightness(1)';
           }}
           title={`Switch to ${language === 'en' ? 'Russian' : 'English'}`}>
 
@@ -464,15 +463,15 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
             justifyContent: 'center'
           }}
           onMouseEnter={(e) => {
-            e.target.style.color = 'var(--mac-error)';
-            e.target.style.filter = 'brightness(1.2)';
+            e.currentTarget.style.color = 'var(--mac-error)';
+            e.currentTarget.style.filter = 'brightness(1.2)';
           }}
           onMouseLeave={(e) => {
-            e.target.style.color = isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-text-primary)';
-            e.target.style.filter = 'brightness(1)';
+            e.currentTarget.style.color = isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-text-primary)';
+            e.currentTarget.style.filter = 'brightness(1)';
           }}
           onClick={() => {
-            auth.logout();
+            auth.clearToken();
           }}
           aria-label="Log out of account"
           title={isCollapsed ? 'Log out' : ''}>

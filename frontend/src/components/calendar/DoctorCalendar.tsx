@@ -1,5 +1,4 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
+import type { CSSProperties } from 'react';
 
 /**
  * DoctorCalendar Component
@@ -28,6 +27,7 @@ import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 import i18n from '../../i18n';
+const t18 = i18n.t as unknown as (key: string, options?: Record<string, unknown>) => string;
 
 const API_BASE = getApiOrigin();
 
@@ -64,7 +64,7 @@ const getWeekDays = (startDate) => {
   return days;
 };
 
-const WEEKDAY_NAMES = [i18n.t('misc.dc_pn'), i18n.t('misc.dc_vt'), i18n.t('misc.dc_sr'), i18n.t('misc.dc_cht'), i18n.t('misc.dc_pt'), i18n.t('misc.dc_sb'), i18n.t('misc.dc_vs')];
+const WEEKDAY_NAMES = [t18('misc.dc_pn'), t18('misc.dc_vt'), t18('misc.dc_sr'), t18('misc.dc_cht'), t18('misc.dc_pt'), t18('misc.dc_sb'), t18('misc.dc_vs')];
 
 
 
@@ -85,14 +85,14 @@ const DoctorCalendar = ({
   onViewAppointment,
   compact = false
 }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const { theme } = useTheme();
   const isDark = theme === 'dark';
 
   const [, setCurrentDate] = useState(new Date());
   const [weekStart, setWeekStart] = useState(getWeekStart(new Date()));
   const [weekDays, setWeekDays] = useState([]);
-  const [schedule, setSchedule] = useState({});
+  const [schedule, setSchedule] = useState<Record<string, any>>({});
   useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -133,7 +133,7 @@ const DoctorCalendar = ({
       );
 
       if (!response.ok) {
-        throw new Error(i18n.t('misc.dc_ne_udalos_zagruzit_raspisani'));
+        throw new Error(t18('misc.dc_ne_udalos_zagruzit_raspisani'));
       }
 
       const data = await response.json();
@@ -311,7 +311,7 @@ const DoctorCalendar = ({
 
     if (daySchedule.length === 0) {
       return (
-        <div style={{ fontSize: 'var(--mac-font-size-xs)', color: isDark ? 'var(--mac-text-tertiary)' : 'var(--mac-text-tertiary)', fontStyle: 'italic' }}>
+        <div style={{ fontSize: 'var(--mac-font-size-xs)', color: isDark ? 'var(--mac-text-tertiary)' : 'var(--mac-text-tertiary)', fontStyle: 'italic' } as CSSProperties}>
                     Нет записей
                 </div>);
 
@@ -325,13 +325,13 @@ const DoctorCalendar = ({
       style={{
         ...styles.slot,
         ...(slot.booked ? styles.slotBooked : styles.slotAvailable)
-      }}
+      } as CSSProperties}
       onClick={() => slot.booked ? onViewAppointment?.(slot) : onSelectSlot?.(slot, date)}
       onKeyDown={(event) => handleActivationKeyDown(event, () => (slot.booked ? onViewAppointment?.(slot) : onSelectSlot?.(slot, date)))}>
 
-                <div style={{ fontWeight: 'var(--mac-font-weight-medium)' }}>{slot.time || slot.start_time}</div>
+                <div style={{ fontWeight: 'var(--mac-font-weight-medium)' } as CSSProperties}>{slot.time || slot.start_time}</div>
                 {slot.patient_name &&
-      <div style={{ fontSize: 'var(--mac-font-size-xs)', opacity: 0.8 }}>{slot.patient_name}</div>
+      <div style={{ fontSize: 'var(--mac-font-size-xs)', opacity: 0.8 } as CSSProperties}>{slot.patient_name}</div>
       }
             </div>
     );
@@ -349,7 +349,7 @@ const DoctorCalendar = ({
         style={{
           ...styles.dayCell,
           ...(today ? styles.dayCellToday : {})
-        }}
+        } as CSSProperties}
         onClick={() => setSelectedDay(date)}
         onKeyDown={(event) => handleActivationKeyDown(event, () => setSelectedDay(date))}>
 
@@ -357,7 +357,7 @@ const DoctorCalendar = ({
           style={{
             ...styles.dayNumber,
             ...(today ? styles.dayNumberToday : {})
-          }}>
+          } as CSSProperties}>
 
                     {date.getDate()}
                 </div>
@@ -367,11 +367,11 @@ const DoctorCalendar = ({
   };
 
   return (
-    <div style={styles.container}>
+    <div style={styles.container as unknown as CSSProperties}>
             {/* Header */}
-            <div style={styles.header}>
-                <div style={styles.title}>
-                    <Calendar size={20} />
+            <div style={styles.header as unknown as CSSProperties}>
+                <div style={styles.title as unknown as CSSProperties}>
+                    <Calendar size={20 as unknown as "small" | "default" | "large" | "xlarge"} />
                     <span>
                         {weekDays.length > 0 &&
             <>
@@ -381,64 +381,64 @@ const DoctorCalendar = ({
                     </span>
                 </div>
 
-                <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)', alignItems: 'center' } as CSSProperties}>
                     <button
-            style={styles.navButton}
+            style={styles.navButton as unknown as CSSProperties}
             onClick={goToPrevWeek}
-            title={i18n.t('misc.dc_predyduschaya_nedelya')}
-            aria-label={i18n.t('misc.dc_predyduschaya_nedelya')}>
+            title={t18('misc.dc_predyduschaya_nedelya')}
+            aria-label={t18('misc.dc_predyduschaya_nedelya')}>
 
-                        <ChevronLeft size={18} />
+                        <ChevronLeft size={18 as unknown as "small" | "default" | "large" | "xlarge"} />
                     </button>
 
                     <button
-            style={styles.todayButton}
+            style={styles.todayButton as unknown as CSSProperties}
             onClick={goToToday}>
 
                         Сегодня
                     </button>
 
                     <button
-            style={styles.navButton}
+            style={styles.navButton as unknown as CSSProperties}
             onClick={goToNextWeek}
-            title={i18n.t('misc.dc_sleduyuschaya_nedelya')}
-            aria-label={i18n.t('misc.dc_sleduyuschaya_nedelya')}>
+            title={t18('misc.dc_sleduyuschaya_nedelya')}
+            aria-label={t18('misc.dc_sleduyuschaya_nedelya')}>
 
-                        <ChevronRight size={18} />
+                        <ChevronRight size={18 as unknown as "small" | "default" | "large" | "xlarge"} />
                     </button>
 
                     <button
-            style={styles.navButton}
+            style={styles.navButton as unknown as CSSProperties}
             onClick={loadSchedule}
-            title={i18n.t('misc.dc_obnovit')}
-            aria-label={i18n.t('misc.dc_obnovit')}>
+            title={t18('misc.dc_obnovit')}
+            aria-label={t18('misc.dc_obnovit')}>
 
-                        <RefreshCw size={16} className={loading ? 'spinning' : ''} />
+                        <RefreshCw size={16 as unknown as "small" | "default" | "large" | "xlarge"} className={loading ? 'spinning' : ''} />
                     </button>
                 </div>
             </div>
 
             {/* Error */}
             {error &&
-      <div style={styles.error}>
-                    <AlertCircle size={16} style={{ marginRight: 'var(--mac-spacing-2)' }} />
+      <div style={styles.error as unknown as CSSProperties}>
+                    <AlertCircle size={16 as unknown as "small" | "default" | "large" | "xlarge"} style={{ marginRight: 'var(--mac-spacing-2)' }} />
                     {error}
                 </div>
       }
 
             {/* Loading */}
             {loading ?
-      <div style={styles.loading}>
-                    <RefreshCw size={24} className="spinning" style={{ marginRight: 'var(--mac-spacing-2)' }} />
+      <div style={styles.loading as unknown as CSSProperties}>
+                    <RefreshCw size={24 as unknown as "small" | "default" | "large" | "xlarge"} className="spinning" style={{ marginRight: 'var(--mac-spacing-2)' }} />
                     Загрузка расписания...
                 </div> :
 
       <>
                     {/* Week Grid */}
-                    <div style={styles.weekGrid}>
+                    <div style={styles.weekGrid as unknown as CSSProperties}>
                         {/* Day Headers */}
                         {WEEKDAY_NAMES.map((name, idx) =>
-          <div key={idx} style={styles.dayHeader}>
+          <div key={idx} style={styles.dayHeader as unknown as CSSProperties}>
                                 {name}
                             </div>
           )}

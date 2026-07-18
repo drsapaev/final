@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 /**
  * QueueManagementCard - Универсальный компонент управления очередью
@@ -26,6 +24,7 @@ import logger from '../../utils/logger';
 import './QueueManagementCard.css';
 import { useTranslation } from '../../i18n/useTranslation';
 import i18n from '../../i18n';
+const t18 = i18n.t as unknown as (key: string, options?: Record<string, unknown>) => string;
 
 const normalizeQueueAction = (action) => String(action || '').trim().toLowerCase().replace(/-/g, '_');
 
@@ -62,7 +61,7 @@ const hasBackendQueueAction = (entry, action, flagName) => {
  * Если передан styles.actionButtonStyle — используется он (backward compat),
  * иначе — CSS-класс .qm-action-btn.qm-action-btn--{color}.
  */
-const ActionButton = ({ color, icon: Icon, iconSize, onClick, disabled, ariaLabel, title, actionButtonStyle, getColor }) => {
+const ActionButton = ({ color, icon: Icon, iconSize, onClick, disabled, ariaLabel, title, actionButtonStyle, getColor }: Record<string, any>) => {
   // Backward compat: если передан custom actionButtonStyle — используем inline-стиль.
   if (actionButtonStyle) {
     return (
@@ -115,10 +114,11 @@ ActionButton.propTypes = {
 export const QueueActionButtons = ({
   entry,
   onStatusChange,
-  styles = {},
+  styles: stylesRaw = {},
   compact = false
 }) => {
-  const { t } = useTranslation();
+  const styles = stylesRaw as Record<string, any>;
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [loading, setLoading] = useState(false);
 
   const {
@@ -145,23 +145,23 @@ export const QueueActionButtons = ({
       let response;
       switch (action) {
         case 'no-show':
-          response = await api.post(`/queue/entry/${entryId}/no-show`);
+          response = await api.post(`/queue/entry/${entryId}/no-show`, undefined);
           break;
         case 'restore-next':
           response = await api.post(`/queue/entry/${entryId}/restore-next`, payload);
           break;
         case 'diagnostics':
-          response = await api.post(`/queue/entry/${entryId}/diagnostics`);
+          response = await api.post(`/queue/entry/${entryId}/diagnostics`, undefined);
           break;
         case 'call-from-diagnostics':
           // Используем endpoint для возврата с діагностики
-          response = await api.post(`/queue/position/notify/diagnostics-return/${entryId}`);
+          response = await api.post(`/queue/position/notify/diagnostics-return/${entryId}`, undefined);
           break;
         case 'incomplete':
           response = await api.post(`/queue/entry/${entryId}/incomplete`, payload);
           break;
         case 'complete':
-          response = await api.post(`/doctor/queue/${entryId}/complete`);
+          response = await api.post(`/doctor/queue/${entryId}/complete`, undefined);
           break;
         default:
           throw new Error(`Unknown action: ${action}`);
@@ -363,14 +363,14 @@ export const QueueActionButtons = ({
       case 'done':
         return (
           <span className="qm-status-text qm-status-text--success">
-            <CheckCircle size={14} /> {t('misc.qmc_status_completed')}
+            <CheckCircle size={14 as unknown as "small" | "default" | "large" | "xlarge"} /> {t('misc.qmc_status_completed')}
           </span>
         );
 
       case 'incomplete':
         return (
           <span className="qm-status-text qm-status-text--danger">
-            <AlertCircle size={14} /> {t('misc.qmc_status_incomplete')}
+            <AlertCircle size={14 as unknown as "small" | "default" | "large" | "xlarge"} /> {t('misc.qmc_status_incomplete')}
           </span>
         );
 
@@ -397,8 +397,9 @@ export const QueueActionButtons = ({
 /**
  * Карточка статистики очереди (для хедера)
  */
-export const QueueStatsBar = ({ stats, getColor }) => {
-  const { t } = useTranslation();
+export const QueueStatsBar = ({ stats, getColor }: Record<string, any>) => {
+  const styles = {} as Record<string, any> as Record<string, any>;
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // UX Audit Registrar #3: если getColor не передан — используем CSS-классы.
   // Backward compat: если getColor передан — используем inline-стили.
   if (getColor) {
@@ -453,18 +454,18 @@ export const QueueStatsBar = ({ stats, getColor }) => {
  */
 export const getQueueStatusInfo = (status) => {
   const statusMap = {
-    waiting: { label: i18n.t('misc.qmc_status_waiting'), variant: 'warning', color: 'var(--mac-warning)' },
-    called: { label: i18n.t('misc.qmc_status_called'), variant: 'primary', color: 'var(--mac-accent-blue)' },
-    calling: { label: i18n.t('misc.qmc_status_calling'), variant: 'primary', color: 'var(--mac-accent-blue)' },
-    in_cabinet: { label: i18n.t('misc.qmc_status_in_cabinet'), variant: 'info', color: 'var(--mac-accent-blue)' },
-    in_service: { label: i18n.t('misc.qmc_status_in_service'), variant: 'info', color: 'var(--mac-accent-blue)' },
-    diagnostics: { label: i18n.t('misc.qmc_status_diagnostics'), variant: 'info', color: 'var(--mac-accent-purple)' },
-    served: { label: i18n.t('misc.qmc_status_served'), variant: 'success', color: 'var(--mac-success)' },
-    completed: { label: i18n.t('misc.qmc_status_completed'), variant: 'success', color: 'var(--mac-success)' },
-    done: { label: i18n.t('misc.qmc_status_completed'), variant: 'success', color: 'var(--mac-success)' },
-    incomplete: { label: i18n.t('misc.qmc_status_incomplete'), variant: 'danger', color: 'var(--mac-error)' },
-    no_show: { label: i18n.t('misc.qmc_not_arrived'), variant: 'danger', color: 'var(--mac-error)' },
-    cancelled: { label: i18n.t('misc.qmc_status_cancelled'), variant: 'secondary', color: 'var(--mac-text-secondary)' }
+    waiting: { label: t18('misc.qmc_status_waiting'), variant: 'warning', color: 'var(--mac-warning)' },
+    called: { label: t18('misc.qmc_status_called'), variant: 'primary', color: 'var(--mac-accent-blue)' },
+    calling: { label: t18('misc.qmc_status_calling'), variant: 'primary', color: 'var(--mac-accent-blue)' },
+    in_cabinet: { label: t18('misc.qmc_status_in_cabinet'), variant: 'info', color: 'var(--mac-accent-blue)' },
+    in_service: { label: t18('misc.qmc_status_in_service'), variant: 'info', color: 'var(--mac-accent-blue)' },
+    diagnostics: { label: t18('misc.qmc_status_diagnostics'), variant: 'info', color: 'var(--mac-accent-purple)' },
+    served: { label: t18('misc.qmc_status_served'), variant: 'success', color: 'var(--mac-success)' },
+    completed: { label: t18('misc.qmc_status_completed'), variant: 'success', color: 'var(--mac-success)' },
+    done: { label: t18('misc.qmc_status_completed'), variant: 'success', color: 'var(--mac-success)' },
+    incomplete: { label: t18('misc.qmc_status_incomplete'), variant: 'danger', color: 'var(--mac-error)' },
+    no_show: { label: t18('misc.qmc_not_arrived'), variant: 'danger', color: 'var(--mac-error)' },
+    cancelled: { label: t18('misc.qmc_status_cancelled'), variant: 'secondary', color: 'var(--mac-text-secondary)' }
   };
 
   return statusMap[status] || { label: status, variant: 'default', color: 'var(--mac-text-secondary)' };

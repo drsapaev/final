@@ -1,5 +1,4 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
+import type { CSSProperties } from 'react';
 
 import { useTranslation } from '../../i18n/useTranslation';
 import i18n from '../../i18n';
@@ -7,13 +6,14 @@ import i18n from '../../i18n';
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { useTheme } from '../../contexts/ThemeContext';
+const t18 = i18n.t as unknown as (key: string, options?: Record<string, unknown>) => string;
 
 // Контекст для модальных окон
-const ModalContext = createContext();
+const ModalContext = createContext<any>(null);
 let openModalExternal = null;
 
 const getFontSize = (size) => {
-  // t accessed via closure or i18n.t()
+  // t accessed via closure or t18()
   const sizes = {
     sm: '0.875rem',
     md: '1rem',
@@ -71,7 +71,7 @@ export function ModalProvider({ children }) {
   return (
     <ModalContext.Provider value={value}>
       {children}
-      <ModalContainer modals={modals} onClose={closeModal} theme={theme} />
+      <ModalContainerAny modals={modals} onClose={closeModal} />
     </ModalContext.Provider>);
 
 }
@@ -117,11 +117,11 @@ function ModalContainer({ modals, onClose, theme }) {
   return (
     <>
       {modals.map((modal) =>
-      <div key={modal.id} style={overlayStyle}>
+      <div key={modal.id} style={overlayStyle as unknown as CSSProperties}>
           {modal.closable &&
         <button
           type="button"
-          style={backdropButtonStyle}
+          style={backdropButtonStyle as unknown as CSSProperties}
           onClick={() => onClose(modal.id)}
           tabIndex={-1}
           aria-label="Close modal" />
@@ -129,8 +129,7 @@ function ModalContainer({ modals, onClose, theme }) {
         }
           <ModalItem
           modal={modal}
-          onClose={onClose}
-          theme={theme} />
+          onClose={onClose} />
 
         </div>
       )}
@@ -235,20 +234,20 @@ function ModalItem({ modal, onClose }) {
 
   return (
     <div
-      style={modalStyle}>
+      style={modalStyle as unknown as CSSProperties}>
 
       {modal.title &&
-      <div style={headerStyle}>
-          <h2 style={titleStyle}>{modal.title}</h2>
+      <div style={headerStyle as unknown as CSSProperties}>
+          <h2 style={titleStyle as unknown as CSSProperties}>{modal.title}</h2>
           {modal.closable &&
         <button
-          style={closeButtonStyle}
+          style={closeButtonStyle as unknown as CSSProperties}
           onClick={() => onClose(modal.id)}
           onMouseOver={(e) => {
-            e.target.style.backgroundColor = 'var(--color-background-tertiary)';
+            e.currentTarget.style.backgroundColor = 'var(--color-background-tertiary)';
           }}
           onMouseOut={(e) => {
-            e.target.style.backgroundColor = 'transparent';
+            e.currentTarget.style.backgroundColor = 'transparent';
           }}>
 
               ×
@@ -257,12 +256,12 @@ function ModalItem({ modal, onClose }) {
         </div>
       }
       
-      <div style={contentStyle}>
+      <div style={contentStyle as unknown as CSSProperties}>
         {modal.content}
       </div>
       
       {modal.footer &&
-      <div style={footerStyle}>
+      <div style={footerStyle as unknown as CSSProperties}>
           {modal.footer}
         </div>
       }
@@ -391,30 +390,30 @@ export function Modal({
   if (!isOpen) return null;
 
   return (
-    <div style={overlayStyle}>
+    <div style={overlayStyle as unknown as CSSProperties}>
       {closable &&
       <button
         type="button"
-        style={backdropButtonStyle}
+        style={backdropButtonStyle as unknown as CSSProperties}
         onClick={onClose}
         tabIndex={-1}
         aria-label="Close modal" />
 
       }
 
-      <div style={modalStyle}>
+      <div style={modalStyle as unknown as CSSProperties}>
         {title &&
-        <div style={headerStyle}>
-            <h2 style={titleStyle}>{title}</h2>
+        <div style={headerStyle as unknown as CSSProperties}>
+            <h2 style={titleStyle as unknown as CSSProperties}>{title}</h2>
             {closable &&
           <button
-            style={closeButtonStyle}
+            style={closeButtonStyle as unknown as CSSProperties}
             onClick={onClose}
             onMouseOver={(e) => {
-              e.target.style.backgroundColor = 'var(--color-background-tertiary)';
+              e.currentTarget.style.backgroundColor = 'var(--color-background-tertiary)';
             }}
             onMouseOut={(e) => {
-              e.target.style.backgroundColor = 'transparent';
+              e.currentTarget.style.backgroundColor = 'transparent';
             }}>
 
                 ×
@@ -423,12 +422,12 @@ export function Modal({
           </div>
         }
         
-        <div style={contentStyle}>
+        <div style={contentStyle as unknown as CSSProperties}>
           {children}
         </div>
         
         {footer &&
-        <div style={footerStyle}>
+        <div style={footerStyle as unknown as CSSProperties}>
             {footer}
           </div>
         }
@@ -446,10 +445,10 @@ export const modal = {
       return null;
     }
     return openModalExternal({
-      title: i18n.t('final.modal_confirm_title'),
+      title: t18('final.modal_confirm_title'),
       content: <p>{message}</p>,
       footer:
-      <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)' }}>
+      <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)' } as CSSProperties}>
           <button onClick={onCancel}>Отмена</button>
           <button onClick={onConfirm}>Подтвердить</button>
         </div>
@@ -462,7 +461,7 @@ export const modal = {
       return null;
     }
     return openModalExternal({
-      title: i18n.t('final.modal_notification_title'),
+      title: t18('final.modal_notification_title'),
       content: <p>{message}</p>,
       footer:
       <button onClick={onClose}>OK</button>
@@ -480,6 +479,8 @@ ModalContainer.propTypes = {
   onClose: PropTypes.func,
   theme: PropTypes.any
 };
+
+const ModalContainerAny = ModalContainer as unknown as React.ComponentType<Record<string, unknown>>;
 
 ModalItem.propTypes = {
   modal: PropTypes.object,

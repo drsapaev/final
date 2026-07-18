@@ -1,5 +1,4 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
+import type { CSSProperties } from 'react';
 
 import { useTranslation } from '../../i18n/useTranslation';
 import i18n from '../../i18n';
@@ -12,12 +11,18 @@ import i18n from '../../i18n';
 import { useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { AlertCircle, X, Save, Package, Users, Filter } from 'lucide-react';
-import { MacOSTab, MacOSCard, Button, Input, Label, Select, Textarea, Checkbox } from '../ui/macos';
+import { MacOSTab, MacOSCard, Button as ButtonRaw, Input as InputRaw, Label, Select as SelectRaw, Textarea as TextareaRaw, Checkbox } from '../ui/macos';
 import ServiceChangesPreview from './ServiceChangesPreview';
 import { isValidServiceCode, normalizeServiceCode, formatServiceCodeInput } from '../../utils/serviceCodeUtils';
 import logger from '../../utils/logger';
 import { api } from '../../api/client';
 import notify from '../../services/notify';
+import React from "react";
+const Textarea = TextareaRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Input = InputRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Select = SelectRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Button = ButtonRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const t18 = i18n.t as unknown as (key: string, options?: Record<string, unknown>) => string;
 
 // UX Audit Admin #4.1: shared constants extracted from ServiceCatalog.jsx.
 const SERVICE_GROUP_PREFIXES = {
@@ -38,11 +43,11 @@ const SERVICE_GROUP_ALIASES = {
 };
 
 // UX Audit Admin #4.1: service group label keys live under admin2.sf_group_<key>.
-// The lookup is performed via i18n.t() at the call site so the dictionary remains
+// The lookup is performed via t18() at the call site so the dictionary remains
 // free of hardcoded Russian strings.
 
 const resolveServiceGroup = ({ queueTag, departmentKey, categorySpecialty }) => {
-  // t accessed via closure or i18n.t()
+  // t accessed via closure or t18()
   for (const rawValue of [queueTag, departmentKey, categorySpecialty]) {
     if (!rawValue) continue;
     const normalized = String(rawValue).trim().toLowerCase();
@@ -60,7 +65,7 @@ const getAllowedPrefixesForGroup = (groupKey) => SERVICE_GROUP_PREFIXES[groupKey
 
 
 const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMessage, onSave, onCancel }) => {
-  // t accessed via closure or i18n.t()
+  // t accessed via closure or t18()
   const [activeTab, setActiveTab] = useState('basic'); // 'basic', 'queue', 'options'
   const [showPreview, setShowPreview] = useState(false); // ✅ PREVIEW: Show changes preview
   const [formData, setFormData] = useState({
@@ -105,7 +110,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
           (s) => (s.code === normalizedCode || s.service_code === normalizedCode) && s.id !== service?.id
         );
         if (duplicate) {
-          setCodeWarning(i18n.t('admin2.sf_code_duplicate_warning', { code: normalizedCode, name: duplicate.name }));
+          setCodeWarning(t18('admin2.sf_code_duplicate_warning', { code: normalizedCode, name: duplicate.name }));
         } else {
           setCodeWarning('');
         }
@@ -140,7 +145,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
     );
   const expectedPrefixLabel = allowedPrefixes.length ? allowedPrefixes.join(' / ') : '';
   const selectedGroupLabel = selectedServiceGroup
-    ? i18n.t(`admin2.sf_group_${selectedServiceGroup}`, { defaultValue: selectedServiceGroup })
+    ? t18(`admin2.sf_group_${selectedServiceGroup}`, { defaultValue: selectedServiceGroup })
     : '';
 
   // Auto-extract category_code from code prefix (guarded by prefix alignment checks)
@@ -150,14 +155,14 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
     e.preventDefault();
 
     if (!formData.name.trim()) {
-      notify.warning(i18n.t('admin2.service_name_required'));
+      notify.warning(t18('admin2.service_name_required'));
       return;
     }
 
     if (codePrefixMismatch) {
       const errorText = selectedGroupLabel
-        ? i18n.t('admin2.sf_code_mismatch_group_error', { code: normalizedCode, group: selectedGroupLabel, prefixes: expectedPrefixLabel })
-        : i18n.t('admin2.sf_code_mismatch_category_error', { code: normalizedCode, prefixes: expectedPrefixLabel });
+        ? t18('admin2.sf_code_mismatch_group_error', { code: normalizedCode, group: selectedGroupLabel, prefixes: expectedPrefixLabel })
+        : t18('admin2.sf_code_mismatch_category_error', { code: normalizedCode, prefixes: expectedPrefixLabel });
       logger.warn('[FIX:ADM-06] Blocking mismatched service code before save:', {
         normalizedCode,
         selectedServiceGroup,
@@ -166,7 +171,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
         queue_tag: formData.queue_tag,
         department_key: formData.department_key
       });
-      setMessage({ type: 'error', text: errorText });
+      setMessage({ type: 'danger', text: errorText });
       return;
     }
 
@@ -209,7 +214,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
     let normalizedValue = value;
 
     if (field === 'code') {
-      normalizedValue = formatServiceCodeInput(value, formData[field]);
+      normalizedValue = formatServiceCodeInput(value) as string;
     }
 
     // ⭐ SSOT: Sync queue_tag with department_key
@@ -228,15 +233,15 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
   };
 
   const tabs = [
-  { key: 'basic', label: i18n.t('admin2.sf_tab_basic'), icon: Package },
-  { key: 'queue', label: i18n.t('admin2.sf_tab_queue'), icon: Users },
-  { key: 'options', label: i18n.t('admin2.sf_tab_options'), icon: Filter }];
+  { key: 'basic', label: t18('admin2.sf_tab_basic'), icon: Package },
+  { key: 'queue', label: t18('admin2.sf_tab_queue'), icon: Users },
+  { key: 'options', label: t18('admin2.sf_tab_options'), icon: Filter }];
 
 
   return (
     <MacOSCard variant="default" className="p-6">
       <h3 className="admin-h3-18-600-primary-mb-20">
-        {service ? i18n.t('admin2.sf_header_edit') : i18n.t('admin2.sf_header_add')}
+        {service ? t18('admin2.sf_header_edit') : t18('admin2.sf_header_add')}
       </h3>
 
       {/* Tab Navigation */}
@@ -254,9 +259,9 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
                 '--admin-tab-border': isActive ? '2px solid var(--mac-accent)' : '2px solid transparent',
                 '--admin-tab-color': isActive ? 'var(--mac-accent)' : 'var(--mac-text-secondary)',
                 '--admin-tab-weight': isActive ? '600' : '500'
-              }}>
+              } as CSSProperties}>
 
-              <TabIcon size={16} />
+              <TabIcon size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
               {tab.label}
             </button>);
 
@@ -270,7 +275,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
         <div className="admin-grid-auto-250-12">
             <div>
               <label className="admin-label-14-500-primary-mb-8">
-                {i18n.t('admin2.sf_label_name')}
+                {t18('admin2.sf_label_name')}
               </label>
               <Input
               type="text"
@@ -281,7 +286,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
 
             <div>
               <label className="admin-label-14-500-primary-mb-8">
-                {i18n.t('admin2.sf_label_code')}
+                {t18('admin2.sf_label_code')}
               </label>
               <Input
               type="text"
@@ -292,49 +297,49 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
 
               {formData.code && !isValidServiceCode(formData.code) &&
             <div className="admin-hint-12-warning-mt-4">
-                  {i18n.t('admin2.sf_hint_code_format')}
+                  {t18('admin2.sf_hint_code_format')}
                 </div>
             }
               {codeWarning &&
             <div className="admin-hint-12-error-mt-4-flex">
-                  <AlertCircle size={14} />
+                  <AlertCircle size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
                   {codeWarning}
                 </div>
             }
               {checkingDuplicates && !codeWarning &&
             <div className="admin-hint-12-tertiary-mt-4">
-                  {i18n.t('admin2.sf_checking_duplicates')}
+                  {t18('admin2.sf_checking_duplicates')}
                 </div>
             }
               {derivedCategoryCode &&
             <div className="admin-hint-12-secondary-mt-4">
-                  {i18n.t('admin2.sf_hint_code_prefix', { prefix: derivedCategoryCode })}
+                  {t18('admin2.sf_hint_code_prefix', { prefix: derivedCategoryCode })}
                 </div>
             }
               {selectedGroupLabel && !codePrefixMismatch &&
             <div className="admin-hint-12-secondary-mt-4">
-                  {i18n.t('admin2.sf_hint_expected_prefix', { group: selectedGroupLabel, prefixes: expectedPrefixLabel })}
+                  {t18('admin2.sf_hint_expected_prefix', { group: selectedGroupLabel, prefixes: expectedPrefixLabel })}
                 </div>
             }
               {codePrefixMismatch &&
             <div className="admin-hint-12-warning-mt-4-flex">
-                  <AlertCircle size={14} />
+                  <AlertCircle size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
                   {selectedGroupLabel
-                    ? i18n.t('admin2.sf_warn_code_mismatch_group', { code: normalizedCode, group: selectedGroupLabel })
-                    : i18n.t('admin2.sf_warn_code_mismatch_no_group', { code: normalizedCode })}
+                    ? t18('admin2.sf_warn_code_mismatch_group', { code: normalizedCode, group: selectedGroupLabel })
+                    : t18('admin2.sf_warn_code_mismatch_no_group', { code: normalizedCode })}
                 </div>
             }
             </div>
 
             <div>
               <label className="admin-label-14-500-primary-mb-8">
-                {i18n.t('admin2.sf_label_category')}
+                {t18('admin2.sf_label_category')}
               </label>
               <Select
               value={formData.category_id}
               onChange={(value) => handleChange('category_id', value)}
               options={[
-              { value: '', label: i18n.t('admin2.sf_select_category') },
+              { value: '', label: t18('admin2.sf_select_category') },
               ...categories.map((category) => ({
                 value: category.id,
                 label: `${category.name_ru} (${category.specialty})`
@@ -344,7 +349,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
 
             <div>
               <label className="admin-label-14-500-primary-mb-8">
-                {i18n.t('admin2.sf_label_price')}
+                {t18('admin2.sf_label_price')}
               </label>
               <div className="admin-form-row-gap-8">
                 <Input
@@ -368,7 +373,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
 
             <div>
               <label className="admin-label-14-500-primary-mb-8">
-                {i18n.t('admin2.sf_label_duration')}
+                {t18('admin2.sf_label_duration')}
               </label>
               <Input
               type="number"
@@ -380,16 +385,16 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
 
             <div>
               <label className="admin-label-14-500-primary-mb-8">
-                {i18n.t('admin2.sf_label_doctor')}
+                {t18('admin2.sf_label_doctor')}
               </label>
               <Select
               value={formData.doctor_id}
               onChange={(value) => handleChange('doctor_id', value)}
               options={[
-              { value: '', label: i18n.t('admin2.sf_select_all_doctors') },
+              { value: '', label: t18('admin2.sf_select_all_doctors') },
               ...doctors.map((doctor) => ({
                 value: doctor.id,
-                label: `${doctor.user?.full_name || i18n.t('admin2.sf_doctor_fallback', { id: doctor.id })} (${doctor.specialty})`
+                label: `${doctor.user?.full_name || t18('admin2.sf_doctor_fallback', { id: doctor.id })} (${doctor.specialty})`
               }))]
               } />
             </div>
@@ -401,19 +406,19 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
         <div className="flex flex-col gap-4">
             <div className="admin-info-banner-catalog">
               <p className="admin-p-14-secondary-m0">
-                {i18n.t('admin2.sf_queue_tab_desc')}
+                {t18('admin2.sf_queue_tab_desc')}
               </p>
             </div>
 
             <div>
               <label className="admin-label-14-500-primary-mb-8">
-                {i18n.t('admin2.sf_label_queue_tab')}
+                {t18('admin2.sf_label_queue_tab')}
               </label>
               <Select
               value={formData.queue_tag}
               onChange={(value) => handleChange('queue_tag', value)}
               options={[
-              { value: '', label: i18n.t('admin2.sf_no_queue_option') },
+              { value: '', label: t18('admin2.sf_no_queue_option') },
               ...queueProfiles.
               filter((profile) => profile.is_active !== false).
               map((profile) => ({
@@ -426,7 +431,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
             {formData.queue_tag &&
           <div className="admin-success-banner-catalog">
                 <p className="admin-p-14-success-m0">
-                  {i18n.t('admin2.sf_queue_tag_banner_prefix')} <strong>{formData.queue_tag}</strong>
+                  {t18('admin2.sf_queue_tag_banner_prefix')} <strong>{formData.queue_tag}</strong>
                 </p>
               </div>
           }
@@ -441,36 +446,36 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
               id="active"
               checked={formData.active}
               onChange={(checked) => handleChange('active', checked)}
-              label={i18n.t('admin2.sf_chk_active')} />
+              label={t18('admin2.sf_chk_active')} />
 
               <Checkbox
               id="requires_doctor"
               checked={formData.requires_doctor}
               onChange={(checked) => handleChange('requires_doctor', checked)}
-              label={i18n.t('admin2.sf_chk_requires_doctor')} />
+              label={t18('admin2.sf_chk_requires_doctor')} />
 
               <Checkbox
               id="is_consultation"
               checked={formData.is_consultation}
               onChange={(checked) => handleChange('is_consultation', checked)}
-              label={i18n.t('admin2.sf_chk_is_consultation')} />
+              label={t18('admin2.sf_chk_is_consultation')} />
 
               <Checkbox
               id="allow_doctor_price_override"
               checked={formData.allow_doctor_price_override}
               onChange={(checked) => handleChange('allow_doctor_price_override', checked)}
-              label={i18n.t('admin2.sf_chk_allow_price_override')} />
+              label={t18('admin2.sf_chk_allow_price_override')} />
 
             </div>
 
             <div className="admin-bg-secondary-box-catalog">
               <h5 className="admin-h5-14-600-primary-mb-8">
-                {i18n.t('admin2.sf_hints_title')}
+                {t18('admin2.sf_hints_title')}
               </h5>
               <ul className="admin-ul-13-secondary-pl-20">
-                <li><strong>{i18n.t('admin2.sf_hint_requires_doctor_label')}</strong>{i18n.t('admin2.sf_hint_requires_doctor_desc')}</li>
-                <li><strong>{i18n.t('admin2.sf_hint_consultation_label')}</strong>{i18n.t('admin2.sf_hint_consultation_desc')}</li>
-                <li><strong>{i18n.t('admin2.sf_hint_price_override_label')}</strong>{i18n.t('admin2.sf_hint_price_override_desc')}</li>
+                <li><strong>{t18('admin2.sf_hint_requires_doctor_label')}</strong>{t18('admin2.sf_hint_requires_doctor_desc')}</li>
+                <li><strong>{t18('admin2.sf_hint_consultation_label')}</strong>{t18('admin2.sf_hint_consultation_desc')}</li>
+                <li><strong>{t18('admin2.sf_hint_price_override_label')}</strong>{t18('admin2.sf_hint_price_override_desc')}</li>
               </ul>
             </div>
           </div>
@@ -483,12 +488,12 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
               имитируя wizard с последовательным продвижением. */}
           <div className="admin-form-row-gap-12">
             <Button type="button" variant="outline" onClick={onCancel}>
-              <X size={16} className="mr-2" />
-              {i18n.t('admin2.sf_btn_cancel')}
+              <X size={16 as unknown as "small" | "default" | "large" | "xlarge"} className="mr-2" />
+              {t18('admin2.sf_btn_cancel')}
             </Button>
             <Button type="submit">
-              <Save size={16} className="mr-2" />
-              {i18n.t('admin2.sf_btn_save')}
+              <Save size={16 as unknown as "small" | "default" | "large" | "xlarge"} className="mr-2" />
+              {t18('admin2.sf_btn_save')}
             </Button>
           </div>
         </div>
