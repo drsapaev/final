@@ -219,7 +219,7 @@ const TelegramManager = () => {
 
       const statusData = statusRes?.data || {};
       const integrationData = integrationRes?.data || {};
-      const templatesData = templatesRes?.data || {};
+      const templatesData: any = templatesRes?.data || {};
       setBotStatus({
         bot_active: Boolean(integrationData.active ?? statusData.active ?? statusData.configured),
         webhook_configured: Boolean(integrationData.webhook_set || statusData.webhook_configured || statusData.webhook_set),
@@ -243,7 +243,7 @@ const TelegramManager = () => {
 
       const normalizedTemplates = Array.isArray(templatesData) ?
       templatesData :
-      Object.entries(templatesData).map(([key, value]) => ({
+      Object.entries(templatesData).map(([key, value]: [string, any]) => ({
         id: key,
         name: value?.subject || key,
         message_type: key,
@@ -371,7 +371,7 @@ const TelegramManager = () => {
     const reasonCode = form.reasonCode || undefined;
     const actionKey = `${action}:${requestId}`;
     let endpoint = `/telegram/onboarding/requests/${requestId}/${action}`;
-    let payload = { reasonCode, safeNote: safeNote || undefined };
+    let payload: any = { reasonCode, safeNote: safeNote || undefined };
 
     if (action === 'link-existing') {
       const candidateId = (options as any).candidateId || form.selectedCandidateId || onboardingDialog.candidateId;
@@ -1075,7 +1075,7 @@ const TelegramManager = () => {
   }
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Box sx={{ padding: '12px' } as any}>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h4" component="h1">
           {t('misc.tg_title')}
