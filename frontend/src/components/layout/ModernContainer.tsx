@@ -1,9 +1,40 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
+import type { CSSProperties, ReactNode } from 'react';
 
 import { useTheme } from '../../contexts/ThemeContext';
 import './ModernContainer.css';
 import PropTypes from 'prop-types';
+
+type MaxWidth = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'full';
+type PaddingSize = 'none' | 'small' | 'medium' | 'large' | 'xl';
+
+interface ModernContainerProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'children' | 'style'> {
+  children?: ReactNode;
+  maxWidth?: MaxWidth;
+  padding?: PaddingSize;
+  margin?: string;
+  fluid?: boolean;
+  centered?: boolean;
+  className?: string;
+  style?: CSSProperties;
+}
+
+const maxWidthValues: Record<string, string> = {
+  xs: '480px',
+  sm: '640px',
+  md: '768px',
+  lg: '1024px',
+  xl: '1280px',
+  '2xl': '1536px',
+  full: '100%'
+};
+
+const paddingValues: Record<string, string> = {
+  none: '0',
+  small: '12px',
+  medium: '20px',
+  large: '32px',
+  xl: '48px'
+};
 
 const ModernContainer = ({
   children,
@@ -14,29 +45,11 @@ const ModernContainer = ({
   centered = false,
   className = '',
   ...props
-}) => {
+}: ModernContainerProps) => {
   useTheme();
 
-  const maxWidthValues = {
-    xs: '480px',
-    sm: '640px',
-    md: '768px',
-    lg: '1024px',
-    xl: '1280px',
-    '2xl': '1536px',
-    full: '100%'
-  };
-
-  const paddingValues = {
-    none: '0',
-    small: '12px',
-    medium: '20px',
-    large: '32px',
-    xl: '48px'
-  };
-
-  const containerStyles = {
-    maxWidth: fluid ? '100%' : maxWidthValues[maxWidth] || maxWidthValues.xl,
+  const containerStyles: CSSProperties = {
+    maxWidth: fluid ? '100%' : (maxWidthValues[maxWidth] || maxWidthValues.xl),
     padding: paddingValues[padding] || paddingValues.medium,
     margin: margin === 'auto' ? '0 auto' : margin,
     ...(centered && {

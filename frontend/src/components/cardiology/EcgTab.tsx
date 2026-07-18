@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 /**
  * EcgTab — R-15 (UX audit): extracted from CardiologistPanelUnified.
@@ -15,8 +13,11 @@
 import PropTypes from 'prop-types';
 import { Plus } from 'lucide-react';
 import { Button } from '../ui/macos';
-import ECGViewer from './ECGViewer';
-import EchoForm from './EchoForm';
+import ECGViewerRaw from './ECGViewer';
+import React from 'react';
+const ECGViewer = ECGViewerRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import EchoFormRaw from './EchoForm';
+const EchoForm = EchoFormRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import { useTranslation } from '../../i18n/useTranslation';
 
 /**

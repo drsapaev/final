@@ -1,10 +1,8 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 export const ControlCenter = ({ onActivate, onLogin }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   return (
     <div className="control-center spotlight-card">
       <h2>{t('misc.cc_panel_upravleniya')}</h2>
