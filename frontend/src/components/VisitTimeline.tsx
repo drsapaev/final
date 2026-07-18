@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useTranslation } from '../i18n/useTranslation';
 import { CheckCircle, Clock, AlertCircle, CreditCard, User, FileText, Pill } from 'lucide-react';
@@ -13,7 +11,7 @@ import {
 } from '../constants/appointmentStatus';
 
 const VisitTimeline = ({ appointment, emr, prescription }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const timelineSteps = [
     {
       id: 'appointment',
@@ -131,7 +129,7 @@ const VisitTimeline = ({ appointment, emr, prescription }) => {
                       step.status === 'completed' ? 'success' :
                       step.status === 'current' ? 'info' : 'secondary'
                     }
-                    size="sm"
+                    size="small"
                   >
                     {step.status === 'completed' ? t('misc.vt_gotovo') :
                      step.status === 'current' ? t('misc.vt_v_protsesse') : t('misc.vt_ozhidanie')}
@@ -160,7 +158,7 @@ const VisitTimeline = ({ appointment, emr, prescription }) => {
               {STATUS_LABELS[appointment?.status] || t('misc.vt_neizvestno')}
             </div>
           </div>
-          <Badge variant={STATUS_COLORS[appointment?.status]}>
+          <Badge variant={STATUS_COLORS[appointment?.status] as unknown as "default" | "primary" | "secondary" | "success" | "warning" | "danger" | "info" | "outline"}>
             {STATUS_LABELS[appointment?.status]}
           </Badge>
         </div>

@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 /**
  * DiagnosisSection - Диагноз с МКБ-10
@@ -12,12 +10,17 @@
 
 import PropTypes from 'prop-types';
 import { useMemo } from 'react';
-import EMRSection from './EMRSection';
-import EMRSmartFieldV2 from './EMRSmartFieldV2';
-import EMRTextField from './EMRTextField';
+import EMRSectionRaw from './EMRSection';
+import React from 'react';
+import EMRSmartFieldV2Raw from './EMRSmartFieldV2';
+import EMRTextFieldRaw from './EMRTextField';
 import { useDoctorPhrases } from '../../../hooks/useDoctorPhrases';
 import './DiagnosisSection.css';
 import { useTranslation } from '../../../i18n/useTranslation';
+
+const EMRSection = EMRSectionRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const EMRSmartFieldV2 = EMRSmartFieldV2Raw as unknown as React.ComponentType<Record<string, unknown>>;
+const EMRTextField = EMRTextFieldRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 function normalizeTextValue(value) {
     if (typeof value === 'string') {
@@ -69,7 +72,7 @@ export function DiagnosisSection({
     experimentalGhostMode = false,
     onTelemetry,
 }) {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
     const diagnosisText = normalizeTextValue(diagnosis);
     const icd10Text = normalizeTextValue(icd10Code);
 
@@ -84,7 +87,7 @@ export function DiagnosisSection({
 
     // Merge suggestions: Doctor History first, then Generic AI
     const allSuggestions = useMemo(() => {
-        const historyItems = doctorSuggestions.map(s => ({
+        const historyItems = doctorSuggestions.map((s: Record<string, unknown>) => ({
             id: s.id,
             content: s.text,
             source: 'history', // Badge will show "История"

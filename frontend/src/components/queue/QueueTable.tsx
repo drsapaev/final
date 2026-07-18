@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import {
   Badge, Icon,
@@ -25,7 +23,7 @@ const QueueTable = ({
         return (
             <div className="qt-empty-state">
                 <Icon name="person.crop.circle.badge.questionmark" size="large" className="qt-empty-state-icon" />
-                <p>{t?.selectDoctor || 'Выберите специалиста'}</p>
+                <p>{(t as Record<string, string>)?.selectDoctor || 'Выберите специалиста'}</p>
             </div>
         );
     }
@@ -45,7 +43,7 @@ const QueueTable = ({
         return (
             <div className="qt-empty-state">
                 <Icon name="exclamationmark.triangle" size="large" className="qt-empty-state-icon-warning" />
-                <p>{t?.queueNotFound || 'Очередь не найдена'}</p>
+                <p>{(t as Record<string, string>)?.queueNotFound || 'Очередь не найдена'}</p>
                 <p className="qt-empty-state-hint">
                     Попробуйте сгенерировать QR код для создания очереди
                 </p>
@@ -61,7 +59,7 @@ const QueueTable = ({
         return (
             <div className="qt-empty-state">
                 <Icon name="person.2.slash" size="large" className="qt-empty-state-icon" />
-                <p>{t?.queueEmpty || 'Очередь пуста'}</p>
+                <p>{(t as Record<string, string>)?.queueEmpty || 'Очередь пуста'}</p>
                 <p className="qt-empty-state-hint">
                     Пациенты могут записаться через QR код
                 </p>
@@ -111,11 +109,11 @@ const QueueTable = ({
                     <thead>
                         <tr className="qt-table-header-row">
                             <th className="qt-table-th">№</th>
-                            <th className="qt-table-th">{t?.patient || 'Пациент'}</th>
-                            <th className="qt-table-th">{t?.phone || 'Телефон'}</th>
-                            <th className="qt-table-th">{t?.time || 'Время'}</th>
-                            <th className="qt-table-th">{t?.status || 'Статус'}</th>
-                            <th className="qt-table-th-right">{t?.actions || 'Действия'}</th>
+                            <th className="qt-table-th">{(t as Record<string, string>)?.patient || 'Пациент'}</th>
+                            <th className="qt-table-th">{(t as Record<string, string>)?.phone || 'Телефон'}</th>
+                            <th className="qt-table-th">{(t as Record<string, string>)?.time || 'Время'}</th>
+                            <th className="qt-table-th">{(t as Record<string, string>)?.status || 'Статус'}</th>
+                            <th className="qt-table-th-right">{(t as Record<string, string>)?.actions || 'Действия'}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -167,7 +165,7 @@ const QueueTable = ({
                                     {entry.status === 'called' && (
                                         <Badge variant="info">
                                             <Icon name="bell.fill" size="small" className="qt-status-badge-icon" />
-                                            {t?.called || 'Вызван'}
+                                            {(t as Record<string, string>)?.called || 'Вызван'}
                                         </Badge>
                                     )}
                                 </td>

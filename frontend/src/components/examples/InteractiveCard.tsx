@@ -1,5 +1,4 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
+import type { CSSProperties } from "react";
 
 import { Card } from '../ui/macos';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -16,7 +15,8 @@ const InteractiveCard = ({
   style = {},
   ...props
 }) => {
-  const { getColor, getSpacing, getShadow, getBorderRadius } = useTheme();
+  const { getColor, getSpacing, getShadow } = useTheme();
+  const getBorderRadius = (size: string) => "8px";
   const { ref, isHovered } = useHover();
 
   const cardStyle = {
@@ -46,18 +46,18 @@ const InteractiveCard = ({
 
   return (
     <Card
-      ref={ref}
+      ref={ref as unknown as React.Ref<HTMLDivElement>}
       onClick={onClick}
       className={className}
       style={{
         padding: getSpacing('lg'),
         borderRadius: getBorderRadius('lg'),
-        ...cardStyle
+        ...cardStyle as unknown as CSSProperties
       }}
       {...props}
     >
       {/* Overlay эффект */}
-      <div style={overlayStyle} />
+      <div style={overlayStyle as unknown as CSSProperties} />
 
       {/* Основное содержимое */}
       <div style={{ position: 'relative', zIndex: 1 }}>
@@ -169,7 +169,7 @@ export const InteractiveListItem = ({
   if (onClick) {
     return (
       <div
-        ref={ref}
+        ref={ref as unknown as React.Ref<HTMLDivElement>}
         onClick={onClick}
         role="button"
         tabIndex={0}
@@ -189,7 +189,7 @@ export const InteractiveListItem = ({
 
   return (
     <div
-      ref={ref}
+      ref={ref as unknown as React.Ref<HTMLDivElement>}
       style={itemStyle}
       {...props}
     >

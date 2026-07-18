@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useState, useCallback, useEffect } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
@@ -14,10 +12,10 @@ import DisplayBoardSettings from './DisplayBoardSettings';
 import SecuritySettings from './SecuritySettings';
 import WizardSettings from './WizardSettings';
 import ClinicSettings from './ClinicSettings';
-import ColorSchemeSelector from './ColorSchemeSelector.jsx';
+import ColorSchemeSelector from './ColorSchemeSelector';
 import { AccentPicker } from '../ui/macos';
 // P-025 fix: shared loading/error/empty wrapper for Unified* panels.
-import StateWrapper from '../common/StateWrapper.jsx';
+import StateWrapper from '../common/StateWrapper';
 import { useTranslation } from '../../i18n/useTranslation';
 
 const stripPasswordFields = (formData) => {
@@ -40,7 +38,7 @@ const ADMIN_SETTINGS_ROUTE_SECTION_MAP = {
 };
 
 const UnifiedSettings = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const routeSection = ADMIN_SETTINGS_ROUTE_SECTION_MAP[location.pathname.replace(/\/$/, '')];
