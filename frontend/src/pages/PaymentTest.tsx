@@ -1,34 +1,34 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 /**
  * PaymentTest - Тестовая страница для проверки PaymentWidget
  */
 
 import { useEffect, useState } from 'react';
+import type { CSSProperties } from 'react';
 import { CreditCard, FlaskConical } from 'lucide-react';
 
 import {
-  Alert, Button, Card, CardContent, Typography,
+  Alert as RawAlert, Button, Card, CardContent, Typography as RawTypography,
   Input } from '../components/ui/macos';
+const Typography = RawTypography as unknown as React.ComponentType<Record<string, unknown>>;
+const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
 import PaymentWidget from '../components/payment/PaymentWidget';
 import { getApiOrigin, setToken, getToken } from '../api/client';
 
 import logger from '../utils/logger';
 import { useTranslation } from '../i18n/useTranslation';
 
-const pageStyle = {
+const pageStyle: CSSProperties = {
   maxWidth: 1180,
   margin: '0 auto',
   padding: '32px 16px 48px',
 };
 
-const headerStyle = {
+const headerStyle: CSSProperties = {
   textAlign: 'center',
   marginBottom: 32,
 };
 
-const titleRowStyle = {
+const titleRowStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
@@ -36,20 +36,20 @@ const titleRowStyle = {
   flexWrap: 'wrap',
 };
 
-const mainGridStyle = {
+const mainGridStyle: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))',
   gap: 24,
   alignItems: 'start',
 };
 
-const fieldStackStyle = {
+const fieldStackStyle: CSSProperties = {
   display: 'grid',
   gap: 14,
   marginTop: 16,
 };
 
-const fieldLabelStyle = {
+const fieldLabelStyle: CSSProperties = {
   display: 'grid',
   gap: 6,
   color: 'var(--mac-text-secondary)',
@@ -57,7 +57,7 @@ const fieldLabelStyle = {
   fontWeight: 'var(--mac-font-weight-medium)',
 };
 
-const fieldControlStyle = {
+const fieldControlStyle: CSSProperties = {
   width: '100%',
   minHeight: 40,
   boxSizing: 'border-box',
@@ -70,7 +70,7 @@ const fieldControlStyle = {
   outlineOffset: 2,
 };
 
-const resultPreStyle = {
+const resultPreStyle: CSSProperties = {
   margin: 0,
   whiteSpace: 'pre-wrap',
   wordBreak: 'break-word',
@@ -83,20 +83,20 @@ const resultPreStyle = {
   lineHeight: 1.45,
 };
 
-const placeholderStyle = {
+const placeholderStyle: CSSProperties = {
   minHeight: 400,
   display: 'grid',
   placeItems: 'center',
   textAlign: 'center',
 };
 
-const statsGridStyle = {
+const statsGridStyle: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
   gap: 12,
 };
 
-const statItemStyle = {
+const statItemStyle: CSSProperties = {
   textAlign: 'center',
   border: '1px solid var(--mac-border)',
   borderRadius: 'var(--mac-radius-md)',
@@ -104,12 +104,13 @@ const statItemStyle = {
   background: 'var(--mac-bg-secondary)',
 };
 
-const fullWidthButtonStyle = {
+const fullWidthButtonStyle: CSSProperties = {
   width: '100%',
 };
 
 const PaymentTest = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [showWidget, setShowWidget] = useState(false);
   const [testData, setTestData] = useState({
     visitId: 1,

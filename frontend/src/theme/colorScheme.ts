@@ -1,4 +1,3 @@
-// @ts-nocheck removed — file fully typed in Phase B burn batch.
 // (legacy banner kept blank for git diff readability)
 
 import logger from '../utils/logger';

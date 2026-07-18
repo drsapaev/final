@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import React from 'react';
 import '@testing-library/jest-dom';
 import fs from 'node:fs';
@@ -11,8 +8,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import LabReportWorkbench from '../LabReportWorkbench';
 import { labReportingApi } from '../../../api/labReporting';
-import { ThemeProvider } from '../../../contexts/ThemeContext.tsx';
-import { MacOSThemeProvider } from '../../../theme/macosTheme.tsx';
+import { ThemeProvider } from '../../../contexts/ThemeContext';
+import { MacOSThemeProvider } from '../../../theme/macosTheme';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const workbenchPath = path.resolve(__dirname, '../LabReportWorkbench.tsx');

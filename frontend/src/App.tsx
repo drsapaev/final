@@ -1,7 +1,5 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { lazy, Suspense, useEffect, useState } from 'react';
+import type { CSSProperties } from 'react';
 import PropTypes from 'prop-types';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
@@ -15,25 +13,25 @@ import './theme/macos-tokens.css';
 import './styles/macos.css';
 import './styles/header-new.css';
 import 'react-toastify/dist/ReactToastify.css';
-import { MacOSThemeProvider } from './theme/macosTheme.jsx';
-import { bootstrapStoredColorScheme } from './theme/colorScheme.js';
+import { MacOSThemeProvider } from './theme/macosTheme';
+import { bootstrapStoredColorScheme } from './theme/colorScheme';
 import {
   Sidebar,
 } from './components/ui/macos';
-import HeaderNew from './components/layout/HeaderNew.jsx';
+import HeaderNew from './components/layout/HeaderNew';
 // SW-05 fix: global command palette (Cmd+K)
 import { CommandPalette } from './components/common/CommandPalette';
-import Health from './pages/Health.jsx';
-import Landing from './pages/Landing.jsx';
-import LoginFormStyled from './components/auth/LoginFormStyled.jsx';
-import Setup from './pages/Setup.jsx';
-import { useSetupStatus } from './hooks/useSetupStatus.js';
-import { useBreakpoint } from './hooks/useEnhancedMediaQuery.js';
-import auth from './stores/auth.js';
-import { ROUTE_REGISTRY } from './routing/routeRegistry.js';
-import { ForbiddenPage, LegacyRouteRedirect, NotFoundPage, RouteAccessBoundary, UnauthorizedPage, resolveSetupRedirect } from './routing/routeGuards.jsx';
-import { getRouteChromeState } from './routing/routeSelectors.js';
-import { sanitizeSpeedInsightsEvent } from './utils/speedInsightsPrivacy.js';
+import Health from './pages/Health';
+import Landing from './pages/Landing';
+import LoginFormStyled from './components/auth/LoginFormStyled';
+import Setup from './pages/Setup';
+import { useSetupStatus } from './hooks/useSetupStatus';
+import { useBreakpoint } from './hooks/useEnhancedMediaQuery';
+import auth from './stores/auth';
+import { ROUTE_REGISTRY } from './routing/routeRegistry';
+import { ForbiddenPage, LegacyRouteRedirect, NotFoundPage, RouteAccessBoundary, UnauthorizedPage, resolveSetupRedirect } from './routing/routeGuards';
+import { getRouteChromeState } from './routing/routeSelectors';
+import { sanitizeSpeedInsightsEvent } from './utils/speedInsightsPrivacy';
 
 bootstrapStoredColorScheme();
 
@@ -174,7 +172,11 @@ function AppShell({ children }) {
   const { theme } = useTheme();
   const { isMobile } = useBreakpoint();
   const [authState, setAuthState] = useState(() => auth.getState());
-  const chrome = getRouteChromeState(location.pathname, location.search, authState.profile);
+  const chrome = getRouteChromeState(location.pathname, location.search, authState.profile) as unknown as Record<string, unknown> & {
+    sidebarItems?: unknown[]; sidebarSections?: unknown[]; activeSidebarItem?: string;
+    hideHeader?: boolean; hideSidebar?: boolean; route?: { id?: string };
+    sidebarPreset?: { navigation?: string; queryParam?: string };
+  };
   const compactSidebar = isMobile && !chrome.hideSidebar;
 
   // P-018 fix: allow mobile users to expand the sidebar via a hamburger toggle.
@@ -304,9 +306,9 @@ function AppShell({ children }) {
               </button>
             )}
             <Sidebar
-              items={chrome.sidebarItems}
+              items={chrome.sidebarItems as never}
               // P-010 fix: pass sectioned structure to Sidebar for grouped rendering.
-              sections={chrome.sidebarSections}
+              sections={chrome.sidebarSections as never}
               activeItem={chrome.activeSidebarItem}
               onItemClick={handleSidebarClick}
               // When mobile+expanded → show full sidebar (labels visible).
@@ -466,14 +468,14 @@ export default function App() {
             draggable
             theme="colored"
           />
-          <SpeedInsights beforeSend={beforeSendSpeedInsights} />
+          <SpeedInsights {...{ beforeSend: beforeSendSpeedInsights } as Record<string, unknown>} />
         </AppProviders>
       </ThemeProvider>
     </MacOSThemeProvider>
   );
 }
 
-const macOSWrapStyle = {
+const macOSWrapStyle: CSSProperties = {
   fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif',
   background: 'transparent',
   minHeight: '100vh',
@@ -486,7 +488,7 @@ const macOSWrapStyle = {
   flexDirection: 'column',
 };
 
-const macOSMainStyle = {
+const macOSMainStyle: CSSProperties = {
   flex: 1,
   maxWidth: '100%',
   margin: 0,

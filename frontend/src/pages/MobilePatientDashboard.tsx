@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useState, useEffect } from 'react';
 import { api } from '../api/client';  // PR-54: replace raw fetch
 import {
@@ -23,7 +20,8 @@ import {
 import { usePWA } from '../hooks/usePWA';
 import MobileNotifications from '../components/mobile/MobileNotifications';
 import OfflineIndicator from '../components/mobile/OfflineIndicator';
-import QueuePositionCard from '../components/mobile/QueuePositionCard';
+import QueuePositionCardRaw from '../components/mobile/QueuePositionCard';
+const QueuePositionCard = QueuePositionCardRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
@@ -33,7 +31,8 @@ import { useTranslation } from '../i18n/useTranslation';
  * Мобильная панель пациента для PWA
  */
 const MobilePatientDashboard = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [patientData, setPatientData] = useState(null);
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);

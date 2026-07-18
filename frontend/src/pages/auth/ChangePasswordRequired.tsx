@@ -1,7 +1,5 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useState } from 'react';
+import type { CSSProperties } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
 import { Lock, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react';
@@ -19,7 +17,8 @@ import { useTranslation } from '../../i18n/useTranslation';
  * Показывается когда must_change_password = true
  */
 export default function ChangePasswordRequired({ currentPassword }) {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
     const navigate = useNavigate();
     const { theme, getColor } = useTheme();
 
@@ -96,7 +95,7 @@ export default function ChangePasswordRequired({ currentPassword }) {
         }
     };
 
-    const containerStyle = {
+    const containerStyle: CSSProperties = {
         minHeight: '100vh',
         display: 'flex',
         alignItems: 'center',
@@ -107,13 +106,13 @@ export default function ChangePasswordRequired({ currentPassword }) {
             : 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)'
     };
 
-    const cardStyle = {
+    const cardStyle: CSSProperties = {
         width: '100%',
         maxWidth: '450px',
         padding: '32px'
     };
 
-    const titleStyle = {
+    const titleStyle: CSSProperties = {
         fontSize: 'var(--mac-font-size-3xl)',
         fontWeight: 'var(--mac-font-weight-bold)',
         marginBottom: 'var(--mac-spacing-2)',
@@ -121,19 +120,19 @@ export default function ChangePasswordRequired({ currentPassword }) {
         textAlign: 'center'
     };
 
-    const subtitleStyle = {
+    const subtitleStyle: CSSProperties = {
         fontSize: 'var(--mac-font-size-base)',
         color: 'var(--mac-text-secondary)',
         marginBottom: 'var(--mac-spacing-6)',
         textAlign: 'center'
     };
 
-    const inputContainerStyle = {
+    const inputContainerStyle: CSSProperties = {
         position: 'relative',
         marginBottom: 'var(--mac-spacing-4)'
     };
 
-    const toggleButtonStyle = {
+    const toggleButtonStyle: CSSProperties = {
         position: 'absolute',
         right: '12px',
         top: '50%',
@@ -145,7 +144,7 @@ export default function ChangePasswordRequired({ currentPassword }) {
         padding: 'var(--mac-spacing-1)'
     };
 
-    const requirementsStyle = {
+    const requirementsStyle: CSSProperties = {
         marginBottom: 'var(--mac-spacing-5)',
         padding: 'var(--mac-spacing-3)',
         borderRadius: 'var(--mac-radius-md)',
