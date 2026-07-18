@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useTranslation } from '../../i18n/useTranslation';
 /**
  * Treatment Planner Component  
@@ -10,19 +7,25 @@ import { useTranslation } from '../../i18n/useTranslation';
 import { Fragment, useState } from 'react';
 import type { CSSProperties } from 'react';
 import {
-  Alert,
-  Badge,
-  Button,
+  Alert as RawAlert,
+  Badge as RawBadge,
+  Button as RawButton,
   Card,
   CardContent,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
-  Input,
-  Select,
-  Textarea,
+  Input as RawInput,
+  Select as RawSelect,
+  Textarea as RawTextarea,
 } from '../ui/macos';
+const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
+const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
+const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
+const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
+const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
+const Textarea = RawTextarea as unknown as React.ComponentType<Record<string, unknown>>;
 import {
   CalendarDays,
   ClipboardList,
@@ -54,11 +57,11 @@ function clonePlainObject(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
-async function loadExistingEmrDraft(visitId) {
+async function loadExistingEmrDraft(visitId: string | number) {
   const response = await api.get(`/v2/emr/${visitId}`, {
     silent: true,
-    validateStatus: (status) => status === 404 || (status >= 200 && status < 300),
-  });
+    validateStatus: (status: number) => status === 404 || (status >= 200 && status < 300),
+  } as Record<string, unknown>) as any;
 
   return response.status === 404 ? null : response.data;
 }
@@ -82,7 +85,7 @@ function buildTreatmentPlanEmrPayload(existingEmr, treatmentPlan) {
   };
 }
 
-const styles = {
+const styles: Record<string, CSSProperties> = {
   panel: {
     display: 'block',
   },
