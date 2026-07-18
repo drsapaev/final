@@ -1,15 +1,68 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
-import React from 'react';
+import React, { type CSSProperties } from 'react';
 import PropTypes from 'prop-types';
 import { useTheme } from '../../../contexts/ThemeContext';
+
+type ProgressVariant = 'default' | 'primary' | 'success' | 'warning' | 'danger';
+type ProgressSize = 'small' | 'default' | 'large';
+type CircularProgressSize = 'small' | 'default' | 'large' | 'xlarge';
+type ProgressThickness = 'thin' | 'medium' | 'thick';
+
+interface ProgressProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'children' | 'style'> {
+  value?: number;
+  max?: number;
+  variant?: ProgressVariant;
+  size?: ProgressSize;
+  animated?: boolean;
+  showValue?: boolean;
+  formatValue?: (value: number, max: number) => string;
+  className?: string;
+  style?: CSSProperties;
+}
+
+interface CircularProgressProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'children' | 'style'> {
+  value?: number;
+  max?: number;
+  size?: CircularProgressSize;
+  thickness?: ProgressThickness;
+  variant?: ProgressVariant;
+  animated?: boolean;
+  showValue?: boolean;
+  formatValue?: (value: number, max: number) => string | number;
+  className?: string;
+  style?: CSSProperties;
+}
+
+interface ProgressStyle extends CSSProperties {
+  transition?: string;
+}
+
+interface ProgressDimensions {
+  height: string;
+  borderRadius: string;
+}
+
+interface CircularDimensions {
+  width: number;
+  height: number;
+}
+
+const PROGRESS_COLOR_MAP: Record<ProgressVariant, string> = {
+  default: 'var(--mac-accent-blue)',
+  primary: 'var(--mac-accent-blue)',
+  success: 'var(--mac-success)',
+  warning: 'var(--mac-warning)',
+  danger: 'var(--mac-error)'
+};
+
+function getProgressColor(variant: ProgressVariant): string {
+  return PROGRESS_COLOR_MAP[variant] || PROGRESS_COLOR_MAP.default;
+}
 
 /**
  * macOS-style Progress Component
  * Implements Apple's Human Interface Guidelines for progress indicators
  */
-const Progress = React.forwardRef(({
+const Progress = React.forwardRef<HTMLDivElement, ProgressProps>(({
   value = 0,
   max = 100,
   variant = 'default',
@@ -26,7 +79,7 @@ const Progress = React.forwardRef(({
   const percentage = Math.min(100, Math.max(0, value / max * 100));
 
   // Size mapping
-  const sizeMap = {
+  const sizeMap: Record<ProgressSize, ProgressDimensions> = {
     small: { height: '4px', borderRadius: '2px' },
     default: { height: '6px', borderRadius: '3px' },
     large: { height: '8px', borderRadius: '4px' }
@@ -35,7 +88,7 @@ const Progress = React.forwardRef(({
   const sizeStyles = sizeMap[size] || sizeMap.default;
 
   // Variant styles
-  const variantStyles = {
+  const variantStyles: Record<ProgressVariant, CSSProperties> = {
     default: {
       backgroundColor: 'var(--mac-bg-tertiary)',
       border: '1px solid var(--mac-border)'
@@ -58,7 +111,7 @@ const Progress = React.forwardRef(({
     }
   };
 
-  const progressStyles = {
+  const progressStyles: CSSProperties = {
     width: '100%',
     backgroundColor: variantStyles[variant]?.backgroundColor || variantStyles.default.backgroundColor,
     border: variantStyles[variant]?.border || variantStyles.default.border,
@@ -69,7 +122,7 @@ const Progress = React.forwardRef(({
     ...style
   };
 
-  const fillStyles = {
+  const fillStyles: ProgressStyle = {
     width: `${percentage}%`,
     height: '100%',
     backgroundColor: getProgressColor(variant),
@@ -78,7 +131,7 @@ const Progress = React.forwardRef(({
     position: 'relative'
   };
 
-  const valueTextStyles = {
+  const valueTextStyles: CSSProperties = {
     position: 'absolute',
     top: '50%',
     left: '50%',
@@ -90,17 +143,6 @@ const Progress = React.forwardRef(({
     fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif',
     userSelect: 'none'
   };
-
-  function getProgressColor(variant) {
-    const colorMap = {
-      default: 'var(--mac-accent-blue)',
-      primary: 'var(--mac-accent-blue)',
-      success: 'var(--mac-success)',
-      warning: 'var(--mac-warning)',
-      danger: 'var(--mac-error)'
-    };
-    return colorMap[variant] || colorMap.default;
-  }
 
   const displayValue = formatValue ? formatValue(value, max) : `${Math.round(percentage)}%`;
 
@@ -115,7 +157,7 @@ const Progress = React.forwardRef(({
       aria-valuemax={max}
       aria-label={`Progress: ${displayValue}`}
       {...props}>
-      
+
       <div className="mac-progress-fill" style={fillStyles}>
         {showValue &&
         <span className="mac-progress-value" style={valueTextStyles}>
@@ -144,7 +186,7 @@ Progress.propTypes = {
 /**
  * Circular Progress Component
  */
-export const CircularProgress = React.forwardRef(({
+export const CircularProgress = React.forwardRef<HTMLDivElement, CircularProgressProps>(({
   value = 0,
   max = 100,
   size = 'default',
@@ -162,7 +204,7 @@ export const CircularProgress = React.forwardRef(({
   const percentage = Math.min(100, Math.max(0, value / max * 100));
 
   // Size mapping
-  const sizeMap = {
+  const sizeMap: Record<CircularProgressSize, CircularDimensions> = {
     small: { width: 20, height: 20 },
     default: { width: 32, height: 32 },
     large: { width: 48, height: 48 },
@@ -172,7 +214,7 @@ export const CircularProgress = React.forwardRef(({
   const dimensions = sizeMap[size] || sizeMap.default;
 
   // Thickness mapping
-  const thicknessMap = {
+  const thicknessMap: Record<ProgressThickness, number> = {
     thin: 2,
     medium: 3,
     thick: 4
@@ -184,7 +226,7 @@ export const CircularProgress = React.forwardRef(({
   const strokeDasharray = circumference;
   const strokeDashoffset = circumference - percentage / 100 * circumference;
 
-  const containerStyles = {
+  const containerStyles: CSSProperties = {
     position: 'relative',
     display: 'inline-flex',
     alignItems: 'center',
@@ -192,17 +234,6 @@ export const CircularProgress = React.forwardRef(({
     ...dimensions,
     ...style
   };
-
-  function getProgressColor(variant) {
-    const colorMap = {
-      default: 'var(--mac-accent-blue)',
-      primary: 'var(--mac-accent-blue)',
-      success: 'var(--mac-success)',
-      warning: 'var(--mac-warning)',
-      danger: 'var(--mac-error)'
-    };
-    return colorMap[variant] || colorMap.default;
-  }
 
   const displayValue = formatValue ? formatValue(value, max) : Math.round(percentage);
 
@@ -217,13 +248,13 @@ export const CircularProgress = React.forwardRef(({
       aria-valuemax={max}
       aria-label={`Progress: ${displayValue}%`}
       {...props}>
-      
+
       <svg
         width={dimensions.width}
         height={dimensions.height}
         viewBox={`0 0 ${dimensions.width} ${dimensions.height}`}
         style={{ transform: 'rotate(-90deg)' }}>
-        
+
         {/* Background circle */}
         <circle
           cx={dimensions.width / 2}
@@ -232,7 +263,7 @@ export const CircularProgress = React.forwardRef(({
           stroke="var(--mac-bg-tertiary)"
           strokeWidth={strokeWidth}
           fill="none" />
-        
+
 
         {/* Progress circle */}
         <circle
@@ -247,8 +278,8 @@ export const CircularProgress = React.forwardRef(({
           strokeLinecap="round"
           style={{
             transition: animated ? 'stroke-dashoffset 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)' : 'none'
-          }} />
-        
+          } as CSSProperties} />
+
       </svg>
 
       {/* Value text */}
@@ -263,7 +294,7 @@ export const CircularProgress = React.forwardRef(({
           fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif',
           userSelect: 'none'
         }}>
-        
+
           {displayValue}%
         </div>
       }
