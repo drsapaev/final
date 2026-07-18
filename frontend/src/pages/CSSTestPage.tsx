@@ -1,19 +1,18 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useState } from 'react';
 import {
   Card, Button, Badge,
 } from '../components/ui/macos';
-import ModernTabs from '../components/navigation/ModernTabs';
+import ModernTabsRaw from '../components/navigation/ModernTabs';
+const ModernTabs = ModernTabsRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import { AlertCircle, CheckCircle, XCircle, Info } from 'lucide-react';
 
 import logger from '../utils/logger';
 import { useTranslation } from '../i18n/useTranslation';
 const CSSTestPage = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [activeTab, setActiveTab] = useState('cardio');
-  const [testResults, setTestResults] = useState([]);
+  const [testResults, setTestResults] = useState<Array<{ test: string; passed: boolean; message: string }>>([]);
 
   const departmentStats = {
     cardio: { todayCount: 5, hasActiveQueue: true, hasPendingPayments: false },
@@ -42,10 +41,11 @@ const CSSTestPage = () => {
         });
       }
     } catch (error) {
+      const err = error as { message?: string };
       results.push({
         test: 'ModernTabs Border Conflict',
         passed: false,
-        message: t('misc.ctp_oshibka_testirovaniya_error_', { message: error.message })
+        message: t('misc.ctp_oshibka_testirovaniya_error_', { message: err?.message })
       });
     }
 
@@ -60,10 +60,11 @@ const CSSTestPage = () => {
         });
       }
     } catch (error) {
+      const err = error as { message?: string };
       results.push({
         test: 'Native Card Component',
         passed: false,
-        message: t('misc.ctp_oshibka_nativnogo_komponenta', { message: error.message })
+        message: t('misc.ctp_oshibka_nativnogo_komponenta', { message: err?.message })
       });
     }
 
@@ -81,10 +82,11 @@ const CSSTestPage = () => {
         });
       }
     } catch (error) {
+      const err = error as { message?: string };
       results.push({
         test: 'Global CSS Fixes',
         passed: false,
-        message: t('misc.ctp_oshibka_globalnyh_stiley_err', { message: error.message })
+        message: t('misc.ctp_oshibka_globalnyh_stiley_err', { message: err?.message })
       });
     }
 
@@ -104,7 +106,7 @@ const CSSTestPage = () => {
     }
   };
 
-  const getTestIcon = (passed) => {
+  const getTestIcon = (passed: boolean) => {
     return passed ? (
       <CheckCircle className="w-5 h-5 text-green-500" />
     ) : (

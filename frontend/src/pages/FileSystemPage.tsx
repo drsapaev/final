@@ -1,10 +1,7 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useState } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import FileManager from '../components/files/FileManager';
-export default FileSystemPage;import { useTranslation } from '../i18n/useTranslation';
+import { useTranslation } from '../i18n/useTranslation';
 import {
 
   Upload,
@@ -27,7 +24,8 @@ import {
  * Централизованное управление файлами и документами
  */
 const FileSystemPage = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   useTheme();
   const [activeTab, setActiveTab] = useState('files');
 

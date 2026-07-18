@@ -1,8 +1,7 @@
-import { ROUTE_REGISTRY, ROLE_HOME_PRIORITY, SIDEBAR_PRESETS } from './routeRegistry.js';
+import { ROUTE_REGISTRY, ROLE_HOME_PRIORITY, SIDEBAR_PRESETS } from './routeRegistry';
 
 // routeRegistry.ts is a literal array without explicit types. Model the
 // canonical surface here so the snapshot generator can compile without
-// @ts-nocheck. When routeRegistry.ts is migrated, these can move there.
 type RouteGroup = 'public' | 'onboarding' | 'clinical' | 'admin' | 'internal-demo' | string;
 type RouteAuth = 'public' | 'authenticated' | 'role-scoped' | string;
 type RouteLifecycle = 'stable' | 'compatibility' | 'experimental' | 'internal' | string;

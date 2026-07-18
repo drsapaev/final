@@ -1,10 +1,8 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useState } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import TwoFactorManager from '../components/security/TwoFactorManager';
-import TwoFactorSetupWizard from '../components/security/TwoFactorSetupWizard';
+import TwoFactorSetupWizardRaw from '../components/security/TwoFactorSetupWizard';
+const TwoFactorSetupWizard = TwoFactorSetupWizardRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import SMSEmail2FA from '../components/security/SMSEmail2FA';
 import { useTranslation } from '../i18n/useTranslation';
 import {
@@ -24,7 +22,8 @@ import {
  * Централизованное управление всеми аспектами безопасности
  */
 const SecurityPage = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   useTheme();
   const [activeTab, setActiveTab] = useState('overview');
   const [showSetupWizard, setShowSetupWizard] = useState(false);

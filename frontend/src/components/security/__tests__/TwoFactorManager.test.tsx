@@ -1,12 +1,9 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
-import { ThemeProvider } from '../../../contexts/ThemeContext.tsx';
-import { MacOSThemeProvider } from '../../../theme/macosTheme.tsx';
+import { ThemeProvider } from '../../../contexts/ThemeContext';
+import { MacOSThemeProvider } from '../../../theme/macosTheme';
 
 const { apiGet, apiPost, apiDelete, loggerInfo, loggerError } = vi.hoisted(() => ({
   apiGet: vi.fn(),
@@ -31,7 +28,7 @@ vi.mock('../../../utils/logger', () => ({
   },
 }));
 
-import TwoFactorManager from '../TwoFactorManager.tsx';
+import TwoFactorManager from '../TwoFactorManager';
 
 const disabledStatus = {
   enabled: false,
