@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import React, { useState, useRef } from 'react';
 import PropTypes from 'prop-types';
@@ -125,16 +123,16 @@ const ModernForm = ({
       if (!React.isValidElement(child)) return child;
 
       // Если это поле формы
-      if (child.props.name) {
-        const name = child.props.name;
+      if ((child.props as Record<string, unknown>).name) {
+        const name = String((child.props as Record<string, unknown>).name);
         const fieldError = touched[name] ? errors[name] : null;
 
-        return React.cloneElement(child, {
+        return (React.cloneElement as unknown as (el: React.ReactElement, props: Record<string, unknown>) => React.ReactElement)(child as React.ReactElement, {
           value: values[name] || '',
           onChange: (e) => {
             const value = e.target ? e.target.value : e;
             updateValue(name, value);
-            child.props.onChange?.(e);
+            ((child.props as Record<string, unknown>).onChange as ((...args: unknown[]) => void) | undefined)?.(e);
           },
           onBlur: (e) => {
             markTouched(name);
@@ -142,18 +140,18 @@ const ModernForm = ({
             if (error) {
               setErrors((prev) => ({ ...prev, [name]: error }));
             }
-            child.props.onBlur?.(e);
+            ((child.props as Record<string, unknown>).onBlur as ((...args: unknown[]) => void) | undefined)?.(e);
           },
           error: fieldError,
-          ...child.props
+          ...(child.props as Record<string, unknown>)
         });
       }
 
       // Рекурсивная обработка вложенных элементов
-      if (child.props.children) {
-        return React.cloneElement(child, {
-          ...child.props,
-          children: cloneChildren(child.props.children)
+      if ((child.props as Record<string, unknown>).children) {
+        return (React.cloneElement as unknown as (el: React.ReactElement, props: Record<string, unknown>) => React.ReactElement)(child as React.ReactElement, {
+          ...(child.props as Record<string, unknown>),
+          children: cloneChildren((child.props as Record<string, unknown>).children)
         });
       }
 

@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { api } from '../../api/client';
 import { useState, useEffect } from 'react';
@@ -33,7 +31,7 @@ const SMSEmail2FA = ({
   phoneNumber = '',
   emailAddress = ''
 }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -75,15 +73,15 @@ const SMSEmail2FA = ({
         })
       });
 
-      const data = await response.json();
+      const data = await (response as unknown as { json: () => Promise<unknown> }).json();
 
-      if (response.ok) {
+      if (response.status >= 200 && response.status < 300) {
         setSuccess(t('misc.sef_kod_otpravlen_na_method_sms_', { emailAddress: method === 'sms' ? phoneNumber : emailAddress }));
         setTimeLeft(resendDelay);
         setCanResend(false);
         setAttempts(0);
       } else {
-        setError(data.detail || t('misc.sef_oshibka_otpravki_koda'));
+        setError(String((data as Record<string, unknown>)?.detail) || t('misc.sef_oshibka_otpravki_koda'));
       }
     } catch {
       setError(t('misc.sef_oshibka_otpravki_koda'));
@@ -116,15 +114,15 @@ const SMSEmail2FA = ({
         })
       });
 
-      const data = await response.json();
+      const data = await (response as unknown as { json: () => Promise<unknown> }).json();
 
-      if (response.ok) {
+      if (response.status >= 200 && response.status < 300) {
         setSuccess(t('misc.sef_kod_podtverzhden_uspeshno'));
         if (onSuccess) {
           onSuccess(data);
         }
       } else {
-        setError(data.detail || t('misc.sef_nevernyy_kod'));
+        setError(String((data as Record<string, unknown>)?.detail) || t('misc.sef_nevernyy_kod'));
         setAttempts((prev) => prev + 1);
 
         if (attempts + 1 >= maxAttempts) {

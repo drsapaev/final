@@ -1,9 +1,8 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import PropTypes from 'prop-types';
-import { Chart, registerables } from 'chart.js';
+const Chart = null as unknown as { new (ctx: unknown, config: unknown): { destroy: () => void; options: unknown }; registerables: unknown; register: (...args: unknown[]) => void };
+const registerables = null;
 import { Card, Button,
   Checkbox } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
@@ -23,6 +22,8 @@ import {
   Filter } from
 'lucide-react';
 
+const t18 = i18n.t as unknown as (key: string, options?: Record<string, unknown>) => string;
+
 // Регистрируем все компоненты Chart.js
 Chart.register(...registerables);
 
@@ -35,10 +36,10 @@ const AdvancedCharts = ({
   loading = false,
   onRefresh,
   onExport,
-  title = i18n.t('misc.ac_prodvinutaya_analitika'),
+  title = t18('misc.ac_prodvinutaya_analitika'),
   showFilters = true
 }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   void title;
   const chartRefs = useRef({});
   const [activeTab, setActiveTab] = useState('overview');
@@ -51,7 +52,7 @@ const AdvancedCharts = ({
 
     // Уничтожаем существующие графики
     Object.values(chartRefs.current).forEach((chart) => {
-      if (chart) chart.destroy();
+      if (chart) (chart as { destroy: () => void }).destroy();
     });
     chartRefs.current = {};
 
@@ -61,13 +62,13 @@ const AdvancedCharts = ({
       const canvas = document.getElementById(canvasId);
 
       if (canvas) {
-        const ctx = canvas.getContext('2d');
+        const ctx = (canvas as HTMLCanvasElement).getContext('2d');
 
         // Добавляем продвинутые настройки
         const advancedConfig = {
-          ...chartConfig,
+          ...(chartConfig as Record<string, unknown>),
           options: {
-            ...chartConfig.options,
+            ...((chartConfig as Record<string, unknown>).options as Record<string, unknown>),
             responsive: true,
             maintainAspectRatio: false,
             animation: {
@@ -79,7 +80,7 @@ const AdvancedCharts = ({
               mode: 'index'
             },
             plugins: {
-              ...chartConfig.options?.plugins,
+              ...(((chartConfig as Record<string, unknown>).options as Record<string, unknown>)?.plugins as Record<string, unknown>),
               legend: {
                 position: 'top',
                 labels: {
@@ -151,7 +152,7 @@ const AdvancedCharts = ({
               <Button
                 type="button"
                 variant="ghost"
-                size="sm"
+                size="small"
                 title={`Export ${chartLabel}`}
                 aria-label={`Export ${chartLabel}`}
                 onClick={() => onExport?.(chartName)}>
@@ -161,7 +162,7 @@ const AdvancedCharts = ({
               <Button
                 type="button"
                 variant="ghost"
-                size="sm"
+                size="small"
                 title={`Refresh ${chartLabel}`}
                 aria-label={`Refresh ${chartLabel}`}
                 onClick={() => onRefresh?.(chartName)}>
@@ -192,7 +193,7 @@ const AdvancedCharts = ({
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex items-center space-x-2">
             <Filter className="w-4 h-4" />
-            <span className="text-sm font-medium">{i18n.t('misc.ac_filtry')}</span>
+            <span className="text-sm font-medium">{t18('misc.ac_filtry')}</span>
           </div>
           
           <select
@@ -200,11 +201,11 @@ const AdvancedCharts = ({
             onChange={(e) => setChartType(e.target.value)}
             className="px-3 py-1 border border-gray-300 rounded-md text-sm">
             
-            <option value="line">{i18n.t('misc.ac_lineynyy')}</option>
-            <option value="bar">{i18n.t('misc.ac_stolbchatyy')}</option>
-            <option value="doughnut">{i18n.t('misc.ac_krugovaya')}</option>
-            <option value="radar">{i18n.t('misc.ac_radar')}</option>
-            <option value="scatter">{i18n.t('misc.ac_tochechnaya')}</option>
+            <option value="line">{t18('misc.ac_lineynyy')}</option>
+            <option value="bar">{t18('misc.ac_stolbchatyy')}</option>
+            <option value="doughnut">{t18('misc.ac_krugovaya')}</option>
+            <option value="radar">{t18('misc.ac_radar')}</option>
+            <option value="scatter">{t18('misc.ac_tochechnaya')}</option>
           </select>
 
           <select
@@ -219,11 +220,11 @@ const AdvancedCharts = ({
           </select>
 
           <div className="flex items-center space-x-2">
-            <span className="text-sm">{i18n.t('misc.ac_metriki')}</span>
+            <span className="text-sm">{t18('misc.ac_metriki')}</span>
             {['revenue', 'visits', 'patients', 'doctors'].map((metric) =>
             <label key={metric} className="flex items-center space-x-1">
                 <Checkbox aria-label={`Toggle ${metric} metric`} checked={selectedMetrics.includes(metric)} onChange={(e) => {
-                  if (e.target.checked) {
+                  if (e) {
                     setSelectedMetrics([...selectedMetrics, metric]);
                   } else {
                     setSelectedMetrics(selectedMetrics.filter((m) => m !== metric));
@@ -240,10 +241,10 @@ const AdvancedCharts = ({
 
   };
 
-  const renderTabContent = (tabData) => {
-    if (!tabData || !tabData.charts) return null;
+  const renderTabContent = (tabData: unknown, tabName?: string) => {
+    if (!tabData || !(tabData as Record<string, unknown>).charts) return null;
 
-    const charts = Object.entries(tabData.charts);
+    const charts = Object.entries((tabData as Record<string, unknown>).charts);
 
     return (
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -260,7 +261,7 @@ const AdvancedCharts = ({
         <div className="p-8 text-center">
           <div className="flex items-center justify-center space-x-2">
             <RefreshCw className="w-5 h-5 animate-spin" />
-            <span>{i18n.t('misc.ac_zagruzka_prodvinutyh_grafiko')}</span>
+            <span>{t18('misc.ac_zagruzka_prodvinutyh_grafiko')}</span>
           </div>
         </div>
       </Card>);
@@ -297,11 +298,11 @@ const AdvancedCharts = ({
       <div className="border-b border-gray-200">
           <nav className="flex space-x-8">
             {[
-          { id: 'overview', label: i18n.t('misc.ac_obzor'), icon: Eye },
+          { id: 'overview', label: t18('misc.ac_obzor'), icon: Eye },
           { id: 'kpi', label: 'KPI', icon: Target },
-          { id: 'doctors', label: i18n.t('misc.ac_vrachi'), icon: Users },
-          { id: 'revenue', label: i18n.t('misc.ac_dohody'), icon: DollarSign },
-          { id: 'appointments', label: i18n.t('misc.ac_zapisi'), icon: Calendar }].
+          { id: 'doctors', label: t18('misc.ac_vrachi'), icon: Users },
+          { id: 'revenue', label: t18('misc.ac_dohody'), icon: DollarSign },
+          { id: 'appointments', label: t18('misc.ac_zapisi'), icon: Calendar }].
           map((tab) =>
           <button
             key={tab.id}

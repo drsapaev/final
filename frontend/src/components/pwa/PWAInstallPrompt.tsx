@@ -1,5 +1,5 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
+import React from 'react';
+import type { CSSProperties } from 'react';
 
 import { useState } from 'react';
 import PropTypes from 'prop-types';
@@ -14,9 +14,9 @@ import {
 } from 'lucide-react';
 
 import {
-  Alert,
+  Alert as AlertRaw,
   Badge,
-  Button,
+  Button as ButtonRaw,
   Card,
   CardContent,
   CardDescription,
@@ -27,6 +27,9 @@ import { usePWA } from '../../hooks/usePWA';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 import i18n from '../../i18n';
+const Button = ButtonRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Alert = AlertRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const t18 = i18n.t as unknown as (key: string, options?: Record<string, unknown>) => string;
 
 const styles = {
   shell: {
@@ -107,12 +110,12 @@ const styles = {
 
 const hasNotificationApi = () => typeof window !== 'undefined' && 'Notification' in window;
 
-function CapabilityChip({ children, icon: Icon, variant = 'outline', onClick, ariaLabel }) {
-  const { t } = useTranslation();
+function CapabilityChipRaw({ children, icon: Icon, variant = 'outline', onClick, ariaLabel }: Record<string, unknown>) {
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const content = (
     <span style={styles.chipContent}>
-      {Icon && <Icon size={13} aria-hidden="true" />}
-      {children}
+      {Icon && React.createElement(Icon as unknown as React.ComponentType<Record<string, unknown>>, { size: 13, "aria-hidden": "true" })}
+      {String(children)}
     </span>
   );
 
@@ -132,19 +135,21 @@ function CapabilityChip({ children, icon: Icon, variant = 'outline', onClick, ar
   }
 
   return (
-    <Badge variant={variant} size="small">
+    <Badge variant={variant as unknown as "default" | "primary" | "secondary" | "success" | "warning" | "danger" | "info" | "outline"} size="small">
       {content}
     </Badge>
   );
 }
 
-CapabilityChip.propTypes = {
+CapabilityChipRaw.propTypes = {
   ariaLabel: PropTypes.string,
   children: PropTypes.node.isRequired,
   icon: PropTypes.elementType,
   onClick: PropTypes.func,
   variant: PropTypes.oneOf(['default', 'primary', 'secondary', 'success', 'warning', 'danger', 'info', 'outline'])
 };
+
+const CapabilityChip = CapabilityChipRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const PWAInstallPrompt = ({ onClose }) => {
   const {
@@ -190,26 +195,26 @@ const PWAInstallPrompt = ({ onClose }) => {
     return null;
   }
 
-  const canRequestNotifications = capabilities.notifications && notificationPermission !== 'granted';
-  const title = updateAvailable ? i18n.t('misc.pip_obnovlenie_dostupno') : i18n.t('misc.pip_ustanovit_prilozhenie');
+  const canRequestNotifications = (capabilities as Record<string, unknown>).notifications && notificationPermission !== 'granted';
+  const title = updateAvailable ? t18('misc.pip_obnovlenie_dostupno') : t18('misc.pip_ustanovit_prilozhenie');
   const description = updateAvailable
-    ? i18n.t('misc.pip_dostupna_novaya_versiya_pril')
-    : i18n.t('misc.pip_ustanovite_prilozhenie_na_do');
+    ? t18('misc.pip_dostupna_novaya_versiya_pril')
+    : t18('misc.pip_ustanovite_prilozhenie_na_do');
 
   return (
     <div
       className="pwa-install-prompt"
-      style={styles.shell}
+      style={styles.shell as unknown as CSSProperties}
       role="dialog"
       aria-modal="false"
       aria-labelledby="pwa-install-prompt-title"
     >
-      <Card variant="elevated" padding="default" style={styles.card}>
-        <CardHeader style={styles.header}>
+      <Card variant="elevated" padding="default" style={styles.card as unknown as CSSProperties}>
+        <CardHeader style={styles.header as unknown as CSSProperties}>
           <div style={styles.titleRow}>
             <Smartphone size={22} aria-hidden="true" style={styles.titleIcon} />
             <div>
-              <CardTitle id="pwa-install-prompt-title" style={{ marginBottom: 2 }}>
+              <CardTitle id="pwa-install-prompt-title" style={{ marginBottom: 2 } as CSSProperties}>
                 {title}
               </CardTitle>
               <CardDescription>{description}</CardDescription>
@@ -222,7 +227,7 @@ const PWAInstallPrompt = ({ onClose }) => {
               variant="ghost"
               size="small"
               onClick={onClose}
-              aria-label={i18n.t('misc.pip_zakryt_priglashenie_ustanovk')}
+              aria-label={t18('misc.pip_zakryt_priglashenie_ustanovk')}
               style={styles.closeButton}
             >
               <X size={14} aria-hidden="true" />
@@ -238,20 +243,20 @@ const PWAInstallPrompt = ({ onClose }) => {
             </Button>
           ) : isInstallable ? (
             <>
-              <div style={styles.chipGrid} aria-label={i18n.t('misc.pip_statusy_pwa')}>
+              <div style={styles.chipGrid as unknown as CSSProperties} aria-label={t18('misc.pip_statusy_pwa')}>
                 <CapabilityChip
                   icon={isOnline ? CheckCircle2 : WifiOff}
                   variant={isOnline ? 'success' : 'warning'}
                 >
-                  {isOnline ? i18n.t('misc.pip_onlayn') : i18n.t('misc.pip_oflayn_rezhim')}
+                  {isOnline ? t18('misc.pip_onlayn') : t18('misc.pip_oflayn_rezhim')}
                 </CapabilityChip>
 
-                {capabilities.notifications && (
+                {(capabilities as Record<string, unknown>).notifications && (
                   <CapabilityChip
                     icon={Bell}
                     variant={notificationPermission === 'granted' ? 'success' : 'outline'}
                     onClick={canRequestNotifications ? handleNotificationPermission : undefined}
-                    ariaLabel={i18n.t('misc.pip_razreshit_push_uvedomleniya')}
+                    ariaLabel={t18('misc.pip_razreshit_push_uvedomleniya')}
                   >
                     Push уведомления
                   </CapabilityChip>
@@ -267,10 +272,10 @@ const PWAInstallPrompt = ({ onClose }) => {
                   fullWidth
                 >
                   <Download size={16} aria-hidden="true" style={styles.actionIcon} />
-                  {isInstalling ? i18n.t('misc.pip_ustanovka') : i18n.t('misc.pip_ustanovit_prilozhenie')}
+                  {isInstalling ? t18('misc.pip_ustanovka') : t18('misc.pip_ustanovit_prilozhenie')}
                 </Button>
 
-                {capabilities.notifications && notificationPermission === 'default' && (
+                {(capabilities as Record<string, unknown>).notifications && notificationPermission === 'default' && (
                   <Button
                     type="button"
                     variant="outline"
@@ -290,19 +295,19 @@ const PWAInstallPrompt = ({ onClose }) => {
           )}
 
           <div>
-            <p style={styles.capabilityLabel}>{i18n.t('misc.pip_vozmozhnosti_prilozheniya_2')}</p>
-            <div style={styles.chipGrid} aria-label={i18n.t('misc.pip_vozmozhnosti_prilozheniya')}>
-              {capabilities.serviceWorker && (
-                <CapabilityChip variant="outline">{i18n.t('misc.pip_oflayn_rabota')}</CapabilityChip>
+            <p style={styles.capabilityLabel as unknown as CSSProperties}>{t18('misc.pip_vozmozhnosti_prilozheniya_2')}</p>
+            <div style={styles.chipGrid as unknown as CSSProperties} aria-label={t18('misc.pip_vozmozhnosti_prilozheniya')}>
+              {(capabilities as Record<string, unknown>).serviceWorker && (
+                <CapabilityChip variant="outline">{t18('misc.pip_oflayn_rabota')}</CapabilityChip>
               )}
-              {capabilities.notifications && (
-                <CapabilityChip variant="outline">{i18n.t('misc.pip_uvedomleniya')}</CapabilityChip>
+              {(capabilities as Record<string, unknown>).notifications && (
+                <CapabilityChip variant="outline">{t18('misc.pip_uvedomleniya')}</CapabilityChip>
               )}
-              {capabilities.backgroundSync && (
-                <CapabilityChip variant="outline">{i18n.t('misc.pip_sinhronizatsiya')}</CapabilityChip>
+              {(capabilities as Record<string, unknown>).backgroundSync && (
+                <CapabilityChip variant="outline">{t18('misc.pip_sinhronizatsiya')}</CapabilityChip>
               )}
-              {capabilities.webShare && (
-                <CapabilityChip variant="outline">{i18n.t('misc.pip_bystryy_dostup')}</CapabilityChip>
+              {(capabilities as Record<string, unknown>).webShare && (
+                <CapabilityChip variant="outline">{t18('misc.pip_bystryy_dostup')}</CapabilityChip>
               )}
             </div>
           </div>

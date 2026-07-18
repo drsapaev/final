@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useState } from 'react';
 import { api } from '../api/client';
@@ -10,7 +8,7 @@ import { Input,
 import { useTranslation } from '../i18n/useTranslation';
 
 const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -26,7 +24,7 @@ const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken })
     setError('');
 
     try {
-      const requestData = {
+      const requestData: Record<string, unknown> = {
         remember_device: rememberDevice
       };
 
@@ -49,13 +47,13 @@ const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken })
 
       const response = await api.post('/2fa/verify', requestData);
 
-      if (response.data?.access_token || response.success) {
+      if (response.data?.access_token || response.data?.success) {
         setSuccess(t('misc.tfv_verifikatsiya_uspeshna'));
         if (onSuccess) {
           onSuccess(response);
         }
       } else {
-        setError(response.data?.message || response.message || t('misc.tfv_nevernyy_kod'));
+        setError(response.data?.message || response.data?.message || t('misc.tfv_nevernyy_kod'));
       }
     } catch (err) {
       setError(err.response?.data?.detail || t('misc.tfv_oshibka_verifikatsii'));
@@ -222,7 +220,7 @@ const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken })
           cursor: 'pointer',
           color: 'var(--text-primary)'
         }}>
-            <Checkbox aria-label="Remember this device for 30 days" checked={rememberDevice} onChange={(e) => setRememberDevice(e.target.checked)}
+            <Checkbox aria-label="Remember this device for 30 days" checked={rememberDevice} onChange={(e) => setRememberDevice(e)}
             style={{ margin: 0 }} />
 
             <span style={{ fontSize: 'var(--mac-font-size-base)' }}>
