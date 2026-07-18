@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useState, useEffect } from 'react';
 import { Printer, CheckCircle, Clock, X } from 'lucide-react';
@@ -10,7 +8,7 @@ import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 
 const MultipleTicketsPrinter = ({ tickets, onClose, onAllPrinted }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [printedTickets, setPrintedTickets] = useState(new Set());
   const [currentPrinting, setCurrentPrinting] = useState(null);
   const [countdown, setCountdown] = useState(0);

@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 /**
  * AISuggestionPanel - Sidebar panel for AI suggestions
@@ -51,12 +49,12 @@ export function AISuggestionPanel({
     isOpen = true,
     onClose,
 }) {
-    const { t } = useTranslation();
+    const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
     if (!isOpen) return null;
 
     // Group suggestions by field
-    const groupedSuggestions = suggestions.reduce((acc, suggestion) => {
-        const field = suggestion.targetField;
+    const groupedSuggestions = suggestions.reduce((acc: Record<string, unknown[]>, suggestion: Record<string, unknown>) => {
+        const field = String(suggestion.targetField);
         if (!acc[field]) {
             acc[field] = [];
         }
@@ -123,14 +121,14 @@ export function AISuggestionPanel({
 
                 {!isLoading && hasAnySuggestions && (
                     <div className="ai-suggestion-panel__groups">
-                        {Object.entries(groupedSuggestions).map(([field, fieldSuggestions]) => (
+                        {Object.entries(groupedSuggestions as Record<string, unknown[]>).map(([field, fieldSuggestions]) => (
                             <div key={field} className="ai-suggestion-panel__group">
                                 <div className="ai-suggestion-panel__group-header">
                                     {getFieldLabels(t)[field] || field}
                                 </div>
-                                {fieldSuggestions.map(suggestion => (
+                                {fieldSuggestions.map((suggestion: Record<string, unknown>) => (
                                     <AISuggestionCard
-                                        key={suggestion.id}
+                                        key={String(suggestion.id)}
                                         suggestion={suggestion}
                                         onApply={onApply}
                                         onDismiss={onDismiss}

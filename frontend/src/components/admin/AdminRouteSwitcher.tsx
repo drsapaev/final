@@ -1,10 +1,9 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
+import type { CSSProperties } from "react";
 
 import { useTranslation } from '../../i18n/useTranslation';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeftRight, LayoutDashboard, LineChart } from 'lucide-react';
-import { getCanonicalRouteById, getEffectiveRouteByPath } from '../../routing/routeSelectors.js';
+import { getCanonicalRouteById, getEffectiveRouteByPath } from '../../routing/routeSelectors';
 
 const SWITCHER_ROUTE_IDS = ['admin-dashboard', 'admin-analytics'];
 
@@ -31,7 +30,7 @@ const buildSwitcherRoutes = (t) => SWITCHER_ROUTE_IDS
     return {
       id: route.id,
       path: route.path,
-      label: route.nav?.label || route.title,
+      label: ((typeof route.nav === "object" && route.nav ? route.nav : null) as { label?: string } | null)?.label || route.title,
       description: presentation.description,
       icon: presentation.icon,
     };
@@ -113,7 +112,7 @@ const getRouteIconStyle = (isActive) => ({
 });
 
 export default function AdminRouteSwitcher() {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -123,15 +122,15 @@ export default function AdminRouteSwitcher() {
 
   return (
     <section
-      style={switcherStyle}
+      style={switcherStyle as CSSProperties}
       aria-label={t('admin2.ars_aria')}
     >
-      <div style={switcherLabelStyle}>
+      <div style={switcherLabelStyle as CSSProperties}>
         <ArrowLeftRight size={14} aria-hidden="true" />
         {/* UX Audit Admin #2.1: переименовано для соответствия фактическому функционалу (только 2 маршрута). */}
         {t('admin2.ars_title')}
       </div>
-      <div style={routeGridStyle}>
+      <div style={routeGridStyle as CSSProperties}>
         {switcherRoutes.map((route) => {
           const Icon = route.icon;
           const isActive = activeId === route.id;
@@ -141,10 +140,10 @@ export default function AdminRouteSwitcher() {
               key={route.id}
               type="button"
               onClick={() => navigate(route.path)}
-              style={getRouteButtonStyle(isActive)}
+              style={getRouteButtonStyle(isActive) as CSSProperties}
               aria-current={isActive ? 'page' : undefined}
             >
-              <span style={getRouteIconStyle(isActive)}>
+              <span style={getRouteIconStyle(isActive) as CSSProperties}>
                 <Icon size={18} aria-hidden="true" />
               </span>
               <span style={routeTextStyle}>

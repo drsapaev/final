@@ -1,13 +1,14 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import {
-  Card, CardContent, CardHeader, CardTitle, Badge, Button, Icon, Alert, Input,
+  Card, CardContent, CardHeader, CardTitle, Badge, Button, Icon, Alert as AlertRaw, Input as InputRaw,
 } from '../ui/macos';
 import { useWebAuthn } from '../../hooks/useWebAuthn';
 import { useTranslation } from '../../i18n/useTranslation';
+import React from "react";
+const Alert = AlertRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Input = InputRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 /**
  * WebAuthn Registration UI — P5 frontend integration.
@@ -16,7 +17,7 @@ import { useTranslation } from '../../i18n/useTranslation';
  * an alternative to Telegram Mini App authentication.
  */
 export default function WebAuthnRegistration({ patientId }) {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const { isSupported, isRegistering, error, register, listCredentials, deactivateCredential } = useWebAuthn();
   const [credentials, setCredentials] = useState([]);
   const [credentialName, setCredentialName] = useState('');
@@ -66,7 +67,7 @@ export default function WebAuthnRegistration({ patientId }) {
     <Card variant="filled" padding="none">
       <CardHeader style={{ background: 'var(--mac-bg-tertiary)', borderBottom: '1px solid var(--mac-border)', padding: '12px 16px' }}>
         <CardTitle style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Icon name="lock.shield" size={20} />
+          <Icon name="lock.shield" size={20 as unknown as "small" | "default" | "large" | "xlarge"} />
           {t('patient.pat_web_title')}
         </CardTitle>
       </CardHeader>
@@ -88,7 +89,7 @@ export default function WebAuthnRegistration({ patientId }) {
             loading={isRegistering}
             disabled={isRegistering}
           >
-            <Icon name="plus" size={16} />
+            <Icon name="plus" size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
             {isRegistering ? t('patient.pat_web_registering') : t('patient.pat_web_add_passkey')}
           </Button>
         </div>
@@ -139,7 +140,7 @@ export default function WebAuthnRegistration({ patientId }) {
                   size="small"
                   onClick={() => handleDeactivate(cred.id)}
                 >
-                  <Icon name="trash" size={14} />
+                  <Icon name="trash" size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
                   {t('patient.pat_web_delete')}
                 </Button>
               </div>

@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useState, useEffect } from 'react';
 import { Wifi, WifiOff, Cloud, RefreshCw } from 'lucide-react';
@@ -10,7 +8,7 @@ import { useTranslation } from '../../i18n/useTranslation';
  * ИСПРАВЛЕНО: Убран избыточный импорт React
  */
 const CompactConnectionStatus = ({ className = '', showTooltip = true }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [isOnline, setIsOnline] = useState(() => (
     typeof navigator === 'undefined' ? true : navigator.onLine
   ));
@@ -102,7 +100,7 @@ const CompactConnectionStatus = ({ className = '', showTooltip = true }) => {
     if (!lastSyncTime) return null;
     
     const now = new Date();
-    const diffMs = now - lastSyncTime;
+    const diffMs = now.getTime() - (lastSyncTime as Date).getTime();
     const diffMins = Math.floor(diffMs / 60000);
     
     if (diffMins < 1) return t('misc.ccs_tolko_chto');

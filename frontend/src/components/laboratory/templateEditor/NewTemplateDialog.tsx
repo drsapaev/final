@@ -1,12 +1,12 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useEffect, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import {
-  Alert, Button, Dialog, DialogTitle, DialogContent, DialogActions, Input, Label, Textarea, Icon,
+  Alert as AlertRaw, Button, Dialog, DialogTitle, DialogContent, DialogActions, Input, Label, Textarea, Icon,
 } from '../../ui/macos';
 import { useTranslation } from '../../../i18n/useTranslation';
+import React from "react";
+const Alert = AlertRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 /**
  * L-H-6 fix: NewTemplateDialog выделен в отдельный файл (~110 строк).
@@ -20,7 +20,7 @@ import { useTranslation } from '../../../i18n/useTranslation';
  * уже существует в переданном списке templates.
  */
 function NewTemplateDialog({ open, onClose, onCreate, saving, existingTemplates = [] }) {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [form, setForm] = useState({
     code: '',
     name: '',
@@ -130,7 +130,7 @@ function NewTemplateDialog({ open, onClose, onCreate, saving, existingTemplates 
           form="new-template-form"
           disabled={saving || Boolean(codeConflict)}
         >
-          <Icon name="plus" size={16} />
+          <Icon name="plus" size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
           Создать
         </Button>
       </DialogActions>

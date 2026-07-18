@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useState, useEffect } from 'react';
 import { Download, X, Smartphone, Monitor } from 'lucide-react';
@@ -10,7 +8,7 @@ import { useTranslation } from '../../i18n/useTranslation';
  * Компонент для предложения установки PWA
  */
 const PWAInstallPrompt = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [showInstallPrompt, setShowInstallPrompt] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
@@ -19,7 +17,7 @@ const PWAInstallPrompt = () => {
     // Проверяем, установлено ли уже PWA
     const checkIfInstalled = () => {
       const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
-      const isIOSStandalone = window.navigator.standalone === true;
+      const isIOSStandalone = (navigator as unknown as { standalone?: boolean }).standalone === true;
       setIsInstalled(isStandalone || isIOSStandalone);
     };
 
