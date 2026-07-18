@@ -1,6 +1,25 @@
-import { useState } from 'react';
+import React, { useState, type ReactNode, type CSSProperties } from 'react';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import PropTypes from 'prop-types';
+
+interface MacOSStatCardProps {
+  title?: ReactNode;
+  value?: ReactNode;
+  subtitle?: ReactNode;
+  icon?: React.ComponentType<any> | ReactNode;
+  trend?: ReactNode;
+  trendType?: 'positive' | 'negative' | 'neutral' | string;
+  trendLabel?: ReactNode;
+  color?: string;
+  size?: 'sm' | 'md' | 'lg' | string;
+  variant?: string;
+  loading?: boolean;
+  onClick?: () => void;
+  className?: string;
+  style?: CSSProperties;
+  detail?: ReactNode;
+  [key: string]: any;
+}
 
 const MacOSStatCard = ({
   title,
@@ -17,7 +36,7 @@ const MacOSStatCard = ({
   onClick,
   className,
   style
-}) => {
+}: MacOSStatCardProps) => {
   const [isHovered, setIsHovered] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
 
@@ -70,7 +89,7 @@ const MacOSStatCard = ({
     gray: 'var(--mac-text-secondary)'
   };
 
-  const trendStyles = {
+  const trendStyles: Record<string, { color: string; icon: React.ComponentType<any> }> = {
     positive: {
       color: 'var(--mac-success)',
       icon: TrendingUp
@@ -90,7 +109,7 @@ const MacOSStatCard = ({
   const currentColor = colorStyles[color] || colorStyles.blue;
   const currentTrend = trendStyles[trendType];
 
-  const cardStyle = {
+  const cardStyle: CSSProperties = {
     padding: currentSize.padding,
     background: currentVariant.background,
     border: currentVariant.border,
@@ -106,21 +125,21 @@ const MacOSStatCard = ({
     ...style
   };
 
-  const headerStyle = {
+  const headerStyle: CSSProperties = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: '8px'
   };
 
-  const titleStyle = {
+  const titleStyle: CSSProperties = {
     fontSize: currentSize.fontSize,
     fontWeight: 'var(--mac-font-weight-medium)',
     color: 'var(--mac-text-secondary)',
     margin: 0
   };
 
-  const valueStyle = {
+  const valueStyle: CSSProperties = {
     fontSize: currentSize.valueFontSize,
     fontWeight: 'var(--mac-font-weight-bold)',
     color: 'var(--mac-text-primary)',
@@ -128,13 +147,13 @@ const MacOSStatCard = ({
     lineHeight: 1.2
   };
 
-  const subtitleStyle = {
+  const subtitleStyle: CSSProperties = {
     fontSize: 'var(--mac-font-size-xs)',
     color: 'var(--mac-text-tertiary)',
     margin: 0
   };
 
-  const trendStyle = {
+  const trendStyle: CSSProperties = {
     display: 'flex',
     alignItems: 'center',
     marginTop: '8px',
@@ -143,7 +162,7 @@ const MacOSStatCard = ({
     color: currentTrend.color
   };
 
-  const iconStyle = {
+  const iconStyle: CSSProperties = {
     width: currentSize.iconSize,
     height: currentSize.iconSize,
     color: currentColor,
@@ -177,7 +196,7 @@ const MacOSStatCard = ({
     
     return (
       <div style={trendStyle}>
-        <TrendIcon size={12} style={{ marginRight: '4px' }} />
+        {TrendIcon && <TrendIcon size={12} style={{ marginRight: '4px' }} />}
         <span>{trend}</span>
         {trendLabel && (
           <span style={{ marginLeft: '4px', opacity: 0.8 }}>
@@ -228,7 +247,8 @@ const MacOSStatCard = ({
     <>
       <div style={headerStyle}>
         <h3 style={titleStyle}>{title}</h3>
-        {Icon && <Icon style={iconStyle} />}
+        {Icon && typeof Icon === 'function' && <Icon style={iconStyle} />}
+        {Icon && typeof Icon !== 'function' && <span>{Icon}</span>}
       </div>
       
       <div style={valueStyle}>{value}</div>

@@ -1,7 +1,5 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useEffect, useState } from 'react';
+import type { CSSProperties } from "react";
 import PropTypes from 'prop-types';
 import {
   Bell,
@@ -341,13 +339,13 @@ function buildPolicyPayload(policyDraft) {
       desktop: Boolean(normalized.channel_controls?.desktop ?? true),
     },
     family_controls: Object.fromEntries(
-      Object.entries(normalized.family_controls || {}).map(([familyKey, familyControl]) => [
+      Object.entries(normalized.family_controls || {}).map(([familyKey, familyControl]: [string, any]) => [
         familyKey,
         { desktop: Boolean(familyControl?.desktop ?? true) },
       ])
     ),
     event_controls: Object.fromEntries(
-      Object.entries(normalized.event_controls || {}).map(([eventKey, eventControl]) => [
+      Object.entries(normalized.event_controls || {}).map(([eventKey, eventControl]: [string, any]) => [
         eventKey,
         { desktop: Boolean(eventControl?.desktop ?? true) },
       ])
@@ -398,7 +396,7 @@ async function requestNotificationSettings(userId) {
     if (!shouldFallbackToDirectApi(error)) {
       throw error;
     }
-    const response = await api.get(`/notifications/settings/${userId}`);
+    const response = await api.get(`/notifications/settings/${userId}`) as any;
     return response.data;
   }
 }
@@ -410,20 +408,20 @@ async function persistNotificationSettings(userId, payload) {
     if (!shouldFallbackToDirectApi(error)) {
       throw error;
     }
-    const response = await api.put(`/notifications/settings/${userId}`, payload);
+    const response = await api.put(`/notifications/settings/${userId}`, payload) as any;
     return response.data;
   }
 }
 
-async function requestNotificationPolicy(userId) {
+async function requestNotificationPolicy(userId: any) {
   try {
-    const payload = await notificationsService.getPolicy(userId);
+    const payload = await notificationsService.getPolicy(userId) as any;
     return payload?.policy || {};
   } catch (error) {
     if (!shouldFallbackToDirectApi(error)) {
       throw error;
     }
-    const response = await api.get(`/notifications/settings/${userId}/policy`);
+    const response = await api.get(`/notifications/settings/${userId}/policy`) as any;
     return response?.data?.policy || {};
   }
 }
@@ -436,7 +434,7 @@ async function persistNotificationPolicy(userId, payload) {
     if (!shouldFallbackToDirectApi(error)) {
       throw error;
     }
-    const response = await api.put(`/notifications/settings/${userId}/policy`, payload);
+    const response = await api.put(`/notifications/settings/${userId}/policy`, payload) as any;
     return response?.data?.policy || payload;
   }
 }
@@ -569,19 +567,20 @@ export function __resetNotificationSettingsCacheForTests() {
 }
 
 export default function NotificationPreferences() {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [lastSavedAt, setLastSavedAt] = useState(null);
   const [userId, setUserId] = useState(null);
-  const [settings, setSettings] = useState(null);
+  const [settings, setSettings] = useState(null as any);
   const [draft, setDraft] = useState(null);
   const [policyLoading, setPolicyLoading] = useState(false);
   const [policyError, setPolicyError] = useState('');
   const [policyLoaded, setPolicyLoaded] = useState(false);
-  const [policySettings, setPolicySettings] = useState(null);
+  const [policySettings, setPolicySettings] = useState(null as any);
   const [policyDraft, setPolicyDraft] = useState(null);
 
   useEffect(() => {

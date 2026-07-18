@@ -1,7 +1,5 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import type { CSSProperties } from "react";
 import { useLocation, useNavigate } from 'react-router-dom';
 import '../styles/dark-theme-visibility-fix.css';
 import AIAssistant from '../components/ai/AIAssistant';
@@ -45,9 +43,9 @@ import {
 'lucide-react';
 
 // ✅ УЛУЧШЕНИЕ: Универсальные хуки для устранения дублирования
-import { useModal } from '../hooks/useModal.jsx';
-import { useBreakpoint, useTouchDevice } from '../hooks/useEnhancedMediaQuery.js';
-import useDoctorQueue from '../hooks/useDoctorQueue.js';
+import { useModal } from '../hooks/useModal';
+import { useBreakpoint, useTouchDevice } from '../hooks/useEnhancedMediaQuery';
+import useDoctorQueue from '../hooks/useDoctorQueue';
 import { getProfile } from '../stores/auth';
 import ScheduleNextModal from '../components/common/ScheduleNextModal';
 import AIChatWidget from '../components/ai/AIChatWidget';
@@ -79,7 +77,8 @@ const DoctorPanel = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { isMobile, isTablet } = useBreakpoint();
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const isTouchDevice = useTouchDevice();
   // UX Audit Doctor L-43: isTouchDevice used for disabling hover on touch.
   void isTouchDevice;
@@ -900,7 +899,7 @@ const DoctorPanel = () => {
                           <td className="doctor-td">{patient.phone || '—'}</td>
                           <td className="doctor-td">{patient.diagnosis || '—'}</td>
                           <td className="doctor-td" aria-label={`${getPatientA11yContext(patient)} status`}>
-                            <Badge variant={getStatusVariant(patient.status)} size="md">
+                            <Badge variant={getStatusVariant(patient.status)} size="default">
                               {getStatusText(patient.status)}
                             </Badge>
                           </td>
@@ -1039,7 +1038,7 @@ const DoctorPanel = () => {
                           <td className="doctor-td">{appointment.patientName || t('doctor.patient_default')}</td>
                           <td className="doctor-td">{appointment.type || '—'}</td>
                           <td className="doctor-td">
-                            <Badge variant={getStatusVariant(appointment.status)} size="md">
+                            <Badge variant={getStatusVariant(appointment.status)} size="default">
                               {getStatusText(appointment.status)}
                             </Badge>
                           </td>

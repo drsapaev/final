@@ -1,8 +1,8 @@
 import React, { type ReactNode, type CSSProperties } from 'react';
 import PropTypes from 'prop-types';
 
-type BadgeVariant = 'default' | 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'info' | 'outline';
-type BadgeSize = 'small' | 'default' | 'large';
+type BadgeVariant = 'default' | 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'destructive' | 'error' | 'info' | 'outline' | string;
+type BadgeSize = 'small' | 'default' | 'large' | string;
 
 interface BadgeProps extends Omit<React.HTMLAttributes<HTMLSpanElement>, 'children' | 'style'> {
   children?: ReactNode;
@@ -10,6 +10,11 @@ interface BadgeProps extends Omit<React.HTMLAttributes<HTMLSpanElement>, 'childr
   size?: BadgeSize;
   className?: string;
   style?: CSSProperties;
+  // Backward-compat props used by legacy callers
+  text?: ReactNode;
+  color?: string;
+  outline?: boolean;
+  [key: string]: any;
 }
 
 /**
@@ -27,7 +32,7 @@ const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>(({
   // SW-01: removed useTheme() — Badge doesn't use theme values
 
   // Size mapping
-  const sizeMap: Record<BadgeSize, CSSProperties> = {
+  const sizeMap: Record<string, CSSProperties> = {
     small: {
       padding: '2px 6px',
       fontSize: '10px',
@@ -45,10 +50,10 @@ const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>(({
     }
   };
 
-  const sizeStyles = sizeMap[size] || sizeMap.default;
+  const sizeStyles = sizeMap[size as BadgeSize] || sizeMap.default;
 
   // Variant styles
-  const variantStyles: Record<BadgeVariant, CSSProperties> = {
+  const variantStyles: Record<string, CSSProperties> = {
     default: {
       backgroundColor: 'var(--mac-bg-tertiary)',
       color: 'var(--mac-text-primary)',
@@ -101,7 +106,7 @@ const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>(({
     whiteSpace: 'nowrap',
     userSelect: 'none',
     ...sizeStyles,
-    ...variantStyles[variant],
+    ...(variantStyles[variant as BadgeVariant] || variantStyles.default),
     ...style
   };
 

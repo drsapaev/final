@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useTranslation } from '../../i18n/useTranslation';
 /**
  * QueueProfilesManager - Admin component for managing queue tabs
@@ -17,6 +14,7 @@ import { useTranslation } from '../../i18n/useTranslation';
  */
 import PropTypes from 'prop-types';
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import type { CSSProperties } from "react";
 import {
     Plus,
     Edit2,
@@ -44,12 +42,15 @@ import {
 import api from '../../services/api';
 import logger from '../../utils/logger';
 import {
-  Select,
-  Input,
-  Checkbox } from '../ui/macos';
+  Select as RawSelect,
+  Input as RawInput,
+  Checkbox as RawCheckbox } from '../ui/macos';
+const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
+const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
+const Checkbox = RawCheckbox as unknown as React.ComponentType<Record<string, unknown>>;
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
-import { notify } from '../../services/notify.js';
+import { notify } from '../../services/notify';
 
 const getStatusFilterOptions = (t) => [
     { value: 'all', label: t('admin2.qp_filter_all') },
@@ -82,11 +83,13 @@ const PRESET_COLORS = [
 ];
 
 const QueueProfilesManager = ({ theme = 'light' }) => {
-    const { t } = useTranslation();
+    const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
     const statusFilterOptions = getStatusFilterOptions(t);
     const availableIcons = getAvailableIcons(t);
     // P-013 fix: shared ConfirmDialog hook (replaces 2 window.confirm() calls).
-    const [confirm, confirmDialog] = useConfirm();
+    const [confirmRaw, confirmDialog] = useConfirm();
+  const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
     const [profiles, setProfiles] = useState([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -110,7 +113,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
         try {
             setLoading(true);
             setError(null);
-            const response = await api.get('/queues/profiles?active_only=false');
+            const response = await api.get('/queues/profiles?active_only=false') as any;
             setProfiles(response.data.profiles || []);
             setSelectedProfiles([]); // Clear selection on reload
             logger.info(`Loaded ${response.data.profiles?.length || 0} queue profiles`);
@@ -125,7 +128,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
     useEffect(() => {
         loadProfiles();
         // PR-21: load departments for department_key Select
-        api.get('/admin/departments').then(res => {
+        api.get('/admin/departments').then((res: any) => {
             setDepartments(res.data?.data || []);
         }).catch(err => logger.error('Failed to load departments:', err));
     }, [loadProfiles]);
@@ -351,9 +354,9 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
 
             for (let i = 1; i < lines.length; i++) {
                 const values = lines[i].split(',').map(v => v.replace(/^"|"$/g, '').replace(/""/g, '"'));
-                const profile = {};
+                const profile: any = {};
 
-                headers.forEach((header, index) => {
+                headers.forEach((header: any, index: number) => {
                     const value = values[index];
                     switch (header) {
                         case 'queue_tags':
@@ -415,7 +418,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
     if (loading) {
         return (
             <div className="admin-qp-container">
-                <div className="admin-p-24-radius-12-bd-1px-solid-var-mac-bo-ta-center-p-40-bgc-dyn" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' }}>
+                <div className="admin-p-24-radius-12-bd-1px-solid-var-mac-bo-ta-center-p-40-bgc-dyn" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' } as CSSProperties}>
                     <RefreshCw size={24} className="admin-anim-spin-1s-linear-infin" />
                     <p className="admin-secondary-mt-12">
                         {t('admin2.qp_loading')}
@@ -432,26 +435,26 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
         <div className="admin-qp-container">
             {/* Statistics Cards */}
             <div className="admin-qp-stats-grid">
-                <div className="admin-qp-stat-card" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' }}>
+                <div className="admin-qp-stat-card" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' } as CSSProperties}>
                     <div className="admin-qp-stat-value">{stats.total}</div>
                     <div className="admin-qp-stat-label">{t('admin2.qp_stat_total')}</div>
                 </div>
-                <div className="admin-p-16-radius-12-bd-1px-solid-var-mac-bo-ta-center-bgc-dyn" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' }}>
+                <div className="admin-p-16-radius-12-bd-1px-solid-var-mac-bo-ta-center-bgc-dyn" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' } as CSSProperties}>
                     <div className="admin-fs-28-fw-bold-primary-mb-4-var-mac-success-10B9">{stats.active}</div>
                     <div className="admin-qp-stat-label">{t('admin2.qp_stat_active')}</div>
                 </div>
-                <div className="admin-qp-stat-card" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' }}>
+                <div className="admin-qp-stat-card" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' } as CSSProperties}>
                     <div className="admin-fs-28-fw-bold-primary-mb-4-var-mac-warning-F59E">{stats.inactive}</div>
                     <div className="admin-qp-stat-label">{t('admin2.qp_stat_hidden')}</div>
                 </div>
-                <div className="admin-qp-stat-card" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' }}>
+                <div className="admin-qp-stat-card" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' } as CSSProperties}>
                     <div className="admin-fs-28-fw-bold-primary-mb-4-var-mac-info-3B82F6">{stats.totalTags}</div>
                     <div className="admin-qp-stat-label">Queue Tags</div>
                 </div>
             </div>
 
             {/* Main Card */}
-            <div className="admin-qp-main-card" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' }}>
+            <div className="admin-qp-main-card" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' } as CSSProperties}>
                 {/* Header */}
                 <div className="admin-qp-header">
                     <h2 className="admin-qp-title">{t('admin2.qp_page_title')}</h2>
@@ -460,7 +463,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                         <div className="admin-qp-search-wrapper">
                             <Search size={16} className="admin-qp-search-icon" />
                             <Input
-                                className="admin-qp-search-input" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-tertiary)' : 'var(--mac-bg-secondary)' }}
+                                className="admin-qp-search-input" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-tertiary)' : 'var(--mac-bg-secondary)' } as CSSProperties}
                                 aria-label={t('admin2.qp_search_aria')}
                                 placeholder={t('admin2.qp_search_placeholder')}
                                 value={searchTerm}
@@ -471,7 +474,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                         {/* Status filter */}
                         <Select
                             value={statusFilter}
-                            onChange={setStatusFilter}
+                            onChange={(v: unknown) => setStatusFilter(String(v))}
                             options={statusFilterOptions}
                             size="large"
                             className="admin-w-160"/>
@@ -652,14 +655,14 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                                 <td className="admin-qp-td">
                                     {(() => {
                                         const IconComponent = availableIcons.find(i => i.name === profile.icon)?.component || Package;
-                                        return <IconComponent size={20} className="admin-col-dyn" style={{ '--admin-col0': profile.color || 'var(--mac-text-secondary)' }} />;
+                                        return <IconComponent size={20} className="admin-col-dyn" style={{ '--admin-col0': profile.color || 'var(--mac-text-secondary)' } as CSSProperties} />;
                                     })()}
                                 </td>
                                 <td className="admin-qp-td">
                                     <div
                                         role="img"
                                         aria-label={t('admin2.qp_color_aria', { name: profile.name, color: profile.color || t('admin2.qp_color_not_set') })}
-                                        className="admin-w-16-h-16-radius-50pct-bd-2px-solid-var-mac-bo-bgc-dyn" style={{ '--admin-bgc0': profile.color || '#718096' }}
+                                        className="admin-w-16-h-16-radius-50pct-bd-2px-solid-var-mac-bo-bgc-dyn" style={{ '--admin-bgc0': profile.color || '#718096' } as CSSProperties}
                                         title={profile.color}
                                     />
                                 </td>
@@ -667,7 +670,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                                     <span
                                         className="admin-d-inline-flex-ai-center-gap-4-p-2px-8px-radius-12-fs-11-fw-500-bgc-dyn-col-dyn" style={{ '--admin-bgc0': profile.is_active !== false
                                                 ? 'rgba(16, 185, 129, 0.1)'
-                                                : 'var(--mac-error-bg)', '--admin-col1': profile.is_active !== false ? 'var(--mac-success)' : 'var(--mac-error)' }}
+                                                : 'var(--mac-error-bg)', '--admin-col1': profile.is_active !== false ? 'var(--mac-success)' : 'var(--mac-error)' } as CSSProperties}
                                     >
                                         {profile.is_active !== false ? t('admin2.qp_status_active') : t('admin2.qp_status_hidden')}
                                     </span>
@@ -731,14 +734,15 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                     />
                 )}
                 {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
-                {confirmDialog}
+                {confirmDialog as unknown as React.ReactNode}
             </div>
         </div>
     );
 };
 // Profile form component with show_on_qr_page support
-const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = false, departments = [] }) => {
-    const { t } = useTranslation();
+const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = false, departments = [] }: any) => {
+    const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
     const availableIcons = getAvailableIcons(t);
     const [formData, setFormData] = useState({
         key: profile?.key || '',
@@ -751,7 +755,7 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
         show_on_qr_page: profile?.show_on_qr_page !== false, // ⭐ NEW: QR page visibility
         icon: profile?.icon || 'Package',
         color: profile?.color || '#718096',
-    });
+    } as any);
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -776,7 +780,7 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
             aria-label={t('admin2.qp_close_form_aria')}
             onClick={onCancel}
             onKeyDown={(event) => handleActivationKeyDown(event, onCancel)}>
-            <div className="admin-qp-modal" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-primary)' : 'white' }} onClickCapture={e => e.stopPropagation()}>
+            <div className="admin-qp-modal" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-primary)' : 'white' } as CSSProperties} onClickCapture={e => e.stopPropagation()}>
                 <div className="admin-qp-modal-header">
                     <h3 className="admin-qp-modal-title">
                         {isEdit ? t('admin2.qp_edit_title') : t('admin2.qp_create_title')}
@@ -796,7 +800,7 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                         <div className="admin-qp-field">
                             <label className="admin-qp-label">{t('admin2.qp_key_label')}</label>
                             <Input
-                                className="admin-qp-input" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' }}
+                                className="admin-qp-input" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' } as CSSProperties}
                                 aria-label={t('admin2.qp_key_input_aria')}
                                 value={formData.key}
                                 onChange={e => setFormData({ ...formData, key: e.target.value })}
@@ -813,7 +817,7 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                         <div className="admin-mb-16-flex-1-1">
                             <label className="admin-qp-label">{t('admin2.qp_title_en_label')}</label>
                             <Input
-                                className="admin-qp-input" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' }}
+                                className="admin-qp-input" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' } as CSSProperties}
                                 aria-label={t('admin2.qp_title_en_aria')}
                                 value={formData.title}
                                 onChange={e => setFormData({ ...formData, title: e.target.value })}
@@ -824,7 +828,7 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                         <div className="admin-mb-16-flex-1">
                             <label className="admin-qp-label">{t('admin2.qp_title_ru_label')}</label>
                             <Input
-                                className="admin-qp-input" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' }}
+                                className="admin-qp-input" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' } as CSSProperties}
                                 aria-label={t('admin2.qp_title_ru_aria')}
                                 value={formData.title_ru}
                                 onChange={e => setFormData({ ...formData, title_ru: e.target.value })}
@@ -837,7 +841,7 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                     <div className="admin-qp-field">
                         <label className="admin-qp-label">Queue Tags</label>
                         <Input
-                            className="admin-qp-input" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' }}
+                            className="admin-qp-input" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' } as CSSProperties}
                             aria-label="Queue Tags"
                             value={formData.queue_tags}
                             onChange={e => setFormData({ ...formData, queue_tags: e.target.value })}
@@ -851,7 +855,7 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                         <label className="admin-qp-label">{t('admin2.qp_department_label')}</label>
                         <select
                             className="admin-w-100pct-p-10px-12px-radius-8-bd-1px-solid-var-mac-bo-primary-fs-14-bsz-border-box-w-100-bgc-dyn"
-                            style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' }}
+                            style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' } as CSSProperties}
                             value={formData.department_key}
                             onChange={e => setFormData({ ...formData, department_key: e.target.value })}
                         >
@@ -867,7 +871,7 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                     <div className="admin-qp-field">
                         <label className="admin-qp-label">{t('admin2.qp_order_label')}</label>
                         <Input
-                            className="admin-w-100pct-p-10px-12px-radius-8-bd-1px-solid-var-mac-bo-primary-fs-14-bsz-border-box-w-100-bgc-dyn" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' }}
+                            className="admin-w-100pct-p-10px-12px-radius-8-bd-1px-solid-var-mac-bo-primary-fs-14-bsz-border-box-w-100-bgc-dyn" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' } as CSSProperties}
                             type="number"
                             aria-label={t('admin2.qp_order_aria')}
                             min="0"
@@ -887,10 +891,10 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                                     <button
                                         key={icon.name}
                                         type="button"
-                                        className="admin-p-12-bd-2px-solid-var-mac-bo-radius-8-bgc-transparent-cur-pointer-d-flex-fd-column-ai-center-gap-4-tr-all-0-2s-bd-c-dyn-bgc-dyn" style={{ '--admin-bd-c0': isSelected ? 'var(--mac-accent-blue)' : 'var(--mac-border)', '--admin-bgc1': isSelected ? 'var(--mac-accent-bg)' : 'transparent' }}
+                                        className="admin-p-12-bd-2px-solid-var-mac-bo-radius-8-bgc-transparent-cur-pointer-d-flex-fd-column-ai-center-gap-4-tr-all-0-2s-bd-c-dyn-bgc-dyn" style={{ '--admin-bd-c0': isSelected ? 'var(--mac-accent-blue)' : 'var(--mac-border)', '--admin-bgc1': isSelected ? 'var(--mac-accent-bg)' : 'transparent' } as CSSProperties}
                                         onClick={() => setFormData({ ...formData, icon: icon.name })}
                                     >
-                                        <IconComponent size={24} className="admin-col-dyn" style={{ '--admin-col0': formData.color }} />
+                                        <IconComponent size={24} className="admin-col-dyn" style={{ '--admin-col0': formData.color } as CSSProperties} />
                                         <span className="admin-fs-10-secondary">
                                             {icon.label}
                                         </span>
@@ -908,7 +912,7 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                                 <button
                                     key={color}
                                     type="button"
-                                    className="admin-w-32-h-32-radius-50pct-bd-3px-solid-transparen-cur-pointer-tr-all-0-2s-bgc-dyn-bd-c-dyn-bsh-dyn" style={{ '--admin-bgc0': color, '--admin-bd-c1': formData.color === color ? 'white' : 'transparent', '--admin-bsh2': formData.color === color ? `0 0 0 2px ${color}` : 'none' }}
+                                    className="admin-w-32-h-32-radius-50pct-bd-3px-solid-transparen-cur-pointer-tr-all-0-2s-bgc-dyn-bd-c-dyn-bsh-dyn" style={{ '--admin-bgc0': color, '--admin-bd-c1': formData.color === color ? 'white' : 'transparent', '--admin-bsh2': formData.color === color ? `0 0 0 2px ${color}` : 'none' } as CSSProperties}
                                     onClick={() => setFormData({ ...formData, color })}
                                     aria-label={t('admin2.qp_color_pick_aria', { color })}
                                     title={color}

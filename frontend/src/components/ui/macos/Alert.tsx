@@ -1,3 +1,4 @@
+import React from 'react';
 import { AlertCircle, CheckCircle, Info, AlertTriangle, X } from 'lucide-react';
 import PropTypes from 'prop-types';
 import { useTranslation } from '../../../i18n/useTranslation';
@@ -27,6 +28,19 @@ const typeIcons = {
   error: AlertCircle,
 };
 
+interface AlertProps {
+  children?: React.ReactNode;
+  severity?: string;
+  type?: string;
+  title?: React.ReactNode;
+  description?: React.ReactNode;
+  action?: React.ReactNode;
+  dismissible?: boolean;
+  onDismiss?: () => void;
+  style?: React.CSSProperties;
+  [key: string]: any;
+}
+
 const Alert = ({
   children,
   severity = 'info',
@@ -39,7 +53,7 @@ const Alert = ({
   onDismiss,
   style = {},
   ...props
-}) => {
+}: AlertProps) => {
   // If type is provided (MacOSAlert API), use it as severity
   const effectiveSeverity = type || severity;
   const Icon = typeIcons[effectiveSeverity] || Info;

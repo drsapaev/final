@@ -1,7 +1,5 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useEffect, useState } from 'react';
+import type { CSSProperties } from "react";
 import PropTypes from 'prop-types';
 import {
   AlertTriangle,
@@ -62,7 +60,8 @@ const toneChipStyles = {
 };
 
 function MetricCard({ accent, icon: Icon, label, value }) {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   return (
     <div
       className="theme-soft-surface"
@@ -98,7 +97,7 @@ MetricCard.propTypes = {
   value: PropTypes.string.isRequired,
 };
 
-function SectionShell({ title, description, action, children }) {
+function SectionShell({ title, description, action, children }: any) {
   return (
     <Card shadow="default">
       <CardHeader style={{ paddingBottom: 12 }}>
@@ -132,7 +131,7 @@ SectionShell.propTypes = {
   title: PropTypes.string.isRequired,
 };
 
-function EmptyState({ icon: Icon, title, description, action }) {
+function EmptyState({ icon: Icon, title, description, action }: any) {
   return (
     <div
       className="theme-empty-state"
@@ -186,7 +185,8 @@ function resolveApiError(error, fallbackMessage) {
 }
 
 function DeviceCard({ badgeLabel, details, lastUsed, name, pending, onCancel, onConfirm, onToggle }) {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   return (
     <Card shadow="none" style={{ borderStyle: 'solid' }}>
       <CardContent style={{ display: 'grid', gap: 12 }}>
@@ -256,7 +256,8 @@ DeviceCard.propTypes = {
 };
 
 export default function TwoFactorManager() {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -295,7 +296,7 @@ export default function TwoFactorManager() {
 
   async function loadStatus() {
     try {
-      const response = await api.get('/2fa/status');
+      const response = await api.get('/2fa/status') as any;
       const data = response.data;
       setStatus(data);
       if (data?.enabled) {
@@ -309,7 +310,7 @@ export default function TwoFactorManager() {
 
   async function loadDevices() {
     try {
-      const response = await api.get('/2fa/devices');
+      const response = await api.get('/2fa/devices') as any;
       setDevices(response.data?.devices || []);
     } catch (err) {
       logger.error('Error loading devices:', err);
@@ -318,7 +319,7 @@ export default function TwoFactorManager() {
 
   async function loadSecurityLogs() {
     try {
-      const response = await api.get('/2fa/security-logs');
+      const response = await api.get('/2fa/security-logs') as any;
       setSecurityLogs(response.data?.logs || []);
     } catch (err) {
       logger.error('Error loading security logs:', err);
@@ -327,7 +328,7 @@ export default function TwoFactorManager() {
 
   async function loadRecoveryMethods() {
     try {
-      const response = await api.get('/2fa/recovery-methods');
+      const response = await api.get('/2fa/recovery-methods') as any;
       setRecoveryMethods(response.data?.methods || []);
     } catch (err) {
       logger.error('Error loading recovery methods:', err);
@@ -343,7 +344,7 @@ export default function TwoFactorManager() {
     try {
       setLoading(true);
       setError('');
-      const response = await api.get('/2fa/backup-codes');
+      const response = await api.get('/2fa/backup-codes') as any;
       setBackupCodes(response.data?.backup_codes || []);
       logger.info('[FIX:2FA] Loaded backup codes for enabled 2FA');
     } catch (err) {
@@ -364,7 +365,7 @@ export default function TwoFactorManager() {
       const response = await api.post('/2fa/setup', {
         recovery_email: status?.recovery_email || '',
         recovery_phone: status?.recovery_phone || '',
-      });
+      }) as any;
       setSetupData(response.data);
       setBackupCodes(response.data?.backup_codes || []);
       setVerificationCode('');
@@ -391,7 +392,7 @@ export default function TwoFactorManager() {
       logger.info('[FIX:2FA] Verifying 2FA setup');
       const response = await api.post('/2fa/verify-setup', null, {
         params: { totp_code: verificationCode },
-      });
+      }) as any;
       if (response.data?.success) {
         setSuccess(t('misc.tfm_enable_success'));
         await loadStatus();
@@ -446,7 +447,7 @@ export default function TwoFactorManager() {
 
     try {
       logger.info('[FIX:2FA] Regenerating backup codes via supported endpoint');
-      const response = await api.post('/2fa/backup-codes/regenerate');
+      const response = await api.post('/2fa/backup-codes/regenerate') as any;
       setBackupCodes(response.data?.backup_codes || []);
       setConfirmRegenerate(false);
       setSuccess(t('misc.tfm_regenerate_success'));
