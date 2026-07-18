@@ -1,9 +1,6 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import useAIChat from '../useAIChat.ts';
+import useAIChat from '../useAIChat';
 
 const {
   apiMock,
@@ -24,7 +21,7 @@ const {
   };
 
   const runtimeMock = {
-    buildWsUrl: vi.fn((path) => `ws://localhost:18000${path}`),
+    buildWsUrl: vi.fn((path: string) => `ws://localhost:18000${path}`),
   };
 
   const tokenManagerMock = {
@@ -56,10 +53,29 @@ vi.mock('../../utils/tokenManager', () => ({
   tokenManager: tokenManagerMock,
 }));
 
-function deferred() {
-  let resolve;
-  let reject;
-  const promise = new Promise((res, rej) => {
+// Cast the mocked api and logger through unknown so vitest mock
+// methods are visible to TypeScript.
+const apiMockTyped = apiMock as unknown as {
+  get: ReturnType<typeof vi.fn>;
+  post: ReturnType<typeof vi.fn>;
+  delete: ReturnType<typeof vi.fn>;
+};
+const loggerMockTyped = loggerMock as unknown as {
+  info: ReturnType<typeof vi.fn>;
+  warn: ReturnType<typeof vi.fn>;
+  error: ReturnType<typeof vi.fn>;
+};
+
+interface Deferred<T = unknown> {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+  reject: (reason?: unknown) => void;
+}
+
+function deferred<T = unknown>(): Deferred<T> {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
     resolve = res;
     reject = rej;
   });
@@ -67,7 +83,7 @@ function deferred() {
   return { promise, resolve, reject };
 }
 
-function makeSessionResponse(id, messageCount = 1) {
+function makeSessionResponse(id: number, messageCount = 1) {
   const stamp = `2026-03-29T10:0${id}:00Z`;
   return {
     data: {
@@ -93,7 +109,7 @@ describe('useAIChat', () => {
     const session2 = deferred();
     const session2Messages = deferred();
 
-    apiMock.get.mockImplementation((url) => {
+    apiMockTyped.get.mockImplementation((url: string) => {
       if (url === '/ai/chat/sessions/1') return session1.promise;
       if (url === '/ai/chat/sessions/1/messages') {
         throw new Error('stale loadSession should not request messages for session 1');
@@ -106,8 +122,8 @@ describe('useAIChat', () => {
 
     const { result } = renderHook(() => useAIChat({ contextType: 'general', specialty: 'general' }));
 
-    let loadSession1;
-    let loadSession2;
+    let loadSession1: Promise<unknown>;
+    let loadSession2: Promise<unknown>;
     await act(async () => {
       loadSession1 = result.current.loadSession(1);
       loadSession2 = result.current.loadSession(2);
@@ -115,7 +131,7 @@ describe('useAIChat', () => {
 
     session2.resolve(makeSessionResponse(2));
     await waitFor(() => {
-      expect(apiMock.get).toHaveBeenCalledWith('/ai/chat/sessions/2/messages');
+      expect(apiMockTyped.get).toHaveBeenCalledWith('/ai/chat/sessions/2/messages');
     });
 
     session2Messages.resolve({
@@ -132,7 +148,7 @@ describe('useAIChat', () => {
     session1.resolve(makeSessionResponse(1));
 
     await act(async () => {
-      await Promise.allSettled([loadSession1, loadSession2]);
+      await Promise.allSettled([loadSession1!, loadSession2!]);
     });
 
     await waitFor(() => {
@@ -145,7 +161,7 @@ describe('useAIChat', () => {
       });
     });
 
-    expect(apiMock.get).not.toHaveBeenCalledWith('/ai/chat/sessions/1/messages');
-    expect(loggerMock.error).not.toHaveBeenCalled();
+    expect(apiMockTyped.get).not.toHaveBeenCalledWith('/ai/chat/sessions/1/messages');
+    expect(loggerMockTyped.error).not.toHaveBeenCalled();
   });
 });

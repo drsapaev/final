@@ -1,16 +1,19 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('../../api/client.ts', () => ({
+vi.mock('../../api/client', () => ({
   me: vi.fn(),
   setToken: vi.fn(),
 }));
 
-import { me, setToken as setClientToken } from '../../api/client.ts';
+import { me, setToken as setClientToken } from '../../api/client';
 
-function createJwt(expSecondsFromNow) {
+// Cast me and setClientToken through unknown so we can call vitest
+// mock methods (mockResolvedValue / mockRejectedValueOnce / etc.) —
+// the real me() returns Promise<UserProfile>, not a Mock.
+const meMock = me as unknown as ReturnType<typeof vi.fn>;
+const setClientTokenMock = setClientToken as unknown as ReturnType<typeof vi.fn>;
+
+function createJwt(expSecondsFromNow: number): string {
   const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
   const payload = btoa(JSON.stringify({
     sub: '1',
@@ -20,17 +23,17 @@ function createJwt(expSecondsFromNow) {
 }
 
 describe('auth store', () => {
-  let storage;
+  let storage: Record<string, string>;
 
-  function primeSessionStorage(initial = {}) {
+  function primeSessionStorage(initial: Record<string, string> = {}) {
     storage = { ...initial };
-    sessionStorage.getItem.mockImplementation((key) =>
+    vi.spyOn(sessionStorage, 'getItem').mockImplementation((key: string) =>
       Object.prototype.hasOwnProperty.call(storage, key) ? storage[key] : null
     );
-    sessionStorage.setItem.mockImplementation((key, value) => {
+    vi.spyOn(sessionStorage, 'setItem').mockImplementation((key: string, value: string) => {
       storage[key] = String(value);
     });
-    sessionStorage.removeItem.mockImplementation((key) => {
+    vi.spyOn(sessionStorage, 'removeItem').mockImplementation((key: string) => {
       delete storage[key];
     });
   }
@@ -46,15 +49,15 @@ describe('auth store', () => {
       auth_token: createJwt(3600),
       auth_profile: JSON.stringify({ id: 1, username: 'registrar' }),
     });
-    me.mockRejectedValueOnce({ response: { status: 401 } });
+    meMock.mockRejectedValueOnce({ response: { status: 401 } });
 
-    const auth = await import('../auth.ts');
+    const auth = await import('../auth');
     const profile = await auth.getProfile(true);
 
     expect(profile).toBeNull();
     expect(storage.auth_token).toBeUndefined();
     expect(storage.auth_profile).toBeUndefined();
-    expect(setClientToken).toHaveBeenCalledWith(null);
+    expect(setClientTokenMock).toHaveBeenCalledWith(null);
   });
 
   it('clears expired tokens before protected routes hit the API', async () => {
@@ -63,10 +66,10 @@ describe('auth store', () => {
       auth_profile: JSON.stringify({ id: 1, username: 'registrar' }),
     });
 
-    const auth = await import('../auth.ts');
+    const auth = await import('../auth');
     const state = await auth.validateSession(true);
 
-    expect(me).not.toHaveBeenCalled();
+    expect(meMock).not.toHaveBeenCalled();
     expect(state).toEqual({ token: null, profile: null });
     expect(storage.auth_token).toBeUndefined();
     expect(storage.auth_profile).toBeUndefined();
@@ -77,9 +80,9 @@ describe('auth store', () => {
       auth_token: createJwt(3600),
       auth_profile: JSON.stringify({ id: 1, username: 'registrar' }),
     });
-    me.mockResolvedValue({ id: 1, username: 'registrar' });
+    meMock.mockResolvedValue({ id: 1, username: 'registrar' });
 
-    const auth = await import('../auth.ts');
+    const auth = await import('../auth');
     const firstState = await auth.validateSession(true);
     const secondState = await auth.validateSession();
 
@@ -88,7 +91,7 @@ describe('auth store', () => {
       profile: { id: 1, username: 'registrar' },
     });
     expect(secondState).toEqual(firstState);
-    expect(me).toHaveBeenCalledTimes(1);
+    expect(meMock).toHaveBeenCalledTimes(1);
   });
 
   it('keeps cached auth state when /auth/me is rate limited', async () => {
@@ -96,9 +99,9 @@ describe('auth store', () => {
       auth_token: createJwt(3600),
       auth_profile: JSON.stringify({ id: 1, username: 'registrar' }),
     });
-    me.mockRejectedValueOnce({ response: { status: 429 } });
+    meMock.mockRejectedValueOnce({ response: { status: 429 } });
 
-    const auth = await import('../auth.ts');
+    const auth = await import('../auth');
     const state = await auth.validateSession(true);
 
     expect(state).toEqual({

@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../api/adminSettings', () => ({
@@ -8,7 +5,7 @@ vi.mock('../../api/adminSettings', () => ({
 }));
 
 vi.mock('../../api/ticketPrintSettings', async () => {
-  const actual = await vi.importActual('../../api/ticketPrintSettings');
+  const actual = await vi.importActual<typeof import('../../api/ticketPrintSettings')>('../../api/ticketPrintSettings');
   return {
     ...actual,
     fetchTicketPrintSettings: vi.fn(),
@@ -26,14 +23,18 @@ import {
   resolvePanelTicketPayloads,
 } from '../panelPrint';
 
+// Cast the mocked functions through unknown to expose vitest mock methods.
+const fetchTicketPrintSettingsMock = fetchTicketPrintSettings as unknown as ReturnType<typeof vi.fn>;
+const fetchClinicSettingsMock = fetchClinicSettings as unknown as ReturnType<typeof vi.fn>;
+
 describe('panelPrint ticket renderer', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it('uses the default ticket layout with QR enabled when settings are absent', async () => {
-    fetchTicketPrintSettings.mockResolvedValueOnce(TICKET_PRINT_SETTINGS_DEFAULTS);
-    fetchClinicSettings.mockResolvedValueOnce([
+    fetchTicketPrintSettingsMock.mockResolvedValueOnce(TICKET_PRINT_SETTINGS_DEFAULTS);
+    fetchClinicSettingsMock.mockResolvedValueOnce([
       { key: 'clinic_name', value: 'City Clinic' },
       { key: 'logo_url', value: '/static/logo.png' },
     ]);
@@ -58,7 +59,7 @@ describe('panelPrint ticket renderer', () => {
   });
 
   it('renders only the fields enabled in ticket print settings', async () => {
-    fetchTicketPrintSettings.mockResolvedValueOnce({
+    fetchTicketPrintSettingsMock.mockResolvedValueOnce({
       ...TICKET_PRINT_SETTINGS_DEFAULTS,
       show_logo: true,
       show_patient_name: true,
@@ -66,7 +67,7 @@ describe('panelPrint ticket renderer', () => {
       show_price: true,
       show_qr_code: true,
     });
-    fetchClinicSettings.mockResolvedValueOnce([
+    fetchClinicSettingsMock.mockResolvedValueOnce([
       { key: 'clinic_name', value: 'City Clinic' },
       { key: 'logo_url', value: '/static/logo.png' },
     ]);
@@ -96,8 +97,8 @@ describe('panelPrint ticket renderer', () => {
   });
 
   it('resolves queue number from nested queue_numbers shapes without failing', async () => {
-    fetchTicketPrintSettings.mockResolvedValueOnce(TICKET_PRINT_SETTINGS_DEFAULTS);
-    fetchClinicSettings.mockResolvedValueOnce([]);
+    fetchTicketPrintSettingsMock.mockResolvedValueOnce(TICKET_PRINT_SETTINGS_DEFAULTS);
+    fetchClinicSettingsMock.mockResolvedValueOnce([]);
 
     const html = await buildPanelTicketPrintableHtml({
       queue_numbers: {
@@ -115,8 +116,8 @@ describe('panelPrint ticket renderer', () => {
   });
 
   it('builds a multi-ticket document from aggregated queue_numbers in a single printable html', async () => {
-    fetchTicketPrintSettings.mockResolvedValueOnce(TICKET_PRINT_SETTINGS_DEFAULTS);
-    fetchClinicSettings.mockResolvedValueOnce([
+    fetchTicketPrintSettingsMock.mockResolvedValueOnce(TICKET_PRINT_SETTINGS_DEFAULTS);
+    fetchClinicSettingsMock.mockResolvedValueOnce([
       { key: 'clinic_name', value: 'City Clinic' },
     ]);
 
