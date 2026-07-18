@@ -44,15 +44,13 @@ declare module 'react-i18next' {
       'uz-Cyrl': Record<string, unknown>;
     };
   }
-  // Make t() accept any string key and return string
-  function useTranslation(...args: any[]): {
+  // Override useTranslation to return a permissive t() that accepts any string key
+  function useTranslation(ns?: string | string[], options?: Record<string, unknown>): {
     t: (key: string, options?: Record<string, unknown>) => string;
     i18n: any;
     ready: boolean;
     language: string;
     languages: string[];
-    setLanguage: (lang: string) => void;
-    availableLanguages: { code: string; name: string; flag: string }[];
   };
 }
 
