@@ -1114,7 +1114,7 @@ const EnhancedAppointmentsTable = ({
               type="text"
               placeholder={t('misc.eat_search')}
               value={filterConfig.search}
-              onChange={(e) => setFilterConfig((prev) => ({ ...prev, search: e.target.value }))}
+              onChange={(e: any) => setFilterConfig((prev) => ({ ...prev, search: e.target.value }))}
               icon={Search}
               className="eat-search-input" />
 
@@ -1123,7 +1123,7 @@ const EnhancedAppointmentsTable = ({
           {/* Фильтр по статусу */}
           <Select
             value={filterConfig.status}
-            onChange={(e) => setFilterConfig((prev) => ({ ...prev, status: e.target.value }))}
+            onChange={(e: any) => setFilterConfig((prev) => ({ ...prev, status: e.target.value }))}
             options={[
             { value: '', label: t('misc.eat_filter') },
             { value: 'scheduled', label: t('misc.eat_scheduled') },
@@ -1184,7 +1184,7 @@ const EnhancedAppointmentsTable = ({
               }}
               aria-label={t('misc.eat_select_all')}>
                   <Checkbox aria-label={t('misc.eat_select_all')} checked={selectedRows.size === paginatedData.length && paginatedData.length > 0}
-                  onChange={(e) => handleSelectAll(e.target.checked)}
+                  onChange={(e: any) => handleSelectAll(e.target.checked)}
                   />
 
                 </th>
@@ -1494,7 +1494,7 @@ const EnhancedAppointmentsTable = ({
                   <td
                     className="eat-td-base"
                     aria-label={`${t('misc.eat_select_all')}: ${row.patient_fio || row.patient_name || row.id}`}>
-                        <Checkbox aria-label={`${t('misc.eat_select_all')}: ${row.patient_fio || row.patient_name || row.id}`} checked={selectedRows.has(row.id)} onChange={(e) => {
+                        <Checkbox aria-label={`${t('misc.eat_select_all')}: ${row.patient_fio || row.patient_name || row.id}`} checked={selectedRows.has(row.id)} onChange={(e: any) => {
                         e?.stopPropagation();
                         handleRowSelect(row.id, e.target.checked);
                       }}
@@ -2158,7 +2158,7 @@ const EnhancedAppointmentsTable = ({
             <span>{t('misc.eat_page')}</span>
             <select
             value={currentPage}
-            onChange={(e) => setCurrentPage(parseInt(e.target.value))}
+            onChange={(e: any) => setCurrentPage(parseInt(e.target.value))}
             className="eat-pagination-select">
 
               {Array.from({ length: totalPages }, (_, i) =>
