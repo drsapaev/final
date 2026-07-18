@@ -3,7 +3,7 @@ import { useTranslation } from '../../i18n/useTranslation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import {
-  Badge, Button, Checkbox, Icon, Input as InputRaw, Textarea as TextareaRaw,
+  Badge, Button, Checkbox, Icon, Input, Textarea,
 } from '../ui/macos';
 import { useConfirm } from '../common/ConfirmDialog';
 import { api } from '../../api/client';
@@ -13,8 +13,6 @@ import {
 } from './patientUtils';
 import PanelEmptyState from './PanelEmptyState';
 import React from "react";
-const Textarea = TextareaRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = InputRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 /**
  * L-H-4 fix: PatientFormsPreview выделен в отдельный файл.

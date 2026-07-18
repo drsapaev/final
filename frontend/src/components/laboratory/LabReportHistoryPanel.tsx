@@ -2,7 +2,7 @@
 import PropTypes from 'prop-types';
 import { useCallback, useRef } from 'react';
 import {
-  Alert as AlertRaw, Badge, Button, Card, CardContent, CardHeader, CardTitle, Icon,
+  Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Icon,
 } from '../ui/macos';
 import {
   formatLabStatus,
@@ -13,7 +13,6 @@ import { historySeverityState, matchesHistoryFilter } from './utils/labReportNor
 // STRAT#21: t() для i18n — history panel strings мигрированы.
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
-const Alert = AlertRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 /**
  * P-04 fix: LabReportHistoryPanel выделен из LabReportWorkbench.

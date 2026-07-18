@@ -16,8 +16,8 @@ import { toast } from 'react-toastify';
 import { useAsyncAction } from '../../hooks/useAsyncAction';
 import {
   MacOSCard,
-  Button as ButtonRaw,
-  Input as InputRaw,
+  Button,
+  Input,
   Checkbox,
   Select as SelectRaw,
 } from '../ui/macos';
@@ -28,9 +28,7 @@ import {
 } from '../../api/adminSettings';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
-const Input = InputRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const Select = SelectRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const Button = ButtonRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const PaymentProviderSettings = () => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;

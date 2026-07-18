@@ -3,10 +3,9 @@
 import PropTypes from 'prop-types';
 import { useState, useMemo, useCallback } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
-import { Input as InputRaw } from '../ui/macos';
+import { Input } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
 import React, { type CSSProperties } from "react";
-const Input = InputRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 /**
  * Компонент таблицы

@@ -5,12 +5,11 @@ import PropTypes from 'prop-types';
 import { Cloud, RefreshCw, Wifi, WifiOff, X } from 'lucide-react';
 
 import {
-  Alert as AlertRaw, Badge, Button,
+  Alert, Badge, Button,
 } from '../ui/macos';
 import { usePWA } from '../../hooks/usePWA';
 import { useTranslation } from '../../i18n/useTranslation';
 import i18n from '../../i18n';
-const Alert = AlertRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import React from "react";
 const t18 = i18n.t as unknown as (key: string, options?: Record<string, unknown>) => string;
 

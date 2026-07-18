@@ -8,10 +8,10 @@ import { useState, useEffect } from 'react';
 import {
   Card,
   CardContent,
-  Typography as TypographyRaw,
+  Typography,
   Button,
-  Alert as AlertRaw,
-  Input as InputRaw,
+  Alert,
+  Input,
   Textarea,
 } from '../ui/macos';
 import {
@@ -28,9 +28,6 @@ import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
-const Input = InputRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const Typography = TypographyRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const Alert = AlertRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const DEFAULT_ECHO_DATA = {
   // Левый желудочек

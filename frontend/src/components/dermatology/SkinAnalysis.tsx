@@ -10,9 +10,9 @@ import {
   Box,
   Card,
   CardContent,
-  Typography as TypographyRaw,
-  Button as ButtonRaw,
-  Alert as AlertRaw,
+  Typography,
+  Button,
+  Alert,
   Progress as ProgressRaw,
   Badge,
   CircularProgress as CircularProgressRaw,
@@ -39,9 +39,6 @@ import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
 const CircularProgressAny = CircularProgressRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const ProgressAny = ProgressRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const Button = ButtonRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const Typography = TypographyRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const Alert = AlertRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const SkinAnalysis = ({ photos, visitId, patientId, onAnalysisComplete }) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [analyzing, setAnalyzing] = useState(false);

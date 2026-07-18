@@ -13,9 +13,9 @@ import { api } from '../../api/client';
 import { useConfirm } from '../common/ConfirmDialog';
 import {
   Badge,
-  Button as ButtonRaw,
+  Button,
   MacOSCard,
-  MacOSEmptyState as MacOSEmptyStateRaw,
+  MacOSEmptyState,
   Input,
   Skeleton as SkeletonRaw,
   Select as SelectRaw,
@@ -24,9 +24,7 @@ import IconButton from './IconButton';
 import logger from '../../utils/logger';
 import React from "react";
 const Select = SelectRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const Button = ButtonRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const Skeleton = SkeletonRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const MacOSEmptyState = MacOSEmptyStateRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 // PR-19: departmentOptions now loaded dynamically from /admin/departments
 // (was hardcoded — new departments didn't appear in filter dropdown)

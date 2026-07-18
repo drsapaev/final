@@ -2,15 +2,13 @@
 import { useTranslation } from '../../i18n/useTranslation';
 import { useState } from 'react';
 import {
-  Card, CardContent, Typography as TypographyRaw, Alert as AlertRaw, Badge, Button,
+  Card, CardContent, Typography, Alert, Badge, Button,
 } from '../ui/macos';
 import { Brain, Hospital, ChevronDown, ChevronUp, Copy, Check } from 'lucide-react';
 import { notify } from '../../services/notify';
 import AIClinicalText from './AIClinicalText';
 import PropTypes from 'prop-types';
 import React from "react";
-const Alert = AlertRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const Typography = TypographyRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const AISuggestions = ({
   suggestions = [],

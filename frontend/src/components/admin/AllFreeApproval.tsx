@@ -18,7 +18,7 @@ import {
   Bell } from
 'lucide-react';
 import {
-  MacOSCard, Badge as BadgeRaw, Button as ButtonRaw, Select as SelectRaw,
+  MacOSCard, Badge, Button, Select as SelectRaw,
 } from '../ui/macos';
 import { useTheme } from '../../contexts/ThemeContext';
 import { toast } from 'react-toastify';
@@ -27,9 +27,7 @@ import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
-const Badge = BadgeRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const Select = SelectRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const Button = ButtonRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const ALL_FREE_ACTION_CAN_FIELD = {
   approve: 'can_approve',

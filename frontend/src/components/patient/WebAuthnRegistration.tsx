@@ -2,13 +2,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import {
-  Card, CardContent, CardHeader, CardTitle, Badge, Button, Icon, Alert as AlertRaw, Input as InputRaw,
+  Card, CardContent, CardHeader, CardTitle, Badge, Button, Icon, Alert, Input,
 } from '../ui/macos';
 import { useWebAuthn } from '../../hooks/useWebAuthn';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
-const Alert = AlertRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = InputRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 /**
  * WebAuthn Registration UI — P5 frontend integration.

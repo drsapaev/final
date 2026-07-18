@@ -8,9 +8,9 @@ import { useState, useRef, useEffect } from 'react';
 import {
   Card,
   CardContent,
-  Typography as TypographyRaw,
+  Typography,
   Badge,
-  Input as InputRaw } from '../ui/macos';
+  Input } from '../ui/macos';
 import {
   ArrowLeftRight,
 
@@ -24,8 +24,6 @@ import {
 import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
-const Input = InputRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const Typography = TypographyRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const PhotoComparison = ({ beforePhoto, afterPhoto, metadata: metadataRaw = {} }) => {
   const metadata = metadataRaw as Record<string, any>;

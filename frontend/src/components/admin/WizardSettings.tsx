@@ -6,11 +6,11 @@ import {
   Button,
   Checkbox,
   Skeleton,
-  MacOSEmptyState as MacOSEmptyStateRaw,
-  Alert as AlertRaw,
+  MacOSEmptyState,
+  Alert,
   Badge,
   Modal,
-  MacOSStatCard as MacOSStatCardRaw,
+  MacOSStatCard,
 } from '../ui/macos';
 import { Settings, Save, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react';
 import { toast } from 'react-toastify';
@@ -19,9 +19,6 @@ import { fetchWizardSettings, saveWizardSettings } from '../../api/adminSettings
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
-const Alert = AlertRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const MacOSEmptyState = MacOSEmptyStateRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const MacOSStatCard = MacOSStatCardRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const WizardSettings = () => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [settings, setSettings] = useState({

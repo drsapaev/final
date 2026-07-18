@@ -44,6 +44,7 @@ interface AlertProps {
   role?: string;
   variant?: string;
   sx?: Record<string, unknown>;
+  message?: React.ReactNode;
 }
 
 const Alert = ({

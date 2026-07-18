@@ -2,7 +2,7 @@ import type { CSSProperties } from 'react';
 
 import { useState, useEffect } from 'react';
 import {
-  MacOSCard, Button as ButtonRaw, Badge, Input as InputRaw, Select as SelectRaw, Textarea as TextareaRaw,
+  MacOSCard, Button, Badge, Input, Select as SelectRaw, Textarea,
 } from '../ui/macos';
 import {
   Bell,
@@ -27,10 +27,7 @@ import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
-const Textarea = TextareaRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = InputRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const Select = SelectRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const Button = ButtonRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const RegistrarNotificationManager = () => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [activeTab, setActiveTab] = useState('send');

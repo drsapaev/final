@@ -18,16 +18,14 @@ import {
   AlertCircle } from
 'lucide-react';
 import {
-  MacOSCard, Button as ButtonRaw, Skeleton as SkeletonRaw,
-  Input as InputRaw } from '../ui/macos';
+  MacOSCard, Button, Skeleton as SkeletonRaw,
+  Input } from '../ui/macos';
 
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
 import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
-const Input = InputRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const Button = ButtonRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const Skeleton = SkeletonRaw as unknown as React.ComponentType<Record<string, unknown>>;
 /**
  * Селектор услуг для панели врача

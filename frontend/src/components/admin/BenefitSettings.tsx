@@ -16,15 +16,15 @@ import {
 } from 'lucide-react';
 import {
   MacOSCard,
-  Button as ButtonRaw,
-  Input as InputRaw,
+  Button,
+  Input,
   Checkbox,
   Skeleton as SkeletonRaw,
-  MacOSEmptyState as MacOSEmptyStateRaw,
-  Alert as AlertRaw,
-  Badge as BadgeRaw,
+  MacOSEmptyState,
+  Alert,
+  Badge,
   Modal as ModalRaw,
-  MacOSStatCard as MacOSStatCardRaw,
+  MacOSStatCard,
 } from '../ui/macos';
 import { toast } from 'react-toastify';
 import { fetchBenefitSettings, saveBenefitSettings } from '../../api/adminSettings';
@@ -32,14 +32,8 @@ import { fetchBenefitSettings, saveBenefitSettings } from '../../api/adminSettin
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
-const MacOSStatCard = MacOSStatCardRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const Badge = BadgeRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const Modal = ModalRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = InputRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const Button = ButtonRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const Skeleton = SkeletonRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const MacOSEmptyState = MacOSEmptyStateRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const Alert = AlertRaw as unknown as React.ComponentType<Record<string, unknown>>;
 /**
  * Компонент для управления настройками льгот в админке
  */

@@ -13,7 +13,7 @@
 import { useMemo, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { AlertCircle, X } from 'lucide-react';
-import { Button as ButtonRaw, Tooltip,
+import { Button, Tooltip,
   Checkbox } from '../ui/macos';
 import { normalizeCategoryCode } from '../../utils/serviceCodeUtils';
 import { MIXED_REPEAT_WARNING, categories } from './wizardUtils';
@@ -21,7 +21,6 @@ import { MIXED_REPEAT_WARNING, categories } from './wizardUtils';
 import './CartStepV2.css';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
-const Button = ButtonRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const CartStepV2 = ({
   cart,

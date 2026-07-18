@@ -15,16 +15,13 @@ import {
 
   Monitor } from
 'lucide-react';
-import { Card, Button as ButtonRaw, Badge as BadgeRaw,
-  Input as InputRaw } from '../ui/macos';
+import { Card, Button, Badge,
+  Input } from '../ui/macos';
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
 import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
-const Badge = BadgeRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = InputRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const Button = ButtonRaw as unknown as React.ComponentType<Record<string, unknown>>;
 /**
  * Управление контентом для табло
  * Основа: passport.md стр. 2571-3324

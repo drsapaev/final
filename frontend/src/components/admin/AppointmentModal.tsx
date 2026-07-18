@@ -3,23 +3,19 @@ import { useState, useEffect, useMemo } from 'react';
 import { Save, Calendar, Clock, AlertCircle, Phone, Mail } from 'lucide-react';
 import logger from '../../utils/logger';
 import {
-  Button as ButtonRaw,
+  Button,
   Badge,
-  Input as InputRaw,
+  Input,
   Select as SelectRaw,
-  Textarea as TextareaRaw,
+  Textarea,
   Modal as ModalRaw,
-  Alert as AlertRaw,
+  Alert,
 } from '../ui/macos';
 import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
 const Modal = ModalRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const Textarea = TextareaRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = InputRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const Select = SelectRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const Button = ButtonRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const Alert = AlertRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const AppointmentModal = ({
   isOpen,

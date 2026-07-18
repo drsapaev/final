@@ -11,9 +11,8 @@ import auth from '../../stores/auth';
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
 import { getCanonicalRouteById, getRoleHomeRoute } from '../../routing/routeSelectors';
-import { Input as InputRaw } from '../ui/macos';
+import { Input } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
-const Input = InputRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const patientSearchRouteByRole = {
   registrar: getRoleHomeRoute('registrar'),

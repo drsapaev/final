@@ -19,18 +19,16 @@ import {
 import {
   Card as MacOSCard,
   Badge,
-  MacOSEmptyState as MacOSEmptyStateRaw,
+  MacOSEmptyState,
   Button,
   Skeleton as SkeletonRaw,
-  MacOSStatCard as MacOSStatCardRaw,
+  MacOSStatCard,
 } from '../ui/macos';
 import useAdminData from '../../hooks/useAdminData';
 import AdminRouteSwitcher from './AdminRouteSwitcher';
 import ErrorBoundary from '../common/ErrorBoundary';
 import formatCurrency from '../../utils/formatCurrency';
-const MacOSStatCard = MacOSStatCardRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const Skeleton = SkeletonRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const MacOSEmptyState = MacOSEmptyStateRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const adminSurface = 'linear-gradient(180deg, color-mix(in srgb, var(--mac-card-bg), white 72%) 0%, color-mix(in srgb, var(--mac-card-bg), white 64%) 100%)';
 const adminInsetSurface = 'color-mix(in srgb, var(--mac-card-bg), white 82%)';

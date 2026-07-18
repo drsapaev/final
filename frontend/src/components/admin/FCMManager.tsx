@@ -3,12 +3,12 @@ import type { CSSProperties } from 'react';
 import { useState, useEffect, useCallback } from 'react';
 import {
   MacOSCard,
-  Button as ButtonRaw,
-  Badge as BadgeRaw,
+  Button,
+  Badge,
   Skeleton as SkeletonRaw,
-  Input as InputRaw,
+  Input,
   Select as SelectRaw,
-  Textarea as TextareaRaw,
+  Textarea,
   Checkbox,
 } from '../ui/macos';
 import {
@@ -31,11 +31,7 @@ import { toast } from 'react-toastify';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
-const Badge = BadgeRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const Textarea = TextareaRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = InputRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const Select = SelectRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const Button = ButtonRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const Skeleton = SkeletonRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const formatFcmTokenStatus = (user, t) => {
   const fallbackLength = typeof user.fcm_token === 'string' ? user.fcm_token.length : 0;

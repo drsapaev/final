@@ -3,12 +3,12 @@ import type { CSSProperties } from 'react';
 import { useState, useEffect } from 'react';
 import {
   MacOSCard,
-  Button as ButtonRaw,
+  Button,
   Badge,
   Skeleton as SkeletonRaw,
-  Input as InputRaw,
+  Input,
   Select as SelectRaw,
-  Textarea as TextareaRaw,
+  Textarea,
 } from '../ui/macos';
 import {
   Phone,
@@ -29,10 +29,7 @@ import { toast } from 'react-toastify';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
-const Textarea = TextareaRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = InputRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const Select = SelectRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const Button = ButtonRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const Skeleton = SkeletonRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const PhoneVerificationManager = () => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;

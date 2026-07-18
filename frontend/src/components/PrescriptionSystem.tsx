@@ -2,13 +2,11 @@
 import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { Pill, Plus, X, Save, Printer, AlertCircle, CheckCircle } from 'lucide-react';
-import { Card, Button as ButtonRaw, Badge,
-  Input as InputRaw } from './ui/macos';
+import { Card, Button, Badge,
+  Input } from './ui/macos';
 import logger from '../utils/logger';
 import { useTranslation } from '../i18n/useTranslation';
 import React from "react";
-const Input = InputRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const Button = ButtonRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const createEmptyPrescription = () => ({
   medications: [], // Список препаратов
   instructions: '', // Общие инструкции

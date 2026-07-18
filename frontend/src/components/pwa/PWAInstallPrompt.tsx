@@ -14,9 +14,9 @@ import {
 } from 'lucide-react';
 
 import {
-  Alert as AlertRaw,
+  Alert,
   Badge,
-  Button as ButtonRaw,
+  Button,
   Card,
   CardContent,
   CardDescription,
@@ -27,8 +27,6 @@ import { usePWA } from '../../hooks/usePWA';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 import i18n from '../../i18n';
-const Button = ButtonRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const Alert = AlertRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const t18 = i18n.t as unknown as (key: string, options?: Record<string, unknown>) => string;
 
 const styles = {
@@ -110,7 +108,7 @@ const styles = {
 
 const hasNotificationApi = () => typeof window !== 'undefined' && 'Notification' in window;
 
-function CapabilityChipRaw({ children, icon: Icon, variant = 'outline', onClick, ariaLabel }: Record<string, unknown>) {
+function CapabilityChipRaw({ children, icon: Icon, variant = 'outline', onClick, ariaLabel }: { children?: React.ReactNode; icon?: React.ComponentType<any>; variant?: string; onClick?: () => void; ariaLabel?: string }) {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const content = (
     <span style={styles.chipContent}>

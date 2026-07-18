@@ -22,11 +22,11 @@ import {
   MacOSCard,
   Button,
   SegmentedControl as SegmentedControlRaw,
-  MacOSStatCard as MacOSStatCardRaw,
+  MacOSStatCard,
   Skeleton as SkeletonRaw,
-  MacOSEmptyState as MacOSEmptyStateRaw,
-  Alert as AlertRaw,
-  Badge as BadgeRaw,
+  MacOSEmptyState,
+  Alert,
+  Badge,
   Modal,
 } from '../ui/macos';
 import BranchManagement from './BranchManagement';
@@ -39,12 +39,8 @@ import ClinicSettings from './ClinicSettings';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
-const Badge = BadgeRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const SegmentedControl = SegmentedControlRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const MacOSStatCard = MacOSStatCardRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const Skeleton = SkeletonRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const MacOSEmptyState = MacOSEmptyStateRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const Alert = AlertRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const ClinicManagement = () => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [activeTab, setActiveTab] = useState('overview');

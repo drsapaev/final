@@ -5,10 +5,9 @@ import logger from '../../utils/logger';
  * Renders the "Фото" tab: PhotoUploader + SkinAnalysis + PhotoComparison.
  */
 import PropTypes from 'prop-types';
-import { MacOSCard as MacOSCardRaw, MacOSEmptyState as MacOSEmptyStateRaw, Button } from '../ui/macos';
+import { MacOSCard as MacOSCardRaw, MacOSEmptyState, Button } from '../ui/macos';
 import React from 'react';
 const MacOSCard = MacOSCardRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const MacOSEmptyState = MacOSEmptyStateRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import { Camera } from 'lucide-react';
 import PhotoUploader from './PhotoUploader';
 import SkinAnalysis from './SkinAnalysis';

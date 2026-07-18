@@ -1,10 +1,9 @@
 
 import { useState, useEffect } from 'react';
 import {
-  Button, Card, CardContent, Typography as TypographyRaw, Box,
+  Button, Card, CardContent, Typography, Box,
 } from './ui/macos';
 import React from 'react';
-const Typography = TypographyRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import { Download, X, Smartphone, Monitor } from 'lucide-react';
 
 import logger from '../utils/logger';
