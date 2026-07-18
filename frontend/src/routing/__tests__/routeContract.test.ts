@@ -1,10 +1,7 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { describe, expect, it } from 'vitest';
-import { renderRouteDocsMarkdown } from '../routeDocsSnapshot.ts';
-import { resolveSetupRedirect } from '../routeGuards.tsx';
-import { ROUTE_REGISTRY, SIDEBAR_PRESETS } from '../routeRegistry.ts';
+import { renderRouteDocsMarkdown } from '../routeDocsSnapshot';
+import { resolveSetupRedirect } from '../routeGuards';
+import { ROUTE_REGISTRY, SIDEBAR_PRESETS } from '../routeRegistry';
 import {
   getCompatibilityRedirects,
   getAdminNavSections,
@@ -18,7 +15,14 @@ import {
   getRouteChromeState,
   isInternalDemoEnabled,
   isRouteAccessibleToProfile,
-} from '../routeSelectors.ts';
+} from '../routeSelectors';
+
+interface RouteHeadingContractEntry {
+  path: string;
+  pageTitle: string;
+}
+
+type RouteHeadingContract = Record<string, RouteHeadingContractEntry>;
 
 const PRODUCTION_ROLE_HOMES = {
   admin: '/admin',
@@ -100,31 +104,31 @@ const CLINICAL_CONTEXTUAL_ROUTE_IDS = [
   'clinical-pickup',
 ];
 
-function assertAiSidebarDisclaimer(item) {
+function assertAiSidebarDisclaimer(item: { badge?: unknown; tooltip?: unknown; ariaLabel?: unknown }) {
   expect(item.badge).toBe(AI_SIDEBAR_BADGE);
   expect(item.tooltip).toMatch(AI_SIDEBAR_ACCESSIBLE_COPY);
   expect(item.ariaLabel).toMatch(AI_SIDEBAR_ACCESSIBLE_COPY);
 }
 
-function getRouteById(routeId) {
+function getRouteById(routeId: string) {
   return ROUTE_REGISTRY.find((route) => route.id === routeId);
 }
 
-function assertRouteSpecificChromeHeadings(routeHeadingContract) {
+function assertRouteSpecificChromeHeadings(routeHeadingContract: RouteHeadingContract) {
   const adminProfile = { role: 'Admin' };
 
   Object.entries(routeHeadingContract).forEach(([routeId, expected]) => {
-    const route = getRouteById(routeId);
+    const route = getRouteById(routeId) as { id: string; title?: string; layout?: { pageTitle?: string; activeSidebarItem?: string } } | undefined;
     const chrome = getRouteChromeState(expected.path, '', adminProfile);
 
     expect(route).toBeTruthy();
-    expect(route.layout.pageTitle).toBe(expected.pageTitle);
-    expect(route.title).toBeTruthy();
+    expect(route?.layout?.pageTitle).toBe(expected.pageTitle);
+    expect(route?.title).toBeTruthy();
     expect(chrome.pageTitle).toBe(expected.pageTitle);
     expect(chrome.pageTitle).not.toBe('AdminPanel');
     expect(chrome.pageTitle).not.toBe('Admin');
 
-    if (route.layout.activeSidebarItem) {
+    if (route?.layout?.activeSidebarItem) {
       expect(chrome.activeSidebarItem).toBe(route.layout.activeSidebarItem);
     }
   });

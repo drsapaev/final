@@ -1,11 +1,8 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
-import { ThemeProvider, useTheme } from '../ThemeContext.tsx';
-import { getColorSchemeDefinition } from '../../theme/colorScheme.ts';
+import { ThemeProvider, useTheme } from '../ThemeContext';
+import { getColorSchemeDefinition } from '../../theme/colorScheme';
 
 const { apiMock } = vi.hoisted(() => {
   const apiMock = {
@@ -18,11 +15,17 @@ const { apiMock } = vi.hoisted(() => {
   };
 });
 
-vi.mock('../../api/client.ts', () => ({
+vi.mock('../../api/client', () => ({
   default: apiMock,
   api: apiMock,
   apiClient: apiMock,
 }));
+
+// Cast apiMock through unknown to expose vitest mock methods cleanly.
+const apiMockTyped = apiMock as unknown as {
+  get: ReturnType<typeof vi.fn>;
+  put: ReturnType<typeof vi.fn>;
+};
 
 function ThemeHarness() {
   const { theme, colorScheme, setColorScheme } = useTheme();
@@ -51,8 +54,8 @@ function renderWithProvider() {
 describe('ThemeContext', () => {
   beforeEach(() => {
     localStorage.clear();
-    apiMock.get.mockReset();
-    apiMock.put.mockReset();
+    apiMockTyped.get.mockReset();
+    apiMockTyped.put.mockReset();
 
     Object.defineProperty(window, 'matchMedia', {
       writable: true,
@@ -84,8 +87,8 @@ describe('ThemeContext', () => {
   });
 
   it('loads and saves theme preferences for authenticated users', async () => {
-    apiMock.get.mockResolvedValue({ data: { theme: 'gradient' } });
-    apiMock.put.mockResolvedValue({ data: { success: true } });
+    apiMockTyped.get.mockResolvedValue({ data: { theme: 'gradient' } });
+    apiMockTyped.put.mockResolvedValue({ data: { success: true } });
 
     renderWithProvider();
     await act(async () => {
@@ -96,15 +99,15 @@ describe('ThemeContext', () => {
     });
 
     await waitFor(() => {
-      expect(apiMock.get).toHaveBeenCalledWith('/users/me/preferences');
+      expect(apiMockTyped.get).toHaveBeenCalledWith('/users/me/preferences');
       expect(screen.getByTestId('color-scheme')).toHaveTextContent('gradient');
     });
-    expect(apiMock.put).not.toHaveBeenCalled();
+    expect(apiMockTyped.put).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole('button', { name: 'vibrant' }));
 
     await waitFor(() => {
-      expect(apiMock.put).toHaveBeenCalledWith('/users/me/preferences', { theme: 'vibrant' });
+      expect(apiMockTyped.put).toHaveBeenCalledWith('/users/me/preferences', { theme: 'vibrant' });
     }, { timeout: 2000 });
   });
 
@@ -120,8 +123,8 @@ describe('ThemeContext', () => {
       expect(screen.getByTestId('theme')).toHaveTextContent('light');
     });
 
-    expect(apiMock.get).not.toHaveBeenCalledWith('/users/me/preferences');
-    expect(apiMock.put).not.toHaveBeenCalled();
+    expect(apiMockTyped.get).not.toHaveBeenCalledWith('/users/me/preferences');
+    expect(apiMockTyped.put).not.toHaveBeenCalled();
   });
 
   it('keeps vibrant and gradient as visually distinct custom schemes', () => {
@@ -129,9 +132,9 @@ describe('ThemeContext', () => {
     const gradient = getColorSchemeDefinition('gradient');
 
     expect(vibrant.preview.background).not.toBe(gradient.preview.background);
-    expect(vibrant.tokens['--mac-gradient-window']).not.toBe(gradient.tokens['--mac-gradient-window']);
-    expect(vibrant.tokens['--mac-card-bg']).not.toBe(gradient.tokens['--mac-card-bg']);
-    expect(vibrant.tokens['--mac-main-shell-bg']).not.toBe(gradient.tokens['--mac-main-shell-bg']);
-    expect(vibrant.tokens['--mac-scheme-accent']).not.toBe(gradient.tokens['--mac-scheme-accent']);
+    expect(vibrant.tokens?.['--mac-gradient-window']).not.toBe(gradient.tokens?.['--mac-gradient-window']);
+    expect(vibrant.tokens?.['--mac-card-bg']).not.toBe(gradient.tokens?.['--mac-card-bg']);
+    expect(vibrant.tokens?.['--mac-main-shell-bg']).not.toBe(gradient.tokens?.['--mac-main-shell-bg']);
+    expect(vibrant.tokens?.['--mac-scheme-accent']).not.toBe(gradient.tokens?.['--mac-scheme-accent']);
   });
 });
