@@ -1,10 +1,8 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import PropTypes from 'prop-types';
 import { useCallback, useRef } from 'react';
 import {
-  Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Icon,
+  Alert as AlertRaw, Badge, Button, Card, CardContent, CardHeader, CardTitle, Icon,
 } from '../ui/macos';
 import {
   formatLabStatus,
@@ -14,6 +12,8 @@ import {
 import { historySeverityState, matchesHistoryFilter } from './utils/labReportNormalize';
 // STRAT#21: t() для i18n — history panel strings мигрированы.
 import { useTranslation } from '../../i18n/useTranslation';
+import React from "react";
+const Alert = AlertRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 /**
  * P-04 fix: LabReportHistoryPanel выделен из LabReportWorkbench.
@@ -53,7 +53,7 @@ export default function LabReportHistoryPanel({
   activeInstanceId = null,
   onOpenInstance,
 }) {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const sourceItems = showRecentReportsBrowser ? recentReports : reportHistory;
   const filteredItems = sortHistoryItems(
     sourceItems.filter((item) => matchesHistoryFilter(item, historySeverityFilter))
@@ -92,7 +92,7 @@ export default function LabReportHistoryPanel({
     <Card variant="filled" padding="none">
       <CardHeader style={{ background: 'var(--mac-bg-tertiary)', borderBottom: '1px solid var(--mac-border)', padding: 'var(--mac-spacing-4)' }}>
         <CardTitle style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
-          <Icon name="clock.arrow.circlepath" size={20} />
+          <Icon name="clock.arrow.circlepath" size={20 as unknown as "small" | "default" | "large" | "xlarge"} />
           {title}
         </CardTitle>
       </CardHeader>
@@ -164,7 +164,7 @@ export default function LabReportHistoryPanel({
                   <Badge variant={getLabStatusVariant(item.status)}>
                     {formatLabStatus(item.status)}
                   </Badge>
-                  <Badge variant={severity.variant}>
+                  <Badge variant={severity.variant as unknown as "default" | "primary" | "secondary" | "success" | "warning" | "danger" | "info" | "outline"}>
                     {formatSeverityLabel(severity.label)}
                   </Badge>
                   {item.flagged_findings_count > 0 && (

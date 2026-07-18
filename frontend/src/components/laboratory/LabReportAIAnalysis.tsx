@@ -1,15 +1,17 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useEffect, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import {
-  Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle,
-  Icon, Typography,
+  Alert as AlertRaw, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle,
+  Icon, Typography as TypographyRaw,
 } from '../ui/macos';
-import { AIButton, AIAssistant } from '../ai';
+import { AIButton, AIAssistant as AIAssistantRaw } from '../ai';
 // STRAT#22: t() для i18n — AI analysis strings мигрированы.
 import { useTranslation } from '../../i18n/useTranslation';
+import React from "react";
+const Typography = TypographyRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Alert = AlertRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const AIAssistant = AIAssistantRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 /**
  * P-01 fix: AI-анализ лабораторного бланка перенесён из LabResultsManager
@@ -52,7 +54,7 @@ function hasAnyFilledResult(results) {
 }
 
 export default function LabReportAIAnalysis({ activeInstance, notify }) {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [showAIAnalysis, setShowAIAnalysis] = useState(false);
 
   // Извлекаем возраст и пол из patient_snapshot (backend уже вычислил age_years).
@@ -144,7 +146,7 @@ export default function LabReportAIAnalysis({ activeInstance, notify }) {
               >
                 {/* L-M-8 fix: emoji ✕ заменён на lucide-icon X для консистентности
                     с остальными UI-кнопками (cashier/registrar/admin/doctor panels). */}
-                <Icon name="xmark" size={14} />
+                <Icon name="xmark" size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
               </Button>
             </Box>
           </DialogTitle>

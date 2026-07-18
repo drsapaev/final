@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useTranslation } from '../i18n/useTranslation';
 import PropTypes from 'prop-types';
@@ -13,8 +11,8 @@ import {
 '../constants/appointmentStatus';
 
 const AppointmentFlow = ({ appointment }) => {
-  const { t } = useTranslation();
-  const getStepIcon = (step) => {
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const getStepIcon = (step: string, status?: string) => {
     switch (step) {
       case 'payment':
         return <CreditCard className="w-5 h-5" />;
@@ -125,7 +123,7 @@ const AppointmentFlow = ({ appointment }) => {
                       status === 'completed' ? 'success' :
                       status === 'current' ? 'info' : 'secondary'
                       }
-                      size="sm">
+                      size="small">
 
                       {status === 'completed' ? t('misc.af_gotovo') :
                       status === 'current' ? t('misc.af_v_protsesse') : t('misc.af_ozhidanie')}
@@ -150,7 +148,7 @@ const AppointmentFlow = ({ appointment }) => {
               {STATUS_LABELS[appointment?.status] || t('misc.af_neizvestno')}
             </div>
           </div>
-          <Badge variant={STATUS_COLORS[appointment?.status]}>
+          <Badge variant={STATUS_COLORS[appointment?.status] as unknown as "default" | "primary" | "secondary" | "success" | "warning" | "danger" | "info" | "outline"}>
             {STATUS_LABELS[appointment?.status]}
           </Badge>
         </div>

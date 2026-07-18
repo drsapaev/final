@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 /**
  * ExaminationSection - Осмотр с "Мой опыт"
@@ -11,14 +9,20 @@
 import PropTypes from 'prop-types';
 import { useState, useMemo, useCallback } from 'react';
 
-import EMRSection from './EMRSection';
-import EMRSmartFieldV2 from './EMRSmartFieldV2';
+import EMRSectionRaw from './EMRSection';
+import React from 'react';
+import EMRSmartFieldV2Raw from './EMRSmartFieldV2';
 import ExaminationMatrix from './ExaminationMatrix';
 import { useDoctorPhrases } from '../../../hooks/useDoctorPhrases';
-import { DoctorTemplatesPanel, DoctorTemplatesButton } from '../DoctorTemplatesPanel';
+import { DoctorTemplatesPanel as DTPRaw, DoctorTemplatesButton as DTBRaw } from '../DoctorTemplatesPanel';
 import { useDoctorSectionTemplates } from '../../../hooks/useDoctorSectionTemplates';
 import logger from '../../../utils/logger';
 import { useTranslation } from '../../../i18n/useTranslation';
+
+const EMRSection = EMRSectionRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const EMRSmartFieldV2 = EMRSmartFieldV2Raw as unknown as React.ComponentType<Record<string, unknown>>;
+const DoctorTemplatesPanel = DTPRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const DoctorTemplatesButton = DTBRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 /**
  * ExaminationSection Component
@@ -75,7 +79,7 @@ export function ExaminationSection({
 
   // Merge suggestions: Doctor History first, then Generic AI
   const allSuggestions = useMemo(() => {
-    const historyItems = doctorSuggestions.map((s) => ({
+    const historyItems = doctorSuggestions.map((s: Record<string, unknown>) => ({
       id: s.id,
       content: s.text,
       source: 'history', // Badge will show "История"

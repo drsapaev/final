@@ -1,15 +1,16 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useTranslation } from '../../i18n/useTranslation';
 import { useState } from 'react';
 import {
-  Card, CardContent, Typography, Alert, Badge, Button,
+  Card, CardContent, Typography as TypographyRaw, Alert as AlertRaw, Badge, Button,
 } from '../ui/macos';
 import { Brain, Hospital, ChevronDown, ChevronUp, Copy, Check } from 'lucide-react';
-import { notify } from '../../services/notify.js';
+import { notify } from '../../services/notify';
 import AIClinicalText from './AIClinicalText';
 import PropTypes from 'prop-types';
+import React from "react";
+const Alert = AlertRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Typography = TypographyRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const AISuggestions = ({
   suggestions = [],
@@ -21,7 +22,7 @@ const AISuggestions = ({
   clinicalRecommendations = null,
   fallbackProvider = null
 }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   title = title || t('misc.as_ai_podskazki');
   const [expanded, setExpanded] = useState(true);
   const [copiedId, setCopiedId] = useState(null);
