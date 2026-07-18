@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect } from 'react';
 import logger from '../../utils/logger';
@@ -36,7 +33,8 @@ const PatientCard = ({
   onClose,
   isEditMode = false
 }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [formData, setFormData] = useState({
     // Основные данные
     id: '',
@@ -279,7 +277,7 @@ const PatientCard = ({
           type="text"
           aria-label={t('dental.dental_pc_aria_age')}
           value={formData.birthDate ?
-          Math.floor((new Date() - new Date(formData.birthDate)) / (365.25 * 24 * 60 * 60 * 1000)) : ''
+          Math.floor((new Date().getTime() - new Date(formData.birthDate).getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : ''
           }
           disabled
           className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100" />

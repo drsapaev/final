@@ -1,9 +1,7 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useTranslation } from '../../i18n/useTranslation';
 import { api } from '../../api/client';
 import { useEffect, useMemo, useState } from 'react';
+import type { CSSProperties } from 'react';
 import PropTypes from 'prop-types';
 import {
   AlertCircle,
@@ -24,21 +22,29 @@ import { tokenManager } from '../../utils/tokenManager';
 import {
   AppEmpty,
   AppLoading,
-  Badge,
-  Button,
-  Card,
+  Badge as RawBadge,
+  Button as RawButton,
+  Card as RawCard,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-  Input,
-  Table,
-  SegmentedControl,
-  Select,
-  Textarea,
+  Input as RawInput,
+  Table as RawTable,
+  SegmentedControl as RawSegmentedControl,
+  Select as RawSelect,
+  Textarea as RawTextarea,
 } from '../ui/macos';
+const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
+const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
+const Card = RawCard as unknown as React.ComponentType<Record<string, unknown>>;
+const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
+const Table = RawTable as unknown as React.ComponentType<Record<string, unknown>>;
+const SegmentedControl = RawSegmentedControl as unknown as React.ComponentType<Record<string, unknown>>;
+const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
+const Textarea = RawTextarea as unknown as React.ComponentType<Record<string, unknown>>;
 
-const pageStyles = {
+const pageStyles: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   gap: 'var(--mac-spacing-4)',
@@ -47,7 +53,7 @@ const pageStyles = {
   padding: 'clamp(12px, 2vw, 20px)'
 };
 
-const headerStyles = {
+const headerStyles: CSSProperties = {
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'flex-start',
@@ -55,19 +61,19 @@ const headerStyles = {
   flexWrap: 'wrap'
 };
 
-const gridStyles = {
+const gridStyles: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))',
   gap: 'var(--mac-spacing-3)'
 };
 
-const formGridStyles = {
+const formGridStyles: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))',
   gap: 'var(--mac-spacing-3)'
 };
 
-const stackStyles = {
+const stackStyles: CSSProperties = {
   display: 'grid',
   gap: 'var(--mac-spacing-3)'
 };
@@ -96,7 +102,8 @@ const parseRecipients = (value) =>
 
 const EmailSMSManager = () => {
   useTheme();
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(false);
   const [statistics, setStatistics] = useState(null);
@@ -340,7 +347,7 @@ const EmailSMSManager = () => {
     );
   };
 
-  const renderStatCard = ({ title, value, detail, icon: Icon, tone = 'blue' }) => {
+  const renderStatCard = ({ title, value, detail, icon: Icon, tone = 'blue' }: any) => {
     const toneColor = {
       blue: 'var(--mac-accent-blue)',
       green: 'var(--mac-success)',
@@ -467,13 +474,13 @@ const EmailSMSManager = () => {
           <Select
             label={t('misc.esm_label_template')}
             value={emailForm.template}
-            onChange={(value) => setEmailForm({ ...emailForm, template: value })}
+            onChange={(value: unknown) => setEmailForm({ ...emailForm, template: String(value) })}
             options={emailTemplateOptions}
           />
           <Select
             label={t('misc.esm_label_priority')}
             value={emailForm.priority}
-            onChange={(value) => setEmailForm({ ...emailForm, priority: value })}
+            onChange={(value: unknown) => setEmailForm({ ...emailForm, priority: String(value) })}
             options={priorityOptions(t)}
           />
         </div>
@@ -524,7 +531,7 @@ const EmailSMSManager = () => {
           <Select
             label={t('misc.esm_label_template')}
             value={smsForm.template}
-            onChange={(value) => setSmsForm({ ...smsForm, template: value })}
+            onChange={(value: unknown) => setSmsForm({ ...smsForm, template: String(value) })}
             options={smsTemplateOptions}
           />
           <Select
@@ -727,7 +734,7 @@ const EmailSMSManager = () => {
 
       <Card padding="small" shadow="small">
         <CardContent style={{ overflowX: 'auto' }}>
-          <SegmentedControl value={activeTab} onChange={setActiveTab} options={tabs} />
+          <SegmentedControl value={activeTab} onChange={(v: unknown) => setActiveTab(String(v))} options={tabs} />
         </CardContent>
       </Card>
 
@@ -773,7 +780,8 @@ ActionCard.propTypes = {
 };
 
 const TemplateColumn = ({ title, icon: Icon, templates, tone }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const columns = [
     {
       key: 'title',

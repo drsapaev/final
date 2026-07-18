@@ -1,17 +1,22 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useState, useEffect, useCallback } from 'react';
+import type { CSSProperties } from 'react';
 import {
   MacOSCard,
-  Button,
-  Badge,
-  Input,
-  Select,
-  SegmentedControl,
-  Skeleton,
-  MacOSEmptyState,
+  Button as RawButton,
+  Badge as RawBadge,
+  Input as RawInput,
+  Select as RawSelect,
+  SegmentedControl as RawSegmentedControl,
+  Skeleton as RawSkeleton,
+  MacOSEmptyState as RawMacOSEmptyState,
 } from '../ui/macos';
+const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
+const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
+const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
+const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
+const SegmentedControl = RawSegmentedControl as unknown as React.ComponentType<Record<string, unknown>>;
+const Skeleton = RawSkeleton as unknown as React.ComponentType<Record<string, unknown>>;
+const MacOSEmptyState = RawMacOSEmptyState as unknown as React.ComponentType<Record<string, unknown>>;
 import {
   Activity,
   Wifi,
@@ -37,26 +42,27 @@ import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 
 const MedicalEquipmentManager = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [activeTab, setActiveTab] = useState('devices');
   const [devices, setDevices] = useState([]);
   const [measurements, setMeasurements] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [selectedDevice, setSelectedDevice] = useState(null);
-  const [overview, setOverview] = useState(null);
+  const [selectedDevice, setSelectedDevice] = useState(null as any);
+  const [overview, setOverview] = useState(null as any);
 
   // Состояние для измерения
   const [measurementForm, setMeasurementForm] = useState({
     device_id: '',
     patient_id: ''
-  });
+  } as any);
 
   // Состояние для фильтров
   const [filters, setFilters] = useState({
     device_type: '',
     status: '',
     location: ''
-  });
+  } as any);
 
   useEffect(() => {
     loadDevices();
@@ -66,7 +72,7 @@ const MedicalEquipmentManager = () => {
   const loadDevices = async () => {
     setLoading(true);
     try {
-      const response = await api.get('/medical-equipment/devices');
+      const response = await api.get('/medical-equipment/devices') as any;
       setDevices(response.data.devices || []);
     } catch (error) {
       // P0 fix: removed mock-device fallback. Was showing fabricated "Тонометр
@@ -82,7 +88,7 @@ const MedicalEquipmentManager = () => {
 
   const loadOverview = async () => {
     try {
-      const response = await api.get('/medical-equipment/statistics/overview');
+      const response = await api.get('/medical-equipment/statistics/overview') as any;
       setOverview(response.data.overview);
     } catch (error) {
       // P0 fix: removed mock-overview fallback. Was showing fabricated stats
@@ -102,10 +108,10 @@ const MedicalEquipmentManager = () => {
   const loadMeasurements = useCallback(async () => {
     setLoading(true);
     try {
-      const params = {};
+      const params: any = {};
       if (filters.device_type) params.device_type = filters.device_type;
 
-      const response = await api.get('/medical-equipment/measurements', { params });
+      const response = await api.get('/medical-equipment/measurements', { params }) as any;
       setMeasurements(response.data.measurements || []);
     } catch (error) {
       // P0 fix: removed mock-measurements fallback. Was showing fabricated
@@ -125,7 +131,7 @@ const MedicalEquipmentManager = () => {
 
   const connectDevice = async (deviceId) => {
     try {
-      const response = await api.post(`/medical-equipment/devices/${deviceId}/connect`);
+      const response = await api.post(`/medical-equipment/devices/${deviceId}/connect`) as any;
       const data = response.data;
       if (data.success) {
         toast.success(t('admin2.equip_toast_connected'));
@@ -141,7 +147,7 @@ const MedicalEquipmentManager = () => {
 
   const disconnectDevice = async (deviceId) => {
     try {
-      const response = await api.post(`/medical-equipment/devices/${deviceId}/disconnect`);
+      const response = await api.post(`/medical-equipment/devices/${deviceId}/disconnect`) as any;
       const data = response.data;
       if (data.success) {
         toast.success(t('admin2.equip_toast_disconnected'));
@@ -180,7 +186,7 @@ const MedicalEquipmentManager = () => {
 
   const calibrateDevice = async (deviceId) => {
     try {
-      const response = await api.post(`/medical-equipment/devices/${deviceId}/calibrate`);
+      const response = await api.post(`/medical-equipment/devices/${deviceId}/calibrate`) as any;
       const data = response.data;
       if (data.success) {
         toast.success(t('admin2.equip_toast_calibrate_done'));
@@ -196,7 +202,7 @@ const MedicalEquipmentManager = () => {
 
   const runDiagnostics = async (deviceId) => {
     try {
-      const response = await api.post(`/medical-equipment/devices/${deviceId}/diagnostics`);
+      const response = await api.post(`/medical-equipment/devices/${deviceId}/diagnostics`) as any;
       const data = response.data;
       setSelectedDevice({ ...selectedDevice, diagnostics: data });
       toast.success(t('admin2.equip_toast_diagnostics_done'));
@@ -332,7 +338,7 @@ const MedicalEquipmentManager = () => {
             {t('admin2.equip_stat_by_type')}
           </h4>
           {overview?.device_types ?
-        Object.entries(overview.device_types).map(([type, stats]) =>
+        Object.entries(overview.device_types).map(([type, stats]: [string, any]) =>
         <div key={type} className="admin-stat-row-border">
                 <span className="admin-text-sm-primary">
                   {getDeviceTypeName(type)}
@@ -401,7 +407,7 @@ const MedicalEquipmentManager = () => {
             <Select
             id="device-type-filter"
             value={filters.device_type}
-            onChange={(value) => setFilters({ ...filters, device_type: value })}
+            onChange={(value: unknown) => setFilters({ ...filters, device_type: String(value) })}
             options={[
             { value: '', label: t('admin2.equip_filter_all_types') },
             { value: 'blood_pressure', label: t('admin2.equip_type_blood_pressure') },
@@ -419,7 +425,7 @@ const MedicalEquipmentManager = () => {
             <Select
             id="status-filter"
             value={filters.status}
-            onChange={(value) => setFilters({ ...filters, status: value })}
+            onChange={(value: unknown) => setFilters({ ...filters, status: String(value) })}
             options={[
             { value: '', label: t('admin2.equip_filter_all_statuses') },
             { value: 'online', label: t('admin2.equip_status_online') },
@@ -471,7 +477,7 @@ const MedicalEquipmentManager = () => {
               <div className="admin-flex-wrap-8">
                 {device.status === 'offline' ?
               <Button
-                size="sm"
+                size="small"
                 onClick={() => connectDevice(device.id)}
                 className="flex items-center justify-center">
                 
@@ -480,7 +486,7 @@ const MedicalEquipmentManager = () => {
                   </Button> :
 
               <Button
-                size="sm"
+                size="small"
                 variant="outline"
                 onClick={() => disconnectDevice(device.id)}
                 className="flex items-center justify-center">
@@ -491,7 +497,7 @@ const MedicalEquipmentManager = () => {
               }
 
                 <Button
-                size="sm"
+                size="small"
                 variant="outline"
                 onClick={() => calibrateDevice(device.id)}
                 disabled={device.status !== 'online'}>
@@ -501,7 +507,7 @@ const MedicalEquipmentManager = () => {
                 </Button>
 
                 <Button
-                size="sm"
+                size="small"
                 variant="outline"
                 onClick={() => setSelectedDevice(device)}>
                 
@@ -536,7 +542,7 @@ const MedicalEquipmentManager = () => {
               <Select
               id="measurement-device"
               value={measurementForm.device_id}
-              onChange={(value) => setMeasurementForm({ ...measurementForm, device_id: value })}
+              onChange={(value: unknown) => setMeasurementForm({ ...measurementForm, device_id: String(value) })}
               options={[
               { value: '', label: t('admin2.equip_select_device') },
               ...devices.
@@ -627,7 +633,7 @@ const MedicalEquipmentManager = () => {
               <Select
                 id="measurements-device-type"
                 value={filters.device_type}
-                onChange={(value) => setFilters({ ...filters, device_type: value })}
+                onChange={(value: unknown) => setFilters({ ...filters, device_type: String(value) })}
                 options={[
                 { value: '', label: t('admin2.equip_filter_all_types') },
                 { value: 'blood_pressure', label: t('admin2.equip_type_blood_pressure') },
@@ -677,7 +683,7 @@ const MedicalEquipmentManager = () => {
                     <div>
                       <strong>{t('admin2.equip_field_data')}</strong>
                       <div className="text-sm admin-mt-4">
-                        {measurement.measurements && Object.entries(measurement.measurements).map(([key, value]) =>
+                        {measurement.measurements && Object.entries(measurement.measurements).map(([key, value]: [string, any]) =>
                       <div key={key}>
                             {key}: {typeof value === 'number' ? value.toFixed(1) : value}
                           </div>
@@ -723,7 +729,7 @@ const MedicalEquipmentManager = () => {
         <SegmentedControl
           aria-label={t('admin2.equip_tabs_aria')}
           value={activeTab}
-          onChange={setActiveTab}
+          onChange={(v: unknown) => setActiveTab(String(v))}
           options={[
             {
               value: 'overview',
@@ -809,7 +815,7 @@ const MedicalEquipmentManager = () => {
           <div className="mb-6">
                 <h4 className="font-medium mb-2">{t('admin2.equip_diagnostics_results')}</h4>
                 <div className="space-y-2">
-                  {Object.entries(selectedDevice.diagnostics.tests).map(([test, result]) =>
+                  {Object.entries(selectedDevice.diagnostics.tests).map(([test, result]: [string, any]) =>
               <div key={test} className="flex justify-between items-center p-2 bg-gray-50 rounded">
                       <span>{test}</span>
                       <Badge variant={result.passed ? 'success' : 'destructive'}>
