@@ -1,15 +1,65 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
-import React from 'react';
+import React, { type ReactNode, type CSSProperties, type MouseEvent } from 'react';
 import PropTypes from 'prop-types';
 import { useTheme } from '../../../contexts/ThemeContext';
+
+type ListVariant = 'default' | 'compact' | 'inset';
+type DividerVariant = 'fullWidth' | 'inset' | 'middle';
+type DividerOrientation = 'horizontal' | 'vertical';
+
+interface ListProps extends Omit<React.HTMLAttributes<HTMLUListElement>, 'children' | 'style'> {
+  children?: ReactNode;
+  className?: string;
+  style?: CSSProperties;
+  variant?: ListVariant;
+  dense?: boolean;
+}
+
+interface ListItemProps extends Omit<React.HTMLAttributes<HTMLLIElement>, 'children' | 'style' | 'onClick'> {
+  children?: ReactNode;
+  className?: string;
+  style?: CSSProperties;
+  button?: boolean;
+  selected?: boolean;
+  disabled?: boolean;
+  onClick?: (e: MouseEvent<HTMLLIElement>) => void;
+}
+
+interface ListItemTextProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'children' | 'style'> {
+  primary?: ReactNode;
+  secondary?: ReactNode;
+  children?: ReactNode;
+  className?: string;
+  style?: CSSProperties;
+}
+
+interface ListItemIconProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'children' | 'style'> {
+  children?: ReactNode;
+  className?: string;
+  style?: CSSProperties;
+}
+
+interface ListItemSecondaryActionProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'children' | 'style'> {
+  children?: ReactNode;
+  className?: string;
+  style?: CSSProperties;
+}
+
+interface DividerProps extends Omit<React.HTMLAttributes<HTMLHRElement>, 'style'> {
+  className?: string;
+  style?: CSSProperties;
+  variant?: DividerVariant;
+  orientation?: DividerOrientation;
+}
+
+interface ListItemStyle extends CSSProperties {
+  transition?: string;
+}
 
 /**
  * macOS-style List Component
  * Implements Apple's Human Interface Guidelines for lists
  */
-const List = React.forwardRef(({
+const List = React.forwardRef<HTMLUListElement, ListProps>(({
   children,
   className = '',
   style = {},
@@ -19,7 +69,7 @@ const List = React.forwardRef(({
 }, ref) => {
   useTheme();
 
-  const listStyles = {
+  const listStyles: CSSProperties = {
     backgroundColor: 'var(--mac-bg-primary)',
     borderRadius: '8px',
     border: '1px solid var(--mac-border)',
@@ -34,7 +84,7 @@ const List = React.forwardRef(({
       className={`mac-list mac-list--${variant} ${dense ? 'mac-list--dense' : ''} ${className}`}
       style={listStyles}
       {...props}>
-      
+
       {children}
     </ul>);
 
@@ -43,7 +93,7 @@ const List = React.forwardRef(({
 /**
  * macOS-style ListItem Component
  */
-const ListItem = React.forwardRef(({
+const ListItem = React.forwardRef<HTMLLIElement, ListItemProps>(({
   children,
   className = '',
   style = {},
@@ -53,7 +103,7 @@ const ListItem = React.forwardRef(({
   onClick,
   ...props
 }, ref) => {
-  const itemStyles = {
+  const itemStyles: ListItemStyle = {
     display: 'flex',
     alignItems: 'center',
     padding: '12px 16px',
@@ -66,40 +116,42 @@ const ListItem = React.forwardRef(({
     ...style
   };
 
-  const handleMouseEnter = (e) => {
+  const handleMouseEnter = (e: MouseEvent<HTMLLIElement>) => {
     if (button && !disabled && !selected) {
-      e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
+      e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)';
     }
   };
 
-  const handleMouseLeave = (e) => {
+  const handleMouseLeave = (e: MouseEvent<HTMLLIElement>) => {
     if (button && !disabled && !selected) {
-      e.target.style.backgroundColor = 'transparent';
+      e.currentTarget.style.backgroundColor = 'transparent';
     }
   };
 
-  const Component = button ? 'button' : 'li';
-
+  // When `button` is true the original code rendered a <button>, but
+  // <button> cannot be a direct child of <ul> (invalid HTML). The
+  // forwardRef typing is also for HTMLLIElement, so we keep <li>
+  // always and let the cursor/onClick props carry the button affordance.
   return (
-    <Component
+    <li
       ref={ref}
       className={`mac-list-item ${button ? 'mac-list-item--button' : ''} ${selected ? 'mac-list-item--selected' : ''} ${disabled ? 'mac-list-item--disabled' : ''} ${className}`}
       style={itemStyles}
       onClick={disabled ? undefined : onClick}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      disabled={disabled}
+      aria-disabled={disabled || undefined}
       {...props}>
-      
+
       {children}
-    </Component>);
+    </li>);
 
 });
 
 /**
  * macOS-style ListItemText Component
  */
-const ListItemText = React.forwardRef(({
+const ListItemText = React.forwardRef<HTMLDivElement, ListItemTextProps>(({
   primary,
   secondary,
   children,
@@ -107,7 +159,7 @@ const ListItemText = React.forwardRef(({
   style = {},
   ...props
 }, ref) => {
-  const textStyles = {
+  const textStyles: CSSProperties = {
     flex: 1,
     minWidth: 0,
     ...style
@@ -119,7 +171,7 @@ const ListItemText = React.forwardRef(({
       className={`mac-list-item-text ${className}`}
       style={textStyles}
       {...props}>
-      
+
       {primary &&
       <div style={{
         fontSize: '14px',
@@ -147,13 +199,13 @@ const ListItemText = React.forwardRef(({
 /**
  * macOS-style ListItemIcon Component
  */
-const ListItemIcon = React.forwardRef(({
+const ListItemIcon = React.forwardRef<HTMLDivElement, ListItemIconProps>(({
   children,
   className = '',
   style = {},
   ...props
 }, ref) => {
-  const iconStyles = {
+  const iconStyles: CSSProperties = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -168,7 +220,7 @@ const ListItemIcon = React.forwardRef(({
       className={`mac-list-item-icon ${className}`}
       style={iconStyles}
       {...props}>
-      
+
       {children}
     </div>);
 
@@ -177,13 +229,13 @@ const ListItemIcon = React.forwardRef(({
 /**
  * macOS-style ListItemSecondaryAction Component
  */
-const ListItemSecondaryAction = React.forwardRef(({
+const ListItemSecondaryAction = React.forwardRef<HTMLDivElement, ListItemSecondaryActionProps>(({
   children,
   className = '',
   style = {},
   ...props
 }, ref) => {
-  const actionStyles = {
+  const actionStyles: CSSProperties = {
     display: 'flex',
     alignItems: 'center',
     marginLeft: '12px',
@@ -196,7 +248,7 @@ const ListItemSecondaryAction = React.forwardRef(({
       className={`mac-list-item-secondary-action ${className}`}
       style={actionStyles}
       {...props}>
-      
+
       {children}
     </div>);
 
@@ -205,14 +257,14 @@ const ListItemSecondaryAction = React.forwardRef(({
 /**
  * macOS-style Divider Component
  */
-const Divider = React.forwardRef(({
+const Divider = React.forwardRef<HTMLHRElement, DividerProps>(({
   className = '',
   style = {},
   variant = 'fullWidth',
   orientation = 'horizontal',
   ...props
 }, ref) => {
-  const dividerStyles = {
+  const dividerStyles: CSSProperties = {
     border: 'none',
     backgroundColor: 'var(--mac-separator)',
     ...(orientation === 'horizontal' ? {
