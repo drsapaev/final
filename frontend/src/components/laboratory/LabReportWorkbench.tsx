@@ -1,13 +1,17 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { CSSProperties } from 'react';
 import PropTypes from 'prop-types';
 import { toast } from 'react-toastify';  // STRAT#2: retained for backward-compat;
 // новые callers должны использовать useLabToast.interactive* вместо прямого toast.
 import {
-  Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Icon,
-  Input } from '../ui/macos';
+  Alert as RawAlert, Badge as RawBadge, Button as RawButton, Card as RawCard, CardContent, CardHeader, CardTitle, Icon,
+  Input as RawInput } from '../ui/macos';
+const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
+const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
+const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
+const Card = RawCard as unknown as React.ComponentType<Record<string, unknown>>;
+const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
 import { labReportingApi } from '../../api/labReporting';
 import { api } from '../../api/client';
 import { printService } from '../../services/print';
@@ -66,11 +70,13 @@ export default function LabReportWorkbench({
   onQueueChanged = undefined,
   notify
 }) {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // WF-08 fix: confirmation dialog для irreversible actions.
   // Finalize делает бланк immutable (можно только revise). Revise создаёт
   // новый instance. Оба действия необратимы без объяснения последствий.
-  const [confirm, confirmDialog] = useConfirm();
+  const [confirmRaw, confirmDialog] = useConfirm();
+  const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
 
   // STRAT#2: единый канал нотификаций.
   const labToast = useLabToast(notify);
@@ -185,7 +191,7 @@ export default function LabReportWorkbench({
     };
   }, [isDirty, canSaveDraft, saving, draftValues]);
 
-  const handleCreateInstance = useCallback(async (templateIdOverride = null, options = {}) => {
+  const handleCreateInstance = useCallback(async (templateIdOverride = null, options: any = {}) => {
     const templateId = templateIdOverride || selectedTemplateId;
     if (!selectedAppointment?.patient_id || !templateId) {
       notify('error', t('errors.select_patient_template'));
@@ -280,7 +286,7 @@ export default function LabReportWorkbench({
       }, expectedUpdatedAt);
     }
     if (payload.length > 0) {
-      const response = await labReportingApi.bulkSaveValues(activeInstance.id, payload, expectedUpdatedAt);
+      const response = await labReportingApi.bulkSaveValues(activeInstance.id, payload, expectedUpdatedAt) as any;
       latestInstance = response.instance;
     }
     onInstanceChange(latestInstance);
@@ -347,7 +353,7 @@ export default function LabReportWorkbench({
     setBusyAction('finalize');
     try {
       const latest = await persistDraft();
-      const finalized = await labReportingApi.finalize((latest || activeInstance).id);
+      const finalized = await labReportingApi.finalize((latest || activeInstance).id) as any;
       onInstanceChange(finalized);
       await onRefreshHistory(finalized.patient_id);
       await onRefreshRecentReports?.();
@@ -379,7 +385,7 @@ export default function LabReportWorkbench({
     setSaving(true);
     setBusyAction('revise');
     try {
-      const revised = await labReportingApi.revise(activeInstance.id);
+      const revised = await labReportingApi.revise(activeInstance.id) as any;
       onInstanceChange(revised);
       await onRefreshHistory(revised.patient_id);
       await onRefreshRecentReports?.();
@@ -406,10 +412,10 @@ export default function LabReportWorkbench({
     try {
       const printResult = await printService.printLabResults(
         buildLabPrintPayload(activeInstance, selectedAppointment)
-      );
+      ) as any;
 
       if (printResult.success) {
-        const printed = await labReportingApi.markPrinted(activeInstance.id);
+        const printed = await labReportingApi.markPrinted(activeInstance.id) as any;
         onInstanceChange(printed);
         await onRefreshHistory(printed.patient_id);
         await onRefreshRecentReports?.();
@@ -455,7 +461,7 @@ export default function LabReportWorkbench({
       const popup = window.open(url, '_blank', 'noopener,noreferrer');
       // WF-05 fix: не помечаем как PRINTED при неудаче popup.
       if (popup) {
-        const printed = await labReportingApi.markPrinted(activeInstance.id);
+        const printed = await labReportingApi.markPrinted(activeInstance.id) as any;
         onInstanceChange(printed);
         await onRefreshHistory(printed.patient_id);
         await onRefreshRecentReports?.();
@@ -525,7 +531,7 @@ export default function LabReportWorkbench({
       <Card variant="filled" padding="none">
         <CardHeader style={{ background: 'var(--mac-bg-tertiary)', borderBottom: '1px solid var(--mac-border)', padding: 'var(--mac-spacing-4)' }}>
           <CardTitle style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
-            <Icon name="doc.text" size={20} />
+            <Icon name="doc.text" size={20 as never} />
             {t('workbench.title')}
           </CardTitle>
         </CardHeader>
@@ -619,7 +625,7 @@ export default function LabReportWorkbench({
                   onClick={() => handleCreateInstance()}
                   disabled={saving || templateResolutionLoading || (resolutionHasBlockingGap && !escapeHatchActive) || !selectedTemplateId}
                 >
-                  <Icon name="plus.rectangle.on.folder" size={16} />
+                  <Icon name="plus.rectangle.on.folder" size={16 as never} />
                   {busyAction === 'create' ? t('workbench.creating_report') : t('workbench.create_report')}
                 </Button>
               </div>
@@ -860,7 +866,7 @@ export default function LabReportWorkbench({
         onOpenInstance={onOpenInstance}
       />
       {/* WF-08 fix: portal-mounted ConfirmDialog для irreversible actions */}
-      {confirmDialog}
+      {confirmDialog as unknown as React.ReactNode}
     </div>
   );
 }

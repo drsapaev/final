@@ -1,26 +1,29 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useTranslation } from '../i18n/useTranslation';
 import { useEffect, useMemo, useState } from 'react';
+import type { CSSProperties } from 'react';
 import PropTypes from 'prop-types';
-import RoleGate from '../components/RoleGate.jsx';
-import { api } from '../api/client.js';
+import RoleGateRaw from '../components/RoleGate';
+const RoleGate = RoleGateRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import { api } from '../api/client';
 import { useTheme } from '../contexts/ThemeContext';
-import TwoFactorManager from '../components/security/TwoFactorManager';
-import ColorSchemeSelector from '../components/admin/ColorSchemeSelector.jsx';
+import TwoFactorManagerRaw from '../components/security/TwoFactorManager';
+const TwoFactorManager = TwoFactorManagerRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import ColorSchemeSelectorRaw from '../components/admin/ColorSchemeSelector';
+const ColorSchemeSelector = ColorSchemeSelectorRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import { AccentPicker } from '../components/ui/macos';
 
-import PhoneVerification from '../components/auth/PhoneVerification';
+import PhoneVerificationRaw from '../components/auth/PhoneVerification';
+const PhoneVerification = PhoneVerificationRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 import logger from '../utils/logger';
-import NotificationSystemStatus from '../components/settings/NotificationSystemStatus.jsx';
+import NotificationSystemStatusRaw from '../components/settings/NotificationSystemStatus';
+const NotificationSystemStatus = NotificationSystemStatusRaw as unknown as React.ComponentType<Record<string, unknown>>;
 // P-013 fix: shared ConfirmDialog hook replacing native confirm() calls.
 import { useConfirm } from '../components/common/ConfirmDialog';
 import './SettingsAnalytics.css';
 import { Input,
   Checkbox } from '../components/ui/macos';
-import { notify } from '../services/notify.js';
+import { notify } from '../services/notify';
 function TabButton({ active, onClick, children }) {
   // Используем CSS переменные вместо хардкод стилей
   const st = {
@@ -38,7 +41,8 @@ function TabButton({ active, onClick, children }) {
 }
 
 function Row({ k, v, onSave }) {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [val, setVal] = useState(String(v ?? ''));
   useEffect(() => setVal(String(v ?? '')), [v]);
   return (
@@ -59,10 +63,12 @@ function Row({ k, v, onSave }) {
 export default function Settings() {void
   useTheme();
   useState('Settings');
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // P-013 fix: shared ConfirmDialog hook (replaces 1 native confirm() call).
-  const [confirm, confirmDialog] = useConfirm();
-  const [tab, setTab] = useState('license');
+  const [confirmRaw, confirmDialog] = useConfirm();
+  const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
+  const [tab, setTab] = useState('license' as any);
 
   // license tab
   const [status, setStatus] = useState(null);
@@ -78,7 +84,7 @@ export default function Settings() {void
 
   async function loadStatus() {
     try {
-      const st = await api.get('/activation/status');
+      const st = await api.get('/activation/status') as any;
       setStatus(st?.data ?? st ?? null);
     } catch {
       setStatus(null);
@@ -89,7 +95,7 @@ export default function Settings() {void
     setBusyAct(true);
     setErrAct('');
     try {
-      const response = await api.post('/activation/activate', { key });
+      const response = await api.post('/activation/activate', { key }) as any;
       const res = response?.data ?? response;
       if (!res?.ok) {
         setErrAct(res?.reason || t('misc.settings_activation_failed'));
@@ -106,7 +112,7 @@ export default function Settings() {void
   async function loadProviders() {
     setLoadingProviders(true);
     try {
-      const response = await api.get('/admin/providers');
+      const response = await api.get('/admin/providers') as any;
       setProviders(response || []);
     } catch (error) {
       logger.error('Ошибка загрузки провайдеров:', error);
@@ -172,7 +178,7 @@ export default function Settings() {void
     setErrCat('');
     try {
       // Ожидаем форму {items:[{key,value}]} или массив объектов
-      const res = await api.get('/settings', { params: { category } });
+      const res = await api.get('/settings', { params: { category } }) as any;
       const data = res?.data ?? res;
       let arr = [];
       if (Array.isArray(data?.items)) arr = data.items;else
@@ -440,14 +446,15 @@ export default function Settings() {void
         </div>
       </RoleGate>
       {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
-      {confirmDialog}
+      {confirmDialog as unknown as React.ReactNode}
     </div>);
 
 }
 
 // Компонент карточки провайдера
 function ProviderCard({ provider, onEdit, onDelete }) {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   return (
     <div style={{
       border: '1px solid var(--border-color)',
@@ -499,8 +506,9 @@ function ProviderCard({ provider, onEdit, onDelete }) {
 }
 
 // Модальное окно для добавления/редактирования провайдера
-function ProviderModal({ provider, onClose, onSave, title }) {
-  const { t } = useTranslation();
+function ProviderModal({ provider, onClose, onSave, title }: any) {
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [formData, setFormData] = useState({
     name: provider?.name || '',
     code: provider?.code || '',
@@ -509,7 +517,7 @@ function ProviderModal({ provider, onClose, onSave, title }) {
     secret_key: provider?.secret_key || '',
     webhook_url: provider?.webhook_url || '',
     api_url: provider?.api_url || ''
-  });
+  } as any);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -673,7 +681,7 @@ function ProviderModal({ provider, onClose, onSave, title }) {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Checkbox id="is_active" aria-label="Provider active" checked={formData.is_active} onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })} />
+            <Checkbox id="is_active" aria-label="Provider active" checked={formData.is_active} onChange={(e: any) => setFormData({ ...formData, is_active: e?.target?.checked ?? e })} />
             
             <label htmlFor="is_active" className="settings-label-semibold">{t('misc.settings_active')}</label>
           </div>
@@ -763,7 +771,8 @@ const errBox = {
 };
 
 function KVField({ label, defKey, items, onSave }) {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const found = (items || []).find((x) => x.key === defKey);
   const [val, setVal] = useState(found?.value || '');
   useEffect(() => setVal(found?.value || ''), [found?.value]);
@@ -778,7 +787,8 @@ function KVField({ label, defKey, items, onSave }) {
 
 // Отдельный компонент для роли чтобы избежать hooks в map
 function RoleMapItem({ role, items, onSave }) {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const found = (items || []).find((x) => x.key === role);
   const [val, setVal] = useState(found?.value || '');
   useEffect(() => setVal(found?.value || ''), [found?.value]);

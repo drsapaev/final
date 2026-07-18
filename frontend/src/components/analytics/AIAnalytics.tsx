@@ -1,17 +1,22 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useState, useEffect, useCallback } from 'react';
+import type { CSSProperties } from 'react';
 import {
   MacOSCard,
-  Button,
-  Badge,
-  Input,
-  Select,
-  MacOSTab,
-  Table,
-  MacOSEmptyState,
+  Button as RawButton,
+  Badge as RawBadge,
+  Input as RawInput,
+  Select as RawSelect,
+  MacOSTab as RawMacOSTab,
+  Table as RawTable,
+  MacOSEmptyState as RawMacOSEmptyState,
 } from '../ui/macos';
+const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
+const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
+const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
+const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
+const MacOSTab = RawMacOSTab as unknown as React.ComponentType<Record<string, unknown>>;
+const Table = RawTable as unknown as React.ComponentType<Record<string, unknown>>;
+const MacOSEmptyState = RawMacOSEmptyState as unknown as React.ComponentType<Record<string, unknown>>;
 import {
   Brain,
   TrendingUp,
@@ -40,7 +45,8 @@ import logger from '../../utils/logger';
 import './AIAnalytics.css';
 import { useTranslation } from '../../i18n/useTranslation';
 const AIAnalytics = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(false);
   const [dateRange, setDateRange] = useState({
@@ -70,7 +76,7 @@ const AIAnalytics = () => {
       if (filters.userId) params.append('user_id', filters.userId);
       if (filters.aiFunction) params.append('ai_function', filters.aiFunction);
 
-      const response = await api.get(`/analytics/ai/usage-analytics?${params}`);
+      const response = await api.get(`/analytics/ai/usage-analytics?${params}`) as any;
       setUsageAnalytics(response.data);
     } catch (error) {
       logger.error('Ошибка загрузки аналитики AI:', error);
@@ -88,7 +94,7 @@ const AIAnalytics = () => {
         end_date: dateRange.endDate
       });
 
-      const response = await api.get(`/analytics/ai/learning-insights?${params}`);
+      const response = await api.get(`/analytics/ai/learning-insights?${params}`) as any;
       setLearningInsights(response.data);
     } catch (error) {
       logger.error('Ошибка загрузки инсайтов обучения:', error);
@@ -100,7 +106,7 @@ const AIAnalytics = () => {
 
   const loadUsageSummary = useCallback(async () => {
     try {
-      const response = await api.get('/analytics/ai/usage-summary?days=30');
+      const response = await api.get('/analytics/ai/usage-summary?days=30') as any;
       setUsageSummary(response.data);
     } catch (error) {
       logger.error('Ошибка загрузки сводки AI:', error);
@@ -121,7 +127,7 @@ const AIAnalytics = () => {
         group_by: 'day'
       });
 
-      const response = await api.get(`/analytics/ai/cost-analysis?${params}`);
+      const response = await api.get(`/analytics/ai/cost-analysis?${params}`) as any;
       setCostAnalysis(response.data);
     } catch (error) {
       logger.error('Ошибка загрузки анализа затрат:', error);
@@ -136,10 +142,10 @@ const AIAnalytics = () => {
     try {
       const params = new URLSearchParams({
         function: 'diagnose_symptoms',
-        days: 30
+        days: '30'
       });
 
-      const response = await api.get(`/analytics/ai/model-comparison?${params}`);
+      const response = await api.get(`/analytics/ai/model-comparison?${params}`) as any;
       setModelComparison(response.data);
     } catch (error) {
       logger.error('Ошибка загрузки сравнения моделей:', error);
@@ -152,7 +158,7 @@ const AIAnalytics = () => {
   const optimizeModels = async () => {
     setLoading(true);
     try {
-      const response = await api.post('/analytics/ai/optimize-models');
+      const response = await api.post('/analytics/ai/optimize-models') as any;
       toast.success(t('misc.aia_optimization_started'));
       logger.log('Результат оптимизации:', response.data);
     } catch (error) {
@@ -171,7 +177,7 @@ const AIAnalytics = () => {
         start_date: dateRange.startDate,
         end_date: dateRange.endDate,
         anonymize: true
-      });
+      }) as any;
       toast.success(t('misc.aia_dataset_generated', { dataType }));
       logger.log('Информация о датасете:', response.data);
     } catch (error) {
@@ -380,7 +386,7 @@ const AIAnalytics = () => {
                 {t('misc.aia_by_ai_functions')}
               </h3>
               <div className="ai-analytics-grid-gap">
-                {Object.entries(usageAnalytics.function_breakdown).map(([func, stats]) =>
+                {Object.entries(usageAnalytics.function_breakdown).map(([func, stats]: [string, any]) =>
           <div
             key={func}
             className="ai-analytics-function-card">
@@ -604,7 +610,7 @@ const AIAnalytics = () => {
                 {t('misc.aia_cost_by_function')}
               </h4>
               <div className="ai-analytics-grid-gap">
-                {Object.entries(costAnalysis.function_costs).map(([func, data]) =>
+                {Object.entries(costAnalysis.function_costs).map(([func, data]: [string, any]) =>
           <div
             key={func}
             className="ai-analytics-function-card">
@@ -698,7 +704,7 @@ const AIAnalytics = () => {
           { key: 'satisfaction', label: t('misc.aia_col_satisfaction'), width: '15%', align: 'center' },
           { key: 'reliability', label: t('misc.aia_col_reliability'), width: '20%', align: 'center' }]
           }
-          data={Object.entries(modelComparison.models).map(([model, data]) => ({
+          data={Object.entries(modelComparison.models).map(([model, data]: [string, any]) => ({
             model: <span className="ai-analytics-function-name">{model}</span>,
             accuracy: `${data.accuracy}%`,
             speed: data.speed,
@@ -723,7 +729,7 @@ const AIAnalytics = () => {
             </h4>
 
             <div className="ai-analytics-stat-grid ai-analytics-mb-4">
-              {Object.entries(modelComparison.recommendations).map(([category, model]) =>
+              {Object.entries(modelComparison.recommendations).map(([category, model]: [string, any]) =>
           <div
             key={category}
             className="ai-analytics-model-rec-card">
@@ -835,8 +841,8 @@ const AIAnalytics = () => {
         { id: 'models', label: t('misc.aia_tab_models'), icon: Cpu }]
         }
         activeTab={activeTab}
-        onTabChange={setActiveTab}
-        size="md"
+        onTabChange={(v: unknown) => setActiveTab(String(v))}
+        size="default"
         variant="default" />
       
 

@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useTranslation } from '../../i18n/useTranslation';
 /**
  * EMRContainerV2 - Modular EMR container using v2 sections
@@ -37,27 +34,39 @@ import { isCanonicalSpecialty, normalizeSpecialty } from '../../utils/emrSpecial
 
 // Import modular sections
 import {
-    ComplaintsSection,
-    AnamnesisMorbiSection,
-    AnamnesisVitaeSection,
-    ExaminationSection,
-    DiagnosisSection,
-    TreatmentSection,
-    RecommendationsSection,
-    NotesSection,
+    ComplaintsSection as RawComplaintsSection,
+    AnamnesisMorbiSection as RawAnamnesisMorbiSection,
+    AnamnesisVitaeSection as RawAnamnesisVitaeSection,
+    ExaminationSection as RawExaminationSection,
+    DiagnosisSection as RawDiagnosisSection,
+    TreatmentSection as RawTreatmentSection,
+    RecommendationsSection as RawRecommendationsSection,
+    NotesSection as RawNotesSection,
 } from './sections';
+const ComplaintsSection = RawComplaintsSection as unknown as React.ComponentType<Record<string, unknown>>;
+const AnamnesisMorbiSection = RawAnamnesisMorbiSection as unknown as React.ComponentType<Record<string, unknown>>;
+const AnamnesisVitaeSection = RawAnamnesisVitaeSection as unknown as React.ComponentType<Record<string, unknown>>;
+const ExaminationSection = RawExaminationSection as unknown as React.ComponentType<Record<string, unknown>>;
+const DiagnosisSection = RawDiagnosisSection as unknown as React.ComponentType<Record<string, unknown>>;
+const TreatmentSection = RawTreatmentSection as unknown as React.ComponentType<Record<string, unknown>>;
+const RecommendationsSection = RawRecommendationsSection as unknown as React.ComponentType<Record<string, unknown>>;
+const NotesSection = RawNotesSection as unknown as React.ComponentType<Record<string, unknown>>;
 
 // Import specialty sections (lazy loaded)
 import {
-    CardiologySection,
-    DermatologySection,
-    DentistrySection,
+    CardiologySection as RawCardiologySection,
+    DermatologySection as RawDermatologySection,
+    DentistrySection as RawDentistrySection,
 } from './sections/specialty';
+const CardiologySection = RawCardiologySection as unknown as React.ComponentType<Record<string, unknown>>;
+const DermatologySection = RawDermatologySection as unknown as React.ComponentType<Record<string, unknown>>;
+const DentistrySection = RawDentistrySection as unknown as React.ComponentType<Record<string, unknown>>;
 
 // P0 fix: LabResultsSection — shows lab panel results to all doctors.
 // Previously doctors had no way to see LabReportInstance data; cardiologist
 // had a separate manual-entry CardioBloodTest table, derma/dental had nothing.
-import LabResultsSection from './sections/LabResultsSection';
+import LabResultsSectionRaw from './sections/LabResultsSection';
+const LabResultsSection = LabResultsSectionRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 import './EMRContainerV2.css';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
@@ -94,8 +103,10 @@ import {
  */
 export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Component = null }) {
     // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
-    const [confirm, confirmDialog] = useConfirm();
-    const { t } = useTranslation();
+    const [confirmRaw, confirmDialog] = useConfirm();
+  const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
+    const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
     const canonicalSpecialty = normalizeSpecialty(specialty);
     const {
         data,
@@ -120,10 +131,10 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
         redo,
         reloadFromServer,
         forceOverwrite,
-    } = useEMR(visitId, { specialty: canonicalSpecialty });
+    } = useEMR(visitId, { specialty: canonicalSpecialty }) as any;
 
     // Get current user (doctor) for history/AI suggestions
-    const { currentUser } = useAppData();
+    const { currentUser } = useAppData() as any;
     const doctorId = currentUser?.id;
 
     // Autosave setup
@@ -136,7 +147,7 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
         debounceMs: DEBOUNCE.autosave,
         maxWaitMs: 30000,
         enabled: !isSigned && !accessDenied,
-    });
+    } as any);
 
     // Navigation guard
     useBeforeUnload(isDirty);
@@ -151,8 +162,8 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
     const [experimentalGhostMode, setExperimentalGhostMode] = useState(false);
 
     // AI Suggestions state
-    const [aiSuggestions, setAiSuggestions] = useState({});
-    const [aiLoading, setAiLoading] = useState({});
+    const [aiSuggestions, setAiSuggestions] = useState({} as any);
+    const [aiLoading, setAiLoading] = useState({} as any);
 
     // 🔄 Visit Lifecycle Management - критично для безопасности данных
     const visitLifecycle = useVisitLifecycle(visitId, patientId, {
@@ -515,7 +526,7 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
 
                         <Button
                             variant="ghost"
-                            size="sm"
+                            size="small"
                             onClick={() => setShowHelp(true)}
                             title={t('misc.emr_help_title')}
                             aria-label={t('misc.emr_help_title')}
@@ -526,7 +537,7 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                         {/* UX Audit Doctor M-19: «Ghost Mode» → «Расширенный режим», Ghost icon → PanelTopOpen. */}
                         <Button
                             variant={experimentalGhostMode ? 'primary' : 'ghost'}
-                            size="sm"
+                            size="small"
                             onClick={toggleGhostMode}
                             disabled={isSigned || isAmended}
                             title={isSigned ? t('misc.emr_ghost_unavailable_title') : t('misc.emr_ghost_title')}
@@ -537,7 +548,7 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                         </Button>
                         <Button
                             variant="ghost"
-                            size="sm"
+                            size="small"
                             onClick={() => setShowHistory(!showHistory)}
                             title={t('misc.emr_history_title')}
                             aria-label={t('misc.emr_history_title')}
@@ -550,13 +561,13 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
 
                 {/* Toolbar */}
                 <div className="emr-v2-toolbar">
-                    <Button variant="ghost" size="sm" onClick={undo} disabled={!canUndo} title={t('misc.emr_undo_title')} aria-label={t('misc.emr_undo_title')}>
+                    <Button variant="ghost" size="small" onClick={undo} disabled={!canUndo} title={t('misc.emr_undo_title')} aria-label={t('misc.emr_undo_title')}>
                         <Undo2 size={14} aria-hidden="true" /> {t('misc.emr_undo')}
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={redo} disabled={!canRedo} title={t('misc.emr_redo_title')} aria-label={t('misc.emr_redo_title')}>
+                    <Button variant="ghost" size="small" onClick={redo} disabled={!canRedo} title={t('misc.emr_redo_title')} aria-label={t('misc.emr_redo_title')}>
                         <Redo2 size={14} aria-hidden="true" /> {t('misc.emr_redo')}
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={loadEMR} title={t('misc.emr_refresh_title')} aria-label={t('misc.emr_refresh_aria')}>
+                    <Button variant="ghost" size="small" onClick={loadEMR} title={t('misc.emr_refresh_title')} aria-label={t('misc.emr_refresh_aria')}>
                         <RefreshCw size={14} aria-hidden="true" /> {t('misc.emr_refresh')}
                     </Button>
                 </div>
@@ -906,7 +917,7 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                 onClose={() => setShowHelp(false)}
             />
             {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
-            {confirmDialog}
+            {confirmDialog as unknown as React.ReactNode}
         </div>
     );
 }

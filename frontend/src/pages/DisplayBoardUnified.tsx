@@ -1,7 +1,5 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useState, useEffect, useRef, useMemo } from 'react';
+import type { CSSProperties } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   Volume2,
@@ -68,7 +66,8 @@ export default function DisplayBoardUnified({
   boardId = 'main_board'
 }) {void
   useTheme();
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
 
   // Параметры из URL или пропсов
   // PR #1910 bugfix: department destructured as departmentProp, но использовался
@@ -290,7 +289,7 @@ export default function DisplayBoardUnified({
 
     try {
       // Создаем звуковой сигнал с помощью Web Audio API
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
       const oscillator = audioContext.createOscillator();
       const gainNode = audioContext.createGain();
 
@@ -537,14 +536,14 @@ export default function DisplayBoardUnified({
     boardSettings.kioskMode ? 'displayboard-root--kiosk' : ''
   ].filter(Boolean).join(' ');
 
-  const rootCssVars = {
+  const rootCssVars: CSSProperties = {
     '--board-bg': board.bg_color || currentTheme.background,
     '--board-text-primary': board.text_color || currentTheme.textPrimary,
     '--board-text-secondary': currentTheme.textSecondary,
     '--board-card-bg': currentTheme.cardBg,
     '--board-border': currentTheme.border,
     '--board-font-scale': String(boardSettings.fontScale)
-  };
+  } as CSSProperties;
 
   return (
     <div className={rootClassName} style={rootCssVars}>

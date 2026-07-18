@@ -1,9 +1,7 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useTranslation } from '../../i18n/useTranslation';
 import { api } from '../../api/client';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { CSSProperties } from 'react';
 import {
   Archive,
   BarChart3,
@@ -51,7 +49,7 @@ import {
   Select,
 } from '../ui/macos';
 
-const pageStyles = {
+const pageStyles: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   gap: 'var(--mac-spacing-4)',
@@ -60,7 +58,7 @@ const pageStyles = {
   padding: 'clamp(12px, 2vw, 20px)'
 };
 
-const headerStyles = {
+const headerStyles: CSSProperties = {
   display: 'flex',
   alignItems: 'flex-start',
   justifyContent: 'space-between',
@@ -68,7 +66,7 @@ const headerStyles = {
   flexWrap: 'wrap'
 };
 
-const toolbarStyles = {
+const toolbarStyles: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
@@ -89,7 +87,7 @@ const fileGridStyles = {
   gap: 'var(--mac-spacing-3)'
 };
 
-const iconButtonStyle = {
+const iconButtonStyle: CSSProperties = {
   width: '32px',
   height: '32px',
   padding: 0
@@ -135,9 +133,11 @@ const fileTypeColors = {
 
 const FileManager = () => {
   useTheme();
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // P-013 fix: shared ConfirmDialog hook (replaces 1 native confirm() call).
-  const [confirm, confirmDialog] = useConfirm();
+  const [confirmRaw, confirmDialog] = useConfirm();
+  const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
   const [loading, setLoading] = useState(false);
   const [files, setFiles] = useState([]);
   const [, setFolders] = useState([]);
@@ -155,7 +155,7 @@ const FileManager = () => {
   const [currentFolder] = useState(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showStatsModal, setShowStatsModal] = useState(false);
-  const [stats, setStats] = useState(null);
+  const [stats, setStats] = useState(null as any);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploading, setUploading] = useState(false);
 
@@ -275,7 +275,7 @@ const FileManager = () => {
   };
 
   const handleFileUpload = async (event) => {
-    const uploadFiles = Array.from(event.target.files || []);
+    const uploadFiles = Array.from(event.target.files || []) as File[];
     if (uploadFiles.length === 0) return;
 
     setUploading(true);
@@ -672,7 +672,7 @@ const FileManager = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
           <SegmentedControl
             value={viewMode}
-            onChange={setViewMode}
+            onChange={(v: unknown) => setViewMode(String(v))}
             options={[
               { value: 'grid', label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}><Grid size={14} />{t('misc.fm_view_grid')}</span> },
               { value: 'list', label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}><ListIcon size={14} />{t('misc.fm_view_list')}</span> }
@@ -834,7 +834,7 @@ const FileManager = () => {
                   {Object.entries(stats.files_by_type || {}).length === 0 ? (
                     <span style={{ color: 'var(--mac-text-secondary)' }}>{t('misc.no_data')}</span>
                   ) : (
-                    Object.entries(stats.files_by_type || {}).map(([type, count]) => (
+                    Object.entries(stats.files_by_type || {}).map(([type, count]: [string, any]) => (
                       <div key={type} style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--mac-spacing-3)' }}>
                         <span style={{ color: 'var(--mac-text-secondary)' }}>{fileTypeLabels(t)[type] || type}</span>
                         <strong>{count}</strong>
@@ -875,7 +875,7 @@ const FileManager = () => {
         </DialogActions>
       </Dialog>
       {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
-      {confirmDialog}
+      {confirmDialog as unknown as React.ReactNode}
     </div>
   );
 };
