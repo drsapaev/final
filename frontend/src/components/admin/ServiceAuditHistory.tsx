@@ -1,5 +1,4 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
+import type { CSSProperties } from 'react';
 
 import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect } from 'react';
@@ -30,7 +29,7 @@ import {
 } from '../ui/macos';
 
 const ServiceAuditHistory = ({ serviceId, serviceName }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [loading, setLoading] = useState(true);
   const [history, setHistory] = useState([]);
   const [errorMessage, setErrorMessage] = useState('');
@@ -54,7 +53,7 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
       setLoading(true);
       setErrorMessage('');
       const response = await servicesService.getServiceHistory(serviceId, { limit: 100 });
-      setHistory(response);
+      setHistory(response as unknown[]);
     } catch (error) {
       setErrorMessage(
         error?.response?.data?.detail ||
@@ -193,11 +192,11 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
           action={
             <Button
               variant="outline"
-              size="sm"
+              size="small"
               aria-label={t('admin2.sah_retry_aria', { label: refreshHistoryLabel })}
               onClick={loadHistory}
             >
-              <RefreshCw size={14} className="admin-mr-6" />
+              <RefreshCw size={14 as unknown as "small" | "default" | "large" | "xlarge"} className="admin-mr-6" />
               {t('admin2.sah_retry')}
             </Button>
           }
@@ -232,7 +231,7 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
     >
       <div className="admin-p-20px-24px-bd-b-1px-solid-var-mac-bo-d-flex-ai-center-jc-between">
         <div className="admin-flex-center-12">
-          <History size={20} className="admin-accent" />
+          <History size={20 as unknown as "small" | "default" | "large" | "xlarge"} className="admin-accent" />
           <div>
             <h3 id={historyTitleId} className="admin-fs-16-fw-600-primary-m-0">
               {t('admin2.sah_title')}
@@ -246,11 +245,11 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
         </div>
         <Button
           variant="outline"
-          size="sm"
+          size="small"
           aria-label={refreshHistoryLabel}
           onClick={loadHistory}
         >
-          <RefreshCw size={14} className="admin-mr-6" />
+          <RefreshCw size={14 as unknown as "small" | "default" | "large" | "xlarge"} className="admin-mr-6" />
           {t('admin2.sah_refresh_btn')}
         </Button>
       </div>
@@ -274,13 +273,13 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
             <div
               key={item.id}
               role="listitem"
-              className="admin-p-16px-24px-tr-background-color-0-2-bd-b-dyn" style={{ '--admin-bd-b0': index < history.length - 1 ? '1px solid var(--mac-border)' : 'none' }}
+              className="admin-p-16px-24px-tr-background-color-0-2-bd-b-dyn" style={{ '--admin-bd-b0': index < history.length - 1 ? '1px solid var(--mac-border)' : 'none' } as CSSProperties}
             >
               <div className="admin-d-flex-ai-start-gap-12">
                 <div
-                  className="admin-w-32-h-32-radius-8-d-flex-ai-center-jc-center-fsk-0-bgc-dyn" style={{ '--admin-bgc0': `${getActionColor(item.action)}15` }}
+                  className="admin-w-32-h-32-radius-8-d-flex-ai-center-jc-center-fsk-0-bgc-dyn" style={{ '--admin-bgc0': `${getActionColor(item.action)}15` } as CSSProperties}
                 >
-                  <ActionIcon size={16} className="admin-col-dyn" style={{ '--admin-col0': getActionColor(item.action) }} />
+                  <ActionIcon size={16 as unknown as "small" | "default" | "large" | "xlarge"} className="admin-col-dyn" style={{ '--admin-col0': getActionColor(item.action) } as CSSProperties} />
                 </div>
 
                 <div className="admin-flex-1-minw-0">
@@ -288,24 +287,24 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
                     <span className="admin-fs-14-fw-600-primary-1">
                       {getActionLabel(item.action)}
                     </span>
-                    <Badge variant="outline" size="sm">
+                    <Badge variant="outline" size="small">
                       {item.action}
                     </Badge>
                   </div>
 
-                  <div className="admin-d-flex-ai-center-gap-12-fs-13-secondary-mb-dyn" style={{ '--admin-mb0': hasChanges ? '8px' : '0' }}>
+                  <div className="admin-d-flex-ai-center-gap-12-fs-13-secondary-mb-dyn" style={{ '--admin-mb0': hasChanges ? '8px' : '0' } as CSSProperties}>
                     <div className="admin-flex-center admin-gap-4">
-                      <User size={12} />
+                      <User size={12 as unknown as "small" | "default" | "large" | "xlarge"} />
                       <span>{item.user_name || t('admin2.sah_system')}</span>
                     </div>
                     <div className="admin-flex-center admin-gap-4">
-                      <Clock size={12} />
+                      <Clock size={12 as unknown as "small" | "default" | "large" | "xlarge"} />
                       <span>{formatDate(item.created_at)}</span>
                     </div>
                   </div>
 
                   {item.comment && (
-                    <div className="admin-fs-13-secondary-fst-italic-mb-dyn" style={{ '--admin-mb0': hasChanges ? '8px' : '0' }}>
+                    <div className="admin-fs-13-secondary-fst-italic-mb-dyn" style={{ '--admin-mb0': hasChanges ? '8px' : '0' } as CSSProperties}>
                       {item.comment}
                     </div>
                   )}
@@ -320,7 +319,7 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
                         aria-label={changesToggleLabel}
                         className="admin-bg-none-bd-none-p-4px-0-cur-pointer-d-flex-ai-center-gap-4-fs-13-accent-fw-500"
                       >
-                        {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                        {isExpanded ? <ChevronUp size={14 as unknown as "small" | "default" | "large" | "xlarge"} /> : <ChevronDown size={14 as unknown as "small" | "default" | "large" | "xlarge"} />}
                         {isExpanded ? t('admin2.sah_hide_changes') : t('admin2.sah_show_changes', { count: changesCount })}
                       </button>
 
@@ -340,10 +339,10 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
                                 {formatFieldName(field)}
                               </div>
                               <div className="admin-error-td-line-through">
-                                {formatValue(change.old)}
+                                {formatValue((change as Record<string, unknown>).old)}
                               </div>
                               <div className="admin-success-fw-500">
-                                {formatValue(change.new)}
+                                {formatValue((change as Record<string, unknown>).new)}
                               </div>
                             </div>
                           ))}

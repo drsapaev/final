@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 /**
  * ForceMajeureModal - Modal for mass queue operations
@@ -38,7 +36,7 @@ const ForceMajeureModal = ({
   specialistName,
   onSuccess
 }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [activeTab, setActiveTab] = useState('transfer'); // 'transfer' | 'cancel'
   const [reason, setReason] = useState('');
   const [refundType, setRefundType] = useState('deposit'); // 'deposit' | 'bank_transfer'
@@ -153,7 +151,7 @@ const ForceMajeureModal = ({
   const isConfirmValid = confirmText === 'ПОДТВЕРЖДАЮ';
   const isReasonValid = reason.trim().length >= 5;
   const primaryActionLabel = loading ? t('misc.fm_processing') : activeTab === 'transfer' ? t('misc.fm_transfer_button') : t('misc.fm_cancel_button');
-  const primaryActionIcon = loading ? <Loader2 size={18} className="animate-spin" /> : activeTab === 'transfer' ? <ArrowRight size={18} /> : <XCircle size={18} />;
+  const primaryActionIcon = loading ? <Loader2 size={18 as unknown as "small" | "default" | "large" | "xlarge"} className="animate-spin" /> : activeTab === 'transfer' ? <ArrowRight size={18 as unknown as "small" | "default" | "large" | "xlarge"} /> : <XCircle size={18 as unknown as "small" | "default" | "large" | "xlarge"} />;
   const dialogSurfaceStyle = {
     backgroundColor: 'var(--mac-bg-primary)'
   };
@@ -162,7 +160,7 @@ const ForceMajeureModal = ({
     <div className="fmm-header">
       <div className="fmm-header-info">
         <div className="fmm-header-icon">
-          <AlertTriangle size={20} />
+          <AlertTriangle size={20 as unknown as "small" | "default" | "large" | "xlarge"} />
         </div>
         <div className="fmm-header-text">
           <h2 className="fmm-header-title">
@@ -177,7 +175,7 @@ const ForceMajeureModal = ({
         onClick={onClose}
         className="fmm-close-btn"
         aria-label={t('misc.fm_aria_close')}>
-        <XCircle size={18} />
+        <XCircle size={18 as unknown as "small" | "default" | "large" | "xlarge"} />
       </button>
     </div>
   );
@@ -217,21 +215,21 @@ const ForceMajeureModal = ({
             type="button"
             onClick={() => setActiveTab('transfer')}
             className={`fmm-tab-btn fmm-tab-btn--transfer ${activeTab === 'transfer' ? 'fmm-tab-btn--active' : ''}`}>
-            <Calendar size={18} />
+            <Calendar size={18 as unknown as "small" | "default" | "large" | "xlarge"} />
             {t('misc.fm_tab_transfer')}
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('cancel')}
             className={`fmm-tab-btn fmm-tab-btn--cancel ${activeTab === 'cancel' ? 'fmm-tab-btn--active' : ''}`}>
-            <DollarSign size={18} />
+            <DollarSign size={18 as unknown as "small" | "default" | "large" | "xlarge"} />
             {t('misc.fm_tab_cancel')}
           </button>
         </div>
 
         {dryRunResult &&
         <div className="fmm-dry-run-card">
-          <Users size={32} className="fmm-dry-run-icon" />
+          <Users size={32 as unknown as "small" | "default" | "large" | "xlarge"} className="fmm-dry-run-icon" />
           <div className="fmm-dry-run-info">
             <p className="fmm-dry-run-count">
               {t('misc.fm_entries_count', { count: dryRunResult.count })}
@@ -246,7 +244,7 @@ const ForceMajeureModal = ({
             onClick={loadPendingEntries}
             className="fmm-refresh-btn"
             aria-label={t('misc.fm_aria_refresh')}>
-            <RefreshCw size={18} />
+            <RefreshCw size={18 as unknown as "small" | "default" | "large" | "xlarge"} />
           </button>
         </div>
         }
@@ -288,7 +286,7 @@ const ForceMajeureModal = ({
               </div>
               <div>
                 <div className="fmm-refund-label">{t('misc.fm_refund_deposit')}</div>
-                <div className="fmm-refund-label" style="font-size: var(--mac-font-size-xs); color: var(--mac-text-secondary);">{t('misc.fm_refund_deposit_desc')}</div>
+                <div className="fmm-refund-label" style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary)' }}>{t('misc.fm_refund_deposit_desc')}</div>
               </div>
             </label>
             <label className={`fmm-refund-option ${refundType === 'bank_transfer' ? 'fmm-refund-option--selected' : ''}`}>
@@ -305,18 +303,18 @@ const ForceMajeureModal = ({
               </div>
               <div>
                 <div className="fmm-refund-label">{t('misc.fm_refund_card')}</div>
-                <div className="fmm-refund-label" style="font-size: var(--mac-font-size-xs); color: var(--mac-text-secondary);">{t('misc.fm_refund_card_desc')}</div>
+                <div className="fmm-refund-label" style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary)' }}>{t('misc.fm_refund_card_desc')}</div>
               </div>
             </label>
           </div>
         </div>
         }
 
-        <div className="fmm-error-box" style="border-radius: 14px;">
+        <div className="fmm-error-box" style={{ borderRadius: "14px" }}>
           <p className="fmm-warning-text">
             {t('misc.fm_warning_irreversible')}
           </p>
-          <label className="fmm-field-label" style="font-size: var(--mac-font-size-sm); color: var(--mac-error);">
+          <label className="fmm-field-label" style={{ fontSize: "var(--mac-font-size-sm)", color: "var(--mac-error)" }}>
             {t('misc.fm_confirm_prefix')}<strong>ПОДТВЕРЖДАЮ</strong>{t('misc.fm_confirm_suffix')}
           </label>
           <Input

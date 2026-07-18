@@ -1,12 +1,12 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
+import React, { type CSSProperties } from 'react';
 
 // Компонент для ролевых ограничений доступа
 import PropTypes from 'prop-types';
 import { useTheme } from '../../contexts/ThemeContext';
-import { getProfileRoles, hasRouteAccess as hasRouteAccessByRole, normalizeRole } from '../../routing/routeSelectors.js';
+import { getProfileRoles, hasRouteAccess as hasRouteAccessByRole, normalizeRole } from '../../routing/routeSelectors';
 import { useTranslation } from '../../i18n/useTranslation';
 import i18n from '../../i18n';
+const t18 = i18n.t as unknown as (key: string, options?: Record<string, unknown>) => string;
 
 /**
  * Компонент для проверки ролевого доступа
@@ -19,7 +19,7 @@ export function RoleGuard({
   profile = null,
   route = null
 }) {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const theme = useTheme();
   theme;
 
@@ -28,12 +28,12 @@ export function RoleGuard({
   JSON.parse(sessionStorage.getItem('auth_profile') || 'null') : null);
 
   if (!userProfile) {
-    return fallback || <AccessDenied message={i18n.t('misc.rg_neobhodima_avtorizatsiya')} theme={theme} />;
+    return fallback || <AccessDenied message={t18('misc.rg_neobhodima_avtorizatsiya')} theme={theme} />;
   }
 
   // Проверяем доступ по маршруту
   if (route && !hasRouteAccessByRole(userProfile, route)) {
-    return fallback || <AccessDenied message={i18n.t('misc.rg_nedostatochno_prav_dlya_dost')} theme={theme} />;
+    return fallback || <AccessDenied message={t18('misc.rg_nedostatochno_prav_dlya_dost')} theme={theme} />;
   }
 
   // Проверяем роли
@@ -44,7 +44,7 @@ export function RoleGuard({
     );
 
     if (!hasRole) {
-      return fallback || <AccessDenied message={i18n.t('misc.rg_nedostatochno_prav_dlya_vypo')} theme={theme} />;
+      return fallback || <AccessDenied message={t18('misc.rg_nedostatochno_prav_dlya_vypo')} theme={theme} />;
     }
   }
 
@@ -56,7 +56,7 @@ export function RoleGuard({
     );
 
     if (!hasPermission) {
-      return fallback || <AccessDenied message={i18n.t('misc.rg_nedostatochno_razresheniy_dl')} theme={theme} />;
+      return fallback || <AccessDenied message={t18('misc.rg_nedostatochno_razresheniy_dl')} theme={theme} />;
     }
   }
 
@@ -198,10 +198,10 @@ function AccessDenied({ message, theme }) {
   };
 
   return (
-    <div style={containerStyle}>
-      <div style={iconStyle}>🚫</div>
-      <div style={titleStyle}>{i18n.t('misc.rg_dostup_zapreschen')}</div>
-      <div style={messageStyle}>{message}</div>
+    <div style={containerStyle as CSSProperties}>
+      <div style={iconStyle as CSSProperties}>🚫</div>
+      <div style={titleStyle as CSSProperties}>{t18('misc.rg_dostup_zapreschen')}</div>
+      <div style={messageStyle as CSSProperties}>{message}</div>
     </div>);
 
 }
@@ -280,19 +280,19 @@ export function UserInfo({ profile = null, showRoles = true, showPermissions = f
   const permissions = getUserPermissions(userProfile);
 
   return (
-    <div style={containerStyle}>
-      <div style={titleStyle}>{i18n.t('misc.rg_informatsiya_o_polzovatele')}</div>
-      <div style={infoStyle}>Имя: {userProfile.username || i18n.t('misc.rg_ne_ukazano')}</div>
-      <div style={infoStyle}>Email: {userProfile.email || i18n.t('misc.rg_ne_ukazano')}</div>
+    <div style={containerStyle as CSSProperties}>
+      <div style={titleStyle as CSSProperties}>{t18('misc.rg_informatsiya_o_polzovatele')}</div>
+      <div style={infoStyle as CSSProperties}>Имя: {userProfile.username || t18('misc.rg_ne_ukazano')}</div>
+      <div style={infoStyle as CSSProperties}>Email: {userProfile.email || t18('misc.rg_ne_ukazano')}</div>
 
       {showRoles &&
-      <div style={infoStyle}>
+      <div style={infoStyle as CSSProperties}>
           Роли: {roles.join(', ')}
         </div>
       }
 
       {showPermissions &&
-      <div style={infoStyle}>
+      <div style={infoStyle as CSSProperties}>
           Разрешения: {permissions.join(', ')}
         </div>
       }

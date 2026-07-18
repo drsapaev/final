@@ -1,10 +1,8 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect } from 'react';
 import { User, Mail, Lock, Shield, Save, AlertCircle } from 'lucide-react';
-import { Modal } from '../ui/macos';
+import { Modal as ModalRaw } from '../ui/macos';
 import { Button } from '../ui/macos';
 import { Checkbox } from '../ui/macos';
 import {
@@ -14,6 +12,8 @@ import { useRoles } from '../../hooks/useRoles';
 
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
+import React from "react";
+const Modal = ModalRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 /**
  * UserModal - macOS-styled modal for creating/editing users
@@ -26,8 +26,8 @@ const UserModal = ({
   onSave,
   loading = false
 }) => {
-  const { t } = useTranslation();
-  const [formData, setFormData] = useState({
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const [formData, setFormData] = useState<Record<string, any>>({
     username: '',
     email: '',
     full_name: '',
@@ -36,7 +36,7 @@ const UserModal = ({
     password: '',
     confirmPassword: ''
   });
-  const [errors, setErrors] = useState({});
+  const [errors, setErrors] = useState<Record<string, any>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Load roles from API (Phase 4: DB-driven roles - completed)
@@ -85,7 +85,7 @@ const UserModal = ({
   }, [isOpen, user]);
 
   const validateForm = () => {
-    const newErrors = {};
+    const newErrors: Record<string, string> = {};
 
     if (!formData.username.trim()) {
       newErrors.username = t('admin2.umdl_err_username_required');
@@ -122,7 +122,7 @@ const UserModal = ({
 
     setIsSubmitting(true);
     try {
-      const userData = {
+      const userData: Record<string, any> = {
         username: formData.username.trim(),
         email: formData.email.trim(),
         full_name: formData.full_name.trim(),
@@ -181,7 +181,9 @@ const UserModal = ({
   );
 
 
-  FormField.propTypes = {
+  const FormFieldAny = FormField as unknown as React.ComponentType<Record<string, unknown>>;
+
+FormField.propTypes = {
     ...(FormField.propTypes || {}),
     children: PropTypes.any,
     error: PropTypes.any,
@@ -195,12 +197,12 @@ const UserModal = ({
       isOpen={isOpen}
       onClose={onClose}
       title={user ? t('admin2.umdl_title_edit') : t('admin2.umdl_title_add')}
-      size="md"
+      size="default"
       closable
     >
       <form onSubmit={handleSubmit}>
         {/* Username */}
-        <FormField
+        <FormFieldAny
           label={t('admin2.umdl_field_username')}
           required
           icon={User}
@@ -214,20 +216,20 @@ const UserModal = ({
             error={!!errors.username}
             className="admin-input-pl-40"
           />
-        </FormField>
+        </FormFieldAny>
 
         {/* Full Name */}
-        <FormField label={t('admin2.umdl_field_full_name')}>
+        <FormFieldAny label={t('admin2.umdl_field_full_name')}>
           <Input
             type="text"
             value={formData.full_name}
             onChange={(e) => handleChange('full_name', e.target.value)}
             placeholder={t('admin2.umdl_ph_full_name')}
           />
-        </FormField>
+        </FormFieldAny>
 
         {/* Email */}
-        <FormField
+        <FormFieldAny
           label="Email"
           required
           icon={Mail}
@@ -241,10 +243,10 @@ const UserModal = ({
             error={!!errors.email}
             className="admin-input-pl-40"
           />
-        </FormField>
+        </FormFieldAny>
 
         {/* Role */}
-        <FormField label={t('admin2.umdl_field_role')} icon={Shield}>
+        <FormFieldAny label={t('admin2.umdl_field_role')} icon={Shield}>
           <Select
             value={formData.role}
             onChange={(value) => handleChange('role', value)}
@@ -252,7 +254,7 @@ const UserModal = ({
             size="large"
             className="admin-input-pl-40"
           />
-        </FormField>
+        </FormFieldAny>
 
         {/* Status */}
         <div className="admin-mb-16">
@@ -267,7 +269,7 @@ const UserModal = ({
         </div>
 
         {/* Password */}
-        <FormField
+        <FormFieldAny
           label={user ? t('admin2.umdl_field_password_new') : t('admin2.umdl_field_password')}
           required={!user}
           icon={Lock}
@@ -281,11 +283,11 @@ const UserModal = ({
             error={!!errors.password}
             className="admin-input-pl-40"
           />
-        </FormField>
+        </FormFieldAny>
 
         {/* Confirm Password */}
         {formData.password && (
-          <FormField
+          <FormFieldAny
             label={t('admin2.umdl_field_password_confirm')}
             required
             icon={Lock}
@@ -299,7 +301,7 @@ const UserModal = ({
               error={!!errors.confirmPassword}
               className="admin-input-pl-40"
             />
-          </FormField>
+          </FormFieldAny>
         )}
 
         {/* Action Buttons */}

@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 /**
  * DentistrySection - Специализированная секция для стоматологии
@@ -14,8 +12,11 @@
 
 import PropTypes from 'prop-types';
 import { useState, useCallback } from 'react';
-import EMRSection from '../EMRSection';
-import EMRTextField from '../EMRTextField';
+import EMRSectionRaw from '../EMRSection';
+import React from 'react';
+const EMRSection = EMRSectionRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import EMRTextFieldRaw from '../EMRTextField';
+const EMRTextField = EMRTextFieldRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import TeethChart from '../../../dental/TeethChart';
 import './DentistrySection.css';
 import { Input, Checkbox } from '../../../ui/macos';
@@ -34,16 +35,21 @@ import { useTranslation } from '../../../../i18n/useTranslation';
  * @param {boolean} props.disabled - Read-only mode
  */
 export function DentistrySection({
-    toothStatus = {},
-    hygieneIndices = {},
-    periodontalPockets = {},
-    measurements = {},
-    radiographs = {},
+    toothStatus: toothStatusRaw = {},
+    hygieneIndices: hygieneIndicesRaw = {},
+    periodontalPockets: periodontalPocketsRaw = {},
+    measurements: measurementsRaw = {},
+    radiographs: radiographsRaw = {},
     onChange,
     disabled = false,
 }) {
-  const { t } = useTranslation();
-    const [activeTab, setActiveTab] = useState('chart'); // 'chart' | 'hygiene' | 'periodontal' | 'occlusion' | 'radiographs'
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+    const hygieneIndices = hygieneIndicesRaw as Record<string, any>;
+  const toothStatus = toothStatusRaw as Record<string, any>;
+  const periodontalPockets = periodontalPocketsRaw as Record<string, any>;
+  const measurements = measurementsRaw as Record<string, any>;
+  const radiographs = radiographsRaw as Record<string, any>;
+  const [activeTab, setActiveTab] = useState('chart'); // 'chart' | 'hygiene' | 'periodontal' | 'occlusion' | 'radiographs'
 
     // Handlers
     const handleToothChange = useCallback((toothNumber, toothData) => {
@@ -138,7 +144,7 @@ export function DentistrySection({
                         <EMRTextField
                             label="OHIS (Oral Hygiene Index Simplified)"
                             value={hygieneIndices?.ohis || ''}
-                            onChange={(e) => handleHygieneIndexChange('ohis', e.target.value)}
+                            onChange={(e) => handleHygieneIndexChange('ohis', e as unknown as string)}
                             disabled={disabled}
                             type="number"
                             placeholder="0.0 - 6.0"
@@ -146,7 +152,7 @@ export function DentistrySection({
                         <EMRTextField
                             label="PLI (Plaque Index)"
                             value={hygieneIndices?.pli || ''}
-                            onChange={(e) => handleHygieneIndexChange('pli', e.target.value)}
+                            onChange={(e) => handleHygieneIndexChange('pli', e as unknown as string)}
                             disabled={disabled}
                             type="number"
                             placeholder="0.0 - 3.0"
@@ -154,7 +160,7 @@ export function DentistrySection({
                         <EMRTextField
                             label="CPI (Community Periodontal Index)"
                             value={hygieneIndices?.cpi || ''}
-                            onChange={(e) => handleHygieneIndexChange('cpi', e.target.value)}
+                            onChange={(e) => handleHygieneIndexChange('cpi', e as unknown as string)}
                             disabled={disabled}
                             type="number"
                             placeholder="0 - 4"
@@ -162,7 +168,7 @@ export function DentistrySection({
                         <EMRTextField
                             label="Bleeding Index (%)"
                             value={hygieneIndices?.bleeding || ''}
-                            onChange={(e) => handleHygieneIndexChange('bleeding', e.target.value)}
+                            onChange={(e) => handleHygieneIndexChange('bleeding', e as unknown as string)}
                             disabled={disabled}
                             type="number"
                             placeholder="0 - 100"
@@ -199,7 +205,7 @@ export function DentistrySection({
                                             value={depth}
                                             onChange={(e) => onChange?.('periodontal_pockets', {
                                                 ...periodontalPockets,
-                                                [toothNum]: parseFloat(e.target.value) || 0
+                                                [toothNum]: parseFloat(e as unknown as string) || 0
                                             })}
                                             disabled={disabled}
                                             className="pocket-depth-input"
@@ -229,7 +235,7 @@ export function DentistrySection({
                                             value={depth}
                                             onChange={(e) => onChange?.('periodontal_pockets', {
                                                 ...periodontalPockets,
-                                                [toothNum]: parseFloat(e.target.value) || 0
+                                                [toothNum]: parseFloat(e as unknown as string) || 0
                                             })}
                                             disabled={disabled}
                                             className="pocket-depth-input"
@@ -244,7 +250,7 @@ export function DentistrySection({
                     {/* Summary Stats */}
                     <div className="periodontal-summary">
                         {(() => {
-                            const pockets = Object.values(periodontalPockets || {}).filter(v => v > 0);
+                            const pockets = Object.values((periodontalPockets || {}) as Record<string, number>).filter(v => v > 0);
                             if (pockets.length === 0) return null;
 
                             const avg = (pockets.reduce((a, b) => a + b, 0) / pockets.length).toFixed(1);
@@ -284,7 +290,7 @@ export function DentistrySection({
                         <EMRTextField
                             label={t('misc.ds_overjet_mm')}
                             value={measurements?.overjet || ''}
-                            onChange={(e) => handleMeasurementChange('overjet', e.target.value)}
+                            onChange={(e) => handleMeasurementChange('overjet', e as unknown as string)}
                             disabled={disabled}
                             type="number"
                             placeholder={t('misc.ds_gorizontalnoe_perekrytie')}
@@ -292,7 +298,7 @@ export function DentistrySection({
                         <EMRTextField
                             label={t('misc.ds_overbite_mm')}
                             value={measurements?.overbite || ''}
-                            onChange={(e) => handleMeasurementChange('overbite', e.target.value)}
+                            onChange={(e) => handleMeasurementChange('overbite', e as unknown as string)}
                             disabled={disabled}
                             type="number"
                             placeholder={t('misc.ds_vertikalnoe_perekrytie')}
@@ -300,20 +306,20 @@ export function DentistrySection({
                         <EMRTextField
                             label={t('misc.ds_midline_deviation_mm')}
                             value={measurements?.midline || ''}
-                            onChange={(e) => handleMeasurementChange('midline', e.target.value)}
+                            onChange={(e) => handleMeasurementChange('midline', e as unknown as string)}
                             disabled={disabled}
                             type="number"
                             placeholder={t('misc.ds_otklonenie_sredinnoy_linii')}
                         />
                         <div className="dentistry-checkbox-group">
                             <label className="dentistry-checkbox">
-                                <Checkbox aria-label="Crossbite measurement" checked={measurements?.crossbite || false} onChange={(e) => handleMeasurementChange('crossbite', e.target.checked)}
+                                <Checkbox aria-label="Crossbite measurement" checked={measurements?.crossbite || false} onChange={(e) => handleMeasurementChange('crossbite', e)}
                                     disabled={disabled}
                                 />
                                 <span>{t('misc.ds_perekrestnyy_prikus')}</span>
                             </label>
                             <label className="dentistry-checkbox">
-                                <Checkbox aria-label="Open bite measurement" checked={measurements?.openBite || false} onChange={(e) => handleMeasurementChange('openBite', e.target.checked)}
+                                <Checkbox aria-label="Open bite measurement" checked={measurements?.openBite || false} onChange={(e) => handleMeasurementChange('openBite', e)}
                                     disabled={disabled}
                                 />
                                 <span>{t('misc.ds_otkrytyy_prikus')}</span>
@@ -330,14 +336,14 @@ export function DentistrySection({
                         <EMRTextField
                             label={t('misc.ds_panoramnyy_snimok')}
                             value={radiographs?.panoramic || ''}
-                            onChange={(e) => handleRadiographChange('panoramic', e.target.value)}
+                            onChange={(e) => handleRadiographChange('panoramic', e as unknown as string)}
                             disabled={disabled}
                             placeholder={t('misc.ds_url_ili_put_k_faylu')}
                         />
                         <EMRTextField
                             label={t('misc.ds_klkt')}
                             value={radiographs?.cbct || ''}
-                            onChange={(e) => handleRadiographChange('cbct', e.target.value)}
+                            onChange={(e) => handleRadiographChange('cbct', e as unknown as string)}
                             disabled={disabled}
                             placeholder={t('misc.ds_url_ili_put_k_faylu')}
                         />

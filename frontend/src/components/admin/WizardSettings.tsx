@@ -1,5 +1,4 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
+import type { CSSProperties } from 'react';
 
 import { useState, useEffect } from 'react';
 import {
@@ -7,11 +6,11 @@ import {
   Button,
   Checkbox,
   Skeleton,
-  MacOSEmptyState,
-  Alert,
+  MacOSEmptyState as MacOSEmptyStateRaw,
+  Alert as AlertRaw,
   Badge,
   Modal,
-  MacOSStatCard,
+  MacOSStatCard as MacOSStatCardRaw,
 } from '../ui/macos';
 import { Settings, Save, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react';
 import { toast } from 'react-toastify';
@@ -19,8 +18,12 @@ import { fetchWizardSettings, saveWizardSettings } from '../../api/adminSettings
 
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
+import React from "react";
+const Alert = AlertRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const MacOSEmptyState = MacOSEmptyStateRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const MacOSStatCard = MacOSStatCardRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const WizardSettings = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [settings, setSettings] = useState({
     use_new_wizard: false,
     updated_at: null
@@ -170,7 +173,7 @@ const WizardSettings = () => {
                   checked={settings.use_new_wizard}
                   onChange={handleToggleWizard} />
 
-                <span className="admin-fs-sm-fw-med-col-dyn" style={{ '--admin-col0': settings.use_new_wizard ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)' }}>
+                <span className="admin-fs-sm-fw-med-col-dyn" style={{ '--admin-col0': settings.use_new_wizard ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)' } as CSSProperties}>
                   {settings.use_new_wizard ? t('admin2.ws_new_label') : t('admin2.ws_old_label')}
                 </span>
               </div>
@@ -200,14 +203,14 @@ const WizardSettings = () => {
 
           {/* Информация о версиях */}
           <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-16">
-            <MacOSCard className="admin-p-24-tr-all-var-mac-duration-bd-dyn-bgc-dyn-tf-dyn" style={{ '--admin-bd0': !settings.use_new_wizard ? '2px solid var(--mac-accent-blue)' : '1px solid var(--mac-border)', '--admin-bgc1': !settings.use_new_wizard ? 'var(--mac-accent-bg)' : 'var(--mac-bg-primary)', '--admin-tf2': !settings.use_new_wizard ? 'scale(1.02)' : 'scale(1)' }}>
+            <MacOSCard className="admin-p-24-tr-all-var-mac-duration-bd-dyn-bgc-dyn-tf-dyn" style={{ '--admin-bd0': !settings.use_new_wizard ? '2px solid var(--mac-accent-blue)' : '1px solid var(--mac-border)', '--admin-bgc1': !settings.use_new_wizard ? 'var(--mac-accent-bg)' : 'var(--mac-bg-primary)', '--admin-tf2': !settings.use_new_wizard ? 'scale(1.02)' : 'scale(1)' } as CSSProperties}>
               <div className="admin-d-flex-ai-center-gap-4-mb-8">
                 <h4 className="admin-fs-lg-fw-semi-primary-m-0">
                   {t('admin2.ws_classic_card_title')}
                 </h4>
                 <Badge
                   variant={!settings.use_new_wizard ? 'primary' : 'secondary'}
-                  size="sm">
+                  size="small">
 
                   {!settings.use_new_wizard ? t('admin2.ws_status_active') : t('admin2.ws_status_inactive')}
                 </Badge>
@@ -220,14 +223,14 @@ const WizardSettings = () => {
               </ul>
             </MacOSCard>
 
-            <MacOSCard className="admin-p-24-tr-all-var-mac-duration-bd-dyn-bgc-dyn-tf-dyn" style={{ '--admin-bd0': settings.use_new_wizard ? '2px solid var(--mac-success)' : '1px solid var(--mac-border)', '--admin-bgc1': settings.use_new_wizard ? 'var(--mac-success-bg)' : 'var(--mac-bg-primary)', '--admin-tf2': settings.use_new_wizard ? 'scale(1.02)' : 'scale(1)' }}>
+            <MacOSCard className="admin-p-24-tr-all-var-mac-duration-bd-dyn-bgc-dyn-tf-dyn" style={{ '--admin-bd0': settings.use_new_wizard ? '2px solid var(--mac-success)' : '1px solid var(--mac-border)', '--admin-bgc1': settings.use_new_wizard ? 'var(--mac-success-bg)' : 'var(--mac-bg-primary)', '--admin-tf2': settings.use_new_wizard ? 'scale(1.02)' : 'scale(1)' } as CSSProperties}>
               <div className="admin-d-flex-ai-center-gap-4-mb-8">
                 <h4 className="admin-fs-lg-fw-semi-primary-m-0">
                   {t('admin2.ws_new_card_title')}
                 </h4>
                 <Badge
                   variant={settings.use_new_wizard ? 'success' : 'secondary'}
-                  size="sm">
+                  size="small">
 
                   {settings.use_new_wizard ? t('admin2.ws_status_active') : t('admin2.ws_status_inactive')}
                 </Badge>
@@ -302,7 +305,7 @@ const WizardSettings = () => {
         isOpen={showConfirmModal}
         onClose={() => setShowConfirmModal(false)}
         title={t('admin2.ws_confirm_title')}
-        size="sm">
+        size="small">
 
         <div className="admin-p-24">
           <p className="admin-fs-base-primary-mb-24-lh-var-mac-line-height">
