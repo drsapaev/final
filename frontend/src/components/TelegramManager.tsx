@@ -155,7 +155,7 @@ const TelegramManager = () => {
     loadOnboardingRequests();
   }, [onboardingStatusFilter, onboardingSort]);
 
-  const getOnboardingSearchPayload = (request, form = {}) => {
+  const getOnboardingSearchPayload = (request: any, form: any = {}) => {
     const contactName = getOnboardingValue(request, 'contactName', 'contact_name', '');
     const contactPhone = getOnboardingValue(request, 'contactPhone', 'contact_phone', '');
     const desiredBranch = getOnboardingValue(request, 'desiredBranch', 'desired_branch', '');
@@ -366,7 +366,7 @@ const TelegramManager = () => {
 
   const handleOnboardingReviewAction = async (requestId, action, options = {}) => {
     const request = onboardingRequests.find((item) => item.id === requestId) || {};
-    const form = onboardingReviewForms[requestId] || {};
+    const form: any = onboardingReviewForms[requestId] || {};
     const safeNote = (form.safeNote || '').trim();
     const reasonCode = form.reasonCode || undefined;
     const actionKey = `${action}:${requestId}`;
@@ -1751,7 +1751,7 @@ const TelegramManager = () => {
                 <Box display="flex" sx={{ flexDirection: 'column' }} gap={2}>
                   {visibleOnboardingRequests.map((request) => {
                     const requestId = request.id;
-                    const form = onboardingReviewForms[requestId] || {};
+                    const form: any = onboardingReviewForms[requestId] || {};
                     const contactName = getOnboardingValue(request, 'contactName', 'contact_name', 'No name');
                     const contactPhone = getOnboardingValue(request, 'contactPhone', 'contact_phone', 'No phone');
                     const desiredService = getOnboardingValue(request, 'desiredService', 'desired_service', 'Service not selected');

@@ -147,7 +147,7 @@ const AppointmentWizardV2 = ({
       gender: '' // ✅ Добавлено поле пола
     },
     cart: {
-      items: [],
+      items: [] as any[],
       discount_mode: 'none', // none|repeat|benefit
       all_free: false,
       notes: ''
@@ -155,8 +155,9 @@ const AppointmentWizardV2 = ({
     payment: {
       method: 'cash', // Всегда наличные по умолчанию
       total_amount: 0
-    }
-  });
+    },
+    doctors: [] as any[]
+  } as any);
 
   // Состояние UI
   const [errors, setErrors] = useState({} as any);
