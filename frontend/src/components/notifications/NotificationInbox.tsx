@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
@@ -11,11 +9,14 @@ import {
   Sparkles
 } from 'lucide-react';
 import {
-  Select,
-  Input } from '../ui/macos';
+  Select as SelectRaw,
+  Input as InputRaw } from '../ui/macos';
 import { useNotificationCenter } from '../../contexts/NotificationCenterContext';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
+import React from "react";
+const Input = InputRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Select = SelectRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const STATUS_FILTER_OPTIONS = [
   { value: 'all', label: '\u0412\u0441\u0435' },
@@ -36,7 +37,7 @@ function formatDate(value) {
 function getSeverityStyle(severity = 'info') {
   switch (String(severity).toLowerCase()) {
     case 'critical':
-    case 'error':
+    case 'danger':
       return { color: 'var(--mac-error)', background: 'color-mix(in srgb, var(--mac-error), transparent 88%)' };
     case 'warning':
       return { color: 'var(--mac-warning-active, var(--mac-warning))', background: 'color-mix(in srgb, var(--mac-warning), transparent 88%)' };
@@ -134,7 +135,7 @@ function navigateToNotificationTarget(target) {
 }
 
 export default function NotificationInbox({ userRole, onClose }) {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const {
     getNotificationsByRole,
     markAsRead,
@@ -296,7 +297,7 @@ export default function NotificationInbox({ userRole, onClose }) {
             background: 'var(--mac-bg-secondary)'
           }}
         >
-          <Search size={16} />
+          <Search size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
           <Input
             type="search"
             aria-label={t('misc.ni_poisk_po_uvedomleniyam')}
@@ -410,7 +411,7 @@ export default function NotificationInbox({ userRole, onClose }) {
                           flexShrink: 0
                         }}
                       >
-                        <Icon size={16} />
+                        <Icon size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
                       </span>
                       <div style={{ minWidth: 0 }}>
                         <strong style={{ display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -512,7 +513,7 @@ export default function NotificationInbox({ userRole, onClose }) {
                         gap: 6
                       }}
                     >
-                      <Archive size={14} />
+                      <Archive size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
                       Архив
                     </button>
                   ) : null}

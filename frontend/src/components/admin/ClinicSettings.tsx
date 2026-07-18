@@ -1,5 +1,4 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
+import type { CSSProperties } from 'react';
 
 import { useState, useEffect } from 'react';
 import { api } from '../../api/client';
@@ -28,16 +27,21 @@ import {
 } from 'lucide-react';
 import {
   MacOSCard,
-  Button,
-  Input,
-  Select,
-  Textarea,
+  Button as ButtonRaw,
+  Input as InputRaw,
+  Select as SelectRaw,
+  Textarea as TextareaRaw,
   Checkbox,
 } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
+import React from "react";
+const Textarea = TextareaRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Input = InputRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Select = SelectRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Button = ButtonRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const ClinicSettings = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState({
@@ -85,7 +89,7 @@ const ClinicSettings = () => {
       setSettings(prev => ({ ...prev, ...settingsObj }));
     } catch (error) {
       logger.error('Ошибка загрузки настроек:', error);
-      setMessage({ type: 'error', text: t('admin2.cset_err_load') });
+      setMessage({ type: 'danger', text: t('admin2.cset_err_load') });
     } finally {
       setLoading(false);
     }
@@ -102,7 +106,7 @@ const ClinicSettings = () => {
       setTicketPrintSettings({ ...TICKET_PRINT_SETTINGS_DEFAULTS, ...data });
     } catch (error) {
       logger.error('Ошибка загрузки настроек печати талонов:', error);
-      setTicketPrintMessage({ type: 'error', text: t('admin2.cset_err_load_print') });
+      setTicketPrintMessage({ type: 'danger', text: t('admin2.cset_err_load_print') });
       setTicketPrintSettings({ ...TICKET_PRINT_SETTINGS_DEFAULTS });
     } finally {
       setTicketPrintLoading(false);
@@ -118,13 +122,13 @@ const ClinicSettings = () => {
     if (file) {
       // Проверяем тип файла
       if (!file.type.startsWith('image/')) {
-        setMessage({ type: 'error', text: t('admin2.cset_err_logo_type') });
+        setMessage({ type: 'danger', text: t('admin2.cset_err_logo_type') });
         return;
       }
 
       // Проверяем размер (макс 5MB)
       if (file.size > 5 * 1024 * 1024) {
-        setMessage({ type: 'error', text: t('admin2.cset_err_logo_size') });
+        setMessage({ type: 'danger', text: t('admin2.cset_err_logo_size') });
         return;
       }
 
@@ -190,7 +194,7 @@ const ClinicSettings = () => {
       }
     } catch (error) {
       logger.error('Ошибка сохранения:', error);
-      setMessage({ type: 'error', text: t('admin2.cset_err_save') });
+      setMessage({ type: 'danger', text: t('admin2.cset_err_save') });
     } finally {
       setSaving(false);
     }
@@ -205,7 +209,7 @@ const ClinicSettings = () => {
       setTicketPrintMessage({ type: 'success', text: t('admin2.cset_success_save_print') });
     } catch (error) {
       logger.error('Ошибка сохранения настроек печати талонов:', error);
-      setTicketPrintMessage({ type: 'error', text: t('admin2.cset_err_save_print') });
+      setTicketPrintMessage({ type: 'danger', text: t('admin2.cset_err_save_print') });
     } finally {
       setTicketPrintSaving(false);
     }
@@ -273,14 +277,14 @@ const ClinicSettings = () => {
 
         {/* Сообщения */}
         {message.text && (
-          <MacOSCard className="admin-p-16-mb-24" style={{ '--admin-backgroundColor': message.type === 'success' ? 'var(--mac-success-bg)' : 'var(--mac-error-bg)', '--admin-border': message.type === 'success' ? '1px solid var(--mac-success-border)' : '1px solid var(--mac-error-border)' }}>
+          <MacOSCard className="admin-p-16-mb-24" style={{ '--admin-backgroundColor': message.type === 'success' ? 'var(--mac-success-bg)' : 'var(--mac-error-bg)', '--admin-border': message.type === 'success' ? '1px solid var(--mac-success-border)' : '1px solid var(--mac-error-border)' } as CSSProperties}>
             <div className="flex items-center justify-center gap-2">
               {message.type === 'success' ? (
                 <CheckCircle className="admin-w-20-h-20-success" />
               ) : (
                 <AlertCircle className="admin-w-20-h-20-error" />
               )}
-              <span className="admin-sm-med" style={{ '--admin-color': message.type === 'success' ? 'var(--mac-success)' : 'var(--mac-error)' }}>
+              <span className="admin-sm-med" style={{ '--admin-color': message.type === 'success' ? 'var(--mac-success)' : 'var(--mac-error)' } as CSSProperties}>
                 {message.text}
               </span>
             </div>
@@ -422,12 +426,12 @@ const ClinicSettings = () => {
                     htmlFor="logo-upload"
                     className="admin-cursor-pointer-inline-flex-ai-center-p-8px16-bd-1solidvar-mac-border-radiu-832d1430"
                     onMouseEnter={(e) => {
-                      e.target.style.backgroundColor = 'var(--mac-accent-bg)';
-                      e.target.style.borderColor = 'var(--mac-accent-blue)';
+                      e.currentTarget.style.backgroundColor = 'var(--mac-accent-bg)';
+                      e.currentTarget.style.borderColor = 'var(--mac-accent-blue)';
                     }}
                     onMouseLeave={(e) => {
-                      e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
-                      e.target.style.borderColor = 'var(--mac-border)';
+                      e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)';
+                      e.currentTarget.style.borderColor = 'var(--mac-border)';
                     }}
                   >
                     <Upload className="w-4 h-4 mr-2" />
@@ -483,14 +487,14 @@ const ClinicSettings = () => {
           </div>
 
           {ticketPrintMessage.text && (
-            <MacOSCard className="admin-p-16-mb-20" style={{ '--admin-backgroundColor': ticketPrintMessage.type === 'success' ? 'var(--mac-success-bg)' : 'var(--mac-error-bg)', '--admin-border': ticketPrintMessage.type === 'success' ? '1px solid var(--mac-success-border)' : '1px solid var(--mac-error-border)' }}>
+            <MacOSCard className="admin-p-16-mb-20" style={{ '--admin-backgroundColor': ticketPrintMessage.type === 'success' ? 'var(--mac-success-bg)' : 'var(--mac-error-bg)', '--admin-border': ticketPrintMessage.type === 'success' ? '1px solid var(--mac-success-border)' : '1px solid var(--mac-error-border)' } as CSSProperties}>
               <div className="flex items-center justify-center gap-2">
                 {ticketPrintMessage.type === 'success' ? (
                   <CheckCircle className="admin-w-20-h-20-success" />
                 ) : (
                   <AlertCircle className="admin-w-20-h-20-error" />
                 )}
-                <span className="admin-sm-med" style={{ '--admin-color': ticketPrintMessage.type === 'success' ? 'var(--mac-success)' : 'var(--mac-error)' }}>
+                <span className="admin-sm-med" style={{ '--admin-color': ticketPrintMessage.type === 'success' ? 'var(--mac-success)' : 'var(--mac-error)' } as CSSProperties}>
                   {ticketPrintMessage.text}
                 </span>
               </div>

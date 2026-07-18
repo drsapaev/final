@@ -1,20 +1,19 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 /**
  * GlobalSearchBar - macOS-style global search component
  * Aggregated search across patients, visits, and lab results
  */
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, type CSSProperties } from 'react';
 import ReactDOM from 'react-dom';
 import { generatePath, useNavigate } from 'react-router-dom';
 import { api } from '../../api';
 import auth from '../../stores/auth';
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
-import { getCanonicalRouteById, getRoleHomeRoute } from '../../routing/routeSelectors.js';
-import { Input } from '../ui/macos';
+import { getCanonicalRouteById, getRoleHomeRoute } from '../../routing/routeSelectors';
+import { Input as InputRaw } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
+const Input = InputRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const patientSearchRouteByRole = {
   registrar: getRoleHomeRoute('registrar'),
@@ -49,7 +48,7 @@ function useDebounce(value, delay) {
 }
 
 export default function GlobalSearchBar({ className = '' }) {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const navigate = useNavigate();
   const inputRef = useRef(null);
   const containerRef = useRef(null);
@@ -67,7 +66,7 @@ export default function GlobalSearchBar({ className = '' }) {
   // Get user role for navigation
   const getUserRole = () => {
     const st = auth.getState();
-    const profile = st.profile || st.user || {};
+    const profile = (st as Record<string, any>).profile || (st as Record<string, any>).user || {};
     return String(profile?.role || profile?.role_name || '').toLowerCase();
   };
 
@@ -374,9 +373,9 @@ export default function GlobalSearchBar({ className = '' }) {
   let flatIndex = -1;
 
   return (
-    <div style={styles.container} className={className} ref={containerRef}>
-            <div style={styles.inputWrapper}>
-                <span style={styles.searchIcon}>🔍</span>
+    <div style={styles.container as CSSProperties} className={className} ref={containerRef}>
+            <div style={styles.inputWrapper as CSSProperties}>
+                <span style={styles.searchIcon as CSSProperties}>🔍</span>
                 <Input
           ref={inputRef}
           type="text"
@@ -391,10 +390,10 @@ export default function GlobalSearchBar({ className = '' }) {
           aria-expanded={isOpen}
           aria-controls={listboxId}
           aria-activedescendant={activeOptionId}
-          style={styles.input} />
+          style={styles.input as CSSProperties} />
 
-                <span style={styles.shortcut}>⌘K</span>
-                <span style={styles.srOnly} role="status" aria-live="polite">{searchStatus}</span>
+                <span style={styles.shortcut as CSSProperties}>⌘K</span>
+                <span style={styles.srOnly as CSSProperties} role="status" aria-live="polite">{searchStatus}</span>
             </div>
 
             {isOpen && ReactDOM.createPortal(
@@ -402,26 +401,26 @@ export default function GlobalSearchBar({ className = '' }) {
           id={listboxId}
           role="listbox"
           aria-label={t('misc.gsb_rezultaty_globalnogo_poiska')}
-          style={styles.dropdown}
+          style={styles.dropdown as CSSProperties}
           ref={dropdownRef}>
                     {isLoading &&
-          <div style={styles.loading}>{t('misc.gsb_poisk_2')}</div>
+          <div style={styles.loading as CSSProperties}>{t('misc.gsb_poisk_2')}</div>
           }
 
                     {!isLoading && query.length < 2 &&
-          <div style={styles.noResults}>{t('misc.gsb_nachnite_vvod_minimum_2_simv_2')}</div>
+          <div style={styles.noResults as CSSProperties}>{t('misc.gsb_nachnite_vvod_minimum_2_simv_2')}</div>
           }
 
                     {!isLoading && !hasResults && query.length >= 2 &&
-          <div style={styles.noResults}>{t('misc.gsb_nichego_ne_naydeno_2')}</div>
+          <div style={styles.noResults as CSSProperties}>{t('misc.gsb_nichego_ne_naydeno_2')}</div>
           }
 
                     {!isLoading && hasResults &&
           <>
                             {/* Patients */}
                             {results.patients.length > 0 &&
-            <div style={styles.section}>
-                                    <div style={styles.sectionTitle}>{t('misc.gsb_patsienty')}</div>
+            <div style={styles.section as CSSProperties}>
+                                    <div style={styles.sectionTitle as CSSProperties}>{t('misc.gsb_patsienty')}</div>
                                     {results.patients.map((p) => {
                 flatIndex++;
                 const itemIndex = flatIndex;
@@ -433,17 +432,17 @@ export default function GlobalSearchBar({ className = '' }) {
                     role="option"
                     aria-selected={isSelected}
                     tabIndex={0}
-                    style={{ ...styles.item, ...(isSelected ? styles.itemSelected : {}) }}
+                    style={{ ...styles.item, ...(isSelected ? styles.itemSelected : {}) } as CSSProperties}
                     onClick={() => handleItemClick('patient', p)}
                     onKeyDown={(event) => handleResultItemKeyDown(event, () => handleItemClick('patient', p))}
                     onMouseEnter={() => setSelectedIndex(itemIndex)}>
                     
-                                                <span style={styles.itemIcon}>👤</span>
-                                                <div style={styles.itemContent}>
-                                                    <div style={styles.itemTitle}>
+                                                <span style={styles.itemIcon as CSSProperties}>👤</span>
+                                                <div style={styles.itemContent as CSSProperties}>
+                                                    <div style={styles.itemTitle as CSSProperties}>
                                                         {p.last_name} {p.first_name} {p.middle_name || ''}
                                                     </div>
-                                                    <div style={styles.itemSubtitle}>
+                                                    <div style={styles.itemSubtitle as CSSProperties}>
                                                         #{p.id} {p.phone && `• ${p.phone}`}
                                                     </div>
                                                 </div>
@@ -455,8 +454,8 @@ export default function GlobalSearchBar({ className = '' }) {
 
                             {/* Visits */}
                             {results.visits.length > 0 &&
-            <div style={styles.section}>
-                                    <div style={styles.sectionTitle}>{t('misc.gsb_vizity')}</div>
+            <div style={styles.section as CSSProperties}>
+                                    <div style={styles.sectionTitle as CSSProperties}>{t('misc.gsb_vizity')}</div>
                                     {results.visits.map((v) => {
                 flatIndex++;
                 const itemIndex = flatIndex;
@@ -468,17 +467,17 @@ export default function GlobalSearchBar({ className = '' }) {
                     role="option"
                     aria-selected={isSelected}
                     tabIndex={0}
-                    style={{ ...styles.item, ...(isSelected ? styles.itemSelected : {}) }}
+                    style={{ ...styles.item, ...(isSelected ? styles.itemSelected : {}) } as CSSProperties}
                     onClick={() => handleItemClick('visit', v)}
                     onKeyDown={(event) => handleResultItemKeyDown(event, () => handleItemClick('visit', v))}
                     onMouseEnter={() => setSelectedIndex(itemIndex)}>
                     
-                                                <span style={styles.itemIcon}>📋</span>
-                                                <div style={styles.itemContent}>
-                                                    <div style={styles.itemTitle}>
+                                                <span style={styles.itemIcon as CSSProperties}>📋</span>
+                                                <div style={styles.itemContent as CSSProperties}>
+                                                    <div style={styles.itemTitle as CSSProperties}>
                                                         {v.patient_name || t('misc.gsb_vizit_v_id', { id: v.id })}
                                                     </div>
-                                                    <div style={styles.itemSubtitle}>
+                                                    <div style={styles.itemSubtitle as CSSProperties}>
                                                         {v.planned_date} • {v.status || t('misc.gsb_net_statusa')}
                                                     </div>
                                                 </div>
@@ -490,8 +489,8 @@ export default function GlobalSearchBar({ className = '' }) {
 
                             {/* Lab Results */}
                             {results.labResults.length > 0 &&
-            <div style={{ ...styles.section, borderBottom: 'none' }}>
-                                    <div style={styles.sectionTitle}>{t('misc.gsb_analizy')}</div>
+            <div style={{ ...styles.section, borderBottom: 'none' } as CSSProperties}>
+                                    <div style={styles.sectionTitle as CSSProperties}>{t('misc.gsb_analizy')}</div>
                                     {results.labResults.map((l) => {
                 flatIndex++;
                 const itemIndex = flatIndex;
@@ -504,17 +503,17 @@ export default function GlobalSearchBar({ className = '' }) {
                     role="option"
                     aria-selected={isSelected}
                     tabIndex={0}
-                    style={{ ...styles.item, ...(isSelected ? styles.itemSelected : {}) }}
+                    style={{ ...styles.item, ...(isSelected ? styles.itemSelected : {}) } as CSSProperties}
                     onClick={() => handleItemClick('lab', l)}
                     onKeyDown={(event) => handleResultItemKeyDown(event, () => handleItemClick('lab', l))}
                     onMouseEnter={() => setSelectedIndex(itemIndex)}>
                     
-                                                <span style={styles.itemIcon}>{statusIcon}</span>
-                                                <div style={styles.itemContent}>
-                                                    <div style={styles.itemTitle}>
+                                                <span style={styles.itemIcon as CSSProperties}>{statusIcon}</span>
+                                                <div style={styles.itemContent as CSSProperties}>
+                                                    <div style={styles.itemTitle as CSSProperties}>
                                                         {l.patient_name || t('misc.gsb_zakaz_l_id', { id: l.id })}
                                                     </div>
-                                                    <div style={styles.itemSubtitle}>
+                                                    <div style={styles.itemSubtitle as CSSProperties}>
                                                         {l.test_type || t('misc.gsb_laboratornyy_analiz')} • {l.status}
                                                     </div>
                                                 </div>

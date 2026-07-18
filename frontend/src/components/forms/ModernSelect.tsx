@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useState, useRef, useEffect, useId } from 'react';
 import PropTypes from 'prop-types';
@@ -14,13 +12,16 @@ import {
 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import './ModernSelect.css';
-import { Input } from '../ui/macos';
+import { Input as InputRaw } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
 import i18n from '../../i18n';
+import React from "react";
+const Input = InputRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const t18 = i18n.t as unknown as (key: string, options?: Record<string, unknown>) => string;
 
 const ModernSelect = ({
   label,
-  placeholder = i18n.t('misc.ms_vyberite_optsiyu'),
+  placeholder = t18('misc.ms_vyberite_optsiyu'),
   value,
   onChange,
   options = [],
@@ -40,7 +41,7 @@ const ModernSelect = ({
   className = '',
   ...props
 }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const selectListboxId = useId();
   const accessibleLabel = typeof label === 'string' && label.trim() ? label : placeholder;
   const { getColor } = useTheme();
@@ -80,7 +81,7 @@ const ModernSelect = ({
       if (!isOpen) return;
 
       const filteredOptions = !searchQuery ? options : options.filter((option) => {
-        const label = typeof option === 'object' ? option.label : option;
+        const label = typeof option === 'object' ? (option as Record<string, any>).label : option;
         return label.toLowerCase().includes(searchQuery.toLowerCase());
       });
 
@@ -143,7 +144,7 @@ const ModernSelect = ({
     if (!searchQuery) return options;
 
     return options.filter((option) => {
-      const label = typeof option === 'object' ? option.label : option;
+      const label = typeof option === 'object' ? (option as Record<string, any>).label : option;
       return label.toLowerCase().includes(searchQuery.toLowerCase());
     });
   };
@@ -256,10 +257,10 @@ const ModernSelect = ({
                   className="tag-remove"
                   onClick={(e) => handleRemoveOption(e, val)}
                   tabIndex={0}  // PR-42 / Medium-G: was -1 (removed from tab order)
-                  aria-label={i18n.t('misc.ms_udalit')}
-                  title={i18n.t('misc.ms_udalit')}>
+                  aria-label={t18('misc.ms_udalit')}
+                  title={t18('misc.ms_udalit')}>
                   
-                  <X size={12} />
+                  <X size={12 as unknown as "small" | "default" | "large" | "xlarge"} />
                 </button>
               </span>);
 
@@ -273,18 +274,18 @@ const ModernSelect = ({
   };
 
   // Рендер опции
-  const renderOptionContent = (option) => {
+  const renderOptionContent = (option: unknown, index?: number) => {
     if (renderOption) {
       return renderOption(option, isOptionSelected(option));
     }
 
-    const label = typeof option === 'object' ? option.label : option;
+    const label = typeof option === 'object' ? (option as Record<string, any>).label : option;
     const isSelected = isOptionSelected(option);
 
     return (
       <>
         <span className="option-label">{label}</span>
-        {isSelected && <Check size={16} className="option-check" />}
+        {isSelected && <Check size={16 as unknown as "small" | "default" | "large" | "xlarge"} className="option-check" />}
       </>);
 
   };
@@ -331,7 +332,7 @@ const ModernSelect = ({
 
       {/* Контейнер выбора */}
       <div
-        className={`select-container ${variant} ${size} ${focused || isOpen ? 'focused' : ''} ${hasError ? 'error' : ''} ${hasSuccess ? 'success' : ''} ${disabled ? 'disabled' : ''}`}
+        className={`select-container ${variant} ${size} ${focused || isOpen ? 'focused' : ''} ${hasError ? 'danger' : ''} ${hasSuccess ? 'success' : ''} ${disabled ? 'disabled' : ''}`}
         style={selectStyles}
         onClick={() => !disabled && setIsOpen(!isOpen)}
         onKeyDown={handleSelectContainerKeyDown}
@@ -359,29 +360,29 @@ const ModernSelect = ({
             className="select-action-btn"
             onClick={handleClear}
             tabIndex={0}  // PR-42 / Medium-G: was -1 (removed from tab order)
-            aria-label={i18n.t('misc.ms_ochistit_vybor')}
-            title={i18n.t('misc.ms_ochistit_vybor')}>
+            aria-label={t18('misc.ms_ochistit_vybor')}
+            title={t18('misc.ms_ochistit_vybor')}>
             
-              <X size={16} />
+              <X size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
             </button>
           }
 
           {/* Индикатор состояния */}
           {hasError &&
           <div className="select-status error">
-              <AlertCircle size={16} />
+              <AlertCircle size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
             </div>
           }
           
           {hasSuccess &&
           <div className="select-status success">
-              <CheckCircle size={16} />
+              <CheckCircle size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
             </div>
           }
 
           {/* Стрелка */}
           <div className={`select-arrow ${isOpen ? 'open' : ''}`}>
-            {isOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            {isOpen ? <ChevronUp size={16 as unknown as "small" | "default" | "large" | "xlarge"} /> : <ChevronDown size={16 as unknown as "small" | "default" | "large" | "xlarge"} />}
           </div>
         </div>
       </div>
@@ -399,13 +400,13 @@ const ModernSelect = ({
           {/* Поиск */}
           {searchable &&
         <div className="select-search">
-              <Search size={16} className="search-icon" />
+              <Search size={16 as unknown as "small" | "default" | "large" | "xlarge"} className="search-icon" />
               <Input
             ref={searchInputRef}
             type="text"
             className="search-input"
-            aria-label={i18n.t('misc.ms_poisk_accessiblelabel', { accessibleLabel: accessibleLabel })}
-            placeholder={i18n.t('common.search')}
+            aria-label={t18('misc.ms_poisk_accessiblelabel', { accessibleLabel: accessibleLabel })}
+            placeholder={t18('common.search')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{
@@ -421,7 +422,7 @@ const ModernSelect = ({
             {loading ?
           <div className="select-loading">
                 <div className="loading-spinner" />
-                <span>{i18n.t('misc.ms_zagruzka')}</span>
+                <span>{t18('misc.ms_zagruzka')}</span>
               </div> :
 
           (() => {
@@ -489,7 +490,7 @@ const ModernSelect = ({
         className="select-message error"
         style={{ color: getColor('danger') }}>
         
-          <AlertCircle size={14} />
+          <AlertCircle size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
           <span>{error}</span>
         </div>
       }
@@ -500,7 +501,7 @@ const ModernSelect = ({
         className="select-message success"
         style={{ color: getColor('success') }}>
         
-          <CheckCircle size={14} />
+          <CheckCircle size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
           <span>{success}</span>
         </div>
       }
