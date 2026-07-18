@@ -1,5 +1,4 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
+import React from 'react';
 
 import { useTheme } from '../../contexts/ThemeContext';
 import PropTypes from 'prop-types';
@@ -125,7 +124,7 @@ export const CardTitle = ({
   className = '',
   ...props 
 }) => {
-  const Tag = `h${level}`;
+  const Tag = `h${level}` as unknown as React.ElementType;
   return (
     <Tag className={`card-title ${className}`} {...props}>
       {children}

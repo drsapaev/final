@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 /**
  * VisitTab — R-15 (UX audit): extracted from CardiologistPanelUnified.
@@ -14,10 +12,12 @@
 
 import PropTypes from 'prop-types';
 import { User, FileText, RefreshCw, Save, Calendar, Phone } from 'lucide-react';
-import { Button, MacOSCard, MacOSEmptyState } from '../ui/macos';
+import { Button, MacOSCard, MacOSEmptyState as MacOSEmptyStateRaw } from '../ui/macos';
 import { EMRContainerV2 } from '../emr-v2/EMRContainerV2';
 import { formatRegistrarDate, formatRegistrarDateTime } from '../../utils/dateUtils';
 import { useTranslation } from '../../i18n/useTranslation';
+import React from "react";
+const MacOSEmptyState = MacOSEmptyStateRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 export function VisitTab({
   selectedPatient,
@@ -29,7 +29,7 @@ export function VisitTab({
   getColor,
   getFontSize,
 }) {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // Empty state: no patient selected
   if (!selectedPatient) {
     return (

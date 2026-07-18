@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 /**
  * StateWrapper — generic loading / error / empty state wrapper for Unified*
@@ -27,10 +25,13 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { AlertCircle, RefreshCw } from 'lucide-react';
-import { MacOSEmptyState } from '../ui/macos';
-import { Skeleton } from '../ui/macos';
+import { MacOSEmptyState as MacOSEmptyStateRaw } from '../ui/macos';
+import { Skeleton as SkeletonRaw } from '../ui/macos';
 import { Button } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
+import React from "react";
+const Skeleton = SkeletonRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const MacOSEmptyState = MacOSEmptyStateRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const DEFAULT_SKELETON_ROWS = 4;
 
@@ -87,7 +88,7 @@ export function StateWrapper({
         message={errMsg}
         action={
           onRetry ? (
-            <Button variant="outline" size="md" onClick={onRetry}>
+            <Button variant="outline" size="default" onClick={onRetry}>
               <RefreshCw size={14} style={{ marginRight: 6 }} />
               Повторить
             </Button>
@@ -136,7 +137,7 @@ export function StateWrapper({
           {onRetry && (
             <Button
               variant="outline"
-              size="sm"
+              size="small"
               onClick={onRetry}
             >
               <RefreshCw size={12} style={{ marginRight: 4 }} />
