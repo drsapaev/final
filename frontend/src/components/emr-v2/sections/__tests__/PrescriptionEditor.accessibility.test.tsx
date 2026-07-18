@@ -1,12 +1,10 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import React from 'react';
 import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import PrescriptionEditor from '../PrescriptionEditor';
+import PrescriptionEditorRaw from '../PrescriptionEditor';
+const PrescriptionEditor = PrescriptionEditorRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 describe('PrescriptionEditor accessibility', () => {
   it('renders an aria-label on the delete button', () => {

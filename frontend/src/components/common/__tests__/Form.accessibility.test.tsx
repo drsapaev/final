@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import React from 'react';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen } from '@testing-library/react';
@@ -14,7 +11,10 @@ vi.mock('../../../contexts/ThemeContext', () => ({
   }),
 }));
 
-import { FormField, FormProvider, FormSelect, FormTextArea } from '../Form';
+import { FormField as FormFieldRaw, FormProvider, FormSelect as FormSelectRaw, FormTextArea as FormTextAreaRaw } from '../Form';
+const FormField = FormFieldRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const FormTextArea = FormTextAreaRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const FormSelect = FormSelectRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 function renderWithProvider(ui) {
   return render(<FormProvider>{ui}</FormProvider>);

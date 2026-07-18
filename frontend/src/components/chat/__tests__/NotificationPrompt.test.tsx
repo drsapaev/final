@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -35,7 +32,7 @@ vi.mock('../../../utils/logger', () => ({
   }
 }));
 
-import NotificationPrompt from '../NotificationPrompt.tsx';
+import NotificationPrompt from '../NotificationPrompt';
 
 describe('NotificationPrompt', () => {
   beforeEach(() => {

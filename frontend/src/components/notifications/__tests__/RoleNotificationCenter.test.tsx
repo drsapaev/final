@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { render, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -38,7 +35,7 @@ vi.mock('../NotificationInbox', () => ({
   default: () => <div data-testid="notification-inbox" />
 }));
 
-import RoleNotificationCenter from '../RoleNotificationCenter.tsx';
+import RoleNotificationCenter from '../RoleNotificationCenter';
 
 describe('RoleNotificationCenter', () => {
   let loadNotifications;

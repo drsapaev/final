@@ -1,11 +1,8 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { MemoryRouter } from 'react-router-dom';
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import LoginFormStyled from '../LoginFormStyled.tsx';
+import LoginFormStyled from '../LoginFormStyled';
 
 const { useSetupStatusMock } = vi.hoisted(() => ({
   useSetupStatusMock: vi.fn(),

@@ -86,7 +86,7 @@ const PrintDialog = ({
 
     try {
       const result = await printService.getPrinters() as Record<string, unknown>;
-      if (!Boolean(result.success)) {
+      if (!result.success) {
         throw new Error(
           String(result.error || "") || t('misc.pd_ne_udalos_zagruzit_spisok_pr'),
         );

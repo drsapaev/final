@@ -1,11 +1,8 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import '@testing-library/jest-dom';
 import { render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { ThemeProvider } from '../../../contexts/ThemeContext.tsx';
+import { ThemeProvider } from '../../../contexts/ThemeContext';
 import ServiceCatalog from '../ServiceCatalog';
 import { api } from '../../../api/client';
 
