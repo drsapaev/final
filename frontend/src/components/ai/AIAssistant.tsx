@@ -1,14 +1,18 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useTranslation } from '../../i18n/useTranslation';
 import { useState } from 'react';
+import type { CSSProperties } from 'react';
 import PropTypes from 'prop-types';
 import {
-  Card, CardContent, Typography, Alert, Badge, CircularProgress, Button,
+  Card as RawCard, CardContent, Typography as RawTypography, Alert as RawAlert, Badge as RawBadge, CircularProgress as RawCircularProgress, Button as RawButton,
 } from '../ui/macos';
+const Card = RawCard as unknown as React.ComponentType<Record<string, unknown>>;
+const Typography = RawTypography as unknown as React.ComponentType<Record<string, unknown>>;
+const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
+const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
+const CircularProgress = RawCircularProgress as unknown as React.ComponentType<Record<string, unknown>>;
+const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
 import { ChevronDown, ChevronUp, Brain, CheckCircle, Copy, RefreshCw } from 'lucide-react';
-import { notify } from '../../services/notify.js';
+import { notify } from '../../services/notify';
 import { apiClient } from '../../api/client';
 import { mcpAPI } from '../../api/mcpClient';
 import { sanitizeAIContent } from '../../utils/sanitizer';
@@ -110,7 +114,8 @@ const AIAssistant = ({
   specialty,
   onSuggestionSelect,
 }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);

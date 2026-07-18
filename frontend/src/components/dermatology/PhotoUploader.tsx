@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useTranslation } from '../../i18n/useTranslation';
 /**
  * Photo Uploader Component
@@ -8,22 +5,31 @@ import { useTranslation } from '../../i18n/useTranslation';
  * Согласно MASTER_TODO_LIST строка 265
  */
 import { useState, useCallback, useRef } from 'react';
+import type { CSSProperties } from 'react';
 import {
   Box,
-  Card,
+  Card as RawCard,
   CardContent,
-  Typography,
-  Button,
-  Alert,
-  Progress,
-  Input,
-  Select,
-  Option,
+  Typography as RawTypography,
+  Button as RawButton,
+  Alert as RawAlert,
+  Progress as RawProgress,
+  Input as RawInput,
+  Select as RawSelect,
+  Option as RawOption,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
 } from '../ui/macos';
+const Card = RawCard as unknown as React.ComponentType<Record<string, unknown>>;
+const Typography = RawTypography as unknown as React.ComponentType<Record<string, unknown>>;
+const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
+const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
+const Progress = RawProgress as unknown as React.ComponentType<Record<string, unknown>>;
+const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
+const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
+const Option = RawOption as unknown as React.ComponentType<Record<string, unknown>>;
 import {
   Camera,
   Upload,
@@ -45,7 +51,8 @@ import notify from '../../services/notify';
 import { convertHEICToJPEG, isHEICFile } from '../../utils/heicConverter';
 import PropTypes from 'prop-types';
 const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [photos, setPhotos] = useState({
     before: [],
     after: []

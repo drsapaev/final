@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { api } from '../../api/client';
 import { useState, useEffect } from 'react';
 import { Card, Button,
@@ -46,16 +43,17 @@ import {
  * Полное управление ботом, шаблонами и уведомлениями
  */
 const TelegramManager = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [activeTab, setActiveTab] = useState('overview');
-  const [botStatus, setBotStatus] = useState(null);
-  const [settings, setSettings] = useState({});
-  const [templates, setTemplates] = useState({});
+  const [botStatus, setBotStatus] = useState(null as any);
+  const [settings, setSettings] = useState({} as any);
+  const [templates, setTemplates] = useState({} as any);
   const [users, setUsers] = useState([]);
-  const [stats, setStats] = useState(null);
+  const [stats, setStats] = useState(null as any);
   const [showTestModal, setShowTestModal] = useState(false);
   const [testMessage, setTestMessage] = useState('');
   const [testChatId, setTestChatId] = useState('');
@@ -322,7 +320,7 @@ const TelegramManager = () => {
               <Button
             onClick={testBotConnection}
             variant="outline"
-            size="sm"
+            size="small"
             disabled={loading}>
             
                 <RefreshCw className="w-4 h-4 mr-2" />
@@ -331,7 +329,7 @@ const TelegramManager = () => {
               <Button
             onClick={() => setShowTestModal(true)}
             variant="outline"
-            size="sm">
+            size="small">
             
                 <TestTube className="w-4 h-4 mr-2" />
                 {t('misc.tm_btn_send_test')}
@@ -407,7 +405,7 @@ const TelegramManager = () => {
               onClick={() => setSettings({ ...settings, bot_token: '' })}
               variant="outline"
               aria-label="Clear Telegram bot token"
-              size="sm">
+              size="small">
               
                 <Trash2 className="w-4 h-4" />
               </Button>
@@ -502,7 +500,7 @@ const TelegramManager = () => {
         <Button
         onClick={loadTemplates}
         variant="outline"
-        size="sm"
+        size="small"
         disabled={loading}>
         
           <RefreshCw className="w-4 h-4 mr-2" />
@@ -511,13 +509,13 @@ const TelegramManager = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {Object.entries(templates).map(([key, template]) =>
+        {Object.entries(templates).map(([key, template]: [string, any]) =>
       <Card key={key} className="p-4">
             <div className="flex items-center justify-between mb-2">
               <h4 className="font-medium capitalize">{key.replace('_', ' ')}</h4>
               <Button
               variant="ghost"
-              size="sm"
+              size="small"
               aria-label={`Edit Telegram template ${key}`}>
                 <Edit className="w-4 h-4" />
               </Button>
@@ -541,7 +539,7 @@ const TelegramManager = () => {
         <Button
         onClick={loadUsers}
         variant="outline"
-        size="sm"
+        size="small"
         disabled={loading}>
         
           <RefreshCw className="w-4 h-4 mr-2" />
@@ -589,7 +587,7 @@ const TelegramManager = () => {
                   </span>
                   <Button
                   variant="ghost"
-                  size="sm"
+                  size="small"
                   aria-label={`Message Telegram user ${user.username || user.chat_id}`}>
                     <MessageSquare className="w-4 h-4" />
                   </Button>
@@ -614,7 +612,7 @@ const TelegramManager = () => {
           <Button
             onClick={loadBotStatus}
             variant="outline"
-            size="sm"
+            size="small"
             disabled={loading}>
             
             <RefreshCw className="w-4 h-4 mr-2" />

@@ -1,22 +1,29 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect, useRef } from 'react';
+import type { CSSProperties } from 'react';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import {
   MacOSCard,
-  Button,
-  Input,
-  Select,
-  Table,
-  Badge,
-  Modal,
-  Alert,
-  Box,
-  Typography,
+  Button as RawButton,
+  Input as RawInput,
+  Select as RawSelect,
+  Table as RawTable,
+  Badge as RawBadge,
+  Modal as RawModal,
+  Alert as RawAlert,
+  Box as RawBox,
+  Typography as RawTypography,
 } from '../ui/macos';
+const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
+const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
+const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
+const Table = RawTable as unknown as React.ComponentType<Record<string, unknown>>;
+const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
+const Modal = RawModal as unknown as React.ComponentType<Record<string, unknown>>;
+const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
+const Box = RawBox as unknown as React.ComponentType<Record<string, unknown>>;
+const Typography = RawTypography as unknown as React.ComponentType<Record<string, unknown>>;
 import {
   Plus,
   Edit,
@@ -35,7 +42,8 @@ import { useRoles } from '../../hooks/useRoles';
 import { getProfile } from '../../stores/auth';
 
 const UserManagement = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -161,11 +169,11 @@ const UserManagement = () => {
     try {
       setLoading(true);
       // PR-22: use pagination — was per_page=100 with no pagination UI
-      const params = { page, per_page: perPage };
+      const params: any = { page, per_page: perPage };
       if (roleFilter) params.role = roleFilter;
       if (statusFilter) params.status = statusFilter;
       if (searchTerm) params.search = searchTerm;
-      const response = await api.get('/users/users', { params });
+      const response = await api.get('/users/users', { params }) as any;
       setUsers(response.data.users || response.data || []);
       setTotalPages(response.data.total_pages || 1);
       setTotalUsers(response.data.total || 0);
@@ -463,7 +471,7 @@ const UserManagement = () => {
           openActionsMenu(e, user);
         }}
         variant="ghost"
-        size="sm"
+        size="small"
         className="admin-w-32-h-32-p-0">
         
             <MoreVertical size={16} />
@@ -524,7 +532,7 @@ const UserManagement = () => {
             <Select
               label={t('admin2.um_filter_role_label')}
               value={roleFilter}
-              onChange={setRoleFilter}
+              onChange={(v: unknown) => setRoleFilter(String(v))}
               options={roleOptions}
               placeholder={t('admin2.um_filter_all_roles')}
               size="large"
@@ -537,7 +545,7 @@ const UserManagement = () => {
             <Select
               label={t('admin2.um_filter_status_label')}
               value={statusFilter}
-              onChange={setStatusFilter}
+              onChange={(v: unknown) => setStatusFilter(String(v))}
               options={statusOptions}
               placeholder={t('admin2.um_filter_all_statuses')}
               size="large"
@@ -577,14 +585,14 @@ const UserManagement = () => {
             <div style={{ display: 'flex', gap: '8px' }}>
               <Button
                 variant="secondary"
-                size="sm"
+                size="small"
                 disabled={currentPage <= 1 || loading}
                 onClick={() => { setCurrentPage(p => p - 1); loadUsers(currentPage - 1); }}>
                 {t('admin2.um_btn_prev')}
               </Button>
               <Button
                 variant="secondary"
-                size="sm"
+                size="small"
                 disabled={currentPage >= totalPages || loading}
                 onClick={() => { setCurrentPage(p => p + 1); loadUsers(currentPage + 1); }}>
                 {t('admin2.um_btn_next')}
@@ -601,13 +609,13 @@ const UserManagement = () => {
         ref={actionsMenuRef}
         role="menu"
         aria-label={t('admin2.um_actions_menu_aria')}
-        className="admin-pos-fixed-z-2000-w-208-p-6-radius-var-mac-radius-md-bd-1px-solid-var-mac-bo-bg-bg-primary-bsh-var-mac-shadow-lg-d-grid-gap-2-top-dyn-left-dyn" style={{ '--admin-top0': actionsMenuPosition.top, '--admin-left1': actionsMenuPosition.left }}>
+        className="admin-pos-fixed-z-2000-w-208-p-6-radius-var-mac-radius-md-bd-1px-solid-var-mac-bo-bg-bg-primary-bsh-var-mac-shadow-lg-d-grid-gap-2-top-dyn-left-dyn" style={{ '--admin-top0': actionsMenuPosition.top, '--admin-left1': actionsMenuPosition.left } as CSSProperties}>
 
         <Button
           type="button"
           role="menuitem"
           variant="ghost"
-          size="sm"
+          size="small"
           style={actionMenuItemStyle}
           startIcon={<Edit size={16} />}
           onClick={handleEditFromActionsMenu}>
@@ -617,7 +625,7 @@ const UserManagement = () => {
           type="button"
           role="menuitem"
           variant="ghost"
-          size="sm"
+          size="small"
           style={actionMenuItemStyle}
           startIcon={actionsMenuUser.is_active ? <Ban size={16} /> : <CheckCircle size={16} />}
           onClick={handleToggleStatusFromActionsMenu}>
@@ -628,7 +636,7 @@ const UserManagement = () => {
           type="button"
           role="menuitem"
           variant="ghost"
-          size="sm"
+          size="small"
           startIcon={<Trash2 size={16} />}
           className="admin-w-100pct-d-flex-ai-center-gap-10-p-9px-10px-bd-none-radius-var-mac-radius-sm-bg-transparent-primary-font-inherit-fs-13-ta-left-cur-pointer-error"
           onClick={handleDeleteFromActionsMenu}>
@@ -657,7 +665,7 @@ const UserManagement = () => {
               ? t('admin2.um_modal_title_action_unavailable')
               : t('admin2.um_modal_title_delete_confirm')
         }
-        size="sm">
+        size="small">
         
         <div className="admin-p-0-0-24px-0">
           {deleteDialogMode === 'confirm' ? (

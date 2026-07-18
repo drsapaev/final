@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 // Система форм с валидацией
 import React, { useState, useCallback } from 'react';
 import PropTypes from 'prop-types';
@@ -11,13 +8,14 @@ import { useTranslation } from '../../i18n/useTranslation';
 /**
  * Контекст для форм
  */
-const FormContext = React.createContext();
+const FormContext = React.createContext({} as any);
 
 /**
  * Провайдер контекста форм
  */
 export function FormProvider({ children }) {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [forms, setForms] = useState({});
 
   const registerForm = useCallback((formId, initialValues = {}) => {
@@ -119,10 +117,10 @@ export function useForm(formId, initialValues = {}) {
   }, [formId, initialValues, updateForm]);
 
   const validateForm = useCallback((validationRules) => {
-    const errors = {};
+    const errors: Record<string, unknown> = {};
     const values = form?.values || {};
 
-    Object.entries(validationRules).forEach(([name, rules]) => {
+    Object.entries(validationRules).forEach(([name, rules]: [string, any]) => {
       const value = values[name];
 
       if (rules.required && (!value || value.toString().trim() === '')) {
@@ -248,7 +246,7 @@ export function FormField({
 
     // Валидация при потере фокуса
     if (Object.keys(validationRules).length > 0) {
-      const rules = validationRules;
+      const rules = validationRules as any;
 
       if (rules.required && (!value || value.toString().trim() === '')) {
         setError(name, rules.required);
@@ -394,7 +392,7 @@ export function FormTextArea({
     setTouched(name, true);
 
     if (Object.keys(validationRules).length > 0) {
-      const rules = validationRules;
+      const rules = validationRules as any;
 
       if (rules.required && (!value || value.toString().trim() === '')) {
         setError(name, rules.required);
@@ -522,7 +520,7 @@ export function FormSelect({
     setTouched(name, true);
 
     if (Object.keys(validationRules).length > 0) {
-      const rules = validationRules;
+      const rules = validationRules as any;
 
       if (rules.required && (!value || value === '')) {
         setError(name, rules.required);

@@ -1,8 +1,6 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect } from 'react';
+import type { CSSProperties } from 'react';
 import {
   Server,
   Database,
@@ -30,14 +28,21 @@ import {
 'lucide-react';
 import {
   MacOSCard,
-  Button,
-  Badge,
-  Input,
-  Checkbox,
-  Table,
-  MacOSEmptyState,
-  Select,
+  Button as RawButton,
+  Badge as RawBadge,
+  Input as RawInput,
+  Checkbox as RawCheckbox,
+  Table as RawTable,
+  MacOSEmptyState as RawMacOSEmptyState,
+  Select as RawSelect,
 } from '../ui/macos';
+const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
+const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
+const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
+const Checkbox = RawCheckbox as unknown as React.ComponentType<Record<string, unknown>>;
+const Table = RawTable as unknown as React.ComponentType<Record<string, unknown>>;
+const MacOSEmptyState = RawMacOSEmptyState as unknown as React.ComponentType<Record<string, unknown>>;
+const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
 import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 
@@ -45,19 +50,21 @@ import logger from '../../utils/logger';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
 const SystemManagement = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
-  const [confirm, confirmDialog] = useConfirm();
+  const [confirmRaw, confirmDialog] = useConfirm();
+  const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
   const [activeTab, setActiveTab] = useState('monitoring');
   const [loading, setLoading] = useState(false);
 
   // Состояние мониторинга
-  const [systemHealth, setSystemHealth] = useState(null);
-  const [systemMetrics, setSystemMetrics] = useState(null);
+  const [systemHealth, setSystemHealth] = useState(null as any);
+  const [systemMetrics, setSystemMetrics] = useState(null as any);
   const [alerts, setAlerts] = useState([]);
   // UX Audit Admin #4.8: alerts display limit for pagination.
   const [alertsLimit, setAlertsLimit] = useState(10);
-  const [thresholds, setThresholds] = useState({});
+  const [thresholds, setThresholds] = useState({} as any);
 
   // Состояние бэкапов
   const [backups, setBackups] = useState([]);
@@ -65,7 +72,7 @@ const SystemManagement = () => {
     backup_type: 'database',
     include_files: true,
     description: ''
-  });
+  } as any);
 
   useEffect(() => {
     if (activeTab === 'monitoring') {
@@ -136,7 +143,7 @@ const SystemManagement = () => {
 
   const loadBackups = async () => {
     try {
-      const response = await api.get('/system/backup/list');
+      const response = await api.get('/system/backup/list') as any;
       setBackups(response.data?.backups || []);
     } catch (error) {
       logger.error('Ошибка загрузки бэкапов:', error);
@@ -146,7 +153,7 @@ const SystemManagement = () => {
   const createBackup = async () => {
     setLoading(true);
     try {
-      const response = await api.post('/system/backup/create', backupForm);
+      const response = await api.post('/system/backup/create', backupForm) as any;
       if (response.data?.success) {
         toast.success(t('admin2.sm_backup_creating'));
         setTimeout(() => loadBackups(), 2000); // Обновляем список через 2 секунды
@@ -176,7 +183,7 @@ const SystemManagement = () => {
     }
 
     try {
-      const response = await api.delete(`/system/backup/${backupName}`);
+      const response = await api.delete(`/system/backup/${backupName}`) as any;
       if (response.data?.success) {
         toast.success(t('admin2.sm_backup_deleted'));
         loadBackups();
@@ -250,7 +257,7 @@ const SystemManagement = () => {
           <Button
           onClick={collectMetricsNow}
           variant="outline"
-          size="sm">
+          size="small">
 
             <RefreshCw className="w-4 h-4 mr-2" />
             {t('admin2.sm_refresh')}
@@ -260,7 +267,7 @@ const SystemManagement = () => {
         {systemHealth &&
       <div className="admin-grid-auto-200">
             <div className="text-center">
-              <div className="admin-stat-value-dynamic" style={{ '--admin-stat-color': getStatusColor(systemHealth.overall_status) }}>
+              <div className="admin-stat-value-dynamic" style={{ '--admin-stat-color': getStatusColor(systemHealth.overall_status) } as CSSProperties}>
                 {systemHealth.overall_status?.toUpperCase()}
               </div>
               <div className="admin-text-sm-secondary">
@@ -272,12 +279,12 @@ const SystemManagement = () => {
           const StatusIcon = getStatusIcon(status);
           return (
             <div key={component} className="text-center">
-                  <StatusIcon className="admin-status-icon-32" style={{ '--admin-icon-color': getStatusColor(status) }} />
+                  <StatusIcon className="admin-status-icon-32" style={{ '--admin-icon-color': getStatusColor(status) } as CSSProperties} />
                   <div className="admin-text-med-primary-block">
                     {component}
                   </div>
-                  <div className="admin-stat-value-sm-dynamic" style={{ '--admin-stat-color': getStatusColor(status) }}>
-                    {status}
+                  <div className="admin-stat-value-sm-dynamic" style={{ '--admin-stat-color': getStatusColor(status) } as CSSProperties}>
+                    {status as React.ReactNode}
                   </div>
                 </div>);
 
@@ -478,7 +485,7 @@ const SystemManagement = () => {
           <Button
           onClick={loadBackups}
           variant="outline"
-          size="sm">
+          size="small">
 
             <RefreshCw className="w-4 h-4 mr-2" />
             {t('admin2.sm_refresh')}
@@ -516,7 +523,7 @@ const SystemManagement = () => {
           <div className="admin-flex-end-center-8">
                   <Button
                     type="button"
-                    size="sm"
+                    size="small"
                     variant="outline"
                     title={`View backup ${backup.name}`}
                     aria-label={`View backup ${backup.name}`}>
@@ -525,7 +532,7 @@ const SystemManagement = () => {
                   <Button
               type="button"
               onClick={() => deleteBackup(backup.name)}
-              size="sm"
+              size="small"
               variant="outline"
               title={`Delete backup ${backup.name}`}
               aria-label={`Delete backup ${backup.name}`}
@@ -619,7 +626,7 @@ const SystemManagement = () => {
                     {t('admin2.sm_daily_at_2')}
                   </div>
                 </div>
-                <Button size="sm" variant="outline">
+                <Button size="small" variant="outline">
                   {t('admin2.sm_configure')}
                 </Button>
               </div>
@@ -633,7 +640,7 @@ const SystemManagement = () => {
                     {t('admin2.sm_email_critical_alerts')}
                   </div>
                 </div>
-                <Button size="sm" variant="outline">
+                <Button size="small" variant="outline">
                   {t('admin2.sm_configure')}
                 </Button>
               </div>
@@ -693,7 +700,7 @@ const SystemManagement = () => {
               className="admin-tab-btn"
               data-active={isActive}>
 
-              <IconComponent className="w-4 h-4 admin-icon-16-color" style={{ '--admin-icon-color': isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)' }} />
+              <IconComponent className="w-4 h-4 admin-icon-16-color" style={{ '--admin-icon-color': isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)' } as CSSProperties} />
                 {tab.label}
               {isActive &&
               <div className="admin-tab-active-underline" />
@@ -710,7 +717,7 @@ const SystemManagement = () => {
       {activeTab === 'monitoring' && renderMonitoringTab()}
       {/* UX Audit Admin #3.2: backups-tab удалён — дублирует ClinicManagement. */}
       {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
-      {confirmDialog}
+      {confirmDialog as unknown as React.ReactNode}
     </div>);
 
 };

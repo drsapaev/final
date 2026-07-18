@@ -1,31 +1,42 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useState, useEffect } from 'react';
+import type { CSSProperties } from 'react';
 import {
-  Button,
-  Input,
-  Card,
+  Button as RawButton,
+  Input as RawInput,
+  Card as RawCard,
   CardHeader,
   CardTitle,
   CardDescription,
   CardContent,
-  Modal,
+  Modal as RawModal,
   Icon,
-  Badge,
-  Progress,
-  CircularProgress,
+  Badge as RawBadge,
+  Progress as RawProgress,
+  CircularProgress as RawCircularProgress,
   Sidebar,
-  Checkbox,
-  Radio,
-  Switch,
-  Select,
-  SegmentedControl,
-  Textarea,
+  Checkbox as RawCheckbox,
+  Radio as RawRadio,
+  Switch as RawSwitch,
+  Select as RawSelect,
+  SegmentedControl as RawSegmentedControl,
+  Textarea as RawTextarea,
 } from '../ui/macos';
+const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
+const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
+const Card = RawCard as unknown as React.ComponentType<Record<string, unknown>>;
+const Modal = RawModal as unknown as React.ComponentType<Record<string, unknown>>;
+const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
+const Progress = RawProgress as unknown as React.ComponentType<Record<string, unknown>>;
+const CircularProgress = RawCircularProgress as unknown as React.ComponentType<Record<string, unknown>>;
+const Checkbox = RawCheckbox as unknown as React.ComponentType<Record<string, unknown>>;
+const Radio = RawRadio as unknown as React.ComponentType<Record<string, unknown>>;
+const Switch = RawSwitch as unknown as React.ComponentType<Record<string, unknown>>;
+const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
+const SegmentedControl = RawSegmentedControl as unknown as React.ComponentType<Record<string, unknown>>;
+const Textarea = RawTextarea as unknown as React.ComponentType<Record<string, unknown>>;
 import './MacOSDemo.css';
 import { AccentPicker } from '../ui/macos';
-import { notify } from '../../services/notify.js';
+import { notify } from '../../services/notify';
 
 /**
  * macOS UI Demo Component
@@ -368,7 +379,7 @@ const MacOSDemo = () => {
                     { value: 'completed', label: 'Completed' }]
                     }
                     value={segmentedValue}
-                    onChange={setSegmentedValue} />
+                    onChange={(v: unknown) => setSegmentedValue(String(v))} />
 
                 </div>
                 
@@ -438,12 +449,12 @@ const MacOSDemo = () => {
                             borderBottom: isActive ? '2px solid var(--mac-accent-blue)' : '2px solid transparent',
                             marginBottom: '-1px'
                           }}
-                          onMouseEnter={(e) => {
+                          onMouseEnter={(e: any) => {
                             if (!isActive) {
                               e.target.style.color = 'var(--mac-text-primary)';
                             }
                           }}
-                          onMouseLeave={(e) => {
+                          onMouseLeave={(e: any) => {
                             if (!isActive) {
                               e.target.style.color = 'var(--mac-text-secondary)';
                             }
@@ -509,12 +520,12 @@ const MacOSDemo = () => {
                             position: 'relative',
                             marginBottom: '-1px'
                           }}
-                          onMouseEnter={(e) => {
+                          onMouseEnter={(e: any) => {
                             if (!isActive) {
                               e.target.style.color = 'var(--mac-text-primary)';
                             }
                           }}
-                          onMouseLeave={(e) => {
+                          onMouseLeave={(e: any) => {
                             if (!isActive) {
                               e.target.style.color = 'var(--mac-text-secondary)';
                             }
@@ -592,13 +603,13 @@ const MacOSDemo = () => {
                             transition: 'all var(--mac-duration-normal) var(--mac-ease)',
                             boxShadow: isActive ? 'var(--mac-shadow-sm)' : 'none'
                           }}
-                          onMouseEnter={(e) => {
+                          onMouseEnter={(e: any) => {
                             if (!isActive) {
                               e.target.style.backgroundColor = 'var(--mac-bg-tertiary)';
                               e.target.style.color = 'var(--mac-text-primary)';
                             }
                           }}
-                          onMouseLeave={(e) => {
+                          onMouseLeave={(e: any) => {
                             if (!isActive) {
                               e.target.style.backgroundColor = 'transparent';
                               e.target.style.color = 'var(--mac-text-secondary)';

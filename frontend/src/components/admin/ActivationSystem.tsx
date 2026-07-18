@@ -1,8 +1,6 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useTranslation } from '../../i18n/useTranslation';
 import { useCallback, useEffect, useState } from 'react';
+import type { CSSProperties } from 'react';
 import PropTypes from 'prop-types';
 import {
   Key,
@@ -26,10 +24,17 @@ import {
 
 'lucide-react';
 import {
-  AppError, AppLoading, MacOSCard, Button, Badge, Input, Table, Checkbox, Select,
+  AppError, AppLoading, MacOSCard, Button as RawButton, Badge as RawBadge, Input as RawInput, Table as RawTable, Checkbox as RawCheckbox, Select as RawSelect,
 } from '../ui/macos';
+const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
+const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
+const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
+const Table = RawTable as unknown as React.ComponentType<Record<string, unknown>>;
+const Checkbox = RawCheckbox as unknown as React.ComponentType<Record<string, unknown>>;
+const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
 // UX Audit: ModernDialog для extend-activation диалога (вместо window.prompt).
-import ModernDialog from '../dialogs/ModernDialog';
+import ModernDialogRaw from '../dialogs/ModernDialog';
+const ModernDialog = ModernDialogRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 import logger from '../../utils/logger';
 import api from '../../api/client';
@@ -54,12 +59,14 @@ const parseMeta = (meta) => {
 };
 
 const ActivationSystem = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // P-013 fix: shared ConfirmDialog hook (replaces 1 native confirm() call).
-  const [confirm, confirmDialog] = useConfirm();
+  const [confirmRaw, confirmDialog] = useConfirm();
+  const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
   const [loading, setLoading] = useState(true);
-  const [activations, setActivations] = useState([]);
-  const [stats, setStats] = useState({});
+  const [activations, setActivations] = useState([] as any[]);
+  const [stats, setStats] = useState(null as any);
   const [serverStatus, setServerStatus] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -119,7 +126,7 @@ const ActivationSystem = () => {
         })
       };
 
-      const response = await api.post('/activation/issue', payload);
+      const response = await api.post('/activation/issue', payload) as any;
       const result = response.data || {};
       setMessage({ type: 'success', text: t('admin2.act_key_created') });
       setShowCreateForm(false);
@@ -209,7 +216,7 @@ const ActivationSystem = () => {
         <AppLoading
           title={t('admin2.act_loading_title')}
           description={t('admin2.act_loading_desc')}
-          size="sm"
+          size="small"
         />
       </MacOSCard>);
 
@@ -261,7 +268,7 @@ const ActivationSystem = () => {
         '--admin-banner-bg': serverStatus.ok ? 'var(--mac-success-bg)' : 'var(--mac-warning-bg)',
         '--admin-banner-color': serverStatus.ok ? 'var(--mac-success)' : 'var(--mac-warning)',
         '--admin-banner-border': serverStatus.ok ? 'var(--mac-success-border)' : 'var(--mac-warning-border)'
-      }}>
+      } as CSSProperties}>
           <Badge variant={serverStatus.ok ? 'success' : 'warning'}>
             {serverStatus.ok ? t('admin2.act_server_activated') : t('admin2.act_server_not_activated')}
           </Badge>
@@ -279,7 +286,7 @@ const ActivationSystem = () => {
         '--admin-banner-bg': message.type === 'success' ? 'var(--mac-success-bg)' : 'var(--mac-error-bg)',
         '--admin-banner-color': message.type === 'success' ? 'var(--mac-success)' : 'var(--mac-error)',
         '--admin-banner-border': message.type === 'success' ? 'var(--mac-success-border)' : 'var(--mac-error-border)'
-      }}>
+      } as CSSProperties}>
           {message.type === 'success' ?
         <CheckCircle className="w-5 h-5 mr-2" /> :
 
@@ -348,7 +355,7 @@ const ActivationSystem = () => {
             </label>
             <Select
               value={statusFilter}
-              onChange={(value) => setStatusFilter(value)}
+              onChange={(value: unknown) => setStatusFilter(String(value))}
               options={[
               { value: 'all', label: t('admin2.act_filter_all') },
               { value: 'issued', label: t('admin2.act_filter_issued') },
@@ -379,7 +386,7 @@ const ActivationSystem = () => {
                         {(activation || {}).key?.slice(0, 8)}...{(activation || {}).key?.slice(-4)}
                       </div>
                       <Button
-                    size="sm"
+                    size="small"
                     variant="ghost"
                     onClick={() => copyToClipboard((activation || {}).key)}
                     className="admin-btn-ghost-xs-mt-4">
@@ -429,7 +436,7 @@ const ActivationSystem = () => {
                       </div>
                       {isExpired &&
                     <div className="admin-expiry-expired">
-                          {t('admin2.act_expired_ago', { days: Math.floor((new Date() - new Date(row.expiry_date)) / (1000 * 60 * 60 * 24)) })}
+                          {t('admin2.act_expired_ago', { days: Math.floor((new Date().getTime() - new Date(row.expiry_date).getTime()) / (1000 * 60 * 60 * 24)) })}
                         </div>
                     }
                     </div>);
@@ -451,7 +458,7 @@ const ActivationSystem = () => {
               render: (_actionValue, activation) =>
               <div className="admin-form-row-gap-8">
                     <Button
-                  size="sm"
+                  size="small"
                   variant="outline"
                   onClick={() => extendActivation((activation || {}).key)}
                   disabled={(activation || {}).status === 'revoked'}
@@ -462,7 +469,7 @@ const ActivationSystem = () => {
                       <Calendar aria-hidden="true" className="w-3.5 h-3.5" />
                     </Button>
                     <Button
-                  size="sm"
+                  size="small"
                   variant="outline"
                   onClick={() => revokeActivation((activation || {}).key)}
                   disabled={(activation || {}).status === 'revoked'}
@@ -518,7 +525,7 @@ const ActivationSystem = () => {
         </div>
       </MacOSCard>
       {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
-      {confirmDialog}
+      {confirmDialog as unknown as React.ReactNode}
 
       {/* UX Audit: Extend activation dialog (replaces window.prompt). */}
       <ModernDialog
@@ -555,7 +562,8 @@ const ActivationSystem = () => {
 
 // Компонент формы создания ключа
 const ActivationKeyForm = ({ onSave, onCancel }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [formData, setFormData] = useState({
     key_type: 'full',
     duration_days: 365,
@@ -657,7 +665,7 @@ const ActivationKeyForm = ({ onSave, onCancel }) => {
             <label className="admin-label-flex-center-activation">
               <Checkbox
                 checked={formData.features.full_access}
-                onChange={(e) => handleFeatureChange('full_access', e.target.checked)}
+                onChange={(e: any) => handleFeatureChange('full_access', e?.target?.checked ?? e)}
                 className="mr-2" />
               <span className="admin-span-sm-primary">{t('admin2.act_form_feature_full_access')}</span>
             </label>
@@ -665,7 +673,7 @@ const ActivationKeyForm = ({ onSave, onCancel }) => {
             <label className="admin-label-flex-center-activation">
               <Checkbox
                 checked={formData.features.ai_features}
-                onChange={(e) => handleFeatureChange('ai_features', e.target.checked)}
+                onChange={(e: any) => handleFeatureChange('ai_features', e?.target?.checked ?? e)}
                 className="mr-2" />
               <span className="admin-span-sm-primary">{t('admin2.act_form_feature_ai')}</span>
             </label>
@@ -673,7 +681,7 @@ const ActivationKeyForm = ({ onSave, onCancel }) => {
             <label className="admin-label-flex-center-activation">
               <Checkbox
                 checked={formData.features.telegram_integration}
-                onChange={(e) => handleFeatureChange('telegram_integration', e.target.checked)}
+                onChange={(e: any) => handleFeatureChange('telegram_integration', e?.target?.checked ?? e)}
                 className="mr-2" />
               <span className="admin-span-sm-primary">{t('admin2.act_form_feature_telegram')}</span>
             </label>
@@ -681,7 +689,7 @@ const ActivationKeyForm = ({ onSave, onCancel }) => {
             <label className="admin-label-flex-center-activation">
               <Checkbox
                 checked={formData.features.print_system}
-                onChange={(e) => handleFeatureChange('print_system', e.target.checked)}
+                onChange={(e: any) => handleFeatureChange('print_system', e?.target?.checked ?? e)}
                 className="mr-2" />
               <span className="admin-span-sm-primary">{t('admin2.act_form_feature_print')}</span>
             </label>
