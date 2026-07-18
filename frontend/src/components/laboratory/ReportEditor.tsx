@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import PropTypes from 'prop-types';
 import { Badge, Icon, Input } from '../ui/macos';
@@ -38,7 +36,7 @@ export default function ReportEditor({
   reportHistory,
   notify,
 }) {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // STRAT#2: labToast for interactive numeric validation toasts.
   const labToast = useLabToast(notify);
 
@@ -63,7 +61,7 @@ export default function ReportEditor({
             >
               {section.title || section.key}
               {/* L-M-11 fix: заменены ▶/▼ (CJK punctuation) на lucide chevron icons */}
-              <Icon name={isCollapsed ? 'chevron.right' : 'chevron.down'} size={14} />
+              <Icon name={isCollapsed ? 'chevron.right' : 'chevron.down'} size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
             </div>
             {!isCollapsed && (
             <div style={{ padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', display: 'grid', gap: '10px' }}>

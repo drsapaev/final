@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect, useMemo } from 'react';
@@ -15,13 +13,15 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  Typography,
+  Typography as TypographyRaw,
   Box,
 } from '../ui/macos';
 import notify from '../../services/notify';
 import { formatUZS } from '../../utils/formatCurrency';
 // UX Audit #4 regression fix: inline-стили → CSS-классы (после PR #1910 regression).
 import './CashPaymentModal.css';
+import React from "react";
+const Typography = TypographyRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 /**
  * Cash Payment Modal Component
@@ -45,7 +45,7 @@ const getPaymentMethodOptions = (t) => [
 const QUICK_CASH_DENOMINATIONS = [50000, 100000, 200000, 500000];
 
 const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
-    const { t } = useTranslation();
+    const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
     // Auto-fill amount from appointment data
     const defaultAmount = appointment?.total_amount ||
         appointment?.remaining_amount ||
@@ -175,7 +175,7 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
                             id="cash-payment-method"
                             aria-label={t('payment.pay_cash_method_aria')}
                             value={paymentData.method}
-                            onChange={(value) => setPaymentData(prev => ({ ...prev, method: value }))}
+                            onChange={(value) => setPaymentData(prev => ({ ...prev, method: value as unknown as string }))}
                             options={getPaymentMethodOptions(t)}
                             className="cpm-select-full"
                         />

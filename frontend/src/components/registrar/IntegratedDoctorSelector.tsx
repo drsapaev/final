@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useState, useEffect } from 'react';
 import {
@@ -37,10 +35,10 @@ const IntegratedDoctorSelector = ({
   showSchedule = true,
   className = ''
 }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [loading, setLoading] = useState(true);
   const [doctors, setDoctors] = useState([]);
-  const [queueSettings, setQueueSettings] = useState({});
+  const [queueSettings, setQueueSettings] = useState<Record<string, any>>({});
   const [error, setError] = useState('');
 
   // Иконки специальностей
@@ -116,9 +114,9 @@ const IntegratedDoctorSelector = ({
     if (!specialtySettings) return null;
 
     return {
-      startNumber: specialtySettings.start_number,
-      maxPerDay: specialtySettings.max_per_day,
-      queueRange: `${specialtySettings.start_number}-${specialtySettings.start_number + specialtySettings.max_per_day - 1}`
+      startNumber: specialtySettings?.start_number,
+      maxPerDay: specialtySettings?.max_per_day,
+      queueRange: `${specialtySettings?.start_number}-${specialtySettings?.start_number + specialtySettings?.max_per_day - 1}`
     };
   };
 
