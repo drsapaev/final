@@ -18,7 +18,6 @@ interface TextareaProps extends Omit<React.TextareaHTMLAttributes<HTMLTextAreaEl
   // Backward-compat: many callers pass label/rows
   label?: React.ReactNode;
   rows?: number;
-  [key: string]: any;
 }
 
 interface TextareaStyle extends CSSProperties {
@@ -77,7 +76,7 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(({
     }
   };
 
-  const currentVariant: TextareaVariant = error ? 'error' : variant;
+  const currentVariant = error ? 'error' : variant;
   const currentSize = sizeStyles[size];
   const currentVariantStyle = variantStyles[currentVariant];
 

@@ -10,7 +10,7 @@ interface TypographyProps {
   paragraph?: boolean;
   component?: string | React.ComponentType<any>;
   className?: string;
-  [key: string]: any;
+  fontWeight?: number | string;
 }
 // Minimal macOS-style Typography supporting common MUI variants
 const variantMap = {

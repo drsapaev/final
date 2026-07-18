@@ -11,7 +11,6 @@ interface MacOSEmptyStateProps {
   variant?: string;
   className?: string;
   style?: CSSProperties;
-  [key: string]: any;
 }
 
 const MacOSEmptyState = ({

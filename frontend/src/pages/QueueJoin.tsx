@@ -1342,7 +1342,7 @@ const QueueJoin = () => {
                       }
 
                       // Разрешаем только цифры и + в начале
-                      if (!/\d/.test(e.key) && !(e.key === '+' && e.target.selectionStart === 0)) {
+                      if (!/\d/.test(e.key) && !(e.key === '+' && e.currentTarget.selectionStart === 0)) {
                         e.preventDefault();
                       }
                     }}

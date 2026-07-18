@@ -37,8 +37,13 @@ interface AlertProps {
   action?: React.ReactNode;
   dismissible?: boolean;
   onDismiss?: () => void;
+  onClose?: () => void;
   style?: React.CSSProperties;
-  [key: string]: any;
+  className?: string;
+  icon?: React.ReactNode;
+  role?: string;
+  variant?: string;
+  sx?: Record<string, unknown>;
 }
 
 const Alert = ({
