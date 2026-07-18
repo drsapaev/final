@@ -1,13 +1,10 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { MemoryRouter } from 'react-router-dom';
-import { ChatProvider, useChat } from '../ChatContext.tsx';
-import { MESSAGE_EVENT_TYPES } from '../../constants/messagingContract.ts';
+import { ChatProvider, useChat } from '../ChatContext';
+import { MESSAGE_EVENT_TYPES } from '../../constants/messagingContract';
 
 const {
   authMock,
@@ -89,6 +86,9 @@ vi.mock('../../api/runtime', () => ({
 }));
 
 class MockAudioContext {
+  currentTime: number;
+  destination: Record<string, unknown>;
+
   constructor() {
     this.currentTime = 0;
     this.destination = {};
@@ -115,41 +115,93 @@ class MockAudioContext {
   }
 }
 
+interface MockWsEvent {
+  code?: number;
+  reason?: string;
+  data?: string;
+}
+
+interface MockWebSocketInstance {
+  url: string;
+  readyState: number;
+  sent: string[];
+  onopen: ((e?: MockWsEvent) => void) | null;
+  onmessage: ((e: MockWsEvent) => void) | null;
+  onclose: ((e: MockWsEvent) => void) | null;
+  onerror: ((e?: unknown) => void) | null;
+  send: ReturnType<typeof vi.fn>;
+  close: ReturnType<typeof vi.fn>;
+  triggerOpen: () => void;
+  triggerMessage: (data: unknown) => void;
+}
+
 class MockWebSocket {
   static CONNECTING = 0;
   static OPEN = 1;
   static CLOSING = 2;
   static CLOSED = 3;
+  static instances: MockWebSocketInstance[] = [];
 
-  constructor(url) {
+  url: string;
+  readyState: number;
+  sent: string[];
+  onopen: ((e?: MockWsEvent) => void) | null;
+  onmessage: ((e: MockWsEvent) => void) | null;
+  onclose: ((e: MockWsEvent) => void) | null;
+  onerror: ((e?: unknown) => void) | null;
+  send: ReturnType<typeof vi.fn>;
+  close: ReturnType<typeof vi.fn>;
+
+  constructor(url: string) {
     this.url = url;
     this.readyState = MockWebSocket.CONNECTING;
     this.sent = [];
-    MockWebSocket.instances.push(this);
+    this.onopen = null;
+    this.onmessage = null;
+    this.onclose = null;
+    this.onerror = null;
+    this.send = vi.fn((payload: string) => {
+      this.sent.push(payload);
+    });
+    this.close = vi.fn(() => {
+      this.readyState = MockWebSocket.CLOSED;
+      this.onclose?.({ code: 1000 });
+    });
+    MockWebSocket.instances.push(this as unknown as MockWebSocketInstance);
   }
-
-  send = vi.fn((payload) => {
-    this.sent.push(payload);
-  });
-
-  close = vi.fn(() => {
-    this.readyState = MockWebSocket.CLOSED;
-    this.onclose?.({ code: 1000 });
-  });
 
   triggerOpen() {
     this.readyState = MockWebSocket.OPEN;
     this.onopen?.();
   }
 
-  triggerMessage(data) {
+  triggerMessage(data: unknown) {
     this.onmessage?.({ data: JSON.stringify(data) });
   }
 }
 
-MockWebSocket.instances = [];
+// Cast the mocks through unknown to expose vitest mock methods.
+const messagesApiMockTyped = messagesApiMock as unknown as Record<string, ReturnType<typeof vi.fn>>;
+const loggerMockTyped = loggerMock as unknown as Record<string, ReturnType<typeof vi.fn>>;
 
-function ChatHarness({ openChat = true }) {
+interface ChatMessage {
+  is_read?: boolean;
+}
+
+interface ChatContextValue {
+  messages: ChatMessage[];
+  unreadCount: number;
+  activeConversation: number | null;
+  isChatOpen: boolean;
+  setActiveConversation: (id: number | null) => void;
+  setIsChatOpen: (open: boolean) => void;
+}
+
+function useChatTyped(): ChatContextValue {
+  return useChat() as unknown as ChatContextValue;
+}
+
+function ChatHarness({ openChat = true }: { openChat?: boolean }) {
   const {
     messages,
     unreadCount,
@@ -157,7 +209,7 @@ function ChatHarness({ openChat = true }) {
     isChatOpen,
     setActiveConversation,
     setIsChatOpen,
-  } = useChat();
+  } = useChatTyped();
 
   useEffect(() => {
     setActiveConversation(2);
@@ -195,7 +247,7 @@ describe('ChatContext', () => {
   beforeEach(() => {
     MockWebSocket.instances = [];
     vi.clearAllMocks();
-    global.WebSocket = MockWebSocket;
+    global.WebSocket = MockWebSocket as unknown as typeof WebSocket;
     Object.defineProperty(window, 'WebSocket', {
       writable: true,
       value: MockWebSocket,
@@ -218,8 +270,8 @@ describe('ChatContext', () => {
     renderChat(true);
 
     await waitFor(() => {
-      expect(messagesApiMock.getConversations).toHaveBeenCalled();
-      expect(messagesApiMock.getUnreadCount).toHaveBeenCalled();
+      expect(messagesApiMockTyped.getConversations).toHaveBeenCalled();
+      expect(messagesApiMockTyped.getUnreadCount).toHaveBeenCalled();
     });
 
     await waitFor(() => {
@@ -232,8 +284,8 @@ describe('ChatContext', () => {
     });
 
     await waitFor(() => {
-      expect(messagesApiMock.getConversations).toHaveBeenCalledTimes(1);
-      expect(messagesApiMock.getUnreadCount).toHaveBeenCalledTimes(1);
+      expect(messagesApiMockTyped.getConversations).toHaveBeenCalledTimes(1);
+      expect(messagesApiMockTyped.getUnreadCount).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -251,8 +303,8 @@ describe('ChatContext', () => {
       expect(screen.getByTestId('unread-count')).toHaveTextContent('0');
     });
 
-    expect(messagesApiMock.getConversations).not.toHaveBeenCalled();
-    expect(messagesApiMock.getUnreadCount).not.toHaveBeenCalled();
+    expect(messagesApiMockTyped.getConversations).not.toHaveBeenCalled();
+    expect(messagesApiMockTyped.getUnreadCount).not.toHaveBeenCalled();
   });
 
   it('auto-marks incoming messages as read when the active conversation is open and focused', async () => {
@@ -287,7 +339,7 @@ describe('ChatContext', () => {
     });
 
     await waitFor(() => {
-      expect(messagesApiMock.markAsRead).toHaveBeenCalledWith(99);
+      expect(messagesApiMockTyped.markAsRead).toHaveBeenCalledWith(99);
       expect(screen.getByTestId('message-count')).toHaveTextContent('1');
       expect(screen.getByTestId('latest-message-read')).toHaveTextContent('true');
       expect(screen.getByTestId('unread-count')).toHaveTextContent('0');
@@ -322,7 +374,7 @@ describe('ChatContext', () => {
     });
 
     await waitFor(() => {
-      expect(loggerMock.warn).toHaveBeenCalledWith(
+      expect(loggerMockTyped.warn).toHaveBeenCalledWith(
         '[FIX:WS] Messaging contract version mismatch',
         expect.objectContaining({
           expected: '2026-03',
@@ -335,7 +387,7 @@ describe('ChatContext', () => {
   });
 
   it('does not auto-mark incoming messages when the chat is closed', async () => {
-    messagesApiMock.getConversations.mockResolvedValueOnce({
+    messagesApiMockTyped.getConversations.mockResolvedValueOnce({
       conversations: [],
       total_unread: 1,
     });
@@ -371,7 +423,7 @@ describe('ChatContext', () => {
     });
 
     await waitFor(() => {
-      expect(messagesApiMock.markAsRead).not.toHaveBeenCalled();
+      expect(messagesApiMockTyped.markAsRead).not.toHaveBeenCalled();
       expect(screen.getByTestId('message-count')).toHaveTextContent('1');
       expect(screen.getByTestId('latest-message-read')).toHaveTextContent('false');
       expect(screen.getByTestId('unread-count')).toHaveTextContent('1');

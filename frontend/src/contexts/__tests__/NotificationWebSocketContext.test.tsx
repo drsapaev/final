@@ -1,11 +1,8 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { act, render } from '@testing-library/react';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import PropTypes from 'prop-types';
 import { MemoryRouter } from 'react-router-dom';
-import { NotificationWebSocketProvider } from '../NotificationWebSocketContext.tsx';
+import { NotificationWebSocketProvider } from '../NotificationWebSocketContext';
 
 const {
   notificationCenterMock,
@@ -16,7 +13,7 @@ const {
   cacheMock,
 } = vi.hoisted(() => {
   const notificationCenterMock = {
-    appendNotification: vi.fn((notification) => notification),
+    appendNotification: vi.fn((notification: unknown) => notification),
     replaceNotifications: vi.fn(),
     updateUnreadSnapshot: vi.fn(),
   };
@@ -33,7 +30,7 @@ const {
   };
 
   const runtimeMock = {
-    buildWsUrl: vi.fn((path) => `ws://localhost:18000${path}`),
+    buildWsUrl: vi.fn((path: string) => `ws://localhost:18000${path}`),
   };
 
   const notifyMock = {
@@ -81,34 +78,74 @@ vi.mock('../../api/services', () => ({
   clearNotificationQueryCache: cacheMock.clearNotificationQueryCache,
 }));
 
+// Cast the notification center mock through unknown so we can read
+// mock.calls without fighting the original signature.
+const notificationCenterMockTyped = notificationCenterMock as unknown as {
+  appendNotification: ReturnType<typeof vi.fn>;
+  replaceNotifications: ReturnType<typeof vi.fn>;
+  updateUnreadSnapshot: ReturnType<typeof vi.fn>;
+};
+const tokenManagerMockTyped = tokenManagerMock as unknown as {
+  getAccessToken: ReturnType<typeof vi.fn>;
+  isTokenValid: ReturnType<typeof vi.fn>;
+};
+
+interface MockWsEvent {
+  code?: number;
+  reason?: string;
+  data?: string;
+}
+
+interface MockWebSocketInstance {
+  url: string;
+  readyState: number;
+  onopen: ((e?: MockWsEvent) => void) | null;
+  onmessage: ((e: MockWsEvent) => void) | null;
+  onclose: ((e: MockWsEvent) => void) | null;
+  onerror: ((e?: unknown) => void) | null;
+  close: ReturnType<typeof vi.fn>;
+  triggerOpen: () => void;
+  triggerMessage: (payload: unknown) => void;
+}
+
 class MockWebSocket {
   static CONNECTING = 0;
   static OPEN = 1;
   static CLOSING = 2;
   static CLOSED = 3;
+  static instances: MockWebSocketInstance[] = [];
 
-  constructor(url) {
+  url: string;
+  readyState: number;
+  onopen: ((e?: MockWsEvent) => void) | null;
+  onmessage: ((e: MockWsEvent) => void) | null;
+  onclose: ((e: MockWsEvent) => void) | null;
+  onerror: ((e?: unknown) => void) | null;
+  close: ReturnType<typeof vi.fn>;
+
+  constructor(url: string) {
     this.url = url;
     this.readyState = MockWebSocket.CONNECTING;
-    MockWebSocket.instances.push(this);
+    this.onopen = null;
+    this.onmessage = null;
+    this.onclose = null;
+    this.onerror = null;
+    this.close = vi.fn(() => {
+      this.readyState = MockWebSocket.CLOSED;
+      this.onclose?.({ code: 1000, reason: 'Unmount' });
+    });
+    MockWebSocket.instances.push(this as unknown as MockWebSocketInstance);
   }
-
-  close = vi.fn(() => {
-    this.readyState = MockWebSocket.CLOSED;
-    this.onclose?.({ code: 1000, reason: 'Unmount' });
-  });
 
   triggerOpen() {
     this.readyState = MockWebSocket.OPEN;
     this.onopen?.();
   }
 
-  triggerMessage(payload) {
+  triggerMessage(payload: unknown) {
     this.onmessage?.({ data: JSON.stringify(payload) });
   }
 }
-
-MockWebSocket.instances = [];
 
 function Harness() {
   return <div data-testid="ws-harness" />;
@@ -116,7 +153,7 @@ function Harness() {
 
 Harness.propTypes = {};
 
-function renderProvider(pathname) {
+function renderProvider(pathname: string) {
   return render(
     <MemoryRouter initialEntries={[pathname]}>
       <NotificationWebSocketProvider>
@@ -131,7 +168,7 @@ describe('NotificationWebSocketContext', () => {
     MockWebSocket.instances = [];
     vi.clearAllMocks();
     vi.useFakeTimers();
-    global.WebSocket = MockWebSocket;
+    global.WebSocket = MockWebSocket as unknown as typeof WebSocket;
     Object.defineProperty(window, 'WebSocket', {
       writable: true,
       value: MockWebSocket,
@@ -166,7 +203,7 @@ describe('NotificationWebSocketContext', () => {
     });
 
     expect(MockWebSocket.instances).toHaveLength(0);
-    expect(tokenManagerMock.isTokenValid).not.toHaveBeenCalled();
+    expect(tokenManagerMockTyped.isTokenValid).not.toHaveBeenCalled();
   });
 
   it('normalizes legacy queue_changed websocket events to queue_update', async () => {
@@ -186,8 +223,11 @@ describe('NotificationWebSocketContext', () => {
       });
     });
 
-    expect(notificationCenterMock.appendNotification).toHaveBeenCalledTimes(1);
-    const [notification, source] = notificationCenterMock.appendNotification.mock.calls[0];
+    expect(notificationCenterMockTyped.appendNotification).toHaveBeenCalledTimes(1);
+    const [notification, source] = notificationCenterMockTyped.appendNotification.mock.calls[0] as [
+      { type: string; title: string },
+      string
+    ];
     expect(notification.type).toBe('queue_update');
     expect(notification.title).toBe('Обновление очереди');
     expect(source).toBe('ws');
@@ -211,8 +251,11 @@ describe('NotificationWebSocketContext', () => {
       });
     });
 
-    expect(notificationCenterMock.appendNotification).toHaveBeenCalledTimes(1);
-    const [notification, source] = notificationCenterMock.appendNotification.mock.calls[0];
+    expect(notificationCenterMockTyped.appendNotification).toHaveBeenCalledTimes(1);
+    const [notification, source] = notificationCenterMockTyped.appendNotification.mock.calls[0] as [
+      { type: string; title: string },
+      string
+    ];
     expect(notification.type).toBe('diagnostics_return_needed');
     expect(notification.title).toBe('Повторная диагностика');
     expect(source).toBe('ws');
