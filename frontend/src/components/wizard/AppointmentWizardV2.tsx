@@ -159,13 +159,13 @@ const AppointmentWizardV2 = ({
   });
 
   // Состояние UI
-  const [errors, setErrors] = useState({});
+  const [errors, setErrors] = useState({} as any);
   const [patientSuggestions, setPatientSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [searchTimeout, setSearchTimeout] = useState(null);
+  const [searchTimeout, setSearchTimeout] = useState(null as any);
   const [isSearchingPatients, setIsSearchingPatients] = useState(false); // UX Audit Registrar #11
-  const [phoneCheckTimeout, setPhoneCheckTimeout] = useState(null); // ✅ Timeout для проверки телефона
-  const [phoneError, setPhoneError] = useState(null); // ✅ Ошибка уникальности телефона
+  const [phoneCheckTimeout, setPhoneCheckTimeout] = useState(null as any); // ✅ Timeout для проверки телефона
+  const [phoneError, setPhoneError] = useState(null as any); // ✅ Ошибка уникальности телефона
   const [servicesData, setServicesData] = useState([]);
   const [doctorsData, setDoctorsData] = useState([]);
   const [filteredServices, setFilteredServices] = useState([]);
@@ -173,7 +173,7 @@ const AppointmentWizardV2 = ({
   // PR-25: queue profiles for dynamic department filtering
   const [queueProfiles, setQueueProfiles] = useState([]);
   const [formattedBirthDate, setFormattedBirthDate] = useState('');
-  const [repeatEligibilityByItemId, setRepeatEligibilityByItemId] = useState({});
+  const [repeatEligibilityByItemId, setRepeatEligibilityByItemId] = useState({} as any);
   const [isRepeatEligibilityLoading, setIsRepeatEligibilityLoading] = useState(false);
 
   // ===================== ИНИЦИАЛИЗАЦИЯ (EDIT MODE vs DRAFT) =====================
@@ -2647,11 +2647,11 @@ const AppointmentWizardV2 = ({
       title={t('misc.aw_close')}
       aria-label={t('misc.aw_close')}
       style={wizardHeaderCloseStyle}
-      onMouseEnter={(e) => {
+      onMouseEnter={(e: any) => {
         e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)';
         e.currentTarget.style.borderColor = 'var(--mac-border-secondary)';
       }}
-      onMouseLeave={(e) => {
+      onMouseLeave={(e: any) => {
         e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)';
         e.currentTarget.style.borderColor = 'var(--mac-border)';
       }}>
@@ -2703,14 +2703,14 @@ const AppointmentWizardV2 = ({
           transform: activeServiceCategory === cat.id ? 'translateY(-1px)' : 'translateY(0)',
           boxShadow: activeServiceCategory === cat.id ? '0 6px 14px rgba(59, 130, 246, 0.08)' : 'var(--mac-shadow-sm)'
         }}
-        onMouseEnter={(e) => {
+        onMouseEnter={(e: any) => {
           if (activeServiceCategory !== cat.id) {
             e.currentTarget.style.background = 'var(--mac-bg-tertiary)';
             e.currentTarget.style.transform = 'translateY(-1px)';
             e.currentTarget.style.boxShadow = 'var(--mac-shadow-sm)';
           }
         }}
-        onMouseLeave={(e) => {
+        onMouseLeave={(e: any) => {
           if (activeServiceCategory !== cat.id) {
             e.currentTarget.style.background = 'var(--mac-bg-secondary)';
             e.currentTarget.style.transform = 'translateY(0)';
@@ -2757,14 +2757,14 @@ const AppointmentWizardV2 = ({
           transition: 'all 0.2s',
           boxShadow: 'var(--mac-shadow-sm)'
         }}
-        onMouseEnter={(e) => {
+        onMouseEnter={(e: any) => {
           if (!isReloadingServices) {
             e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)';
             e.currentTarget.style.borderColor = 'var(--mac-primary)';
             e.currentTarget.style.color = 'var(--mac-primary)';
           }
         }}
-        onMouseLeave={(e) => {
+        onMouseLeave={(e: any) => {
           e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)';
           e.currentTarget.style.borderColor = 'var(--mac-border)';
           e.currentTarget.style.color = 'var(--mac-text-secondary)';
@@ -2793,12 +2793,12 @@ const AppointmentWizardV2 = ({
           transition: 'all 0.2s',
           boxShadow: 'var(--mac-shadow-sm)'
         }}
-        onMouseEnter={(e) => {
+        onMouseEnter={(e: any) => {
           e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)';
           e.currentTarget.style.borderColor = 'var(--mac-border-secondary)';
           e.currentTarget.style.color = 'var(--mac-text-primary)';
         }}
-        onMouseLeave={(e) => {
+        onMouseLeave={(e: any) => {
           e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)';
           e.currentTarget.style.borderColor = 'var(--mac-border)';
           e.currentTarget.style.color = 'var(--mac-text-secondary)';

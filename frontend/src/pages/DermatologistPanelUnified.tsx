@@ -174,7 +174,7 @@ const DermatologistPanelUnified = () => {
   // STRAT#33: useTranslation adapter for confirm/notify i18n.
   const { t: tI18n } = useTranslation();
   // QW-6 (UX audit): session timeout warning
-  const [sessionWarning, setSessionWarning] = useState(null);
+  const [sessionWarning, setSessionWarning] = useState(null as any);
 
   useSessionTimeoutWarning({
     onWarning: () => setSessionWarning({ active: true }),
@@ -228,7 +228,7 @@ const DermatologistPanelUnified = () => {
   // Состояния для таблицы записей
   const [appointments, setAppointments] = useState([]);
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
-  const [services, setServices] = useState({});
+  const [services, setServices] = useState({} as any);
   const appointmentsLoadPromiseRef = useRef(null);
   const urlResolutionRef = useRef({ search: '', refreshAttempted: false, notified: false });
 
@@ -266,9 +266,9 @@ const DermatologistPanelUnified = () => {
 
   // Дополнительные состояния из старого файла
   const [patients, setPatients] = useState([]);
-  const [currentAppointment, setCurrentAppointment] = useState(null);
-  const [emr, setEmr] = useState(null);
-  const [prescription, setPrescription] = useState(null);
+  const [currentAppointment, setCurrentAppointment] = useState(null as any);
+  const [emr, setEmr] = useState(null as any);
+  const [prescription, setPrescription] = useState(null as any);
   const [canCreatePrescription, setCanCreatePrescription] = useState(false);
   const [doctorPrice, setDoctorPrice] = useState('');
 

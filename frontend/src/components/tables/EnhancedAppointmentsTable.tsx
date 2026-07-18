@@ -1472,12 +1472,12 @@ const EnhancedAppointmentsTable = ({
                     borderLeft: sessionColor ? `4px solid ${sessionColor}` : 'none',
                     position: 'relative'
                   }}
-                  onMouseEnter={(e) => {
+                  onMouseEnter={(e: any) => {
                     if (!selectedRows.has(row.id)) {
                       e.target.closest('tr').style.backgroundColor = 'var(--mac-bg-secondary)';
                     }
                   }}
-                  onMouseLeave={(e) => {
+                  onMouseLeave={(e: any) => {
                     if (!selectedRows.has(row.id)) {
                       // Восстанавливаем фон на основе индекса (для полосатой таблицы)
                       const tr = e.target.closest('tr');
@@ -1887,11 +1887,11 @@ const EnhancedAppointmentsTable = ({
                       position: 'relative',
                       zIndex: 100
                     }}
-                    onClick={(e) => {
+                    onClick={(e: any) => {
                       // Блокируем клик на строку при клике в ячейке действий
                       e.stopPropagation();
                     }}
-                    onMouseDown={(e) => {
+                    onMouseDown={(e: any) => {
                       // Блокируем mousedown на строку при клике в ячейке действий
                       e.stopPropagation();
                     }}>
@@ -1911,11 +1911,11 @@ const EnhancedAppointmentsTable = ({
                         {canPay &&
                       <button
                         className="action-button action-button--success"
-                        onMouseDown={(e) => {
+                        onMouseDown={(e: any) => {
                           e.preventDefault();
                           e.stopPropagation();
                         }}
-                        onClick={(e) => {
+                        onClick={(e: any) => {
                           e.preventDefault();
                           e.stopPropagation();
                           onActionClick?.('payment', row, e);
@@ -1930,11 +1930,11 @@ const EnhancedAppointmentsTable = ({
                         {canCall &&
                       <button
                         className="action-button action-button--primary"
-                        onMouseDown={(e) => {
+                        onMouseDown={(e: any) => {
                           e.preventDefault();
                           e.stopPropagation();
                         }}
-                        onClick={(e) => {
+                        onClick={(e: any) => {
                           e.preventDefault();
                           e.stopPropagation();
                           onActionClick?.('call', row, e);
@@ -1949,11 +1949,11 @@ const EnhancedAppointmentsTable = ({
                         {canPrint &&
                       <button
                         className="action-button"
-                        onMouseDown={(e) => {
+                        onMouseDown={(e: any) => {
                           e.preventDefault();
                           e.stopPropagation();
                         }}
-                        onClick={(e) => {
+                        onClick={(e: any) => {
                           e.preventDefault();
                           e.stopPropagation();
                           onActionClick?.('print', row, e);
@@ -1969,11 +1969,11 @@ const EnhancedAppointmentsTable = ({
                         {canComplete &&
                       <button
                         className="action-button"
-                        onMouseDown={(e) => {
+                        onMouseDown={(e: any) => {
                           e.preventDefault();
                           e.stopPropagation();
                         }}
-                        onClick={(e) => {
+                        onClick={(e: any) => {
                           e.preventDefault();
                           e.stopPropagation();
                           onActionClick?.('complete', row, e);
@@ -2011,12 +2011,12 @@ const EnhancedAppointmentsTable = ({
                         {/* Просмотр */}
                         <button
                         className="action-button"
-                        onMouseDown={(e) => {
+                        onMouseDown={(e: any) => {
                           e.preventDefault();
                           e.stopPropagation();
                           logger.log('[EnhancedAppointmentsTable] Кнопка Просмотр нажата:', row);
                         }}
-                        onClick={(e) => {
+                        onClick={(e: any) => {
                           e.preventDefault();
                           e.stopPropagation();
                           onActionClick?.('view', row, e);
@@ -2030,12 +2030,12 @@ const EnhancedAppointmentsTable = ({
                         {/* Редактировать */}
                         <button
                         className="action-button"
-                        onMouseDown={(e) => {
+                        onMouseDown={(e: any) => {
                           e.preventDefault();
                           e.stopPropagation();
                           logger.log('[EnhancedAppointmentsTable] Кнопка Редактировать нажата:', row);
                         }}
-                        onClick={(e) => {
+                        onClick={(e: any) => {
                           e.preventDefault();
                           e.stopPropagation();
                           onActionClick?.('edit', row, e);
@@ -2050,11 +2050,11 @@ const EnhancedAppointmentsTable = ({
                         {canViewEmr &&
                         <button
                         className="action-button action-button--primary"
-                        onMouseDown={(e) => {
+                        onMouseDown={(e: any) => {
                           e.preventDefault();
                           e.stopPropagation();
                         }}
-                        onClick={(e) => {
+                        onClick={(e: any) => {
                           e.preventDefault();
                           e.stopPropagation();
                           onActionClick?.('view_emr', row, e);
@@ -2071,11 +2071,11 @@ const EnhancedAppointmentsTable = ({
                         {canReschedule &&
                       <button
                         className="action-button"
-                        onMouseDown={(e) => {
+                        onMouseDown={(e: any) => {
                           e.preventDefault();
                           e.stopPropagation();
                         }}
-                        onClick={(e) => {
+                        onClick={(e: any) => {
                           e.preventDefault();
                           e.stopPropagation();
                           onActionClick?.('reschedule', row, e);
@@ -2089,11 +2089,11 @@ const EnhancedAppointmentsTable = ({
                         {canCancel &&
                       <button
                         className="action-button"
-                        onMouseDown={(e) => {
+                        onMouseDown={(e: any) => {
                           e.preventDefault();
                           e.stopPropagation();
                         }}
-                        onClick={(e) => {
+                        onClick={(e: any) => {
                           e.preventDefault();
                           e.stopPropagation();
                           onActionClick?.('cancel', row, e);
@@ -2107,11 +2107,11 @@ const EnhancedAppointmentsTable = ({
                         {/* Еще */}
                       <button
                         className="action-button"
-                        onMouseDown={(e) => {
+                        onMouseDown={(e: any) => {
                           e.preventDefault();
                           e.stopPropagation();
                         }}
-                        onClick={(e) => {
+                        onClick={(e: any) => {
                           e.preventDefault();
                           e.stopPropagation();
                           onActionClick?.('more', row, e);
@@ -2126,11 +2126,11 @@ const EnhancedAppointmentsTable = ({
                         {canScheduleNext &&
                       <button
                         className="action-button action-button--primary"
-                        onMouseDown={(e) => {
+                        onMouseDown={(e: any) => {
                           e.preventDefault();
                           e.stopPropagation();
                         }}
-                        onClick={(e) => {
+                        onClick={(e: any) => {
                           e.preventDefault();
                           e.stopPropagation();
                           onActionClick?.('schedule_next', row, e);

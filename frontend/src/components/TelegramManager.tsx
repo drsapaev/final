@@ -118,13 +118,13 @@ const ONBOARDING_REASON_LABELS = {
 const TelegramManager = () => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
-  const [botStatus, setBotStatus] = useState(null);
+  const [botStatus, setBotStatus] = useState(null as any);
   const [templates, setTemplates] = useState([]);
   const [onboardingRequests, setOnboardingRequests] = useState([]);
   const [onboardingTotal, setOnboardingTotal] = useState(0);
-  const [onboardingReviewForms, setOnboardingReviewForms] = useState({});
+  const [onboardingReviewForms, setOnboardingReviewForms] = useState({} as any);
   const [onboardingActionId, setOnboardingActionId] = useState('');
-  const [onboardingAnalytics, setOnboardingAnalytics] = useState(null);
+  const [onboardingAnalytics, setOnboardingAnalytics] = useState(null as any);
   const [onboardingStatusFilter, setOnboardingStatusFilter] = useState('all');
   const [onboardingSort, setOnboardingSort] = useState('newest');
   const [onboardingDialog, setOnboardingDialog] = useState({

@@ -407,8 +407,8 @@ const CashierPanel = () => {
   const [status, setStatus] = useState('all');
   const [payments, setPayments] = useState([]);
   const [appointments, setAppointments] = useState([]);
-  const [paymentSuccess, setPaymentSuccess] = useState(null);
-  const [paymentError, setPaymentError] = useState(null);
+  const [paymentSuccess, setPaymentSuccess] = useState(null as any);
+  const [paymentError, setPaymentError] = useState(null as any);
 
   // Состояния для календаря
   const [dateMode, setDateMode] = useState('single'); // 'single' | 'range'
@@ -422,13 +422,13 @@ const CashierPanel = () => {
   // ✅ УЛУЧШЕНИЕ: Новые состояния для отмены платежа
   // UX Audit #2.1: контекст отменяемого платежа (id + patient + amount) —
   // показывается в диалоге, чтобы кассир видел, ЧТО именно он отменяет.
-  const [cancelPaymentContext, setCancelPaymentContext] = useState(null);
+  const [cancelPaymentContext, setCancelPaymentContext] = useState(null as any);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
 
   // UX Audit #4.5: anti-double-click state для action-кнопок.
   // Хранит {type, id} текущего action; пока не null — все action-кнопки disabled.
-  const [processingAction, setProcessingAction] = useState(null);
+  const [processingAction, setProcessingAction] = useState(null as any);
 
   // UX Audit #4.2: client-side sort state для таба «История платежей».
   // Сортировка применяется к уже загруженным filteredPayments (после groupPaymentsByPatientAndTime).
@@ -636,9 +636,9 @@ const CashierPanel = () => {
 
   // Deferred #1: session timeout warning — prevents silent JWT expiry while
   // cashier is processing a payment. Mirrors all other clinical panels.
-  const [sessionWarning, setSessionWarning] = useState(null);
+  const [sessionWarning, setSessionWarning] = useState(null as any);
   // UX Audit #2.5: счётчик секунд до истечения сессии.
-  const [sessionSecondsLeft, setSessionSecondsLeft] = useState(null);
+  const [sessionSecondsLeft, setSessionSecondsLeft] = useState(null as any);
   useSessionTimeoutWarning({
     onWarning: (expiresAt) => {
       // UX Audit #2.5: сохраняем expiresAt для счётчика обратного отсчёта.
@@ -848,7 +848,7 @@ const CashierPanel = () => {
 
   // ✅ v2.0: Состояние для возврата
   const [refundDialogOpen, setRefundDialogOpen] = useState(false);
-  const [refundPaymentId, setRefundPaymentId] = useState(null);
+  const [refundPaymentId, setRefundPaymentId] = useState(null as any);
   const [refundPaymentAmount, setRefundPaymentAmount] = useState(0);
   const [refundAmount, setRefundAmount] = useState('');
   const [refundReason, setRefundReason] = useState('');
