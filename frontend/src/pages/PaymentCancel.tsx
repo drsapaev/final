@@ -1,35 +1,35 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
-
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import type { CSSProperties } from 'react';
 import {
-  Box, Card, CardContent, Typography, Button, Alert,
+  Box as RawBox, Card, CardContent, Typography as RawTypography, Button, Alert as RawAlert,
 } from '../components/ui/macos';
+const Typography = RawTypography as unknown as React.ComponentType<Record<string, unknown>>;
+const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
+const Box = RawBox as unknown as React.ComponentType<Record<string, unknown>>;
 import { XCircle as CancelIcon, Home as HomeIcon, Headset as SupportIcon } from 'lucide-react';
 import { useTranslation } from '../i18n/useTranslation';
 
 const SUPPORT_TELEGRAM_HANDLE = '@clinic_support';
 const SUPPORT_TELEGRAM_URL = 'https://t.me/clinic_support';
 
-const pageStyle = {
+const pageStyle: CSSProperties = {
   maxWidth: 960,
   margin: '32px auto',
   padding: '0 16px 40px',
 };
 
-const statusCardStyle = {
+const statusCardStyle: CSSProperties = {
   marginBottom: 16,
   borderColor: 'var(--mac-warning-border, color-mix(in srgb, var(--mac-warning), transparent 64%))',
   background: 'var(--mac-warning-bg)',
 };
 
-const statusContentStyle = {
+const statusContentStyle: CSSProperties = {
   textAlign: 'center',
   padding: '32px 16px',
 };
 
-const cancelIconStyle = {
+const cancelIconStyle: CSSProperties = {
   width: 80,
   height: 80,
   color: 'var(--mac-warning)',
@@ -56,7 +56,8 @@ const actionGridStyle = {
 };
 
 const PaymentCancel = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
