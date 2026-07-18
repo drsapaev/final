@@ -1,15 +1,19 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import type { ReactElement } from 'react';
 
-import { ThemeProvider } from '../../../../contexts/ThemeContext.tsx';
+import { ThemeProvider } from '../../../../contexts/ThemeContext';
 import Button from '../Button';
 import Typography from '../Typography';
 
-const renderWithTheme = (ui) => render(<ThemeProvider>{ui}</ThemeProvider>);
+// Typography is still implicit-any and its propTypes require `color`
+// and `paragraph`. Cast through unknown to a permissive component so
+// the test's bare <Typography variant="h4" component="h1"> usage
+// compiles without supplying those props.
+const TypographyAny = Typography as unknown as React.ComponentType<Record<string, unknown>>;
+
+const renderWithTheme = (ui: ReactElement) => render(<ThemeProvider>{ui}</ThemeProvider>);
 
 describe('macOS primitives regressions', () => {
   it('does not expose button CSS as accessible text', () => {
@@ -23,9 +27,9 @@ describe('macOS primitives regressions', () => {
 
   it('renders Typography with the requested semantic component', () => {
     render(
-      <Typography variant="h4" component="h1">
+      <TypographyAny variant="h4" component="h1">
         Screen title
-      </Typography>
+      </TypographyAny>
     );
 
     expect(screen.getByRole('heading', { level: 1, name: 'Screen title' })).toBeInTheDocument();
