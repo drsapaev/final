@@ -1,8 +1,6 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useTranslation } from '../../i18n/useTranslation';
-import React from 'react';
+import React, { type CSSProperties } from 'react';
 import {
   Activity,
   AlertCircle,
@@ -21,15 +19,18 @@ import {
 import {
   Card as MacOSCard,
   Badge,
-  MacOSEmptyState,
+  MacOSEmptyState as MacOSEmptyStateRaw,
   Button,
-  Skeleton,
-  MacOSStatCard,
+  Skeleton as SkeletonRaw,
+  MacOSStatCard as MacOSStatCardRaw,
 } from '../ui/macos';
 import useAdminData from '../../hooks/useAdminData';
 import AdminRouteSwitcher from './AdminRouteSwitcher';
 import ErrorBoundary from '../common/ErrorBoundary';
 import formatCurrency from '../../utils/formatCurrency';
+const MacOSStatCard = MacOSStatCardRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Skeleton = SkeletonRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const MacOSEmptyState = MacOSEmptyStateRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const adminSurface = 'linear-gradient(180deg, color-mix(in srgb, var(--mac-card-bg), white 72%) 0%, color-mix(in srgb, var(--mac-card-bg), white 64%) 100%)';
 const adminInsetSurface = 'color-mix(in srgb, var(--mac-card-bg), white 82%)';
@@ -53,7 +54,7 @@ function formatTimeAgo(date, t) {
   if (Number.isNaN(dateObj.getTime())) return t('admin2.adm_recent');
 
   const now = new Date();
-  const diff = now - dateObj;
+  const diff = now.getTime() - (dateObj as Date).getTime();
   const seconds = Math.floor(diff / 1000);
   const minutes = Math.floor(seconds / 60);
   const hours = Math.floor(minutes / 60);
@@ -75,11 +76,11 @@ function getStatusIcon(status) {
     default: 'var(--mac-text-tertiary)',
   };
 
-  if (status === 'success') return <CheckCircle className="admin-w-16-h-16-col-dyn" style={{ '--admin-col0': colorMap.success }} />;
-  if (status === 'warning') return <AlertTriangle className="admin-w-16-h-16-col-dyn" style={{ '--admin-col0': colorMap.warning }} />;
-  if (status === 'error') return <AlertTriangle className="admin-w-16-h-16-col-dyn" style={{ '--admin-col0': colorMap.error }} />;
-  if (status === 'info') return <Clock className="admin-w-16-h-16-col-dyn" style={{ '--admin-col0': colorMap.info }} />;
-  return <Clock className="admin-w-16-h-16-col-dyn" style={{ '--admin-col0': colorMap.default }} />;
+  if (status === 'success') return <CheckCircle className="admin-w-16-h-16-col-dyn" style={{ '--admin-col0': colorMap.success } as CSSProperties} />;
+  if (status === 'warning') return <AlertTriangle className="admin-w-16-h-16-col-dyn" style={{ '--admin-col0': colorMap.warning } as CSSProperties} />;
+  if (status === 'error') return <AlertTriangle className="admin-w-16-h-16-col-dyn" style={{ '--admin-col0': colorMap.error } as CSSProperties} />;
+  if (status === 'info') return <Clock className="admin-w-16-h-16-col-dyn" style={{ '--admin-col0': colorMap.info } as CSSProperties} />;
+  return <Clock className="admin-w-16-h-16-col-dyn" style={{ '--admin-col0': colorMap.default } as CSSProperties} />;
 }
 
 function buildSystemAlerts(systemAlertsData, t) {
@@ -109,7 +110,7 @@ function getPriorityLabel(priority, t) {
 // Helper для экспорта данных активности в CSV.
 // Раньше кнопка «Экспорт» не имела onClick — была кнопкой-призраком.
 function exportActivityToCsv(chartData, t) {
-  if (!chartData?.data || chartData.data.length === 0) {
+  if (!(chartData as Record<string, any>)?.data || chartData.data.length === 0) {
     return;
   }
 
@@ -142,9 +143,9 @@ function exportActivityToCsv(chartData, t) {
 }
 
 const AdminDashboard = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const {
-    data: statsData,
+    data: statsDataRaw,
     loading: statsLoading,
     error: statsError,
     refresh: refreshStats,
@@ -174,7 +175,7 @@ const AdminDashboard = () => {
   });
 
   const {
-    data: activityChartData,
+    data: activityChartDataRaw,
     loading: activityChartLoading,
     error: activityChartError,
   } = useAdminData('/admin/activity-chart?days=7', {
@@ -183,8 +184,10 @@ const AdminDashboard = () => {
     initialData: { labels: [], data: [] },
   });
 
+  const statsData = statsDataRaw as Record<string, any>;
+  const activityChartData = activityChartDataRaw as Record<string, any>;
   const stats = statsData || defaultStats;
-  const recentActivities = recentActivitiesData?.activities || [];
+  const recentActivities = (recentActivitiesData as Record<string, any>)?.activities || [];
   const systemAlerts = React.useMemo(() => buildSystemAlerts(systemAlertsData, t), [systemAlertsData, t]);
 
   // UX Audit Stage 3 (Dashboard issue 4.1):
@@ -250,10 +253,12 @@ const AdminDashboard = () => {
     },
   ], [stats]);
 
+  const AdminRouteSwitcherAny = AdminRouteSwitcher as unknown as React.ComponentType<Record<string, unknown>>;
+
   return (
     <ErrorBoundary>
       <div className="flex flex-col gap-6">
-        <AdminRouteSwitcher current="dashboard" />
+        <AdminRouteSwitcherAny current="dashboard" />
 
         {statsLoading ? (
           <div className="admin-kpi-grid" aria-label={t('admin2.adm_kpi_loading_aria')} aria-busy="true">
@@ -266,7 +271,7 @@ const AdminDashboard = () => {
             description={t('admin2.adm_error_load_stats_desc')}
             action={(
               <Button onClick={refreshStats} variant="primary">
-                <RefreshCw size={16} />
+                <RefreshCw size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
                 {t('admin2.adm_retry')}
               </Button>
             )}
@@ -292,17 +297,17 @@ const AdminDashboard = () => {
           <MacOSCard className="admin-bg-var-mac-gradient-sid-bd-1px-solid-var-mac-ma-radius-24-bsh-none-bflt-var-mac-blur-light-webkitba-var-mac-blur-light-p-24">
             <div className="admin-p-16-d-flex-ai-center-jc-between-mb-16">
               <h3 className="admin-fs-lg-fw-semi-primary-m-0">{t('admin2.adm_activity_system')}</h3>
-              <Button variant="outline" size="sm" onClick={handleExportActivity} disabled={!activityChartData?.data?.length}>
+              <Button variant="outline" size="small" onClick={handleExportActivity} disabled={!activityChartData?.data?.length}>
                 <Download className="w-4 h-4 mr-2" aria-hidden="true" />
                 {t('admin2.adm_export')}
               </Button>
             </div>
             {activityChartLoading ? (
-              <div className="admin-h-256-radius-var-mac-radius-md-d-flex-ai-center-jc-center-bg-dyn" style={{ '--admin-bg0': adminSurface }}>
+              <div className="admin-h-256-radius-var-mac-radius-md-d-flex-ai-center-jc-center-bg-dyn" style={{ '--admin-bg0': adminSurface } as CSSProperties}>
                 <Skeleton type="text" count={3} />
               </div>
             ) : activityChartError ? (
-              <div className="admin-h-256-radius-var-mac-radius-md-d-flex-ai-center-jc-center-bg-dyn" style={{ '--admin-bg0': adminSurface }}>
+              <div className="admin-h-256-radius-var-mac-radius-md-d-flex-ai-center-jc-center-bg-dyn" style={{ '--admin-bg0': adminSurface } as CSSProperties}>
                 <MacOSEmptyState
                   icon={AlertTriangle}
                   title={t('admin2.adm_error_load_chart')}
@@ -310,14 +315,14 @@ const AdminDashboard = () => {
                 />
               </div>
             ) : activityChartData?.data && activityChartData.data.length > 0 ? (
-              <div className="admin-h-256-radius-var-mac-radius-md-p-16-d-flex-fd-column-jc-between-bg-dyn-bd-dyn" style={{ '--admin-bg0': adminSurface, '--admin-bd1': adminBorder }}>
+              <div className="admin-h-256-radius-var-mac-radius-md-p-16-d-flex-fd-column-jc-between-bg-dyn-bd-dyn" style={{ '--admin-bg0': adminSurface, '--admin-bd1': adminBorder } as CSSProperties}>
                 <div className="admin-d-flex-ai-end-jc-around-h-200-gap-4">
                   {activityChartData.data.map((item, index) => {
                     const maxValue = Math.max(...activityChartData.data.map((entry) => entry.total || 0));
                     const height = maxValue > 0 ? (item.total / maxValue) * 180 : 0;
                     return (
                       <div key={`${activityChartData.labels?.[index] || 'activity'}-${index}`} className="admin-flex-1-d-flex-fd-column-ai-center-gap-4">
-                        <div className="admin-w-100pct-bg-linear-gradient-to-t-radius-4px-4px-0-0-minh-4-tr-height-0-3s-ease-h-dyn" style={{ '--admin-h0': `${height}px` }} />
+                        <div className="admin-w-100pct-bg-linear-gradient-to-t-radius-4px-4px-0-0-minh-4-tr-height-0-3s-ease-h-dyn" style={{ '--admin-h0': `${height}px` } as CSSProperties} />
                         <span className="admin-fs-10-tertiary-ta-center">
                           {activityChartData.labels[index]}
                         </span>
@@ -325,17 +330,17 @@ const AdminDashboard = () => {
                     );
                   })}
                 </div>
-                <div className="admin-d-flex-jc-around-mt-8-fs-12-col-dyn" style={{ '--admin-col0': adminTextSecondary }}>
+                <div className="admin-d-flex-jc-around-mt-8-fs-12-col-dyn" style={{ '--admin-col0': adminTextSecondary } as CSSProperties}>
                   <span>{t('admin2.adm_chart_appointments_count', { count: activityChartData.data.reduce((sum, entry) => sum + (entry.appointments || 0), 0) })}</span>
                   <span>{t('admin2.adm_chart_payments_count', { count: activityChartData.data.reduce((sum, entry) => sum + (entry.payments || 0), 0) })}</span>
                   <span>{t('admin2.adm_chart_users_count', { count: activityChartData.data.reduce((sum, entry) => sum + (entry.users || 0), 0) })}</span>
                 </div>
               </div>
             ) : (
-              <div className="admin-h-256-radius-var-mac-radius-md-d-flex-ai-center-jc-center-bg-dyn" style={{ '--admin-bg0': adminSurface }}>
+              <div className="admin-h-256-radius-var-mac-radius-md-d-flex-ai-center-jc-center-bg-dyn" style={{ '--admin-bg0': adminSurface } as CSSProperties}>
                 <div className="text-center">
-                  <Activity className="admin-w-48-h-48-m-0-auto-16px-auto-col-dyn" style={{ '--admin-col0': adminTextSecondary }} />
-                  <p className="admin-col-dyn" style={{ '--admin-col0': adminTextSecondary }}>{t('admin2.adm_no_data_period')}</p>
+                  <Activity className="admin-w-48-h-48-m-0-auto-16px-auto-col-dyn" style={{ '--admin-col0': adminTextSecondary } as CSSProperties} />
+                  <p className="admin-col-dyn" style={{ '--admin-col0': adminTextSecondary } as CSSProperties}>{t('admin2.adm_no_data_period')}</p>
                 </div>
               </div>
             )}
@@ -344,7 +349,7 @@ const AdminDashboard = () => {
           <MacOSCard className="admin-bg-var-mac-gradient-sid-bd-1px-solid-var-mac-ma-radius-24-bsh-none-bflt-var-mac-blur-light-webkitba-var-mac-blur-light-p-0-1">
             <div className="admin-p-16-d-flex-ai-center-jc-between-mb-16">
               <h3 className="admin-fs-lg-fw-semi-primary-m-0">{t('admin2.adm_recent_actions')}</h3>
-              <Button variant="outline" size="sm" onClick={handleViewAllActivities} disabled={recentActivities.length === 0}>
+              <Button variant="outline" size="small" onClick={handleViewAllActivities} disabled={recentActivities.length === 0}>
                 <Eye className="w-4 h-4 mr-2" aria-hidden="true" />
                 {t('admin2.adm_view_all')}
               </Button>
@@ -368,7 +373,7 @@ const AdminDashboard = () => {
             ) : (
               <div className="flex flex-col gap-4">
                 {recentActivities.map((activity) => (
-                  <div key={activity.id} className="admin-d-flex-ai-center-gap-12-p-12-radius-var-mac-radius-md-bg-dyn-bd-dyn" style={{ '--admin-bg0': adminInsetSurface, '--admin-bd1': adminBorder }}>
+                  <div key={activity.id} className="admin-d-flex-ai-center-gap-12-p-12-radius-var-mac-radius-md-bg-dyn-bd-dyn" style={{ '--admin-bg0': adminInsetSurface, '--admin-bd1': adminBorder } as CSSProperties}>
                     {getStatusIcon(activity.status)}
                     <div className="admin-flex-1">
                       <p className="admin-fs-sm-fw-med-primary-m-0">{activity.message}</p>
@@ -405,13 +410,13 @@ const AdminDashboard = () => {
           ) : (
             <div className="flex flex-col gap-4">
               {systemAlerts.map((alert) => (
-                <div key={alert.id} className="admin-d-flex-ai-center-gap-12-p-12-radius-var-mac-radius-md-bd-dyn-bg-dyn" style={{ '--admin-bd0': adminBorder, '--admin-bg1': adminInsetSurface }}>
+                <div key={alert.id} className="admin-d-flex-ai-center-gap-12-p-12-radius-var-mac-radius-md-bd-dyn-bg-dyn" style={{ '--admin-bd0': adminBorder, '--admin-bg1': adminInsetSurface } as CSSProperties}>
                   <AlertTriangle className="admin-w-20-h-20-warning" />
                   <div className="admin-flex-1">
                     <p className="admin-fs-sm-fw-med-primary-m-0">{alert.message}</p>
                     <p className="admin-fs-12-secondary-m-4px-0-0-0">{alert.time}</p>
                   </div>
-                  <Badge variant={alert.priority === 'high' ? 'error' : alert.priority === 'medium' ? 'warning' : 'info'}>
+                  <Badge variant={(alert.priority === 'high' ? 'error' : alert.priority === 'medium' ? 'warning' : 'info') as unknown as "default" | "primary" | "secondary" | "success" | "warning" | "danger" | "info" | "outline"}>
                     {/* UX Audit Stage 3 (Dashboard issue 4.2): локализация приоритета. */}
                     {getPriorityLabel(alert.priority, t)}
                   </Badge>

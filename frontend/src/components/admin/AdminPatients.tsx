@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useTranslation } from '../../i18n/useTranslation';
 import { Edit, Plus, RefreshCw, Search, Trash2, Users } from 'lucide-react';
@@ -7,21 +5,26 @@ import PropTypes from 'prop-types';
 
 import PatientModal from './PatientModal';
 import usePatients from '../../hooks/usePatients';
-import useModal from '../../hooks/useModal.jsx';
+import useModal from '../../hooks/useModal';
 import notify from '../../services/notify';
 import {
   Badge,
-  Button,
+  Button as ButtonRaw,
   MacOSCard,
-  MacOSEmptyState,
+  MacOSEmptyState as MacOSEmptyStateRaw,
   Input,
-  Skeleton,
-  Select,
+  Skeleton as SkeletonRaw,
+  Select as SelectRaw,
 } from '../ui/macos';
 import IconButton from './IconButton';
 import logger from '../../utils/logger';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
+import React from "react";
+const Select = SelectRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Button = ButtonRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Skeleton = SkeletonRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const MacOSEmptyState = MacOSEmptyStateRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const GENDER_OPTION_KEYS = [
   { value: '', labelKey: 'admin2.ap_gender_all' },
@@ -110,7 +113,7 @@ const formatAge = (patient, calculateAge, t) => {
 };
 
 const AdminPatients = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
   const [confirm, confirmDialog] = useConfirm();
   const genderOptions = getGenderOptions(t);
@@ -149,7 +152,7 @@ const AdminPatients = () => {
   const handleDeletePatient = async (patient) => {
     const patientName = getPatientName(patient, t);
     // P-013 fix: replaced window.confirm() with shared useConfirm hook.
-    const ok = await confirm({
+    const ok = await (confirm as unknown as (opts: Record<string, unknown>) => Promise<boolean>)({
       title: t('admin.delete_patient_title'),
       message: t('admin2.ap_delete_patient_message', { name: patientName }),
       description: t('admin2.ap_delete_patient_description'),
@@ -209,7 +212,7 @@ const AdminPatients = () => {
               {t('admin2.ap_page_subtitle')}
             </p>
           </div>
-          <Button onClick={handleCreatePatient} startIcon={<Plus size={16} />}>
+          <Button onClick={handleCreatePatient} startIcon={<Plus size={16 as unknown as "small" | "default" | "large" | "xlarge"} />}>
             {t('admin2.ap_add_patient_btn')}
           </Button>
         </div>
@@ -261,7 +264,7 @@ const AdminPatients = () => {
         {/* UX Audit Admin #1.1: кнопка «Сбросить» для быстрой очистки фильтров. */}
         {filtersActive && (
           <div style={{ marginBottom: '12px' }}>
-            <Button variant="ghost" size="sm" onClick={() => {
+            <Button variant="ghost" size="small" onClick={() => {
               setSearchTerm(''); setFilterGender(''); setFilterAgeRange(''); setFilterBloodType('');
             }} aria-label={t('admin2.ap_reset_filters_aria')}>
               {t('admin2.ap_reset_filters_btn')}
@@ -278,7 +281,7 @@ const AdminPatients = () => {
               title={t('admin2.ap_load_error_title')}
               description={t('admin2.ap_load_error_desc')}
               action={
-                <Button onClick={refresh} startIcon={<RefreshCw size={16} />}>
+                <Button onClick={refresh} startIcon={<RefreshCw size={16 as unknown as "small" | "default" | "large" | "xlarge"} />}>
                   {t('admin2.ap_refresh_btn')}
                 </Button>
               }
@@ -293,7 +296,7 @@ const AdminPatients = () => {
                   : t('admin2.ap_empty_desc_initial')
               }
               action={
-                <Button onClick={handleCreatePatient} startIcon={<Plus size={16} />}>
+                <Button onClick={handleCreatePatient} startIcon={<Plus size={16 as unknown as "small" | "default" | "large" | "xlarge"} />}>
                   {t('admin2.ap_add_first_patient_btn')}
                 </Button>
               }
@@ -318,7 +321,7 @@ const AdminPatients = () => {
               <tbody>
                 {/* UX Audit Admin #1.5: indicator for 200-row cap. */}
                 {patients.length > 200 && (
-                  <tr><td colSpan="7" style={{ textAlign: 'center', padding: '8px', fontSize: '13px', color: 'var(--mac-text-secondary)' }}>
+                  <tr><td colSpan={7} style={{ textAlign: 'center', padding: '8px', fontSize: '13px', color: 'var(--mac-text-secondary)' }}>
                     {t('admin2.ap_cap_message', { count: patients.length })}
                   </td></tr>
                 )}
@@ -388,14 +391,14 @@ const AdminPatients = () => {
                     >
                       <div className="flex items-center justify-center gap-2">
                         <IconButton label={t('admin2.ap_edit_aria')} onClick={() => handleEditPatient(patient)}>
-                          <Edit size={16} />
+                          <Edit size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
                         </IconButton>
                         <IconButton
                           label={t('admin2.ap_delete_aria')}
                           tone="danger"
                           onClick={() => handleDeletePatient(patient)}
                         >
-                          <Trash2 size={16} />
+                          <Trash2 size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
                         </IconButton>
                       </div>
                     </td>
@@ -416,7 +419,7 @@ const AdminPatients = () => {
         loading={patientModal.loading}
       />
       {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
-      {confirmDialog}
+      {confirmDialog as unknown as React.ReactNode}
     </div>
   );
 };

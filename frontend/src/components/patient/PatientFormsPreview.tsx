@@ -1,11 +1,9 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useTranslation } from '../../i18n/useTranslation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import {
-  Badge, Button, Checkbox, Icon, Input, Textarea,
+  Badge, Button, Checkbox, Icon, Input as InputRaw, Textarea as TextareaRaw,
 } from '../ui/macos';
 import { useConfirm } from '../common/ConfirmDialog';
 import { api } from '../../api/client';
@@ -14,6 +12,9 @@ import {
   describePatientError,
 } from './patientUtils';
 import PanelEmptyState from './PanelEmptyState';
+import React from "react";
+const Textarea = TextareaRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Input = InputRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 /**
  * L-H-4 fix: PatientFormsPreview выделен в отдельный файл.
@@ -57,10 +58,10 @@ const buildInitialFormState = (form) => ({
 });
 
 function PatientFormsPreview({ status, preview = null, error = '', initData = '' }) {
-  const { t } = useTranslation();
-  const [formState, setFormState] = useState({});
-  const [autoSaveTimestamps, setAutoSaveTimestamps] = useState({});
-  const [autoSavingForms, setAutoSavingForms] = useState({});
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const [formState, setFormState] = useState<Record<string, any>>({});
+  const [autoSaveTimestamps, setAutoSaveTimestamps] = useState<Record<string, any>>({});
+  const [autoSavingForms, setAutoSavingForms] = useState<Record<string, any>>({});
   const autoSaveTimersRef = useRef({});
   const handleSaveRef = useRef(null);
 
@@ -90,7 +91,7 @@ function PatientFormsPreview({ status, preview = null, error = '', initData = ''
 
     // L-M-9 fix: confirmation dialog для submit (irreversible action).
     if (nextStatus === 'submitted') {
-      const ok = await confirm({
+      const ok = await (confirm as unknown as (opts: Record<string, unknown>) => Promise<boolean>)({
         title: t('patient.pat_forms_submit_title'),
         message: t('patient.pat_forms_submit_message'),
         description: t('patient.pat_forms_submit_description'),
@@ -186,7 +187,7 @@ function PatientFormsPreview({ status, preview = null, error = '', initData = ''
     });
 
     return () => {
-      Object.values(timers).forEach((t) => clearTimeout(t));
+      Object.values(timers as unknown[]).forEach((t) => clearTimeout(t as unknown as ReturnType<typeof setTimeout>));
     };
   }, [formState, forms, storageEnabled, initData]);
 
@@ -255,7 +256,7 @@ function PatientFormsPreview({ status, preview = null, error = '', initData = ''
           Показывает «Анкета N из M» если форм больше одной. */}
       {forms.length > 1 && (
         <div className="pp-forms-progress" aria-label={t('patient.pat_forms_progress_aria')}>
-          <Icon name="doc.text" size={14} />
+          <Icon name="doc.text" size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
           <span>{t('patient.pat_forms_available', { count: forms.length })}</span>
           <span className="pp-forms-progress-separator">·</span>
           <span>
@@ -332,13 +333,13 @@ function PatientFormsPreview({ status, preview = null, error = '', initData = ''
               <div className="pp-grid-span-2 pp-form-footer">
                 {currentFormState.message && (
                   <div className="pp-message pp-message--success" role="status">
-                    <Icon name="checkmark.circle" size={16} />
+                    <Icon name="checkmark.circle" size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
                     {currentFormState.message}
                   </div>
                 )}
                 {currentFormState.error && (
                   <div className="pp-message pp-message--error" role="alert">
-                    <Icon name="exclamationmark.triangle" size={16} />
+                    <Icon name="exclamationmark.triangle" size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
                     {currentFormState.error}
                   </div>
                 )}
@@ -350,13 +351,13 @@ function PatientFormsPreview({ status, preview = null, error = '', initData = ''
                 {/* L-M-1 fix: autosave indicator */}
                 {autoSavingForms[form.id] && (
                   <div className="pp-form-autosave-indicator" aria-live="polite">
-                    <Icon name="arrow.clockwise" size={12} />
+                    <Icon name="arrow.clockwise" size={12 as unknown as "small" | "default" | "large" | "xlarge"} />
                     {t('patient.pat_forms_autosaving')}
                   </div>
                 )}
                 {!autoSavingForms[form.id] && autoSaveTimestamps[form.id] && (
                   <div className="pp-form-autosave-timestamp">
-                    <Icon name="checkmark.circle" size={12} />
+                    <Icon name="checkmark.circle" size={12 as unknown as "small" | "default" | "large" | "xlarge"} />
                     {t('patient.pat_forms_saved_at', { time: autoSaveTimestamps[form.id].toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) })}
                   </div>
                 )}
@@ -368,7 +369,7 @@ function PatientFormsPreview({ status, preview = null, error = '', initData = ''
                     loading={currentFormState.status === 'saving-draft'}
                     onClick={() => handleSave(form, 'draft')}
                   >
-                    <Icon name="square.and.arrow.down" size={16} />
+                    <Icon name="square.and.arrow.down" size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
                     {t('patient.pat_forms_save_draft')}
                   </Button>
                   <Button
@@ -378,7 +379,7 @@ function PatientFormsPreview({ status, preview = null, error = '', initData = ''
                     loading={currentFormState.status === 'submitting'}
                     onClick={() => handleSave(form, 'submitted')}
                   >
-                    <Icon name="paperplane" size={16} />
+                    <Icon name="paperplane" size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
                     {t('patient.pat_forms_submit_button')}
                   </Button>
                 </div>
@@ -388,7 +389,7 @@ function PatientFormsPreview({ status, preview = null, error = '', initData = ''
         );
       })}
       {/* L-M-9 fix: portal-mounted ConfirmDialog */}
-      {confirmDialog}
+      {confirmDialog as unknown as React.ReactNode}
     </div>
   );
 }

@@ -1,11 +1,9 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 // Компоненты для отображения состояния загрузки
-import React from 'react';
+import React, { type CSSProperties } from 'react';
 import PropTypes from 'prop-types';
 import { useTheme } from '../../contexts/ThemeContext';
-import AnimatedLoader from '../AnimatedLoader.jsx';
+import AnimatedLoader from '../AnimatedLoader';
 import { useTranslation } from '../../i18n/useTranslation';
 
 /**
@@ -102,32 +100,32 @@ export function Loading({
     switch (variant) {
       case 'dots':
         return (
-          <div style={dotsStyle}>
+          <div style={dotsStyle as CSSProperties}>
             {[0, 1, 2].map((i) =>
             <div
               key={i}
               style={{
                 ...dotStyle,
                 animationDelay: `${i * 0.16}s`
-              }} />
+              } as CSSProperties} />
 
             )}
           </div>);
 
 
       case 'pulse':
-        return <div style={pulseStyle} />;
+        return <div style={pulseStyle as CSSProperties} />;
 
       case 'spinner':
       default:
-        return <div style={spinnerStyle} />;
+        return <div style={spinnerStyle as CSSProperties} />;
     }
   };
 
   return (
-    <div style={containerStyle}>
+    <div style={containerStyle as CSSProperties}>
       {renderLoader()}
-      {text && <div style={textStyle}>{text}</div>}
+      {text && <div style={textStyle as CSSProperties}>{text}</div>}
     </div>);
 
 }
@@ -158,8 +156,8 @@ export function ButtonLoading({ loading, children, style = {}, disabled = false,
   };
 
   return (
-    <button {...props} style={buttonStyle} disabled={loading || disabled}>
-      {loading && <div style={spinnerStyle} />}
+    <button {...props} style={buttonStyle as CSSProperties} disabled={loading || disabled}>
+      {loading && <div style={spinnerStyle as CSSProperties} />}
       {children}
     </button>);
 
@@ -199,12 +197,12 @@ export function TableLoadingOld({ columns = 3, rows = 5 }) {
 
   return (
     <div className="admin-table-wrapper">
-<table style={tableStyle}>
+<table style={tableStyle as CSSProperties}>
       <thead>
         <tr>
           {Array.from({ length: columns }).map((_, i) =>
-          <th key={i} style={cellStyle} aria-label={`Loading column ${i + 1}`}>
-              <div style={skeletonStyle} />
+          <th key={i} style={cellStyle as CSSProperties} aria-label={`Loading column ${i + 1}`}>
+              <div style={skeletonStyle as CSSProperties} />
             </th>
           )}
         </tr>
@@ -215,10 +213,10 @@ export function TableLoadingOld({ columns = 3, rows = 5 }) {
             {Array.from({ length: columns }).map((_, colIndex) =>
           <td
             key={colIndex}
-            style={cellStyle}
+            style={cellStyle as CSSProperties}
             aria-label={`Loading cell row ${rowIndex + 1} column ${colIndex + 1}`}
           >
-                <div style={skeletonStyle} />
+                <div style={skeletonStyle as CSSProperties} />
               </td>
           )}
           </tr>
@@ -234,7 +232,7 @@ export function TableLoadingOld({ columns = 3, rows = 5 }) {
  */
 export function CardLoading({ count = 3 }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 'var(--mac-spacing-5)' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 'var(--mac-spacing-5)' } as CSSProperties}>
       {Array.from({ length: count }).map((_, i) =>
       <AnimatedLoader.CardSkeleton key={i} />
       )}
@@ -271,13 +269,13 @@ export function CardLoadingOld({ count = 3 }) {
   };
 
   return (
-    <div style={containerStyle}>
+    <div style={containerStyle as CSSProperties}>
       {Array.from({ length: count }).map((_, i) =>
-      <div key={i} style={cardStyle}>
-          <div style={{ ...skeletonStyle, height: '24px', marginBottom: getSpacing('md') }} />
-          <div style={{ ...skeletonStyle, width: '80%' }} />
-          <div style={{ ...skeletonStyle, width: '60%' }} />
-          <div style={{ ...skeletonStyle, width: '40%' }} />
+      <div key={i} style={cardStyle as CSSProperties}>
+          <div style={{ ...skeletonStyle, height: '24px', marginBottom: getSpacing('md') } as CSSProperties} />
+          <div style={{ ...skeletonStyle, width: '80%' } as CSSProperties} />
+          <div style={{ ...skeletonStyle, width: '60%' } as CSSProperties} />
+          <div style={{ ...skeletonStyle, width: '40%' } as CSSProperties} />
         </div>
       )}
     </div>);
@@ -329,13 +327,13 @@ export function ListLoading({ count = 5 }) {
   };
 
   return (
-    <div style={containerStyle}>
+    <div style={containerStyle as CSSProperties}>
       {Array.from({ length: count }).map((_, i) =>
-      <div key={i} style={itemStyle}>
-          <div style={avatarStyle} />
-          <div style={contentStyle}>
-            <div style={{ ...skeletonStyle, width: '60%' }} />
-            <div style={{ ...skeletonStyle, width: '40%' }} />
+      <div key={i} style={itemStyle as CSSProperties}>
+          <div style={avatarStyle as CSSProperties} />
+          <div style={contentStyle as CSSProperties}>
+            <div style={{ ...skeletonStyle, width: '60%' } as CSSProperties} />
+            <div style={{ ...skeletonStyle, width: '40%' } as CSSProperties} />
           </div>
         </div>
       )}
