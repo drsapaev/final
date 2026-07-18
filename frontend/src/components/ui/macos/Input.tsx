@@ -18,12 +18,16 @@ interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, '
   style?: CSSProperties;
   icon?: IconComponent;
   iconPosition?: IconPosition;
-  size?: InputSize;
-  variant?: InputVariant;
+  size?: InputSize | string;
+  variant?: InputVariant | string;
   error?: boolean;
   disabled?: boolean;
   clearable?: boolean;
   onClear?: () => void;
+  // Backward-compat: many callers pass label/hint for visual labels
+  label?: React.ReactNode;
+  hint?: React.ReactNode;
+  [key: string]: any;
 }
 
 interface InputStyle extends CSSProperties {
