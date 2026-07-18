@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 /**
  * DentalPatientsTab — R-15: extracted from DentistPanelUnified.
@@ -19,10 +17,10 @@ export function DentalPatientsTab({
   onTreatment,
   onProsthetic,
 }) {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   if (patients.length === 0) {
     return (
-      <Card padding="lg">
+      <Card padding="large">
         <div className="dental-text-center dental-p-48 dental-text-secondary">
           {t('dental.dental_dpt_empty')}
         </div>
@@ -33,7 +31,7 @@ export function DentalPatientsTab({
   return (
     <div className="dental-flex-col dental-gap-16">
       {patients.map((patient) => (
-        <Card key={patient.id || patient.patient_id} padding="md">
+        <Card key={patient.id || patient.patient_id} padding="default">
           <div className="dental-flex-between-16">
             <div className="dental-flex dental-gap-12 dental-items-center">
               <div>
@@ -49,7 +47,7 @@ export function DentalPatientsTab({
             </div>
             <div className="dental-flex dental-gap-8">
               <Button
-                size="sm"
+                size="small"
                 variant="outline"
                 aria-label={t('dental.dental_dpt_aria_view', { name: patient.name || patient.id })}
                 onClick={() => onSelectPatient(patient)}
@@ -58,7 +56,7 @@ export function DentalPatientsTab({
                 <Eye aria-hidden="true" className="dental-icon-16" />
               </Button>
               <Button
-                size="sm"
+                size="small"
                 variant="outline"
                 aria-label={t('dental.dental_dpt_aria_chart', { name: patient.name || patient.id })}
                 onClick={() => onDentalChart(patient)}
@@ -67,7 +65,7 @@ export function DentalPatientsTab({
                 <Tooth aria-hidden="true" className="dental-icon-16" />
               </Button>
               <Button
-                size="sm"
+                size="small"
                 variant="outline"
                 aria-label={t('dental.dental_dpt_aria_treatment', { name: patient.name || patient.id })}
                 onClick={() => onTreatment(patient)}
@@ -76,7 +74,7 @@ export function DentalPatientsTab({
                 <Scissors aria-hidden="true" className="dental-icon-16" />
               </Button>
               <Button
-                size="sm"
+                size="small"
                 variant="outline"
                 aria-label={t('dental.dental_dpt_aria_prosthetic', { name: patient.name || patient.id })}
                 onClick={() => onProsthetic(patient)}

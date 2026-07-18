@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 /**
  * NotesSection - Примечания с "Мой опыт"
@@ -10,9 +8,14 @@
 
 import { useState, useCallback } from 'react';
 import PropTypes from 'prop-types';
-import EMRSection from './EMRSection';
-import EMRTextField from './EMRTextField';
-import { DoctorTemplatesPanel, DoctorTemplatesButton } from '../DoctorTemplatesPanel';
+import EMRSectionRaw from './EMRSection';
+import React from 'react';
+const EMRSection = EMRSectionRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import EMRTextFieldRaw from './EMRTextField';
+const EMRTextField = EMRTextFieldRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import { DoctorTemplatesPanel as DTPRaw, DoctorTemplatesButton as DTBRaw } from '../DoctorTemplatesPanel';
+const DoctorTemplatesPanel = DTPRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const DoctorTemplatesButton = DTBRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import { useDoctorSectionTemplates } from '../../../hooks/useDoctorSectionTemplates';
 import { useTranslation } from '../../../i18n/useTranslation';
 
