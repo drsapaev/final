@@ -1,21 +1,19 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
+import type { CSSProperties } from 'react';
 import ReactDOM from 'react-dom';
 import { Sun as LSun, Moon as LMoon, Monitor as LMonitor, Rainbow as LRainbow, Layers as LLayers, Sparkles as LSparkles, Bell as BellIcon } from 'lucide-react';
 import { useNotificationCenter } from '../../contexts/NotificationCenterContext';
 import { useNavigate, useLocation } from 'react-router-dom';
-import auth, { setProfile } from '../../stores/auth.js';
-import { useTheme } from '../../contexts/ThemeContext.jsx';
+import auth, { setProfile } from '../../stores/auth';
+import { useTheme } from '../../contexts/ThemeContext';
 import CompactConnectionStatus from '../pwa/CompactConnectionStatus';
 import {
   Button, Icon,
 } from '../ui/macos';
 import GlobalSearchBar from '../search/GlobalSearchBar';
 import ChatButton from '../chat/ChatButton';
-import { COLOR_SCHEMES } from '../../theme/colorScheme.js';
-import { getCanonicalRouteById, getEffectiveRouteByPath, getRoleHomeRoute } from '../../routing/routeSelectors.js';
+import { COLOR_SCHEMES } from '../../theme/colorScheme';
+import { getCanonicalRouteById, getEffectiveRouteByPath, getRoleHomeRoute } from '../../routing/routeSelectors';
 
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
@@ -44,7 +42,8 @@ export function isThemeMenuInteraction(event, themeMenuRoot) {
 export default function HeaderNew() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { t, language, setLanguage } = useTranslation();  // PR-50: i18n wired
+  const { t: rawT, language, setLanguage } = useTranslation();  // PR-50: i18n wired
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
 
   const [state, setState] = useState(auth.getState());
   const { inboxOpen, setInboxOpen, getUnreadCount } = useNotificationCenter();
@@ -110,7 +109,7 @@ export default function HeaderNew() {
     }
   };
 
-  const user = state.profile || state.user || null;
+  const user = (state as any).profile || (state as any).user || null;
   const role = user?.role || user?.role_name || 'Guest';
   const roleLower = String(role).toLowerCase();
   // Normalize receptionist to registrar for UI consistency
@@ -215,7 +214,7 @@ export default function HeaderNew() {
   const backButton = canGoBack ? (
     <Button
       variant="ghost"
-      size="sm"
+      size="small"
       onClick={handleBack}
       title={t('legacy.hn_back_title')}
       aria-label={t('legacy.hn_back_title')}
@@ -234,7 +233,7 @@ export default function HeaderNew() {
   const brand =
   <Button
     variant="ghost"
-    size="sm"
+    size="small"
     onClick={() => navigate(landingRoute)}
     title={t('legacy.hn_brand_title')}
     style={{

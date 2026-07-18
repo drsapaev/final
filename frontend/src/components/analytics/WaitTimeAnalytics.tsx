@@ -1,17 +1,22 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useState, useEffect, useCallback } from 'react';
+import type { CSSProperties } from 'react';
 import {
   MacOSCard,
-  Button,
-  Badge,
-  Input,
-  MacOSTab,
-  MacOSStatCard,
-  MacOSEmptyState,
-  Skeleton,
+  Button as RawButton,
+  Badge as RawBadge,
+  Input as RawInput,
+  MacOSTab as RawMacOSTab,
+  MacOSStatCard as RawMacOSStatCard,
+  MacOSEmptyState as RawMacOSEmptyState,
+  Skeleton as RawSkeleton,
 } from '../ui/macos';
+const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
+const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
+const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
+const MacOSTab = RawMacOSTab as unknown as React.ComponentType<Record<string, unknown>>;
+const MacOSStatCard = RawMacOSStatCard as unknown as React.ComponentType<Record<string, unknown>>;
+const MacOSEmptyState = RawMacOSEmptyState as unknown as React.ComponentType<Record<string, unknown>>;
+const Skeleton = RawSkeleton as unknown as React.ComponentType<Record<string, unknown>>;
 import {
   Clock,
   TrendingUp,
@@ -35,7 +40,8 @@ import './WaitTimeAnalytics.css';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 const WaitTimeAnalytics = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(false);
   const [dateRange, setDateRange] = useState({
@@ -48,11 +54,11 @@ const WaitTimeAnalytics = () => {
   });
 
   // Данные аналитики
-  const [analytics, setAnalytics] = useState(null);
-  const [realTimeEstimates, setRealTimeEstimates] = useState(null);
-  const [serviceAnalytics, setServiceAnalytics] = useState(null);
-  const [summary, setSummary] = useState(null);
-  const [heatmapData, setHeatmapData] = useState(null);
+  const [analytics, setAnalytics] = useState(null as any);
+  const [realTimeEstimates, setRealTimeEstimates] = useState(null as any);
+  const [serviceAnalytics, setServiceAnalytics] = useState(null as any);
+  const [summary, setSummary] = useState(null as any);
+  const [heatmapData, setHeatmapData] = useState(null as any);
 
   const loadAnalytics = useCallback(async () => {
     setLoading(true);
@@ -65,7 +71,7 @@ const WaitTimeAnalytics = () => {
       if (filters.department) params.append('department', filters.department);
       if (filters.doctorId) params.append('doctor_id', filters.doctorId);
 
-      const response = await api.get(`/analytics/wait-time/wait-time-analytics?${params}`);
+      const response = await api.get(`/analytics/wait-time/wait-time-analytics?${params}`) as any;
       setAnalytics(response.data);
     } catch (error) {
       logger.error('Ошибка загрузки аналитики времени ожидания:', error);
@@ -80,7 +86,7 @@ const WaitTimeAnalytics = () => {
       const params = new URLSearchParams();
       if (filters.department) params.append('department', filters.department);
 
-      const response = await api.get(`/analytics/wait-time/real-time-wait-estimates?${params}`);
+      const response = await api.get(`/analytics/wait-time/real-time-wait-estimates?${params}`) as any;
       setRealTimeEstimates(response.data);
     } catch (error) {
       logger.error('Ошибка загрузки real-time оценок:', error);
@@ -95,7 +101,7 @@ const WaitTimeAnalytics = () => {
         end_date: dateRange.endDate
       });
 
-      const response = await api.get(`/analytics/wait-time/service-wait-analytics?${params}`);
+      const response = await api.get(`/analytics/wait-time/service-wait-analytics?${params}`) as any;
       setServiceAnalytics(response.data);
     } catch (error) {
       logger.error('Ошибка загрузки аналитики по услугам:', error);
@@ -107,10 +113,10 @@ const WaitTimeAnalytics = () => {
 
   const loadSummary = useCallback(async () => {
     try {
-      const params = new URLSearchParams({ days: 7 });
+      const params = new URLSearchParams({ days: '7' });
       if (filters.department) params.append('department', filters.department);
 
-      const response = await api.get(`/analytics/wait-time/wait-time-summary?${params}`);
+      const response = await api.get(`/analytics/wait-time/wait-time-summary?${params}`) as any;
       setSummary(response.data);
     } catch (error) {
       logger.error('Ошибка загрузки сводки:', error);
@@ -127,7 +133,7 @@ const WaitTimeAnalytics = () => {
 
       if (filters.department) params.append('department', filters.department);
 
-      const response = await api.get(`/analytics/wait-time/wait-time-heatmap?${params}`);
+      const response = await api.get(`/analytics/wait-time/wait-time-heatmap?${params}`) as any;
       setHeatmapData(response.data);
     } catch (error) {
       logger.error('Ошибка загрузки тепловой карты:', error);
@@ -245,7 +251,7 @@ const WaitTimeAnalytics = () => {
                 {t('misc.wta_recommendations')}
               </h4>
               <div className="wta-recommendations-list">
-                {summary.top_recommendations.map((recommendation, index) =>
+                {summary.top_recommendations.map((recommendation: any, index: number) =>
           <div
             key={index}
             className="wta-recommendation-item wta-recommendation-warning">
@@ -283,7 +289,7 @@ const WaitTimeAnalytics = () => {
 
 
       <div className="wta-grid-gap">
-              {Object.values(realTimeEstimates.queues).map((queue) =>
+              {Object.values(realTimeEstimates.queues).map((queue: any) =>
         <div
           key={queue.queue_id}
           className="wta-queue-card">
@@ -397,7 +403,7 @@ const WaitTimeAnalytics = () => {
                 {t('misc.wta_by_departments')}
               </h3>
               <div className="wta-grid-gap">
-                {Object.entries(analytics.department_breakdown).map(([dept, stats]) =>
+                {Object.entries(analytics.department_breakdown).map(([dept, stats]: any) =>
           <div
             key={dept}
             className="wta-dept-card">
@@ -431,7 +437,7 @@ const WaitTimeAnalytics = () => {
                 {t('misc.wta_improvement_recommendations')}
               </h3>
               <div className="wta-recommendations-list-gap2">
-                {analytics.recommendations.map((recommendation, index) =>
+                {analytics.recommendations.map((recommendation: any, index: number) =>
           <div
             key={index}
             className="wta-recommendation-info">
@@ -480,7 +486,7 @@ const WaitTimeAnalytics = () => {
     serviceAnalytics && Object.keys(serviceAnalytics.service_analytics).length > 0 ?
     <MacOSCard className="wta-card-padded">
           <div className="wta-grid-gap">
-            {Object.entries(serviceAnalytics.service_analytics).map(([serviceCode, data]) =>
+            {Object.entries(serviceAnalytics.service_analytics).map(([serviceCode, data]: any) =>
         <div
           key={serviceCode}
           className="wta-service-card">
@@ -577,7 +583,7 @@ const WaitTimeAnalytics = () => {
           </div>
 
           <div className="wta-heatmap-grid">
-            {heatmapData.heatmap_data.map((hourData) =>
+            {heatmapData.heatmap_data.map((hourData: any) =>
         <div
           key={hourData.hour}
           style={{
