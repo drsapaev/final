@@ -54,7 +54,7 @@ const DERMATOLOGY_REQUEST_COOLDOWN_MS = 5000;
 const DERMATOLOGY_WAITING_STATUSES = ['waiting', 'confirmed', 'pending'];
 const DERMATOLOGY_CALLED_STATUSES = ['called', 'in_progress'];
 const DERMATOLOGY_COMPLETED_STATUSES = ['completed', 'done'];
-const dermatologyAppointmentsHeaderStyle = {
+const dermatologyAppointmentsHeaderStyle: CSSProperties = {
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'flex-start',
@@ -62,7 +62,7 @@ const dermatologyAppointmentsHeaderStyle = {
   marginBottom: 'var(--mac-spacing-5)',
   flexWrap: 'wrap'
 };
-const dermatologyAppointmentsTitleStyle = {
+const dermatologyAppointmentsTitleStyle: CSSProperties = {
   fontSize: 'var(--mac-font-size-lg)',
   fontWeight: 'var(--mac-font-weight-semibold)',
   color: 'var(--mac-text-primary)',

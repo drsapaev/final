@@ -1976,14 +1976,14 @@ function TelegramMiniAppPatientShell() {
   );
 }
 
-const miniAppPageStyle = {
+const miniAppPageStyle: CSSProperties = {
   minHeight: '100vh',
   background: 'var(--mac-bg-page, #f5f7fb)',
   color: 'var(--mac-text-primary, #111827)',
   fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif',
 };
 
-const miniAppMainStyle = {
+const miniAppMainStyle: CSSProperties = {
   width: '100%',
   maxWidth: '720px',
   margin: '0 auto',
@@ -1991,7 +1991,7 @@ const miniAppMainStyle = {
   boxSizing: 'border-box',
 };
 
-const miniAppHeroStyle = {
+const miniAppHeroStyle: CSSProperties = {
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'flex-start',
@@ -2001,19 +2001,19 @@ const miniAppHeroStyle = {
   padding: '8px 0 18px',
 };
 
-const miniAppHeroTitleGroupStyle = {
+const miniAppHeroTitleGroupStyle: CSSProperties = {
   flex: '1 1 220px',
   minWidth: 0,
 };
 
-const miniAppKickerStyle = {
+const miniAppKickerStyle: CSSProperties = {
   margin: '0 0 6px',
   fontSize: 'var(--mac-font-size-sm)',
   fontWeight: 'var(--mac-font-weight-bold)',
   color: 'var(--mac-text-secondary, #5f6b7a)',
 };
 
-const miniAppTitleStyle = {
+const miniAppTitleStyle: CSSProperties = {
   margin: 0,
   fontSize: 'var(--mac-font-size-3xl)',
   lineHeight: 1.15,
@@ -2021,7 +2021,7 @@ const miniAppTitleStyle = {
   color: 'var(--mac-text-primary, #111827)',
 };
 
-const miniAppStatusBadgeStyle = {
+const miniAppStatusBadgeStyle: CSSProperties = {
   flexShrink: 0,
   fontWeight: 'var(--mac-font-weight-bold)',
   maxWidth: 'min(100%, 220px)',
@@ -2029,25 +2029,25 @@ const miniAppStatusBadgeStyle = {
   textAlign: 'center',
 };
 
-const miniAppNoticeStyle = {
+const miniAppNoticeStyle: CSSProperties = {
   fontSize: 'var(--mac-font-size-base)',
   lineHeight: 1.5,
 };
 
-const miniAppQueueEmptyContentStyle = {
+const miniAppQueueEmptyContentStyle: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   gap: 'var(--mac-spacing-1)',
 };
 
-const miniAppActionRowStyle = {
+const miniAppActionRowStyle: CSSProperties = {
   display: 'flex',
   gap: '10px',
   flexWrap: 'wrap',
   alignItems: 'center',
 };
 
-const miniAppOnboardingSummaryStyle = {
+const miniAppOnboardingSummaryStyle: CSSProperties = {
   border: '1px solid var(--mac-border, #d8dde8)',
   borderRadius: 'var(--mac-radius-lg)',
   padding: '14px',
@@ -2057,7 +2057,7 @@ const miniAppOnboardingSummaryStyle = {
   gap: 'var(--mac-spacing-3)',
 };
 
-const miniAppOnboardingSummaryHeaderStyle = {
+const miniAppOnboardingSummaryHeaderStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'flex-start',
   justifyContent: 'space-between',
@@ -2065,31 +2065,31 @@ const miniAppOnboardingSummaryHeaderStyle = {
   flexWrap: 'wrap',
 };
 
-const miniAppOnboardingSummaryGridStyle = {
+const miniAppOnboardingSummaryGridStyle: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
   gap: '10px',
 };
 
-const miniAppOnboardingSummaryItemStyle = {
+const miniAppOnboardingSummaryItemStyle: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   gap: 'var(--mac-spacing-1)',
   minWidth: 0,
 };
 
-const miniAppGridStyle = {
+const miniAppGridStyle: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fit, minmax(156px, 1fr))',
   gap: 'var(--mac-spacing-3)',
 };
 
-const miniAppSelectedSectionStyle = {
+const miniAppSelectedSectionStyle: CSSProperties = {
   marginBottom: 'var(--mac-spacing-3)',
   borderColor: 'var(--mac-accent-border)',
 };
 
-const miniAppSelectedSectionContentStyle = {
+const miniAppSelectedSectionContentStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'flex-start',
   justifyContent: 'space-between',
@@ -2097,7 +2097,7 @@ const miniAppSelectedSectionContentStyle = {
   flexWrap: 'wrap',
 };
 
-const miniAppSelectedSectionTitleStyle = {
+const miniAppSelectedSectionTitleStyle: CSSProperties = {
   margin: 0,
   fontSize: 'var(--mac-font-size-2xl)',
   lineHeight: 1.25,
@@ -2105,7 +2105,7 @@ const miniAppSelectedSectionTitleStyle = {
   color: 'var(--mac-text-primary, #111827)',
 };
 
-const miniAppSelectedSectionStatusStyle = {
+const miniAppSelectedSectionStatusStyle: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'flex-end',
@@ -2113,23 +2113,23 @@ const miniAppSelectedSectionStatusStyle = {
   minWidth: '128px',
 };
 
-const miniAppAppointmentPreviewStyle = {
+const miniAppAppointmentPreviewStyle: CSSProperties = {
   marginBottom: 'var(--mac-spacing-3)',
   borderColor: 'var(--mac-success-border, color-mix(in srgb, var(--mac-success), transparent 74%))',
 };
 
-const miniAppOnboardingBlockedStyle = {
+const miniAppOnboardingBlockedStyle: CSSProperties = {
   marginBottom: 'var(--mac-spacing-3)',
   borderColor: 'var(--mac-warning-border, color-mix(in srgb, var(--mac-warning), transparent 72%))',
 };
 
-const miniAppAppointmentPreviewContentStyle = {
+const miniAppAppointmentPreviewContentStyle: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   gap: '14px',
 };
 
-const miniAppAppointmentPreviewHeaderStyle = {
+const miniAppAppointmentPreviewHeaderStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'flex-start',
   justifyContent: 'space-between',
@@ -2137,24 +2137,24 @@ const miniAppAppointmentPreviewHeaderStyle = {
   flexWrap: 'wrap',
 };
 
-const miniAppAppointmentFormStyle = {
+const miniAppAppointmentFormStyle: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   gap: 'var(--mac-spacing-3)',
 };
 
-const miniAppAppointmentFormGridStyle = {
+const miniAppAppointmentFormGridStyle: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
   gap: 'var(--mac-spacing-3)',
 };
 
-const miniAppAppointmentInputStyle = {
+const miniAppAppointmentInputStyle: CSSProperties = {
   width: '100%',
   boxSizing: 'border-box',
 };
 
-const miniAppAppointmentPreviewResultStyle = {
+const miniAppAppointmentPreviewResultStyle: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fit, minmax(132px, 1fr))',
   alignItems: 'center',
@@ -2167,13 +2167,13 @@ const miniAppAppointmentPreviewResultStyle = {
   color: 'var(--mac-text-primary, #111827)',
 };
 
-const miniAppVisitsSectionStyle = {
+const miniAppVisitsSectionStyle: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   gap: '10px',
 };
 
-const miniAppSubsectionTitleStyle = {
+const miniAppSubsectionTitleStyle: CSSProperties = {
   margin: 0,
   fontSize: 'var(--mac-font-size-lg)',
   lineHeight: 1.3,
@@ -2181,13 +2181,13 @@ const miniAppSubsectionTitleStyle = {
   color: 'var(--mac-text-primary, #111827)',
 };
 
-const miniAppVisitsListStyle = {
+const miniAppVisitsListStyle: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   gap: '10px',
 };
 
-const miniAppVisitItemStyle = {
+const miniAppVisitItemStyle: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   gap: '10px',
@@ -2197,7 +2197,7 @@ const miniAppVisitItemStyle = {
   background: 'var(--mac-bg-secondary, #ffffff)',
 };
 
-const miniAppVisitItemHeaderStyle = {
+const miniAppVisitItemHeaderStyle: CSSProperties = {
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'center',
@@ -2206,7 +2206,7 @@ const miniAppVisitItemHeaderStyle = {
   fontSize: 'var(--mac-font-size-base)',
 };
 
-const miniAppCheckboxRowStyle = {
+const miniAppCheckboxRowStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   gap: '10px',
@@ -2220,19 +2220,19 @@ const miniAppCheckboxRowStyle = {
   color: 'var(--mac-text-primary, #111827)',
 };
 
-const miniAppCheckboxStyle = {
+const miniAppCheckboxStyle: CSSProperties = {
   width: '18px',
   height: '18px',
   flexShrink: 0,
 };
 
-const miniAppListStyle = {
+const miniAppListStyle: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   gap: '10px',
 };
 
-const miniAppListItemStyle = {
+const miniAppListItemStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
@@ -2244,16 +2244,16 @@ const miniAppListItemStyle = {
   flexWrap: 'wrap',
 };
 
-const miniAppCapabilityStyle = {
+const miniAppCapabilityStyle: CSSProperties = {
   minHeight: '128px',
 };
 
-const miniAppCapabilitySelectedStyle = {
+const miniAppCapabilitySelectedStyle: CSSProperties = {
   outline: '2px solid var(--mac-accent-border)',
   outlineOffset: '-2px',
 };
 
-const miniAppCapabilityContentStyle = {
+const miniAppCapabilityContentStyle: CSSProperties = {
   minHeight: '104px',
   boxSizing: 'border-box',
   display: 'flex',
@@ -2262,21 +2262,21 @@ const miniAppCapabilityContentStyle = {
   gap: 'var(--mac-spacing-3)',
 };
 
-const miniAppCapabilityHeaderStyle = {
+const miniAppCapabilityHeaderStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'flex-start',
   justifyContent: 'space-between',
   gap: '10px',
 };
 
-const miniAppCapabilityTitleStyle = {
+const miniAppCapabilityTitleStyle: CSSProperties = {
   margin: 0,
   fontSize: 'var(--mac-font-size-lg)',
   lineHeight: 1.25,
   fontWeight: 750,
 };
 
-const miniAppCapabilityTextStyle = {
+const miniAppCapabilityTextStyle: CSSProperties = {
   margin: 0,
   fontSize: 'var(--mac-font-size-sm)',
   lineHeight: 1.4,
