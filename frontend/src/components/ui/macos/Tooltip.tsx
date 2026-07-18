@@ -1,11 +1,56 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
-import { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect, type ReactNode, type CSSProperties, type PointerEvent, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { useTheme } from '../../../contexts/ThemeContext';
 import PropTypes from 'prop-types';
 import { useTranslation } from '../../../i18n/useTranslation';
+
+type TooltipPosition =
+  | 'top'
+  | 'bottom'
+  | 'left'
+  | 'right'
+  | 'top-left'
+  | 'top-right'
+  | 'bottom-left'
+  | 'bottom-right';
+
+type AxisAlign = 'left' | 'right' | 'center';
+type VerticalAlign = 'top' | 'bottom' | 'center';
+
+interface Coords {
+  x: number;
+  y: number;
+}
+
+interface TooltipSize {
+  width: number;
+  height: number;
+}
+
+interface TooltipPositionMap {
+  x: AxisAlign;
+  y: VerticalAlign;
+}
+
+interface TooltipProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'children' | 'style' | 'content'> {
+  children?: ReactNode;
+  content?: ReactNode;
+  position?: TooltipPosition;
+  delay?: number;
+  disabled?: boolean;
+  followCursor?: boolean;
+  className?: string;
+  style?: CSSProperties;
+}
+
+interface TooltipStyle extends CSSProperties {
+  transition?: string;
+  transformOrigin?: string;
+}
+
+interface ContentStyle extends CSSProperties {
+  WebkitBackdropFilter?: string;
+}
 
 /**
  * macOS-style Tooltip Component
@@ -17,24 +62,26 @@ const Tooltip = ({
   position = 'top',
   delay = 700,
   disabled = false,
-  followCursor = false, // ✅ NEW: Тултип следует за курсором
+  followCursor = false,
   className = '',
   style = {},
   ...props
-}) => {
+}: TooltipProps) => {
   useTheme();
+  const { t } = useTranslation();
+  void t;
   const [isVisible, setIsVisible] = useState<boolean>(false);
   const [shouldRender, setShouldRender] = useState<boolean>(false);
-  const [coords, setCoords] = useState({ x: 0, y: 0 });
-  const [mouseCoords, setMouseCoords] = useState({ x: 0, y: 0 });
-  const [tooltipSize, setTooltipSize] = useState<unknown>(null); // ✅ NEW: Размеры тултипа
+  const [coords, setCoords] = useState<Coords>({ x: 0, y: 0 });
+  const [mouseCoords, setMouseCoords] = useState<Coords>({ x: 0, y: 0 });
+  const [tooltipSize, setTooltipSize] = useState<TooltipSize | null>(null);
 
-  const triggerRef = useRef<unknown>(null);
-  const tooltipRef = useRef<unknown>(null);
-  const timeoutRef = useRef<unknown>(null);
+  const triggerRef: RefObject<HTMLDivElement | null> = useRef<HTMLDivElement | null>(null);
+  const tooltipRef: RefObject<HTMLDivElement | null> = useRef<HTMLDivElement | null>(null);
+  const timeoutRef: RefObject<ReturnType<typeof setTimeout> | null> = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Position calculations
-  const positionMap = {
+  const positionMap: Record<TooltipPosition, TooltipPositionMap> = {
     top: { x: 'center', y: 'bottom' },
     bottom: { x: 'center', y: 'top' },
     left: { x: 'right', y: 'center' },
@@ -45,10 +92,9 @@ const Tooltip = ({
     'bottom-right': { x: 'right', y: 'top' }
   };
 
-  const handleMouseEnter = (e) => {
+  const handleMouseEnter = (e: PointerEvent<HTMLDivElement>) => {
     if (disabled) return;
 
-    // ✅ FIXED: Запоминаем начальную позицию курсора сразу
     if (followCursor) {
       setMouseCoords({ x: e.clientX, y: e.clientY });
     }
@@ -60,13 +106,12 @@ const Tooltip = ({
           x: rect.left + rect.width / 2,
           y: rect.top + rect.height / 2
         });
-        setShouldRender(true); // Сначала рендерим (невидимым) для замера
+        setShouldRender(true);
       }
     }, delay);
   };
 
-  // ✅ FIXED: Обновляем позицию при любом движении мыши
-  const handleMouseMove = (e) => {
+  const handleMouseMove = (e: PointerEvent<HTMLDivElement>) => {
     if (followCursor) {
       setMouseCoords({ x: e.clientX, y: e.clientY });
     }
@@ -91,12 +136,10 @@ const Tooltip = ({
     };
   }, []);
 
-  // ✅ NEW: Измеряем размеры сразу после рендера через useLayoutEffect
   useLayoutEffect(() => {
     if (shouldRender && tooltipRef.current) {
       const rect = tooltipRef.current.getBoundingClientRect();
       setTooltipSize({ width: rect.width, height: rect.height });
-      // Теперь можно показывать
       requestAnimationFrame(() => setIsVisible(true));
     } else if (!shouldRender) {
       setTooltipSize(null);
@@ -106,19 +149,19 @@ const Tooltip = ({
 
   const tooltipPosition = positionMap[position] || positionMap.top;
 
-  const tooltipStyles = {
+  const tooltipStyles: TooltipStyle = {
     position: 'fixed',
     top: 0,
     left: 0,
-    zIndex: 9999, // Поверх всего (Portal)
+    zIndex: 9999,
     pointerEvents: 'none',
-    opacity: isVisible && tooltipSize ? 1 : 0, // Показываем только когда измерено
+    opacity: isVisible && tooltipSize ? 1 : 0,
     transform: isVisible && tooltipSize ? 'scale(1)' : 'scale(0.95)',
     transition: 'opacity 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)',
     transformOrigin: `${tooltipPosition.x === 'center' ? 'center' : tooltipPosition.x === 'left' ? 'right' : 'left'} ${tooltipPosition.y === 'center' ? 'center' : tooltipPosition.y === 'top' ? 'bottom' : 'top'}`
   };
 
-  const contentStyles = {
+  const contentStyles: ContentStyle = {
     backgroundColor: 'var(--mac-bg-tertiary)',
     color: 'var(--mac-text-primary)',
     border: '1px solid var(--mac-border)',
@@ -136,40 +179,32 @@ const Tooltip = ({
     WebkitBackdropFilter: 'blur(12px)'
   };
 
-  // Position the tooltip
-  const getPositionedStyles = () => {
-    if (!tooltipSize) return {}; // Ждем измерения
+  const getPositionedStyles = (): CSSProperties => {
+    if (!tooltipSize) return {};
 
     let top = 0;
     let left = 0;
 
-    // ✅ NEW: Если followCursor включен, позиционируем относительно курсора
     if (followCursor) {
       const tooltipWidth = tooltipSize.width;
       const tooltipHeight = tooltipSize.height;
       const offset = 16;
 
-      // Проверяем, хватает ли места справа и снизу
       const spaceRight = window.innerWidth - mouseCoords.x;
       const spaceBottom = window.innerHeight - mouseCoords.y;
 
-      // Позиционируем по горизонтали
       if (spaceRight > tooltipWidth + offset) {
         left = mouseCoords.x + offset;
       } else {
         left = mouseCoords.x - tooltipWidth - offset;
       }
 
-      // Позиционируем по вертикали
       if (spaceBottom > tooltipHeight + offset) {
         top = mouseCoords.y + offset;
       } else {
         top = mouseCoords.y - tooltipHeight - offset;
       }
     } else {
-      // Стандартное позиционирование (без followCursor)
-      // Здесь используем сохраненные coords (центр триггера)
-
       const tooltipWidth = tooltipSize.width;
       const tooltipHeight = tooltipSize.height;
 
@@ -206,7 +241,6 @@ const Tooltip = ({
       bottom: window.innerHeight - 8
     };
 
-    // Проверка границ
     if (left < viewport.left) left = viewport.left;
     const currentWidth = tooltipSize.width;
     if (left + currentWidth > viewport.right) {
@@ -222,7 +256,7 @@ const Tooltip = ({
     return { top: `${top}px`, left: `${left}px` };
   };
 
-  if (!content) return children;
+  if (!content) return <>{children}</>;
 
   return (
     <>
@@ -252,7 +286,6 @@ const Tooltip = ({
             {content}
           </div>
 
-          {/* Стрелочку показываем только если НЕ followCursor */}
           {!followCursor &&
           <div
             className="mac-tooltip-arrow"
@@ -284,7 +317,7 @@ const Tooltip = ({
                 left: '50%',
                 marginLeft: '-5px'
               })
-            }} />
+            } as CSSProperties} />
 
           }
 

@@ -1,16 +1,41 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
-import React from 'react';
+import React, { type ReactNode, type CSSProperties, type MouseEvent, type KeyboardEvent } from 'react';
 import PropTypes from 'prop-types';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { useTranslation } from '../../../i18n/useTranslation';
+
+type CardVariant = 'default' | 'elevated' | 'outlined' | 'filled';
+type CardPadding = 'none' | 'small' | 'default' | 'large';
+type CardShadow = 'none' | 'small' | 'default' | 'large';
+
+interface CardProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'children' | 'style' | 'onClick'> {
+  children?: ReactNode;
+  variant?: CardVariant;
+  padding?: CardPadding;
+  shadow?: CardShadow;
+  interactive?: boolean;
+  onClick?: (e: MouseEvent<HTMLDivElement>) => void;
+  className?: string;
+  style?: CSSProperties;
+}
+
+interface CardPartProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'children' | 'style'> {
+  children?: ReactNode;
+  className?: string;
+  style?: CSSProperties;
+}
+
+interface CardStyle extends CSSProperties {
+  transition?: string;
+  WebkitBackdropFilter?: string;
+  ':hover'?: Record<string, unknown>;
+  ':active'?: Record<string, unknown>;
+}
 
 /**
  * macOS-style Card Component
  * Implements Apple's Human Interface Guidelines for cards and containers
  */
-const Card = React.forwardRef(({
+const Card = React.forwardRef<HTMLDivElement, CardProps>(({
   children,
   variant = 'default',
   padding = 'default',
@@ -22,13 +47,14 @@ const Card = React.forwardRef(({
   ...props
 }, ref) => {
   useTheme();
+  const { t } = useTranslation();
+  void t;
 
-  // macOS card styles based on variant
-  const getCardStyles = () => {
-    const baseStyles = {
+  const getCardStyles = (): CardStyle => {
+    const baseStyles: CardStyle = {
       backgroundColor: 'var(--mac-card-bg, var(--mac-bg-primary))',
       border: '1px solid var(--mac-card-border, var(--mac-border))',
-      borderRadius: 'var(--mac-radius-lg)', // Стандартный радиус macOS для карточек
+      borderRadius: 'var(--mac-radius-lg)',
       fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif',
       position: 'relative',
       overflow: 'hidden',
@@ -37,21 +63,21 @@ const Card = React.forwardRef(({
       WebkitBackdropFilter: 'var(--mac-blur-light)'
     };
 
-    const paddingStyles = {
+    const paddingStyles: Record<CardPadding, CSSProperties> = {
       none: { padding: '0' },
       small: { padding: '12px' },
       default: { padding: '20px' },
       large: { padding: '32px' }
     };
 
-    const shadowStyles = {
+    const shadowStyles: Record<CardShadow, CSSProperties> = {
       none: { boxShadow: 'none' },
       small: { boxShadow: 'var(--mac-shadow-sm)' },
       default: { boxShadow: 'var(--mac-shadow-md)' },
       large: { boxShadow: 'var(--mac-shadow-lg)' }
     };
 
-    const variantStyles = {
+    const variantStyles: Record<CardVariant, CSSProperties> = {
       default: {},
       elevated: {
         boxShadow: 'var(--mac-shadow-lg)',
@@ -83,18 +109,18 @@ const Card = React.forwardRef(({
         }
       }),
       ...style
-    };
+    } as CardStyle;
   };
 
-  const handleClick = (e) => {
+  const handleClick = (e: MouseEvent<HTMLDivElement>) => {
     if (interactive && onClick) {
       onClick(e);
     }
   };
-  const handleKeyDown = (e) => {
+  const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (interactive && onClick && (e.key === 'Enter' || e.key === ' ')) {
       e.preventDefault();
-      onClick(e);
+      onClick(e as unknown as MouseEvent<HTMLDivElement>);
     }
   };
 
@@ -191,7 +217,7 @@ Card.displayName = 'macOS Card';
 /**
  * macOS-style Card Header Component
  */
-export const CardHeader = React.forwardRef(({
+export const CardHeader = React.forwardRef<HTMLDivElement, CardPartProps>(({
   children,
   className = '',
   style = {},
@@ -219,7 +245,7 @@ CardHeader.displayName = 'macOS Card Header';
 /**
  * macOS-style Card Title Component
  */
-export const CardTitle = React.forwardRef(({
+export const CardTitle = React.forwardRef<HTMLHeadingElement, CardPartProps>(({
   children,
   className = '',
   style = {},
@@ -250,7 +276,7 @@ CardTitle.displayName = 'macOS Card Title';
 /**
  * macOS-style Card Description Component
  */
-export const CardDescription = React.forwardRef(({
+export const CardDescription = React.forwardRef<HTMLParagraphElement, CardPartProps>(({
   children,
   className = '',
   style = {},
@@ -280,7 +306,7 @@ CardDescription.displayName = 'macOS Card Description';
 /**
  * macOS-style Card Content Component
  */
-export const CardContent = React.forwardRef(({
+export const CardContent = React.forwardRef<HTMLDivElement, CardPartProps>(({
   children,
   className = '',
   style = {},
@@ -309,7 +335,7 @@ CardContent.displayName = 'macOS Card Content';
 /**
  * macOS-style Card Footer Component
  */
-export const CardFooter = React.forwardRef(({
+export const CardFooter = React.forwardRef<HTMLDivElement, CardPartProps>(({
   children,
   className = '',
   style = {},
