@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useTranslation } from '../../i18n/useTranslation';
 import { useEffect, useRef, useState } from 'react';
@@ -51,7 +49,7 @@ const AppointmentContextMenu = ({
   theme = 'light',
   isDoctorView = false
 }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const menuRef = useRef(null);
   const [isVisible, setIsVisible] = useState(false);
 
@@ -288,10 +286,10 @@ const AppointmentContextMenu = ({
                 transition: 'background-color 0.15s ease'
               }}
               onMouseEnter={(e) => {
-                e.target.style.backgroundColor = colors.hover;
+                e.currentTarget.style.backgroundColor = colors.hover;
               }}
               onMouseLeave={(e) => {
-                e.target.style.backgroundColor = 'transparent';
+                e.currentTarget.style.backgroundColor = 'transparent';
               }}
               title={item.title}>
               
