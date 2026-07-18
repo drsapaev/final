@@ -1,11 +1,8 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import ColorSchemeSelector from '../ColorSchemeSelector.tsx';
-import { ThemeProvider } from '../../../contexts/ThemeContext.tsx';
-import { MacOSThemeProvider } from '../../../theme/macosTheme.tsx';
+import ColorSchemeSelector from '../ColorSchemeSelector';
+import { ThemeProvider } from '../../../contexts/ThemeContext';
+import { MacOSThemeProvider } from '../../../theme/macosTheme';
 
 const { apiMock } = vi.hoisted(() => ({
   apiMock: {

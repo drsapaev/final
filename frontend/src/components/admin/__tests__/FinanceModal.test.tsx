@@ -1,11 +1,8 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import FinanceModal from '../FinanceModal.tsx';
-import { ThemeProvider } from '../../../contexts/ThemeContext.tsx';
-import { MacOSThemeProvider } from '../../../theme/macosTheme.tsx';
+import FinanceModal from '../FinanceModal';
+import { ThemeProvider } from '../../../contexts/ThemeContext';
+import { MacOSThemeProvider } from '../../../theme/macosTheme';
 
 const renderFinanceModal = (props = {}) => render(
   <MacOSThemeProvider>
