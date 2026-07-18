@@ -18,7 +18,6 @@ interface MacOSStatCardProps {
   className?: string;
   style?: CSSProperties;
   detail?: ReactNode;
-  [key: string]: any;
 }
 
 const MacOSStatCard = ({

@@ -24,10 +24,8 @@ interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, '
   disabled?: boolean;
   clearable?: boolean;
   onClear?: () => void;
-  // Backward-compat: many callers pass label/hint for visual labels
   label?: React.ReactNode;
   hint?: React.ReactNode;
-  [key: string]: any;
 }
 
 interface InputStyle extends CSSProperties {
@@ -84,7 +82,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(({
     }
   };
 
-  const currentVariant: InputVariant = error ? 'error' : variant;
+  const currentVariant = error ? 'error' : variant;
   const currentSize = sizeStyles[size];
   const currentVariantStyle = variantStyles[currentVariant];
   const hasRightIcon = Boolean(Icon) && iconPosition === 'right';

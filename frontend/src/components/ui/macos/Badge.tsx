@@ -10,11 +10,10 @@ interface BadgeProps extends Omit<React.HTMLAttributes<HTMLSpanElement>, 'childr
   size?: BadgeSize;
   className?: string;
   style?: CSSProperties;
-  // Backward-compat props used by legacy callers
   text?: ReactNode;
   color?: string;
   outline?: boolean;
-  [key: string]: any;
+  hidden?: boolean;
 }
 
 /**

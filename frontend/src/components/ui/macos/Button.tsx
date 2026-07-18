@@ -15,11 +15,14 @@ interface ButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>
   className?: string;
   style?: CSSProperties;
   onClick?: (e: MouseEvent<HTMLButtonElement>) => void;
-  // Backward-compat props used by legacy callers
   startIcon?: ReactNode;
   endIcon?: ReactNode;
   color?: string;
-  [key: string]: any;
+  icon?: ReactNode;
+  label?: ReactNode;
+  action?: ReactNode;
+  emptyAction?: boolean;
+  as?: string;
 }
 
 type ButtonStyle = CSSProperties & {

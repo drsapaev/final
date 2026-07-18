@@ -1840,7 +1840,7 @@ function TelegramMiniAppPatientShell() {
                         <Textarea
                           key={field.key}
                           label={field.label}
-                          value={getMiniAppFormFieldValue(formAnswers, form.id, field)}
+                          value={String(getMiniAppFormFieldValue(formAnswers, form.id, field) ?? "")}
                           onChange={handlePatientFormFieldChange(form.id, field)}
                           maxLength={field.max_length || undefined}
                           minRows={2}
