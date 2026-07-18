@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 /**
  * Language Switcher Component
@@ -13,7 +11,7 @@ import {
 import PropTypes from 'prop-types';
 
 const LanguageSwitcher = ({ compact = false }) => {
-    const { language, setLanguage, availableLanguages, t } = useTranslation();
+    const { language, setLanguage, availableLanguages, t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
     const [isOpen, setIsOpen] = useState(false);
     const menuRef = useRef(null);
 
@@ -94,17 +92,17 @@ const LanguageSwitcher = ({ compact = false }) => {
                             }}
                             onMouseEnter={(e) => {
                                 if (language !== lang.code) {
-                                    e.target.style.background = 'var(--mac-bg-tertiary)';
+                                    e.currentTarget.style.background = 'var(--mac-bg-tertiary)';
                                 }
                             }}
                             onMouseLeave={(e) => {
                                 if (language !== lang.code) {
-                                    e.target.style.background = 'transparent';
+                                    e.currentTarget.style.background = 'transparent';
                                 }
                             }}
                         >
                             <span style={{ fontSize: 'var(--mac-font-size-xl)' }}>{lang.flag}</span>
-                            <span>{lang.nativeName || lang.name}</span>
+                            <span>{(lang as Record<string, unknown>).nativeName as string || lang.name}</span>
                         </button>
                     ))}
                 </div>

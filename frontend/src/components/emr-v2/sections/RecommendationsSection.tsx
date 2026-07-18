@@ -1,20 +1,17 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
-/**
- * RecommendationsSection - Рекомендации с "Мой опыт"
- * 
- * Phase 4.1: Text section with personalized templates
- */
-
+import React from 'react';
 import { useState, useCallback } from 'react';
 import PropTypes from 'prop-types';
-
-import EMRSection from './EMRSection';
-import EMRTextField from './EMRTextField';
-import { DoctorTemplatesPanel, DoctorTemplatesButton } from '../DoctorTemplatesPanel';
+import EMRSectionRaw from './EMRSection';
+import EMRTextFieldRaw from './EMRTextField';
+import { DoctorTemplatesPanel as DTPRaw, DoctorTemplatesButton as DTBRaw } from '../DoctorTemplatesPanel';
 import { useDoctorSectionTemplates } from '../../../hooks/useDoctorSectionTemplates';
 import { useTranslation } from '../../../i18n/useTranslation';
+
+const EMRSection = EMRSectionRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const EMRTextField = EMRTextFieldRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const DoctorTemplatesPanel = DTPRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const DoctorTemplatesButton = DTBRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 /**
  * RecommendationsSection Component

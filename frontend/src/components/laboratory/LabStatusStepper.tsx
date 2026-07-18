@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import PropTypes from 'prop-types';
 import { Icon } from '../ui/macos';
@@ -44,7 +42,7 @@ const VISIBLE_STEPPER_STEPS = LAB_REPORT_STATUS_CONFIG.filter(
 );
 
 export default function LabStatusStepper({ status }) {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // Индекс считаем по полной конфигурации, чтобы READY (если пришёл с бэкенда)
   // корректно отображался как текущий шаг.
   const fullIndex = getLabReportStepIndex(status);
@@ -95,7 +93,7 @@ export default function LabStatusStepper({ status }) {
               title={`${step.label} — ${titleSuffix}`}
             >
               {isCompleted && (
-                <Icon name="checkmark.circle.fill" size={12} />
+                <Icon name="checkmark.circle.fill" size={12 as unknown as "small" | "default" | "large" | "xlarge"} />
               )}
               {isCurrent && (
                 <span

@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import {
   Card, Badge,
@@ -9,7 +7,7 @@ import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 
 const QueuePositionCard = ({ queueEntry }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   if (!queueEntry) return null;
 
   const {

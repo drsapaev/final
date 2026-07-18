@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
@@ -8,7 +6,7 @@ import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 
 export default function NotificationSystemStatus() {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
     const [status, setStatus] = useState(null);
     const [loading, setLoading] = useState(true);
 
@@ -60,7 +58,7 @@ export default function NotificationSystemStatus() {
 }
 
 function StatusCard({ title, configured, details }) {
-    const { t } = useTranslation();
+    const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
     return (
         <div style={{
             border: '1px solid var(--border-color)',
