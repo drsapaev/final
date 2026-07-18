@@ -68,3 +68,59 @@ declare module '@vercel/speed-insights/react' {
 declare module '@vercel/speed-insights' {
   export function inject(): void;
 }
+
+// Telegram WebApp SDK — injected by Telegram client
+interface Window {
+  Telegram?: {
+    WebApp?: {
+      initData: string;
+      initDataUnsafe: {
+        user?: {
+          id: number;
+          first_name?: string;
+          last_name?: string;
+          username?: string;
+          language_code?: string;
+          photo_url?: string;
+        };
+        auth_date?: number;
+        hash?: string;
+        start_param?: string;
+      };
+      colorScheme?: 'light' | 'dark';
+      themeParams?: Record<string, string>;
+      isExpanded?: boolean;
+      viewportHeight?: number;
+      viewportStableHeight?: number;
+      headerColor?: string;
+      backgroundColor?: string;
+      BackButton?: {
+        show: () => void;
+        hide: () => void;
+        onClick: (cb: () => void) => void;
+        offClick: (cb: () => void) => void;
+      };
+      MainButton?: {
+        text: string;
+        show: () => void;
+        hide: () => void;
+        setText: (text: string) => void;
+        onClick: (cb: () => void) => void;
+        offClick: (cb: () => void) => void;
+        enable: () => void;
+        disable: () => void;
+        showProgress: () => void;
+        hideProgress: () => void;
+      };
+      HapticFeedback?: {
+        impactOccurred: (style: string) => void;
+        notificationOccurred: (type: string) => void;
+        selectionChanged: () => void;
+      };
+      openLink: (url: string) => void;
+      ready: () => void;
+      expand: () => void;
+      close: () => void;
+    };
+  };
+}
