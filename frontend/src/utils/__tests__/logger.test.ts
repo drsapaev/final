@@ -1,9 +1,6 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 /**
  * Unit tests for logger utility
- * 
+ *
  * Tests cover:
  * - PHI sanitization
  * - Basic logging methods
@@ -14,6 +11,23 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 // Import logger and sanitize
 import logger, { sanitize } from '../logger';
 
+// logger is still implicit-any; cast to a permissive shape so the test's
+// typeof checks and method calls compile without a concrete Logger type.
+interface LoggerShape {
+  log: (...args: unknown[]) => void;
+  warn: (...args: unknown[]) => void;
+  error: (...args: unknown[]) => void;
+  debug: (...args: unknown[]) => void;
+  info: (...args: unknown[]) => void;
+  group: (...args: unknown[]) => void;
+  groupEnd: (...args: unknown[]) => void;
+  table: (...args: unknown[]) => void;
+  time: (...args: unknown[]) => void;
+  timeEnd: (...args: unknown[]) => void;
+}
+const loggerTyped = logger as unknown as LoggerShape;
+const sanitizeTyped = sanitize as unknown as (input: unknown) => unknown;
+
 describe('logger', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -21,43 +35,43 @@ describe('logger', () => {
 
     describe('basic logging methods', () => {
         it('should have log method', () => {
-            expect(typeof logger.log).toBe('function');
+            expect(typeof loggerTyped.log).toBe('function');
         });
 
         it('should have warn method', () => {
-            expect(typeof logger.warn).toBe('function');
+            expect(typeof loggerTyped.warn).toBe('function');
         });
 
         it('should have error method', () => {
-            expect(typeof logger.error).toBe('function');
+            expect(typeof loggerTyped.error).toBe('function');
         });
 
         it('should have debug method', () => {
-            expect(typeof logger.debug).toBe('function');
+            expect(typeof loggerTyped.debug).toBe('function');
         });
 
         it('should have info method', () => {
-            expect(typeof logger.info).toBe('function');
+            expect(typeof loggerTyped.info).toBe('function');
         });
 
         it('should have group method', () => {
-            expect(typeof logger.group).toBe('function');
+            expect(typeof loggerTyped.group).toBe('function');
         });
 
         it('should have groupEnd method', () => {
-            expect(typeof logger.groupEnd).toBe('function');
+            expect(typeof loggerTyped.groupEnd).toBe('function');
         });
 
         it('should have table method', () => {
-            expect(typeof logger.table).toBe('function');
+            expect(typeof loggerTyped.table).toBe('function');
         });
 
         it('should have time method', () => {
-            expect(typeof logger.time).toBe('function');
+            expect(typeof loggerTyped.time).toBe('function');
         });
 
         it('should have timeEnd method', () => {
-            expect(typeof logger.timeEnd).toBe('function');
+            expect(typeof loggerTyped.timeEnd).toBe('function');
         });
     });
 
@@ -69,7 +83,7 @@ describe('logger', () => {
         it('should not modify primitive email strings', () => {
             // Primitives are returned as-is (PHI filtering works on object keys)
             const input = 'Contact: patient@example.com';
-            const result = sanitize(input);
+            const result = sanitizeTyped(input);
 
             // Primitives should be unchanged
             expect(result).toBe(input);
@@ -78,7 +92,7 @@ describe('logger', () => {
         it('should not modify primitive strings', () => {
             // Primitives are returned as-is (PHI filtering works on object keys)
             const input = 'Phone: +7 (999) 123-45-67';
-            const result = sanitize(input);
+            const result = sanitizeTyped(input);
 
             // Primitives should be unchanged
             expect(result).toBe(input);
@@ -91,7 +105,7 @@ describe('logger', () => {
                 email: 'john@example.com',
                 status: 'active'
             };
-            const result = sanitize(input);
+            const result = sanitizeTyped(input) as Record<string, unknown>;
 
             // PHI fields should be redacted
             expect(result.patient_name).toBe('[REDACTED]');
@@ -108,7 +122,7 @@ describe('logger', () => {
                     phone: '+7 999 123 4567'
                 }
             };
-            const result = sanitize(input);
+            const result = sanitizeTyped(input) as { user: Record<string, unknown> };
 
             expect(result.user.name).toBe('[REDACTED]');
             expect(result.user.phone).toBe('[REDACTED]');
@@ -116,53 +130,53 @@ describe('logger', () => {
 
         it('should handle arrays', () => {
             const input = ['test@email.com', 'normal text'];
-            const result = sanitize(input);
+            const result = sanitizeTyped(input);
 
             expect(Array.isArray(result)).toBe(true);
-            expect(result.length).toBe(2);
+            expect((result as unknown[]).length).toBe(2);
         });
 
         it('should handle null and undefined gracefully', () => {
-            expect(sanitize(null)).toBeNull();
-            expect(sanitize(undefined)).toBeUndefined();
+            expect(sanitizeTyped(null)).toBeNull();
+            expect(sanitizeTyped(undefined)).toBeUndefined();
         });
 
         it('should handle empty strings', () => {
-            const result = sanitize('');
+            const result = sanitizeTyped('');
             expect(result).toBe('');
         });
 
         it('should handle numbers', () => {
-            expect(sanitize(123)).toBe(123);
-            expect(sanitize(0)).toBe(0);
+            expect(sanitizeTyped(123)).toBe(123);
+            expect(sanitizeTyped(0)).toBe(0);
         });
 
         it('should handle booleans', () => {
-            expect(sanitize(true)).toBe(true);
-            expect(sanitize(false)).toBe(false);
+            expect(sanitizeTyped(true)).toBe(true);
+            expect(sanitizeTyped(false)).toBe(false);
         });
     });
 
     describe('log output - should not throw', () => {
         it('should call log method without throwing', () => {
-            expect(() => logger.log('Test message')).not.toThrow();
+            expect(() => loggerTyped.log('Test message')).not.toThrow();
         });
 
         it('should call warn method without throwing', () => {
-            expect(() => logger.warn('Warning message')).not.toThrow();
+            expect(() => loggerTyped.warn('Warning message')).not.toThrow();
         });
 
         it('should call error method without throwing', () => {
-            expect(() => logger.error('Error message')).not.toThrow();
+            expect(() => loggerTyped.error('Error message')).not.toThrow();
         });
 
         it('should handle multiple arguments', () => {
-            expect(() => logger.log('Message', { data: 'value' }, 123)).not.toThrow();
+            expect(() => loggerTyped.log('Message', { data: 'value' }, 123)).not.toThrow();
         });
 
         it('should handle Error objects', () => {
             const error = new Error('Test error');
-            expect(() => logger.error('Error:', error)).not.toThrow();
+            expect(() => loggerTyped.error('Error:', error)).not.toThrow();
         });
     });
 
@@ -170,52 +184,52 @@ describe('logger', () => {
         it('should handle rapid logging without errors', () => {
             expect(() => {
                 for (let i = 0; i < 100; i++) {
-                    logger.log(`Message ${i}`);
+                    loggerTyped.log(`Message ${i}`);
                 }
             }).not.toThrow();
         });
 
         it('should handle large objects', () => {
-            const largeObject = {};
+            const largeObject: Record<string, string> = {};
             for (let i = 0; i < 100; i++) {
                 largeObject[`key${i}`] = `value${i}`;
             }
-            expect(() => logger.log('Large object:', largeObject)).not.toThrow();
+            expect(() => loggerTyped.log('Large object:', largeObject)).not.toThrow();
         });
     });
 
     describe('special characters handling', () => {
         it('should handle strings with special characters', () => {
             const specialChars = 'Test: <script>alert("XSS")</script>';
-            expect(() => logger.log(specialChars)).not.toThrow();
+            expect(() => loggerTyped.log(specialChars)).not.toThrow();
         });
 
         it('should handle unicode characters', () => {
             const unicode = 'Тест: 日本語 🎉 émoji';
-            expect(() => logger.log(unicode)).not.toThrow();
+            expect(() => loggerTyped.log(unicode)).not.toThrow();
         });
 
         it('should handle newlines and tabs', () => {
             const multiline = 'Line 1\nLine 2\tTabbed';
-            expect(() => logger.log(multiline)).not.toThrow();
+            expect(() => loggerTyped.log(multiline)).not.toThrow();
         });
     });
 
     describe('circular reference handling', () => {
         it('should handle circular references without throwing', () => {
-            const obj = { name: 'test' };
+            const obj: { name: string; self?: unknown } = { name: 'test' };
             obj.self = obj; // Create circular reference
 
-            expect(() => sanitize(obj)).not.toThrow();
+            expect(() => sanitizeTyped(obj)).not.toThrow();
         });
 
         it('should handle deeply nested objects', () => {
-            let nested = { value: 'deep' };
+            let nested: Record<string, unknown> = { value: 'deep' };
             for (let i = 0; i < 20; i++) {
                 nested = { child: nested };
             }
 
-            expect(() => sanitize(nested)).not.toThrow();
+            expect(() => sanitizeTyped(nested)).not.toThrow();
         });
     });
 });
