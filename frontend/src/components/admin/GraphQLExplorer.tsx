@@ -1,14 +1,16 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useState, useEffect } from 'react';
+import type { CSSProperties } from 'react';
 import {
   MacOSCard,
-  Button,
-  Textarea,
-  Alert,
-  Skeleton,
+  Button as RawButton,
+  Textarea as RawTextarea,
+  Alert as RawAlert,
+  Skeleton as RawSkeleton,
 } from '../ui/macos';
+const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
+const Textarea = RawTextarea as unknown as React.ComponentType<Record<string, unknown>>;
+const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
+const Skeleton = RawSkeleton as unknown as React.ComponentType<Record<string, unknown>>;
 import {
   Database,
   Play,
@@ -29,7 +31,8 @@ import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 
 const GraphQLExplorer = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [activeTab, setActiveTab] = useState('explorer');
   const [query, setQuery] = useState('');
   const [variables, setVariables] = useState('{}');
@@ -515,7 +518,7 @@ const GraphQLExplorer = () => {
             className="admin-h-100pct" /> :
 
           result ?
-          <pre className="admin-m-0-ws-pre-wrap-col-dyn" style={{ '--admin-col0': result.errors ? 'var(--mac-error)' : 'var(--mac-text-primary)' }}>
+          <pre className="admin-m-0-ws-pre-wrap-col-dyn" style={{ '--admin-col0': result.errors ? 'var(--mac-error)' : 'var(--mac-text-primary)' } as CSSProperties}>
                 {formatJSON(result)}
               </pre> :
 
@@ -610,7 +613,7 @@ const GraphQLExplorer = () => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className="admin-p-12px-18px-bd-1px-solid-transparen-cur-pointer-d-flex-ai-center-gap-8-radius-14-fs-sm-tr-all-var-mac-duration-bg-dyn-bsh-dyn-bd-c-dyn-col-dyn-fw-dyn" style={{ '--admin-bg0': activeTab === tab.id ? 'color-mix(in srgb, var(--mac-card-hover-bg), white 8%)' : 'transparent', '--admin-bsh1': activeTab === tab.id ? 'var(--mac-shadow-sm)' : 'none', '--admin-bd-c2': activeTab === tab.id ? 'color-mix(in srgb, var(--mac-card-border), white 12%)' : 'transparent', '--admin-col3': activeTab === tab.id ? 'var(--mac-accent)' : 'var(--mac-text-secondary)', '--admin-fw4': activeTab === tab.id ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)' }}>
+              className="admin-p-12px-18px-bd-1px-solid-transparen-cur-pointer-d-flex-ai-center-gap-8-radius-14-fs-sm-tr-all-var-mac-duration-bg-dyn-bsh-dyn-bd-c-dyn-col-dyn-fw-dyn" style={{ '--admin-bg0': activeTab === tab.id ? 'color-mix(in srgb, var(--mac-card-hover-bg), white 8%)' : 'transparent', '--admin-bsh1': activeTab === tab.id ? 'var(--mac-shadow-sm)' : 'none', '--admin-bd-c2': activeTab === tab.id ? 'color-mix(in srgb, var(--mac-card-border), white 12%)' : 'transparent', '--admin-col3': activeTab === tab.id ? 'var(--mac-accent)' : 'var(--mac-text-secondary)', '--admin-fw4': activeTab === tab.id ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)' } as CSSProperties}>
               
               <Icon size={16} />
               {tab.label}

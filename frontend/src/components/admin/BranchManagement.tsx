@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useState, useEffect, useCallback } from 'react';
 import {
   Building2,
@@ -18,15 +15,23 @@ import {
 'lucide-react';
 import {
   MacOSCard,
-  Button,
-  Badge,
-  Input,
-  Select,
-  Checkbox,
-  Skeleton,
-  MacOSEmptyState,
-  Alert,
+  Button as RawButton,
+  Badge as RawBadge,
+  Input as RawInput,
+  Select as RawSelect,
+  Checkbox as RawCheckbox,
+  Skeleton as RawSkeleton,
+  MacOSEmptyState as RawMacOSEmptyState,
+  Alert as RawAlert,
 } from '../ui/macos';
+const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
+const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
+const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
+const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
+const Checkbox = RawCheckbox as unknown as React.ComponentType<Record<string, unknown>>;
+const Skeleton = RawSkeleton as unknown as React.ComponentType<Record<string, unknown>>;
+const MacOSEmptyState = RawMacOSEmptyState as unknown as React.ComponentType<Record<string, unknown>>;
+const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
@@ -59,7 +64,7 @@ const BranchManagement = () => {
   const [editingBranch, setEditingBranch] = useState(null);
   const [message, setMessage] = useState({ type: '', text: '' });
   const [stats, setStats] = useState(null);
-  const [formErrors, setFormErrors] = useState({});
+  const [formErrors, setFormErrors] = useState({} as any);
 
   // Форма филиала
   const [formData, setFormData] = useState({
@@ -71,9 +76,10 @@ const BranchManagement = () => {
     status: 'active',
     capacity: 50,
     services_available: ['cardiology', 'dermatology', 'stomatology']
-  });
+  } as any);
 
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
 
   const statusOptions = [
   { value: 'active', label: t('admin2.br_status_active'), color: 'success' },
@@ -132,7 +138,7 @@ const BranchManagement = () => {
   const loadBranches = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await api.get('/clinic/branches');
+      const response = await api.get('/clinic/branches') as any;
       const nextBranches = Array.isArray(response.data)
         ? response.data
         : response.data?.branches || [];
@@ -309,7 +315,7 @@ const BranchManagement = () => {
             <Select
               aria-label={t('admin2.br_filter_status_aria')}
               value={statusFilter}
-              onChange={setStatusFilter}
+              onChange={(v: unknown) => setStatusFilter(String(v))}
               options={[
                 { value: 'all', label: t('admin2.br_status_all') },
                 ...statusOptions.map((option) => ({ value: option.value, label: option.label }))
@@ -424,7 +430,7 @@ const BranchManagement = () => {
                 <Select
                 aria-label={t('admin2.br_status_select_aria')}
                 value={formData.status}
-                onChange={(value) => setFormData({ ...formData, status: value })}
+                onChange={(value: unknown) => setFormData({ ...formData, status: String(value) })}
                 options={statusOptions.map((option) => ({ value: option.value, label: option.label }))}
                 size="large" />
               </div>

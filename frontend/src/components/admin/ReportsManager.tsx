@@ -1,8 +1,6 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect } from 'react';
+import type { CSSProperties } from 'react';
 import {
   FileText,
   Download,
@@ -23,15 +21,23 @@ import {
   FileX,
   Loader2 } from
 'lucide-react';
-import { MacOSCard, Button, Badge } from '../ui/macos';
+import { MacOSCard, Button as RawButton, Badge as RawBadge } from '../ui/macos';
+const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
+const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
 import {
-  MacOSStatCard,
-  Table,
-  Input,
-  MacOSEmptyState,
-  Select,
-  SegmentedControl,
+  MacOSStatCard as RawMacOSStatCard,
+  Table as RawTable,
+  Input as RawInput,
+  MacOSEmptyState as RawMacOSEmptyState,
+  Select as RawSelect,
+  SegmentedControl as RawSegmentedControl,
 } from '../ui/macos';
+const MacOSStatCard = RawMacOSStatCard as unknown as React.ComponentType<Record<string, unknown>>;
+const Table = RawTable as unknown as React.ComponentType<Record<string, unknown>>;
+const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
+const MacOSEmptyState = RawMacOSEmptyState as unknown as React.ComponentType<Record<string, unknown>>;
+const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
+const SegmentedControl = RawSegmentedControl as unknown as React.ComponentType<Record<string, unknown>>;
 import { toast } from 'react-toastify';
 
 import { api } from '../../api/client';
@@ -41,9 +47,11 @@ import { getReportEndpoint } from '../../utils/reportEndpoints';
 import { useConfirm } from '../common/ConfirmDialog';
 
 const ReportsManager = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
-  const [confirm, confirmDialog] = useConfirm();
+  const [confirmRaw, confirmDialog] = useConfirm();
+  const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
   const [activeTab, setActiveTab] = useState('generate');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null); // Global error state
@@ -58,7 +66,7 @@ const ReportsManager = () => {
     start_date: '',
     end_date: '',
     filters: {}
-  });
+  } as any);
 
   // Состояние для быстрых отчетов
   const [quickReports, setQuickReports] = useState({ daily: null });
@@ -71,7 +79,7 @@ const ReportsManager = () => {
 
   const loadAvailableReports = async () => {
     try {
-      const response = await api.get('/reports/available-reports');
+      const response = await api.get('/reports/available-reports') as any;
       const reports = response.data?.reports || [];
       setAvailableReports(reports);
       setReportForm((prev) => ({
@@ -88,7 +96,7 @@ const ReportsManager = () => {
 
   const loadReportFiles = async () => {
     try {
-      const response = await api.get('/reports/files');
+      const response = await api.get('/reports/files') as any;
       setFiles(response.data?.files || []);
     } catch (error) {
       logger.error('Ошибка загрузки файлов отчетов:', error);
@@ -103,7 +111,7 @@ const ReportsManager = () => {
       // endpoints do not exist (verified via backend/openapi.json), so the
       // weekly/monthly KPI cards showed a perpetual loading spinner. Removed
       // those cards; this loader now only fetches daily.
-      const response = await api.get('/reports/daily-summary');
+      const response = await api.get('/reports/daily-summary') as any;
       setQuickReports((prev) => ({ ...prev, daily: response.data }));
     } catch (error) {
       logger.error('Ошибка загрузки быстрых отчетов:', error);
@@ -133,7 +141,7 @@ const ReportsManager = () => {
         end_date: reportForm.end_date || null,
         format: reportForm.format,
         filters: reportForm.filters
-      });
+      }) as any;
 
       const data = response.data;
       if (data.success) {
@@ -179,7 +187,7 @@ const ReportsManager = () => {
     try {
       const response = await api.get(`/reports/download/${filename}`, {
         responseType: 'blob'
-      });
+      }) as any;
 
       const blob = new Blob([response.data]);
       const url = window.URL.createObjectURL(blob);
@@ -212,7 +220,7 @@ const ReportsManager = () => {
     }
 
     try {
-      const response = await api.post('/reports/cleanup');
+      const response = await api.post('/reports/cleanup') as any;
       toast.success(response.data?.message || t('admin2.rm_files_cleaned_success'));
       loadReportFiles();
     } catch (error) {
@@ -287,7 +295,7 @@ const ReportsManager = () => {
           onClick={generateReport}
           disabled={loading || !reportForm.type}
           className="admin-btn-blue-w-full-h-44-flex-center admin-opacity-dynamic"
-          style={{ '--admin-opacity': loading ? 0.7 : 1 }}>
+          style={{ '--admin-opacity': loading ? 0.7 : 1 } as CSSProperties}>
 
             {loading ?
           <>
@@ -356,7 +364,7 @@ const ReportsManager = () => {
           render: (row) =>
           <Button
             type="button"
-            size="sm"
+            size="small"
             variant="outline"
             title={t('admin2.rm_download_report_aria', { filename: row.filename })}
             aria-label={t('admin2.rm_download_report_aria', { filename: row.filename })}
@@ -387,7 +395,7 @@ const ReportsManager = () => {
             <Button
             onClick={loadReportFiles}
             variant="outline"
-            size="sm"
+            size="small"
             className="admin-btn-min-w-100-h-36">
 
               <RefreshCw className="w-4 h-4 mr-2" />
@@ -396,7 +404,7 @@ const ReportsManager = () => {
             <Button
             onClick={cleanupOldReports}
             variant="outline"
-            size="sm"
+            size="small"
             className="admin-btn-error-min-w-140-h-36">
 
               <Trash2 className="w-4 h-4 mr-2" />
@@ -453,7 +461,7 @@ const ReportsManager = () => {
           render: (row) =>
           <Button
             type="button"
-            size="sm"
+            size="small"
             variant="ghost"
             title={t('admin2.rm_download_file_aria', { filename: row.filename })}
             aria-label={t('admin2.rm_download_file_aria', { filename: row.filename })}
@@ -616,7 +624,7 @@ const ReportsManager = () => {
           { value: 'settings', label: t('admin2.rm_tab_settings'), icon: Settings }]
           }
           value={activeTab}
-          onChange={setActiveTab}
+          onChange={(v: unknown) => setActiveTab(String(v))}
           size="large"
           variant="default" />
 
@@ -628,7 +636,7 @@ const ReportsManager = () => {
         </>
       }
       {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
-      {confirmDialog}
+      {confirmDialog as unknown as React.ReactNode}
     </div>);
 
 };

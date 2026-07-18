@@ -1,7 +1,5 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useState, useEffect, useCallback } from 'react';
+import type { CSSProperties } from 'react';
 import {
   Key,
   Plus,
@@ -24,15 +22,23 @@ import {
 'lucide-react';
 import {
   MacOSCard,
-  Button,
-  Badge,
-  Input,
-  Select,
-  Textarea,
-  Skeleton,
-  MacOSEmptyState,
-  Alert,
+  Button as RawButton,
+  Badge as RawBadge,
+  Input as RawInput,
+  Select as RawSelect,
+  Textarea as RawTextarea,
+  Skeleton as RawSkeleton,
+  MacOSEmptyState as RawMacOSEmptyState,
+  Alert as RawAlert,
 } from '../ui/macos';
+const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
+const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
+const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
+const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
+const Textarea = RawTextarea as unknown as React.ComponentType<Record<string, unknown>>;
+const Skeleton = RawSkeleton as unknown as React.ComponentType<Record<string, unknown>>;
+const MacOSEmptyState = RawMacOSEmptyState as unknown as React.ComponentType<Record<string, unknown>>;
+const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
@@ -67,7 +73,8 @@ const LicenseManagement = () => {
   const [message, setMessage] = useState({ type: '', text: '' });
   const [stats, setStats] = useState(null);
   const [showKeys, setShowKeys] = useState({});
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
 
   // Форма лицензии
   const [formData, setFormData] = useState({
@@ -81,7 +88,7 @@ const LicenseManagement = () => {
     cost: 0,
     seats: 1,
     description: ''
-  });
+  } as any);
 
   const statusOptions = [
   { value: 'active', label: t('admin2.lm_status_active'), color: 'success' },
@@ -102,7 +109,7 @@ const LicenseManagement = () => {
   const loadLicenses = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await api.get('/clinic/licenses');
+      const response = await api.get('/clinic/licenses') as any;
       const nextLicenses = Array.isArray(response.data)
         ? response.data
         : response.data?.licenses || [];
@@ -203,7 +210,7 @@ const LicenseManagement = () => {
     return statusOption ? statusOption.label : status;
   };
 
-  const getTypeLabel = (type) => {
+  const getTypeLabel = (type: string) => {
     const typeOption = typeOptions.find((t) => t.value === type);
     return typeOption ? typeOption.label : type;
   };
@@ -211,7 +218,7 @@ const LicenseManagement = () => {
   const isExpiringSoon = (expiryDate) => {
     const expiry = new Date(expiryDate);
     const now = new Date();
-    const diffTime = expiry - now;
+    const diffTime = expiry.getTime() - now.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return diffDays <= 30 && diffDays > 0;
   };
@@ -291,7 +298,7 @@ const LicenseManagement = () => {
             <Select
               aria-label={t('admin2.lm_filter_status_aria')}
               value={statusFilter}
-              onChange={setStatusFilter}
+              onChange={(v: unknown) => setStatusFilter(String(v))}
               options={[
                 { value: 'all', label: t('admin2.lm_filter_all_statuses') },
                 ...statusOptions.map((option) => ({ value: option.value, label: option.label }))
@@ -301,7 +308,7 @@ const LicenseManagement = () => {
             <Select
               aria-label={t('admin2.lm_filter_type_aria')}
               value={typeFilter}
-              onChange={setTypeFilter}
+              onChange={(v: unknown) => setTypeFilter(String(v))}
               options={[
                 { value: 'all', label: t('admin2.lm_filter_all_types') },
                 ...typeOptions.map((option) => ({ value: option.value, label: option.label }))
@@ -362,7 +369,7 @@ const LicenseManagement = () => {
                 <Select
                 aria-label={t('admin2.lm_field_type_aria')}
                 value={formData.type}
-                onChange={(value) => setFormData({ ...formData, type: value })}
+                onChange={(value: unknown) => setFormData({ ...formData, type: String(value) })}
                 options={[
                   { value: '', label: t('admin2.lm_field_type_select_option') },
                   ...typeOptions.map((option) => ({ value: option.value, label: option.label }))
@@ -399,7 +406,7 @@ const LicenseManagement = () => {
                 <Select
                 aria-label={t('admin2.lm_field_status_aria')}
                 value={formData.status}
-                onChange={(value) => setFormData({ ...formData, status: value })}
+                onChange={(value: unknown) => setFormData({ ...formData, status: String(value) })}
                 options={statusOptions.map((option) => ({ value: option.value, label: option.label }))}
                 size="large" />
               </div>
@@ -576,7 +583,7 @@ const LicenseManagement = () => {
                   <span>{t('admin2.lm_seats_count', { count: license.seats })}</span>
                 </div>
                 {license.expiry_date &&
-            <div className="admin-flex-ai-center-gap-8-sm" style={{ '--admin-color': isExpiringSoon(license.expiry_date) ? 'var(--mac-warning)' : 'var(--mac-text-secondary)' }}>
+            <div className="admin-flex-ai-center-gap-8-sm" style={{ '--admin-color': isExpiringSoon(license.expiry_date) ? 'var(--mac-warning)' : 'var(--mac-text-secondary)' } as CSSProperties}>
                     <Calendar aria-hidden="true" className="w-4 h-4" />
                     <span>{t('admin2.lm_expiry_label', { date: new Date(license.expiry_date).toLocaleDateString() })}</span>
                     {isExpiringSoon(license.expiry_date) &&
