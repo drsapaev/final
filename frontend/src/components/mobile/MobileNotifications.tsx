@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useTranslation } from '../../i18n/useTranslation';
 import { api } from '../../api/client';
@@ -8,13 +6,13 @@ import { Bell, BellOff, Settings, Check } from 'lucide-react';
 import { Button, Card, Badge } from '../ui/macos';
 import { tokenManager } from '../../utils/tokenManager';
 import logger from '../../utils/logger';
-import { notify } from '../../services/notify.js';
+import { notify } from '../../services/notify';
 
 /**
  * Компонент для управления мобильными уведомлениями
  */
 const MobileNotifications = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [notifications, setNotifications] = useState([]);
   const [permission, setPermission] = useState('default');
   const [loading, setLoading] = useState(false);
@@ -151,7 +149,7 @@ const MobileNotifications = () => {
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     const now = new Date();
-    const diffInHours = (now - date) / (1000 * 60 * 60);
+    const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
 
     if (diffInHours < 1) {
       return 'Только что';
@@ -187,7 +185,7 @@ const MobileNotifications = () => {
         <Button
           onClick={() => window.open('chrome://settings/content/notifications')}
           variant="outline"
-          size="sm">
+          size="small">
           
           <Settings className="w-4 h-4 mr-2" />
           Открыть настройки
@@ -204,7 +202,7 @@ const MobileNotifications = () => {
           <Bell className="w-5 h-5" />
           <h3 className="font-semibold">Уведомления</h3>
           {unreadCount > 0 &&
-          <Badge variant="destructive" className="text-xs">
+          <Badge variant="danger" className="text-xs">
               {unreadCount}
             </Badge>
           }
@@ -214,7 +212,7 @@ const MobileNotifications = () => {
           {permission === 'default' &&
           <Button
             onClick={requestNotificationPermission}
-            size="sm"
+            size="small"
             variant="outline">
             
               Включить
@@ -224,7 +222,7 @@ const MobileNotifications = () => {
           {unreadCount > 0 &&
           <Button
             onClick={markAllAsRead}
-            size="sm"
+            size="small"
             variant="ghost">
             
               <Check className="w-4 h-4 mr-1" />

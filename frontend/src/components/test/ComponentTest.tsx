@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useTranslation } from '../../i18n/useTranslation';
 // Тестовый компонент для проверки работоспособности всех созданных компонентов
@@ -16,10 +14,11 @@ import {
   useModal,
   FormProvider,
   useForm,
-  Table,
+  Table as TableRaw,
   RoleGuard,
   useRoleAccess
 } from '../common';
+const Table = TableRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 /**
  * Тестовый компонент для проверки всех созданных компонентов
@@ -27,11 +26,11 @@ import {
 function ComponentTestInner() {
   const theme = useTheme();
   const { getColor, getSpacing, getFontSize } = theme;
-  const { addToast } = useToast();
-  const { openModal } = useModal();
+  const { addToast } = useToast() as { addToast: (...args: unknown[]) => void };
+  const { openModal } = useModal() as { openModal: (...args: unknown[]) => void };
   const { form, setValue, setError, validateForm } = useForm('test-form', { name: '', email: '' });
   const { profile, hasRole, isAdmin } = useRoleAccess();
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
 
   const [loading, setLoading] = useState(false);
   const [tableData, setTableData] = useState([

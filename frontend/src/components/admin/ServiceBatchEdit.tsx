@@ -1,5 +1,4 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
+import type { CSSProperties } from 'react';
 
 import { useTranslation } from '../../i18n/useTranslation';
 import { useState } from 'react';
@@ -23,10 +22,10 @@ import {
   Checkbox,
   Select,
 } from '../ui/macos';
-import { notify } from '../../services/notify.js';
+import { notify } from '../../services/notify';
 
 const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [updates, setUpdates] = useState({});
   const [comment, setComment] = useState('');
   const [loading, setLoading] = useState(false);
@@ -50,7 +49,7 @@ const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }
     if (newSelected.has(fieldKey)) {
       newSelected.delete(fieldKey);
       const newUpdates = { ...updates };
-      delete newUpdates[fieldKey];
+      delete newUpdates[String(fieldKey)];
       setUpdates(newUpdates);
     } else {
       newSelected.add(fieldKey);
@@ -59,7 +58,7 @@ const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }
   };
 
   const handleFieldChange = (fieldKey, value) => {
-    setUpdates(prev => ({ ...prev, [fieldKey]: value }));
+    setUpdates(prev => ({ ...prev, [String(fieldKey)]: value }));
   };
 
   const handleSubmit = async () => {
@@ -167,10 +166,10 @@ const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }
                       ? '2px solid var(--mac-accent)'
                       : '1px solid var(--mac-border)', '--admin-bgc1': selectedFields.has(field.key)
                       ? 'rgba(59, 130, 246, 0.05)'
-                      : 'var(--mac-bg-primary)' }}
+                      : 'var(--mac-bg-primary)' } as CSSProperties}
                 >
-                  <FieldIcon size={16} className="admin-col-dyn" style={{ '--admin-col0': selectedFields.has(field.key) ? 'var(--mac-accent)' : 'var(--mac-text-secondary)' }} />
-                  {field.label}
+                  <FieldIcon size={16} className="admin-col-dyn" style={{ '--admin-col0': selectedFields.has(field.key) ? 'var(--mac-accent)' : 'var(--mac-text-secondary)' } as CSSProperties} />
+                  {String((field as Record<string, unknown>).label)}
                 </button>
               );
             })}
@@ -187,15 +186,15 @@ const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }
                 const field = availableFields.find(f => f.key === fieldKey);
                 if (!field) return null;
 
-                if (field.type === 'number') {
+                if ((field as Record<string, unknown>).type === 'number') {
                   return (
-                    <div key={fieldKey}>
+                    <div key={String(fieldKey)}>
                       <label className="admin-d-block-fs-13-fw-500-primary-mb-6-2">
-                        {field.label}
+                        {String((field as Record<string, unknown>).label)}
                       </label>
                       <Input
                         type="number"
-                        value={updates[fieldKey] || ''}
+                        value={updates[String(fieldKey)] || ''}
                         onChange={(e) => handleFieldChange(fieldKey, parseFloat(e.target.value) || 0)}
                         placeholder={t('admin2.sbe_input_placeholder', { label: field.label.toLowerCase() })}
                       />
@@ -203,18 +202,18 @@ const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }
                   );
                 }
 
-                if (field.type === 'select') {
+                if ((field as Record<string, unknown>).type === 'select') {
                   const options = fieldKey === 'category_id'
                     ? field.options.map(cat => ({ value: String(cat.id), label: cat.name_ru }))
                     : field.options.map(opt => ({ value: opt, label: opt }));
 
                   return (
-                    <div key={fieldKey}>
+                    <div key={String(fieldKey)}>
                       <label className="admin-d-block-fs-13-fw-500-primary-mb-6-1">
-                        {field.label}
+                        {String((field as Record<string, unknown>).label)}
                       </label>
                       <Select
-                        value={updates[fieldKey] || ''}
+                        value={updates[String(fieldKey)] || ''}
                         onChange={(value) => handleFieldChange(fieldKey, value)}
                         options={[
                           { value: '', label: t('admin2.sbe_select_placeholder', { label: field.label.toLowerCase() }) },
@@ -226,14 +225,14 @@ const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }
                   );
                 }
 
-                if (field.type === 'boolean') {
+                if ((field as Record<string, unknown>).type === 'boolean') {
                   return (
                     <Checkbox
-                      key={fieldKey}
-                      id={fieldKey}
-                      checked={updates[fieldKey] || false}
+                      key={String(fieldKey)}
+                      id={String(fieldKey)}
+                      checked={updates[String(fieldKey)] || false}
                       onChange={(checked) => handleFieldChange(fieldKey, checked)}
-                      label={field.label}
+                      label={String((field as Record<string, unknown>).label)}
                     />
                   );
                 }
