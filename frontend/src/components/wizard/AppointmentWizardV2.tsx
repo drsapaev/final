@@ -26,7 +26,8 @@ import {
   RefreshCw } from
 'lucide-react';
 import { toast } from 'react-toastify';
-import ModernDialog from '../dialogs/ModernDialog';
+import ModernDialogRaw from '../dialogs/ModernDialog';
+const ModernDialog = ModernDialogRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import {
   Input, Button, Tooltip,
 } from '../ui/macos';
@@ -117,7 +118,7 @@ const AppointmentWizardV2 = ({
   onClose,
   onComplete,
   isProcessing = false,
-  setIsProcessing = () => {}, // Дефолтная функция-заглушка
+  setIsProcessing = (_v: boolean) => {}, // Дефолтная функция-заглушка
   activeTab = null, // ✅ ДОБАВЛЯЕМ activeTab для фильтрации услуг по отделению
   editMode = false, // ✨ НОВОЕ: Режим редактирования
   initialData = null // ✨ НОВОЕ: Данные для редактирования
@@ -132,7 +133,8 @@ const AppointmentWizardV2 = ({
 
   // UX Audit Registrar #2: useConfirm hook для замены window.confirm().
   // Возвращает [confirm, dialog]; dialog должен быть отрендерен в JSX.
-  const [confirm, confirmDialog] = useConfirm();
+  const [confirmRaw, confirmDialog] = useConfirm();
+  const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
 
   // Состояние мастера
   const [currentStep, setCurrentStep] = useState(STEP_PATIENT);
@@ -1114,7 +1116,7 @@ const AppointmentWizardV2 = ({
     }));
 
     // Обновляем фильтрацию
-    filterServices(servicesData, [...wizardData.cart.items, newItem]);
+    filterServices(servicesData);
   };
 
   const removeFromCart = (itemId) => {
@@ -1127,7 +1129,7 @@ const AppointmentWizardV2 = ({
       }
     }));
 
-    filterServices(servicesData, newItems);
+    filterServices(servicesData);
   };
 
   const updateCartItem = (itemId, field, value) => {
@@ -1511,7 +1513,7 @@ const AppointmentWizardV2 = ({
 
             try {
               // UX Audit Stage 3: заменён raw fetch() PUT на updatePatient().
-              await updatePatient(foundPatient.id, updateData);
+              await updatePatient(foundPatient.id as string | number, updateData);
               logger.log('✅ Patient data updated');
             } catch (e: any) {
               logger.warn('⚠️ Failed to update patient:', e);
@@ -1755,7 +1757,7 @@ const AppointmentWizardV2 = ({
             logger.error('❌ Ошибка обновления QR-записи:', updateError);
             const errorMessage = updateError?.response?.data?.detail || updateError?.message || t('misc.aw_unknown_error');
             toast.error(t('misc.aw_record_update_error', { message: errorMessage }));
-            setIsProcessing?.(false);
+            setIsProcessing(false);
             return; // ⭐ CRITICAL: Не создаём дубликаты через cart endpoint
           }
         }
@@ -2345,7 +2347,6 @@ const AppointmentWizardV2 = ({
             errorMessage = t('misc.aw_no_permissions');
           }
           toast.error(errorMessage, {
-            duration: 5000,
             style: {
               backgroundColor: 'color-mix(in srgb, var(--mac-error), transparent 84%)',
               border: '1px solid color-mix(in srgb, var(--mac-error), transparent 72%)',
@@ -2393,7 +2394,7 @@ const AppointmentWizardV2 = ({
   handleCompleteRef.current = handleComplete;
 
   // Группировка элементов корзины по визитам
-  const groupCartItemsByVisit = () => {
+  const groupCartItemsByVisit = (): any[] => {
     const visits: any[] = [];
 
     // ✅ ИСПРАВЛЕНО: Фильтруем элементы корзины без service_id
@@ -2407,7 +2408,7 @@ const AppointmentWizardV2 = ({
 
     if (validItems.length === 0) {
       logger.warn('⚠️ Нет валидных элементов в корзине');
-      return {};
+      return [] as any[];
     }
 
     validItems.forEach((item) => {

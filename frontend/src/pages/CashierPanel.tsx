@@ -496,8 +496,8 @@ const CashierPanel = () => {
           date_from: date_from || undefined,
           date_to: date_to || undefined
         });
-        if (statsResult.success && statsResult.data) {
-          setStats(statsResult.data);
+        if ((statsResult as any).success && (statsResult as any).data) {
+          setStats((statsResult as any).data);
         }
       } catch (error: any) {
         logger.error('Error loading stats:', error);
@@ -642,7 +642,7 @@ const CashierPanel = () => {
   useSessionTimeoutWarning({
     onWarning: (expiresAt) => {
       // UX Audit #2.5: сохраняем expiresAt для счётчика обратного отсчёта.
-      const ms = expiresAt ? (expiresAt - Date.now()) : 60 * 1000;
+      const ms = expiresAt ? (Number(expiresAt) - Date.now()) : 60 * 1000;
       setSessionWarning({ active: true, expiresAt });
       setSessionSecondsLeft(Math.max(0, Math.floor(ms / 1000)));
     },
@@ -1061,7 +1061,7 @@ const CashierPanel = () => {
       }
     });
 
-    return Object.values(grouped).map((group) => ({
+    return Object.values(grouped).map((group: any) => ({
       ...group,
       services: Array.from(new Set(group.services.filter(Boolean))),
       services_names: Array.from(new Set(group.services_names.filter(Boolean))),
@@ -1243,7 +1243,7 @@ const CashierPanel = () => {
               Кнопки «Обновить/Экспорт/Аналитика» вынесены в отдельный toolbar над табами —
               Nielsen #8 (эстетический и минималистичный дизайн) + IA-разделение.
               Скрытые плитки (visibility:hidden) удалены — визуальный шум устранён. */}
-          <Card variant="outline" className="cashier-stats-card">
+          <Card variant="outlined" className="cashier-stats-card">
             <div className="cashier-stats-grid">
               {activeTab === 'history' ?
               <>
@@ -1310,7 +1310,7 @@ const CashierPanel = () => {
             <div className="cashier-toolbar-actions">
               <Button
                 size="small"
-                variant="outline"
+                variant="outlined"
                 onClick={handleRefresh}
                 title={tI18n('cashier.refresh_title')}>
 
@@ -1318,7 +1318,7 @@ const CashierPanel = () => {
               </Button>
               <Button
                 size="small"
-                variant="outline"
+                variant="outlined"
                 onClick={exportToCSV}
                 title={tI18n('cashier.export_title')}>
 
@@ -1326,7 +1326,7 @@ const CashierPanel = () => {
               </Button>
               <Button
                 size="small"
-                variant="outline"
+                variant="outlined"
                 onClick={loadHourlyStats}
                 title={tI18n('cashier.hourly_stats_title')}>
 
@@ -1370,11 +1370,11 @@ const CashierPanel = () => {
                 // Раньше: пользователь на табе «История», стр. 5 → переключился
                 // на «Ожидающие» → вернулся → оказался на стр. 5 истории,
                 // хотя ожидал стр. 1 (Nielsen #1 — visibility of system status).
-                setActiveTab(newTab);
+                setActiveTab(String(newTab));
                 setCurrentPage(1);
                 setPendingPage(1);
               }}
-              size="default"
+              size="md"
               variant="default" />
 
 
@@ -1474,7 +1474,7 @@ const CashierPanel = () => {
                               <div className="cashier-refresh-row">
                                 <Button
                             size="small"
-                            variant="outline"
+                            variant="outlined"
                             onClick={() => openPaymentWidget(appointment)}
                             disabled={!canCreateDirectCashierPayment(appointment) || isBackendGroupedCashierPayment(appointment)}
                             aria-label={tI18n('cashier.start_online_payment_aria')}
@@ -1507,7 +1507,7 @@ const CashierPanel = () => {
                 <div className="cashier-pagination">
                         <Button
                     size="small"
-                    variant="outline"
+                    variant="outlined"
                     disabled={pendingPage === 1 || pendingLoading}
                     onClick={() => setPendingPage((p) => Math.max(1, p - 1))}>
 
@@ -1518,7 +1518,7 @@ const CashierPanel = () => {
                         </span>
                         <Button
                     size="small"
-                    variant="outline"
+                    variant="outlined"
                     disabled={pendingPage === pendingTotalPages || pendingLoading}
                     onClick={() => setPendingPage((p) => Math.min(pendingTotalPages, p + 1))}>
 
@@ -1535,7 +1535,7 @@ const CashierPanel = () => {
                 <div className="cashier-empty-state-text">
                   {tI18n('cashier.empty_pending_text')}
                 </div>
-                <Button size="small" variant="outline" onClick={() => setActiveTab('history')}>
+                <Button size="small" variant="outlined" onClick={() => setActiveTab('history')}>
                   {tI18n('cashier.open_history_btn')}
                 </Button>
               </div>
@@ -1686,7 +1686,7 @@ const CashierPanel = () => {
                     ) :
 
                     <tr className="cashier-empty-row">
-                            <td colSpan="7" className="cashier-empty-cell">
+                            <td colSpan={7} className="cashier-empty-cell">
                               {/* UX Audit #4.3: actionable empty state для истории. */}
                               <div className="cashier-empty-state cashier-empty-state--inline" role="status">
                                 <div className="cashier-empty-state-title">{tI18n('cashier.empty_history_title')}</div>
@@ -1705,7 +1705,7 @@ const CashierPanel = () => {
                 <div className="cashier-pagination">
                         <Button
                     size="small"
-                    variant="outline"
+                    variant="outlined"
                     disabled={currentPage === 1 || historyLoading}
                     onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}>
 
@@ -1716,7 +1716,7 @@ const CashierPanel = () => {
                         </span>
                         <Button
                     size="small"
-                    variant="outline"
+                    variant="outlined"
                     disabled={currentPage === totalPages || historyLoading}
                     onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}>
 
@@ -1781,7 +1781,7 @@ const CashierPanel = () => {
               </Typography>
             </DialogContent>
             <DialogActions>
-              <Button variant="outline" onClick={() => setCancelDialogOpen(false)}>
+              <Button variant="outlined" onClick={() => setCancelDialogOpen(false)}>
                 {tI18n('cashier.close_btn')}
               </Button>
               <Button
@@ -1933,7 +1933,7 @@ const CashierPanel = () => {
               </Box>
             </DialogContent>
             <DialogActions>
-              <Button variant="outline" onClick={() => setRefundDialogOpen(false)}>
+              <Button variant="outlined" onClick={() => setRefundDialogOpen(false)}>
                 {tI18n('cashier.cancel')}
               </Button>
               <Button variant="danger" onClick={handleRefund} disabled={processingAction?.type === 'refund'}>
