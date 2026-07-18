@@ -1,5 +1,4 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
+import type { CSSProperties } from 'react';
 
 import { useTheme } from '../../contexts/ThemeContext';
 import PropTypes from 'prop-types';
@@ -33,13 +32,13 @@ const ModernFlex = ({
     flexWrap: wrap,
     justifyContent: justify,
     alignItems: align,
-    gap: gapValues[gap] || gap
+    gap: (gapValues as Record<string, string>)[gap as string] || gap as string
   };
 
   return (
     <div
       className={`modern-flex ${responsive ? 'responsive' : ''} ${className}`}
-      style={flexStyles}
+      style={flexStyles as CSSProperties}
       {...props}>
       
       {children}
@@ -65,7 +64,7 @@ export const FlexItem = ({
   return (
     <div
       className={`flex-item ${className}`}
-      style={itemStyles}
+      style={itemStyles as CSSProperties}
       {...props}>
       
       {children}

@@ -1,8 +1,9 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import PropTypes from 'prop-types';
-import { Alert, Card } from '../../ui/macos';
+import { Alert as AlertRaw, Card as CardRaw } from '../../ui/macos';
+import React from 'react';
+const Alert = AlertRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Card = CardRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import { useTranslation } from '../../../i18n/useTranslation';
 
 /**
@@ -11,7 +12,7 @@ import { useTranslation } from '../../../i18n/useTranslation';
  * Shows branding + sections + fields as they'll appear in the PDF.
  */
 function PreviewTab({ draftVersion }) {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const branding = draftVersion.branding_overrides || {};
   const signers = draftVersion.signer_defaults || {};
 

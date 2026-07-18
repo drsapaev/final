@@ -1,12 +1,13 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Database, Download, Shield, Users } from 'lucide-react';
 import {
-  SegmentedControl,
-  MacOSTab } from '../ui/macos';
+  SegmentedControl as SegmentedControlRaw,
+  MacOSTab as MacOSTabRaw } from '../ui/macos';
+import React from 'react';
+const SegmentedControl = SegmentedControlRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const MacOSTab = MacOSTabRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import UserManagement from './UserManagement';
 import UserDataTransferManager from './UserDataTransferManager';
 import UserExportManager from './UserExportManager';
@@ -24,7 +25,7 @@ const TAB_ICONS = {
 
 
 const UnifiedUserManagement = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [searchParams] = useSearchParams();
   const section = searchParams.get('section') || 'users';
 

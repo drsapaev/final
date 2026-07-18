@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useTranslation } from '../../i18n/useTranslation';
 import React, { useEffect, useState } from 'react';
@@ -28,7 +26,7 @@ const AdminServices = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { isDark } = useTheme();
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [servicesTab, setServicesTab] = useState(() => getInitialServicesTab(location.search));
   const serviceTabs = getServiceTabs(t);
 

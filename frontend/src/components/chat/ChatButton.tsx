@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 /**
  * Кнопка чата для хедера (macOS стиль)
@@ -15,7 +13,7 @@ import { useTranslation } from '../../i18n/useTranslation';
  * Кнопка открытия чата с бейджем непрочитанных сообщений
  */
 const ChatButton = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
     const [isOpen, setIsOpen] = useState(false);
     const { unreadCount, isConnected, loadMessages } = useChat();
     // PR-68 / P0-1: listen for 'openChat' CustomEvent from desktop notifications
