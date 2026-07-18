@@ -1,7 +1,5 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
-import { useState, useEffect, useMemo, useCallback } from 'react';  // PR-41 / High-16: added memoization hooks
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import type { CSSProperties } from 'react';  // PR-41 / High-16: added memoization hooks
 import { useTranslation } from 'react-i18next';
 import {
   Box,
@@ -62,7 +60,7 @@ import {
 
 
 'lucide-react';
-import { api } from '../api/client.js';
+import { api } from '../api/client';
 
 const ONBOARDING_STATUS_FILTER_OPTIONS = [
 { value: 'all', label: 'All statuses' },
@@ -118,7 +116,8 @@ const ONBOARDING_REASON_LABELS = {
 };
 
 const TelegramManager = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [botStatus, setBotStatus] = useState(null);
   const [templates, setTemplates] = useState([]);
   const [onboardingRequests, setOnboardingRequests] = useState([]);
@@ -146,7 +145,7 @@ const TelegramManager = () => {
     message_type: 'text',
     content: '',
     is_active: true
-  });
+  } as any);
 
   useEffect(() => {
     loadTelegramData();
@@ -255,7 +254,7 @@ const TelegramManager = () => {
       setTemplates(normalizedTemplates);
       await loadOnboardingRequests();
       await loadOnboardingAnalytics();
-    } catch (e) {
+    } catch (e: any) {
       setError(e?.response?.data?.detail || e?.message || t('misc.tg_err_load'));
     } finally {
       setLoading(false);
@@ -267,7 +266,7 @@ const TelegramManager = () => {
       const statusFilterValue = onboardingStatusFilter === 'all' ? '' : onboardingStatusFilter;
       const response = await api.get('/telegram/onboarding/requests', {
         params: { status_filter: statusFilterValue, limit: 40 }
-      });
+      }) as any;
       const data = response?.data || {};
       const items = Array.isArray(data.items) ? data.items : [];
       const hydratedItems = await hydrateOnboardingRequests(items);
@@ -280,7 +279,7 @@ const TelegramManager = () => {
 
   const loadOnboardingAnalytics = async () => {
     try {
-      const response = await api.get('/telegram/onboarding/analytics/summary');
+      const response = await api.get('/telegram/onboarding/analytics/summary') as any;
       setOnboardingAnalytics(response?.data || null);
     } catch (_err) {
       setOnboardingAnalytics(null);
@@ -294,7 +293,7 @@ const TelegramManager = () => {
       const response = await api.get('/telegram/onboarding/requests/export', {
         params: { status_filter: statusFilterValue },
         responseType: 'blob'
-      });
+      }) as any;
       const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8' });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -459,13 +458,13 @@ const TelegramManager = () => {
       setError('');
       setSuccess('');
       setRegisteringCommands(true);
-      const response = await api.post('/admin/telegram/register-patient-commands');
+      const response = await api.post('/admin/telegram/register-patient-commands') as any;
       const languages = Array.isArray(response?.data?.registered_languages) ?
       response.data.registered_languages.join(', ') :
       'ru, uz';
       setSuccess(t('misc.tg_success_patient_commands', { languages }));
       await loadTelegramData();
-    } catch (e) {
+    } catch (e: any) {
       const detail = e?.response?.data?.detail;
       const message = typeof detail === 'string' ? detail : detail?.message || detail?.error;
       setError(message || e?.message || t('misc.tg_err_register_commands'));
@@ -479,13 +478,13 @@ const TelegramManager = () => {
       setError('');
       setSuccess('');
       setRegisteringStaffCommands(true);
-      const response = await api.post('/admin/telegram/register-staff-commands');
+      const response = await api.post('/admin/telegram/register-staff-commands') as any;
       const commands = Array.isArray(response?.data?.registered_commands) ?
       response.data.registered_commands.join(', ') :
       'read-only staff commands';
       setSuccess(t('misc.tg_success_staff_commands', { commands }));
       await loadTelegramData();
-    } catch (e) {
+    } catch (e: any) {
       const detail = e?.response?.data?.detail;
       const message = typeof detail === 'string' ? detail : detail?.message || detail?.error;
       setError(message || e?.message || t('misc.tg_err_register_staff_commands'));
@@ -1084,7 +1083,7 @@ const TelegramManager = () => {
         <Button
           variant="outlined"
           onClick={loadTelegramData}>
-          <RefreshCw size={16} />
+          <RefreshCw size={16 as never} />
           {t('misc.tg_refresh')}
         </Button>
       </Box>
@@ -1150,7 +1149,7 @@ const TelegramManager = () => {
                             style={capabilityCardStyle}>
                             <Box display="flex" alignItems="center" gap={1}>
                               <span style={capabilityIconStyle}>
-                                <Icon size={15} />
+                                <Icon size={15 as never} />
                               </span>
                               <Typography variant="body2" fontWeight={600}>
                                 {item.label}
@@ -1193,7 +1192,7 @@ const TelegramManager = () => {
                             style={capabilityCardStyle}>
                             <Box display="flex" alignItems="center" gap={1} mb={0.5}>
                               <span style={capabilityIconStyle}>
-                                <Icon size={15} />
+                                <Icon size={15 as never} />
                               </span>
                               <Typography variant="body2" fontWeight={600}>
                                 {item.label}
@@ -1619,7 +1618,7 @@ const TelegramManager = () => {
                   fullWidth
                   variant="contained"
                   style={{ paddingTop: 12, paddingBottom: 12 }}>
-                  <Settings size={16} />
+                  <Settings size={16 as never} />
                   {t('misc.tg_configure_bot')}
                 </Button>
                 <Button
@@ -1628,7 +1627,7 @@ const TelegramManager = () => {
                   disabled={!botStatus?.configured || registeringCommands}
                   onClick={registerPatientCommands}
                   style={{ paddingTop: 12, paddingBottom: 12 }}>
-                  <CheckCircle size={16} />
+                  <CheckCircle size={16 as never} />
                   {registeringCommands ? t('misc.tg_registering_commands') : t('misc.tg_register_commands')}
                 </Button>
                 <Button
@@ -1637,14 +1636,14 @@ const TelegramManager = () => {
                   disabled={!staffCommandRegistrationEnabled || registeringStaffCommands}
                   onClick={registerStaffCommands}
                   style={{ paddingTop: 12, paddingBottom: 12 }}>
-                  <CheckCircle size={16} />
+                  <CheckCircle size={16 as never} />
                   {registeringStaffCommands ? t('misc.tg_registering_staff_commands') : t('misc.tg_register_staff_commands')}
                 </Button>
                 <Button
                   fullWidth
                   variant="outlined"
                   style={{ paddingTop: 12, paddingBottom: 12 }}>
-                  <Send size={16} />
+                  <Send size={16 as never} />
                   {t('misc.tg_send_message')}
                 </Button>
                 <Button
@@ -1652,7 +1651,7 @@ const TelegramManager = () => {
                   variant="outlined"
                   onClick={() => setShowTemplateDialog(true)}
                   style={{ paddingTop: 12, paddingBottom: 12 }}>
-                  <Plus size={16} />
+                  <Plus size={16 as never} />
                   {t('misc.tg_new_template')}
                 </Button>
               </Box>
@@ -1682,7 +1681,7 @@ const TelegramManager = () => {
                     size="small"
                     disabled={exportingOnboardingCsv}
                     onClick={handleExportOnboardingCsv}>
-                    <ReceiptText size={16} />
+                    <ReceiptText size={16 as never} />
                     {exportingOnboardingCsv ? 'Exporting...' : 'Export CSV'}
                   </Button>
                 </Box>
@@ -1739,7 +1738,7 @@ const TelegramManager = () => {
                   onClick={loadOnboardingRequests}
                   aria-label="Refresh REQUEST_REVIEW requests"
                   style={{ minHeight: 32 }}>
-                  <RefreshCw size={16} />
+                  <RefreshCw size={16 as never} />
                   Refresh
                 </Button>
               </Box>
@@ -1855,7 +1854,7 @@ const TelegramManager = () => {
                                   disabled={actionBusy}
                                   onClick={() => refreshOnboardingCandidates(requestId)}
                                   aria-label={`Refresh duplicate candidates for request ${requestId}`}>
-                                  <RefreshCw size={14} />
+                                  <RefreshCw size={14 as never} />
                                   Refresh candidates
                                 </Button>
                               ) : null}
@@ -1928,7 +1927,7 @@ const TelegramManager = () => {
                                               updateOnboardingReviewForm(requestId, 'selectedCandidateId', candidateId);
                                               openOnboardingActionDialog(requestId, 'link-existing', candidateId);
                                             }}>
-                                            <UserCheck size={16} />
+                                            <UserCheck size={16 as never} />
                                             Link this patient
                                           </Button>
                                         </Box>
@@ -1957,7 +1956,7 @@ const TelegramManager = () => {
                                     size="small"
                                     disabled={actionBusy || !duplicateCandidates.length}
                                     onClick={() => openOnboardingActionDialog(requestId, 'link-existing', form.selectedCandidateId || '')}>
-                                    <UserCheck size={16} />
+                                    <UserCheck size={16 as never} />
                                     Link this patient
                                   </Button>
                                   <Button
@@ -1966,7 +1965,7 @@ const TelegramManager = () => {
                                     size="small"
                                     disabled={actionBusy}
                                     onClick={() => openOnboardingActionDialog(requestId, 'create-patient')}>
-                                    <Plus size={16} />
+                                    <Plus size={16 as never} />
                                     Create new patient
                                   </Button>
                                   <Button
@@ -1975,7 +1974,7 @@ const TelegramManager = () => {
                                     size="small"
                                     disabled={actionBusy}
                                     onClick={() => openOnboardingActionDialog(requestId, 'request-more-info')}>
-                                    <MessageSquare size={16} />
+                                    <MessageSquare size={16 as never} />
                                     Request more info
                                   </Button>
                                   <Button
@@ -1984,7 +1983,7 @@ const TelegramManager = () => {
                                     size="small"
                                     disabled={actionBusy}
                                     onClick={() => openOnboardingActionDialog(requestId, 'reject')}>
-                                    <Trash2 size={16} />
+                                    <Trash2 size={16 as never} />
                                     Reject
                                   </Button>
                                 </>
@@ -2129,7 +2128,7 @@ const TelegramManager = () => {
                               aria-label={t('misc.tg_action_edit')}
                               title={t('misc.tg_action_edit')}
                               style={iconActionStyle}>
-                              <Edit size={16} />
+                              <Edit size={16 as never} />
                             </Button>
                             <Button
                               type="button"
@@ -2138,7 +2137,7 @@ const TelegramManager = () => {
                               aria-label={t('misc.tg_action_delete')}
                               title={t('misc.tg_action_delete')}
                               style={iconActionStyle}>
-                              <Trash2 size={16} />
+                              <Trash2 size={16 as never} />
                             </Button>
                           </Box>
                         </TableCell>

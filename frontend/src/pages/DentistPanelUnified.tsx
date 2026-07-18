@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { lazy, Suspense, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import './dentistry.css';
 import { useLocation } from 'react-router-dom';
@@ -13,7 +10,7 @@ import {
   Button, Badge, Card,
   Input } from '../components/ui/macos';
 import AppointmentSummaryBar from '../components/doctor/AppointmentSummaryBar';
-import auth from '../stores/auth.js';
+import auth from '../stores/auth';
 import { apiClient } from '../api/client';
 import AIAssistant from '../components/ai/AIAssistant';
 import TeethChart from '../components/dental/TeethChart';
@@ -258,7 +255,7 @@ const DentistPanelUnified = () => {
         DENTIST_DOCUMENTS_STORAGE_KEY,
         JSON.stringify({ visitProtocols: savedVisitProtocols })
       );
-    } catch (error) {
+    } catch (error: any) {
       logger.warn('[Dentist] Не удалось сохранить локальные протоколы визита:', error);
     }
   }, [savedVisitProtocols]);
@@ -319,7 +316,7 @@ const DentistPanelUnified = () => {
               }
 
               return protocolRecord;
-            } catch (error) {
+            } catch (error: any) {
               logger.warn('[Dentist] Не удалось загрузить EMR визита для протокола', {
                 patientId,
                 visitId: summary.visit_id,
@@ -333,7 +330,7 @@ const DentistPanelUnified = () => {
         const filteredRecords = records.filter(Boolean);
         dentistVisitProtocolsCache.set(cacheKey, filteredRecords);
         return filteredRecords;
-      } catch (error) {
+      } catch (error: any) {
         dentistVisitProtocolsCache.delete(cacheKey);
         throw error;
       } finally {
@@ -372,7 +369,7 @@ const DentistPanelUnified = () => {
       });
 
       return protocolRecord;
-    } catch (error) {
+    } catch (error: any) {
       logger.warn('[Dentist] Не удалось загрузить протокол визита из EMR v2', {
         visitId,
         error: error?.message || error,
@@ -394,7 +391,7 @@ const DentistPanelUnified = () => {
     gingival_bleeding: '',
     diagnosis: '',
     recommendations: ''
-  });
+  } as any);
 
 
 
@@ -409,7 +406,8 @@ const DentistPanelUnified = () => {
   } = useTheme();
 
   // C-1 (UX audit): confirm hook for visit completion
-  const [confirm, confirmDialog] = useConfirm();
+  const [confirmRaw, confirmDialog] = useConfirm();
+  const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
   // STRAT#34: useTranslation adapter for confirm/notify i18n.
   const { t: tI18n } = useTranslation();
   // C-2 (UX audit): session timeout warning
@@ -460,7 +458,7 @@ const DentistPanelUnified = () => {
         }
 
         return null;
-      } catch (error) {
+      } catch (error: any) {
         logger.error('[Dentist] Ошибка загрузки услуг:', error);
         return null;
       }
@@ -591,7 +589,7 @@ const DentistPanelUnified = () => {
 
         logger.error('Ошибка загрузки очередей:', response.status);
         return [];
-      } catch (error) {
+      } catch (error: any) {
         logger.error('Ошибка загрузки записей стоматолога:', error);
         return [];
       } finally {
@@ -698,7 +696,7 @@ const DentistPanelUnified = () => {
             logger.info('[Dentist] Пациент вызван:', row.patient_fio);
             await loadDentistryAppointments(true);
           }
-        } catch (error) {
+        } catch (error: any) {
           logger.error('[Dentist] Ошибка вызова пациента:', error);
         }
         break;
@@ -713,7 +711,7 @@ const DentistPanelUnified = () => {
             specialtyName: tI18n('dental.dental_panel_specialty_name')
           });
           notify.success(printResult?.message || tI18n('dental.dental_panel_ticket_printed', { name: row.patient_fio }));
-        } catch (error) {
+        } catch (error: any) {
           logger.error('[Dentist] Ошибка печати талона:', error);
           notify.error(error.message || tI18n('dental.dental_panel_ticket_print_failed'));
         }
@@ -741,7 +739,7 @@ const DentistPanelUnified = () => {
           logger.info('[Dentist] Завершение приёма для:', patient.patient_name);
           setSelectedPatient(patient);
           handleTabChange('visit');
-        } catch (error) {
+        } catch (error: any) {
           logger.error('[Dentist] Ошибка при завершении приёма:', error);
         }
         break;
@@ -786,7 +784,7 @@ const DentistPanelUnified = () => {
       if (refreshedPatients.length > 0) {
         setPatients(refreshedPatients);
       }
-    } catch (e) {
+    } catch (e: any) {
       logger.error('Ошибка загрузки пациентов:', e);
     }
   }, [loadDentistryAppointments, tI18n]);
@@ -823,7 +821,7 @@ const DentistPanelUnified = () => {
         loadPatients(),
         loadServices(),
       ]);
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Ошибка загрузки данных:', error);
     } finally {
       setLoading(false);
@@ -852,7 +850,7 @@ const DentistPanelUnified = () => {
         }
 
         setSavedVisitProtocols((prev) => mergeDentistVisitProtocolCards(prev, backendProtocols));
-      } catch (error) {
+      } catch (error: any) {
         logger.warn('[Dentist] Не удалось синхронизировать историю протоколов из EMR v2', {
           patientId: selectedPatientIdForProtocols,
           error: error?.message || error,
@@ -961,7 +959,7 @@ const DentistPanelUnified = () => {
             logger.info('[Dentist] Пациент из URL не найден в очереди, использую безопасный URL-fallback:', patientObj.patient_name);
           }
         }
-      } catch (error) {
+      } catch (error: any) {
         logger.error('[Dentist] Не удалось загрузить пациента из URL:', error);
       }
     };
@@ -1162,7 +1160,7 @@ const DentistPanelUnified = () => {
         logger.warn('[Dentistry] callNextWaiting(dentistry): failed', err);
         // Не блокируем UI: визит уже завершён, просто информируем
       }
-    } catch (error) {
+    } catch (error: any) {
       logger.error('[Dentistry] handleCompleteVisit: error', error);
       notify.error(
         error?.message || tI18n('dental.dental_panel_complete_failed')
@@ -1369,7 +1367,7 @@ const DentistPanelUnified = () => {
 
       setSavedVisitProtocols((prev) => upsertDentistVisitProtocol(prev, backendRecord));
       return backendRecord;
-    } catch (error) {
+    } catch (error: any) {
       logger.warn('[Dentist] Не удалось сохранить протокол визита в EMR v2, сохраняю локальный кеш', {
         visitId: patient.visit_id,
         patientName,
@@ -1444,7 +1442,7 @@ const DentistPanelUnified = () => {
         });
         loadDentistryAppointments(true);
       }
-    } catch (e) {
+    } catch (e: any) {
       logger.error('Ошибка сохранения осмотра:', e);
     }
   };
@@ -2305,7 +2303,7 @@ const DentistPanelUnified = () => {
       <RoleNotificationCenter userRole="dentist" />
 
       {/* C-1 (UX audit): portal-mounted ConfirmDialog */}
-      {confirmDialog}
+      {confirmDialog as unknown as React.ReactNode}
 
       {/* C-2 (UX audit): session timeout warning dialog */}
       {sessionWarning && (

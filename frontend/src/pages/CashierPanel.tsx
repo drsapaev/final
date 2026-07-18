@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useEffect, useState, useCallback, useRef } from 'react';
 import './cashier.css';
 import { useLocation } from 'react-router-dom';
@@ -17,7 +14,7 @@ import SegmentedControl from '../components/ui/macos/SegmentedControl';
 import Input from '../components/ui/macos/Input';
 
 // ✅ УЛУЧШЕНИЕ: Универсальные хуки для устранения дублирования
-import useModal from '../hooks/useModal.jsx';
+import useModal from '../hooks/useModal';
 import { usePayments } from '../hooks/usePayments';
 import { useDebouncedValue } from '../hooks/useDebouncedCallback';
 import { useHotkeys } from '../hooks/useHotkeys';
@@ -314,7 +311,7 @@ const createGroupedCashierPayment = async (appointment, paymentData) => {
     amount: paymentData.amount,
     method: paymentData.method,
     note: paymentData.note || 'Grouped cashier payment'
-  });
+  }) as any;
 
   return response.data;
 };
@@ -350,7 +347,8 @@ const CashierPanel = () => {
   // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
   // The hook returns [confirm, dialogNode]; dialogNode must be rendered once
   // in the component tree (we render it at the end of the JSX below).
-  const [confirm, confirmDialog] = useConfirm();
+  const [confirmRaw, confirmDialog] = useConfirm();
+  const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
   // STRAT#31: useTranslation adapter for confirm/notify i18n.
   const { t: tI18n } = useTranslation();
   const location = useLocation();
@@ -393,12 +391,12 @@ const CashierPanel = () => {
           const token = tokenManager.getAccessToken();
           if (!token) return;
 
-          const response = await api.get(`/patients/${patientIdFromUrl}`);
+          const response = await api.get(`/patients/${patientIdFromUrl}`) as any;
           const patientData = response.data;
           const patientName = `${patientData.last_name || ''} ${patientData.first_name || ''}`.trim();
           setQuery(patientName);
           logger.info('[Cashier] Patient loaded from URL', { patientId: patientData?.id });
-        } catch (error) {
+        } catch (error: any) {
           logger.error('[Cashier] Не удалось загрузить пациента:', error);
         }
       };
@@ -501,7 +499,7 @@ const CashierPanel = () => {
         if (statsResult.success && statsResult.data) {
           setStats(statsResult.data);
         }
-      } catch (error) {
+      } catch (error: any) {
         logger.error('Error loading stats:', error);
         setStats({
           total_amount: 0,
@@ -546,7 +544,7 @@ const CashierPanel = () => {
           logger.warn('Error loading pending payments:', pendingResult.error);
           setAppointments([]);
         }
-      } catch (error) {
+      } catch (error: any) {
         logger.error('Error loading pending payments:', error);
         setAppointments([]);
       }
@@ -589,7 +587,7 @@ const CashierPanel = () => {
           setPayments([]);
           setTotalPages(1);
         }
-      } catch (error) {
+      } catch (error: any) {
         logger.error('Error loading payment history:', error);
         setPayments([]);
       }
@@ -737,7 +735,7 @@ const CashierPanel = () => {
       setPendingPage(1);
       setRefreshKey((prev) => prev + 1); // Принудительное обновление списка
 
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Ошибка обработки платежа:', error);
       const message = getErrorMessage(error, tI18n('cashier.payment_process_failed'));
       setPaymentError(message);
@@ -814,7 +812,7 @@ const CashierPanel = () => {
       } else {
         notify.error(getErrorMessage(result.error, tI18n('cashier.refund_failed')));
       }
-    } catch (error) {
+    } catch (error: any) {
       notify.error(getErrorMessage(error, tI18n('cashier.cancel_failed')));
     } finally {
       setProcessingAction(null);
@@ -887,7 +885,7 @@ const CashierPanel = () => {
       } else {
         notify.error(getErrorMessage(result.error, tI18n('cashier.refund_create_failed')));
       }
-    } catch (error) {
+    } catch (error: any) {
       notify.error(getErrorMessage(error, tI18n('cashier.refund_failed')));
     } finally {
       setProcessingAction(null);
@@ -917,7 +915,7 @@ const CashierPanel = () => {
           logger.warn('[Cashier] Browser receipt print popup blocked, falling back to PDF', {
             paymentId
           });
-        } catch (error) {
+        } catch (error: any) {
           logger.error('[Cashier] Unexpected browser receipt print error:', error);
         }
       }
@@ -1179,7 +1177,7 @@ const CashierPanel = () => {
                   { label: tI18n('cashier.date_mode_range'), value: 'range' }]
                   }
                   value={dateMode}
-                  onChange={setDateMode}
+                  onChange={(v: unknown) => setDateMode(String(v))}
                   size="default" />
 
               </div>
@@ -1311,7 +1309,7 @@ const CashierPanel = () => {
           <div className="cashier-toolbar">
             <div className="cashier-toolbar-actions">
               <Button
-                size="sm"
+                size="small"
                 variant="outline"
                 onClick={handleRefresh}
                 title={tI18n('cashier.refresh_title')}>
@@ -1319,7 +1317,7 @@ const CashierPanel = () => {
                 {tI18n('cashier.refresh_btn')}
               </Button>
               <Button
-                size="sm"
+                size="small"
                 variant="outline"
                 onClick={exportToCSV}
                 title={tI18n('cashier.export_title')}>
@@ -1327,7 +1325,7 @@ const CashierPanel = () => {
                 {tI18n('cashier.export_btn')}
               </Button>
               <Button
-                size="sm"
+                size="small"
                 variant="outline"
                 onClick={loadHourlyStats}
                 title={tI18n('cashier.hourly_stats_title')}>
@@ -1376,7 +1374,7 @@ const CashierPanel = () => {
                 setCurrentPage(1);
                 setPendingPage(1);
               }}
-              size="md"
+              size="default"
               variant="default" />
 
 
@@ -1475,7 +1473,7 @@ const CashierPanel = () => {
                             <td className="cashier-cell-padded">
                               <div className="cashier-refresh-row">
                                 <Button
-                            size="sm"
+                            size="small"
                             variant="outline"
                             onClick={() => openPaymentWidget(appointment)}
                             disabled={!canCreateDirectCashierPayment(appointment) || isBackendGroupedCashierPayment(appointment)}
@@ -1487,7 +1485,7 @@ const CashierPanel = () => {
                                   {tI18n('cashier.online_btn')}
                                 </Button>
                                 <Button
-                            size="sm"
+                            size="small"
                             onClick={() => {
                               paymentModal.openModal(appointment);
                             }}
@@ -1508,7 +1506,7 @@ const CashierPanel = () => {
                     {pendingTotalPages > 1 &&
                 <div className="cashier-pagination">
                         <Button
-                    size="sm"
+                    size="small"
                     variant="outline"
                     disabled={pendingPage === 1 || pendingLoading}
                     onClick={() => setPendingPage((p) => Math.max(1, p - 1))}>
@@ -1519,7 +1517,7 @@ const CashierPanel = () => {
                           {tI18n('cashier.pagination_info', { current: pendingPage, total: pendingTotalPages, total_items: pendingTotalItems })}
                         </span>
                         <Button
-                    size="sm"
+                    size="small"
                     variant="outline"
                     disabled={pendingPage === pendingTotalPages || pendingLoading}
                     onClick={() => setPendingPage((p) => Math.min(pendingTotalPages, p + 1))}>
@@ -1532,12 +1530,12 @@ const CashierPanel = () => {
 
               (/* UX Audit #4.3: actionable empty state вместо голого текста. */
               <div className="cashier-empty-state" role="status">
-                <CheckCircle size={32} className="cashier-empty-state-icon" aria-hidden="true" />
+                <CheckCircle size={32 as never} className="cashier-empty-state-icon" aria-hidden="true" />
                 <div className="cashier-empty-state-title">{tI18n('cashier.empty_pending_title')}</div>
                 <div className="cashier-empty-state-text">
                   {tI18n('cashier.empty_pending_text')}
                 </div>
-                <Button size="sm" variant="outline" onClick={() => setActiveTab('history')}>
+                <Button size="small" variant="outline" onClick={() => setActiveTab('history')}>
                   {tI18n('cashier.open_history_btn')}
                 </Button>
               </div>
@@ -1639,19 +1637,19 @@ const CashierPanel = () => {
                                     Теперь: primary «Принять» видна всегда, остальные 3 —
                                     в overflow menu через нативный <details>. */}
                                 <Button
-                                  size="sm"
+                                  size="small"
                                   variant="success"
                                   onClick={() => confirmPayment(row.id)}
                                   disabled={!hasBackendPaymentAction(row, 'confirm') || processingAction?.id === row.id}
                                   aria-label={tI18n('cashier.confirm_payment_aria')}>
                                   {processingAction?.id === row.id && processingAction?.type === 'confirm' ?
-                                    <Loader2 size={14} className="animate-spin" aria-hidden="true" /> :
-                                    <CheckCircle size={14} />}
+                                    <Loader2 size={14 as never} className="animate-spin" aria-hidden="true" /> :
+                                    <CheckCircle size={14 as never} />}
                                   {tI18n('cashier.confirm_payment_confirm')}
                                 </Button>
                                 <details className="cashier-overflow-menu">
                                   <summary className="cashier-overflow-trigger" aria-label={tI18n('cashier.more_actions_aria')}>
-                                    <MoreVertical size={16} aria-hidden="true" />
+                                    <MoreVertical size={16 as never} aria-hidden="true" />
                                   </summary>
                                   <div className="cashier-overflow-popover" role="menu">
                                     <button
@@ -1661,7 +1659,7 @@ const CashierPanel = () => {
                                       disabled={!hasBackendPaymentAction(row, 'cancel') || processingAction?.id === row.id}
                                       role="menuitem"
                                       aria-label={tI18n('cashier.btn_cancel')}>
-                                      <XCircle size={14} aria-hidden="true" /> {tI18n('cashier.btn_cancel')}
+                                      <XCircle size={14 as never} aria-hidden="true" /> {tI18n('cashier.btn_cancel')}
                                     </button>
                                     <button
                                       type="button"
@@ -1670,7 +1668,7 @@ const CashierPanel = () => {
                                       disabled={!hasBackendPaymentAction(row, 'refund') || processingAction?.id === row.id}
                                       role="menuitem"
                                       aria-label={tI18n('cashier.refund_aria')}>
-                                      <Undo2 size={14} aria-hidden="true" /> {tI18n('cashier.refund_confirm')}
+                                      <Undo2 size={14 as never} aria-hidden="true" /> {tI18n('cashier.refund_confirm')}
                                     </button>
                                     <button
                                       type="button"
@@ -1679,7 +1677,7 @@ const CashierPanel = () => {
                                       disabled={!hasBackendPaymentAction(row, 'print_receipt') || processingAction?.id === row.id}
                                       role="menuitem"
                                       aria-label={tI18n('cashier.print_receipt_aria')}>
-                                      <Receipt size={14} aria-hidden="true" /> {tI18n('cashier.print_receipt_btn')}
+                                      <Receipt size={14 as never} aria-hidden="true" /> {tI18n('cashier.print_receipt_btn')}
                                     </button>
                                   </div>
                                 </details>
@@ -1706,7 +1704,7 @@ const CashierPanel = () => {
                     {totalPages > 1 &&
                 <div className="cashier-pagination">
                         <Button
-                    size="sm"
+                    size="small"
                     variant="outline"
                     disabled={currentPage === 1 || historyLoading}
                     onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}>
@@ -1717,7 +1715,7 @@ const CashierPanel = () => {
                           {tI18n('cashier.pagination_info', { current: currentPage, total: totalPages, total_items: totalItems })}
                         </span>
                         <Button
-                    size="sm"
+                    size="small"
                     variant="outline"
                     disabled={currentPage === totalPages || historyLoading}
                     onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}>
@@ -1790,7 +1788,7 @@ const CashierPanel = () => {
                 variant="danger"
                 onClick={handleCancelPayment}
                 disabled={processingAction?.type === 'cancel' || cancelReason.trim().length < 10}>
-                {processingAction?.type === 'cancel' ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : null}
+                {processingAction?.type === 'cancel' ? <Loader2 size={14 as never} className="animate-spin" aria-hidden="true" /> : null}
                 {tI18n('cashier.btn_cancel')}
               </Button>
             </DialogActions>
@@ -1939,7 +1937,7 @@ const CashierPanel = () => {
                 {tI18n('cashier.cancel')}
               </Button>
               <Button variant="danger" onClick={handleRefund} disabled={processingAction?.type === 'refund'}>
-                {processingAction?.type === 'refund' ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : null}
+                {processingAction?.type === 'refund' ? <Loader2 size={14 as never} className="animate-spin" aria-hidden="true" /> : null}
                 {tI18n('cashier.refund_execute_btn')}
               </Button>
             </DialogActions>
@@ -2029,7 +2027,7 @@ const CashierPanel = () => {
         </div>
       )}
       {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
-      {confirmDialog}
+      {confirmDialog as unknown as React.ReactNode}
     </div>);
 
 };

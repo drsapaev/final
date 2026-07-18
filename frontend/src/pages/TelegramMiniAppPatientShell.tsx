@@ -1,13 +1,11 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import i18n from '../i18n';
 import { useEffect, useState } from 'react';
+import type { CSSProperties } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Alert, Badge, Button, Card, CardContent, Input, Textarea,
   Checkbox } from '../components/ui/macos';
-import { api } from '../api/client.js';
+import { api } from '../api/client';
 
 const MINI_APP_LANGUAGE_RU = 'ru';
 const MINI_APP_LANGUAGE_UZ = 'uz-Latn';

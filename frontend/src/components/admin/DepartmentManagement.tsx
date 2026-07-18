@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useTranslation } from '../../i18n/useTranslation';
 /**
  * DepartmentManagement Component
@@ -8,6 +5,7 @@ import { useTranslation } from '../../i18n/useTranslation';
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import type { CSSProperties } from 'react';
 import {
   Plus,
 
@@ -127,9 +125,11 @@ const PAGE_SIZE_OPTIONS = [
 { value: 50, label: '50' }];
 
 const DepartmentManagement = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // P-013 fix: shared ConfirmDialog hook (replaces 2 window.confirm() calls).
-  const [confirm, confirmDialog] = useConfirm();
+  const [confirmRaw, confirmDialog] = useConfirm();
+  const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
 
   // Reactive label option arrays (depend on current language via t).
   const categoryOptions = getCategoryOptions(t);
@@ -489,7 +489,7 @@ const DepartmentManagement = () => {
       document.body.removeChild(link);
 
       toast.success(t('admin2.dept_export_success'));
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Ошибка экспорта:', error);
       toast.error(t('admin2.dept_export_failed'));
     }
@@ -584,7 +584,7 @@ const DepartmentManagement = () => {
         toast.error(errorData.detail || t('admin2.dept_import_failed'));
       }
 
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Ошибка импорта:', error);
       toast.error(t('admin2.dept_read_file_failed'));
     }
@@ -651,7 +651,7 @@ const DepartmentManagement = () => {
         const errorMessage = errorData.detail || errorData.message || `HTTP ${response.status}: ${response.statusText}`;
         toast.error(t('admin2.dept_bulk_delete_error', { error: errorMessage }));
       }
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Ошибка массового удаления:', error);
       toast.error(t('admin2.dept_bulk_delete_failed'));
     }
@@ -687,7 +687,7 @@ const DepartmentManagement = () => {
         const errorMessage = errorData.detail || errorData.message || `HTTP ${response.status}: ${response.statusText}`;
         toast.error(activate ? t('admin2.dept_bulk_activate_error_on', { error: errorMessage }) : t('admin2.dept_bulk_activate_error_off', { error: errorMessage }));
       }
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Ошибка массовой активации:', error);
       toast.error(activate ? t('admin2.dept_bulk_activate_failed_on') : t('admin2.dept_bulk_activate_failed_off'));
     }
@@ -774,7 +774,7 @@ const DepartmentManagement = () => {
                 size="default"
                 onClick={() => setShowAddForm(!showAddForm)}>
                 
-                                <Plus size={16} className="mr-2" />
+                                <Plus size={16 as never} className="mr-2" />
                                 {t('admin2.dept_add_btn')}
                             </Button>
 
@@ -784,7 +784,7 @@ const DepartmentManagement = () => {
                 onClick={handleExport}
                 title={t('admin2.dept_export_title')}>
                 
-                                <Download size={16} className="mr-2" />
+                                <Download size={16 as never} className="mr-2" />
                                 {t('admin2.dept_export_btn')}
                             </Button>
 
@@ -796,7 +796,7 @@ const DepartmentManagement = () => {
                   className="admin-cursor-pointer"
                   title={t('admin2.dept_import_title')}>
                   
-                                    <Upload size={16} className="mr-2" />
+                                    <Upload size={16 as never} className="mr-2" />
                                     {t('admin2.dept_import_btn')}
                                 </Button>
                                 <input
@@ -813,7 +813,7 @@ const DepartmentManagement = () => {
                     {/* Панель поиска и фильтров */}
                     <div className="admin-flex-gap-16-wrap-mb-24">
                         <div className="admin-flex-search-row">
-                            <Search size={16} className="text-[var(--mac-text-secondary)]" />
+                            <Search size={16 as never} className="text-[var(--mac-text-secondary)]" />
                             <Input
                 placeholder={t('admin2.dept_search_placeholder')}
                 value={searchTerm}
@@ -835,7 +835,7 @@ const DepartmentManagement = () => {
 
                         <Button
               variant="secondary"
-              size="sm"
+              size="small"
               onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
               title={sortOrder === 'asc' ? t('admin2.dept_sort_asc') : t('admin2.dept_sort_desc')}>
               
@@ -1004,7 +1004,7 @@ const DepartmentManagement = () => {
 
                             <div className="admin-flex-gap-12-mt-16">
                                 <Button variant="primary" onClick={handleAddDepartment}>
-                                    <Save size={16} className="mr-2" />
+                                    <Save size={16 as never} className="mr-2" />
                                     {t('admin2.dept_save_btn')}
                                 </Button>
                                 <Button variant="secondary" onClick={() => {
@@ -1012,7 +1012,7 @@ const DepartmentManagement = () => {
                 setFormData(DEFAULT_FORM);
                 setServiceMapping(DEFAULT_SERVICE_MAPPING);
               }}>
-                                    <X size={16} className="mr-2" />
+                                    <X size={16 as never} className="mr-2" />
                                     {t('admin2.dept_cancel_btn')}
                                 </Button>
                             </div>
@@ -1028,40 +1028,40 @@ const DepartmentManagement = () => {
 
                             <Button
               variant="danger"
-              size="sm"
+              size="small"
               onClick={handleBulkDelete}>
               
-                                <Trash2 size={14} className="admin-mr-6" />
+                                <Trash2 size={14 as never} className="admin-mr-6" />
                                 {t('admin2.dept_delete_btn')}
                             </Button>
 
                             <Button
               variant="success"
-              size="sm"
+              size="small"
               onClick={() => handleBulkActivate(true)}>
               
-                                <CheckCircle size={14} className="admin-mr-6" />
+                                <CheckCircle size={14 as never} className="admin-mr-6" />
                                 {t('admin2.dept_activate_btn')}
                             </Button>
 
                             <Button
               variant="warning"
-              size="sm"
+              size="small"
               onClick={() => handleBulkActivate(false)}>
               
-                                <XCircle size={14} className="admin-mr-6" />
+                                <XCircle size={14 as never} className="admin-mr-6" />
                                 {t('admin2.dept_deactivate_btn')}
                             </Button>
 
                             <Button
               variant="secondary"
-              size="sm"
+              size="small"
               onClick={() => {
                 setSelectedDepartments([]);
                 setSelectAll(false);
               }}>
               
-                                <X size={14} className="admin-mr-6" />
+                                <X size={14 as never} className="admin-mr-6" />
                                 {t('admin2.dept_clear_btn')}
                             </Button>
                         </div>
@@ -1114,9 +1114,9 @@ const DepartmentManagement = () => {
                         
                                             </td>
                                             <td className="admin-td-padded">
-                                                <div className="admin-icon-cell-40" style={{ '--admin-icon-bg': dept.color || 'var(--mac-accent-blue)' }}>
+                                                <div className="admin-icon-cell-40" style={{ '--admin-icon-bg': dept.color || 'var(--mac-accent-blue)' } as CSSProperties}>
                                                     {IconComponent ?
-                          <IconComponent size={20} /> :
+                          <IconComponent size={20 as never} /> :
 
                           <span className="admin-icon-fallback-20">{dept.icon || '🏥'}</span>
                           }
@@ -1157,22 +1157,22 @@ const DepartmentManagement = () => {
                                             <td className="admin-td-right">
                                                 <div className="admin-flex-end-center-8">
                                                     <Button
-                            size="sm"
+                            size="small"
                             variant="secondary"
                             aria-label={`Edit department ${dept.name_ru || dept.name || dept.key}`}
                             onClick={() => openEditModal(dept)}
                             title={t('admin2.dept_edit_title')}>
                             
-                                                        <Edit2 size={16} />
+                                                        <Edit2 size={16 as never} />
                                                     </Button>
                                                     <Button
-                            size="sm"
+                            size="small"
                             variant="danger"
                             aria-label={`Delete department ${dept.name_ru || dept.name || dept.key}`}
                             onClick={() => handleDeleteDepartment(dept.id)}
                             title={t('admin2.dept_delete_action_title')}>
                             
-                                                        <Trash2 size={16} />
+                                                        <Trash2 size={16 as never} />
                                                     </Button>
                                                 </div>
                                             </td>
@@ -1419,13 +1419,13 @@ const DepartmentManagement = () => {
             variant="primary"
             onClick={handleUpdateDepartment}>
             
-                        <Save size={16} className="mr-2" />
+                        <Save size={16 as never} className="mr-2" />
                         {t('admin2.dept_save_changes_btn')}
                     </Button>
                 </div>
             </Modal>
             {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
-            {confirmDialog}
+            {confirmDialog as unknown as React.ReactNode}
         </div>
       );
 
