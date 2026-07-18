@@ -1,7 +1,5 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import type { CSSProperties } from 'react';
 import {
   Search,
 
@@ -213,7 +211,8 @@ const EnhancedAppointmentsTable = ({
   }, []);
 
   // Переводы — i18next unified.
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   void language; // legacy prop, kept for backward compat; translations come from i18next.
 
   // Сортировка данных
@@ -1145,7 +1144,7 @@ const EnhancedAppointmentsTable = ({
             onClick={handleExport}
             className="eat-export-btn">
 
-            <Download size={16} />
+            <Download size={16 as never} />
             {t('misc.eat_export')}
           </Button>
 
@@ -1209,7 +1208,7 @@ const EnhancedAppointmentsTable = ({
                 <div className="eat-th-content">
                   {t('misc.eat_number')}
                   {sortConfig.key === 'queue_number' && (
-                  sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)
+                  sortConfig.direction === 'asc' ? <ChevronUp size={14 as never} /> : <ChevronDown size={14 as never} />)
                   }
                 </div>
               </th>
@@ -1232,7 +1231,7 @@ const EnhancedAppointmentsTable = ({
                 <div className="eat-th-content">
                   {t('misc.eat_patient')}
                   {sortConfig.key === 'patient_fio' && (
-                  sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)
+                  sortConfig.direction === 'asc' ? <ChevronUp size={14 as never} /> : <ChevronDown size={14 as never} />)
                   }
                 </div>
               </th>
@@ -1270,7 +1269,7 @@ const EnhancedAppointmentsTable = ({
                 <div className="eat-th-content">
                   {t('misc.eat_birth_year')}
                   {sortConfig.key === 'patient_birth_year' && (
-                  sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)
+                  sortConfig.direction === 'asc' ? <ChevronUp size={14 as never} /> : <ChevronDown size={14 as never} />)
                   }
                 </div>
               </th>
@@ -1351,7 +1350,7 @@ const EnhancedAppointmentsTable = ({
                 <div className="eat-th-content">
                   {t('misc.eat_date')}
                   {sortConfig.key === 'appointment_date' && (
-                  sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)
+                  sortConfig.direction === 'asc' ? <ChevronUp size={14 as never} /> : <ChevronDown size={14 as never} />)
                   }
                 </div>
               </th>
@@ -1374,7 +1373,7 @@ const EnhancedAppointmentsTable = ({
                 <div className="eat-th-content">
                   {t('misc.eat_status')}
                   {sortConfig.key === 'status' && (
-                  sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)
+                  sortConfig.direction === 'asc' ? <ChevronUp size={14 as never} /> : <ChevronDown size={14 as never} />)
                   }
                 </div>
               </th>
@@ -1398,7 +1397,7 @@ const EnhancedAppointmentsTable = ({
                 <div className="eat-th-content--end">
                   {t('misc.eat_cost')}
                   {sortConfig.key === 'cost' && (
-                  sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />)
+                  sortConfig.direction === 'asc' ? <ChevronUp size={14 as never} /> : <ChevronDown size={14 as never} />)
                   }
                 </div>
               </th>
@@ -1585,7 +1584,7 @@ const EnhancedAppointmentsTable = ({
                     whiteSpace: 'nowrap'
                   }}>
                         <div className="eat-phone-cell">
-                          <Phone size={18} className="eat-phone-icon" />
+                          <Phone size={18 as never} className="eat-phone-icon" />
                           {formatPhoneNumber(row.patient_phone)}
                         </div>
                       </td>
@@ -1620,7 +1619,7 @@ const EnhancedAppointmentsTable = ({
 
                         {row.address ?
                     <div className="eat-phone-cell">
-                            <Home size={18} style={{
+                            <Home size={18 as never} style={{
                         color: 'var(--mac-accent-blue)',
                         fontWeight: 'var(--mac-font-weight-bold)',
                         filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.1))',
@@ -1775,11 +1774,11 @@ const EnhancedAppointmentsTable = ({
                                   {timeDisplay.primaryLabel}
                                 </div>
                                 <div className="eat-th-content">
-                                  <Calendar size={12} className="eat-calendar-icon" />
+                                  <Calendar size={12 as never} className="eat-calendar-icon" />
                                   {timeDisplay.primaryDate}
                                 </div>
                                 <div className="eat-time-row">
-                                  <Clock size={10} />
+                                  <Clock size={10 as never} />
                                   {timeDisplay.primaryTime}
                                 </div>
                                 {timeDisplay.showChanged &&
@@ -1796,12 +1795,12 @@ const EnhancedAppointmentsTable = ({
                           return (
                             <div>
                                 <div className="eat-th-content">
-                                  <Calendar size={12} className="eat-calendar-icon" />
+                                  <Calendar size={12 as never} className="eat-calendar-icon" />
                                   {row.appointment_date || '—'}
                                 </div>
                                 {row.appointment_time &&
                               <div className="eat-time-row">
-                                    <Clock size={10} />
+                                    <Clock size={10 as never} />
                                     {row.appointment_time}
                                   </div>
                               }
@@ -1962,7 +1961,7 @@ const EnhancedAppointmentsTable = ({
                         title={t('misc.eat_print')}
                         aria-label={t('misc.eat_print')}>
 
-                            <FileText size={14} />
+                            <FileText size={14 as never} />
                           </button>
                       }
 
@@ -2025,7 +2024,7 @@ const EnhancedAppointmentsTable = ({
                         title={t('misc.eat_view')}
                         aria-label={t('misc.eat_view')}>
 
-                          <Eye size={14} />
+                          <Eye size={14 as never} />
                         </button>
 
                         {/* Редактировать */}
@@ -2044,7 +2043,7 @@ const EnhancedAppointmentsTable = ({
                         title={t('misc.eat_edit')}
                         aria-label={t('misc.eat_edit')}>
 
-                          <Edit size={14} />
+                          <Edit size={14 as never} />
                         </button>
 
                         {/* Просмотр EMR (только для завершённых записей) */}
@@ -2063,7 +2062,7 @@ const EnhancedAppointmentsTable = ({
                         title={t('misc.eat_view_emr')}
                         aria-label={t('misc.eat_view_emr')}>
 
-                              <FileText size={14} />
+                              <FileText size={14 as never} />
                             </button>
                       }
 
@@ -2083,7 +2082,7 @@ const EnhancedAppointmentsTable = ({
                         }}
                         title={t('misc.eat_reschedule')}
                         aria-label={t('misc.eat_reschedule_aria')}>
-                          <CalendarClock size={14} />
+                          <CalendarClock size={14 as never} />
                         </button>
                       }
 
@@ -2101,7 +2100,7 @@ const EnhancedAppointmentsTable = ({
                         }}
                         title={t('misc.eat_cancel')}
                         aria-label={t('misc.eat_cancel_aria')}>
-                          <X size={14} />
+                          <X size={14 as never} />
                         </button>
                       }
 
@@ -2120,7 +2119,7 @@ const EnhancedAppointmentsTable = ({
                         title={t('misc.eat_more')}
                         aria-label={t('misc.eat_more')}>
 
-                          <MoreHorizontal size={14} />
+                          <MoreHorizontal size={14 as never} />
                         </button>
 
                         {/* Назначить следующий визит */}

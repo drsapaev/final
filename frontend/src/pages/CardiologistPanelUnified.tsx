@@ -1,7 +1,5 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useState, useEffect, useCallback, useRef } from 'react';
+import type { CSSProperties } from 'react';
 import { useLocation } from 'react-router-dom';
 // P-009 fix: shared doctor panel state hook
 import { useDoctorPanelState } from '../hooks/useDoctorPanelState';
@@ -102,7 +100,8 @@ const MacOSCardiologistPanelUnified = () => {
   // notification before this fix.
   // QW-10 (UX audit): confirm hook used before completing a visit (prevents
   // accidental completion with empty diagnosis/treatment).
-  const [confirm, confirmDialog] = useConfirm();
+  const [confirmRaw, confirmDialog] = useConfirm();
+  const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
   // STRAT#32: useTranslation adapter for confirm/notify i18n.
   const { t: tI18n } = useTranslation();
   const [scheduleNextModal, setScheduleNextModal] = useState({ open: false, patient: null });
@@ -162,9 +161,9 @@ const MacOSCardiologistPanelUnified = () => {
     crp: '',
     troponin: '',
     interpretation: ''
-  });
+  } as any);
 
-  const [showForm, setShowForm] = useState({ open: false, type: 'blood' });
+  const [showForm, setShowForm] = useState({ open: false, type: 'blood' } as any);
   const [ecgResults, setEcgResults] = useState([]);
   const [bloodTests, setBloodTests] = useState([]);
   const [patientFiles, setPatientFiles] = useState([]);
@@ -403,7 +402,7 @@ const MacOSCardiologistPanelUnified = () => {
       }
 
       setPatientFiles(Array.from(mergedFiles.values()));
-    } catch (error) {
+    } catch (error: any) {
       notify.error(getErrorMessage(error, tI18n('cardio.cardio_panel_patient_data_update_failed')));
     }
   }, [getSelectedPatientContext]);
@@ -477,7 +476,7 @@ const MacOSCardiologistPanelUnified = () => {
           const servicesData = data.services_by_group || {};
           setServices(servicesData);
         }
-      } catch (error) {
+      } catch (error: any) {
       notify.error(getErrorMessage(error, tI18n('cardio.cardio_panel_services_load_failed')));
       }
     };
@@ -526,7 +525,7 @@ const MacOSCardiologistPanelUnified = () => {
       }));
       setActiveTab('patients');
       notify.info(tI18n('cardio.cardio_panel_patient_loaded_info', { name: patientName }));
-    } catch (error) {
+    } catch (error: any) {
       notify.error(getErrorMessage(error, tI18n('cardio.cardio_panel_patient_load_failed')));
     }
   }, [patientIdFromUrl, visitIdFromUrl, selectedPatient, setSelectedPatient, setActiveTab]);
@@ -736,7 +735,7 @@ const MacOSCardiologistPanelUnified = () => {
 
         setAppointments(enrichedAppointmentsData);
       }
-    } catch (error) {
+    } catch (error: any) {
       notify.error(getErrorMessage(error, tI18n('cardio.cardio_panel_appointments_load_failed')));
     } finally {
       setAppointmentsLoading(false);
@@ -793,7 +792,7 @@ const MacOSCardiologistPanelUnified = () => {
       if (response.ok) {
         return await response.json();
       }
-    } catch (error) {
+    } catch (error: any) {
       notify.error(getErrorMessage(error, tI18n('cardio.cardio_panel_patient_data_load_failed')));
     }
     return null;
@@ -868,7 +867,7 @@ const MacOSCardiologistPanelUnified = () => {
       const transformedPatient = transformPatientData(apiPatient);
       setEditPatientModal({ open: true, patient: transformedPatient, loading: false });
 
-    } catch (error) {
+    } catch (error: any) {
       const partialPatient = createPartialPatientFromRow(row);
       setEditPatientModal({ open: true, patient: partialPatient, loading: false });
       notify.error(getErrorMessage(error, tI18n('cardio.cardio_panel_patient_card_load_failed')));
@@ -950,7 +949,7 @@ const MacOSCardiologistPanelUnified = () => {
 
       notify.success(tI18n('cardio.appointment_cancelled'));
       loadMacOSCardiologyAppointments(true);
-    } catch (error) {
+    } catch (error: any) {
       logger.error('[Cardiology] Ошибка отмены записи:', error);
       notify.error(error?.message || tI18n('cardio.cardio_panel_appointment_cancel_failed'));
     } finally {
@@ -1022,7 +1021,7 @@ const MacOSCardiologistPanelUnified = () => {
             await loadMacOSCardiologyAppointments();
             notify.success(tI18n('cardio.cardio_panel_patient_called', { name: row.patient_fio }));
           }
-        } catch (error) {
+        } catch (error: any) {
           notify.error(getErrorMessage(error, tI18n('cardio.cardio_panel_call_patient_failed')));
         }
         break;
@@ -1041,7 +1040,7 @@ const MacOSCardiologistPanelUnified = () => {
             specialtyName: tI18n('cardio.cardio_panel_specialty_name')
           });
           notify.success(printResult?.message || tI18n('cardio.cardio_panel_ticket_printed', { name: row.patient_fio }));
-        } catch (error) {
+        } catch (error: any) {
           notify.error(getErrorMessage(error, tI18n('cardio.cardio_panel_ticket_print_failed')));
         }
         break;
@@ -1077,7 +1076,7 @@ const MacOSCardiologistPanelUnified = () => {
 
             // Переходим на вкладку visit для завершения
             goToTab('visit');
-          } catch (error) {
+          } catch (error: any) {
             notify.error(getErrorMessage(error, tI18n('cardio.cardio_panel_complete_visit_failed')));
           }
           break;
@@ -1272,7 +1271,7 @@ const MacOSCardiologistPanelUnified = () => {
         ));
       }
 
-    } catch (error) {
+    } catch (error: any) {
       notify.error(getErrorMessage(error, tI18n('cardio.cardio_panel_action_failed')));
     } finally {
       setLoading(false);
@@ -1350,7 +1349,7 @@ const MacOSCardiologistPanelUnified = () => {
       notify.error(getErrorMessage(errorPayload, tI18n('cardio.cardio_panel_emr_load_failed')));
       setEmr(null);
       return null;
-    } catch (error) {
+    } catch (error: any) {
       // AbortError happens when the parent component aborted the fetch
       // (e.g. visitId changed) — not a user-facing error.
       if (error?.name === 'AbortError') {
@@ -1467,7 +1466,7 @@ const MacOSCardiologistPanelUnified = () => {
 
     try {
       await handleSaveVisit();
-    } catch (error) {
+    } catch (error: any) {
       notify.error(getErrorMessage(error, tI18n('cardio.cardio_panel_complete_visit_emr_failed')));
     }
   };
@@ -1516,7 +1515,7 @@ const MacOSCardiologistPanelUnified = () => {
 
       const errorData = await response.json().catch(() => ({}));
       notify.error(getErrorMessage(errorData?.detail || errorData?.message || '', tI18n('cardio.cardio_panel_blood_test_save_failed')));
-    } catch (error) {
+    } catch (error: any) {
       notify.error(getErrorMessage(error, tI18n('cardio.cardio_panel_blood_test_save_failed')));
     }
   };
@@ -1576,7 +1575,7 @@ const MacOSCardiologistPanelUnified = () => {
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-    } catch (error) {
+    } catch (error: any) {
       notify.error(getErrorMessage(error, tI18n('cardio.cardio_panel_download_failed')));
     }
   };
@@ -1603,7 +1602,7 @@ const MacOSCardiologistPanelUnified = () => {
       if (!previewWindow) {
         throw new Error(tI18n('cardio.cardio_panel_preview_blocked_short'));
       }
-    } catch (error) {
+    } catch (error: any) {
       notify.error(getErrorMessage(error, tI18n('cardio.cardio_panel_open_file_failed')));
     }
   };
@@ -1751,7 +1750,7 @@ const MacOSCardiologistPanelUnified = () => {
             <MacOSCard className="cardio-p-6">
               <div className="cardio-flex-between" style={{ marginBottom: 16 }}>
                 <h3 style={{ margin: 0 }}>{tI18n('cardio.cardio_panel_add_ecg_title')}</h3>
-                <Button variant="outline" size="sm" onClick={() => setShowForm({ open: false })}>
+                <Button variant="outline" size="small" onClick={() => setShowForm({ open: false })}>
                   {tI18n('cardio.cardio_panel_close')}
                 </Button>
               </div>
@@ -1893,7 +1892,7 @@ const MacOSCardiologistPanelUnified = () => {
         }
 
         {/* QW-10 (UX audit): portal-mounted ConfirmDialog used before completing a visit */}
-        {confirmDialog}
+        {confirmDialog as unknown as React.ReactNode}
 
         {/* P-021 (UX audit): session timeout warning dialog */}
         {sessionWarning && (
@@ -1945,7 +1944,7 @@ const MacOSCardiologistPanelUnified = () => {
           className="cardio-settings-fab"
           aria-label={tI18n('cardio.cardio_panel_settings_open_aria')}>
 
-          <Icon name="gear" size={18} />
+          <Icon name="gear" size={18 as never} />
         </button>
         {(activeTab === 'visit' || activeTab === 'blood') && settingsOpen &&
         <MacOSCard className="cardio-settings-card">
@@ -1978,7 +1977,7 @@ const MacOSCardiologistPanelUnified = () => {
                 // the values are stored.
                 notify.success(tI18n('cardio.settings_saved'));
                 setSettingsOpen(false);
-              }}><Icon name="square.and.arrow.down" size={16} className="cardio-icon-mr" />{tI18n('cardio.cardio_panel_save')}</Button>
+              }}><Icon name="square.and.arrow.down" size={16 as never} className="cardio-icon-mr" />{tI18n('cardio.cardio_panel_save')}</Button>
             </div>
           </MacOSCard>
         }

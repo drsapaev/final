@@ -1,7 +1,5 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useState, useEffect, useCallback, useRef, useMemo, memo, startTransition } from 'react';
+import type { CSSProperties } from 'react';
 import PropTypes from 'prop-types';
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
@@ -104,7 +102,8 @@ import { generateCSV, downloadCSV } from './registrar/registrarCsv';
 
 const RegistrarPanel = () => {
   // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
-  const [confirm, confirmDialog] = useConfirm();
+  const [confirmRaw, confirmDialog] = useConfirm();
+  const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
   // Рендер компонента (debug отключен)
   // Адаптивные хуки
   const { isMobile, isTablet } = useBreakpoint();
@@ -187,7 +186,7 @@ const RegistrarPanel = () => {
 
         // UX Audit R-3.6: убрано логирование patientName (PII leak).
         logger.info('[Registrar] Загружен пациент из URL (patientId matched)');
-      } catch (error) {
+      } catch (error: any) {
         // 404 — пациент не найден, не логируем как error.
         const status = error?.response?.status;
         if (status !== 404) {
@@ -359,7 +358,7 @@ const RegistrarPanel = () => {
 
 
 
-      const response = await api.get('/registrar/queues/today', { params: { target_date: dateParam } });
+      const response = await api.get('/registrar/queues/today', { params: { target_date: dateParam } }) as any;
 
       // Axios successful response
       const data = response.data;
@@ -530,7 +529,7 @@ const RegistrarPanel = () => {
           setDataSource('api');
         });
       }
-    } catch (error) {
+    } catch (error: any) {
       if (error?.response?.status === 429) {
         autoRefreshCooldownUntilRef.current = Date.now() + 60_000;
         autoRefreshCooldownLoggedRef.current = false;
@@ -678,7 +677,7 @@ const RegistrarPanel = () => {
     try {
       logger.info('RegistrarPanel: load-more delegates to canonical queue loader');
       await loadAppointments({ source: 'load_more', silent: true });
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Ошибка загрузки дополнительных записей:', error);
     } finally {
       setPaginationInfo((prev) => ({ ...prev, loadingMore: false }));
@@ -1838,7 +1837,7 @@ const RegistrarPanel = () => {
               notify.warning('Cancelled ' + successCount + '; failed ' + failedCount);
             }
             await loadAppointments({ silent: true, source: 'cancel_complete' });
-          } catch (error) {
+          } catch (error: any) {
             logger.error('RegistrarPanel: cancellation failed:', error);
             notify.error(getErrorMessage(error, 'Could not cancel record. Check connection and try again.'));
             throw error;
@@ -1981,7 +1980,7 @@ const RegistrarPanel = () => {
                 logger.error('Post-wizard reload retry also failed:', retryError);
               }
             }
-          } catch (error) {
+          } catch (error: any) {
             logger.error('Error refreshing data after wizard completion:', error);
             // Не показываем ошибку пользователю, так как запись уже создана
             setShowWizard(false);
@@ -2037,7 +2036,7 @@ const RegistrarPanel = () => {
                 setCustomRescheduleDate('');
                 setCustomRescheduleTime('');
                 loadAppointments({ source: 'reschedule_tomorrow' });
-              } catch (e) {
+              } catch (e: any) {
                 logger.error('Ошибка переноса на завтра:', e);
                 notify.error(getErrorMessage(e, tI18n('registrarPanel.rp_err_reschedule_failed')));
               }
@@ -2108,7 +2107,7 @@ const RegistrarPanel = () => {
                 setCustomRescheduleDate('');
                 setCustomRescheduleTime('');
                 loadAppointments({ source: 'reschedule_date' });
-              } catch (e) {
+              } catch (e: any) {
                 logger.error('Ошибка переноса на дату:', e);
                 notify.error(getErrorMessage(e, tI18n('registrarPanel.rp_err_reschedule_failed')));
               }
@@ -2203,7 +2202,7 @@ const RegistrarPanel = () => {
         }} />
 
       {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
-      {confirmDialog}
+      {confirmDialog as unknown as React.ReactNode}
 
     </div>);
 

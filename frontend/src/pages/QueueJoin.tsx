@@ -1,7 +1,5 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useState, useEffect, useCallback } from 'react';
+import type { CSSProperties } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Clock,
@@ -30,7 +28,8 @@ const QueueJoin = () => {
   const { token: paramToken } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
 
   const formatSpecialistLabel = (specialist) => {
     const doctorName =
@@ -80,7 +79,7 @@ const QueueJoin = () => {
     patientName: '',
     phone: '',
     telegramId: ''
-  });
+  } as any);
   const [selectedSpecialists, setSelectedSpecialists] = useState([]); // Выбранные специалисты для общего QR
   const [availableSpecialists, setAvailableSpecialists] = useState([]); // Список доступных специалистов из API
   const [isSpecialistsLoading, setIsSpecialistsLoading] = useState(true);
@@ -159,7 +158,7 @@ const QueueJoin = () => {
         setStep('info');
       }
 
-    } catch (error) {
+    } catch (error: any) {
       setAvailableSpecialists([]);
       setError(getApiErrorMessage(error, QUEUE_JOIN_MESSAGES.sessionStartFailed));
       setStep('error');
@@ -203,7 +202,7 @@ const QueueJoin = () => {
 
       await startJoinSession();
 
-    } catch (error) {
+    } catch (error: any) {
       setAvailableSpecialists([]);
       setIsSpecialistsLoading(false);
       setError(getApiErrorMessage(error, QUEUE_JOIN_MESSAGES.qrTokenUnavailable));
@@ -429,7 +428,7 @@ const QueueJoin = () => {
 
       setStep('success');
 
-    } catch (error) {
+    } catch (error: any) {
       setError(getApiErrorMessage(error, QUEUE_JOIN_MESSAGES.joinFailed));
     } finally {
       setLoading(false);
