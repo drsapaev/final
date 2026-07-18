@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -26,7 +23,7 @@ describe('isExpectedApiErrorStatus', () => {
   it('returns false when request metadata is missing or invalid', () => {
     expect(isExpectedApiErrorStatus(null, 404)).toBe(false);
     expect(isExpectedApiErrorStatus({}, 404)).toBe(false);
-    expect(isExpectedApiErrorStatus({ expectedErrorStatuses: '404' }, 404)).toBe(false);
+    expect(isExpectedApiErrorStatus({ expectedErrorStatuses: '404' as unknown as number[] }, 404)).toBe(false);
   });
 });
 

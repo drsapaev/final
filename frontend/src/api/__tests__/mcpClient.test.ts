@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 /**
  * Unit tests for MCP Client
  */
@@ -23,6 +20,36 @@ vi.mock('axios', () => {
     }
   };
 });
+
+// Cast axios through unknown so we can call mockReturnValue on its
+// create method — the real axios type doesn't expose vitest mock API.
+const axiosMock = axios as unknown as {
+  create: ReturnType<typeof vi.fn>;
+};
+
+// mcpClient.ts is still implicit-any; the dynamic import returns
+// `typeof import('../mcpClient')` whose mcpAPI methods return Promise<unknown>.
+// Cast mcpAPI to a permissive shape so the test assertions compile.
+interface McpResult {
+  status: string;
+  data: Record<string, unknown> & {
+    suggestions?: Array<{ code: string; name: string; relevance: string }>;
+  };
+  servers?: string[];
+}
+
+interface McpAPI {
+  analyzeComplaint: (payload: Record<string, unknown>) => Promise<McpResult>;
+  suggestICD10: (payload: Record<string, unknown>) => Promise<McpResult>;
+  interpretLabResults: (payload: Record<string, unknown>) => Promise<McpResult>;
+  analyzeSkinLesion: (
+    file: File,
+    meta: Record<string, unknown>,
+    foo: unknown,
+    provider: string
+  ) => Promise<McpResult>;
+  getStatus: () => Promise<McpResult>;
+}
 
 describe('MCP Client API', () => {
   beforeEach(() => {
@@ -51,8 +78,8 @@ describe('MCP Client API', () => {
           response: { use: vi.fn() }
         }
       };
-      axios.create.mockReturnValue(mockClient);
-      const { mcpAPI } = await import('../mcpClient');
+      axiosMock.create.mockReturnValue(mockClient);
+      const { mcpAPI } = await import('../mcpClient') as { mcpAPI: McpAPI };
 
       const result = await mcpAPI.analyzeComplaint({
         complaint: 'Головная боль',
@@ -73,8 +100,8 @@ describe('MCP Client API', () => {
           response: { use: vi.fn() }
         }
       };
-      axios.create.mockReturnValue(mockClient);
-      const { mcpAPI } = await import('../mcpClient');
+      axiosMock.create.mockReturnValue(mockClient);
+      const { mcpAPI } = await import('../mcpClient') as { mcpAPI: McpAPI };
 
       await expect(
         mcpAPI.analyzeComplaint({
@@ -107,8 +134,8 @@ describe('MCP Client API', () => {
           response: { use: vi.fn() }
         }
       };
-      axios.create.mockReturnValue(mockClient);
-      const { mcpAPI } = await import('../mcpClient');
+      axiosMock.create.mockReturnValue(mockClient);
+      const { mcpAPI } = await import('../mcpClient') as { mcpAPI: McpAPI };
 
       const result = await mcpAPI.suggestICD10({
         symptoms: ['головная боль'],
@@ -142,8 +169,8 @@ describe('MCP Client API', () => {
           response: { use: vi.fn() }
         }
       };
-      axios.create.mockReturnValue(mockClient);
-      const { mcpAPI } = await import('../mcpClient');
+      axiosMock.create.mockReturnValue(mockClient);
+      const { mcpAPI } = await import('../mcpClient') as { mcpAPI: McpAPI };
 
       const result = await mcpAPI.interpretLabResults({
         results: [
@@ -179,8 +206,8 @@ describe('MCP Client API', () => {
           response: { use: vi.fn() }
         }
       };
-      axios.create.mockReturnValue(mockClient);
-      const { mcpAPI } = await import('../mcpClient');
+      axiosMock.create.mockReturnValue(mockClient);
+      const { mcpAPI } = await import('../mcpClient') as { mcpAPI: McpAPI };
 
       const result = await mcpAPI.analyzeSkinLesion(
         mockFile,
@@ -210,8 +237,8 @@ describe('MCP Client API', () => {
           response: { use: vi.fn() }
         }
       };
-      axios.create.mockReturnValue(mockClient);
-      const { mcpAPI } = await import('../mcpClient');
+      axiosMock.create.mockReturnValue(mockClient);
+      const { mcpAPI } = await import('../mcpClient') as { mcpAPI: McpAPI };
 
       const result = await mcpAPI.getStatus();
 
@@ -220,4 +247,3 @@ describe('MCP Client API', () => {
     });
   });
 });
-

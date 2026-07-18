@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../client', () => ({
@@ -20,46 +17,54 @@ import {
   startQueueJoinSession,
 } from '../queue';
 
+// Cast api through unknown so we can call vitest mock methods on its
+// members without fighting the real AxiosInstance type.
+const apiMock = api as unknown as {
+  get: ReturnType<typeof vi.fn>;
+  post: ReturnType<typeof vi.fn>;
+  put: ReturnType<typeof vi.fn>;
+};
+
 describe('queue API', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it('loads public queue profiles', async () => {
-    api.get.mockResolvedValueOnce({ data: { items: [] } });
+    apiMock.get.mockResolvedValueOnce({ data: { items: [] } });
     const data = await fetchPublicQueueProfiles();
 
-    expect(api.get).toHaveBeenCalledWith('/queues/profiles/public');
+    expect(apiMock.get).toHaveBeenCalledWith('/queues/profiles/public');
     expect(data).toEqual({ items: [] });
   });
 
   it('loads QR token info by token', async () => {
-    api.get.mockResolvedValueOnce({ data: { valid: true } });
+    apiMock.get.mockResolvedValueOnce({ data: { valid: true } });
     const data = await fetchQrTokenInfo('token-123');
 
-    expect(api.get).toHaveBeenCalledWith('/queue/qr-tokens/token-123/info');
+    expect(apiMock.get).toHaveBeenCalledWith('/queue/qr-tokens/token-123/info');
     expect(data).toEqual({ valid: true });
   });
 
   it('starts queue join session', async () => {
-    api.post.mockResolvedValueOnce({ data: { started: true } });
+    apiMock.post.mockResolvedValueOnce({ data: { started: true } });
     const data = await startQueueJoinSession('token-abc');
 
-    expect(api.post).toHaveBeenCalledWith('/queue/join/start', { token: 'token-abc' });
+    expect(apiMock.post).toHaveBeenCalledWith('/queue/join/start', { token: 'token-abc' });
     expect(data).toEqual({ started: true });
   });
 
   it('completes queue join session', async () => {
     const payload = { token: 'token-abc', patient_name: 'Test User' };
-    api.post.mockResolvedValueOnce({ data: { success: true } });
+    apiMock.post.mockResolvedValueOnce({ data: { success: true } });
     const data = await completeQueueJoinSession(payload);
 
-    expect(api.post).toHaveBeenCalledWith('/queue/join/complete', payload);
+    expect(apiMock.post).toHaveBeenCalledWith('/queue/join/complete', payload);
     expect(data).toEqual({ success: true });
   });
 
   it('posts registrar edit deltas without create-like queue endpoints', async () => {
-    api.post.mockResolvedValueOnce({ data: { success: true, total_amount: 25000 } });
+    apiMock.post.mockResolvedValueOnce({ data: { success: true, total_amount: 25000 } });
 
     const data = await applyRegistrarEditDelta({
       patientId: '42',
@@ -72,7 +77,7 @@ describe('queue API', () => {
       existingQueueEntryIds: ['10', 11],
     });
 
-    expect(api.post).toHaveBeenCalledWith('/registrar/cart/edit-delta', {
+    expect(apiMock.post).toHaveBeenCalledWith('/registrar/cart/edit-delta', {
       patient_id: 42,
       target_date: '2026-05-31',
       patient_data: { full_name: 'Test Patient', sex: 'F' },
