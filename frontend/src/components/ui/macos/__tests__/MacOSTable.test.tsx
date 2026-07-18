@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import React from 'react';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen } from '@testing-library/react';
@@ -21,8 +18,8 @@ describe('Table Accessibility', () => {
   it('adds tabIndex and aria-sort to sortable headers', () => {
     render(<Table columns={columns} data={data} />);
 
-    const nameHeader = screen.getByText('Name').closest('th');
-    const ageHeader = screen.getByText('Age').closest('th');
+    const nameHeader = screen.getByText('Name').closest('th') as Element;
+    const ageHeader = screen.getByText('Age').closest('th') as Element;
 
     expect(nameHeader).toHaveAttribute('tabIndex', '0');
     expect(nameHeader).toHaveAttribute('aria-sort', 'none');
@@ -34,7 +31,7 @@ describe('Table Accessibility', () => {
   it('updates aria-sort when column is sorted', () => {
     render(<Table columns={columns} data={data} />);
 
-    const nameHeader = screen.getByText('Name').closest('th');
+    const nameHeader = screen.getByText('Name').closest('th') as Element;
 
     fireEvent.click(nameHeader);
     expect(nameHeader).toHaveAttribute('aria-sort', 'ascending');
@@ -47,7 +44,7 @@ describe('Table Accessibility', () => {
     const onSort = vi.fn();
     render(<Table columns={columns} data={data} onSort={onSort} />);
 
-    const nameHeader = screen.getByText('Name').closest('th');
+    const nameHeader = screen.getByText('Name').closest('th') as Element;
 
     fireEvent.keyDown(nameHeader, { key: 'Enter' });
     expect(onSort).toHaveBeenCalledWith('name', 'asc');
@@ -84,8 +81,9 @@ describe('Table Accessibility', () => {
     );
 
     const emptyContent = screen.getByTestId('empty-state-content');
-    expect(emptyContent.closest('td')).toBe(screen.getByRole('status'));
-    expect(emptyContent.closest('tr')).toBe(screen.getByRole('status').closest('tr'));
+    const statusEl = screen.getByRole('status');
+    expect(emptyContent.closest('td')).toBe(statusEl);
+    expect(emptyContent.closest('tr')).toBe(statusEl.closest('tr'));
 
     const nestingWarnings = consoleError.mock.calls.filter((call) =>
       call.join(' ').includes('validateDOMNesting')
