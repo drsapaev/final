@@ -1,16 +1,18 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
+import type { CSSProperties } from 'react';
 
 import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { Cloud, RefreshCw, Wifi, WifiOff, X } from 'lucide-react';
 
 import {
-  Alert, Badge, Button,
+  Alert as AlertRaw, Badge, Button,
 } from '../ui/macos';
 import { usePWA } from '../../hooks/usePWA';
 import { useTranslation } from '../../i18n/useTranslation';
 import i18n from '../../i18n';
+const Alert = AlertRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import React from "react";
+const t18 = i18n.t as unknown as (key: string, options?: Record<string, unknown>) => string;
 
 const toneConfig = {
   primary: {
@@ -131,7 +133,7 @@ const styles = {
 };
 
 function ConnectionToast({ open, position, tone, icon: Icon, title, description, onClose }) {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   if (!open) {
     return null;
   }
@@ -139,7 +141,7 @@ function ConnectionToast({ open, position, tone, icon: Icon, title, description,
   const config = toneConfig[tone] || toneConfig.primary;
 
   return (
-    <div style={toastPositionStyle(position)}>
+    <div style={toastPositionStyle(position) as unknown as CSSProperties}>
       <Alert
         severity={config.alert}
         role={tone === 'danger' || tone === 'warning' ? 'alert' : 'status'}
@@ -147,7 +149,7 @@ function ConnectionToast({ open, position, tone, icon: Icon, title, description,
         style={styles.toastAlert}
       >
         <div style={styles.toastContent}>
-          <Icon size={18} aria-hidden="true" style={{ color: config.color, marginTop: 1 }} />
+          <Icon size={18 as unknown as "small" | "default" | "large" | "xlarge"} aria-hidden="true" style={{ color: config.color, marginTop: 1 }} />
           <div>
             <p style={styles.toastTitle}>{title}</p>
             <p style={styles.toastDescription}>{description}</p>
@@ -156,11 +158,11 @@ function ConnectionToast({ open, position, tone, icon: Icon, title, description,
             type="button"
             variant="ghost"
             size="small"
-            aria-label={i18n.t('misc.cs_zakryt_uvedomlenie')}
+            aria-label={t18('misc.cs_zakryt_uvedomlenie')}
             onClick={onClose}
             style={styles.closeButton}
           >
-            <X size={14} aria-hidden="true" />
+            <X size={14 as unknown as "small" | "default" | "large" | "xlarge"} aria-hidden="true" />
           </Button>
         </div>
       </Alert>
@@ -235,24 +237,24 @@ const ConnectionStatus = ({ showOfflineAlert = true, position = 'top' }) => {
   };
 
   const getConnectionLabel = () => {
-    if (!isOnline) return i18n.t('misc.cs_oflayn');
-    if (isSyncing) return i18n.t('misc.cs_sinhronizatsiya');
-    if (isServiceWorkerReady) return i18n.t('misc.cs_onlayn');
-    return i18n.t('misc.cs_podklyuchenie');
+    if (!isOnline) return t18('misc.cs_oflayn');
+    if (isSyncing) return t18('misc.cs_sinhronizatsiya');
+    if (isServiceWorkerReady) return t18('misc.cs_onlayn');
+    return t18('misc.cs_podklyuchenie');
   };
 
   const formatLastSync = () => {
     if (!lastSyncTime) return null;
 
     const now = new Date();
-    const diffMs = now - lastSyncTime;
+    const diffMs = now.getTime() - (lastSyncTime as Date).getTime();
     const diffMins = Math.floor(diffMs / 60000);
 
-    if (diffMins < 1) return i18n.t('misc.cs_tolko_chto');
-    if (diffMins < 60) return i18n.t('misc.cs_diffmins_min_nazad', { diffMins: diffMins });
+    if (diffMins < 1) return t18('misc.cs_tolko_chto');
+    if (diffMins < 60) return t18('misc.cs_diffmins_min_nazad', { diffMins: diffMins });
 
     const diffHours = Math.floor(diffMins / 60);
-    if (diffHours < 24) return i18n.t('misc.cs_diffhours_ch_nazad', { diffHours: diffHours });
+    if (diffHours < 24) return t18('misc.cs_diffhours_ch_nazad', { diffHours: diffHours });
 
     return lastSyncTime.toLocaleDateString();
   };
@@ -265,14 +267,14 @@ const ConnectionStatus = ({ showOfflineAlert = true, position = 'top' }) => {
   return (
     <>
       {/* Индикатор статуса */}
-      <div style={styles.statusRow}>
+      <div style={styles.statusRow as unknown as CSSProperties}>
         <Badge
-          variant={toneStyle.badge}
+          variant={toneStyle.badge as unknown as "default" | "primary" | "secondary" | "success" | "warning" | "danger" | "info" | "outline"}
           size="small"
-          aria-label={i18n.t('misc.cs_status_podklyucheniya_label', { label: label })}
+          aria-label={t18('misc.cs_status_podklyucheniya_label', { label: label })}
         >
           <span style={styles.badgeContent}>
-            <Icon size={14} aria-hidden="true" />
+            <Icon size={14 as unknown as "small" | "default" | "large" | "xlarge"} aria-hidden="true" />
             {label}
           </span>
         </Badge>
@@ -290,7 +292,7 @@ const ConnectionStatus = ({ showOfflineAlert = true, position = 'top' }) => {
           <div
             style={styles.progressTrack}
             role="progressbar"
-            aria-label={i18n.t('misc.cs_sinhronizatsiya_dannyh')}
+            aria-label={t18('misc.cs_sinhronizatsiya_dannyh')}
           >
             <div style={styles.progressBar} />
           </div>
@@ -302,8 +304,8 @@ const ConnectionStatus = ({ showOfflineAlert = true, position = 'top' }) => {
         position={position}
         tone="warning"
         icon={WifiOff}
-        title={i18n.t('misc.cs_net_podklyucheniya_k_interne')}
-        description={i18n.t('misc.cs_prilozhenie_rabotaet_v_oflay')}
+        title={t18('misc.cs_net_podklyucheniya_k_interne')}
+        description={t18('misc.cs_prilozhenie_rabotaet_v_oflay')}
         onClose={() => setShowOfflineToast(false)}
       />
 
@@ -312,16 +314,16 @@ const ConnectionStatus = ({ showOfflineAlert = true, position = 'top' }) => {
         position={position}
         tone="success"
         icon={Cloud}
-        title={i18n.t('misc.cs_podklyuchenie_vosstanovleno')}
-        description={i18n.t('misc.cs_sinhronizatsiya_dannyh_2')}
+        title={t18('misc.cs_podklyuchenie_vosstanovleno')}
+        description={t18('misc.cs_sinhronizatsiya_dannyh_2')}
         onClose={() => setShowOnlineToast(false)}
       />
 
       {/* Постоянный индикатор офлайн режима */}
       {!isOnline && (
-        <div style={styles.offlineBanner} role="status" aria-live="polite">
-          <span style={styles.offlineBannerInner}>
-            <WifiOff size={14} aria-hidden="true" />
+        <div style={styles.offlineBanner as unknown as CSSProperties} role="status" aria-live="polite">
+          <span style={styles.offlineBannerInner as unknown as CSSProperties}>
+            <WifiOff size={14 as unknown as "small" | "default" | "large" | "xlarge"} aria-hidden="true" />
             Офлайн режим - данные будут синхронизированы при подключении
           </span>
         </div>

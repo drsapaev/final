@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 /**
  * PatientStepV2 — Step 1 of AppointmentWizardV2.
@@ -14,13 +12,15 @@
 
 import PropTypes from 'prop-types';
 import { Search, Phone, Calendar, AlertCircle, RefreshCw } from 'lucide-react';
-import { Input,
+import { Input as InputRaw,
   Checkbox } from '../ui/macos';
 import { formatDateDisplay } from '../../utils/dateUtils';
 import { normalizeGenderForForm } from './wizardUtils';
 // UX Audit R-3.3: largest inline style blocks migrated to CSS classes.
 import './PatientStepV2.css';
 import { useTranslation } from '../../i18n/useTranslation';
+import React from "react";
+const Input = InputRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const PatientStepV2 = ({
   data = {}, // ✅ Default empty object to prevent crash
@@ -40,8 +40,8 @@ const PatientStepV2 = ({
   onUpdateCart,
   phoneError
 }) => {
-  const { t } = useTranslation();
-  const safeData = data || {};
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const safeData = (data || {}) as Record<string, any>;
   const selectedGender = normalizeGenderForForm(safeData.gender);
 
   return (
@@ -63,7 +63,7 @@ const PatientStepV2 = ({
               error={!!errors.fio}
               icon={Search}
               iconPosition="left"
-              size="md"
+              size="default"
               autoFocus />
 
 
@@ -87,7 +87,7 @@ const PatientStepV2 = ({
 
           {errors.fio &&
           <span className="patient-step-v2__error-inline">
-              <AlertCircle size={14} />
+              <AlertCircle size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
               {errors.fio}
             </span>
           }
@@ -95,7 +95,7 @@ const PatientStepV2 = ({
           {/* UX Audit Registrar #11: loading indicator во время поиска пациентов. */}
           {isSearching &&
           <div className="patient-step-v2__search-loading">
-            <RefreshCw size={14} className="patient-step-v2__search-spinner" />
+            <RefreshCw size={14 as unknown as "small" | "default" | "large" | "xlarge"} className="patient-step-v2__search-spinner" />
             Поиск пациентов...
           </div>
           }
@@ -121,8 +121,8 @@ const PatientStepV2 = ({
                     {patient.fio || `${patient.last_name} ${patient.first_name}`}
                   </div>
                   <div className="patient-step-v2__suggestion-details">
-                    <span className="patient-step-v2__suggestion-detail"><Phone size={12} aria-hidden="true" />{patient.phone}</span>
-                    <span className="patient-step-v2__suggestion-detail"><Calendar size={12} aria-hidden="true" />{formatDateDisplay(patient.birth_date)}</span>
+                    <span className="patient-step-v2__suggestion-detail"><Phone size={12 as unknown as "small" | "default" | "large" | "xlarge"} aria-hidden="true" />{patient.phone}</span>
+                    <span className="patient-step-v2__suggestion-detail"><Calendar size={12 as unknown as "small" | "default" | "large" | "xlarge"} aria-hidden="true" />{formatDateDisplay(patient.birth_date)}</span>
                   </div>
                 </button>
             )}
@@ -165,7 +165,7 @@ const PatientStepV2 = ({
           </div>
           {errors.gender &&
           <span className="patient-step-v2__error-inline">
-              <AlertCircle size={14} />
+              <AlertCircle size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
               {errors.gender}
             </span>
           }
@@ -179,29 +179,29 @@ const PatientStepV2 = ({
           <Input
             ref={phoneRef}
             type="tel"
-            value={data.phone}
+            value={safeData.phone}
             onChange={(e) => onPhoneChange(e.target.value)}
             placeholder="+998 XX XXX XX XX"
             error={!!errors.phone || !!phoneError}
             icon={Phone}
             iconPosition="left"
-            size="md" />
+            size="default" />
 
-          {!data.phone && !errors.phone &&
+          {!safeData.phone && !errors.phone &&
           <span className="patient-step-v2__phone-hint">
               Для детей и пожилых можно не указывать. Номер можно вводить без +998 — мы приведём его к формату +998XXXXXXXXX.
             </span>
           }
           {errors.phone &&
           <span className="patient-step-v2__error-inline">
-              <AlertCircle size={14} />
+              <AlertCircle size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
               {errors.phone}
             </span>
           }
           {phoneError &&
           <div className="patient-step-v2__phone-error-block">
               <span className="patient-step-v2__phone-error-text">
-                <AlertCircle size={14} />
+                <AlertCircle size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
                 {phoneError.message}
               </span>
               <button
@@ -229,12 +229,12 @@ const PatientStepV2 = ({
             error={!!errors.birth_date}
             icon={Calendar}
             iconPosition="left"
-            size="md"
+            size="default"
             aria-label={t('misc.psv_data_rozhdeniya')} />
 
           {errors.birth_date &&
           <span className="patient-step-v2__error-inline">
-              <AlertCircle size={14} />
+              <AlertCircle size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
               {errors.birth_date}
             </span>
           }
@@ -247,10 +247,10 @@ const PatientStepV2 = ({
           </label>
           <Input
             type="text"
-            value={data.address}
+            value={safeData.address}
             onChange={(e) => onUpdate('address', e.target.value)}
             placeholder={t('misc.psv_adres_prozhivaniya')}
-            size="md" />
+            size="default" />
 
         </div>
 
@@ -314,7 +314,7 @@ const PatientStepV2 = ({
         <div className="patient-step-v2__discount-section-wrapper">
           <label className="patient-step-v2__discount-card">
 
-            <Checkbox aria-label="Request all services free approval" checked={cart?.all_free} onChange={(e) => onUpdateCart('all_free', e.target.checked)}
+            <Checkbox aria-label="Request all services free approval" checked={cart?.all_free} onChange={(e) => onUpdateCart('all_free', e)}
               className="patient-step-v2__discount-radio-input" />
 
             <span className="patient-step-v2__discount-card-text">
@@ -323,7 +323,7 @@ const PatientStepV2 = ({
           </label>
           {cart?.all_free &&
           <div className="patient-step-v2__all-free-warning">
-              <AlertCircle size={16} />
+              <AlertCircle size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
               Заявка будет отправлена на одобрение администратору
             </div>
           }

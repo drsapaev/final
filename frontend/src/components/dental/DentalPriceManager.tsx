@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect, useCallback } from 'react';
@@ -36,7 +34,7 @@ const DentalPriceManager = ({
   onClose
 }) => {
   useTheme();
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [finalPrice, setFinalPrice] = useState('');
   const [reason, setReason] = useState('');
   const [details, setDetails] = useState('');
@@ -138,10 +136,10 @@ const DentalPriceManager = ({
 
   const getStatusIcon = (status) => {
     switch (status) {
-      case 'pending':return <Clock size={16} />;
-      case 'approved':return <CheckCircle size={16} />;
-      case 'rejected':return <X size={16} />;
-      default:return <AlertCircle size={16} />;
+      case 'pending':return <Clock size={16 as unknown as "small" | "default" | "large" | "xlarge"} />;
+      case 'approved':return <CheckCircle size={16 as unknown as "small" | "default" | "large" | "xlarge"} />;
+      case 'rejected':return <X size={16 as unknown as "small" | "default" | "large" | "xlarge"} />;
+      default:return <AlertCircle size={16 as unknown as "small" | "default" | "large" | "xlarge"} />;
     }
   };
 
@@ -163,7 +161,7 @@ const DentalPriceManager = ({
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
           <div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
-              <Stethoscope size={20} className="mr-2 text-blue-600" />
+              <Stethoscope size={20 as unknown as "small" | "default" | "large" | "xlarge"} className="mr-2 text-blue-600" />
               {t('dental.dental_dpm_header_title')}
             </h3>
             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
@@ -175,7 +173,7 @@ const DentalPriceManager = ({
             aria-label={t('dental.dental_dpm_aria_close', { serviceName })}
             className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
             
-            <X size={24} />
+            <X size={24 as unknown as "small" | "default" | "large" | "xlarge"} />
           </button>
         </div>
 
@@ -184,7 +182,7 @@ const DentalPriceManager = ({
           {/* Форма указания цены */}
           <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
             <div className="flex items-center mb-2">
-              <CheckSquare size={16} className="text-blue-600 mr-2" />
+              <CheckSquare size={16 as unknown as "small" | "default" | "large" | "xlarge"} className="text-blue-600 mr-2" />
               <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
                 {t('dental.dental_dpm_treatment_done')}
               </span>
@@ -200,7 +198,7 @@ const DentalPriceManager = ({
                 {t('dental.dental_dpm_label_final_price')}
               </label>
               <div className="relative">
-                <DollarSign size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <DollarSign size={16 as unknown as "small" | "default" | "large" | "xlarge"} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                 <Input
                   id="dental-final-price"
                   type="text"
@@ -268,7 +266,7 @@ const DentalPriceManager = ({
               {isLoading ?
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" /> :
 
-              <Save size={16} className="mr-2" />
+              <Save size={16 as unknown as "small" | "default" | "large" | "xlarge"} className="mr-2" />
               }
               {isLoading ? t('dental.dental_dpm_btn_submit_loading') : t('dental.dental_dpm_btn_submit')}
             </button>
@@ -277,7 +275,7 @@ const DentalPriceManager = ({
           {/* История указанных цен */}
           <div>
             <h4 className="text-md font-medium text-gray-900 dark:text-white mb-3 flex items-center">
-              <FileText size={16} className="mr-2" />
+              <FileText size={16 as unknown as "small" | "default" | "large" | "xlarge"} className="mr-2" />
               {t('dental.dental_dpm_history_title')}
             </h4>
             
