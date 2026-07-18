@@ -613,7 +613,7 @@ const CashierPanel = () => {
   // Only triggers when not focused in input/textarea to avoid hijacking text entry.
   // Note: handlers use lazy references via refs because some callbacks (exportToCSV)
   // are defined further down in the component body.
-  const handlersRef = useRef({});
+  const handlersRef = useRef({} as { refresh?: () => void; export?: () => void });
   useHotkeys({
     'ctrl+f': (e) => {
       e.preventDefault();

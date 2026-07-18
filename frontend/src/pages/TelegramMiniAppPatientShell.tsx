@@ -274,7 +274,7 @@ function getMiniAppTelemetryReasonCode(reasonCode) {
   return value;
 }
 
-function emitMiniAppOnboardingTelemetry(event, meta = {}) {
+function emitMiniAppOnboardingTelemetry(event: string, meta: Record<string, unknown> = {}) {
   const section = MINI_APP_SECTION_ALIASES[String(meta.section || '').trim().toLowerCase()]
     || 'appointments';
   const payloadMeta = {

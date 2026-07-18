@@ -238,8 +238,8 @@ const DepartmentManagement = () => {
   }, [loadDepartments]);
 
   const validateDepartment = useCallback(
-    (data, currentId = null) => {
-      const errors = {};
+    (data: any, currentId: any = null) => {
+      const errors: Record<string, string> = {};
       if (!data.name_ru || data.name_ru.trim().length < 2) {
         errors.name_ru = t('admin2.dept_err_name_required');
       }
