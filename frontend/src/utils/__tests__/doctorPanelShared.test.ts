@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { describe, expect, it, vi } from 'vitest';
 
@@ -28,7 +26,7 @@ describe('doctorPanelShared — SPECIALTY_KEYS', () => {
     // Mutation attempts silently fail in non-strict mode, throw in strict.
     expect(() => {
       'use strict';
-      SPECIALTY_KEYS.NEW = 'should-not-add';
+      (SPECIALTY_KEYS as Record<string, string>).NEW = 'should-not-add';
     }).toThrow(TypeError);
   });
 
