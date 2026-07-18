@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect, useCallback } from 'react';
 import type { CSSProperties } from 'react';
@@ -313,7 +310,7 @@ const QueueSettings = () => {
           style={{
             '--admin-banner-bg': message.type === 'success' ? 'var(--mac-success-bg)' : 'var(--mac-error-bg)',
             '--admin-banner-border': message.type === 'success' ? 'var(--mac-success-border)' : 'var(--mac-error-border)'
-          }}
+          } as CSSProperties}
         >
             <div className="flex items-center justify-center gap-2">
               {message.type === 'success' ?
@@ -323,7 +320,7 @@ const QueueSettings = () => {
             }
               <span
                 className="admin-span-sm-med-dynamic-color"
-                style={{ '--admin-span-color': message.type === 'success' ? 'var(--mac-success)' : 'var(--mac-error)' }}
+                style={{ '--admin-span-color': message.type === 'success' ? 'var(--mac-success)' : 'var(--mac-error)'  } as CSSProperties}
               >
                 {message.text}
               </span>
@@ -337,13 +334,13 @@ const QueueSettings = () => {
           style={{
             '--admin-card-bg': settings.dev_mode_enabled ? 'var(--mac-error-bg)' : 'var(--mac-bg-secondary)',
             '--admin-card-border': settings.dev_mode_enabled ? 'var(--mac-error-border, color-mix(in srgb, var(--mac-error), transparent 70%))' : 'var(--mac-border)'
-          }}
+          } as CSSProperties}
         >
           <div className="flex items-center justify-between">
             <div className="admin-flex-center-12">
               <Zap
                 className="admin-icon-24-dynamic"
-                style={{ '--admin-icon-color': settings.dev_mode_enabled ? 'var(--mac-error)' : 'var(--mac-text-tertiary)' }}
+                style={{ '--admin-icon-color': settings.dev_mode_enabled ? 'var(--mac-error)' : 'var(--mac-text-tertiary)'  } as CSSProperties}
               />
               <div>
                 <div className="admin-span-sm-semi-primary">
@@ -364,7 +361,7 @@ const QueueSettings = () => {
               style={{
                 '--admin-btn-bg': settings.dev_mode_enabled ? 'var(--mac-error)' : 'var(--mac-bg-tertiary)',
                 '--admin-btn-color': settings.dev_mode_enabled ? 'white' : 'var(--mac-text-primary)'
-              }}>
+              } as CSSProperties}>
               
               {settings.dev_mode_enabled ?
               <>
@@ -398,7 +395,7 @@ const QueueSettings = () => {
                 </label>
                 <Select
                   value={Number(settings.queue_start_hour)}
-                  onChange={(value) => handleSettingChange('queue_start_hour', parseInt(value, 10))}
+                  onChange={(value: unknown) => handleSettingChange('queue_start_hour', parseInt(String(value), 10))}
                   options={Array.from({ length: 24 }, (_, i) => ({
                     value: i,
                     label: `${String(i).padStart(2, '0')}:00`
