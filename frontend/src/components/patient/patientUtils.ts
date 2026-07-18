@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 /**
  * Patient Panel — shared utilities.
@@ -22,7 +20,7 @@ export const readTelegramMiniAppInitData = () => {
   if (typeof window === 'undefined') {
     return '';
   }
-  const initData = window.Telegram?.WebApp?.initData;
+  const initData = (window as unknown as { Telegram?: { WebApp?: { initData?: unknown } } }).Telegram?.WebApp?.initData;
   return typeof initData === 'string' ? initData.trim() : '';
 };
 

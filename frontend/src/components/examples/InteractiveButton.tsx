@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useState } from 'react';
 
@@ -74,7 +72,7 @@ const InteractiveButton = ({
 
   return (
     <button
-      ref={ref}
+      ref={ref as unknown as React.Ref<HTMLButtonElement>}
       onClick={onClick}
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}

@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useRef, useEffect } from 'react';
 import PropTypes from 'prop-types';
@@ -42,7 +40,7 @@ export default function VirtualizedQueueList({
   loadingMore = false,
   queueTotal = 0,
 }) {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const scrollRef = useRef(null);
 
   const rowVirtualizer = useVirtualizer({
@@ -127,7 +125,7 @@ export default function VirtualizedQueueList({
             disabled={loadingMore}
             aria-label={t('queue.load_more_aria')}
           >
-            <Icon name={loadingMore ? 'arrow.clockwise' : 'arrow.down'} size={14} />
+            <Icon name={loadingMore ? 'arrow.clockwise' : 'arrow.down'} size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
             {loadingMore
               ? t('queue.loading')
               : `${t('queue.show_more')} (${queueTotal - appointments.length} ${t('queue.remaining')})`}
