@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 /**
  * Unit tests for AIAssistant component
  */
@@ -32,10 +29,19 @@ vi.mock('../../../api/mcpClient', () => ({
   }
 }));
 
-import AIAssistant from '../AIAssistant';
+import AIAssistantRaw from '../AIAssistant';
+const AIAssistant = AIAssistantRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import { mcpAPI } from '../../../api/mcpClient';
 
-const MockWrapper = ({ children }) => <div>{children}</div>;
+const mcpAPIMocks = mcpAPI as unknown as {
+  analyzeComplaint: { mockResolvedValue: (v: unknown) => void; mockRejectedValue: (e: unknown) => void };
+  suggestICD10: { mockResolvedValue: (v: unknown) => void; mockRejectedValue: (e: unknown) => void };
+  interpretLabResults: { mockResolvedValue: (v: unknown) => void; mockRejectedValue: (e: unknown) => void };
+  analyzeSkinLesion: { mockResolvedValue: (v: unknown) => void; mockRejectedValue: (e: unknown) => void };
+  analyzeImage: { mockResolvedValue: (v: unknown) => void; mockRejectedValue: (e: unknown) => void };
+};
+
+const MockWrapper = ({ children }: { children?: React.ReactNode }) => <div>{children}</div>;
 
 
 SnackbarProviderMock.propTypes = {
@@ -90,7 +96,7 @@ describe('AIAssistant Component', () => {
         }
       };
 
-      mcpAPI.analyzeComplaint.mockResolvedValue(mockResult);
+      mcpAPIMocks.analyzeComplaint.mockResolvedValue(mockResult);
 
       render(
         <MockWrapper>
@@ -110,7 +116,7 @@ describe('AIAssistant Component', () => {
       fireEvent.click(refreshButton);
 
       await waitFor(() => {
-        expect(mcpAPI.analyzeComplaint).toHaveBeenCalledWith({
+        expect(mcpAPIMocks.analyzeComplaint).toHaveBeenCalledWith({
           complaint: 'Головная боль',
           patientAge: 30,
           patientGender: 'female',
@@ -137,7 +143,7 @@ describe('AIAssistant Component', () => {
         }
       };
 
-      mcpAPI.suggestICD10.mockResolvedValue(mockResult);
+      mcpAPIMocks.suggestICD10.mockResolvedValue(mockResult);
 
       render(
         <MockWrapper>
@@ -156,7 +162,7 @@ describe('AIAssistant Component', () => {
       fireEvent.click(refreshButton);
 
       await waitFor(() => {
-        expect(mcpAPI.suggestICD10).toHaveBeenCalledWith({
+        expect(mcpAPIMocks.suggestICD10).toHaveBeenCalledWith({
           symptoms: ['головная боль'],
           diagnosis: 'мигрень',
           specialty: undefined,
@@ -179,7 +185,7 @@ describe('AIAssistant Component', () => {
         }
       };
 
-      mcpAPI.suggestICD10.mockResolvedValue(mockResult);
+      mcpAPIMocks.suggestICD10.mockResolvedValue(mockResult);
 
       render(
         <MockWrapper>
@@ -231,7 +237,7 @@ describe('AIAssistant Component', () => {
           urgency: 'планово'
         }
       };
-      mcpAPI.analyzeComplaint.mockResolvedValue(mockResult);
+      mcpAPIMocks.analyzeComplaint.mockResolvedValue(mockResult);
 
       render(
         <MockWrapper>
@@ -251,7 +257,7 @@ describe('AIAssistant Component', () => {
       fireEvent.click(refreshButton);
 
       await waitFor(() => {
-        expect(mcpAPI.analyzeComplaint).toHaveBeenCalledWith({
+        expect(mcpAPIMocks.analyzeComplaint).toHaveBeenCalledWith({
           complaint: 'Test',
           patientAge: undefined,
           patientGender: undefined,
@@ -263,7 +269,7 @@ describe('AIAssistant Component', () => {
 
   describe('Error Handling', () => {
     it('should display error message on API failure', async () => {
-      mcpAPI.analyzeComplaint.mockRejectedValue(new Error('API Error'));
+      mcpAPIMocks.analyzeComplaint.mockRejectedValue(new Error('API Error'));
 
       render(
         <MockWrapper>
@@ -284,7 +290,7 @@ describe('AIAssistant Component', () => {
     });
 
     it('should show retry suggestion after error', async () => {
-      mcpAPI.analyzeComplaint.mockRejectedValue(new Error('Timeout'));
+      mcpAPIMocks.analyzeComplaint.mockRejectedValue(new Error('Timeout'));
 
       render(
         <MockWrapper>
@@ -316,7 +322,7 @@ describe('AIAssistant Component', () => {
         }
       };
 
-      mcpAPI.interpretLabResults.mockResolvedValue(mockResult);
+      mcpAPIMocks.interpretLabResults.mockResolvedValue(mockResult);
 
       render(
         <MockWrapper>
@@ -336,7 +342,7 @@ describe('AIAssistant Component', () => {
       fireEvent.click(refreshButton);
 
       await waitFor(() => {
-        expect(mcpAPI.interpretLabResults).toHaveBeenCalled();
+        expect(mcpAPIMocks.interpretLabResults).toHaveBeenCalled();
       });
 
       await waitFor(() => {

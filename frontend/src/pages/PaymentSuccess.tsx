@@ -1,8 +1,6 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useTranslation } from '../i18n/useTranslation';
 import { useCallback, useEffect, useState } from 'react';
+import type { CSSProperties } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   AlertCircle,
@@ -14,29 +12,30 @@ import {
   Share2,
 } from 'lucide-react';
 import {
-  Alert, Badge, Button, Card, CardContent,
+  Alert as RawAlert, Badge, Button, Card, CardContent,
 } from '../components/ui/macos';
+const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
 
 // API клиент
 import { api as apiClient } from '../api/client';
 
 import logger from '../utils/logger';
 import { openPrintableWindow } from '../utils/printWindow';
-import { notify } from '../services/notify.js';
+import { notify } from '../services/notify';
 
-const pageStyle = {
+const pageStyle: CSSProperties = {
   maxWidth: '960px',
   margin: '32px auto',
   padding: '0 16px 40px',
   color: 'var(--mac-text-primary)',
 };
 
-const centeredCardStyle = {
+const centeredCardStyle: CSSProperties = {
   textAlign: 'center',
   marginBottom: 'var(--mac-spacing-4)',
 };
 
-const statusIconWrapStyle = {
+const statusIconWrapStyle: CSSProperties = {
   width: '88px',
   height: '88px',
   borderRadius: '50%',
@@ -46,14 +45,14 @@ const statusIconWrapStyle = {
   marginBottom: '18px',
 };
 
-const detailGridStyle = {
+const detailGridStyle: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
   gap: 'var(--mac-spacing-3)',
   marginTop: 'var(--mac-spacing-4)',
 };
 
-const detailItemStyle = {
+const detailItemStyle: CSSProperties = {
   border: '1px solid var(--mac-border)',
   borderRadius: 'var(--mac-radius-md)',
   background: 'var(--mac-bg-secondary)',
@@ -61,13 +60,13 @@ const detailItemStyle = {
   minWidth: 0,
 };
 
-const detailLabelStyle = {
+const detailLabelStyle: CSSProperties = {
   margin: '0 0 6px',
   color: 'var(--mac-text-secondary)',
   fontSize: 'var(--mac-font-size-sm)',
 };
 
-const detailValueStyle = {
+const detailValueStyle: CSSProperties = {
   margin: 0,
   color: 'var(--mac-text-primary)',
   fontSize: 'var(--mac-font-size-lg)',
@@ -76,21 +75,21 @@ const detailValueStyle = {
   overflowWrap: 'anywhere',
 };
 
-const actionGridStyle = {
+const actionGridStyle: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
   gap: 'var(--mac-spacing-3)',
   marginTop: 'var(--mac-spacing-4)',
 };
 
-const buttonIconStyle = {
+const buttonIconStyle: CSSProperties = {
   width: '18px',
   height: '18px',
   marginRight: 'var(--mac-spacing-2)',
   flexShrink: 0,
 };
 
-const loadingWrapStyle = {
+const loadingWrapStyle: CSSProperties = {
   minHeight: '60vh',
   display: 'flex',
   alignItems: 'center',
@@ -98,7 +97,7 @@ const loadingWrapStyle = {
   padding: '32px 16px',
 };
 
-const spinnerStyle = {
+const spinnerStyle: CSSProperties = {
   width: '48px',
   height: '48px',
   borderRadius: '50%',
@@ -109,7 +108,8 @@ const spinnerStyle = {
 };
 
 const PaymentSuccess = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 

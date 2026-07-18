@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import {
@@ -42,7 +39,8 @@ import { useTranslation } from '../i18n/useTranslation';
  * Защищённые данные требуют Telegram Mini App identity (initData).
  */
 const PatientPanel = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   useBreakpoint();
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
@@ -225,7 +223,7 @@ const PatientPanel = () => {
                 onKeyDown={(e) => handleTabKeyDown(e, tab.id)}
                 className={`pp-tab ${isActive ? 'pp-tab-active' : ''}`}
               >
-                <Icon name={tab.icon} size={16} />
+                <Icon name={tab.icon} size={16 as never} />
                 {tab.label}
               </button>
             );
@@ -257,7 +255,7 @@ const PatientPanel = () => {
           {isSectionMode ? (
             <Card className="pp-card" data-testid={`patient-section-${activeSection}`}>
               <div className="pp-home-card-header">
-                <Icon name={sectionConfig.icon} size={16} />
+                <Icon name={sectionConfig.icon} size={16 as never} />
                 <h3 className="pp-home-card-title">{sectionTitle}</h3>
               </div>
               <div className="pp-card-body">
@@ -289,7 +287,7 @@ const PatientPanel = () => {
             <div className="pp-home-grid">
               <Card className="pp-card">
                 <div className="pp-home-card-header">
-                  <Icon name="calendar" size={16} />
+                  <Icon name="calendar" size={16 as never} />
                   <h3 className="pp-home-card-title">{t('misc.pp_predstoyaschie_vizity')}</h3>
                 </div>
                 <div className="pp-home-list">
@@ -317,7 +315,7 @@ const PatientPanel = () => {
 
               <Card className="pp-card">
                 <div className="pp-home-card-header">
-                  <Icon name="heart" size={16} />
+                  <Icon name="heart" size={16 as never} />
                   <h3 className="pp-home-card-title">{t('misc.pp_rezultaty_analizov')}</h3>
                 </div>
                 <div className="pp-home-list">
@@ -329,7 +327,7 @@ const PatientPanel = () => {
                           <div className="pp-list-item-secondary">{r.date}</div>
                         </div>
                         <Button variant="outline" size="small">
-                          <Icon name="doc.text" size={16} />
+                          <Icon name="doc.text" size={16 as never} />
                           Открыть
                         </Button>
                       </div>
