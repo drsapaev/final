@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 /**
  * EMRHelpDialog - Справка и безопасность
@@ -8,7 +6,7 @@ import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 
 const EMRHelpDialog = ({ isOpen, onClose }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
     if (!isOpen) return null;
     const handleActivationKeyDown = (event, action) => {
         if (event.key === 'Enter' || event.key === ' ') {
@@ -39,7 +37,7 @@ const EMRHelpDialog = ({ isOpen, onClose }) => {
                         Врач всегда принимает окончательное решение.
                     </div>
 
-                    <ul style={{ paddingLeft: '20px', space: 'y-4' }}>
+                    <ul style={{ paddingLeft: '20px',  }}>
                         <li style={{ marginBottom: 'var(--mac-spacing-3)' }}>
                             <strong>🤖 ИИ не пишет в карту сам</strong>
                             <br />

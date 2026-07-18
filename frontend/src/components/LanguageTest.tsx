@@ -1,17 +1,17 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useTranslation } from '../i18n/useTranslation';
 import { useTheme } from '../contexts/ThemeContext';
 import {
   Select, Button,
 } from './ui/macos';
+import React from 'react';
+const SelectAny = Select as unknown as React.ComponentType<Record<string, unknown>>;
 
 /**
  * Тестовый компонент для проверки работы селектора языка
  */
 const LanguageTest = () => {
-  const { language, setLanguage, t, availableLanguages } = useTranslation();
+  const { language, setLanguage, t: rawT, availableLanguages } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const { isDark, toggleTheme } = useTheme();
 
   return (
@@ -40,9 +40,9 @@ const LanguageTest = () => {
 
       <div style={{ marginBottom: 'var(--mac-spacing-5)' }}>
         <h2>{t('misc.lt_selektor_yazyka')}</h2>
-        <Select
+        <SelectAny
           value={language}
-          onChange={(e) => setLanguage(e.target.value)}
+          onChange={(e: unknown) => setLanguage((e as unknown as { target: { value: string } }).target.value)}
           style={{ width: '200px' }}
         >
           {availableLanguages && availableLanguages.length > 0 ? (
@@ -54,7 +54,7 @@ const LanguageTest = () => {
           ) : (
             <option disabled>{t('misc.lt_zagruzka_yazykov')}</option>
           )}
-        </Select>
+        </SelectAny>
       </div>
 
       <div style={{ marginBottom: 'var(--mac-spacing-5)' }}>

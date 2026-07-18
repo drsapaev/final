@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 /**
  * DentalDashboardTab — R-15: extracted from DentistPanelUnified.
@@ -16,7 +14,7 @@ export function DentalDashboardTab({
   onGoToAppointments,
   onGoToPatients,
 }) {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const totalAppointments = appointments.length;
   const waitingCount = appointments.filter(a => ['waiting', 'confirmed', 'pending'].includes(a.status)).length;
   const calledCount = appointments.filter(a => ['called', 'in_progress'].includes(a.status)).length;
@@ -25,7 +23,7 @@ export function DentalDashboardTab({
   return (
     <div className="dental-flex-col dental-gap-24">
       <div className="dental-grid-4 dental-gap-16">
-        <Card padding="md">
+        <Card padding="default">
           <div className="dental-flex-between">
             <div>
               <div className="dental-text-desc dental-text-secondary">{t('dental.dental_ddt_stat_total')}</div>
@@ -34,7 +32,7 @@ export function DentalDashboardTab({
             <Calendar size={24} className="dental-text-secondary" />
           </div>
         </Card>
-        <Card padding="md">
+        <Card padding="default">
           <div className="dental-flex-between">
             <div>
               <div className="dental-text-desc dental-text-secondary">{t('dental.dental_ddt_stat_waiting')}</div>
@@ -43,7 +41,7 @@ export function DentalDashboardTab({
             <Activity size={24} className="dental-text-secondary" />
           </div>
         </Card>
-        <Card padding="md">
+        <Card padding="default">
           <div className="dental-flex-between">
             <div>
               <div className="dental-text-desc dental-text-secondary">{t('dental.dental_ddt_stat_patients')}</div>
@@ -52,7 +50,7 @@ export function DentalDashboardTab({
             <Users size={24} className="dental-text-secondary" />
           </div>
         </Card>
-        <Card padding="md">
+        <Card padding="default">
           <div className="dental-flex-between">
             <div>
               <div className="dental-text-desc dental-text-secondary">{t('dental.dental_ddt_stat_completed')}</div>
@@ -63,7 +61,7 @@ export function DentalDashboardTab({
         </Card>
       </div>
 
-      <Card padding="lg">
+      <Card padding="large">
         <div className="dental-flex-between-16">
           <h3 className="dental-text-primary">{t('dental.dental_ddt_quick_actions')}</h3>
         </div>

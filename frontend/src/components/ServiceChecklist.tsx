@@ -1,12 +1,25 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import PropTypes from 'prop-types';
 import { Checkbox } from './ui/macos';
 import { useTranslation } from '../i18n/useTranslation';
-const ServiceChecklist = ({ value = [], onChange, department }) => {
-  const { t } = useTranslation();
-  const services = {
+import React from 'react';
+
+interface ChecklistService {
+  id: string;
+  name: string;
+  price: number;
+  group: string;
+}
+
+interface ServiceChecklistProps {
+  value?: string[];
+  onChange?: (value: string[]) => void;
+  department?: string;
+}
+
+const ServiceChecklist = ({ value = [], onChange, department }: ServiceChecklistProps) => {
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const services: Record<string, ChecklistService[]> = {
     cardio: [
       { id: 'cardio_consultation', name: t('misc.sc_konsultatsiya_kardiologa'), price: 60000, group: t('misc.sc_kardiologiya') },
       { id: 'cardio_ekg', name: t('misc.sc_ekg'), price: 25000, group: t('misc.sc_kardiologiya') },
@@ -40,9 +53,11 @@ const ServiceChecklist = ({ value = [], onChange, department }) => {
     ]
   };
 
-  const depServices = services[department?.toLowerCase()] || [];
+  const depServices = (department && services[department.toLowerCase()]) || [];
   const groups = [...new Set(depServices.map(s => s.group))];
   const totalCost = depServices.filter(s => value.includes(s.id)).reduce((sum, s) => sum + s.price, 0);
+
+  const CheckboxAny = Checkbox as unknown as React.ComponentType<Record<string, unknown>>;
 
   return (
     <div style={{ border: '1px solid #e5e5e5', borderRadius: 'var(--mac-radius-md)', padding: 'var(--mac-spacing-3)', marginBottom: 'var(--mac-spacing-3)' }}>
@@ -55,11 +70,12 @@ const ServiceChecklist = ({ value = [], onChange, department }) => {
           <div style={{ fontWeight: 'var(--mac-font-weight-medium)', fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary)', marginBottom: 'var(--mac-spacing-1)' }}>{group}</div>
           {depServices.filter(s => s.group === group).map(service => (
             <label key={service.id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)', marginBottom: 'var(--mac-spacing-1)' }}>
-              <Checkbox aria-label={t('misc.sc_vybrat_uslugu_service_name', { name: service.name })} checked={value.includes(service.id)} onChange={(e) => {
-                  const newValue = e.target.checked 
+              <CheckboxAny aria-label={t('misc.sc_vybrat_uslugu_service_name', { name: service.name })} checked={value.includes(service.id)} onChange={(e: unknown) => {
+                  const checked = (e as unknown as { target: { checked: boolean } }).target.checked;
+                  const newValue = checked
                     ? [...value, service.id]
                     : value.filter(id => id !== service.id);
-                  onChange(newValue);
+                  onChange?.(newValue);
                 }}
               />
               <span style={{ fontSize: 'var(--mac-font-size-xs)', flex: 1 }}>{service.name}</span>
@@ -82,4 +98,3 @@ ServiceChecklist.propTypes = {
 };
 
 export default ServiceChecklist;
-

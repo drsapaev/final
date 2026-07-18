@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import logger from '../../utils/logger';
 /**
@@ -7,7 +5,10 @@ import logger from '../../utils/logger';
  * Renders the "Фото" tab: PhotoUploader + SkinAnalysis + PhotoComparison.
  */
 import PropTypes from 'prop-types';
-import { MacOSCard, MacOSEmptyState, Button } from '../ui/macos';
+import { MacOSCard as MacOSCardRaw, MacOSEmptyState as MacOSEmptyStateRaw, Button } from '../ui/macos';
+import React from 'react';
+const MacOSCard = MacOSCardRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const MacOSEmptyState = MacOSEmptyStateRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import { Camera } from 'lucide-react';
 import PhotoUploader from './PhotoUploader';
 import SkinAnalysis from './SkinAnalysis';
@@ -22,7 +23,7 @@ export function DermaPhotosTab({
   onPhotoUpdate,
   onGoToAppointments,
 }) {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   if (!hasPatient) {
     return (
       <MacOSEmptyState
