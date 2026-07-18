@@ -823,13 +823,13 @@ const DepartmentManagement = () => {
 
                         <Select
               value={statusFilter}
-              onChange={(value) => setStatusFilter(value)}
+              onChange={(value: unknown) => setStatusFilter(String(value))}
               options={statusFilterOptions}
               className="admin-min-w-120" />
 
                         <Select
               value={sortBy}
-              onChange={(value) => setSortBy(value)}
+              onChange={(value: unknown) => setSortBy(String(value))}
               options={sortOptions}
               className="admin-min-w-140" />
 

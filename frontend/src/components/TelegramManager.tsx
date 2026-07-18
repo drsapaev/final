@@ -838,7 +838,7 @@ const TelegramManager = () => {
     { value: 'photo', label: t('misc.tg_tpl_type_photo') },
     { value: 'document', label: t('misc.tg_tpl_type_document') }
   ];
-  const getOnboardingValue = (request, camelKey, snakeKey, fallback = '') =>
+  const getOnboardingValue = (request: any, camelKey: string, snakeKey: string, fallback: any = '') =>
     request?.[camelKey] ?? request?.[snakeKey] ?? fallback;
   const splitOnboardingContactName = (value) => {
     const parts = String(value || '').trim().split(/\s+/).filter(Boolean);
@@ -881,7 +881,7 @@ const TelegramManager = () => {
     if (ageMinutes >= 60) return { label: 'Waiting 1h', variant: 'warning' };
     return { label: 'New', variant: 'primary' };
   };
-  const getCandidateValue = (candidate, camelKey, snakeKey, fallback = '') =>
+  const getCandidateValue = (candidate: any, camelKey: string, snakeKey: string, fallback: any = '') =>
   candidate?.[camelKey] ?? candidate?.[snakeKey] ?? fallback;
   const getCandidateTopScore = (request) => {
     const duplicateCandidates = Array.isArray(request?.duplicateCandidates) ? request.duplicateCandidates : [];
@@ -1723,13 +1723,13 @@ const TelegramManager = () => {
                   label="Status filter"
                   value={onboardingStatusFilter}
                   options={ONBOARDING_STATUS_FILTER_OPTIONS}
-                  onChange={(value) => setOnboardingStatusFilter(value)}
+                  onChange={(value: unknown) => setOnboardingStatusFilter(String(value))}
                   style={{ minWidth: 220 }} />
                 <Select
                   label="Sort"
                   value={onboardingSort}
                   options={ONBOARDING_SORT_OPTIONS}
-                  onChange={(value) => setOnboardingSort(value)}
+                  onChange={(value: unknown) => setOnboardingSort(String(value))}
                   style={{ minWidth: 220 }} />
                 <Button
                   type="button"
