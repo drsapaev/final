@@ -73,6 +73,9 @@ clinic.db
 *.key
 *.crt
 secrets/
+# Encrypted secrets files (setup_secrets.py output)
+master.key
+secrets.json
 *.dump
 *.sql
 
