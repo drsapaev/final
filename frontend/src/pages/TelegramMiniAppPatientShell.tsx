@@ -1936,7 +1936,7 @@ function TelegramMiniAppPatientShell() {
             )}
 
             <section style={miniAppGridStyle}>
-              {capabilityEntries.map(([key, label]) => {
+              {capabilityEntries.map(([key, label]: [string, any]) => {
                 const capability = capabilities[key] || {};
                 const enabled = isMiniAppCapabilityEnabled(capability);
                 const isSelected = key === selectedSection;

@@ -341,7 +341,7 @@ const QueueJoin = () => {
 
       // Подготавливаем данные запроса
       // ✅ ИСПРАВЛЕНО: Используем уже нормализованный номер из валидации
-      const requestBody = {
+      const requestBody: any = {
         session_token: currentSessionToken,
         patient_name: trimmedPatientName,
         phone: normalizedPhone, // ✅ Отправляем нормализованный номер (12 цифр: 998XXXXXXXXX)

@@ -1421,7 +1421,7 @@ const EnhancedAppointmentsTable = ({
             {paginatedData.length === 0 ?
             <tr>
                 <td
-                colSpan="10"
+                colSpan={10}
                 className="eat-empty-row">
 
                   {t('misc.eat_no_data')}
