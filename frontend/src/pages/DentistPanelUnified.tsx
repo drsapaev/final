@@ -12,7 +12,8 @@ import {
 import AppointmentSummaryBar from '../components/doctor/AppointmentSummaryBar';
 import auth from '../stores/auth';
 import { apiClient } from '../api/client';
-import AIAssistant from '../components/ai/AIAssistant';
+import AIAssistantRaw from '../components/ai/AIAssistant';
+const AIAssistant = AIAssistantRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import TeethChartRaw from '../components/dental/TeethChart';
 const TeethChart = TeethChartRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import ToothModalRaw from '../components/dental/ToothModal';
@@ -35,11 +36,15 @@ import ProtocolTemplates from '../components/dental/ProtocolTemplates';
 import DentalReportsTab from '../components/dental/DentalReportsTab';
 import DentalTemplatesTab from '../components/dental/DentalTemplatesTab';
 import DentalDashboardTab from '../components/dental/DentalDashboardTab';
-import DentalPatientsTab from '../components/dental/DentalPatientsTab';
-import ScheduleNextModal from '../components/common/ScheduleNextModal';
+import DentalPatientsTabRaw from '../components/dental/DentalPatientsTab';
+const DentalPatientsTab = DentalPatientsTabRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import ScheduleNextModalRaw from '../components/common/ScheduleNextModal';
+const ScheduleNextModal = ScheduleNextModalRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import SessionWarningModal from '../components/common/SessionWarningModal';
-import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
-import QueueIntegration from '../components/QueueIntegration';
+import EnhancedAppointmentsTableRaw from '../components/tables/EnhancedAppointmentsTable';
+const EnhancedAppointmentsTable = EnhancedAppointmentsTableRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import QueueIntegrationRaw from '../components/QueueIntegration';
+const QueueIntegration = QueueIntegrationRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 import {
   Calendar,

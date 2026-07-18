@@ -24,15 +24,18 @@ import BloodTestsTab from '../components/cardiology/BloodTestsTab';
 import EcgTab from '../components/cardiology/EcgTab';
 import HistoryTab from '../components/cardiology/HistoryTab';
 import ServicesTab from '../components/cardiology/ServicesTab';
-import AiTab from '../components/cardiology/AiTab';
+import AiTabRaw from '../components/cardiology/AiTab';
+const AiTab = AiTabRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import AppointmentsTab from '../components/cardiology/AppointmentsTab';
 import VisitTab from '../components/cardiology/VisitTab';
-import ScheduleNextModal from '../components/common/ScheduleNextModal';
+import ScheduleNextModalRaw from '../components/common/ScheduleNextModal';
+const ScheduleNextModal = ScheduleNextModalRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import EditPatientModalRaw from '../components/common/EditPatientModal';
 const EditPatientModal = EditPatientModalRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import { queueService } from '../services/queue';
 import { printPanelTicket } from '../services/panelPrint';
-import QueueIntegration from '../components/QueueIntegration';
+import QueueIntegrationRaw from '../components/QueueIntegration';
+const QueueIntegration = QueueIntegrationRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import { getApiBaseUrl } from '../api/runtime';
 import { resolveCanonicalVisitId } from '../utils/canonicalVisit';
 import { getErrorMessage } from '../utils/errorHandler';
@@ -142,7 +145,7 @@ const MacOSCardiologistPanelUnified = () => {
 
   // H-8 fix: keyboard shortcuts for tab switching, refresh, close modal.
   useCardiologistHotkeys({
-    setActiveTab: goToTab,
+    setActiveTab: (tab: string) => goToTab(tab),
     refreshData: () => loadMacOSCardiologyAppointments(true),
     closeModal: () => {
       setShowForm({ open: false });
@@ -608,7 +611,7 @@ const MacOSCardiologistPanelUnified = () => {
   }, []);
 
   // Загрузка записей кардиолога
-  const loadMacOSCardiologyAppointments = useCallback(async () => {
+  const loadMacOSCardiologyAppointments = useCallback(async (_silent?: boolean) => {
     setAppointmentsLoading(true);
     try {
       const token = tokenManager.getAccessToken();

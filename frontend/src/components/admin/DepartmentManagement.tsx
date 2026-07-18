@@ -699,7 +699,7 @@ const DepartmentManagement = () => {
     active: departments.filter((dept) => dept.active !== false).length,
     inactive: departments.filter((dept) => dept.active === false).length,
     withDoctors: departments.filter((dept) => (dept.doctor_count || 0) > 0).length,
-    withoutDoctors: departments.filter((dept) => !(dept.doctor_count || 0) > 0).length
+    withoutDoctors: departments.filter((dept) => (dept.doctor_count || 0) === 0).length
   };
 
   if (loading) {
@@ -964,7 +964,7 @@ const DepartmentManagement = () => {
                                         <div>
                                             <Select
                     value={serviceMapping.service_category_code}
-                    onChange={(value) => setServiceMapping({ ...serviceMapping, service_category_code: value })}
+                    onChange={(value: unknown) => setServiceMapping({ ...serviceMapping, service_category_code: String(value) })}
                     options={categoryOptions} />
                                         </div>
                                         <div>
@@ -1200,6 +1200,8 @@ const DepartmentManagement = () => {
                     {totalPages > 1 &&
           <div className="admin-pagination-bar">
                             <MacOSPagination
+              className=""
+              style={{} as CSSProperties}
               currentPage={currentPage}
               totalPages={totalPages}
               onPageChange={setCurrentPage} />
@@ -1361,7 +1363,7 @@ const DepartmentManagement = () => {
                                 </label>
                                 <Select
                 value={serviceMapping.service_category_code}
-                onChange={(value) => setServiceMapping({ ...serviceMapping, service_category_code: value })}
+                onChange={(value: unknown) => setServiceMapping({ ...serviceMapping, service_category_code: String(value) })}
                 options={categoryOptions} />
                             </div>
                             <div>

@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback, useRef, useMemo, memo, startTransitio
 import type { CSSProperties } from 'react';
 import PropTypes from 'prop-types';
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
-import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
+import EnhancedAppointmentsTableRaw from '../components/tables/EnhancedAppointmentsTable';
+const EnhancedAppointmentsTable = EnhancedAppointmentsTableRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import AppointmentContextMenu from '../components/tables/AppointmentContextMenu';
 import ModernTabsRaw from '../components/navigation/ModernTabs';
 const ModernTabs = ModernTabsRaw as unknown as React.ComponentType<Record<string, unknown>>;
@@ -59,7 +60,8 @@ import {
 import PaymentDialog from '../components/dialogs/PaymentDialog';
 import CancelDialog from '../components/dialogs/CancelDialog';
 import PrintDialog from '../components/dialogs/PrintDialog';
-import ModernDialog from '../components/dialogs/ModernDialog';
+import ModernDialogRaw from '../components/dialogs/ModernDialog';
+const ModernDialog = ModernDialogRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import { printPanelTicketInBrowserAsync } from '../services/panelPrint';
 
 // Современный мастер
@@ -905,7 +907,7 @@ const RegistrarPanel = () => {
       }
 
       return {
-        id: typeof serviceItem === 'number' || typeof serviceItem === 'string' && !isNaN(serviceItem) ? Number(serviceItem) : null,
+        id: typeof serviceItem === 'number' || typeof serviceItem === 'string' && !isNaN(Number(serviceItem)) ? Number(serviceItem) : null,
         code: typeof serviceItem === 'string' ? serviceItem : null,
         name: typeof serviceItem === 'string' ? serviceItem : null,
         departmentKey: null
@@ -1064,7 +1066,7 @@ const RegistrarPanel = () => {
 
     appointmentServices.forEach((service, index) => {
       if (appointmentServiceCodes[index]) {
-        serviceToCodeMap.set(service, String(appointmentServiceCodes[index]).toUpperCase());
+        serviceToCodeMap.set(String(service), String(appointmentServiceCodes[index]).toUpperCase());
         return;
       }
 
@@ -1072,17 +1074,17 @@ const RegistrarPanel = () => {
         for (const groupName in services) {
           const groupServices = services[groupName];
           if (Array.isArray(groupServices)) {
-            if (typeof service === 'number' || typeof service === 'string' && !isNaN(service)) {
-              const serviceId = parseInt(service);
+            if (typeof service === 'number' || typeof service === 'string' && !isNaN(Number(service))) {
+              const serviceId = parseInt(String(service));
               const serviceByID = groupServices.find((s) => s.id === serviceId);
               if (serviceByID && serviceByID.service_code) {
-                serviceToCodeMap.set(service, String(serviceByID.service_code).toUpperCase());
+                serviceToCodeMap.set(String(service), String(serviceByID.service_code).toUpperCase());
                 return;
               }
             }
             const serviceByName = groupServices.find((s) => s.name === service);
             if (serviceByName && serviceByName.service_code) {
-              serviceToCodeMap.set(service, String(serviceByName.service_code).toUpperCase());
+              serviceToCodeMap.set(String(service), String(serviceByName.service_code).toUpperCase());
               return;
             }
           }
