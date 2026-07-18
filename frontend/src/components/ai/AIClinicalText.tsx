@@ -1,10 +1,8 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import {
   Box,
-  Typography,
-  Alert,
+  Typography as TypographyRaw,
+  Alert as AlertRaw,
   Paper,
 } from '../ui/macos';
 // UX Audit Registrar #1: P6 codemod в PR #1898 случайно заменил
@@ -19,13 +17,16 @@ import {
 'lucide-react';
 import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
+import React from "react";
+const Alert = AlertRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Typography = TypographyRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 /**
  * Компонент для красивого отображения клинических рекомендаций AI
  * Парсит форматированный текст и отображает его с правильной структурой
  */
 const AIClinicalText = ({ content, variant = 'info' }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   if (!content) return null;
 
   // Разбираем контент на секции

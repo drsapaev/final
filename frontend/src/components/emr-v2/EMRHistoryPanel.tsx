@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 /**
  * EMRHistoryPanel - Read-only version history sidebar
@@ -88,7 +86,7 @@ export function EMRHistoryPanel({
     isOpen = true,
     onClose,
 }) {
-    const { t } = useTranslation();
+    const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
     const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);

@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useTranslation } from '../../i18n/useTranslation';
 import { useEffect, useState } from 'react';
@@ -13,7 +11,7 @@ import logger from '../../utils/logger';
  * Shows a non-intrusive banner that can be dismissed
  */
 export function NotificationPrompt() {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [isVisible, setIsVisible] = useState(false);
   const [isEnabled, setIsEnabled] = useState(false);
   const [isDismissed, setIsDismissed] = useState(false);
