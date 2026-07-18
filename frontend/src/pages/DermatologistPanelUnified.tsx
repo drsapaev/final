@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import type { CSSProperties } from "react";
 import { useLocation } from 'react-router-dom';
 // P-009 fix: shared doctor panel state hook
 import { useDoctorPanelState } from '../hooks/useDoctorPanelState';
@@ -11,14 +12,18 @@ import { useTheme } from '../contexts/ThemeContext';
 import { adaptTimeFields } from '../utils/registrarAggregation';
 import './dermatology.css';
 import AppointmentSummaryBar from '../components/doctor/AppointmentSummaryBar';
-import AIAssistant from '../components/ai/AIAssistant';
+import AIAssistantRaw from '../components/ai/AIAssistant';
+const AIAssistant = AIAssistantRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import ServiceChecklist from '../components/ServiceChecklist';
-import ScheduleNextModal from '../components/common/ScheduleNextModal';
+import ScheduleNextModalRaw from '../components/common/ScheduleNextModal';
+const ScheduleNextModal = ScheduleNextModalRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import SessionWarningModal from '../components/common/SessionWarningModal';
 import EditPatientModalRaw from '../components/common/EditPatientModal';
 const EditPatientModal = EditPatientModalRaw as unknown as React.ComponentType<Record<string, unknown>>;
-import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
-import QueueIntegration from '../components/QueueIntegration';
+import EnhancedAppointmentsTableRaw from '../components/tables/EnhancedAppointmentsTable';
+const EnhancedAppointmentsTable = EnhancedAppointmentsTableRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import QueueIntegrationRaw from '../components/QueueIntegration';
+const QueueIntegration = QueueIntegrationRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import { EMRContainerV2 } from '../components/emr-v2/EMRContainerV2';
 import ProcedureTemplatesRaw from '../components/dermatology/ProcedureTemplates';
 const ProcedureTemplates = ProcedureTemplatesRaw as unknown as React.ComponentType<Record<string, unknown>>;
@@ -39,6 +44,7 @@ import notify from '../services/notify';
 // STRAT#33: useTranslation adapter for confirm/notify i18n.
 import { useTranslation } from '../i18n/useTranslation';
 import i18n from '../i18n';
+const i18nT = i18n.t as unknown as (key: string, options?: Record<string, unknown>) => string;
 import { useConfirm } from '../components/common/ConfirmDialog';
 import { useSessionTimeoutWarning } from '../hooks/useSessionTimeoutWarning';
 import { useDermaHotkeys } from '../hooks/useDermaHotkeys';
@@ -124,7 +130,7 @@ function buildDermatologyPatientFromAppointment(appointment, t) {
   }
 
   const patientName =
-    appointment.patient_fio || appointment.patient_name || appointment.name || i18n.t('derma.derma_panel_patient_default');
+    appointment.patient_fio || appointment.patient_name || appointment.name || i18nT('derma.derma_panel_patient_default');
   const nameParts = splitFullName(patientName);
 
   return {
@@ -175,6 +181,7 @@ const DermatologistPanelUnified = () => {
   const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
   // STRAT#33: useTranslation adapter for confirm/notify i18n.
   const { t: tI18n } = useTranslation();
+  const t = tI18n as unknown as (key: string, options?: Record<string, unknown>) => string;
   // QW-6 (UX audit): session timeout warning
   const [sessionWarning, setSessionWarning] = useState(null as any);
 
@@ -182,7 +189,7 @@ const DermatologistPanelUnified = () => {
     onWarning: () => setSessionWarning({ active: true }),
     onExpired: () => {
       setSessionWarning(null);
-      notify.error(tI18n('derma.session_expired'));
+      notify.error(t('derma.session_expired'));
       if (typeof window !== 'undefined') {
         window.location.href = '/login';
       }
@@ -191,7 +198,7 @@ const DermatologistPanelUnified = () => {
 
   // Deferred #2: keyboard shortcuts for tab switching, refresh, clear selection.
   useDermaHotkeys({
-    handleTabChange,
+    handleTabChange: (tab: string) => {},
     refreshData: () => loadDermatologyAppointments(true),
     clearSelection: () => {
       setSelectedPatient(null);
@@ -433,10 +440,10 @@ const DermatologistPanelUnified = () => {
                     patient_birth_year: entry.patient_birth_year || '',
                     address: entry.address || '',
                     visit_type:
-                      entry.discount_mode === 'repeat' ? tI18n('derma.derma_panel_visit_type_repeat') :
-                      entry.discount_mode === 'benefit' ? tI18n('derma.derma_panel_visit_type_benefit') :
-                      entry.discount_mode === 'all_free' ? tI18n('derma.derma_panel_visit_type_free') :
-                      tI18n('derma.derma_panel_visit_type_paid'),
+                      entry.discount_mode === 'repeat' ? t('derma.derma_panel_visit_type_repeat') :
+                      entry.discount_mode === 'benefit' ? t('derma.derma_panel_visit_type_benefit') :
+                      entry.discount_mode === 'all_free' ? t('derma.derma_panel_visit_type_free') :
+                      t('derma.derma_panel_visit_type_paid'),
                     discount_mode: entry.discount_mode || 'none',
                     services: entry.services || [],
                     service_codes: entry.service_codes || [],
@@ -456,7 +463,7 @@ const DermatologistPanelUnified = () => {
                     canonical_status: entry.canonical_status ?? null,
                     queue_status: entry.queue_status ?? null,
                     queue_position: entry.queue_position,
-                    doctor: entry.doctor_name || tI18n('derma.derma_panel_doctor_default'),
+                    doctor: entry.doctor_name || t('derma.derma_panel_doctor_default'),
                     specialty: queue.specialty,
                     ...adaptTimeFields(entry, queuesData),
                     status: entry.status ?? null,
@@ -618,7 +625,7 @@ const DermatologistPanelUnified = () => {
           const queueEntryId = resolveDoctorQueueEntryId(row);
           if (queueEntryId === null) {
             logger.warn('[Dermatology] Cannot start visit without OnlineQueueEntry id', row);
-            notify.error(tI18n('derma.no_queue_id_for_visit'));
+            notify.error(t('derma.no_queue_id_for_visit'));
             break;
           }
           const token = tokenManager.getAccessToken();
@@ -640,12 +647,12 @@ const DermatologistPanelUnified = () => {
         logger.info('[Dermatology] Печать талона для:', row.patient_fio);
         try {
           const printResult = await printPanelTicket(row, {
-            specialtyName: tI18n('derma.derma_panel_specialty_name')
+            specialtyName: t('derma.derma_panel_specialty_name')
           });
-          notify.success(printResult?.message || tI18n('derma.derma_panel_ticket_printed', { name: row.patient_fio }));
+          notify.success(printResult?.message || t('derma.derma_panel_ticket_printed', { name: row.patient_fio }));
         } catch (error: any) {
           logger.error('[Dermatology] Ошибка печати талона:', error);
-          notify.error(error.message || tI18n('derma.derma_panel_ticket_print_failed'));
+          notify.error(error.message || t('derma.derma_panel_ticket_print_failed'));
         }
         break;
       case 'complete':
@@ -938,7 +945,7 @@ const DermatologistPanelUnified = () => {
           setCurrentAppointment(nextPatient);
           setActiveTab(visitIdFromUrl ? 'visit' : 'appointments');
           urlResolutionRef.current.notified = false;
-          notify.info(tI18n('derma.derma_panel_patient_loaded', { name: patientObj.patient_name }));
+          notify.info(t('derma.derma_panel_patient_loaded', { name: patientObj.patient_name }));
           return true;
         };
 
@@ -964,8 +971,8 @@ const DermatologistPanelUnified = () => {
         if (visitIdFromUrl || patientIdFromUrl) {
           const fallbackPatientId = normalizeNumericId(patientIdFromUrl || null);
           const fallbackLabel = fallbackPatientId
-            ? tI18n('derma.derma_panel_patient_hash', { id: fallbackPatientId })
-            : tI18n('derma.derma_panel_visit_hash', { id: visitIdFromUrl });
+            ? t('derma.derma_panel_patient_hash', { id: fallbackPatientId })
+            : t('derma.derma_panel_visit_hash', { id: visitIdFromUrl });
           const fallbackPatient = {
             id: fallbackPatientId || visitIdFromUrl,
             appointment_id: null,
@@ -997,13 +1004,13 @@ const DermatologistPanelUnified = () => {
           handleTabChange('patients');
           notify.info(
             visitIdFromUrl
-              ? tI18n('derma.derma_panel_visit_not_found')
-              : tI18n('derma.derma_panel_patient_not_found')
+              ? t('derma.derma_panel_visit_not_found')
+              : t('derma.derma_panel_patient_not_found')
           );
         }
       } catch (error: any) {
         logger.error('[Dermatology] Не удалось загрузить пациента из URL:', error);
-        notify.error(tI18n('derma.patient_load_failed'));
+        notify.error(t('derma.patient_load_failed'));
       }
     };
 
@@ -1066,7 +1073,7 @@ const DermatologistPanelUnified = () => {
     try {
       const appointmentId = currentAppointment?.appointment_id || null;
       if (!appointmentId) {
-        notify.error(tI18n('derma.no_entry_for_prescription'));
+        notify.error(t('derma.no_entry_for_prescription'));
         return;
       }
       const response = await api.post(`/appointments/${appointmentId}/prescription`, prescriptionData) as any;
@@ -1074,14 +1081,14 @@ const DermatologistPanelUnified = () => {
       if (response.status < 400) {
         const savedPrescription = response.data;
         setPrescription(savedPrescription);
-        notify.success(tI18n('derma.prescription_saved'));
+        notify.success(t('derma.prescription_saved'));
       } else {
         const error = response.data;
-        notify.error(error.detail || tI18n('derma.derma_panel_prescription_save_failed_short'));
+        notify.error(error.detail || t('derma.derma_panel_prescription_save_failed_short'));
       }
     } catch (error: any) {
       logger.error('DermatologistPanel: Save prescription error:', error);
-      notify.error(tI18n('derma.prescription_save_failed'));
+      notify.error(t('derma.prescription_save_failed'));
     }
   };
 
@@ -1091,7 +1098,7 @@ const DermatologistPanelUnified = () => {
       currentAppointment?.patient_fio ||
       currentAppointment?.patient_name ||
       selectedPatient?.name ||
-      i18n.t('derma.derma_panel_patient_default');
+      i18nT('derma.derma_panel_patient_default');
 
     const payload = {
       prescription: {
@@ -1109,13 +1116,13 @@ const DermatologistPanelUnified = () => {
     };
 
     try {
-      const result = await printService.printPrescription(payload);
+      const result: any = await printService.printPrescription(payload);
 
       if (!result.success) {
-        throw new Error(result.error || tI18n('derma.derma_panel_prescription_print_failed'));
+        throw new Error(result.error || t('derma.derma_panel_prescription_print_failed'));
       }
 
-      notify.success(result.data?.message || tI18n('derma.derma_panel_prescription_printed'));
+      notify.success(result.data?.message || t('derma.derma_panel_prescription_printed'));
       logger.info('[Dermatology] Prescription print success', {
         patientId: payload.patient.id,
         visitId: currentAppointment?.visit_id || null,
@@ -1124,7 +1131,7 @@ const DermatologistPanelUnified = () => {
       });
     } catch (error: any) {
       logger.error('[Dermatology] Prescription print error:', error);
-      notify.error(error.message || tI18n('derma.derma_panel_prescription_print_failed'));
+      notify.error(error.message || t('derma.derma_panel_prescription_print_failed'));
       throw error;
     }
   };
@@ -1135,10 +1142,10 @@ const DermatologistPanelUnified = () => {
   const handleAISuggestion = (type, suggestion) => {
     if (type === 'icd10') {
       setVisitData({ ...visitData, icd10: suggestion });
-        notify.success(tI18n('derma.icd_added_from_ai'));
+        notify.success(t('derma.icd_added_from_ai'));
     } else if (type === 'diagnosis') {
       setVisitData({ ...visitData, diagnosis: suggestion });
-        notify.success(tI18n('derma.diagnosis_added_from_ai'));
+        notify.success(t('derma.diagnosis_added_from_ai'));
     }
   };
 
@@ -1146,11 +1153,11 @@ const DermatologistPanelUnified = () => {
   const handleSaveVisit = async () => {
     // QW-5 (UX audit): confirm before completing the visit
     const ok = await confirm({
-      title: tI18n('derma.complete_visit_title'),
-      message: tI18n('derma.complete_visit_message'),
-      description: tI18n('derma.derma_panel_complete_description'),
-      confirmLabel: tI18n('derma.complete_visit_confirm'),
-      cancelLabel: tI18n('derma.cancel'),
+      title: t('derma.complete_visit_title'),
+      message: t('derma.complete_visit_message'),
+      description: t('derma.derma_panel_complete_description'),
+      confirmLabel: t('derma.complete_visit_confirm'),
+      cancelLabel: t('derma.cancel'),
       intent: 'primary',
     });
     if (!ok) {
@@ -1161,7 +1168,7 @@ const DermatologistPanelUnified = () => {
     const entryId = resolveDoctorQueueEntryId(selectedPatient) ?? resolveDoctorQueueEntryId(currentAppointment);
     if (!entryId) {
       logger.error('[Dermатology] handleSaveVisit: нет entryId');
-      notify.error(tI18n('derma.no_patient_for_complete'));
+      notify.error(t('derma.no_patient_for_complete'));
       return;
     }
 
@@ -1207,7 +1214,7 @@ const DermatologistPanelUnified = () => {
       await queueService.completeVisit(entryId, visitPayload);
       logger.info('[Dermatology] handleSaveVisit: completeVisit OK');
 
-      notify.success(tI18n('derma.visit_completed'));
+      notify.success(t('derma.visit_completed'));
 
       // D-004 fix: offer to schedule next visit (was dead code — setScheduleNextModal was never called)
       if (selectedPatient) {
@@ -1229,7 +1236,7 @@ const DermatologistPanelUnified = () => {
         const next = await queueService.callNextWaiting(SPECIALTY_KEYS.DERMATOLOGY);
         logger.info('[Dermatology] callNextWaiting(dermatology): result', next);
         if (next?.success) {
-            notify.success(tI18n('derma.derma_panel_next_patient_called', { number: next.entry.number }));
+            notify.success(t('derma.derma_panel_next_patient_called', { number: next.entry.number }));
         }
       } catch (err) {
         logger.warn('[Dermatology] callNextWaiting(dermatology): failed', err);
@@ -1237,7 +1244,7 @@ const DermatologistPanelUnified = () => {
 
     } catch (error: any) {
       logger.error('[Dermatology] handleSaveVisit: error', error);
-      notify.error(error.message || tI18n('derma.derma_panel_complete_failed'));
+      notify.error(error.message || t('derma.derma_panel_complete_failed'));
     } finally {
       logger.info('[Dermatology] handleSaveVisit: finish');
       setLoading(false);
@@ -1272,15 +1279,15 @@ const DermatologistPanelUnified = () => {
           treatment_plan: ''
         });
         loadPatientData();
-        notify.success(tI18n('derma.skin_exam_saved'));
+        notify.success(t('derma.skin_exam_saved'));
       } else {
         const detail = await response.text();
         logger.error('[Dermatology] Ошибка ответа при сохранении осмотра', { status: response.status, detail });
-        notify.error(tI18n('derma.skin_exam_save_failed'));
+        notify.error(t('derma.skin_exam_save_failed'));
       }
     } catch (error: any) {
       logger.error('Ошибка сохранения осмотра:', error);
-      notify.error(tI18n('derma.skin_exam_save_failed'));
+      notify.error(t('derma.skin_exam_save_failed'));
     }
   };
 
@@ -1310,15 +1317,15 @@ const DermatologistPanelUnified = () => {
           follow_up: ''
         });
         loadPatientData();
-        notify.success(tI18n('derma.procedure_saved'));
+        notify.success(t('derma.procedure_saved'));
       } else {
         const detail = await response.text();
         logger.error('[Dermatology] Ошибка ответа при сохранении процедуры', { status: response.status, detail });
-        notify.error(tI18n('derma.procedure_save_failed'));
+        notify.error(t('derma.procedure_save_failed'));
       }
     } catch (error: any) {
       logger.error('Ошибка сохранения процедуры:', error);
-      notify.error(tI18n('derma.procedure_save_failed'));
+      notify.error(t('derma.procedure_save_failed'));
     }
   };
 
@@ -1330,25 +1337,25 @@ const DermatologistPanelUnified = () => {
   const appointmentSummaryItems = [
     {
       key: 'total',
-      label: tI18n('derma.derma_panel_summary_total'),
+      label: t('derma.derma_panel_summary_total'),
       value: appointments.length,
       variant: 'info'
     },
     {
       key: 'waiting',
-      label: tI18n('derma.derma_panel_summary_waiting'),
+      label: t('derma.derma_panel_summary_waiting'),
       value: countAppointmentsByStatuses(appointments, DERMATOLOGY_WAITING_STATUSES),
       variant: 'warning'
     },
     {
       key: 'called',
-      label: tI18n('derma.derma_panel_summary_called'),
+      label: t('derma.derma_panel_summary_called'),
       value: countAppointmentsByStatuses(appointments, DERMATOLOGY_CALLED_STATUSES),
       variant: 'primary'
     },
     {
       key: 'completed',
-      label: tI18n('derma.derma_panel_summary_completed'),
+      label: t('derma.derma_panel_summary_completed'),
       value: countAppointmentsByStatuses(appointments, DERMATOLOGY_COMPLETED_STATUSES),
       variant: 'success'
     }
@@ -1370,10 +1377,10 @@ const DermatologistPanelUnified = () => {
                 <div style={dermatologyAppointmentsHeaderStyle}>
                   <h3 style={dermatologyAppointmentsTitleStyle}>
                     <Icon name="calendar" size={20 as never} className="derma-icon-mr-green" />
-                    {tI18n('derma.derma_panel_appointments_title')}
+                    {t('derma.derma_panel_appointments_title')}
                   </h3>
                   <AppointmentSummaryBar
-                    ariaLabel={tI18n('derma.derma_panel_appointments_summary_aria')}
+                    ariaLabel={t('derma.derma_panel_appointments_summary_aria')}
                     items={appointmentSummaryItems}
                     onRefresh={loadDermatologyAppointments}
                     refreshDisabled={appointmentsLoading}
@@ -1405,15 +1412,15 @@ const DermatologistPanelUnified = () => {
                 <div className="derma-flex-center">
                   <h3 className="derma-flex-center">
                     <Icon name="person" size={20 as never} className="derma-icon-mr-green" />
-                    {tI18n('derma.derma_panel_patients_title')}
+                    {t('derma.derma_panel_patients_title')}
                   </h3>
-                  <Badge variant="info">{tI18n('derma.derma_panel_patients_count', { count: patients.length })}</Badge>
+                  <Badge variant="info">{t('derma.derma_panel_patients_count', { count: patients.length })}</Badge>
                 </div>
 
                 {loading ?
               <div className="derma-loading-state">
                     <Icon name="arrow.clockwise" size={32 as never} className="derma-loading-icon" />
-                    <p className="derma-p-14-secondary">{tI18n('derma.derma_panel_patients_loading')}</p>
+                    <p className="derma-p-14-secondary">{t('derma.derma_panel_patients_loading')}</p>
                   </div> :
 
               <div className="derma-flex-col-24">
@@ -1425,7 +1432,7 @@ const DermatologistPanelUnified = () => {
                               <h4 className="derma-h4-16-600">
                                 {patient.last_name} {patient.first_name} {patient.middle_name}
                               </h4>
-                              <Badge variant="success" className="derma-ml-12">{tI18n('derma.derma_panel_badge_dermatology')}</Badge>
+                              <Badge variant="success" className="derma-ml-12">{t('derma.derma_panel_badge_dermatology')}</Badge>
                             </div>
                             <div className="derma-patient-info-list">
                               <div className="derma-flex-center">
@@ -1457,7 +1464,7 @@ const DermatologistPanelUnified = () => {
                         className="derma-flex-center">
 
                               <Icon name="waveform.path.ecg" size={16 as never} />
-                              {tI18n('derma.derma_panel_button_exam')}
+                              {t('derma.derma_panel_button_exam')}
                             </Button>
                             <Button
                         variant="outline"
@@ -1473,7 +1480,7 @@ const DermatologistPanelUnified = () => {
                         className="derma-flex-center">
 
                               <Icon name="sparkles" size={16 as never} />
-                              {tI18n('derma.derma_panel_button_procedure')}
+                              {t('derma.derma_panel_button_procedure')}
                             </Button>
                             <Button
                         variant="outline"
@@ -1481,7 +1488,7 @@ const DermatologistPanelUnified = () => {
                         className="derma-flex-center">
 
                               <Icon name="person" size={16 as never} />
-                              {tI18n('derma.derma_panel_button_view')}
+                              {t('derma.derma_panel_button_view')}
                             </Button>
                           </div>
                         </div>
@@ -1504,10 +1511,10 @@ const DermatologistPanelUnified = () => {
                 <div className="derma-flex-center">
                   <h3 className="derma-flex-center">
                     <Icon name="stethoscope" size={20 as never} className="derma-icon-mr-orange" />
-                    {tI18n('derma.derma_panel_visit_title', { name: currentAppointment.patient_name || tI18n('derma.derma_panel_visit_name_unspecified') })}
+                    {t('derma.derma_panel_visit_title', { name: currentAppointment.patient_name || t('derma.derma_panel_visit_name_unspecified') })}
                   </h3>
                   <Badge variant="info">
-                    {tI18n('derma.derma_panel_status_inline', { status: currentAppointment.status })}
+                    {t('derma.derma_panel_status_inline', { status: currentAppointment.status })}
                   </Badge>
                 </div>
 
@@ -1522,7 +1529,7 @@ const DermatologistPanelUnified = () => {
                 <div className="derma-mt-24">
                   <h4 className="derma-flex-center">
                     <Icon name="doc.text" size={20 as never} className="derma-icon-mr-blue" />
-                    {tI18n('derma.derma_panel_emr_title')}
+                    {t('derma.derma_panel_emr_title')}
                   </h4>
                   <EMRContainerV2
                   visitId={currentAppointment?.visit_id}
@@ -1536,7 +1543,7 @@ const DermatologistPanelUnified = () => {
               <div className="derma-mt-24">
                     <h4 className="derma-flex-center">
                       <Icon name="doc.text" size={20 as never} className="derma-icon-mr-green" />
-                      {tI18n('derma.derma_panel_prescription_title')}
+                      {t('derma.derma_panel_prescription_title')}
                     </h4>
                     <PrescriptionSystem
                   appointment={currentAppointment}
@@ -1562,7 +1569,7 @@ const DermatologistPanelUnified = () => {
 
                   <Icon name="checkmark.circle" size={20 as never} />
                   }
-                      {loading ? tI18n('derma.derma_panel_completing') : tI18n('derma.derma_panel_complete_button')}
+                      {loading ? t('derma.derma_panel_completing') : t('derma.derma_panel_complete_button')}
                     </Button>
                   </div>
               }
@@ -1579,11 +1586,11 @@ const DermatologistPanelUnified = () => {
           <MacOSCard className="derma-p-48">
               <MacOSEmptyState
               icon="calendar"
-              title={tI18n('derma.derma_panel_select_visit_title')}
-              description={tI18n('derma.derma_panel_select_visit_desc')}
+              title={t('derma.derma_panel_select_visit_title')}
+              description={t('derma.derma_panel_select_visit_desc')}
               action={
               <Button variant="outline" onClick={() => handleTabChange('patients')} className="derma-p-4 derma-mt-16">
-                    {tI18n('derma.derma_panel_go_to_appointments')}
+                    {t('derma.derma_panel_go_to_appointments')}
                   </Button>
               } />
             </MacOSCard>
@@ -1638,13 +1645,13 @@ const DermatologistPanelUnified = () => {
               <MacOSCard className="derma-p-8">
                 <h3 className="derma-flex-center">
                   <Icon name="scissors" size={20 as never} className="derma-icon-mr-orange" />
-                  {tI18n('derma.derma_panel_services_title')}
+                  {t('derma.derma_panel_services_title')}
                 </h3>
 
                 <div className="derma-flex-col-16">
                   <div>
                     <label className="derma-label-13-mb8">
-                      {tI18n('derma.derma_panel_services_select')}
+                      {t('derma.derma_panel_services_select')}
                     </label>
 
                     {/* Шаблоны процедур */}
@@ -1665,7 +1672,7 @@ const DermatologistPanelUnified = () => {
                     <div className="derma-p-4 derma-mt-16">
                       <ServiceChecklist
                       value={selectedServices}
-                      onChange={(v: unknown) => setSelectedServices(String(v))}
+                      onChange={(v: any) => setSelectedServices(v)}
                       department="derma" />
 
                     </div>
@@ -1674,7 +1681,7 @@ const DermatologistPanelUnified = () => {
                   <div className="derma-grid-auto-300">
                     <div>
                       <label className="derma-label-13-mb8">
-                        {tI18n('derma.derma_panel_doctor_price_label')}
+                        {t('derma.derma_panel_doctor_price_label')}
                       </label>
                       <div className="derma-flex-gap-8">
                         <div className="derma-pos-rel-flex-1">
@@ -1683,7 +1690,7 @@ const DermatologistPanelUnified = () => {
                           type="text"
                           value={doctorPrice}
                           onChange={(e) => setDoctorPrice(e.target.value)}
-                          placeholder={tI18n('derma.derma_panel_ph_doctor_price')}
+                          placeholder={t('derma.derma_panel_ph_doctor_price')}
                           inputMode="numeric"
                           className="derma-input-pl-40" />
 
@@ -1692,11 +1699,11 @@ const DermatologistPanelUnified = () => {
                         onClick={() => {
                           // PR-47: PriceOverrideManager was dead code (imported but never rendered).
                           // Button now shows a toast instead of calling removed state setters.
-                          notify.info(tI18n('derma.price_change_unavailable'));
+                          notify.info(t('derma.price_change_unavailable'));
                         }}
                         variant="primary"
-                        aria-label={tI18n('derma.derma_panel_change_price_aria')}
-                        title={tI18n('derma.derma_panel_change_price_aria')}>
+                        aria-label={t('derma.derma_panel_change_price_aria')}
+                        title={t('derma.derma_panel_change_price_aria')}>
 
                           <Icon name="dollarsign.circle" size={16 as never} />
                         </Button>
@@ -1705,16 +1712,16 @@ const DermatologistPanelUnified = () => {
 
                     <div>
                       <label className="derma-label-13-mb8">
-                        {tI18n('derma.derma_panel_total_label')}
+                        {t('derma.derma_panel_total_label')}
                       </label>
                       <div className="derma-flex-center">
                         <span className="derma-text-18-600-primary">
                           {totalCost.toLocaleString()} UZS
                         </span>
                         <span className="derma-ml-8-text-13-secondary">
-                          {tI18n('derma.derma_panel_total_breakdown', {
+                          {t('derma.derma_panel_total_breakdown', {
                             services: servicesSubtotal.toLocaleString(),
-                            doctor: doctorPriceNum ? tI18n('derma.derma_panel_doctor_inline', { amount: doctorPriceNum.toLocaleString() }) : ''
+                            doctor: doctorPriceNum ? t('derma.derma_panel_doctor_inline', { amount: doctorPriceNum.toLocaleString() }) : ''
                           })}
                         </span>
                       </div>
@@ -1723,15 +1730,15 @@ const DermatologistPanelUnified = () => {
 
                   <div className="derma-price-info-box">
                     <h4 className="derma-price-h4">
-                      {tI18n('derma.derma_panel_price_directory')}
+                      {t('derma.derma_panel_price_directory')}
                     </h4>
                     <div className="derma-grid-auto-200-13">
-                      <div>{tI18n('derma.derma_panel_price_consultation')}</div>
-                      <div>{tI18n('derma.derma_panel_price_biopsy')}</div>
-                      <div>{tI18n('derma.derma_panel_price_cleaning')}</div>
-                      <div>{tI18n('derma.derma_panel_price_botox')}</div>
-                      <div>{tI18n('derma.derma_panel_price_laser')}</div>
-                      <div>{tI18n('derma.derma_panel_price_doctor_extra')}</div>
+                      <div>{t('derma.derma_panel_price_consultation')}</div>
+                      <div>{t('derma.derma_panel_price_biopsy')}</div>
+                      <div>{t('derma.derma_panel_price_cleaning')}</div>
+                      <div>{t('derma.derma_panel_price_botox')}</div>
+                      <div>{t('derma.derma_panel_price_laser')}</div>
+                      <div>{t('derma.derma_panel_price_doctor_extra')}</div>
                     </div>
                   </div>
                 </div>
@@ -1785,7 +1792,7 @@ const DermatologistPanelUnified = () => {
         <SessionWarningModal
           visible={!!sessionWarning}
           onDismiss={() => setSessionWarning(null)}
-          onExtend={() => notify.info(tI18n('derma.session_extending'))}
+          onExtend={() => notify.info(t('derma.session_extending'))}
         />
       )}
 
