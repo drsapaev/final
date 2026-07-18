@@ -1,18 +1,28 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 // Error Boundary для обработки ошибок React
 import i18n from '../../i18n';
-import React from 'react';
+import React, { type CSSProperties, type ErrorInfo, type ReactNode } from 'react';
 
 import { Button } from '../ui/macos';
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
+interface ErrorBoundaryProps {
+  children: ReactNode;
+  onError?: (error: Error, errorInfo: ErrorInfo) => void;
+  theme?: string;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+  errorInfo: ErrorInfo | null;
+}
+
 /**
  * Error Boundary компонент для перехвата и обработки ошибок React
  */
-class ErrorBoundary extends React.Component {
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props) {
     super(props);
     this.state = { hasError: false, error: null, errorInfo: null };
@@ -71,7 +81,7 @@ ErrorBoundary.propTypes = {
  * Fallback UI компонент
  */
 function ErrorFallback({ error, errorInfo, onRetry, theme }) {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // Проверяем, что theme существует и имеет необходимые методы
   const getColor = theme?.getColor || ((color) => color);
   const getSpacing = theme?.getSpacing || ((size) => size);
@@ -136,10 +146,10 @@ function ErrorFallback({ error, errorInfo, onRetry, theme }) {
   };
 
   return (
-    <div style={containerStyle}>
-      <div style={cardStyle}>
-        <h1 style={titleStyle}>Что-то пошло не так</h1>
-        <p style={messageStyle}>
+    <div style={containerStyle as CSSProperties}>
+      <div style={cardStyle as CSSProperties}>
+        <h1 style={titleStyle as CSSProperties}>Что-то пошло не так</h1>
+        <p style={messageStyle as CSSProperties}>
           Произошла неожиданная ошибка. Мы уже работаем над её исправлением.
         </p>
         
@@ -151,7 +161,7 @@ function ErrorFallback({ error, errorInfo, onRetry, theme }) {
         </Button>
 
         {process.env.NODE_ENV === 'development' && error &&
-        <details style={detailsStyle}>
+        <details style={detailsStyle as CSSProperties}>
             <summary style={{ cursor: 'pointer', marginBottom: getSpacing('sm') }}>
               Детали ошибки (только для разработки)
             </summary>

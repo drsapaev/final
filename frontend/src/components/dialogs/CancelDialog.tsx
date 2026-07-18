@@ -1,10 +1,10 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { AlertTriangle, X } from 'lucide-react';
-import ModernDialog from './ModernDialog';
+import ModernDialogRaw from './ModernDialog';
+import React from 'react';
+const ModernDialog = ModernDialogRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import { toast } from 'react-toastify';
 // UX Audit Registrar #5: все inline-стили перенесены в CancelDialog.css.
 // useTheme удалён — больше не нужен (всё через macos tokens + [data-theme="dark"]).
@@ -13,7 +13,7 @@ import './CancelDialog.css';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [reason, setReason] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState('');

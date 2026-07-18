@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect } from 'react';
@@ -7,12 +5,12 @@ import { Wifi, WifiOff, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react
 import { Card, Button } from '../ui/macos';
 import { tokenManager } from '../../utils/tokenManager';
 import logger from '../../utils/logger';
-import { notify } from '../../services/notify.js';
+import { notify } from '../../services/notify';
 /**
  * Индикатор офлайн/онлайн статуса для мобильных устройств
  */
 const OfflineIndicator = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [showIndicator, setShowIndicator] = useState(false);
   const [syncStatus, setSyncStatus] = useState('idle'); // idle, syncing, success, error
@@ -173,7 +171,7 @@ const OfflineIndicator = () => {
             {!isOnline &&
             <Button
               onClick={retryConnection}
-              size="sm"
+              size="small"
               variant="outline"
               className="text-xs">
               

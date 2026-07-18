@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useTranslation } from '../../i18n/useTranslation';
 /**
@@ -10,10 +8,10 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Mic, Square, Send, Trash2 } from 'lucide-react';
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
-import { notify } from '../../services/notify.js';
+import { notify } from '../../services/notify';
 
 const VoiceRecorder = ({ onSend, onCancel }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
     const [isRecording, setIsRecording] = useState(false);
     const [audioBlob, setAudioBlob] = useState(null);
     const [duration, setDuration] = useState(0);
