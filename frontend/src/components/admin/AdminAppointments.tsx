@@ -304,7 +304,7 @@ const AdminAppointments = () => {
           />
           <Select
             value={filterStatus}
-            onChange={setFilterStatus}
+            onChange={(v: any) => setFilterStatus(String(v))}
             options={statusOptions}
             size="large"
             aria-label={t('admin2.appt_filter_status_aria')}
@@ -317,7 +317,7 @@ const AdminAppointments = () => {
           />
           <Select
             value={filterDoctor}
-            onChange={setFilterDoctor}
+            onChange={(v: any) => setFilterDoctor(String(v))}
             options={doctorOptions}
             size="large"
             aria-label={t('admin2.appt_filter_doctor_aria')}

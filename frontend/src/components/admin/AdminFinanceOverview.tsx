@@ -20,7 +20,7 @@ import {
   MacOSEmptyState,
   Input,
   Skeleton as SkeletonRaw,
-  Select as SelectRaw,
+  Select,
 } from '../ui/macos';
 import useDoctors from '../../hooks/useDoctors';
 import useFinance from '../../hooks/useFinance';
@@ -33,7 +33,6 @@ import FinanceModal from './FinanceModal';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
 import React from "react";
-const Select = SelectRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const Skeleton = SkeletonRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 function getCategoryOptions(t) {
@@ -264,7 +263,7 @@ const AdminFinanceOverview = () => {
           </div>
           <Select
             value={filterType}
-            onChange={(value) => setFilterType(value)}
+            onChange={(value: any) => setFilterType(String(value))}
             options={[
               { value: '', label: t('admin2.fo_filter_type_all') },
               { value: 'income', label: t('admin2.fo_filter_type_income') },
@@ -273,12 +272,12 @@ const AdminFinanceOverview = () => {
           />
           <Select
             value={filterCategory}
-            onChange={(value) => setFilterCategory(value)}
+            onChange={(value: any) => setFilterCategory(String(value))}
             options={getCategoryOptions(t)}
           />
           <Select
             value={filterDateRange}
-            onChange={(value) => setFilterDateRange(value)}
+            onChange={(value: any) => setFilterDateRange(String(value))}
             options={[
               { value: '', label: t('admin2.fo_filter_date_all') },
               { value: 'today', label: t('admin2.fo_filter_date_today') },
@@ -289,7 +288,7 @@ const AdminFinanceOverview = () => {
           />
           <Select
             value={financeFilterStatus}
-            onChange={(value) => setFinanceFilterStatus(value)}
+            onChange={(value: any) => setFinanceFilterStatus(String(value))}
             options={[
               { value: '', label: t('admin2.fo_filter_status_all') },
               { value: 'pending', label: t('admin2.fo_status_pending') },

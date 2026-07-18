@@ -20,7 +20,7 @@ import {
   CreditCard
 } from 'lucide-react';
 import {
-  AppEmpty, AppError, AppLoading, Badge, Button, Table, Select as SelectRaw,
+  AppEmpty, AppError, AppLoading, Badge, Button, Table, Select,
 } from '../ui/macos';
 import notify from '../../services/notify';
 import logger from '../../utils/logger';
@@ -29,7 +29,6 @@ import { formatUZS } from '../../utils/formatCurrency';
 import PropTypes from 'prop-types';
 // UX Audit #3.4: inline-стили перенесены в CSS-классы.
 import './RefundRequestsTable.css';
-const Select = SelectRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const getRefundFilterOptions = (t) => [
   { value: 'all', label: t('misc.rrt_filter_all') },
@@ -223,7 +222,7 @@ const RefundRequestsTable = ({ onRefresh }) => {
           {canApprove && (
             <Button
               variant="success"
-              size="default"
+              size="md"
               onClick={() => handleApprove(request.id)}
               title={t('misc.rrt_odobrit')}
               aria-label={t('misc.rrt_odobrit_zayavku_na_vozvrat_r', { id: request.id })}
@@ -234,7 +233,7 @@ const RefundRequestsTable = ({ onRefresh }) => {
           {canReject && (
             <Button
               variant="danger"
-              size="default"
+              size="md"
               onClick={() => handleReject(request.id)}
               title={t('misc.rrt_otklonit')}
               aria-label={t('misc.rrt_otklonit_zayavku_na_vozvrat_', { id: request.id })}
@@ -245,7 +244,7 @@ const RefundRequestsTable = ({ onRefresh }) => {
           {canComplete && (
             <Button
               variant="primary"
-              size="default"
+              size="md"
               onClick={() => handleComplete(request.id)}
               aria-label={t('misc.rrt_otmetit_zayavku_na_vozvrat_r', { id: request.id })}
             >
@@ -334,9 +333,9 @@ const RefundRequestsTable = ({ onRefresh }) => {
           <Select
             id="refund-request-filter"
             value={filter}
-            onChange={setFilter}
+            onChange={(v: any) => setFilter(String(v))}
             options={getRefundFilterOptions(t)}
-            size="md"
+            size="default"
             aria-label={t('misc.rrt_filtr_zayavok_na_vozvrat')}
           />
           {/* UX Audit #1.3: дублирующая кнопка «Обновить» убрана.
@@ -354,7 +353,7 @@ const RefundRequestsTable = ({ onRefresh }) => {
           title={t('misc.rrt_ne_udalos_zagruzit_zayavki_n')}
           description={error}
           action={
-            <Button variant="secondary" size="default" onClick={loadRequests}>
+            <Button variant="secondary" size="md" onClick={loadRequests}>
               Повторить
             </Button>
           }

@@ -363,7 +363,7 @@ const ClinicManagement = () => {
           <SegmentedControl
             aria-label={t('admin2.cm_tabs_aria')}
             value={activeTab}
-            onChange={setActiveTab}
+            onChange={(v: any) => setActiveTab(String(v))}
             options={tabs.map((tab) => {
               const IconComponent = tab.icon;
               return {
