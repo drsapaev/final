@@ -1,12 +1,10 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 /**
  * Главное окно чата
  */
 
 import { api } from '../../api/client';
 import { useState, useEffect, useRef, useLayoutEffect } from 'react';
+import type { CSSProperties } from "react";
 import ReactDOM from 'react-dom';
 import PropTypes from 'prop-types';
 import { X, Send, MessageCircle, ChevronLeft, ChevronDown, Plus, Search, Check, CheckCheck, Mic, Filter, Smile, Paperclip, Zap, AlertCircle, VolumeX, Volume2 } from 'lucide-react';
@@ -87,11 +85,13 @@ const groupMessagesByDate = (msgs) => {
 
 const ChatWindow = ({ isOpen, onClose }) => {
   // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
-  const [confirm, confirmDialog] = useConfirm();
+  const [confirmRaw, confirmDialog] = useConfirm();
+  const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
   const [authState, setAuthState] = useState(auth.getState());
   const user = authState.profile;
-  const { addToast } = useToast();
-  const { t } = useTranslation();  // PR-72
+  const { addToast } = useToast() as any;
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;  // PR-72
   const {
     conversations,
     messages,
@@ -118,7 +118,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
     toggleReaction,
     deleteMessage,
     uploadFile
-  } = useChat();
+  } = useChat() as any;
 
   const [inputValue, setInputValue] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -192,7 +192,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
   const rowVirtualizer = useVirtualizer({
     count: groupedMessages.length,
     getScrollElement: () => messagesContainerRef.current,
-    estimateSize: (index) => {
+    estimateSize: (index: number) => {
       const item = groupedMessages[index];
       if (item.type === 'date-separator') return 40;
       if (item.message_type === 'image') return 220;
@@ -201,7 +201,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
     },
     overscan: 15,
     scrollToAlignment: 'end'
-  });
+  } as any);
 
   // Scroll to bottom effect
   useLayoutEffect(() => {
@@ -367,7 +367,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
     try {
       const formData = new FormData();
       formData.append('audio_file', audioBlob, 'voice.webm');
-      formData.append('recipient_id', activeConversation);
+      formData.append('recipient_id', String(activeConversation));
       // PR-70 / L-10: send voice_duration (was silently dropped)
       if (duration) {
         formData.append('voice_duration', String(duration));
@@ -377,7 +377,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
       // (was: fetch('/messages/send-voice') — no /api/v1 prefix, no CSRF, no token refresh)
       const response = await api.post('/messages/send-voice', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      }) as any;
 
       // PR-68: axios response already has .data, no need for .json()
       // Обновляем только список бесед - сообщение придет через WebSocket
@@ -584,7 +584,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
   const formatTime = (dateStr) => {
     const date = new Date(dateStr);
     const now = new Date();
-    const diff = now - date;
+    const diff = now.getTime() - date.getTime();
 
     if (diff < 86400000 && date.getDate() === now.getDate()) {
       return date.toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' });
@@ -600,7 +600,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
   };
 
   // Filtered Conversations
-  const filteredConversations = conversations.filter((c) => {
+  const filteredConversations = conversations.filter((c: any) => {
     const matchesSearch = !convSearchQuery ||
     c.user_name && c.user_name.toLowerCase().includes(convSearchQuery.toLowerCase()) ||
     c.last_message && c.last_message.toLowerCase().includes(convSearchQuery.toLowerCase());
@@ -655,7 +655,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
     setContextMenu(null);
   }, [isCompactViewport]);
 
-  const chatWindowStyle = isCompactViewport ? {
+  const chatWindowStyle: CSSProperties = isCompactViewport ? {
     position: 'fixed',
     inset: 0,
     width: '100vw',
@@ -722,7 +722,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
               activeUser ?
 
               <span className="chat-header-name">
-                                            {activeUser.user_name}
+                                            {activeUser?.user_name as React.ReactNode}
                                             {onlineUsers[activeConversation] &&
                 <span className="user-online-dot" title={t('misc.cw_online_title')} />
                 }
@@ -1392,7 +1392,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
   return (
     <>
       {chatWindowElement}
-      {confirmDialog}
+      {confirmDialog as unknown as React.ReactNode}
     </>
   );
 };

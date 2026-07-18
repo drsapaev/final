@@ -1,6 +1,19 @@
-import { useId } from 'react';
+import React, { useId, type ReactNode, type CSSProperties } from 'react';
 import PropTypes from 'prop-types';
 import { useTranslation } from '../../../i18n/useTranslation';
+
+interface MacOSEmptyStateProps {
+  icon?: React.ComponentType<any> | ReactNode;
+  title?: ReactNode;
+  description?: ReactNode;
+  action?: ReactNode;
+  size?: 'sm' | 'md' | 'lg' | string;
+  variant?: string;
+  className?: string;
+  style?: CSSProperties;
+  [key: string]: any;
+}
+
 const MacOSEmptyState = ({
   icon: Icon,
   title = 'Нет данных',
@@ -10,7 +23,7 @@ const MacOSEmptyState = ({
   variant = 'default',
   className,
   style
-}) => {
+}: MacOSEmptyStateProps) => {
   const descriptionId = useId();
   const hasDescription = Boolean(description);
 
@@ -59,7 +72,7 @@ const MacOSEmptyState = ({
   const currentSize = sizeStyles[size];
   const currentVariant = variantStyles[variant];
 
-  const containerStyle = {
+  const containerStyle: CSSProperties = {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
@@ -73,7 +86,7 @@ const MacOSEmptyState = ({
     ...style
   };
 
-  const iconStyle = {
+  const iconStyle: CSSProperties = {
     width: currentSize.iconSize,
     height: currentSize.iconSize,
     color: 'var(--mac-text-tertiary)',
@@ -109,7 +122,8 @@ const MacOSEmptyState = ({
       aria-describedby={hasDescription ? descriptionId : undefined}
       style={containerStyle}
     >
-      {Icon && <Icon aria-hidden="true" focusable="false" style={iconStyle} />}
+      {Icon && typeof Icon === 'function' && <Icon aria-hidden="true" focusable="false" style={iconStyle} />}
+      {Icon && typeof Icon !== 'function' && <span aria-hidden="true">{Icon}</span>}
 
       <h3 style={titleStyle}>{title}</h3>
 

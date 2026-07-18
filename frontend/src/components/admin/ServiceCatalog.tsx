@@ -1,8 +1,6 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect } from 'react';
+import type { CSSProperties } from "react";
 import PropTypes from 'prop-types';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
@@ -33,20 +31,28 @@ import {
 } from 'lucide-react';
 import {
   MacOSCard,
-  Button,
-  Badge,
-  Input,
-  Select,
-  Table,
-  MacOSEmptyState,
-  Alert,
-  Checkbox,
+  Button as RawButton,
+  Badge as RawBadge,
+  Input as RawInput,
+  Select as RawSelect,
+  Table as RawTable,
+  MacOSEmptyState as RawMacOSEmptyState,
+  Alert as RawAlert,
+  Checkbox as RawCheckbox,
 } from '../ui/macos';
+const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
+const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
+const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
+const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
+const Table = RawTable as unknown as React.ComponentType<Record<string, unknown>>;
+const MacOSEmptyState = RawMacOSEmptyState as unknown as React.ComponentType<Record<string, unknown>>;
+const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
+const Checkbox = RawCheckbox as unknown as React.ComponentType<Record<string, unknown>>;
 import {
   normalizeServiceCode,
   formatServiceCodeInput,
   isValidServiceCode } from '../../utils/serviceCodeUtils';
-import { notify } from '../../services/notify.js';
+import { notify } from '../../services/notify';
 
 const SERVICE_GROUP_PREFIXES = {
   cardiology: ['K'],
@@ -109,8 +115,10 @@ const getAllowedPrefixesForGroup = (groupKey) => SERVICE_GROUP_PREFIXES[groupKey
 
 const ServiceCatalog = () => {
   // P-013 fix: shared ConfirmDialog hook (replaces native confirm()).
-  const { t } = useTranslation();
-  const [confirm, confirmDialog] = useConfirm();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const [confirmRaw, confirmDialog] = useConfirm();
+  const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
   const [loading, setLoading] = useState(true);
   const [services, setServices] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -230,7 +238,7 @@ const ServiceCatalog = () => {
         );
 
         try {
-          const response = await api.put(`/services/${editingService.id}`, serviceData);
+          const response = await api.put(`/services/${editingService.id}`, serviceData) as any;
           savedService = response.data;
 
           // Обновляем с реальными данными от сервера
@@ -245,7 +253,7 @@ const ServiceCatalog = () => {
           throw error;
         }
       } else {
-        const response = await api.post('/services', serviceData);
+        const response = await api.post('/services', serviceData) as any;
         savedService = response.data;
 
         // ✅ ОПТИМИСТИЧНОЕ ДОБАВЛЕНИЕ: Добавляем в список сразу
@@ -312,7 +320,7 @@ const ServiceCatalog = () => {
         prevServices.map(s => s.id === serviceId ? { ...s, active: false } : s)
       );
 
-      const response = await api.delete(`/services/${serviceId}`);
+      const response = await api.delete(`/services/${serviceId}`) as any;
 
       // Обновляем с реальными данными от сервера
       if (response.data.active === false) {
@@ -453,7 +461,7 @@ const ServiceCatalog = () => {
             </label>
             <Select
               value={selectedSpecialty}
-              onChange={(value) => setSelectedSpecialty(value)}
+              onChange={(value: unknown) => setSelectedSpecialty(String(value))}
               options={[
               { value: 'all', label: t('admin2.sc_filter_specialty_all') },
               { value: 'cardiology', label: t('admin2.sc_filter_specialty_cardiology') },
@@ -470,7 +478,7 @@ const ServiceCatalog = () => {
             </label>
             <Select
               value={selectedCategory}
-              onChange={(value) => setSelectedCategory(value)}
+              onChange={(value: unknown) => setSelectedCategory(String(value))}
               options={[
               { value: 'all', label: t('admin2.sc_filter_category_all') },
               ...categories.map((category) => ({
@@ -486,7 +494,7 @@ const ServiceCatalog = () => {
             </label>
             <Select
               value={selectedDepartment}
-              onChange={(value) => setSelectedDepartment(value)}
+              onChange={(value: unknown) => setSelectedDepartment(String(value))}
               options={[
               { value: 'all', label: t('admin2.sc_filter_department_all') },
               ...departments.map((dept) => ({
@@ -600,7 +608,7 @@ const ServiceCatalog = () => {
                   <SpecialtyIcon
                   size={20}
                   className="admin-specialty-icon-20"
-                  style={{ '--admin-icon-color': specialtyColors[specialty] || 'var(--mac-text-tertiary)' }} />
+                  style={{ '--admin-icon-color': specialtyColors[specialty] || 'var(--mac-text-tertiary)' } as CSSProperties} />
 
                   <div>
                     <div className="admin-service-name">
@@ -648,7 +656,7 @@ const ServiceCatalog = () => {
               <div className="admin-form-row-gap-8">
                   <Button
                   type="button"
-                  size="sm"
+                  size="small"
                   variant="outline"
                   aria-label={`View change history for ${service.name}`}
                   onClick={() => setShowHistory({ serviceId: service.id, serviceName: service.name })}
@@ -658,7 +666,7 @@ const ServiceCatalog = () => {
                   </Button>
                   <Button
                   type="button"
-                  size="sm"
+                  size="small"
                   variant="outline"
                   aria-label={`Edit service ${service.name}`}
                   onClick={() => setEditingService(service)}
@@ -668,7 +676,7 @@ const ServiceCatalog = () => {
                   </Button>
                   <Button
                   type="button"
-                  size="sm"
+                  size="small"
                   variant="outline"
                   aria-label={`Delete service ${service.name}`}
                   onClick={() => handleDeleteService(service.id)}
@@ -754,15 +762,16 @@ const ServiceCatalog = () => {
         </div>
       )}
       {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
-      {confirmDialog}
+      {confirmDialog as unknown as React.ReactNode}
     </div>);
 
 };
 
 // Компонент формы услуги с вкладками
 // ⭐ SSOT: Redesigned with tabs for better UX, removed duplicate fields
-const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMessage, onSave, onCancel }) => {
-  const { t } = useTranslation();
+const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMessage, onSave, onCancel, departments }: any) => {
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [activeTab, setActiveTab] = useState('basic'); // 'basic', 'queue', 'options'
   const [showPreview, setShowPreview] = useState(false); // ✅ PREVIEW: Show changes preview
   const [formData, setFormData] = useState({
@@ -779,7 +788,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
     requires_doctor: service?.requires_doctor || false,
     is_consultation: service?.is_consultation || false,
     allow_doctor_price_override: service?.allow_doctor_price_override || false
-  });
+  } as any);
 
   // State для проверки дубликатов
   const [codeWarning, setCodeWarning] = useState('');
@@ -801,7 +810,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
     const timeoutId = setTimeout(async () => {
       try {
         setCheckingDuplicates(true);
-        const response = await api.get('/services');
+        const response = await api.get('/services') as any;
         const services = response.data;
         const duplicate = services.find(
           (s) => (s.code === normalizedCode || s.service_code === normalizedCode) && s.id !== service?.id
@@ -911,7 +920,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
     let normalizedValue = value;
 
     if (field === 'code') {
-      normalizedValue = formatServiceCodeInput(value, formData[field]);
+      normalizedValue = formatServiceCodeInput(value);
     }
 
     // ⭐ SSOT: Sync queue_tag with department_key
@@ -956,7 +965,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
                 '--admin-tab-border': isActive ? '2px solid var(--mac-accent)' : '2px solid transparent',
                 '--admin-tab-color': isActive ? 'var(--mac-accent)' : 'var(--mac-text-secondary)',
                 '--admin-tab-weight': isActive ? '600' : '500'
-              }}>
+              } as CSSProperties}>
 
               <TabIcon size={16} />
               {tab.label}
@@ -1033,7 +1042,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
               </label>
               <Select
               value={formData.category_id}
-              onChange={(value) => handleChange('category_id', value)}
+              onChange={(value: unknown) => handleChange('category_id', String(value))}
               options={[
               { value: '', label: t('admin2.sc_form_category_ph') },
               ...categories.map((category) => ({
@@ -1058,7 +1067,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
 
                 <Select
                 value={formData.currency}
-                onChange={(value) => handleChange('currency', value)}
+                onChange={(value: unknown) => handleChange('currency', String(value))}
                 options={[
                 { value: 'UZS', label: 'UZS' },
                 { value: 'USD', label: 'USD' }]
@@ -1085,7 +1094,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
               </label>
               <Select
               value={formData.doctor_id}
-              onChange={(value) => handleChange('doctor_id', value)}
+              onChange={(value: unknown) => handleChange('doctor_id', String(value))}
               options={[
               { value: '', label: t('admin2.sc_form_doctor_all') },
               ...doctors.map((doctor) => ({
@@ -1112,7 +1121,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
               </label>
               <Select
               value={formData.queue_tag}
-              onChange={(value) => handleChange('queue_tag', value)}
+              onChange={(value: unknown) => handleChange('queue_tag', String(value))}
               options={[
               { value: '', label: t('admin2.sc_form_queue_no_queue') },
               ...queueProfiles.

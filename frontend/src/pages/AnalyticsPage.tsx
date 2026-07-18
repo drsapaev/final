@@ -1,7 +1,5 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useState, useEffect, useCallback } from 'react';
+import type { CSSProperties } from "react";
 import PropTypes from 'prop-types';
 import { useTheme } from '../contexts/ThemeContext';
 import { api } from '../api/client';
@@ -104,7 +102,7 @@ const analyticsInsetSurface = 'color-mix(in srgb, var(--mac-card-bg), white 78%)
 const analyticsTextPrimary = 'color-mix(in srgb, var(--mac-text-primary), black 72%)';
 const analyticsTextSecondary = 'color-mix(in srgb, var(--mac-text-secondary), black 48%)';
 
-function AnalyticsSectionCard({ title, subtitle, children, action, compact = false }) {
+function AnalyticsSectionCard({ title, subtitle, children, action, compact = false }: any) {
   return (
     <section style={{
       background: analyticsSurface,
@@ -361,7 +359,8 @@ AnalyticsEmptyState.propTypes = {
 
 export default function AnalyticsPage() {
   const { getColor, getSpacing } = useTheme();
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [loading, setLoading] = useState(false);
   const [dateRange, setDateRange] = useState(buildRelativeDateRange(30));
   const [department, setDepartment] = useState('');
@@ -464,7 +463,7 @@ export default function AnalyticsPage() {
 
       const response = await api.get(`/analytics/export/comprehensive/export/${format}?${params}`, {
         responseType: 'blob'
-      });
+      }) as any;
 
       const blob = new Blob([response?.data ?? response], {
         type: format === 'json' ? 'application/json' :
@@ -908,7 +907,7 @@ export default function AnalyticsPage() {
           </div>
           <Button
             variant="primary"
-            size="lg"
+            size="large"
             startIcon={<Download size={16} />}
             onClick={() => exportData('json')}
             style={{
@@ -1027,7 +1026,7 @@ export default function AnalyticsPage() {
             <Select
               label={t('misc.an_filter_department_label')}
               value={department}
-              onChange={setDepartment}
+              onChange={(v: unknown) => setDepartment(String(v))}
               options={departmentOptions}
               size="large"
               style={{
@@ -1037,7 +1036,7 @@ export default function AnalyticsPage() {
 
           <Button
             variant="primary"
-            size="lg"
+            size="large"
             onClick={() => loadAnalytics()}
             disabled={loading}
             startIcon={<RefreshCw size={16} style={loading ? { animation: 'mac-spin 1s linear infinite' } : undefined} />}

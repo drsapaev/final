@@ -1,20 +1,26 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect, useCallback } from 'react';
+import type { CSSProperties } from "react";
 import PropTypes from 'prop-types';
 import {
   MacOSCard,
-  Button,
-  Badge,
-  Input,
-  Checkbox,
-  Select,
-  Textarea,
-  Skeleton,
-  MacOSEmptyState,
+  Button as RawButton,
+  Badge as RawBadge,
+  Input as RawInput,
+  Checkbox as RawCheckbox,
+  Select as RawSelect,
+  Textarea as RawTextarea,
+  Skeleton as RawSkeleton,
+  MacOSEmptyState as RawMacOSEmptyState,
 } from '../ui/macos';
+const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
+const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
+const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
+const Checkbox = RawCheckbox as unknown as React.ComponentType<Record<string, unknown>>;
+const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
+const Textarea = RawTextarea as unknown as React.ComponentType<Record<string, unknown>>;
+const Skeleton = RawSkeleton as unknown as React.ComponentType<Record<string, unknown>>;
+const MacOSEmptyState = RawMacOSEmptyState as unknown as React.ComponentType<Record<string, unknown>>;
 import {
   Plus,
   Edit,
@@ -109,7 +115,8 @@ const toggleServiceId = (selectedIds, serviceId) => {
 };
 
 const ServiceChecklist = ({ services = [], value = [], onChange }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const selectedIds = getSelectedServiceIds(value);
 
   if (!services.length) {
@@ -132,7 +139,7 @@ const ServiceChecklist = ({ services = [], value = [], onChange }) => {
         const checked = selectedIds.includes(serviceId);
 
         return (
-          <div key={service.id} className="admin-checklist-item" style={{ '--admin-checklist-bg': checked ? 'var(--mac-accent-blue-light)' : 'var(--mac-bg-secondary)' }}>
+          <div key={service.id} className="admin-checklist-item" style={{ '--admin-checklist-bg': checked ? 'var(--mac-accent-blue-light)' : 'var(--mac-bg-secondary)' } as CSSProperties}>
             <Checkbox
               checked={checked}
               onChange={() => onChange(toggleServiceId(selectedIds, service.id))}
@@ -188,14 +195,16 @@ const buildPricingRulePayload = (form) =>
   );
 
 const DynamicPricingManager = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // P-013 fix: shared ConfirmDialog hook (replaces 2 native confirm() calls).
-  const [confirm, confirmDialog] = useConfirm();
+  const [confirmRaw, confirmDialog] = useConfirm();
+  const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
   const [activeTab, setActiveTab] = useState('rules');
   const [pricingRules, setPricingRules] = useState([]);
   const [servicePackages, setServicePackages] = useState([]);
   const [services, setServices] = useState([]);
-  const [analytics, setAnalytics] = useState(null);
+  const [analytics, setAnalytics] = useState(null as any);
   const [loading, setLoading] = useState(false);
   const [showCreateRule, setShowCreateRule] = useState(false);
   const [showCreatePackage, setShowCreatePackage] = useState(false);
@@ -239,7 +248,7 @@ const DynamicPricingManager = () => {
     try {
       // Загружаем услуги
       try {
-        const response = await api.get('/services');
+        const response = await api.get('/services') as any;
         setServices(Array.isArray(response.data) ? response.data : []);
       } catch (e) {
         logger.error('Failed to load services:', e);
@@ -249,7 +258,7 @@ const DynamicPricingManager = () => {
       if (activeTab === 'rules') {
         // Загружаем правила ценообразования
         try {
-          const response = await api.get('/dynamic-pricing/pricing-rules');
+          const response = await api.get('/dynamic-pricing/pricing-rules') as any;
           setPricingRules(Array.isArray(response.data) ? response.data : []);
         } catch (e) {
           logger.error('Failed to load pricing rules:', e);
@@ -258,7 +267,7 @@ const DynamicPricingManager = () => {
       } else if (activeTab === 'packages') {
         // Загружаем пакеты услуг
         try {
-          const response = await api.get('/dynamic-pricing/service-packages');
+          const response = await api.get('/dynamic-pricing/service-packages') as any;
           setServicePackages(Array.isArray(response.data) ? response.data : []);
         } catch (e) {
           logger.error('Failed to load packages:', e);
@@ -267,7 +276,7 @@ const DynamicPricingManager = () => {
       } else if (activeTab === 'analytics') {
         // Загружаем аналитику
         try {
-          const response = await api.get('/dynamic-pricing/pricing-analytics');
+          const response = await api.get('/dynamic-pricing/pricing-analytics') as any;
           setAnalytics(response.data);
         } catch (e) {
           logger.error('Failed to load analytics:', e);
@@ -395,7 +404,7 @@ const DynamicPricingManager = () => {
 
   const handleUpdateDynamicPrices = async () => {
     try {
-      const response = await api.post('/dynamic-pricing/update-dynamic-prices');
+      const response = await api.post('/dynamic-pricing/update-dynamic-prices') as any;
       toast.success(t('admin2.dp_prices_updated', { updated: response.data.updated_count, total: response.data.total_services }));
     } catch (error) {
       logger.error('Ошибка обновления цен:', error);
@@ -566,7 +575,7 @@ const DynamicPricingManager = () => {
               </label>
               <Select
             value={ruleForm.rule_type}
-            onChange={(value) => setRuleForm({ ...ruleForm, rule_type: value })}
+            onChange={(value: unknown) => setRuleForm({ ...ruleForm, rule_type: String(value) })}
             options={getRuleTypeOptions(t)}
             size="large" />
             </div>
@@ -577,7 +586,7 @@ const DynamicPricingManager = () => {
               </label>
               <Select
             value={ruleForm.discount_type}
-            onChange={(value) => setRuleForm({ ...ruleForm, discount_type: value })}
+            onChange={(value: unknown) => setRuleForm({ ...ruleForm, discount_type: String(value) })}
             options={getDiscountTypeOptions(t)}
             size="large" />
             </div>
@@ -1043,7 +1052,7 @@ const DynamicPricingManager = () => {
                 '--admin-tab-border': isActive ? '2px solid var(--mac-accent)' : '2px solid transparent',
                 '--admin-tab-color': isActive ? 'var(--mac-accent)' : 'var(--mac-text-secondary)',
                 '--admin-tab-weight': isActive ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)'
-              }}>
+              } as CSSProperties}>
               
               <Icon size={16} />
               {tab.label}
@@ -1063,7 +1072,7 @@ const DynamicPricingManager = () => {
         </>
       }
       {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
-      {confirmDialog}
+      {confirmDialog as unknown as React.ReactNode}
     </div>);
 
 };

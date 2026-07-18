@@ -1,20 +1,26 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 /**
  * Компонент для управления системой скидок и льгот
  */
 import { useState, useEffect } from 'react';
+import type { CSSProperties } from "react";
 import {
   MacOSCard,
-  Button,
-  Badge,
-  Input,
-  Textarea,
-  Skeleton,
-  MacOSEmptyState,
-  Select,
-  Checkbox } from '../ui/macos';
+  Button as RawButton,
+  Badge as RawBadge,
+  Input as RawInput,
+  Textarea as RawTextarea,
+  Skeleton as RawSkeleton,
+  MacOSEmptyState as RawMacOSEmptyState,
+  Select as RawSelect,
+  Checkbox as RawCheckbox } from '../ui/macos';
+const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
+const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
+const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
+const Textarea = RawTextarea as unknown as React.ComponentType<Record<string, unknown>>;
+const Skeleton = RawSkeleton as unknown as React.ComponentType<Record<string, unknown>>;
+const MacOSEmptyState = RawMacOSEmptyState as unknown as React.ComponentType<Record<string, unknown>>;
+const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
+const Checkbox = RawCheckbox as unknown as React.ComponentType<Record<string, unknown>>;
 import {
   Percent,
   Plus,
@@ -53,14 +59,15 @@ const sanitizePayload = (form) =>
   );
 
 const DiscountBenefitsManager = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [activeTab, setActiveTab] = useState('discounts');
   const [discounts, setDiscounts] = useState([]);
   const [benefits, setBenefits] = useState([]);
   const [loyaltyPrograms, setLoyaltyPrograms] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [analytics, setAnalytics] = useState(null);
+  const [analytics, setAnalytics] = useState(null as any);
 
   // Формы для создания/редактирования
   const [discountForm, setDiscountForm] = useState({
@@ -283,7 +290,7 @@ const DiscountBenefitsManager = () => {
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('admin2.disc_f_type_label')}</label>
           <Select
           value={discountForm.discount_type}
-          onChange={(value) => setDiscountForm({ ...discountForm, discount_type: value })}
+          onChange={(value: unknown) => setDiscountForm({ ...discountForm, discount_type: String(value) })}
           options={Object.entries(discountTypes).map(([key, value]) => ({ value: key, label: value }))}
           size="large" />
         
@@ -352,19 +359,19 @@ const DiscountBenefitsManager = () => {
       </div>
       <div className="flex flex-wrap gap-4">
           <label className="flex items-center">
-            <Checkbox aria-label="Discount applies to services" checked={discountForm.applies_to_services} onChange={(e) => setDiscountForm({ ...discountForm, applies_to_services: e.target.checked })}
+            <Checkbox aria-label="Discount applies to services" checked={discountForm.applies_to_services} onChange={(e: any) => setDiscountForm({ ...discountForm, applies_to_services: e?.target?.checked ?? e })}
               className="mr-2" />
         
           {t('admin2.disc_applies_to_services')}
         </label>
           <label className="flex items-center">
-            <Checkbox aria-label="Discount applies to appointments" checked={discountForm.applies_to_appointments} onChange={(e) => setDiscountForm({ ...discountForm, applies_to_appointments: e.target.checked })}
+            <Checkbox aria-label="Discount applies to appointments" checked={discountForm.applies_to_appointments} onChange={(e: any) => setDiscountForm({ ...discountForm, applies_to_appointments: e?.target?.checked ?? e })}
               className="mr-2" />
         
           {t('admin2.disc_applies_to_appointments')}
         </label>
           <label className="flex items-center">
-            <Checkbox aria-label="Discount can combine with other discounts" checked={discountForm.can_combine_with_others} onChange={(e) => setDiscountForm({ ...discountForm, can_combine_with_others: e.target.checked })}
+            <Checkbox aria-label="Discount can combine with other discounts" checked={discountForm.can_combine_with_others} onChange={(e: any) => setDiscountForm({ ...discountForm, can_combine_with_others: e?.target?.checked ?? e })}
               className="mr-2" />
         
           {t('admin2.disc_can_combine')}
@@ -397,7 +404,7 @@ const DiscountBenefitsManager = () => {
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('admin2.disc_bf_type_label')}</label>
           <Select
           value={benefitForm.benefit_type}
-          onChange={(value) => setBenefitForm({ ...benefitForm, benefit_type: value })}
+          onChange={(value: unknown) => setBenefitForm({ ...benefitForm, benefit_type: String(value) })}
           options={Object.entries(benefitTypes).map(([key, value]) => ({ value: key, label: value }))}
           size="large" />
         
@@ -477,19 +484,19 @@ const DiscountBenefitsManager = () => {
       </div>
       <div className="flex flex-wrap gap-4">
           <label className="flex items-center">
-            <Checkbox aria-label="Benefit requires documents" checked={benefitForm.requires_document} onChange={(e) => setBenefitForm({ ...benefitForm, requires_document: e.target.checked })}
+            <Checkbox aria-label="Benefit requires documents" checked={benefitForm.requires_document} onChange={(e: any) => setBenefitForm({ ...benefitForm, requires_document: e?.target?.checked ?? e })}
               className="mr-2" />
         
           {t('admin2.disc_requires_documents')}
         </label>
           <label className="flex items-center">
-            <Checkbox aria-label="Benefit applies to services" checked={benefitForm.applies_to_services} onChange={(e) => setBenefitForm({ ...benefitForm, applies_to_services: e.target.checked })}
+            <Checkbox aria-label="Benefit applies to services" checked={benefitForm.applies_to_services} onChange={(e: any) => setBenefitForm({ ...benefitForm, applies_to_services: e?.target?.checked ?? e })}
               className="mr-2" />
         
           {t('admin2.disc_applies_to_services')}
         </label>
           <label className="flex items-center">
-            <Checkbox aria-label="Benefit applies to appointments" checked={benefitForm.applies_to_appointments} onChange={(e) => setBenefitForm({ ...benefitForm, applies_to_appointments: e.target.checked })}
+            <Checkbox aria-label="Benefit applies to appointments" checked={benefitForm.applies_to_appointments} onChange={(e: any) => setBenefitForm({ ...benefitForm, applies_to_appointments: e?.target?.checked ?? e })}
               className="mr-2" />
         
           {t('admin2.disc_applies_to_appointments')}
@@ -947,7 +954,7 @@ const DiscountBenefitsManager = () => {
             '--admin-tab-border': activeTab === tab.id ? '2px solid var(--mac-accent)' : '2px solid transparent',
             '--admin-tab-color': activeTab === tab.id ? 'var(--mac-accent)' : 'var(--mac-text-secondary)',
             '--admin-tab-weight': activeTab === tab.id ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)'
-          }}>
+          } as CSSProperties}>
           
             {tab.label}
             {tab.count !== undefined &&

@@ -2,8 +2,8 @@ import React, { type ReactNode, type CSSProperties, type MouseEvent } from 'reac
 import PropTypes from 'prop-types';
 import { useTranslation } from '../../../i18n/useTranslation';
 
-type ButtonVariant = 'default' | 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'ghost' | 'outline' | 'link';
-type ButtonSize = 'small' | 'default' | 'large';
+type ButtonVariant = 'default' | 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'destructive' | 'error' | 'ghost' | 'outline' | 'link' | string;
+type ButtonSize = 'small' | 'default' | 'large' | 'sm' | 'md' | 'lg' | string;
 
 interface ButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'children' | 'style' | 'onClick'> {
   children?: ReactNode;
@@ -15,6 +15,11 @@ interface ButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>
   className?: string;
   style?: CSSProperties;
   onClick?: (e: MouseEvent<HTMLButtonElement>) => void;
+  // Backward-compat props used by legacy callers
+  startIcon?: ReactNode;
+  endIcon?: ReactNode;
+  color?: string;
+  [key: string]: any;
 }
 
 type ButtonStyle = CSSProperties & {
