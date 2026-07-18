@@ -1002,24 +1002,24 @@ const TelegramManager = () => {
     label: 'Conversion rate',
     value: `${onboardingAnalytics?.dashboard?.conversionRate ?? 0}%`
   }];
-  const iconActionStyle = {
+  const iconActionStyle: CSSProperties = {
     width: 32,
     minHeight: 32,
     padding: 0
   };
-  const capabilityPanelStyle = {
+  const capabilityPanelStyle: CSSProperties = {
     border: '1px solid var(--mac-card-border, rgba(27, 46, 73, 0.14))',
     borderRadius: 'var(--mac-radius-lg)',
     background: 'var(--mac-bg-secondary, rgba(238, 246, 255, 0.88))',
     boxShadow: 'var(--mac-shadow-sm)',
     padding: 'var(--mac-spacing-4)'
   };
-  const capabilityGridStyle = {
+  const capabilityGridStyle: CSSProperties = {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
     gap: '10px'
   };
-  const capabilityCardStyle = {
+  const capabilityCardStyle: CSSProperties = {
     border: '1px solid var(--mac-card-border, rgba(27, 46, 73, 0.14))',
     borderRadius: 'var(--mac-radius-md)',
     background: 'var(--mac-card-bg, rgba(255, 255, 255, 0.82))',
@@ -1030,7 +1030,7 @@ const TelegramManager = () => {
     flexDirection: 'column',
     gap: 'var(--mac-spacing-2)'
   };
-  const capabilityIconStyle = {
+  const capabilityIconStyle: CSSProperties = {
     width: 28,
     height: 28,
     borderRadius: 'var(--mac-radius-sm)',

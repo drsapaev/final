@@ -1,4 +1,17 @@
+import React, { type CSSProperties, type ReactNode } from 'react';
 import PropTypes from 'prop-types';
+
+interface TypographyProps {
+  children?: ReactNode;
+  variant?: string;
+  color?: string;
+  gutterBottom?: boolean;
+  style?: CSSProperties;
+  paragraph?: boolean;
+  component?: string | React.ComponentType<any>;
+  className?: string;
+  [key: string]: any;
+}
 // Minimal macOS-style Typography supporting common MUI variants
 const variantMap = {
   h1: { fontSize: '28px', fontWeight: 700 },
@@ -32,7 +45,7 @@ const Typography = ({
   paragraph,
   component,
   ...props
-}) => {
+}: TypographyProps) => {
   const styles = {
     margin: 0,
     fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif',
