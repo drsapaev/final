@@ -14,11 +14,10 @@
 
 import PropTypes from 'prop-types';
 import { Calendar, Eye, Download, FileText } from 'lucide-react';
-import { Button, Badge, MacOSCard, MacOSEmptyState as MacOSEmptyStateRaw } from '../ui/macos';
+import { Button, Badge, MacOSCard, MacOSEmptyState } from '../ui/macos';
 import { formatRegistrarDate } from '../../utils/dateUtils';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
-const MacOSEmptyState = MacOSEmptyStateRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 /**
  * @param {Object} props

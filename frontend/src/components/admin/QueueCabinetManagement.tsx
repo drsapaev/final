@@ -18,17 +18,13 @@ import logger from '../../utils/logger';
 import React from "react";
 import {
   Badge,
-  Button as ButtonRaw,
+  Button,
   MacOSCard,
-  MacOSEmptyState as MacOSEmptyStateRaw,
-  Input as InputRaw,
-  MacOSStatCard as MacOSStatCardRaw,
+  MacOSEmptyState,
+  Input,
+  MacOSStatCard,
   Table,
 } from '../ui/macos';
-const Input = InputRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const Button = ButtonRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const MacOSStatCard = MacOSStatCardRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const MacOSEmptyState = MacOSEmptyStateRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const INITIAL_FILTERS = {
   day: '',

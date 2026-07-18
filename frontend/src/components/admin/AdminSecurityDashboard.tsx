@@ -2,12 +2,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import {
-  Card, CardContent, CardHeader, CardTitle, Badge, Button, Icon, Alert as AlertRaw, Input,
+  Card, CardContent, CardHeader, CardTitle, Badge, Button, Icon, Alert, Input,
 } from '../ui/macos';
 import { api } from '../../api/client';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
-const Alert = AlertRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 /**
  * Admin Security Dashboard — M5.6 frontend integration.

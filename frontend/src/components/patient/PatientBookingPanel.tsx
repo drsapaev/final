@@ -1,7 +1,7 @@
 
 import { useState } from 'react';
 import {
-  Badge, Button, Icon, Input as InputRaw, Textarea as TextareaRaw,
+  Badge, Button, Icon, Input, Textarea,
 } from '../ui/macos';
 import { api } from '../../api/client';
 import {
@@ -14,8 +14,6 @@ import {
 import PanelEmptyState from './PanelEmptyState';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
-const Input = InputRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const Textarea = TextareaRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 /**
  * L-H-4 fix: PatientBookingPanel выделен в отдельный файл (~120 строк).

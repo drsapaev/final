@@ -11,6 +11,9 @@ interface TypographyProps {
   component?: string | React.ComponentType<any>;
   className?: string;
   fontWeight?: number | string;
+  align?: string;
+  display?: string;
+  sx?: Record<string, unknown>;
 }
 // Minimal macOS-style Typography supporting common MUI variants
 const variantMap = {

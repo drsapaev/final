@@ -2,15 +2,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import {
-  Alert as AlertRaw, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle,
-  Icon, Typography as TypographyRaw,
+  Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle,
+  Icon, Typography,
 } from '../ui/macos';
 import { AIButton, AIAssistant as AIAssistantRaw } from '../ai';
 // STRAT#22: t() для i18n — AI analysis strings мигрированы.
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
-const Typography = TypographyRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const Alert = AlertRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const AIAssistant = AIAssistantRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 /**

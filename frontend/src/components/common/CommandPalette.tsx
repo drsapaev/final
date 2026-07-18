@@ -22,10 +22,9 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Search, ArrowRight, Clock } from 'lucide-react';
 import { getCanonicalRoutes, isRouteAccessibleToProfile } from '../../routing/routeSelectors';
-import { Input as InputRaw } from '../ui/macos';
+import { Input } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
-const Input = InputRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const MAX_RESULTS = 8;
 const MAX_RECENT = 5;

@@ -12,14 +12,13 @@
 import PropTypes from 'prop-types';
 import React from 'react';
 import { Calendar } from 'lucide-react';
-import { MacOSCard as MacOSCardRaw, Skeleton as SkeletonRaw, MacOSEmptyState as MacOSEmptyStateRaw } from '../ui/macos';
+import { MacOSCard as MacOSCardRaw, Skeleton as SkeletonRaw, MacOSEmptyState } from '../ui/macos';
 import AppointmentSummaryBar from '../doctor/AppointmentSummaryBar';
 import EnhancedAppointmentsTableRaw from '../tables/EnhancedAppointmentsTable';
 import { useTranslation } from '../../i18n/useTranslation';
 
 const MacOSCard = MacOSCardRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const Skeleton = SkeletonRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const MacOSEmptyState = MacOSEmptyStateRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const EnhancedAppointmentsTable = EnhancedAppointmentsTableRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 export function AppointmentsTab({

@@ -27,18 +27,15 @@ import {
 } from 'lucide-react';
 import {
   MacOSCard,
-  Button as ButtonRaw,
-  Input as InputRaw,
+  Button,
+  Input,
   Select as SelectRaw,
-  Textarea as TextareaRaw,
+  Textarea,
   Checkbox,
 } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
-const Textarea = TextareaRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = InputRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const Select = SelectRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const Button = ButtonRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const ClinicSettings = () => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;

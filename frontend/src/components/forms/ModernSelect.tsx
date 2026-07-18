@@ -12,11 +12,10 @@ import {
 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import './ModernSelect.css';
-import { Input as InputRaw } from '../ui/macos';
+import { Input } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
 import i18n from '../../i18n';
 import React from "react";
-const Input = InputRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const t18 = i18n.t as unknown as (key: string, options?: Record<string, unknown>) => string;
 
 const ModernSelect = ({

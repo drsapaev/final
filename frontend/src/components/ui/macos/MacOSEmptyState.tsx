@@ -11,6 +11,8 @@ interface MacOSEmptyStateProps {
   variant?: string;
   className?: string;
   style?: CSSProperties;
+  message?: React.ReactNode;
+  type?: string;
 }
 
 const MacOSEmptyState = ({

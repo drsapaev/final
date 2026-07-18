@@ -16,9 +16,9 @@ import {
 import {
   Card as MacOSCard,
   Badge,
-  Button as ButtonRaw,
-  MacOSEmptyState as MacOSEmptyStateRaw,
-  Input as InputRaw,
+  Button,
+  MacOSEmptyState,
+  Input,
   Skeleton as SkeletonRaw,
   Select as SelectRaw,
 } from '../ui/macos';
@@ -33,11 +33,8 @@ import FinanceModal from './FinanceModal';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
 import React from "react";
-const Input = InputRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const Select = SelectRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const Button = ButtonRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const Skeleton = SkeletonRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const MacOSEmptyState = MacOSEmptyStateRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 function getCategoryOptions(t) {
   return [

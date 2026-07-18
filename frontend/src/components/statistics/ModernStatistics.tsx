@@ -2,12 +2,11 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import {
-  Button as ButtonRaw, Card, Icon,
+  Button, Card, Icon,
 } from '../ui/macos';
 import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
-const Button = ButtonRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const getAppointmentDate = (appointment) => appointment.date || appointment.appointment_date;
 

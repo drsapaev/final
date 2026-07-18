@@ -10,12 +10,11 @@ import {
 } from 'lucide-react';
 import {
   Select as SelectRaw,
-  Input as InputRaw } from '../ui/macos';
+  Input } from '../ui/macos';
 import { useNotificationCenter } from '../../contexts/NotificationCenterContext';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
-const Input = InputRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const Select = SelectRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const STATUS_FILTER_OPTIONS = [

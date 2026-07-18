@@ -1,8 +1,8 @@
 
 import {
   Box,
-  Typography as TypographyRaw,
-  Alert as AlertRaw,
+  Typography,
+  Alert,
   Paper,
 } from '../ui/macos';
 // UX Audit Registrar #1: P6 codemod в PR #1898 случайно заменил
@@ -18,8 +18,6 @@ import {
 import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
-const Alert = AlertRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const Typography = TypographyRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 /**
  * Компонент для красивого отображения клинических рекомендаций AI

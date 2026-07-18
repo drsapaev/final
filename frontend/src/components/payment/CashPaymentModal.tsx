@@ -13,7 +13,7 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  Typography as TypographyRaw,
+  Typography,
   Box,
 } from '../ui/macos';
 import notify from '../../services/notify';
@@ -21,7 +21,6 @@ import { formatUZS } from '../../utils/formatCurrency';
 // UX Audit #4 regression fix: inline-стили → CSS-классы (после PR #1910 regression).
 import './CashPaymentModal.css';
 import React from "react";
-const Typography = TypographyRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 /**
  * Cash Payment Modal Component

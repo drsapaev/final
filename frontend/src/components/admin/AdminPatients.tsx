@@ -9,9 +9,9 @@ import useModal from '../../hooks/useModal';
 import notify from '../../services/notify';
 import {
   Badge,
-  Button as ButtonRaw,
+  Button,
   MacOSCard,
-  MacOSEmptyState as MacOSEmptyStateRaw,
+  MacOSEmptyState,
   Input,
   Skeleton as SkeletonRaw,
   Select as SelectRaw,
@@ -22,9 +22,7 @@ import logger from '../../utils/logger';
 import { useConfirm } from '../common/ConfirmDialog';
 import React from "react";
 const Select = SelectRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const Button = ButtonRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const Skeleton = SkeletonRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const MacOSEmptyState = MacOSEmptyStateRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const GENDER_OPTION_KEYS = [
   { value: '', labelKey: 'admin2.ap_gender_all' },

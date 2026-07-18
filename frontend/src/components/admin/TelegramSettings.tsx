@@ -21,16 +21,14 @@ import {
 
 'lucide-react';
 import {
-  MacOSCard, Button as ButtonRaw, Input as InputRaw, Select as SelectRaw, Checkbox,
+  MacOSCard, Button, Input, Select as SelectRaw, Checkbox,
 } from '../ui/macos';
 
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
-const Input = InputRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const Select = SelectRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const Button = ButtonRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const getLanguageOptions = (t) => [
   { value: 'ru', label: t('admin2.ts_lang_ru') },

@@ -12,7 +12,7 @@ import {
   Box as BoxRaw,
   Card,
   CardContent,
-  Typography as TypographyRaw,
+  Typography,
   Button,
   Badge,
 } from '../ui/macos';
@@ -41,7 +41,6 @@ import {
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
 const Box = BoxRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const Typography = TypographyRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;

@@ -1,10 +1,9 @@
 
 import React, { useState } from 'react';
 import { useBreakpoint } from '../hooks/useEnhancedMediaQuery';
-import { Button as ButtonRaw } from './ui';
+import { Button } from './ui';
 import PropTypes from 'prop-types';
 import { Checkbox } from './ui/macos';
-const Button = ButtonRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const ResponsiveTable = ({
   data = [],

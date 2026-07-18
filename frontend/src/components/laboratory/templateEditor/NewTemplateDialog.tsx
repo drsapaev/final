@@ -2,11 +2,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import {
-  Alert as AlertRaw, Button, Dialog, DialogTitle, DialogContent, DialogActions, Input, Label, Textarea, Icon,
+  Alert, Button, Dialog, DialogTitle, DialogContent, DialogActions, Input, Label, Textarea, Icon,
 } from '../../ui/macos';
 import { useTranslation } from '../../../i18n/useTranslation';
 import React from "react";
-const Alert = AlertRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 /**
  * L-H-6 fix: NewTemplateDialog выделен в отдельный файл (~110 строк).

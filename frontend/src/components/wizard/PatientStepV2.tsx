@@ -12,7 +12,7 @@
 
 import PropTypes from 'prop-types';
 import { Search, Phone, Calendar, AlertCircle, RefreshCw } from 'lucide-react';
-import { Input as InputRaw,
+import { Input,
   Checkbox } from '../ui/macos';
 import { formatDateDisplay } from '../../utils/dateUtils';
 import { normalizeGenderForForm } from './wizardUtils';
@@ -20,7 +20,6 @@ import { normalizeGenderForForm } from './wizardUtils';
 import './PatientStepV2.css';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
-const Input = InputRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const PatientStepV2 = ({
   data = {}, // ✅ Default empty object to prevent crash

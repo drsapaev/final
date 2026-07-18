@@ -3,8 +3,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, Save, User, Mail, Phone, MapPin } from 'lucide-react';
 import {
   Label,
-  Alert as AlertRaw,
-  Button as ButtonRaw,
+  Alert,
+  Button,
   Checkbox,
   Badge,
   Input,
@@ -14,9 +14,7 @@ import {
 import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
-const Button = ButtonRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const Modal = ModalRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const Alert = AlertRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const DoctorModal = ({
   isOpen,

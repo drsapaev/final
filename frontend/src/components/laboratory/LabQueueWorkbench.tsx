@@ -2,7 +2,7 @@
 import PropTypes from 'prop-types';
 import { useState, useEffect } from 'react';
 import {
-  Badge, Button, Card, CardContent, CardHeader, CardTitle, Icon, Alert as AlertRaw,
+  Badge, Button, Card, CardContent, CardHeader, CardTitle, Icon, Alert,
   Input } from '../ui/macos';
 import {
   formatLabStatus,
@@ -19,7 +19,6 @@ import VirtualizedQueueList from './VirtualizedQueueList';
 import { useTranslation } from '../../i18n/useTranslation';
 import i18n from '../../i18n';
 import React from "react";
-const Alert = AlertRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const t18 = i18n.t as unknown as (key: string, options?: Record<string, unknown>) => string;
 
 // P-05 fix: маскирование PII (номера телефона) в карточках очереди.

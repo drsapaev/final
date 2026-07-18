@@ -11,17 +11,14 @@ import i18n from '../../i18n';
 import { useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { AlertCircle, X, Save, Package, Users, Filter } from 'lucide-react';
-import { MacOSTab, MacOSCard, Button as ButtonRaw, Input as InputRaw, Label, Select as SelectRaw, Textarea as TextareaRaw, Checkbox } from '../ui/macos';
+import { MacOSTab, MacOSCard, Button, Input, Label, Select as SelectRaw, Textarea, Checkbox } from '../ui/macos';
 import ServiceChangesPreview from './ServiceChangesPreview';
 import { isValidServiceCode, normalizeServiceCode, formatServiceCodeInput } from '../../utils/serviceCodeUtils';
 import logger from '../../utils/logger';
 import { api } from '../../api/client';
 import notify from '../../services/notify';
 import React from "react";
-const Textarea = TextareaRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = InputRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const Select = SelectRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const Button = ButtonRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const t18 = i18n.t as unknown as (key: string, options?: Record<string, unknown>) => string;
 
 // UX Audit Admin #4.1: shared constants extracted from ServiceCatalog.jsx.
