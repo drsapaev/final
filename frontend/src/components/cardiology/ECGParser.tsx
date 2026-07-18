@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 /**
  * ECG Parser Component
@@ -8,6 +6,7 @@
  */
 import logger from '../../utils/logger';
 import i18n from '../../i18n';
+const t18 = i18n.t as unknown as (key: string, options?: Record<string, unknown>) => string;
 // Парсер для SCP формата
 // C-1 fix: previously this returned hardcoded fake parameters (heartRate: 75,
 // prInterval: 160, etc.) regardless of file contents. Those fake values were
@@ -27,7 +26,7 @@ export const parseSCPFile = async (file) => {
     if (buffer.byteLength < 6) {
       return {
         success: false,
-        error: i18n.t('cardio.cardio_parser_scp_too_small'),
+        error: t18('cardio.cardio_parser_scp_too_small'),
       };
     }
 
@@ -40,7 +39,7 @@ export const parseSCPFile = async (file) => {
 
     return {
       success: false,
-      error: i18n.t('cardio.cardio_parser_scp_not_implemented'),
+      error: t18('cardio.cardio_parser_scp_not_implemented'),
       format: 'SCP',
       raw: buffer,
     };
@@ -48,7 +47,7 @@ export const parseSCPFile = async (file) => {
     logger.error('Ошибка парсинга SCP:', error);
     return {
       success: false,
-      error: i18n.t('cardio.cardio_parser_scp_read_failed'),
+      error: t18('cardio.cardio_parser_scp_read_failed'),
     };
   }
 };
@@ -106,7 +105,7 @@ export const parseXMLFile = async (file) => {
     logger.error('Ошибка парсинга XML:', error);
     return {
       success: false,
-      error: i18n.t('cardio.cardio_parser_xml_parse_failed')
+      error: t18('cardio.cardio_parser_xml_parse_failed')
     };
   }
 };
@@ -158,12 +157,12 @@ export const parseECGFile = async (file) => {
       success: true,
       parameters: null,
       format: 'PDF',
-      message: i18n.t('cardio.cardio_parser_pdf_view_only')
+      message: t18('cardio.cardio_parser_pdf_view_only')
     };
   } else {
     return {
       success: false,
-      error: i18n.t('cardio.cardio_parser_unsupported_format')
+      error: t18('cardio.cardio_parser_unsupported_format')
     };
   }
 };
@@ -178,32 +177,32 @@ export const analyzeECGParameters = (parameters) => {
   // Анализ ЧСС
   const hr = parseInt(parameters.heartRate);
   if (hr > 100) {
-    findings.push(i18n.t('cardio.cardio_parser_tachycardia'));
-    if (hr > 150) alerts.push(i18n.t('cardio.cardio_parser_severe_tachycardia'));
+    findings.push(t18('cardio.cardio_parser_tachycardia'));
+    if (hr > 150) alerts.push(t18('cardio.cardio_parser_severe_tachycardia'));
   } else if (hr < 60) {
-    findings.push(i18n.t('cardio.cardio_parser_bradycardia'));
-    if (hr < 40) alerts.push(i18n.t('cardio.cardio_parser_severe_bradycardia'));
+    findings.push(t18('cardio.cardio_parser_bradycardia'));
+    if (hr < 40) alerts.push(t18('cardio.cardio_parser_severe_bradycardia'));
   } else {
-    findings.push(i18n.t('cardio.cardio_parser_normal_hr'));
+    findings.push(t18('cardio.cardio_parser_normal_hr'));
   }
 
   // Анализ интервала PR
   const pr = parseInt(parameters.prInterval);
   if (pr > 200) {
-    findings.push(i18n.t('cardio.cardio_parser_pr_prolonged'));
-    if (pr > 300) alerts.push(i18n.t('cardio.cardio_parser_av_block'));
+    findings.push(t18('cardio.cardio_parser_pr_prolonged'));
+    if (pr > 300) alerts.push(t18('cardio.cardio_parser_av_block'));
   } else if (pr < 120) {
-    findings.push(i18n.t('cardio.cardio_parser_pr_short'));
-    alerts.push(i18n.t('cardio.cardio_parser_wpw_possible'));
+    findings.push(t18('cardio.cardio_parser_pr_short'));
+    alerts.push(t18('cardio.cardio_parser_wpw_possible'));
   }
 
   // Анализ QRS
   const qrs = parseInt(parameters.qrsInterval);
   if (qrs > 120) {
-    findings.push(i18n.t('cardio.cardio_parser_qrs_wide'));
-    alerts.push(i18n.t('cardio.cardio_parser_bundle_branch_block'));
+    findings.push(t18('cardio.cardio_parser_qrs_wide'));
+    alerts.push(t18('cardio.cardio_parser_bundle_branch_block'));
   } else if (qrs < 80) {
-    findings.push(i18n.t('cardio.cardio_parser_qrs_narrow'));
+    findings.push(t18('cardio.cardio_parser_qrs_narrow'));
   }
 
   // Анализ QT
@@ -211,22 +210,22 @@ export const analyzeECGParameters = (parameters) => {
   const qtc = parseInt(parameters.qtcInterval);
 
   if (qtc > 450 || qt > 450) {
-    findings.push(i18n.t('cardio.cardio_parser_qt_prolonged'));
+    findings.push(t18('cardio.cardio_parser_qt_prolonged'));
     if (qtc > 500 || qt > 500) {
-      alerts.push(i18n.t('cardio.cardio_parser_qt_critical'));
+      alerts.push(t18('cardio.cardio_parser_qt_critical'));
     }
   } else if (qtc < 340 || qt < 340) {
-    findings.push(i18n.t('cardio.cardio_parser_qt_short'));
+    findings.push(t18('cardio.cardio_parser_qt_short'));
   }
 
   // Анализ электрической оси
   const axis = parseInt(parameters.axis);
   if (axis < -30) {
-    findings.push(i18n.t('cardio.cardio_parser_axis_left'));
+    findings.push(t18('cardio.cardio_parser_axis_left'));
   } else if (axis > 90) {
-    findings.push(i18n.t('cardio.cardio_parser_axis_right'));
+    findings.push(t18('cardio.cardio_parser_axis_right'));
   } else {
-    findings.push(i18n.t('cardio.cardio_parser_axis_normal'));
+    findings.push(t18('cardio.cardio_parser_axis_normal'));
   }
 
   return {
@@ -238,16 +237,16 @@ export const analyzeECGParameters = (parameters) => {
 
 // Генерация текстового заключения
 function generateSummary(findings, alerts) {
-  let summary = i18n.t('cardio.cardio_parser_analysis_prefix');
+  let summary = t18('cardio.cardio_parser_analysis_prefix');
 
   if (alerts.length > 0) {
-    summary += i18n.t('cardio.cardio_parser_attention_prefix') + alerts.join('. ') + '. ';
+    summary += t18('cardio.cardio_parser_attention_prefix') + alerts.join('. ') + '. ';
   }
 
   if (findings.length > 0) {
-    summary += i18n.t('cardio.cardio_parser_findings_prefix') + findings.join(', ') + '.';
+    summary += t18('cardio.cardio_parser_findings_prefix') + findings.join(', ') + '.';
   } else {
-    summary += i18n.t('cardio.cardio_parser_normal_params');
+    summary += t18('cardio.cardio_parser_normal_params');
   }
 
   return summary;
@@ -258,7 +257,7 @@ export const exportECGParameters = (parameters) => {
   return {
     basic: {
       heartRate: parameters.heartRate,
-      rhythm: parameters.rhythm || i18n.t('cardio.cardio_parser_sinus_rhythm')
+      rhythm: parameters.rhythm || t18('cardio.cardio_parser_sinus_rhythm')
     },
     intervals: {
       pr: parameters.prInterval,

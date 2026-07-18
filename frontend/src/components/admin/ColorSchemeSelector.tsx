@@ -1,12 +1,11 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
+import type { CSSProperties } from 'react';
 
 import PropTypes from 'prop-types';
 import { useMemo } from 'react';
 import { Layers, Monitor, Moon, Palette, Rainbow, Sparkles, Sun, SwatchBook } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
-import { useMacOSTheme } from '../../theme/macosTheme.jsx';
-import { COLOR_SCHEMES } from '../../theme/colorScheme.js';
+import { useMacOSTheme } from '../../theme/macosTheme';
+import { COLOR_SCHEMES } from '../../theme/colorScheme';
 import {
   MacOSCard, Select,
 } from '../ui/macos';
@@ -40,7 +39,7 @@ const ACCENT_LABELS = {
 };
 
 function ThemePreviewCard({ scheme, isActive, onSelect }) {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const Icon = ICONS[scheme.id] || Sun;
   const preview = scheme.preview;
   const buttonLabel = isActive
@@ -54,7 +53,7 @@ function ThemePreviewCard({ scheme, isActive, onSelect }) {
       onClick={() => onSelect(scheme.id)}
       aria-pressed={isActive}
       aria-label={buttonLabel}
-      className="admin-cursor-pointer-radius-18-p-16-ta-left-grid-gap-14-minh-196" style={{ '--admin-border': isActive ? '2px solid var(--mac-accent-blue)' : '1px solid var(--mac-border)', '--admin-background': preview.background, '--admin-color': preview.text, '--admin-boxShadow': isActive ? '0 10px 28px rgba(15, 23, 42, 0.26)' : '0 8px 20px rgba(15, 23, 42, 0.12)' }}
+      className="admin-cursor-pointer-radius-18-p-16-ta-left-grid-gap-14-minh-196" style={{ '--admin-border': isActive ? '2px solid var(--mac-accent-blue)' : '1px solid var(--mac-border)', '--admin-background': preview.background, '--admin-color': preview.text, '--admin-boxShadow': isActive ? '0 10px 28px rgba(15, 23, 42, 0.26)' : '0 8px 20px rgba(15, 23, 42, 0.12)' } as CSSProperties}
     >
       <div className="admin-flex-ai-start-jc-between-gap-12">
         <div className="admin-grid-gap-6">
@@ -75,22 +74,22 @@ function ThemePreviewCard({ scheme, isActive, onSelect }) {
           null}
       </div>
 
-      <div className="admin-radius-14-p-12-grid-gap-10-bd-filter-blur12px-wbd-filter-blur12px" style={{ '--admin-border': `1px solid ${preview.border}`, '--admin-background': preview.surface }}>
+      <div className="admin-radius-14-p-12-grid-gap-10-bd-filter-blur12px-wbd-filter-blur12px" style={{ '--admin-border': `1px solid ${preview.border}`, '--admin-background': preview.surface } as CSSProperties}>
         <div className="admin-grid-gtc-56px1fr-gap-10-ai-stretch">
-          <div className="admin-radius-10" style={{ '--admin-background': preview.surfaceAlt, '--admin-border': `1px solid ${preview.border}` }} />
+          <div className="admin-radius-10" style={{ '--admin-background': preview.surfaceAlt, '--admin-border': `1px solid ${preview.border}` } as CSSProperties} />
           <div className="admin-grid-gap-8">
-            <div className="admin-h-12-w-72pct-radius-999-opacity-0p22" style={{ '--admin-background': preview.text }} />
-            <div className="admin-h-10-w-48pct-radius-999-opacity-0p12" style={{ '--admin-background': preview.text }} />
-            <div className="admin-h-24-w-42pct-radius-10" style={{ '--admin-background': preview.accent }} />
+            <div className="admin-h-12-w-72pct-radius-999-opacity-0p22" style={{ '--admin-background': preview.text } as CSSProperties} />
+            <div className="admin-h-10-w-48pct-radius-999-opacity-0p12" style={{ '--admin-background': preview.text } as CSSProperties} />
+            <div className="admin-h-24-w-42pct-radius-10" style={{ '--admin-background': preview.accent } as CSSProperties} />
           </div>
         </div>
       </div>
 
       <div className="admin-flex-wrap-gap-8">
-        <span className="admin-fontsize-8b6852-p-4px8-radius-999-background-5d083b" style={{ '--admin-border': `1px solid ${preview.border}` }}>
+        <span className="admin-fontsize-8b6852-p-4px8-radius-999-background-5d083b" style={{ '--admin-border': `1px solid ${preview.border}` } as CSSProperties}>
           {scheme.surfaces}
         </span>
-        <span className="admin-fontsize-8b6852-p-4px8-radius-999-background-5d083b" style={{ '--admin-border': `1px solid ${preview.border}` }}>
+        <span className="admin-fontsize-8b6852-p-4px8-radius-999-background-5d083b" style={{ '--admin-border': `1px solid ${preview.border}` } as CSSProperties}>
           {scheme.contrast}
         </span>
       </div>
@@ -119,7 +118,7 @@ ThemePreviewCard.propTypes = {
 };
 
 export default function ColorSchemeSelector() {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const { colorScheme, setColorScheme } = useTheme();
   const { accent } = useMacOSTheme();
 
@@ -219,7 +218,7 @@ export default function ColorSchemeSelector() {
         <div
           role="img"
           aria-label={currentPreviewLabel}
-          className="admin-p-18-radius-18-bd-1solidvar-mac-border-grid-gap-16-minh-220" style={{ '--admin-background': currentScheme.preview.background, '--admin-color': currentScheme.preview.text }}
+          className="admin-p-18-radius-18-bd-1solidvar-mac-border-grid-gap-16-minh-220" style={{ '--admin-background': currentScheme.preview.background, '--admin-color': currentScheme.preview.text } as CSSProperties}
         >
           <div className="admin-flex-ai-center-gap-10-jc-between">
             <div className="admin-flex-ai-center-gap-10">
@@ -232,21 +231,21 @@ export default function ColorSchemeSelector() {
           </div>
 
           <div className="admin-grid-gtc-72px1fr-gap-14-flex-1">
-            <div className="admin-radius-14-grid-gap-8-p-10" style={{ '--admin-background': currentScheme.preview.surfaceAlt, '--admin-border': `1px solid ${currentScheme.preview.border}` }}>
+            <div className="admin-radius-14-grid-gap-8-p-10" style={{ '--admin-background': currentScheme.preview.surfaceAlt, '--admin-border': `1px solid ${currentScheme.preview.border}` } as CSSProperties}>
               <div className="admin-h-10-radius-999-background-022358" />
               <div className="admin-h-10-radius-999-background-4443b0" />
-              <div className="admin-mt-auto-h-28-radius-10" style={{ '--admin-background': currentScheme.preview.accent }} />
+              <div className="admin-mt-auto-h-28-radius-10" style={{ '--admin-background': currentScheme.preview.accent } as CSSProperties} />
             </div>
 
-            <div className="admin-radius-16-p-14-grid-gap-12-bd-filter-blur14px-wbd-filter-blur14px" style={{ '--admin-border': `1px solid ${currentScheme.preview.border}`, '--admin-background': currentScheme.preview.surface }}>
-              <div className="admin-h-36-radius-12-background-4443b0" style={{ '--admin-border': `1px solid ${currentScheme.preview.border}` }} />
+            <div className="admin-radius-16-p-14-grid-gap-12-bd-filter-blur14px-wbd-filter-blur14px" style={{ '--admin-border': `1px solid ${currentScheme.preview.border}`, '--admin-background': currentScheme.preview.surface } as CSSProperties}>
+              <div className="admin-h-36-radius-12-background-4443b0" style={{ '--admin-border': `1px solid ${currentScheme.preview.border}` } as CSSProperties} />
               <div className="admin-grid-gap-8">
-                <div className="admin-h-12-w-76pct-radius-999-opacity-0p22" style={{ '--admin-background': currentScheme.preview.text }} />
-                <div className="admin-h-10-w-58pct-radius-999-opacity-0p12" style={{ '--admin-background': currentScheme.preview.text }} />
+                <div className="admin-h-12-w-76pct-radius-999-opacity-0p22" style={{ '--admin-background': currentScheme.preview.text } as CSSProperties} />
+                <div className="admin-h-10-w-58pct-radius-999-opacity-0p12" style={{ '--admin-background': currentScheme.preview.text } as CSSProperties} />
               </div>
               <div className="admin-flex-gap-10">
                 <div className="admin-flex-1-h-36-radius-12-bg-blue" />
-                <div className="admin-w-38pct-h-36-radius-12-background-4443b0" style={{ '--admin-border': `1px solid ${currentScheme.preview.border}` }} />
+                <div className="admin-w-38pct-h-36-radius-12-background-4443b0" style={{ '--admin-border': `1px solid ${currentScheme.preview.border}` } as CSSProperties} />
               </div>
             </div>
           </div>

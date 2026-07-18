@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useState, useEffect } from 'react';
 import { Card, Button, Badge,
@@ -14,13 +12,13 @@ import { useTranslation } from '../../i18n/useTranslation';
  * Показывает работу всех созданных хуков и контекстов
  */
 const IntegrationDemo = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [activeDemo, setActiveDemo] = useState('queue');
   
   // Используем созданные хуки
-  const queueManager = useQueueManager();
+  const queueManager = useQueueManager() as unknown as Record<string, any>;
   const emrAI = useEMRAI();
-  const { users, appointments, actions } = useAppData();
+  const { users, appointments, actions } = useAppData() as unknown as { users: unknown[]; appointments: unknown[]; actions: { setLoading: (key: string, v: boolean) => void; setUsers: (v: unknown[]) => void; [key: string]: unknown }; };
 
   // Локальные состояния для демо
   const [testSymptoms, setTestSymptoms] = useState(t('misc.id_golovnaya_bol_toshnota'));
@@ -59,10 +57,10 @@ const IntegrationDemo = () => {
             <p>{t('misc.id_zagruzka')}</p>
           ) : (
             <div className="clinic-space-y-sm">
-              {queueManager.specialists.map(specialist => (
-                <div key={specialist.id} className="clinic-flex clinic-justify-between">
-                  <span>{specialist.name}</span>
-                  <Badge variant="info">{specialist.role}</Badge>
+              {queueManager.specialists.map((specialist: Record<string, unknown>) => (
+                <div key={String(specialist.id)} className="clinic-flex clinic-justify-between">
+                  <span>{String(specialist.name)}</span>
+                  <Badge variant="info">{String(specialist.role)}</Badge>
                 </div>
               ))}
             </div>
@@ -82,7 +80,7 @@ const IntegrationDemo = () => {
             
             {queueManager.qrData && (
               <div className="clinic-p-sm clinic-bg-success-light clinic-rounded">
-                ✅ QR код сгенерирован: {queueManager.qrData.queue_url}
+                ✅ QR код сгенерирован: {String((queueManager.qrData as Record<string, unknown>).queue_url)}
               </div>
             )}
           </div>
@@ -183,10 +181,10 @@ const IntegrationDemo = () => {
           <h4>{t('misc.id_polzovateli_iz_konteksta')}</h4>
           {users.length > 0 ? (
             <div className="clinic-space-y-sm">
-              {users.map(user => (
-                <div key={user.id} className="clinic-flex clinic-justify-between">
-                  <span>{user.name}</span>
-                  <Badge variant="success">{user.role}</Badge>
+              {users.map((user: Record<string, unknown>) => (
+                <div key={String(user.id)} className="clinic-flex clinic-justify-between">
+                  <span>{String(user.name)}</span>
+                  <Badge variant="success">{String(user.role)}</Badge>
                 </div>
               ))}
             </div>
@@ -200,7 +198,7 @@ const IntegrationDemo = () => {
           <div className="clinic-space-y-sm">
             <Button 
               variant="secondary"
-              onClick={() => actions.addUser({
+              onClick={() => (actions as unknown as { addUser: (user: unknown) => void }).addUser({
                 id: Date.now(),
                 name: t('misc.id_polzovatel_users_length_1', { length: users.length + 1 }),
                 role: 'Test'

@@ -1,5 +1,4 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
+import type { CSSProperties } from 'react';
 
 /**
  * AISuggestionPopover - Inline popup for field-level AI suggestions
@@ -73,7 +72,7 @@ export function AISuggestionPopover({
             const viewportHeight = window.innerHeight;
             const viewportWidth = window.innerWidth;
 
-            const style = {
+            const style: CSSProperties = {
                 position: 'fixed',
                 zIndex: 10000,
             };
@@ -84,7 +83,7 @@ export function AISuggestionPopover({
                 style.left = anchorRect.left;
 
                 // Check if it would go off-screen bottom
-                if (style.top + 300 > viewportHeight) {
+                if (Number(style.top) + 300 > viewportHeight) {
                     // Position above instead
                     style.top = anchorRect.top - 4;
                     style.transform = 'translateY(-100%)';
@@ -99,12 +98,12 @@ export function AISuggestionPopover({
             }
 
             // Prevent going off right edge
-            if (style.left + 400 > viewportWidth) {
+            if (Number(style.left) + 400 > viewportWidth) {
                 style.left = viewportWidth - 420;
             }
 
             // Prevent going off left edge
-            if (style.left < 10) {
+            if (Number(style.left) < 10) {
                 style.left = 10;
             }
 

@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import React from 'react';
 import Icon from '../Icon';
@@ -190,10 +188,10 @@ const MedicalTable = ({
                   backgroundColor: isDark ? 'var(--mac-text-primary)' : 'var(--mac-bg-primary)'
                 }}
                 onMouseEnter={(e) => {
-                  e.target.style.backgroundColor = isDark ? 'var(--mac-text-secondary)' : 'var(--mac-bg-secondary)';
+                  e.currentTarget.style.backgroundColor = isDark ? 'var(--mac-text-secondary)' : 'var(--mac-bg-secondary)';
                 }}
                 onMouseLeave={(e) => {
-                  e.target.style.backgroundColor = isDark ? 'var(--mac-text-primary)' : 'var(--mac-bg-primary)';
+                  e.currentTarget.style.backgroundColor = isDark ? 'var(--mac-text-primary)' : 'var(--mac-bg-primary)';
                 }}
               >
                 {columns.map((column) => (
