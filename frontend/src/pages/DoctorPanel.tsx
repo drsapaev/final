@@ -2,15 +2,21 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type { CSSProperties } from "react";
 import { useLocation, useNavigate } from 'react-router-dom';
 import '../styles/dark-theme-visibility-fix.css';
-import AIAssistant from '../components/ai/AIAssistant';
+import AIAssistantRaw from '../components/ai/AIAssistant';
+const AIAssistant = AIAssistantRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import {
-  Button,
-  Card,
+  Button as RawButton,
+  Card as RawCard,
   CardHeader,
   CardContent,
-  Badge,
-  Skeleton,
-  Input } from '../components/ui/macos';
+  Badge as RawBadge,
+  Skeleton as RawSkeleton,
+  Input as RawInput } from '../components/ui/macos';
+const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
+const Card = RawCard as unknown as React.ComponentType<Record<string, unknown>>;
+const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
+const Skeleton = RawSkeleton as unknown as React.ComponentType<Record<string, unknown>>;
+const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
 // R-14: AnimatedTransition moved from native/ to macos/ kit.
 import { AnimatedTransition } from '../components/ui/macos';
 import { useTheme } from '../contexts/ThemeContext';
@@ -158,7 +164,7 @@ const DoctorPanel = () => {
   const [doctorSpecialty, setDoctorSpecialty] = useState('general');
 
   useEffect(() => {
-    getProfile().then((profile) => {
+    getProfile().then((profile: any) => {
       if (profile?.specialty) {
         setDoctorSpecialty(profile.specialty);
       }
@@ -209,7 +215,7 @@ const DoctorPanel = () => {
     if (!timestamp) return null;
     const start = new Date(timestamp);
     const now = new Date();
-    const diffMs = now - start;
+    const diffMs = now.getTime() - start.getTime();
     const diffMins = Math.floor(diffMs / 60000);
     if (diffMins < 1) return t('doctor.just_now');
     if (diffMins < 60) return `${diffMins}m`;
@@ -363,7 +369,7 @@ const DoctorPanel = () => {
   // UX Audit Doctor H-09: headerHeight useEffect removed — headerRef was never attached.
 
   // Стили
-  const pageStyle = {
+  const pageStyle: CSSProperties = {
     minHeight: '100vh',
     background: 'var(--mac-gradient-window)',
     fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif',
@@ -375,14 +381,14 @@ const DoctorPanel = () => {
   // UX Audit Doctor H-09: 5 мёртвых стилевых блоков удалены (header/inner/title/actions).
   // Они были labelled statements без присваивания — never used.
 
-  const contentStyle = {
+  const contentStyle: CSSProperties = {
     marginTop: '20px',
     padding: isMobile ? getSpacing('md') : getSpacing('lg'),
     maxWidth: '1400px',
     margin: '20px auto 0 auto'
   };
 
-  const tabsStyle = {
+  const tabsStyle: CSSProperties = {
     display: 'flex',
     gap: isMobile ? getSpacing('sm') : getSpacing('md'),
     marginBottom: getSpacing('xl'),
@@ -390,7 +396,7 @@ const DoctorPanel = () => {
     paddingBottom: getSpacing('sm')
   };
 
-  const tabStyle = {
+  const tabStyle: CSSProperties = {
     padding: isMobile ? `${getSpacing('sm')} ${getSpacing('md')}` : `${getSpacing('md')} ${getSpacing('lg')}`,
     borderRadius: 'var(--mac-radius-lg)',
     background: interactiveSurface,
@@ -408,7 +414,7 @@ const DoctorPanel = () => {
     justifyContent: isMobile ? 'center' : 'flex-start'
   };
 
-  const activeTabStyle = {
+  const activeTabStyle: CSSProperties = {
     ...tabStyle,
     background: `linear-gradient(135deg, ${primaryColor} 0%, ${getColor('primary', 600)} 100%)`,
     color: 'var(--mac-text-on-accent)',
@@ -416,14 +422,14 @@ const DoctorPanel = () => {
     transform: 'translateY(-2px)'
   };
 
-  const dashboardGridStyle = {
+  const dashboardGridStyle: CSSProperties = {
     display: 'grid',
     gridTemplateColumns: isMobile ? '1fr' : isTablet ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
     gap: getSpacing('lg'),
     marginBottom: getSpacing('xl')
   };
 
-  const statCardStyle = {
+  const statCardStyle: CSSProperties = {
     background: panelSurface,
     borderRadius: 'var(--mac-radius-xl)',
     padding: getSpacing('lg'),
@@ -434,12 +440,12 @@ const DoctorPanel = () => {
     cursor: 'default'  /* UX Audit Doctor M-33: stat cards not clickable */
   };
 
-  const statCardHoverStyle = {
+  const statCardHoverStyle: CSSProperties = {
     transform: 'translateY(-4px) scale(1.02)',
     boxShadow: getShadow('2xl')
   };
 
-  const patientsTableStyle = {
+  const patientsTableStyle: CSSProperties = {
     background: panelSurface,
     borderRadius: 'var(--mac-radius-xl)',
     overflow: 'hidden',
@@ -448,13 +454,13 @@ const DoctorPanel = () => {
     border: `1px solid ${panelBorder}`
   };
 
-  const tableHeaderStyle = {
+  const tableHeaderStyle: CSSProperties = {
     background: 'linear-gradient(135deg, color-mix(in srgb, var(--mac-bg-secondary), white 8%) 0%, color-mix(in srgb, var(--mac-bg-secondary), transparent 10%) 100%)',
     padding: getSpacing('lg'),
     borderBottom: '1px solid var(--mac-separator)'
   };
 
-  const tableStyle = {
+  const tableStyle: CSSProperties = {
     width: '100%',
     borderCollapse: 'collapse'
   };
@@ -699,7 +705,7 @@ const DoctorPanel = () => {
                   }}>
 
                     <div className="doctor-stat-row">
-                      <div className="doctor-stat-icon" style={{ '--doctor-gradient-from': primaryColor, '--doctor-gradient-to': getColor('primary', 600) }}>
+                      <div className="doctor-stat-icon" style={{ '--doctor-gradient-from': primaryColor, '--doctor-gradient-to': getColor('primary', 600) } as CSSProperties}>
                         <User size={24} />
                       </div>
                       <div>
@@ -726,7 +732,7 @@ const DoctorPanel = () => {
                   }}>
 
                     <div className="doctor-stat-row">
-                      <div className="doctor-stat-icon" style={{ '--doctor-gradient-from': successColor, '--doctor-gradient-to': getColor('success', 600) }}>
+                      <div className="doctor-stat-icon" style={{ '--doctor-gradient-from': successColor, '--doctor-gradient-to': getColor('success', 600) } as CSSProperties}>
                         <Calendar size={24} />
                       </div>
                       <div>
@@ -753,7 +759,7 @@ const DoctorPanel = () => {
                   }}>
 
                     <div className="doctor-stat-row">
-                      <div className="doctor-stat-icon" style={{ '--doctor-gradient-from': warningColor, '--doctor-gradient-to': getColor('warning', 600) }}>
+                      <div className="doctor-stat-icon" style={{ '--doctor-gradient-from': warningColor, '--doctor-gradient-to': getColor('warning', 600) } as CSSProperties}>
                         <Clock size={24} />
                       </div>
                       <div>
@@ -780,7 +786,7 @@ const DoctorPanel = () => {
                   }}>
 
                     <div className="doctor-stat-row">
-                      <div className="doctor-stat-icon" style={{ '--doctor-gradient-from': accentColor, '--doctor-gradient-to': getColor('info', 600) }}>
+                      <div className="doctor-stat-icon" style={{ '--doctor-gradient-from': accentColor, '--doctor-gradient-to': getColor('info', 600) } as CSSProperties}>
                         <CheckCircle size={24} />
                       </div>
                       <div>
@@ -842,7 +848,7 @@ const DoctorPanel = () => {
               </CardHeader>
               <CardContent className="doctor-card-pad-0">
                 {loading ?
-              <Skeleton.Table rows={5} columns={6} /> :
+              <Skeleton variant="rectangular" width="100%" height={200} /> :
               loadError ?
               renderEmptyState({
                 icon: AlertCircle,
@@ -882,7 +888,7 @@ const DoctorPanel = () => {
 
                           <td className="doctor-td" aria-label={getPatientA11yContext(patient)}>
                             <div className="doctor-patient-cell">
-                              <div className="doctor-avatar-sm" style={{ '--doctor-gradient-from': primaryColor, '--doctor-gradient-to': getColor('primary', 600) }}>
+                              <div className="doctor-avatar-sm" style={{ '--doctor-gradient-from': primaryColor, '--doctor-gradient-to': getColor('primary', 600) } as CSSProperties}>
                                 {String(patient.name || t('doctor.patient_default')).split(' ').map((n) => n[0]).join('')}
                               </div>
                               <div>
@@ -994,7 +1000,7 @@ const DoctorPanel = () => {
               </CardHeader>
               <CardContent className="doctor-card-pad-0">
                 {loading ?
-              <Skeleton.Table rows={5} columns={6} /> :
+              <Skeleton variant="rectangular" width="100%" height={200} /> :
               loadError ?
               renderEmptyState({
                 icon: AlertCircle,

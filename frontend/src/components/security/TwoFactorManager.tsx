@@ -970,7 +970,7 @@ export default function TwoFactorManager() {
                   <div style={{ fontSize: 14, fontWeight: 'var(--mac-font-weight-semibold)' }}>{log.action}</div>
                   <div style={{ marginTop: 4, fontSize: 12, color: 'var(--mac-text-secondary)' }}>{log.description}</div>
                   <div style={{ marginTop: 6, fontSize: 12, color: 'var(--mac-text-secondary)' }}>
-                    {formatDate(log.timestamp)} • {log.ip_address || 'unknown'} • {log.user_agent || 'unknown'}
+                    {formatDate(log.timestamp, t)} • {log.ip_address || 'unknown'} • {log.user_agent || 'unknown'}
                   </div>
                 </div>
               </div>

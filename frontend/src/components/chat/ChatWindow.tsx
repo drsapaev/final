@@ -1038,7 +1038,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
                 }}>
                 
                                         {rowVirtualizer.getVirtualItems().map((virtualItem) => {
-                  const item = groupedMessages[virtualItem.index];
+                  const item: any = groupedMessages[virtualItem.index];
                   return (
                     <div
                       key={virtualItem.key}
@@ -1150,7 +1150,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
 
                                                                 {item.reactions && item.reactions.length > 0 &&
                           <div className="message-reactions">
-                                                                        {Object.entries(groupReactions(item.reactions)).map(([emoji, userIds]) =>
+                                                                        {Object.entries(groupReactions(item.reactions)).map(([emoji, userIds]: [string, any]) =>
                             <span
                               key={emoji}
                               className={`reaction-bubble ${userIds.includes(user?.id) ? 'active' : ''}`}
