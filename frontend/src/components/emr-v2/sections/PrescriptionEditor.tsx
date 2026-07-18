@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 /**
  * PrescriptionEditor - Виджет назначений
@@ -35,7 +33,7 @@ const PrescriptionEditor = ({
   isEditable = true,
   onFieldTouch
 }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [isAdding, setIsAdding] = useState(false);
   const [newItem, setNewItem] = useState({
     name: '',

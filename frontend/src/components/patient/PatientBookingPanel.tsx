@@ -1,9 +1,7 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useState } from 'react';
 import {
-  Badge, Button, Icon, Input, Textarea,
+  Badge, Button, Icon, Input as InputRaw, Textarea as TextareaRaw,
 } from '../ui/macos';
 import { api } from '../../api/client';
 import {
@@ -15,6 +13,9 @@ import {
 } from './patientUtils';
 import PanelEmptyState from './PanelEmptyState';
 import { useTranslation } from '../../i18n/useTranslation';
+import React from "react";
+const Input = InputRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Textarea = TextareaRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 /**
  * L-H-4 fix: PatientBookingPanel выделен в отдельный файл (~120 строк).
@@ -29,7 +30,7 @@ import { useTranslation } from '../../i18n/useTranslation';
  * Поток: preview → review summary → create booking.
  */
 function PatientBookingPanel() {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [bookingForm, setBookingForm] = useState(() => ({
     appointmentDate: getDefaultAppointmentDate(),
     appointmentTime: '',
@@ -179,13 +180,13 @@ function PatientBookingPanel() {
 
           {createdBooking && (
             <div className="pp-grid-span-2 pp-message pp-message--success" role="status">
-              <Icon name="checkmark.circle" size={16} />
+              <Icon name="checkmark.circle" size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
               {t('patient.pat_book_created', { id: createdBooking.appointment_id })}
             </div>
           )}
           {bookingError && (
             <div className="pp-grid-span-2 pp-message pp-message--error" role="alert">
-              <Icon name="exclamationmark.triangle" size={16} />
+              <Icon name="exclamationmark.triangle" size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
               {bookingError}
             </div>
           )}
@@ -198,7 +199,7 @@ function PatientBookingPanel() {
               loading={bookingStatus === 'previewing'}
               onClick={previewBooking}
             >
-              <Icon name="doc.text" size={16} />
+              <Icon name="doc.text" size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
               {t('patient.pat_book_preview_button')}
             </Button>
             <Button
@@ -208,7 +209,7 @@ function PatientBookingPanel() {
               loading={bookingStatus === 'creating'}
               onClick={createBooking}
             >
-              <Icon name="calendar" size={16} />
+              <Icon name="calendar" size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
               {t('patient.pat_book_book_button')}
             </Button>
           </div>

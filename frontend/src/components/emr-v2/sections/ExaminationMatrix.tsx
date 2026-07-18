@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 /**
  * ExaminationMatrix - Быстрый ввод объективного статуса
@@ -110,7 +108,7 @@ const ExaminationMatrix = ({
   onGenerateText,
   isEditable = true
 }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [activeCategory, setActiveCategory] = useState(Object.keys(MATRICES[specialty] || MATRICES.general)[0]);
   const [status, setStatus] = useState({}); // { 'em_item_tones': 'norm' | 'path' }
 

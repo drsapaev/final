@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { api } from '../../api/client';
 import { useState } from 'react';
@@ -19,7 +17,7 @@ import {
 } from 'lucide-react';
 
 const AppActivation = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [activationKey, setActivationKey] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -54,9 +52,9 @@ const AppActivation = () => {
         })
       });
 
-      const result = await response.json();
+      const result = response.data;
 
-      if (response.ok) {
+      if (response.status >= 200 && response.status < 300) {
         setSuccess(t('misc.aa_prilozhenie_uspeshno_aktivir'));
         setStep('success');
 

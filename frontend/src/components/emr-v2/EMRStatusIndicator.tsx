@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 /**
  * EMRStatusIndicator - Psychological anchor for the doctor
@@ -85,7 +83,7 @@ export function EMRStatusIndicator({
     version,
     autosaveConfig = { debounceMs: 3000, enabled: true },
 }) {
-    const { t } = useTranslation();
+    const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
     // Update relative time every 10 seconds
     const [, setTick] = useState(0);
 

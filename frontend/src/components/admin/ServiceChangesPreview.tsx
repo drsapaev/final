@@ -1,5 +1,4 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
+import type { CSSProperties } from 'react';
 
 import { useTranslation } from '../../i18n/useTranslation';
 import PropTypes from 'prop-types';
@@ -9,7 +8,7 @@ import {
 } from '../ui/macos';
 
 const ServiceChangesPreview = ({ oldService, newService, onConfirm, onCancel }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const formatFieldName = (field) => {
     const fieldNames = {
       name: t('admin2.scp_field_name'),
@@ -125,7 +124,7 @@ const ServiceChangesPreview = ({ oldService, newService, onConfirm, onCancel }) 
       className="admin-p-0"
     >
       {/* Header */}
-      <div className="admin-p-20px-24px-bd-b-1px-solid-var-mac-bo-bgc-dyn" style={{ '--admin-bgc0': hasImportantChanges ? 'rgba(245, 158, 11, 0.05)' : 'transparent' }}>
+      <div className="admin-p-20px-24px-bd-b-1px-solid-var-mac-bo-bgc-dyn" style={{ '--admin-bgc0': hasImportantChanges ? 'rgba(245, 158, 11, 0.05)' : 'transparent' } as CSSProperties}>
         <h3 id={previewTitleId} className="admin-fs-18-fw-600-primary-m-0-0-8px-0">
           {t('admin2.scp_title')}
         </h3>
@@ -164,14 +163,13 @@ const ServiceChangesPreview = ({ oldService, newService, onConfirm, onCancel }) 
                 ? 'rgba(245, 158, 11, 0.05)'
                 : 'var(--mac-bg-secondary)', '--admin-bd2': change.isImportant
                 ? '1px solid rgba(245, 158, 11, 0.2)'
-                : '1px solid var(--mac-border)' }}
-          >
+                : '1px solid var(--mac-border)' } as CSSProperties}>
             <div className="admin-d-flex-ai-center-gap-8-mb-12">
               <span className="admin-fs-14-fw-600-primary">
                 {formatFieldName(change.field)}
               </span>
               {change.isImportant && (
-                <Badge variant="warning" size="sm">
+                <Badge variant="warning" size="small">
                   {t('admin2.scp_important_badge')}
                 </Badge>
               )}
