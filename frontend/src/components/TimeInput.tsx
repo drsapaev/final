@@ -1,8 +1,16 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import PropTypes from 'prop-types';
 import { Input } from './ui/macos';
+import type { CSSProperties, ChangeEvent, FocusEvent } from 'react';
+import React from 'react';
+
+interface TimeInputProps {
+  value?: string;
+  onChange?: (value: string) => void;
+  disabled?: boolean;
+  style?: CSSProperties;
+  ariaLabel?: string;
+}
+
 /**
  * TimeInput — контрол ввода времени HH:MM с простейшей валидацией.
  * Props:
@@ -17,16 +25,14 @@ export default function TimeInput({
   disabled = false,
   style = {},
   ariaLabel = 'Время в формате часы и минуты',
-}) {
-  function onInput(e) {
+}: TimeInputProps) {
+  function onInput(e: ChangeEvent<HTMLInputElement>) {
     const raw = e.target.value;
-    // Нормализуем до ##:##, только цифры и двоеточие
     const cleaned = raw.replace(/[^\d:]/g, '').slice(0, 5);
     onChange(cleaned);
   }
 
   function onBlur() {
-    // Автокоррекция "9:5" -> "09:05"
     const m = /^(\d{1,2}):(\d{1,2})$/.exec(String(value || ''));
     if (!m) return;
     const hh = Math.max(0, Math.min(23, parseInt(m[1], 10) || 0));
@@ -35,7 +41,7 @@ export default function TimeInput({
     if (fixed !== value) onChange(fixed);
   }
 
-  const baseStyle = {
+  const baseStyle: CSSProperties = {
     padding: 8,
     borderRadius: 8,
     border: '1px solid #ddd',
@@ -44,14 +50,16 @@ export default function TimeInput({
     ...style,
   };
 
+  const MacInput = Input as unknown as React.ComponentType<Record<string, unknown>>;
+
   return (
-    <Input
+    <MacInput
       aria-label={ariaLabel}
       type="text"
       placeholder="HH:MM"
       value={value}
-      onChange={onInput}
-      onBlur={onBlur}
+      onChange={onInput as unknown as React.ChangeEventHandler<HTMLInputElement>}
+      onBlur={onBlur as unknown as React.FocusEventHandler<HTMLInputElement>}
       disabled={disabled}
       inputMode="numeric"
       pattern="^\d{2}:\d{2}$"
@@ -69,5 +77,3 @@ TimeInput.propTypes = {
   style: PropTypes.any,
   value: PropTypes.any,
 };
-
-

@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { Button } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
@@ -12,7 +10,7 @@ import { useTranslation } from '../../i18n/useTranslation';
  * consistent styling and dark mode support.
  */
 const SessionWarningModal = ({ visible, onDismiss, onExtend }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   if (!visible) return null;
 
   return (

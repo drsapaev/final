@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 /**
  * DentalTemplatesTab — R-15: extracted from DentistPanelUnified.
@@ -16,10 +14,10 @@ export function DentalTemplatesTab({
   templates = [],
   onApplyTemplate,
 }) {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   return (
     <div className="dental-flex-col dental-gap-24">
-      <Card padding="lg">
+      <Card padding="large">
         <div className="dental-flex-between-16">
           <div>
             <h3 className="dental-text-primary">{t('dental.dental_dtt_title')}</h3>

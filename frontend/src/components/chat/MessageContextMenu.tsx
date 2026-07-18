@@ -21,7 +21,7 @@ interface MessageContextMenuProps {
 }
 
 const MessageContextMenu = ({ x, y, message, onBlur, onAction, isOwn }: MessageContextMenuProps) => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string) => string;
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

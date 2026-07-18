@@ -1,7 +1,7 @@
 
 import { useTranslation } from '../../i18n/useTranslation';
 export const ContactCard = () => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string) => string;
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   return (
     <div className="contact-card spotlight-card">
       <h2>{t('misc.cc_kontakty')}</h2>

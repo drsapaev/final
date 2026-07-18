@@ -1,14 +1,12 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import PropTypes from 'prop-types';
 import { RefreshCw } from 'lucide-react';
 import {
   Badge, Button,
 } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
+import type { CSSProperties, ReactNode, ComponentType } from 'react';
 
-const summaryBarStyle = {
+const summaryBarStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'flex-end',
@@ -17,12 +15,30 @@ const summaryBarStyle = {
   minWidth: 0
 };
 
-const refreshButtonStyle = {
+const refreshButtonStyle: CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
   gap: 'var(--mac-spacing-2)',
   flexShrink: 0
 };
+
+interface SummaryItem {
+  key: string;
+  label: string;
+  value: string | number;
+  variant: string;
+}
+
+interface AppointmentSummaryBarProps {
+  ariaLabel: string;
+  items: SummaryItem[];
+  onRefresh: () => void;
+  refreshDisabled?: boolean;
+  refreshLabel?: string;
+  BadgeComponent?: ComponentType<Record<string, unknown>>;
+  ButtonComponent?: ComponentType<Record<string, unknown>>;
+  buttonProps?: { style?: CSSProperties; [key: string]: unknown };
+}
 
 export default function AppointmentSummaryBar({
   ariaLabel,
@@ -30,10 +46,12 @@ export default function AppointmentSummaryBar({
   onRefresh,
   refreshDisabled = false,
   refreshLabel = 'Обновить',
-  BadgeComponent = Badge,
-  ButtonComponent = Button,
+  BadgeComponent = Badge as unknown as ComponentType<Record<string, unknown>>,
+  ButtonComponent = Button as unknown as ComponentType<Record<string, unknown>>,
   buttonProps = {}
-}) {
+}: AppointmentSummaryBarProps) {
+  const { t: rawT } = useTranslation();
+  void rawT;
   return (
     <div style={summaryBarStyle} role="list" aria-label={ariaLabel}>
       {items.map((item) => (
