@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 /**
  * Photo Comparison Component
@@ -10,9 +8,9 @@ import { useState, useRef, useEffect } from 'react';
 import {
   Card,
   CardContent,
-  Typography,
+  Typography as TypographyRaw,
   Badge,
-  Input } from '../ui/macos';
+  Input as InputRaw } from '../ui/macos';
 import {
   ArrowLeftRight,
 
@@ -25,9 +23,13 @@ import {
 'lucide-react';
 import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
+import React from "react";
+const Input = InputRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Typography = TypographyRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
-const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
-  const { t } = useTranslation();
+const PhotoComparison = ({ beforePhoto, afterPhoto, metadata: metadataRaw = {} }) => {
+  const metadata = metadataRaw as Record<string, any>;
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [sliderPosition, setSliderPosition] = useState(50);
   const [viewMode, setViewMode] = useState('slider'); // slider, side-by-side, overlay
   const [zoom, setZoom] = useState(1);

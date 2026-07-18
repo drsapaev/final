@@ -1,15 +1,14 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
+import type { CSSProperties } from 'react';
 
 import { useState, useEffect } from 'react';
 import {
   MacOSCard,
-  Button,
+  Button as ButtonRaw,
   Badge,
-  Skeleton,
-  Input,
-  Select,
-  Textarea,
+  Skeleton as SkeletonRaw,
+  Input as InputRaw,
+  Select as SelectRaw,
+  Textarea as TextareaRaw,
 } from '../ui/macos';
 import {
   Phone,
@@ -29,12 +28,18 @@ import { toast } from 'react-toastify';
 
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
+import React from "react";
+const Textarea = TextareaRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Input = InputRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Select = SelectRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Button = ButtonRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Skeleton = SkeletonRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const PhoneVerificationManager = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [loading, setLoading] = useState(false);
   const [statistics, setStatistics] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
-  const [adminForm, setAdminForm] = useState({
+  const [adminForm, setAdminForm] = useState<Record<string, any>>({
     phone: '',
     purpose: 'verification',
     provider: '',
@@ -66,7 +71,7 @@ const PhoneVerificationManager = () => {
 
     setLoading(true);
     try {
-      const params = {
+      const params: Record<string, any> = {
         phone: adminForm.phone,
         purpose: adminForm.purpose
       };
@@ -191,7 +196,7 @@ const PhoneVerificationManager = () => {
                   {purpose === 'registration' && t('admin2.pvm_purpose_registration')}
                 </p>
               </div>
-              <Badge variant="outline">{count}</Badge>
+              <Badge variant="outline">{String(count)}</Badge>
             </div>
         )}
         </div>
@@ -211,7 +216,7 @@ const PhoneVerificationManager = () => {
                   {provider}
                 </p>
               </div>
-              <Badge variant={provider === 'mock' ? 'secondary' : 'success'}>{count}</Badge>
+              <Badge variant={provider === 'mock' ? 'secondary' : 'success'}>{String(count)}</Badge>
             </div>
         )}
         </div>
@@ -413,7 +418,7 @@ const PhoneVerificationManager = () => {
         </div>
         
         <Button onClick={loadStatistics} disabled={loading} variant="outline">
-          <RefreshCw className="admin-w-16-h-16-mr-8" style={{ '--admin-animation': loading ? 'spin 1s linear infinite' : 'none' }} />
+          <RefreshCw className="admin-w-16-h-16-mr-8" style={{ '--admin-animation': loading ? 'spin 1s linear infinite' : 'none' } as CSSProperties} />
           {t('admin2.pvm_refresh')}
         </Button>
       </div>
@@ -428,19 +433,19 @@ const PhoneVerificationManager = () => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className="admin-p-12px20-bd-none-bg-transparent-cursor-pointer-flex-ai-center-gap-8-sm-tra-ea233b09" style={{ '--admin-color': isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)', '--admin-fontWeight': isActive ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)' }}
+              className="admin-p-12px20-bd-none-bg-transparent-cursor-pointer-flex-ai-center-gap-8-sm-tra-ea233b09" style={{ '--admin-color': isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)', '--admin-fontWeight': isActive ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)' } as CSSProperties}
               onMouseEnter={(e) => {
                 if (!isActive) {
-                  e.target.style.color = 'var(--mac-text-primary)';
+                  e.currentTarget.style.color = 'var(--mac-text-primary)';
                 }
               }}
               onMouseLeave={(e) => {
                 if (!isActive) {
-                  e.target.style.color = 'var(--mac-text-secondary)';
+                  e.currentTarget.style.color = 'var(--mac-text-secondary)';
                 }
               }}>
               
-              <Icon className="admin-w-16-h-16" style={{ '--admin-color': isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)' }} />
+              <Icon className="admin-w-16-h-16" style={{ '--admin-color': isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)' } as CSSProperties} />
               {tab.label}
               {isActive &&
               <div className="admin-pos-absolute-bottom-0-left-0-right-0-h-3-bg-blue-radius-2px2px00" />

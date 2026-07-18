@@ -1,5 +1,4 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
+import type { CSSProperties } from 'react';
 
 import { useState, useEffect } from 'react';
 import {
@@ -22,12 +21,16 @@ import {
 
 'lucide-react';
 import {
-  MacOSCard, Button, Input, Select, Checkbox,
+  MacOSCard, Button as ButtonRaw, Input as InputRaw, Select as SelectRaw, Checkbox,
 } from '../ui/macos';
 
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
+import React from "react";
+const Input = InputRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Select = SelectRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Button = ButtonRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const getLanguageOptions = (t) => [
   { value: 'ru', label: t('admin2.ts_lang_ru') },
@@ -36,7 +39,7 @@ const getLanguageOptions = (t) => [
 ];
 
 const TelegramSettings = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState({
@@ -52,7 +55,7 @@ const TelegramSettings = () => {
   });
   const [botInfo, setBotInfo] = useState(null);
   const [webhookInfo, setWebhookInfo] = useState(null);
-  const [stats, setStats] = useState({});
+  const [stats, setStats] = useState<Record<string, any>>({});
   const [showToken, setShowToken] = useState(false);
   const [testChatId, setTestChatId] = useState('');
   const [testMessage, setTestMessage] = useState(t('admin2.ts_default_test_message'));
@@ -87,7 +90,7 @@ const TelegramSettings = () => {
 
     } catch (error) {
       logger.error('Ошибка загрузки Telegram данных:', error);
-      setMessage({ type: 'error', text: t('admin2.ts_load_data_error') });
+      setMessage({ type: 'danger', text: t('admin2.ts_load_data_error') });
     } finally {
       setLoading(false);
     }
@@ -106,7 +109,7 @@ const TelegramSettings = () => {
       setMessage({ type: 'success', text: result.message || t('admin2.ts_settings_saved') });
     } catch (error) {
       logger.error('Ошибка сохранения:', error);
-      setMessage({ type: 'error', text: t('admin2.ts_save_error') });
+      setMessage({ type: 'danger', text: t('admin2.ts_save_error') });
     } finally {
       setSaving(false);
     }
@@ -121,7 +124,7 @@ const TelegramSettings = () => {
       setMessage({ type: 'success', text: result.message });
     } catch (error) {
       logger.error('Ошибка тестирования бота:', error);
-      setMessage({ type: 'error', text: error.message });
+      setMessage({ type: 'danger', text: error.message });
     }
   };
 
@@ -134,13 +137,13 @@ const TelegramSettings = () => {
       await loadData(); // Перезагружаем данные
     } catch (error) {
       logger.error('Ошибка установки webhook:', error);
-      setMessage({ type: 'error', text: error.message });
+      setMessage({ type: 'danger', text: error.message });
     }
   };
 
   const sendTestMessage = async () => {
     if (!testChatId || !testMessage) {
-      setMessage({ type: 'error', text: t('admin2.ts_test_required') });
+      setMessage({ type: 'danger', text: t('admin2.ts_test_required') });
       return;
     }
 
@@ -152,7 +155,7 @@ const TelegramSettings = () => {
       setMessage({ type: 'success', text: result.message });
     } catch (error) {
       logger.error('Ошибка отправки:', error);
-      setMessage({ type: 'error', text: error.message });
+      setMessage({ type: 'danger', text: error.message });
     }
   };
 
@@ -204,7 +207,7 @@ const TelegramSettings = () => {
         'var(--mac-success)' :
         'var(--mac-error)', '--admin-border': `1px solid ${message.type === 'success' ?
         'var(--mac-success-border)' :
-        'var(--mac-error-border)'}` }}>
+        'var(--mac-error-border)'}` } as CSSProperties}>
           {message.type === 'success' ?
         <CheckCircle className="admin-w-20-h-20-mr-8" /> :
 
@@ -343,7 +346,7 @@ const TelegramSettings = () => {
               <label className="admin-flex-ai-center">
                 <Checkbox
                   checked={settings.notifications_enabled}
-                  onChange={(e) => handleSettingChange('notifications_enabled', e.target.checked)}
+                  onChange={(e) => handleSettingChange('notifications_enabled', e)}
                   className="admin-mr-12" />
                 
                 <span className="admin-sm-med-primary">{t('admin2.ts_notifications_enabled')}</span>
@@ -352,7 +355,7 @@ const TelegramSettings = () => {
               <label className="admin-flex-ai-center">
                 <Checkbox
                   checked={settings.appointment_reminders}
-                  onChange={(e) => handleSettingChange('appointment_reminders', e.target.checked)}
+                  onChange={(e) => handleSettingChange('appointment_reminders', e)}
                   className="admin-mr-12" />
                 
                 <span className="admin-sm-med-primary">{t('admin2.ts_appointment_reminders')}</span>
@@ -361,7 +364,7 @@ const TelegramSettings = () => {
               <label className="admin-flex-ai-center">
                 <Checkbox
                   checked={settings.lab_results_notifications}
-                  onChange={(e) => handleSettingChange('lab_results_notifications', e.target.checked)}
+                  onChange={(e) => handleSettingChange('lab_results_notifications', e)}
                   className="admin-mr-12" />
                 
                 <span className="admin-sm-med-primary">{t('admin2.ts_lab_results_notifications')}</span>
@@ -370,7 +373,7 @@ const TelegramSettings = () => {
               <label className="admin-flex-ai-center">
                 <Checkbox
                   checked={settings.payment_notifications}
-                  onChange={(e) => handleSettingChange('payment_notifications', e.target.checked)}
+                  onChange={(e) => handleSettingChange('payment_notifications', e)}
                   className="admin-mr-12" />
                 
                 <span className="admin-sm-med-primary">{t('admin2.ts_payment_notifications')}</span>
@@ -398,10 +401,10 @@ const TelegramSettings = () => {
               'var(--mac-success-bg)' :
               'var(--mac-warning-bg)', '--admin-borderColor': webhookInfo.webhook_set ?
               'var(--mac-success-border)' :
-              'var(--mac-warning-border)' }}>
+              'var(--mac-warning-border)' } as CSSProperties}>
                 <h4 className="admin-med-mb-8-m-0" style={{ '--admin-color': webhookInfo.webhook_set ?
                 'var(--mac-success)' :
-                'var(--mac-warning)' }}>
+                'var(--mac-warning)' } as CSSProperties}>
                   Webhook: {webhookInfo.webhook_set ? t('admin2.ts_webhook_configured') : t('admin2.ts_webhook_not_configured')}
                 </h4>
                 {webhookInfo.webhook_info &&

@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useTranslation } from '../../i18n/useTranslation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -17,15 +15,20 @@ import { toast } from 'react-toastify';
 
 import { apiRequest } from '../../api/client';
 import logger from '../../utils/logger';
+import React from "react";
 import {
   Badge,
-  Button,
+  Button as ButtonRaw,
   MacOSCard,
-  MacOSEmptyState,
-  Input,
-  MacOSStatCard,
+  MacOSEmptyState as MacOSEmptyStateRaw,
+  Input as InputRaw,
+  MacOSStatCard as MacOSStatCardRaw,
   Table,
 } from '../ui/macos';
+const Input = InputRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Button = ButtonRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const MacOSStatCard = MacOSStatCardRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const MacOSEmptyState = MacOSEmptyStateRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const INITIAL_FILTERS = {
   day: '',
@@ -78,11 +81,11 @@ const buildStatsSummary = (stats, queues) => {
 };
 
 const QueueCabinetManagement = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [filters, setFilters] = useState(INITIAL_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState(INITIAL_FILTERS);
   const [queues, setQueues] = useState([]);
-  const [statistics, setStatistics] = useState(null);
+  const [statistics, setStatistics] = useState<Record<string, any> | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
 
@@ -112,7 +115,7 @@ const QueueCabinetManagement = () => {
       }
 
       if (statisticsResult.status === 'fulfilled') {
-        const payload = statisticsResult.value || {};
+        const payload = (statisticsResult.value || {}) as Record<string, any>;
         setStatistics(payload.statistics || payload);
       } else {
         logger.warn(
@@ -167,11 +170,11 @@ const QueueCabinetManagement = () => {
         params,
       });
 
-      toast.success(result?.message || t('admin2.qcm_sync_success'));
+      toast.success((result as Record<string, any>)?.message || t('admin2.qcm_sync_success'));
       await loadData(appliedFilters);
     } catch (error) {
       logger.error('Ошибка синхронизации кабинетов:', error);
-      toast.error(error?.message || t('admin2.qcm_sync_error'));
+      toast.error((error as Record<string, any>)?.message || t('admin2.qcm_sync_error'));
     } finally {
       setSyncing(false);
     }

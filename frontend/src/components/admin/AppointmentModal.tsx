@@ -1,20 +1,25 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useState, useEffect, useMemo } from 'react';
 import { Save, Calendar, Clock, AlertCircle, Phone, Mail } from 'lucide-react';
 import logger from '../../utils/logger';
 import {
-  Button,
+  Button as ButtonRaw,
   Badge,
-  Input,
-  Select,
-  Textarea,
-  Modal,
-  Alert,
+  Input as InputRaw,
+  Select as SelectRaw,
+  Textarea as TextareaRaw,
+  Modal as ModalRaw,
+  Alert as AlertRaw,
 } from '../ui/macos';
 import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
+import React from "react";
+const Modal = ModalRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Textarea = TextareaRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Input = InputRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Select = SelectRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Button = ButtonRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Alert = AlertRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const AppointmentModal = ({
   isOpen,
@@ -25,8 +30,8 @@ const AppointmentModal = ({
   doctors = [],
   patients = []
 }) => {
-  const { t } = useTranslation();
-  const [formData, setFormData] = useState({
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const [formData, setFormData] = useState<Record<string, any>>({
     patientId: '',
     doctorId: '',
     appointmentDate: '',
@@ -38,7 +43,7 @@ const AppointmentModal = ({
     phone: '',
     email: ''
   });
-  const [errors, setErrors] = useState({});
+  const [errors, setErrors] = useState<Record<string, any>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
   const selectedDoctor = useMemo(
@@ -82,7 +87,7 @@ const AppointmentModal = ({
   }, [isOpen, appointment]);
 
   const validateForm = () => {
-    const newErrors = {};
+    const newErrors: Record<string, string> = {};
 
     if (!formData.patientId) {
       newErrors.patientId = t('admin2.am_err_patient_required');
@@ -138,8 +143,8 @@ const AppointmentModal = ({
         phone: formData.phone.trim() || null,
         email: formData.email.trim() || null
       };
-      if (formData.status) {
-        appointmentData.status = formData.status;
+      if ((formData as Record<string, any>).status) {
+        (appointmentData as Record<string, any>).status = (formData as Record<string, any>).status;
       }
 
       await onSave(appointmentData);
@@ -192,7 +197,7 @@ const AppointmentModal = ({
       isOpen={isOpen}
       onClose={onClose}
       title={appointment ? t('admin2.am_title_edit') : t('admin2.am_title_create')}
-      size="lg">
+      size="large">
       
           {/* Submit error (P1 fix: show save errors instead of swallowing) */}
           {submitError ? (
@@ -330,7 +335,7 @@ const AppointmentModal = ({
                   {t('admin2.am_label_status')}
                 </label>
                 <Select
-              value={formData.status}
+              value={(formData as Record<string, any>).status}
               onChange={(value) => handleChange('status', value)}
               options={[
               { value: '', label: t('admin2.am_status_default') },
@@ -455,12 +460,12 @@ const AppointmentModal = ({
                     <strong className="admin-text-primary">{t('admin2.am_preview_duration_label')}</strong> {formData.duration} {t('admin2.am_preview_duration_minutes')}
                   </p>
                   <p className="admin-fs-sm-secondary-m-0">
-                    <strong className="admin-text-primary">{t('admin2.am_preview_status')}</strong> {formData.status === 'pending' ? t('admin2.am_status_pending') :
-              formData.status === 'confirmed' ? t('admin2.am_status_confirmed') :
-              formData.status === 'paid' ? t('admin2.am_status_paid') :
-              formData.status === 'in_visit' ? t('admin2.am_status_in_visit') :
-              formData.status === 'completed' ? t('admin2.am_status_completed') :
-              formData.status === 'cancelled' ? t('admin2.am_status_cancelled') : t('admin2.am_status_no_show')}
+                    <strong className="admin-text-primary">{t('admin2.am_preview_status')}</strong> {(formData as Record<string, any>).status === 'pending' ? t('admin2.am_status_pending') :
+              (formData as Record<string, any>).status === 'confirmed' ? t('admin2.am_status_confirmed') :
+              (formData as Record<string, any>).status === 'paid' ? t('admin2.am_status_paid') :
+              (formData as Record<string, any>).status === 'in_visit' ? t('admin2.am_status_in_visit') :
+              (formData as Record<string, any>).status === 'completed' ? t('admin2.am_status_completed') :
+              (formData as Record<string, any>).status === 'cancelled' ? t('admin2.am_status_cancelled') : t('admin2.am_status_no_show')}
                   </p>
                 </div>
               </div>
