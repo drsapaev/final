@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useState, useEffect } from 'react';
 import logger from '../../utils/logger';
 import {
@@ -21,14 +18,20 @@ import {
   Ban } from
 'lucide-react';
 import {
-  Input,
-  Select,
-  Button,
-  Checkbox,
-  Badge,
-  SegmentedControl,
+  Input as RawInput,
+  Select as RawSelect,
+  Button as RawButton,
+  Checkbox as RawCheckbox,
+  Badge as RawBadge,
+  SegmentedControl as RawSegmentedControl,
   MacOSCard,
 } from '../ui/macos';
+const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
+const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
+const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
+const Checkbox = RawCheckbox as unknown as React.ComponentType<Record<string, unknown>>;
+const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
+const SegmentedControl = RawSegmentedControl as unknown as React.ComponentType<Record<string, unknown>>;
 import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 
@@ -37,7 +40,8 @@ const SecuritySettings = ({
   onSave,
   loading = false
 }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [formData, setFormData] = useState({
     // Пароль
     currentPassword: '',
@@ -76,9 +80,9 @@ const SecuritySettings = ({
     backupFrequency: 'daily', // daily, weekly, monthly
     backupRetention: 30, // дни
     encryptBackups: true
-  });
+  } as any);
 
-  const [errors, setErrors] = useState({});
+  const [errors, setErrors] = useState({} as any);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState('password');
   const [showPasswords, setShowPasswords] = useState({
@@ -98,7 +102,7 @@ const SecuritySettings = ({
   }, [settings]);
 
   const validatePasswordForm = () => {
-    const newErrors = {};
+    const newErrors: Record<string, string> = {};
 
     if (!formData.currentPassword) {
       newErrors.currentPassword = t('admin2.ss_err_current_required');
@@ -210,7 +214,7 @@ const SecuritySettings = ({
       {/* Вкладки */}
       <SegmentedControl
         value={activeTab}
-        onChange={setActiveTab}
+        onChange={(v: unknown) => setActiveTab(String(v))}
         options={tabs.map(({ id, label, icon: TabIcon }) => ({
           value: id,
           label: (
@@ -382,7 +386,7 @@ const SecuritySettings = ({
               variant="outline"
               onClick={terminateAllOtherSessions}
               disabled={activeSessions.length === 0}
-              size="sm">
+              size="small">
               
                 <Trash2 className="w-4 h-4 mr-2" />
                 {t('admin2.ss_btn_terminate_all_others')}
@@ -405,7 +409,7 @@ const SecuritySettings = ({
                       <p className="admin-base-med-primary-m-0-flex-ai-center-gap-8">
                         {session.device}
                         {session.current &&
-                    <Badge variant="success" size="sm">{t('admin2.ss_session_current_badge')}</Badge>
+                    <Badge variant="success" size="small">{t('admin2.ss_session_current_badge')}</Badge>
                     }
                       </p>
                       <p className="admin-sm-secondary-m-4px000">
@@ -420,7 +424,7 @@ const SecuritySettings = ({
                   {!session.current &&
               <Button
                 variant="outline"
-                size="sm"
+                size="small"
                 onClick={() => terminateSession(session.id)}
                 title="Terminate this session"
                 aria-label="Terminate this session"
@@ -558,7 +562,7 @@ const SecuritySettings = ({
                     <div className="flex items-center justify-center gap-2">
                       <Badge
                       variant={log.status === 'success' ? 'success' : log.status === 'failed' ? 'error' : 'warning'}
-                      size="sm">
+                      size="small">
                       
                         {getStatusLabel(log.status)}
                       </Badge>

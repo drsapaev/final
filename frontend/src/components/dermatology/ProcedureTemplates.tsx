@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 /**
  * Procedure Templates Component
@@ -9,23 +7,34 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Box,
-  Card,
+  Card as RawCard,
   CardContent,
-  Typography,
-  Button,
-  Input,
-  Alert,
-  Badge,
-  Grid,
-  List,
+  Typography as RawTypography,
+  Button as RawButton,
+  Input as RawInput,
+  Alert as RawAlert,
+  Badge as RawBadge,
+  Grid as RawGrid,
+  List as RawList,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
-  Select,
-  Option,
-  Textarea,
+  Select as RawSelect,
+  Option as RawOption,
+  Textarea as RawTextarea,
 } from '../ui/macos';
+const Card = RawCard as unknown as React.ComponentType<Record<string, unknown>>;
+const Typography = RawTypography as unknown as React.ComponentType<Record<string, unknown>>;
+const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
+const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
+const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
+const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
+const Grid = RawGrid as unknown as React.ComponentType<Record<string, unknown>>;
+const List = RawList as unknown as React.ComponentType<Record<string, unknown>>;
+const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
+const Option = RawOption as unknown as React.ComponentType<Record<string, unknown>>;
+const Textarea = RawTextarea as unknown as React.ComponentType<Record<string, unknown>>;
 import {
   Hospital,
   Plus,
@@ -48,7 +57,8 @@ import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 const ProcedureTemplates = ({ onSelectProcedure }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [templates, setTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -169,7 +179,7 @@ const ProcedureTemplates = ({ onSelectProcedure }) => {
   const loadTemplates = useCallback(async () => {
     try {
       // В реальном приложении загружаем с сервера
-      // const response = await api.get('/procedure-templates');
+      // const response = await api.get('/procedure-templates') as any;
       // setTemplates(response.data);
 
       // Для демо используем предустановленные
@@ -406,7 +416,7 @@ const ProcedureTemplates = ({ onSelectProcedure }) => {
                   label: `${material.name} - ${material.quantity} ${material.unit}`,
                   icon: CheckCircle
                 }))}
-                size="sm" />
+                size="small" />
               
               </Grid>
               
@@ -417,7 +427,7 @@ const ProcedureTemplates = ({ onSelectProcedure }) => {
                 </Typography>
                 <List
                 items={selectedTemplate.steps.map((step, i) => `${i + 1}. ${step}`)}
-                size="sm" />
+                size="small" />
               
               </Grid>
               

@@ -1,18 +1,21 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect } from 'react';
 import { Save, User, Mail, Phone, MapPin, Calendar, IdCard, AlertCircle } from 'lucide-react';
 import logger from '../../utils/logger';
 import {
-  Button,
-  Input,
-  Select,
-  Textarea,
-  Modal,
-  Alert,
+  Button as RawButton,
+  Input as RawInput,
+  Select as RawSelect,
+  Textarea as RawTextarea,
+  Modal as RawModal,
+  Alert as RawAlert,
 } from '../ui/macos';
+const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
+const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
+const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
+const Textarea = RawTextarea as unknown as React.ComponentType<Record<string, unknown>>;
+const Modal = RawModal as unknown as React.ComponentType<Record<string, unknown>>;
+const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
 import PropTypes from 'prop-types';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
@@ -24,9 +27,11 @@ const PatientModal = ({
   onSave,
   loading = false
 }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
-  const [confirm, confirmDialog] = useConfirm();
+  const [confirmRaw, confirmDialog] = useConfirm();
+  const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -44,8 +49,8 @@ const PatientModal = ({
     allergies: '',
     chronicDiseases: '',
     notes: ''
-  });
-  const [errors, setErrors] = useState({});
+  } as any);
+  const [errors, setErrors] = useState({} as any);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
@@ -100,7 +105,7 @@ const PatientModal = ({
   }, [isOpen, patient]);
 
   const validateForm = () => {
-    const newErrors = {};
+    const newErrors: Record<string, string> = {};
 
     if (!formData.firstName.trim()) {
       newErrors.firstName = t('admin2.pm_err_first_name_required');
@@ -597,7 +602,7 @@ const PatientModal = ({
         </div>
       </form>
       {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
-      {confirmDialog}
+      {confirmDialog as unknown as React.ReactNode}
     </Modal>);
 
 };

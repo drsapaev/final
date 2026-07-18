@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect, useCallback } from 'react';
 import {
@@ -35,7 +32,8 @@ const PriceOverrideManager = ({
   onClose
 }) => {
   useTheme();
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [newPrice, setNewPrice] = useState('');
   const [reason, setReason] = useState('');
   const [details, setDetails] = useState('');
@@ -56,7 +54,7 @@ const PriceOverrideManager = ({
     try {
       const response = await api.get('/derma/price-overrides', {
         params: { visit_id: visitId }
-      });
+      }) as any;
       setPriceOverrides(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       logger.error('Error loading price overrides:', error);
@@ -93,7 +91,7 @@ const PriceOverrideManager = ({
         new_price: priceNum,
         reason: reason,
         details: details || null
-      });
+      }) as any;
 
       if (response.status >= 200 && response.status < 300) {
         const result = response.data;
@@ -207,10 +205,10 @@ const PriceOverrideManager = ({
               transition: 'all var(--mac-duration-fast) var(--mac-ease)',
               padding: 'var(--mac-spacing-1)'
             }}
-            onMouseEnter={(e) => {
+            onMouseEnter={(e: any) => {
               e.currentTarget.style.color = 'var(--mac-text-primary)';
             }}
-            onMouseLeave={(e) => {
+            onMouseLeave={(e: any) => {
               e.currentTarget.style.color = 'var(--mac-text-secondary)';
             }}>
             
@@ -410,13 +408,13 @@ const PriceOverrideManager = ({
                 transition: 'all var(--mac-duration-normal) var(--mac-ease)',
                 fontWeight: 'var(--mac-font-weight-medium)'
               }}
-              onMouseEnter={(e) => {
+              onMouseEnter={(e: any) => {
                 if (!isLoading && newPrice && reason) {
                   e.target.style.background = 'var(--mac-accent-orange-hover)';
                   e.target.style.transform = 'translateY(-1px)';
                 }
               }}
-              onMouseLeave={(e) => {
+              onMouseLeave={(e: any) => {
                 if (!isLoading && newPrice && reason) {
                   e.target.style.background = 'var(--mac-accent-orange)';
                   e.target.style.transform = 'translateY(0)';

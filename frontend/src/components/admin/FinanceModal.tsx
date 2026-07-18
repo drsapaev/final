@@ -1,7 +1,5 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useState, useEffect } from 'react';
+import type { CSSProperties } from 'react';
 import PropTypes from 'prop-types';
 import { X, Save, DollarSign, Calendar, AlertCircle, Receipt } from 'lucide-react';
 import { MacOSCard, Button,
@@ -58,7 +56,7 @@ const getExpenseCategories = (t) => [
 const FinanceModal = ({
   isOpen,
   onClose,
-  transaction = null,
+  transaction = null as any,
   onSave,
   loading = false,
   patients = [],
@@ -76,10 +74,11 @@ const FinanceModal = ({
     transactionDate: '',
     notes: '',
     reference: ''
-  });
-  const [errors, setErrors] = useState({});
+  } as any);
+  const [errors, setErrors] = useState({} as any);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
 
   // Инициализация формы при открытии
   useEffect(() => {
@@ -121,7 +120,7 @@ const FinanceModal = ({
   }, [isOpen, transaction]);
 
   const validateForm = () => {
-    const newErrors = {};
+    const newErrors: Record<string, string> = {};
 
     if (!formData.type) {
       newErrors.type = t('admin2.fm_err_type_required');
@@ -320,7 +319,7 @@ const FinanceModal = ({
                       className={`w-full pl-10 pr-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent admin-modal-input-bd-dyn ${
                         errors.amount ? 'border-red-500' : 'border-gray-300'
                       }`}
-                      style={{ '--admin-bd': errors.amount ? 'var(--mac-danger)' : 'var(--mac-border)' }}
+                      style={{ '--admin-bd': errors.amount ? 'var(--mac-danger)' : 'var(--mac-border)' } as CSSProperties}
                       placeholder="100000"
                       min="1"
                       step="1"
@@ -354,7 +353,7 @@ const FinanceModal = ({
                       className={`w-full pl-10 pr-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent admin-modal-input-bd-dyn ${
                         errors.transactionDate ? 'border-red-500' : 'border-gray-300'
                       }`}
-                      style={{ '--admin-bd': errors.transactionDate ? 'var(--mac-danger)' : 'var(--mac-border)' }}
+                      style={{ '--admin-bd': errors.transactionDate ? 'var(--mac-danger)' : 'var(--mac-border)' } as CSSProperties}
                     />
                   </div>
                   {errors.transactionDate && (
@@ -378,8 +377,8 @@ const FinanceModal = ({
                   className={`w-full px-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent admin-modal-input-bd-dyn ${
                     errors.description ? 'border-red-500' : 'border-gray-300'
                   }`}
-                  style={{ '--admin-bd': errors.description ? 'var(--mac-danger)' : 'var(--mac-border)' }}
-                  rows="2"
+                  style={{ '--admin-bd': errors.description ? 'var(--mac-danger)' : 'var(--mac-border)' } as CSSProperties}
+                  rows={2}
                   placeholder={t('admin2.fm_placeholder_description')}
                 />
                 {errors.description && (
@@ -488,7 +487,7 @@ const FinanceModal = ({
                       className={`w-full pl-10 pr-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent admin-modal-input-bd-dyn ${
                         errors.reference ? 'border-red-500' : 'border-gray-300'
                       }`}
-                      style={{ '--admin-bd': errors.reference ? 'var(--mac-danger)' : 'var(--mac-border)' }}
+                      style={{ '--admin-bd': errors.reference ? 'var(--mac-danger)' : 'var(--mac-border)' } as CSSProperties}
                       placeholder="**** **** **** 1234"
                     />
                   </div>
@@ -516,7 +515,7 @@ const FinanceModal = ({
                   value={formData.notes}
                   onChange={(e) => handleChange('notes', e.target.value)}
                   className="w-full px-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent admin-form-control"
-                  rows="3"
+                  rows={3}
                   placeholder={t('admin2.fm_placeholder_notes')}
                 />
               </div>

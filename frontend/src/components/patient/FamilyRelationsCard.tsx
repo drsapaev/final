@@ -1,23 +1,26 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useTranslation } from '../../i18n/useTranslation';
 /**
  * FamilyRelationsCard - component for patient family relationship display.
  */
 import { useCallback, useEffect, useState } from 'react';
+import type { CSSProperties } from 'react';
 import {
-  Alert,
-  Badge,
-  Button,
+  Alert as RawAlert,
+  Badge as RawBadge,
+  Button as RawButton,
   Card,
   CardContent,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
-  Input,
-  Checkbox } from '../ui/macos';
+  Input as RawInput,
+  Checkbox as RawCheckbox } from '../ui/macos';
+const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
+const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
+const Checkbox = RawCheckbox as unknown as React.ComponentType<Record<string, unknown>>;
+const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
+const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
 import {
   Baby,
   Phone,
@@ -42,7 +45,7 @@ const RELATION_TYPES = {
   other: { labelKey: 'patient.pat_fam_relation_other', Icon: Users }
 };
 
-const styles = {
+const styles: Record<string, CSSProperties> = {
   card: {
     marginBottom: 'var(--mac-spacing-4)'
   },
@@ -258,8 +261,10 @@ export default function FamilyRelationsCard({
   onFamilyChange
 }) {
   // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
-  const [confirm, confirmDialog] = useConfirm();
-  const { t } = useTranslation();
+  const [confirmRaw, confirmDialog] = useConfirm();
+  const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [family, setFamily] = useState([]);
@@ -420,7 +425,7 @@ export default function FamilyRelationsCard({
         }}
       />
       {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
-      {confirmDialog}
+      {confirmDialog as unknown as React.ReactNode}
     </Card>
   );
 }
@@ -433,7 +438,8 @@ FamilyRelationsCard.propTypes = {
 };
 
 function AddRelationDialog({ open, onClose, patientId, patientName, onSuccess }) {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [selectedPatient, setSelectedPatient] = useState(null);

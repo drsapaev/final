@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useTranslation } from '../i18n/useTranslation';
 import { useState, useEffect } from 'react';
 import { api } from '../api/client';
@@ -23,9 +20,11 @@ import {
 'lucide-react';
 
 const TwoFactorSettings = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // P-013 fix: shared ConfirmDialog hook (replaces 2 native confirm() calls).
-  const [confirm, confirmDialog] = useConfirm();
+  const [confirmRaw, confirmDialog] = useConfirm();
+  const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -42,7 +41,7 @@ const TwoFactorSettings = () => {
 
   const loadStatus = async () => {
     try {
-      const response = await api.get('/2fa/status');
+      const response = await api.get('/2fa/status') as any;
       setStatus(response);
     } catch {
       setError(t('misc.tfs_load_status_error'));
@@ -51,7 +50,7 @@ const TwoFactorSettings = () => {
 
   const loadDevices = async () => {
     try {
-      const response = await api.get('/2fa/devices');
+      const response = await api.get('/2fa/devices') as any;
       setDevices(response.devices || []);
     } catch (err) {
       logger.error('Error loading devices:', err);
@@ -60,7 +59,7 @@ const TwoFactorSettings = () => {
 
   const loadBackupCodes = async () => {
     try {
-      const response = await api.get('/2fa/backup-codes');
+      const response = await api.get('/2fa/backup-codes') as any;
       setBackupCodes(response.backup_codes || []);
       setShowBackupCodes(true);
     } catch {
@@ -82,7 +81,7 @@ const TwoFactorSettings = () => {
       const response = await api.post('/2fa/disable', {
         password,
         totp_code: totpCode
-      });
+      }) as any;
 
       if (response.success) {
         setSuccess(t('misc.tfs_disable_success'));
@@ -115,7 +114,7 @@ const TwoFactorSettings = () => {
     setError('');
 
     try {
-      const response = await api.post('/2fa/backup-codes/regenerate');
+      const response = await api.post('/2fa/backup-codes/regenerate') as any;
       setBackupCodes(response.backup_codes || []);
       setShowBackupCodes(true);
       setSuccess(t('misc.tfs_regenerate_success'));
@@ -588,7 +587,7 @@ const TwoFactorSettings = () => {
         </div>
       </div>
       {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
-      {confirmDialog}
+      {confirmDialog as unknown as React.ReactNode}
     </div>);
 
 };
