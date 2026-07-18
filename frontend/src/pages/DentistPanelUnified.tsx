@@ -13,15 +13,23 @@ import AppointmentSummaryBar from '../components/doctor/AppointmentSummaryBar';
 import auth from '../stores/auth';
 import { apiClient } from '../api/client';
 import AIAssistant from '../components/ai/AIAssistant';
-import TeethChart from '../components/dental/TeethChart';
-import ToothModal from '../components/dental/ToothModal';
-import DentalVisitScreen from '../components/dental/DentalVisitScreen';
-import TreatmentPlanner from '../components/dental/TreatmentPlanner';
-import PatientCard from '../components/dental/PatientCard';
+import TeethChartRaw from '../components/dental/TeethChart';
+const TeethChart = TeethChartRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import ToothModalRaw from '../components/dental/ToothModal';
+const ToothModal = ToothModalRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import DentalVisitScreenRaw from '../components/dental/DentalVisitScreen';
+const DentalVisitScreen = DentalVisitScreenRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import TreatmentPlannerRaw from '../components/dental/TreatmentPlanner';
+const TreatmentPlanner = TreatmentPlannerRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import PatientCardRaw from '../components/dental/PatientCard';
+const PatientCard = PatientCardRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import DentalPriceManager from '../components/dental/DentalPriceManager';
-import ExaminationForm from '../components/dental/ExaminationForm';
-import DiagnosisForm from '../components/dental/DiagnosisForm';
-import VisitProtocol from '../components/dental/VisitProtocol';
+import ExaminationFormRaw from '../components/dental/ExaminationForm';
+const ExaminationForm = ExaminationFormRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import DiagnosisFormRaw from '../components/dental/DiagnosisForm';
+const DiagnosisForm = DiagnosisFormRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import VisitProtocolRaw from '../components/dental/VisitProtocol';
+const VisitProtocol = VisitProtocolRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import PhotoArchive from '../components/dental/PhotoArchive';
 import ProtocolTemplates from '../components/dental/ProtocolTemplates';
 import DentalReportsTab from '../components/dental/DentalReportsTab';
@@ -72,7 +80,8 @@ import {
 } from '../utils/doctorPanelShared';
 import { useVisitLifecycle } from '../hooks/useVisitLifecycle';
 
-const LazyReportsAndAnalytics = lazy(() => import('../components/dental/ReportsAndAnalytics'));
+const LazyReportsAndAnalyticsRaw = lazy(() => import('../components/dental/ReportsAndAnalytics'));
+const LazyReportsAndAnalytics = LazyReportsAndAnalyticsRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const API_V1_BASE = getApiBaseUrl();
 const DENTISTRY_WAITING_STATUSES = ['waiting', 'confirmed', 'pending'];
@@ -290,16 +299,16 @@ const DentistPanelUnified = () => {
         const response = await apiClient.get(`/v2/emr/patient/${patientId}`, {
           params: { limit: 20 },
           silent: true,
-        });
+        } as any);
 
         const summaries = Array.isArray(response.data) ? response.data : [];
         const records = await Promise.all(
           summaries.map(async (summary) => {
             try {
               const emrResponse = await apiClient.get(`/v2/emr/${summary.visit_id}`, {
-                silent: true,
+                silent: true as any,
                 validateStatus: (status) => status === 404 || (status >= 200 && status < 300),
-              });
+              } as any);
 
               if (emrResponse.status === 404) {
                 return null;
@@ -348,9 +357,9 @@ const DentistPanelUnified = () => {
 
     try {
       const response = await apiClient.get(`/v2/emr/${visitId}`, {
-        silent: true,
+        silent: true as any,
         validateStatus: (status) => status === 404 || (status >= 200 && status < 300),
-      });
+      } as any);
 
       if (response.status === 404) {
         return null;
@@ -1534,7 +1543,7 @@ const DentistPanelUnified = () => {
     />;
   const renderAppointments = () =>
   <div className="dental-appointments-root">
-      <Card padding="lg" className="dental-appointments-card">
+      <Card padding="large" className="dental-appointments-card">
         <div className="dental-appointments-header">
           <h3 className="dental-appointments-title">
             <Calendar className="dental-icon-20 dental-text-success dental-mr-8" />
@@ -1571,7 +1580,7 @@ const DentistPanelUnified = () => {
   // Рендер осмотров
   const renderExaminations = () =>
   <div className="dental-flex-col dental-gap-24">
-      <Card padding="lg">
+      <Card padding="large">
         <h3 className="dental-text-primary">{tI18n('dental.dental_panel_examinations_title')}</h3>
         <p className="dental-text-desc dental-text-secondary">
           {tI18n('dental.dental_panel_examinations_subtitle')}
@@ -1615,7 +1624,7 @@ const DentistPanelUnified = () => {
   // Рендер диагнозов
   const renderDiagnoses = () =>
   <div className="dental-flex-col dental-gap-24">
-      <Card padding="lg">
+      <Card padding="large">
         <h3 className="dental-text-primary">{tI18n('dental.dental_panel_diagnoses_title')}</h3>
         <p className="dental-text-desc dental-text-secondary">
           {tI18n('dental.dental_panel_diagnoses_subtitle')}
@@ -1676,7 +1685,7 @@ const DentistPanelUnified = () => {
     // Иначе показываем список пациентов для выбора протокола
     return (
       <div className="dental-flex-col dental-gap-24">
-        <Card padding="lg">
+        <Card padding="large">
           <h3 className="dental-text-primary">{tI18n('dental.dental_panel_visits_title')}</h3>
           <p className="dental-text-desc dental-text-secondary">
             {tI18n('dental.dental_panel_visits_subtitle')}
@@ -1721,7 +1730,7 @@ const DentistPanelUnified = () => {
   // Рендер фото архива
   const renderPhotos = () =>
   <div className="dental-flex-col dental-gap-24">
-      <Card padding="lg">
+      <Card padding="large">
         <h3 className="dental-text-primary">{tI18n('dental.dental_panel_photos_title')}</h3>
         <p className="dental-text-desc dental-text-secondary">
           {tI18n('dental.dental_panel_photos_subtitle')}
@@ -1778,7 +1787,7 @@ const DentistPanelUnified = () => {
     />;
   const renderDentalChart = () =>
   <div className="dental-flex-col dental-gap-24">
-      <Card padding="lg">
+      <Card padding="large">
         <h3 className="dental-text-primary">{tI18n('dental.dental_panel_chart_title')}</h3>
         <p className="dental-text-desc dental-text-secondary">
           {tI18n('dental.dental_panel_chart_subtitle')}
@@ -1824,7 +1833,7 @@ const DentistPanelUnified = () => {
 
   const renderAIAssistant = () =>
   <div className="dental-flex-col dental-gap-24">
-      <Card padding="lg">
+      <Card padding="large">
         <h3 className="dental-text-primary">{tI18n('dental.dental_panel_ai_title')}</h3>
         <AIAssistant
         specialty="dentistry"
