@@ -1,11 +1,89 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
-import React from 'react';
-import { useState } from 'react';
+import React, { useState, type ReactNode, type CSSProperties, type MouseEvent, type KeyboardEvent } from 'react';
 import PropTypes from 'prop-types';
 import { ChevronUp, ChevronDown } from 'lucide-react';
 import { useTranslation } from '../../../i18n/useTranslation';
+
+type TableSize = 'sm' | 'md' | 'lg';
+type TableVariant = 'default' | 'filled' | 'minimal';
+type SortDirection = 'asc' | 'desc';
+type TableCellAlign = 'left' | 'right' | 'center';
+
+interface TableColumn {
+  key: string;
+  title?: ReactNode;
+  sortable?: boolean;
+  render?: (value: unknown, row: Record<string, unknown>, rowIndex: number) => ReactNode;
+  [key: string]: unknown;
+}
+
+interface TableProps {
+  columns?: TableColumn[];
+  data?: Array<Record<string, unknown>>;
+  loading?: boolean;
+  emptyState?: ReactNode;
+  sortable?: boolean;
+  selectable?: boolean;
+  selectedRows?: number[];
+  onRowSelect?: (row: Record<string, unknown>, index: number) => void;
+  onSort?: (key: string, direction: SortDirection) => void;
+  size?: TableSize;
+  variant?: TableVariant;
+  striped?: boolean;
+  hoverable?: boolean;
+  className?: string;
+  style?: CSSProperties;
+  children?: ReactNode;
+}
+
+interface TableSizeStyle {
+  padding: string;
+  fontSize: string;
+  headerPadding: string;
+}
+
+interface TableVariantStyle {
+  border: string;
+  background: string;
+  headerBackground: string;
+}
+
+interface TablePartProps extends Omit<React.HTMLAttributes<HTMLElement>, 'children' | 'style'> {
+  children?: ReactNode;
+  className?: string;
+  style?: CSSProperties;
+}
+
+interface TableRowProps extends Omit<React.HTMLAttributes<HTMLTableRowElement>, 'children' | 'style' | 'onClick'> {
+  children?: ReactNode;
+  className?: string;
+  style?: CSSProperties;
+  hover?: boolean;
+  selected?: boolean;
+  onClick?: (e: MouseEvent<HTMLTableRowElement>) => void;
+}
+
+interface TableCellProps extends Omit<React.HTMLAttributes<HTMLTableCellElement>, 'children' | 'style'> {
+  children?: ReactNode;
+  className?: string;
+  style?: CSSProperties;
+  align?: TableCellAlign;
+  padding?: string;
+}
+
+interface TableHeaderCellProps extends Omit<React.HTMLAttributes<HTMLTableCellElement>, 'children' | 'style' | 'onClick'> {
+  children?: ReactNode;
+  className?: string;
+  style?: CSSProperties;
+  align?: TableCellAlign;
+  padding?: string;
+  sortable?: boolean;
+  sortDirection?: SortDirection | null;
+  onSort?: () => void;
+}
+
+interface TableStyleExt extends CSSProperties {
+  transition?: string;
+}
 
 const Table = ({
   columns = [],
@@ -24,11 +102,13 @@ const Table = ({
   className,
   style,
   children // ✅ Добавляем поддержку children для legacy использования
-}) => {
-  const [sortColumn, setSortColumn] = useState<unknown>(null);
-  const [sortDirection, setSortDirection] = useState('asc');
+}: TableProps) => {
+  const { t } = useTranslation();
+  void t;
+  const [sortColumn, setSortColumn] = useState<string | null>(null);
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
-  const sizeStyles = {
+  const sizeStyles: Record<TableSize, TableSizeStyle> = {
     sm: {
       padding: '8px 12px',
       fontSize: 'var(--mac-font-size-xs)',
@@ -46,7 +126,7 @@ const Table = ({
     }
   };
 
-  const variantStyles = {
+  const variantStyles: Record<TableVariant, TableVariantStyle> = {
     default: {
       border: '1px solid var(--mac-border)',
       background: 'color-mix(in srgb, var(--mac-card-bg, var(--mac-bg-primary)), var(--mac-gradient-sidebar, var(--mac-main-shell-bg)) 16%)',
@@ -67,7 +147,7 @@ const Table = ({
   const currentSize = sizeStyles[size];
   const currentVariant = variantStyles[variant];
 
-  const tableStyle = {
+  const tableStyle: CSSProperties = {
     width: '100%',
     borderCollapse: 'collapse',
     borderRadius: 'var(--mac-radius-md)',
@@ -76,7 +156,7 @@ const Table = ({
     ...style
   };
 
-  const headerStyle = {
+  const headerStyle: TableStyleExt = {
     background: currentVariant.headerBackground,
     fontWeight: 'var(--mac-font-weight-semibold)',
     color: 'var(--mac-table-header-text)',
@@ -90,7 +170,7 @@ const Table = ({
     userSelect: 'none'
   };
 
-  const cellStyle = (isSelected = false) => ({
+  const cellStyle = (isSelected = false): TableStyleExt => ({
     padding: currentSize.padding,
     fontSize: currentSize.fontSize,
     color: 'var(--mac-text-primary)',
@@ -100,31 +180,31 @@ const Table = ({
     transition: 'all var(--mac-duration-normal) var(--mac-ease)'
   });
 
-  const rowStyle = (index, isSelected = false) => ({
+  const rowStyle = (index: number, isSelected = false): TableStyleExt => ({
     background: isSelected ? 'var(--mac-bg-blue)' : (striped && index % 2 === 1 ? 'var(--mac-table-row-alt-bg)' : 'transparent'),
     transition: 'background-color var(--mac-duration-normal) var(--mac-ease)',
     cursor: hoverable ? 'pointer' : 'default'
   });
 
-  const handleSort = (column) => {
+  const handleSort = (column: TableColumn) => {
     if (!sortable || !column.sortable) return;
 
-    const newDirection = sortColumn === column.key && sortDirection === 'asc' ? 'desc' : 'asc';
+    const newDirection: SortDirection = sortColumn === column.key && sortDirection === 'asc' ? 'desc' : 'asc';
     setSortColumn(column.key);
     setSortDirection(newDirection);
-    
+
     if (onSort) {
       onSort(column.key, newDirection);
     }
   };
 
-  const handleRowClick = (row, index) => {
+  const handleRowClick = (row: Record<string, unknown>, index: number) => {
     if (selectable && onRowSelect) {
       onRowSelect(row, index);
     }
   };
 
-  const handleMouseEnter = (e, isSelected, isSortable) => {
+  const handleMouseEnter = (e: MouseEvent<HTMLElement>, isSelected: boolean, isSortable: boolean) => {
     if (hoverable || isSortable) {
       const target = e.currentTarget;
       if (isSortable && target.tagName === 'TH') {
@@ -135,7 +215,7 @@ const Table = ({
     }
   };
 
-  const handleMouseLeave = (e, isSelected, isSortable) => {
+  const handleMouseLeave = (e: MouseEvent<HTMLElement>, isSelected: boolean, isSortable: boolean) => {
     const target = e.currentTarget;
     if (isSortable && target.tagName === 'TH') {
       target.style.backgroundColor = currentVariant.headerBackground;
@@ -144,19 +224,19 @@ const Table = ({
     }
   };
 
-  const handleHeaderKeyDown = (e, column) => {
+  const handleHeaderKeyDown = (e: KeyboardEvent<HTMLTableCellElement>, column: TableColumn) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       handleSort(column);
     }
   };
 
-  const renderSortIcon = (column) => {
+  const renderSortIcon = (column: TableColumn) => {
     if (!sortable || !column.sortable) return null;
-    
+
     const isActive = sortColumn === column.key;
     const isAsc = sortDirection === 'asc';
-    
+
     return (
       <span style={{ marginLeft: '8px', display: 'inline-flex', alignItems: 'center' }}>
         {isActive ? (
@@ -170,14 +250,14 @@ const Table = ({
     );
   };
 
-  const renderCell = (row, column, rowIndex) => {
+  const renderCell = (row: Record<string, unknown>, column: TableColumn, rowIndex: number) => {
     if (column.render) {
       return column.render(row[column.key], row, rowIndex);
     }
     return row[column.key];
   };
 
-  const renderStatusCell = (content) => (
+  const renderStatusCell = (content: ReactNode) => (
     <tr>
       <td
         colSpan={columns.length}
@@ -283,7 +363,7 @@ const Table = ({
                       borderRight: colIndex === columns.length - 1 ? 'none' : '1px solid var(--mac-border)'
                     }}
                   >
-                    {renderCell(row, column, rowIndex)}
+                    {renderCell(row, column, rowIndex) as React.ReactNode}
                   </td>
                 ))}
               </tr>
@@ -321,7 +401,7 @@ Table.propTypes = {
   children: PropTypes.node
 };
 
-const TableHead = React.forwardRef(({
+const TableHead = React.forwardRef<HTMLTableSectionElement, TablePartProps>(({
   children,
   className = '',
   style = {},
@@ -348,7 +428,7 @@ const TableHead = React.forwardRef(({
 /**
  * macOS-style TableBody Component
  */
-const TableBody = React.forwardRef(({
+const TableBody = React.forwardRef<HTMLTableSectionElement, TablePartProps>(({
   children,
   className = '',
   style = {},
@@ -369,7 +449,7 @@ const TableBody = React.forwardRef(({
 /**
  * macOS-style TableRow Component
  */
-const TableRow = React.forwardRef(({
+const TableRow = React.forwardRef<HTMLTableRowElement, TableRowProps>(({
   children,
   className = '',
   style = {},
@@ -378,7 +458,7 @@ const TableRow = React.forwardRef(({
   onClick,
   ...props
 }, ref) => {
-  const rowStyles = {
+  const rowStyles: TableStyleExt = {
     borderBottom: '1px solid var(--mac-separator)',
     transition: 'background-color 0.2s ease',
     cursor: onClick ? 'pointer' : 'default',
@@ -387,15 +467,15 @@ const TableRow = React.forwardRef(({
     ...style
   };
 
-  const handleMouseEnter = (e) => {
+  const handleMouseEnter = (e: MouseEvent<HTMLTableRowElement>) => {
     if (hover && !selected) {
-      e.target.style.backgroundColor = 'var(--mac-table-row-hover-bg)';
+      e.currentTarget.style.backgroundColor = 'var(--mac-table-row-hover-bg)';
     }
   };
 
-  const handleMouseLeave = (e) => {
+  const handleMouseLeave = (e: MouseEvent<HTMLTableRowElement>) => {
     if (hover && !selected) {
-      e.target.style.backgroundColor = 'transparent';
+      e.currentTarget.style.backgroundColor = 'transparent';
     }
   };
 
@@ -417,7 +497,7 @@ const TableRow = React.forwardRef(({
 /**
  * macOS-style TableCell Component
  */
-const TableCell = React.forwardRef(({
+const TableCell = React.forwardRef<HTMLTableCellElement, TableCellProps>(({
   children,
   className = '',
   style = {},
@@ -425,7 +505,7 @@ const TableCell = React.forwardRef(({
   padding = '12px 16px',
   ...props
 }, ref) => {
-  const cellStyles = {
+  const cellStyles: CSSProperties = {
     padding,
     textAlign: align,
     borderBottom: '1px solid var(--mac-separator)',
@@ -448,7 +528,7 @@ const TableCell = React.forwardRef(({
 /**
  * macOS-style TableHeaderCell Component
  */
-const TableHeaderCell = React.forwardRef(({
+const TableHeaderCell = React.forwardRef<HTMLTableCellElement, TableHeaderCellProps>(({
   children,
   className = '',
   style = {},
@@ -459,7 +539,7 @@ const TableHeaderCell = React.forwardRef(({
   onSort,
   ...props
 }, ref) => {
-  const headerStyles = {
+  const headerStyles: CSSProperties = {
     padding,
     textAlign: align,
     fontWeight: '600',
