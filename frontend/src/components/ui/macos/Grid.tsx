@@ -25,6 +25,9 @@ interface GridProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'children
   justify?: GridJustify;
   alignItems?: GridAlign;
   wrap?: GridWrap;
+  // Backward-compat: MUI sx prop
+  sx?: Record<string, unknown>;
+  [key: string]: any;
 }
 
 interface GridContainerProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'children' | 'style'> {

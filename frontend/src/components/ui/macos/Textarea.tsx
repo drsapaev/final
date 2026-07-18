@@ -7,14 +7,18 @@ type TextareaVariant = 'default' | 'filled' | 'error';
 interface TextareaProps extends Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, 'children' | 'style' | 'size'> {
   className?: string;
   style?: CSSProperties;
-  size?: TextareaSize;
-  variant?: TextareaVariant;
+  size?: TextareaSize | string;
+  variant?: TextareaVariant | string;
   error?: boolean;
   disabled?: boolean;
   autoResize?: boolean;
   minRows?: number;
   maxRows?: number;
   textareaStyle?: CSSProperties;
+  // Backward-compat: many callers pass label/rows
+  label?: React.ReactNode;
+  rows?: number;
+  [key: string]: any;
 }
 
 interface TextareaStyle extends CSSProperties {
