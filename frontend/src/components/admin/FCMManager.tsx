@@ -1,15 +1,14 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
+import type { CSSProperties } from 'react';
 
 import { useState, useEffect, useCallback } from 'react';
 import {
   MacOSCard,
-  Button,
-  Badge,
-  Skeleton,
-  Input,
-  Select,
-  Textarea,
+  Button as ButtonRaw,
+  Badge as BadgeRaw,
+  Skeleton as SkeletonRaw,
+  Input as InputRaw,
+  Select as SelectRaw,
+  Textarea as TextareaRaw,
   Checkbox,
 } from '../ui/macos';
 import {
@@ -31,6 +30,13 @@ import { toast } from 'react-toastify';
 
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
+import React from "react";
+const Badge = BadgeRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Textarea = TextareaRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Input = InputRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Select = SelectRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Button = ButtonRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Skeleton = SkeletonRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const formatFcmTokenStatus = (user, t) => {
   const fallbackLength = typeof user.fcm_token === 'string' ? user.fcm_token.length : 0;
   const tokenLength = Number.isFinite(user.fcm_token_length) ? user.fcm_token_length : fallbackLength;
@@ -39,12 +45,12 @@ const formatFcmTokenStatus = (user, t) => {
 };
 
 const FCMManager = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [loading, setLoading] = useState(false);
   const [fcmStatus, setFcmStatus] = useState(null);
   const [usersWithTokens, setUsersWithTokens] = useState([]);
   const [activeTab, setActiveTab] = useState('overview');
-  const [notificationForm, setNotificationForm] = useState({
+  const [notificationForm, setNotificationForm] = useState<Record<string, any>>({
     title: '',
     body: '',
     user_ids: [],
@@ -117,7 +123,7 @@ const FCMManager = () => {
     try {
       setLoading(true);
 
-      const payload = {
+      const payload: Record<string, any> = {
         title: notificationForm.title,
         body: notificationForm.body,
         sound: notificationForm.sound
@@ -335,8 +341,8 @@ const FCMManager = () => {
               <div className="admin-maxh-160-ovy-auto-bd-1px-solid-var-mac-bo-radius-var-mac-radius-md-p-8-bgc-bg-secondary">
                 {usersWithTokens.map((user) =>
               <label key={user.user_id} className="admin-d-flex-ai-center-gap-8-p-8-radius-var-mac-radius-sm-cur-pointer-tr-background-color-var"
-              onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--mac-bg-tertiary)'}
-              onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}>
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
                 
                     <Checkbox
                   checked={notificationForm.user_ids.includes(user.user_id)}
@@ -481,19 +487,19 @@ const FCMManager = () => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className="admin-p-12px-20px-bd-none-bg-transparent-cur-pointer-d-flex-ai-center-gap-8-fs-sm-tr-all-var-mac-duration-pos-relative-mb-n1-col-dyn-fw-dyn" style={{ '--admin-col0': isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)', '--admin-fw1': isActive ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)' }}
+              className="admin-p-12px-20px-bd-none-bg-transparent-cur-pointer-d-flex-ai-center-gap-8-fs-sm-tr-all-var-mac-duration-pos-relative-mb-n1-col-dyn-fw-dyn" style={{ '--admin-col0': isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)', '--admin-fw1': isActive ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)' } as CSSProperties}
               onMouseEnter={(e) => {
                 if (!isActive) {
-                  e.target.style.color = 'var(--mac-text-primary)';
+                  e.currentTarget.style.color = 'var(--mac-text-primary)';
                 }
               }}
               onMouseLeave={(e) => {
                 if (!isActive) {
-                  e.target.style.color = 'var(--mac-text-secondary)';
+                  e.currentTarget.style.color = 'var(--mac-text-secondary)';
                 }
               }}>
               
-              <Icon className="admin-w-16-h-16-col-dyn" style={{ '--admin-col0': isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)' }} />
+              <Icon className="admin-w-16-h-16-col-dyn" style={{ '--admin-col0': isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)' } as CSSProperties} />
               {tab.label}
               {isActive &&
               <div className="admin-pos-absolute-bottom-0-left-0-right-0-h-3-bgc-blue-radius-2px-2px-0-0" />

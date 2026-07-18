@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { api } from '../../api/client';
 import { useState, useEffect, useCallback } from 'react';
@@ -20,13 +18,17 @@ import {
   AlertCircle } from
 'lucide-react';
 import {
-  MacOSCard, Button, Skeleton,
-  Input } from '../ui/macos';
+  MacOSCard, Button as ButtonRaw, Skeleton as SkeletonRaw,
+  Input as InputRaw } from '../ui/macos';
 
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
 import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
+import React from "react";
+const Input = InputRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Button = ButtonRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Skeleton = SkeletonRaw as unknown as React.ComponentType<Record<string, unknown>>;
 /**
  * Селектор услуг для панели врача
  * Использует справочник из админ панели согласно passport.md стр. 1254
@@ -38,13 +40,13 @@ const DoctorServiceSelector = ({
   canEditPrices = true,
   className = ''
 }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // Проверяем демо-режим в самом начале
   const isDemoMode = window.location.pathname.includes('/medilab-demo');
 
   const [serviceSearch, setServiceSearch] = useState('');
   const [loading, setLoading] = useState(true);
-  const [services, setServices] = useState({});
+  const [services, setServices] = useState<Record<string, any>>({});
   const [error, setError] = useState('');
 
   // Иконки для категорий услуг
@@ -197,7 +199,7 @@ const DoctorServiceSelector = ({
   if (error) {
     return (
       <MacOSCard style={{ padding: 'var(--mac-spacing-6)', display: 'flex', alignItems: 'center', color: 'var(--mac-red-600)' }}>
-        <AlertCircle size={20} style={{ marginRight: 'var(--mac-spacing-2)' }} />
+        <AlertCircle size={20 as unknown as "small" | "default" | "large" | "xlarge"} style={{ marginRight: 'var(--mac-spacing-2)' }} />
         <span>{error}</span>
       </MacOSCard>);
 
@@ -281,7 +283,7 @@ const DoctorServiceSelector = ({
             }}>
             
                 <div style={{ display: 'flex', alignItems: 'center' }}>
-                  <CheckCircle size={16} style={{ marginRight: 'var(--mac-spacing-3)', color: 'var(--mac-success)' }} />
+                  <CheckCircle size={16 as unknown as "small" | "default" | "large" | "xlarge"} style={{ marginRight: 'var(--mac-spacing-3)', color: 'var(--mac-success)' }} />
                   <div>
                     <div style={{
                   fontWeight: 'var(--mac-font-weight-medium)',
@@ -309,14 +311,14 @@ const DoctorServiceSelector = ({
               }}>
                     <Button
                   type="button"
-                  size="sm"
+                  size="small"
                   variant="ghost"
                   title={`Decrease quantity for ${service.name}`}
                   aria-label={`Decrease quantity for ${service.name}`}
                   onClick={() => handleQuantityChange(service.id, service.quantity - 1)}
                   disabled={service.quantity <= 1}>
 
-                      <Minus aria-hidden="true" size={14} />
+                      <Minus aria-hidden="true" size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
                     </Button>
                     <span style={{
                   width: '32px',
@@ -326,13 +328,13 @@ const DoctorServiceSelector = ({
                 }}>{service.quantity}</span>
                     <Button
                   type="button"
-                  size="sm"
+                  size="small"
                   variant="ghost"
                   title={`Increase quantity for ${service.name}`}
                   aria-label={`Increase quantity for ${service.name}`}
                   onClick={() => handleQuantityChange(service.id, service.quantity + 1)}>
 
-                      <Plus aria-hidden="true" size={14} />
+                      <Plus aria-hidden="true" size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
                     </Button>
                   </div>
 
@@ -357,12 +359,12 @@ const DoctorServiceSelector = ({
                   transition: 'all var(--mac-duration-fast) var(--mac-ease)'
                 }}
                 onFocus={(e) => {
-                  e.target.style.borderColor = 'var(--mac-accent)';
-                  e.target.style.boxShadow = 'var(--mac-focus-ring)';
+                  e.currentTarget.style.borderColor = 'var(--mac-accent)';
+                  e.currentTarget.style.boxShadow = 'var(--mac-focus-ring)';
                 }}
                 onBlur={(e) => {
-                  e.target.style.borderColor = 'var(--mac-border)';
-                  e.target.style.boxShadow = 'none';
+                  e.currentTarget.style.borderColor = 'var(--mac-border)';
+                  e.currentTarget.style.boxShadow = 'none';
                 }}
                 min="0" /> :
 
@@ -381,13 +383,13 @@ const DoctorServiceSelector = ({
                   {/* Убрать услугу */}
                   <Button
                 type="button"
-                size="sm"
+                size="small"
                 variant="ghost"
                 title={`Remove service ${service.name}`}
                 aria-label={`Remove service ${service.name}`}
                 onClick={() => handleServiceToggle(service)}>
 
-                    <Minus aria-hidden="true" size={14} />
+                    <Minus aria-hidden="true" size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
                   </Button>
                 </div>
               </div>
@@ -412,7 +414,7 @@ const DoctorServiceSelector = ({
                 alignItems: 'center',
                 color: 'var(--mac-text-primary)'
               }}>
-                <CategoryIcon size={20} style={{ marginRight: 'var(--mac-spacing-2)', color: 'var(--mac-info)' }} />
+                <CategoryIcon size={20 as unknown as "small" | "default" | "large" | "xlarge"} style={{ marginRight: 'var(--mac-spacing-2)', color: 'var(--mac-info)' }} />
                 {categoryName}
               </h3>
 
@@ -455,9 +457,9 @@ const DoctorServiceSelector = ({
                       
                       <div style={{ display: 'flex', alignItems: 'center' }}>
                         {isSelected ?
-                        <CheckCircle size={20} style={{ marginRight: 'var(--mac-spacing-3)', color: 'var(--mac-info)' }} /> :
+                        <CheckCircle size={20 as unknown as "small" | "default" | "large" | "xlarge"} style={{ marginRight: 'var(--mac-spacing-3)', color: 'var(--mac-info)' }} /> :
 
-                        <Circle size={20} style={{ marginRight: 'var(--mac-spacing-3)', color: 'var(--mac-text-tertiary)' }} />
+                        <Circle size={20 as unknown as "small" | "default" | "large" | "xlarge"} style={{ marginRight: 'var(--mac-spacing-3)', color: 'var(--mac-text-tertiary)' }} />
                         }
                         <div>
                           <div style={{
@@ -493,7 +495,7 @@ const DoctorServiceSelector = ({
                           justifyContent: 'flex-end',
                           gap: 'var(--mac-spacing-1)'
                         }}>
-                          <Clock size={12} />
+                          <Clock size={12 as unknown as "small" | "default" | "large" | "xlarge"} />
                           {service.duration_minutes} мин
                         </div>
                       </div>

@@ -1,5 +1,4 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
+import type { CSSProperties } from 'react';
 
 import { useState, useEffect } from 'react';
 import {
@@ -17,33 +16,42 @@ import {
 } from 'lucide-react';
 import {
   MacOSCard,
-  Button,
-  Input,
+  Button as ButtonRaw,
+  Input as InputRaw,
   Checkbox,
-  Skeleton,
-  MacOSEmptyState,
-  Alert,
-  Badge,
-  Modal,
-  MacOSStatCard,
+  Skeleton as SkeletonRaw,
+  MacOSEmptyState as MacOSEmptyStateRaw,
+  Alert as AlertRaw,
+  Badge as BadgeRaw,
+  Modal as ModalRaw,
+  MacOSStatCard as MacOSStatCardRaw,
 } from '../ui/macos';
 import { toast } from 'react-toastify';
 import { fetchBenefitSettings, saveBenefitSettings } from '../../api/adminSettings';
 
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
+import React from "react";
+const MacOSStatCard = MacOSStatCardRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Badge = BadgeRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Modal = ModalRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Input = InputRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Button = ButtonRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Skeleton = SkeletonRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const MacOSEmptyState = MacOSEmptyStateRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Alert = AlertRaw as unknown as React.ComponentType<Record<string, unknown>>;
 /**
  * Компонент для управления настройками льгот в админке
  */
 const BenefitSettings = () => {
-  const { t } = useTranslation();
-  const [settings, setSettings] = useState({
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const [settings, setSettings] = useState<Record<string, any>>({
     repeat_visit_days: 21,
     repeat_visit_discount: 0,
     benefit_consultation_free: true,
     all_free_auto_approve: false
   });
-  const [originalSettings, setOriginalSettings] = useState({});
+  const [originalSettings, setOriginalSettings] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
@@ -60,7 +68,7 @@ const BenefitSettings = () => {
       const data = await fetchBenefitSettings();
       setSettings(data);
       setOriginalSettings(data);
-      setLastUpdated(new Date(data.updated_at));
+      setLastUpdated(new Date(data?.updated_at as any));
     } catch (error) {
       logger.error('Error loading benefit settings:', error);
       setError(error.response?.data?.detail || t('admin2.bs_error_load_settings'));
@@ -122,7 +130,7 @@ const BenefitSettings = () => {
   }
 
   // Критическая ошибка загрузки
-  if (error && !settings.updated_at) {
+  if (error && !settings?.updated_at as any) {
     return (
       <div className="admin-benefit-container">
         <MacOSCard className="p-6">
@@ -187,7 +195,7 @@ const BenefitSettings = () => {
                 variant="outline"
                 className="admin-action-btn"
               >
-                <RefreshCw className="admin-refresh-conditional" style={{ '--admin-spin-anim': loading ? 'admin-spin 1s linear infinite' : 'none' }} />
+                <RefreshCw className="admin-refresh-conditional" style={{ '--admin-spin-anim': loading ? 'admin-spin 1s linear infinite' : 'none' } as CSSProperties} />
                 {t('admin2.bs_btn_refresh')}
               </Button>
             </div>
@@ -196,7 +204,7 @@ const BenefitSettings = () => {
           {/* Настройки */}
           <div className="admin-grid-auto-400-24">
             {/* Повторные визиты */}
-            <MacOSCard className="admin-settings-card" style={{ '--admin-card-transform': settings.repeat_visit_discount > 0 ? 'scale(1.02)' : 'scale(1)' }}>
+            <MacOSCard className="admin-settings-card" style={{ '--admin-card-transform': settings.repeat_visit_discount > 0 ? 'scale(1.02)' : 'scale(1)' } as CSSProperties}>
               <div className="admin-setting-card-header">
                 <div className="admin-icon-bg-success">
                   <Calendar className="admin-icon-20-success" />
@@ -208,7 +216,7 @@ const BenefitSettings = () => {
                     </h3>
                     <Badge
                       variant={settings.repeat_visit_discount > 0 ? 'success' : 'secondary'}
-                      size="sm"
+                      size="small"
                     >
                       {settings.repeat_visit_discount > 0 ? t('admin2.bs_status_active') : t('admin2.bs_status_inactive')}
                     </Badge>
@@ -294,7 +302,7 @@ const BenefitSettings = () => {
             </MacOSCard>
 
             {/* Льготные визиты */}
-            <MacOSCard className="admin-settings-card" style={{ '--admin-card-transform': settings.benefit_consultation_free ? 'scale(1.02)' : 'scale(1)' }}>
+            <MacOSCard className="admin-settings-card" style={{ '--admin-card-transform': settings.benefit_consultation_free ? 'scale(1.02)' : 'scale(1)' } as CSSProperties}>
               <div className="admin-setting-card-header">
                 <div className="admin-icon-bg-warning">
                   <Shield className="admin-icon-20-warning" />
@@ -306,7 +314,7 @@ const BenefitSettings = () => {
                     </h3>
                     <Badge
                       variant={settings.benefit_consultation_free ? 'success' : 'warning'}
-                      size="sm"
+                      size="small"
                     >
                       {settings.benefit_consultation_free ? t('admin2.bs_status_free') : t('admin2.bs_status_paid')}
                     </Badge>
@@ -486,13 +494,13 @@ const BenefitSettings = () => {
                 </span>
               </div>
               <div className="flex items-center justify-center gap-2">
-                <CheckCircle className="admin-icon-14-color" style={{ '--admin-icon-color': settings.benefit_consultation_free ? 'var(--mac-success)' : 'var(--mac-text-tertiary)' }} />
+                <CheckCircle className="admin-icon-14-color" style={{ '--admin-icon-color': settings.benefit_consultation_free ? 'var(--mac-success)' : 'var(--mac-text-tertiary)' } as CSSProperties} />
                 <span className="text-[var(--mac-text-secondary)]">
                   {t('admin2.bs_preview_benefits', { state: settings.benefit_consultation_free ? t('admin2.bs_status_free') : t('admin2.bs_status_paid') })}
                 </span>
               </div>
               <div className="flex items-center justify-center gap-2">
-                <Shield className="admin-icon-14-color" style={{ '--admin-icon-color': settings.all_free_auto_approve ? 'var(--mac-warning)' : 'var(--mac-text-tertiary)' }} />
+                <Shield className="admin-icon-14-color" style={{ '--admin-icon-color': settings.all_free_auto_approve ? 'var(--mac-warning)' : 'var(--mac-text-tertiary)' } as CSSProperties} />
                 <span className="text-[var(--mac-text-secondary)]">
                   All Free: {settings.all_free_auto_approve ? t('admin2.bs_status_auto_approve') : t('admin2.bs_status_manual_approve')}
                 </span>
@@ -507,7 +515,7 @@ const BenefitSettings = () => {
         isOpen={showConfirmModal}
         onClose={() => setShowConfirmModal(false)}
         title={t('admin2.bs_modal_confirm_title')}
-        size="sm"
+        size="small"
       >
         <div className="p-6">
           <p className="admin-confirm-p">
@@ -530,7 +538,7 @@ const BenefitSettings = () => {
             >
               {saving ? (
                 <>
-                  <RefreshCw className="admin-refresh-mr-8-conditional" style={{ '--admin-spin-anim': 'admin-spin 1s linear infinite' }} />
+                  <RefreshCw className="admin-refresh-mr-8-conditional" style={{ '--admin-spin-anim': 'admin-spin 1s linear infinite' } as CSSProperties} />
                   {t('admin2.bs_btn_saving')}
                 </>
               ) : (

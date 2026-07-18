@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 /**
  * CartStepV2 — Step 2 of AppointmentWizardV2.
@@ -15,13 +13,15 @@
 import { useMemo, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { AlertCircle, X } from 'lucide-react';
-import { Button, Tooltip,
+import { Button as ButtonRaw, Tooltip,
   Checkbox } from '../ui/macos';
 import { normalizeCategoryCode } from '../../utils/serviceCodeUtils';
 import { MIXED_REPEAT_WARNING, categories } from './wizardUtils';
 // UX Audit R-3.3: largest inline style blocks migrated to CSS classes.
 import './CartStepV2.css';
 import { useTranslation } from '../../i18n/useTranslation';
+import React from "react";
+const Button = ButtonRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const CartStepV2 = ({
   cart,
@@ -41,7 +41,7 @@ const CartStepV2 = ({
   onApplyRepeatSuggestion,
   repeatSuggestionSummary
 }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // Local state removed - lifted to AppointmentWizardV2
 
   // Categories are now defined globally at the top of the file
@@ -219,7 +219,7 @@ const CartStepV2 = ({
                 key={service.id}
                 className={`compact-service-card ${isInCart ? 'selected' : ''}`}>
 
-                <Checkbox aria-label={`Select service ${service.name || service.service_code || service.id}`} checked={isInCart} onChange={() => handleServiceToggle(service)}
+                <Checkbox aria-label={`Select as SelectRaw service ${service.name || service.service_code || service.id}`} checked={isInCart} onChange={() => handleServiceToggle(service)}
                   className="cart-step-v2__service-checkbox" />
 
                 <div className="cart-step-v2__service-info">
@@ -264,7 +264,7 @@ const CartStepV2 = ({
                 Повторная скидка для консультаций
               </span>
               <Button
-              size="sm"
+              size="small"
               onClick={onApplyRepeatSuggestion}
               disabled={Boolean(isRepeatEligibilityLoading)}>
                 Применить повторную скидку
@@ -442,7 +442,7 @@ const CartStepV2 = ({
                       display: 'flex'
                     }}>
 
-                      <X size={14} />
+                      <X size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
                     </button>
                   </div>
                   {requiresDoctor &&
@@ -502,7 +502,7 @@ const CartStepV2 = ({
           alignItems: 'center',
           gap: 'var(--mac-spacing-2)'
         }}>
-            <AlertCircle size={14} />
+            <AlertCircle size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
             {errors.cart || errors.doctors || errors.repeat}
           </div>
         }

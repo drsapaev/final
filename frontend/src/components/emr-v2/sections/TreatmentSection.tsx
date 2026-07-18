@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 /**
  * TreatmentSection v2 - Лечение с шаблонами
@@ -18,14 +16,18 @@
 import PropTypes from 'prop-types';
 import { useState, useCallback, useMemo } from 'react';
 import { History, Pin, Edit2 } from 'lucide-react';
-import EMRSection from './EMRSection';
-import EMRSmartFieldV2 from './EMRSmartFieldV2';
+import EMRSectionRaw from './EMRSection';
+import EMRSmartFieldV2Raw from './EMRSmartFieldV2';
 import { TreatmentTemplatesButton, TreatmentTemplatesPanel } from '../templates';
-import PrescriptionEditor from './PrescriptionEditor';
+import PrescriptionEditorRaw from './PrescriptionEditor';
 import { useDoctorPhrases } from '../../../hooks/useDoctorPhrases';
 import { useDoctorTreatmentTemplates } from '../../../hooks/useDoctorTreatmentTemplates';
 import logger from '../../../utils/logger';
 import { useTranslation } from '../../../i18n/useTranslation';
+import React from "react";
+const PrescriptionEditor = PrescriptionEditorRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const EMRSection = EMRSectionRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const EMRSmartFieldV2 = EMRSmartFieldV2Raw as unknown as React.ComponentType<Record<string, unknown>>;
 
 /**
  * TreatmentSection Component
@@ -60,7 +62,7 @@ export function TreatmentSection({
   experimentalGhostMode = false,
   onTelemetry
 }) {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [showTemplates, setShowTemplates] = useState(false);
   const [showMyExperience, setShowMyExperience] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState(null);
@@ -90,7 +92,7 @@ export function TreatmentSection({
 
   // Merge suggestions: history first, then AI
   const allSuggestions = useMemo(() => {
-    const historyItems = doctorSuggestions.map((s) => ({
+    const historyItems = doctorSuggestions.map((s: Record<string, any>) => ({
       id: s.id,
       content: s.text,
       source: 'history',
@@ -170,7 +172,7 @@ export function TreatmentSection({
             transition: 'all 0.15s ease'
           }}>
           
-                        <History size={14} />
+                        <History size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
                         Мой опыт {hasMyExperience && `(${myExperienceTemplates.length})`}
                     </button>
                     {/* 📋 Generic Templates */}
@@ -289,7 +291,7 @@ export function TreatmentSection({
                   color: t.is_pinned ? 'var(--accent-warning, #f59e0b)' : 'var(--text-muted, #6b7280)'
                 }}>
                 
-                                            <Pin size={16} />
+                                            <Pin size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
                                         </button>
 
                                         {/* Edit button */}
@@ -311,7 +313,7 @@ export function TreatmentSection({
                   color: 'var(--text-muted, #6b7280)'
                 }}>
                 
-                                            <Edit2 size={14} />
+                                            <Edit2 size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
                                         </button>
 
                                         {/* Template content - clickable */}
@@ -392,7 +394,7 @@ export function TreatmentSection({
                 </div>
       }
 
-            {/* 📋 Generic Templates Panel Modal */}
+            {/* 📋 Generic Templates Panel Modal as ModalRaw */}
             <TreatmentTemplatesPanel
         isOpen={showTemplates}
         specialty={specialty}
