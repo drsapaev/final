@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import PropTypes from 'prop-types';
@@ -129,7 +126,8 @@ const AppointmentWizardV2 = ({
   const hasRegistrarAccess = hasRole(['Admin', 'Registrar', 'Receptionist']);
 
   // i18n: unified translation hook — required for all t('misc.aw_*') calls below.
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
 
   // UX Audit Registrar #2: useConfirm hook для замены window.confirm().
   // Возвращает [confirm, dialog]; dialog должен быть отрендерен в JSX.
@@ -284,7 +282,7 @@ const AppointmentWizardV2 = ({
             }
           };
         });
-      } catch (error) {
+      } catch (error: any) {
         logger.warn('[AppointmentWizardV2] Failed to hydrate edit-mode patient gender', {
           patientId,
           error: error?.message || error
@@ -385,7 +383,7 @@ const AppointmentWizardV2 = ({
       } else {
         setPhoneError(null);
       }
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Ошибка проверки телефона:', error);
     }
   };
@@ -519,7 +517,7 @@ const AppointmentWizardV2 = ({
 
       setPatientSuggestions(sorted.slice(0, 10)); // Максимум 10 результатов
       setShowSuggestions(true);
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Ошибка поиска пациентов:', error);
     } finally {
       setIsSearchingPatients(false);
@@ -610,10 +608,10 @@ const AppointmentWizardV2 = ({
         let profiles = queueProfiles;
         if (profiles.length === 0) {
           try {
-            const profilesRes = await api.get('/queues/profiles?active_only=true');
+            const profilesRes = await api.get('/queues/profiles?active_only=true') as any;
             profiles = profilesRes.data?.profiles || [];
             setQueueProfiles(profiles);
-          } catch (e) {
+          } catch (e: any) {
             logger.error('Failed to load queue profiles for filter:', e);
           }
         }
@@ -641,7 +639,7 @@ const AppointmentWizardV2 = ({
 
         setServicesData(allServices);
         setFilteredServices(allServices);
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Ошибка загрузки услуг:', error);
     }
   }, [activeTab, editMode]);
@@ -836,7 +834,7 @@ const AppointmentWizardV2 = ({
     try {
       const { data } = await api.get('/registrar/doctors');
       setDoctorsData(data);
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Ошибка загрузки врачей:', error);
     }
   }, []);
@@ -931,7 +929,7 @@ const AppointmentWizardV2 = ({
         const response = await api.post('/registrar/repeat-eligibility-preview', {
           patient_id: patientId,
           candidates: previewCandidates
-        });
+        }) as any;
 
         const mergedMap = { ...initialMap };
         (response?.data?.items || []).forEach((resultItem) => {
@@ -949,7 +947,7 @@ const AppointmentWizardV2 = ({
         if (!isCancelled) {
           setRepeatEligibilityByItemId(mergedMap);
         }
-      } catch (error) {
+      } catch (error: any) {
         logger.error('❌ Ошибка preview повторной скидки:', error);
         const fallbackMap = { ...initialMap };
         previewCandidates.forEach((candidate) => {
@@ -1404,7 +1402,7 @@ const AppointmentWizardV2 = ({
         toast.error(t('misc.aw_session_expired'));
         return;
       }
-    } catch (error) {
+    } catch (error: any) {
       logger.error('❌ Ошибка проверки токена:', error);
       toast.error(t('misc.aw_auth_check_failed'));
       return;
@@ -1512,7 +1510,7 @@ const AppointmentWizardV2 = ({
               // UX Audit Stage 3: заменён raw fetch() PUT на updatePatient().
               await updatePatient(foundPatient.id, updateData);
               logger.log('✅ Patient data updated');
-            } catch (e) {
+            } catch (e: any) {
               logger.warn('⚠️ Failed to update patient:', e);
             }
           }
@@ -2180,7 +2178,7 @@ const AppointmentWizardV2 = ({
                       })
                       ));
                       logger.log('✅ Все удаленные записи очереди успешно отменены');
-                    } catch (error) {
+                    } catch (error: any) {
                       logger.error('❌ Ошибка при отмене записей очереди:', error);
                     }
                   } else {
@@ -2382,7 +2380,7 @@ const AppointmentWizardV2 = ({
 
       onComplete?.(result);
       onClose();
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Ошибка завершения мастера:', error);
       toast.error(error.message || t('misc.aw_error_occurred'));
     } finally {
@@ -2512,21 +2510,21 @@ const AppointmentWizardV2 = ({
     label: t('misc.aw_clear_form'),
     onClick: clearDraft,
     variant: 'secondary',
-    icon: <Trash2 size={16} />,
+    icon: <Trash2 size={16 as never} />,
     disabled: isProcessing
   },
   currentStep > STEP_PATIENT && {
     label: t('misc.aw_back'),
     onClick: prevStep,
     variant: 'secondary',
-    icon: <ArrowLeft size={16} />,
+    icon: <ArrowLeft size={16 as never} />,
     disabled: isProcessing
   },
   {
     label: currentStep === totalSteps ? t('misc.aw_finish') : t('misc.aw_next'),
     onClick: currentStep === totalSteps ? handleComplete : nextStep,
     variant: 'primary',
-    icon: currentStep === totalSteps ? <Check size={16} /> : <ArrowRight size={16} />,
+    icon: currentStep === totalSteps ? <Check size={16 as never} /> : <ArrowRight size={16 as never} />,
     disabled: isProcessing,
     loading: isProcessing
   }].
@@ -2540,7 +2538,7 @@ const AppointmentWizardV2 = ({
     try {
       await loadServices();
       toast.success(t('misc.aw_services_list_updated'));
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Ошибка обновления услуг:', error);
       toast.error(t('misc.aw_services_list_update_failed'));
     } finally {
@@ -2630,7 +2628,7 @@ const AppointmentWizardV2 = ({
   <div style={wizardHeaderShellStyle}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-3)', minWidth: 0 }}>
         <div style={wizardHeaderIconStyle}>
-          <Check size={18} />
+          <Check size={18 as never} />
         </div>
         <div style={{ minWidth: 0 }}>
           {editModeBanner}
@@ -2657,7 +2655,7 @@ const AppointmentWizardV2 = ({
         e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)';
         e.currentTarget.style.borderColor = 'var(--mac-border)';
       }}>
-        <X size={18} />
+        <X size={18 as never} />
       </button>
     </div>;
 
@@ -2675,7 +2673,7 @@ const AppointmentWizardV2 = ({
         clearable
         onClear={() => setServiceSearchQuery('')}
         autoFocus
-        size="sm"
+        size="small"
         style={{ height: '38px', fontSize: 'var(--mac-font-size-sm)' }} />
 
       </div>
@@ -2721,10 +2719,10 @@ const AppointmentWizardV2 = ({
         }}>
 
             <span style={{ fontSize: 'var(--mac-font-size-lg)', display: 'inline-flex', alignItems: 'center' }}>
-            {cat.icon === 'stethoscope' ? <Stethoscope size={16} /> :
-             cat.icon === 'flask' ? <FlaskConical size={16} /> :
-             cat.icon === 'syringe' ? <Syringe size={16} /> :
-             cat.icon === 'clipboard' ? <ClipboardList size={16} /> : null}
+            {cat.icon === 'stethoscope' ? <Stethoscope size={16 as never} /> :
+             cat.icon === 'flask' ? <FlaskConical size={16 as never} /> :
+             cat.icon === 'syringe' ? <Syringe size={16 as never} /> :
+             cat.icon === 'clipboard' ? <ClipboardList size={16 as never} /> : null}
           </span>
             {cat.label}
           </button>
@@ -2772,7 +2770,7 @@ const AppointmentWizardV2 = ({
           e.currentTarget.style.color = 'var(--mac-text-secondary)';
         }}>
 
-          <RefreshCw size={16} className={isReloadingServices ? 'spin' : ''} />
+          <RefreshCw size={16 as never} className={isReloadingServices ? 'spin' : ''} />
         </button>
 
         {/* Кнопка закрытия */}
@@ -2806,7 +2804,7 @@ const AppointmentWizardV2 = ({
           e.currentTarget.style.color = 'var(--mac-text-secondary)';
         }}>
 
-          <X size={18} />
+          <X size={18 as never} />
         </button>
       </div>
     </div>;
@@ -2826,7 +2824,7 @@ const AppointmentWizardV2 = ({
           textAlign: 'center'
         }}>
           <AlertCircle
-            size={48}
+            size={48 as never}
             style={{
               color: 'var(--mac-danger)',
               marginBottom: 'var(--mac-spacing-4)'
