@@ -1,10 +1,20 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
-import React from 'react';
+import React, { type CSSProperties, type ReactElement } from 'react';
 import { useTheme } from '../../../contexts/ThemeContext';
 import PropTypes from 'prop-types';
 import { useTranslation } from '../../../i18n/useTranslation';
+
+type IconSize = 'small' | 'default' | 'large' | 'xlarge';
+type IconColor = 'default' | 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'white' | 'black' | 'accent' | string;
+type IconVariant = 'multicolor' | 'monochrome';
+
+interface IconProps extends Omit<React.SVGProps<SVGSVGElement>, 'children' | 'style' | 'size' | 'color' | 'name'> {
+  name?: string;
+  size?: IconSize;
+  color?: IconColor;
+  variant?: IconVariant;
+  className?: string;
+  style?: CSSProperties;
+}
 
 /**
  * macOS-style Icon Component
@@ -12,7 +22,7 @@ import { useTranslation } from '../../../i18n/useTranslation';
  */
 
 // SF Symbols-like icon definitions (simplified SVG paths)
-const ICONS = {
+const ICONS: Record<string, ReactElement> = {
   // Navigation & UI
   'house':
   <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" />,
@@ -440,7 +450,7 @@ const ICONS = {
 /**
  * macOS-style Icon Component
  */
-const Icon = React.forwardRef(({
+const Icon = React.forwardRef<SVGSVGElement, IconProps>(({
   name,
   size = 'default',
   color = 'default',
@@ -450,19 +460,22 @@ const Icon = React.forwardRef(({
   ...props
 }, ref) => {
   useTheme();
+  const { t } = useTranslation();
+  void t;
 
   // Size mapping
-  const sizeMap = {
+  const sizeMap: Record<'small' | 'default' | 'large' | 'xlarge', number> = {
     small: 16,
     default: 20,
     large: 24,
     xlarge: 32
   };
 
-  const iconSize = sizeMap[size] || sizeMap.default;
+  const sizeKey = (size in sizeMap ? size : 'default') as 'small' | 'default' | 'large' | 'xlarge';
+  const iconSize = sizeMap[sizeKey];
 
   // Color mapping
-  const colorMap = {
+  const colorMap: Record<string, string> = {
     default: 'var(--mac-text-secondary)',
     primary: 'var(--mac-accent-blue)',
     secondary: 'var(--mac-text-secondary)',
@@ -473,12 +486,12 @@ const Icon = React.forwardRef(({
     black: 'black'
   };
 
-  const iconColor = color === 'accent' ? 'var(--accent)' : colorMap[color] || colorMap.default;
+  const iconColor = color === 'accent' ? 'var(--accent)' : (colorMap[color] || colorMap.default);
 
   // Get the icon SVG
-  const iconPath = ICONS[name] || ICONS['questionmark'];
+  const iconPath = (name && ICONS[name]) || ICONS['questionmark'];
 
-  const iconStyles = {
+  const iconStyles: CSSProperties = {
     display: 'inline-block',
     width: `${iconSize}px`,
     height: `${iconSize}px`,
@@ -500,7 +513,7 @@ const Icon = React.forwardRef(({
         {...baseProps}
         fill="none"
         stroke="currentColor"
-        strokeWidth="1.5"
+        strokeWidth={1.5}
         strokeLinecap="round"
         strokeLinejoin="round">
 
@@ -515,7 +528,7 @@ const Icon = React.forwardRef(({
       {...baseProps}
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.5"
+      strokeWidth={1.5}
       strokeLinecap="round"
       strokeLinejoin="round"
       {...props}>

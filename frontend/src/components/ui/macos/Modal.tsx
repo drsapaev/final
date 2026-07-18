@@ -1,11 +1,45 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
-import React, { useEffect, useId, useRef } from 'react';
+import React, { useEffect, useId, useRef, type ReactNode, type CSSProperties, type MouseEvent, type KeyboardEvent, type RefObject } from 'react';
 import PropTypes from 'prop-types';
 import { useTheme } from '../../../contexts/ThemeContext';
 import Button from './Button';
 import { useTranslation } from '../../../i18n/useTranslation';
+
+type ModalSize = 'small' | 'default' | 'large' | 'fullscreen';
+type ModalVariant = 'default' | 'compact' | 'sheet';
+
+interface ModalProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'children' | 'style' | 'title'> {
+  isOpen?: boolean;
+  onClose?: () => void;
+  title?: ReactNode;
+  children?: ReactNode;
+  actions?: ReactNode;
+  size?: ModalSize;
+  variant?: ModalVariant;
+  closeOnBackdrop?: boolean;
+  closeOnEscape?: boolean;
+  className?: string;
+  style?: CSSProperties;
+}
+
+interface ModalPartProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'children' | 'style'> {
+  children?: ReactNode;
+  className?: string;
+  style?: CSSProperties;
+}
+
+interface ModalTitleProps extends Omit<React.HTMLAttributes<HTMLHeadingElement>, 'children' | 'style'> {
+  children?: ReactNode;
+  className?: string;
+  style?: CSSProperties;
+}
+
+interface FocusableElement extends HTMLElement {
+  focus: () => void;
+}
+
+interface StyleWithBackdrop extends CSSProperties {
+  WebkitBackdropFilter?: string;
+}
 
 /**
  * macOS-style Modal Component
@@ -28,16 +62,18 @@ const Modal = ({
   className = '',
   style = {},
   ...props
-}) => {
+}: ModalProps) => {
   useTheme();
+  const { t } = useTranslation();
+  void t;
   void variant;
-  const modalRef = useRef<unknown>(null);
-  const backdropRef = useRef<unknown>(null);
+  const modalRef: RefObject<HTMLDivElement | null> = useRef<HTMLDivElement | null>(null);
+  const backdropRef: RefObject<HTMLDivElement | null> = useRef<HTMLDivElement | null>(null);
   // PR-37 / P0-B: unique id for aria-labelledby — avoids collisions when
   // multiple modals are rendered simultaneously.
   const titleId = useId();
   // PR-37 / P0-A: track the previously-focused element to restore focus on close.
-  const previouslyFocusedRef = useRef<unknown>(null);
+  const previouslyFocusedRef: RefObject<FocusableElement | null> = useRef<FocusableElement | null>(null);
 
   // PR-37 / P0-A: Focus trap implementation.
   // On open: save document.activeElement, move focus into the modal.
@@ -47,11 +83,11 @@ const Modal = ({
     if (!isOpen) return;
 
     // Save the trigger element so we can restore focus on close.
-    previouslyFocusedRef.current = document.activeElement;
+    previouslyFocusedRef.current = document.activeElement as FocusableElement | null;
 
-    const handleKeyDown = (e) => {
+    const handleKeyDown = (e: globalThis.KeyboardEvent) => {
       if (e.key === 'Escape' && closeOnEscape) {
-        onClose();
+        onClose?.();
         return;
       }
       if (e.key !== 'Tab') return;
@@ -66,7 +102,7 @@ const Modal = ({
         'textarea:not([disabled])',
         '[tabindex]:not([tabindex="-1"])',
       ].join(',');
-      const focusables = Array.from(modal.querySelectorAll(focusableSelectors))
+      const focusables = Array.from(modal.querySelectorAll<HTMLElement>(focusableSelectors))
         .filter((el) => el.offsetParent !== null || el === document.activeElement);
       if (focusables.length === 0) return;
       const first = focusables[0];
@@ -88,7 +124,7 @@ const Modal = ({
     // Move focus into the modal on open
     requestAnimationFrame(() => {
       if (modalRef.current) {
-        const focusables = modalRef.current.querySelectorAll(
+        const focusables = modalRef.current.querySelectorAll<HTMLElement>(
           'button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])'
         );
         if (focusables.length > 0) {
@@ -109,13 +145,13 @@ const Modal = ({
   }, [isOpen, closeOnEscape, onClose]);
 
   // Handle backdrop click
-  const handleBackdropClick = (e) => {
+  const handleBackdropClick = (e: MouseEvent<HTMLDivElement>) => {
     if (closeOnBackdrop && e.target === backdropRef.current) {
       onClose?.();
     }
   };
 
-  const handleBackdropKeyDown = (e) => {
+  const handleBackdropKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (!closeOnBackdrop) return;
     if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
@@ -124,7 +160,7 @@ const Modal = ({
   };
 
   // Size styles
-  const sizeStyles = {
+  const sizeStyles: Record<ModalSize, CSSProperties> = {
     small: { width: '400px', maxWidth: '90vw' },
     default: { width: '500px', maxWidth: '90vw' },
     large: { width: '700px', maxWidth: '90vw' },
@@ -132,7 +168,7 @@ const Modal = ({
   };
 
   // Modal styles
-  const modalStyles = {
+  const modalStyles: CSSProperties = {
     position: 'fixed',
     top: 0,
     left: 0,
@@ -146,7 +182,7 @@ const Modal = ({
     ...style
   };
 
-  const backdropStyles = {
+  const backdropStyles: StyleWithBackdrop = {
     position: 'absolute',
     top: 0,
     left: 0,
@@ -158,7 +194,7 @@ const Modal = ({
     animation: isOpen ? 'mac-modal-fade-in 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)' : 'mac-modal-fade-out 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)'
   };
 
-  const contentStyles = {
+  const contentStyles: StyleWithBackdrop = {
     backgroundColor: 'var(--mac-bg-primary)',
     backdropFilter: 'var(--mac-blur-light)',
     WebkitBackdropFilter: 'var(--mac-blur-light)',
@@ -352,7 +388,7 @@ const Modal = ({
 /**
  * macOS-style Modal Header Component
  */
-export const ModalHeader = React.forwardRef(({
+export const ModalHeader = React.forwardRef<HTMLDivElement, ModalPartProps>(({
   children,
   className = '',
   style = {},
@@ -378,7 +414,7 @@ ModalHeader.displayName = 'macOS Modal Header';
 /**
  * macOS-style Modal Title Component
  */
-export const ModalTitle = React.forwardRef(({
+export const ModalTitle = React.forwardRef<HTMLHeadingElement, ModalTitleProps>(({
   children,
   className = '',
   style = {},
@@ -408,7 +444,7 @@ ModalTitle.displayName = 'macOS Modal Title';
 /**
  * macOS-style Modal Content Component
  */
-export const ModalContent = React.forwardRef(({
+export const ModalContent = React.forwardRef<HTMLDivElement, ModalPartProps>(({
   children,
   className = '',
   style = {},
@@ -439,7 +475,7 @@ ModalContent.displayName = 'macOS Modal Content';
 /**
  * macOS-style Modal Footer Component
  */
-export const ModalFooter = React.forwardRef(({
+export const ModalFooter = React.forwardRef<HTMLDivElement, ModalPartProps>(({
   children,
   className = '',
   style = {},
