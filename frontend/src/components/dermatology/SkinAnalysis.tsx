@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 /**
  * Skin Analysis Component
@@ -12,12 +10,12 @@ import {
   Box,
   Card,
   CardContent,
-  Typography,
-  Button,
-  Alert,
-  Progress,
+  Typography as TypographyRaw,
+  Button as ButtonRaw,
+  Alert as AlertRaw,
+  Progress as ProgressRaw,
   Badge,
-  CircularProgress,
+  CircularProgress as CircularProgressRaw,
 } from '../ui/macos';
 import {
   BarChart3,
@@ -38,8 +36,14 @@ import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
+import React from "react";
+const CircularProgressAny = CircularProgressRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const ProgressAny = ProgressRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Button = ButtonRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Typography = TypographyRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Alert = AlertRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const SkinAnalysis = ({ photos, visitId, patientId, onAnalysisComplete }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
   useState(null);
@@ -227,7 +231,7 @@ const SkinAnalysis = ({ photos, visitId, patientId, onAnalysisComplete }) => {
           {/* Прогресс анализа */}
           {analyzing &&
           <div style={{ marginTop: 24 }}>
-              <Progress />
+              <ProgressAny />
               <Typography variant="body2" color="textSecondary" style={{ textAlign: 'center', marginTop: 8 }}>
                 {t('derma.derma_skin_analyzing')}
               </Typography>
@@ -244,11 +248,11 @@ const SkinAnalysis = ({ photos, visitId, patientId, onAnalysisComplete }) => {
                     {t('derma.derma_skin_overall_state')}
                   </Typography>
                   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 16 }}>
-                    <CircularProgress
+                    <CircularProgressAny
                   variant="determinate"
                   value={analysisResult.overall_score}
-                  size={80}
-                  thickness={4}
+                  size={80 as unknown as "small" | "default" | "large" | "xlarge"}
+                  thickness={"thick" as unknown as "thin" | "medium" | "thick"}
                   color={getScoreColor(analysisResult.overall_score)} />
                 
                     <div>

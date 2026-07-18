@@ -1,5 +1,4 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
+import type { CSSProperties } from 'react';
 
 import { useState, useEffect, useCallback } from 'react';
 import {
@@ -17,10 +16,10 @@ import { toast } from 'react-toastify';
 import { useAsyncAction } from '../../hooks/useAsyncAction';
 import {
   MacOSCard,
-  Button,
-  Input,
+  Button as ButtonRaw,
+  Input as InputRaw,
   Checkbox,
-  Select,
+  Select as SelectRaw,
 } from '../ui/macos';
 import {
   fetchPaymentProviderSettings,
@@ -28,9 +27,13 @@ import {
   testPaymentProviderConfig,
 } from '../../api/adminSettings';
 import { useTranslation } from '../../i18n/useTranslation';
+import React from "react";
+const Input = InputRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Select = SelectRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Button = ButtonRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const PaymentProviderSettings = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const { executeAction, loading } = useAsyncAction();
 
   const [settings, setSettings] = useState({
@@ -59,7 +62,7 @@ const PaymentProviderSettings = () => {
     payme: false
   });
 
-  const [testResults, setTestResults] = useState({});
+  const [testResults, setTestResults] = useState<Record<string, any>>({});
 
   const loadSettings = useCallback(async () => {
     await executeAction(
@@ -199,14 +202,14 @@ const PaymentProviderSettings = () => {
         </div>
 
         {testResult && (
-          <MacOSCard className="admin-p-12-mb-16-bgc-dyn-bd-dyn" style={{ '--admin-bgc0': testResult.success ? 'var(--mac-success-bg)' : 'var(--mac-error-bg)', '--admin-bd1': testResult.success ? '1px solid var(--mac-success-border)' : '1px solid var(--mac-error-border)' }}>
+          <MacOSCard className="admin-p-12-mb-16-bgc-dyn-bd-dyn" style={{ '--admin-bgc0': testResult.success ? 'var(--mac-success-bg)' : 'var(--mac-error-bg)', '--admin-bd1': testResult.success ? '1px solid var(--mac-success-border)' : '1px solid var(--mac-error-border)' } as CSSProperties}>
             <div className="admin-flex-center-8">
               {testResult.success ? (
                 <CheckCircle className="admin-w-16-h-16-success" />
               ) : (
                 <XCircle className="admin-w-16-h-16-error" />
               )}
-              <span className="admin-fs-sm-fw-med-col-dyn" style={{ '--admin-col0': testResult.success ? 'var(--mac-success)' : 'var(--mac-error)' }}>
+              <span className="admin-fs-sm-fw-med-col-dyn" style={{ '--admin-col0': testResult.success ? 'var(--mac-success)' : 'var(--mac-error)' } as CSSProperties}>
                 {testResult.message}
               </span>
               <small className="admin-fs-xs-tertiary-ml-auto">

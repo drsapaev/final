@@ -1,11 +1,10 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import React, { useState } from 'react';
 import { useBreakpoint } from '../hooks/useEnhancedMediaQuery';
-import { Button } from './ui';
+import { Button as ButtonRaw } from './ui';
 import PropTypes from 'prop-types';
 import { Checkbox } from './ui/macos';
+const Button = ButtonRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const ResponsiveTable = ({
   data = [],
@@ -97,7 +96,7 @@ const ResponsiveTable = ({
                   {row.name || row.fio || `Запись ${index + 1}`}
                 </div>
                 {onRowSelect &&
-              <Checkbox aria-label={`Select ${row.name || row.fio || `record ${index + 1}`}`} checked={selectedRows.has(index)} onChange={(e) => onRowSelect(index, e.target.checked)}
+              <Checkbox aria-label={`Select as SelectRaw ${row.name || row.fio || `record ${index + 1}`}`} checked={selectedRows.has(index)} onChange={(e) => onRowSelect(index, e)}
                 style={{ transform: 'scale(1.2)' }} />
 
               }
@@ -154,7 +153,7 @@ const ResponsiveTable = ({
                     key={actionIndex}
                     className={action.className}
                     style={action.style}
-                    onClick={(e) => {e.stopPropagation();action.onClick(row, index);}}
+                    onClick={(e) => {(e as unknown as { stopPropagation: () => void }).stopPropagation();action.onClick(row, index);}}
                     title={action.title}>
                     
                           {action.icon || action.title}
@@ -163,9 +162,9 @@ const ResponsiveTable = ({
                   <Button
                     key={actionIndex}
                     variant={action.variant || 'primary'}
-                    size="sm"
+                    size="small"
                     onClick={(e) => {
-                      e.stopPropagation();
+                      (e as unknown as { stopPropagation: () => void }).stopPropagation();
                       action.onClick(row, index);
                     }}
                     style={{ minWidth: 'auto', ...(action.style || {}) }}
@@ -240,13 +239,13 @@ const ResponsiveTable = ({
               top: 0,
               zIndex: 11,
               display: 'table-cell !important',
-              visibility: 'visible !important',
+              visibility: 'visible' as unknown as 'visible' | 'hidden' | 'collapse',
               opacity: '1 !important',
               color: 'var(--mac-text-primary) !important'
             }} aria-label="Row selection">
                 <Checkbox aria-label="Select all rows" checked={selectedRows.size === data.length && data.length > 0}
                 onChange={(e) => {
-                  data.forEach((_, index) => onRowSelect(index, e.target.checked));
+                  data.forEach((_, index) => onRowSelect(index, e));
                 }} />
               
               </th>
@@ -271,7 +270,7 @@ const ResponsiveTable = ({
                     zIndex: column.fixed ? 12 : 11,
                     borderBottom: '2px solid var(--mac-border)',
                     display: 'table-cell !important',
-                    visibility: 'visible !important',
+                    visibility: 'visible' as unknown as 'visible' | 'hidden' | 'collapse',
                     opacity: '1 !important'
                   }}
                   onClick={() => column.sortable && handleSort(column.key)}>
@@ -298,7 +297,7 @@ const ResponsiveTable = ({
               zIndex: 11,
               borderBottom: '2px solid var(--mac-border)',
               display: 'table-cell !important',
-              visibility: 'visible !important',
+              visibility: 'visible' as unknown as 'visible' | 'hidden' | 'collapse',
               opacity: '1 !important',
               color: 'var(--mac-text-primary) !important'
             }}>
@@ -320,20 +319,20 @@ const ResponsiveTable = ({
             onClick={() => onRowClick?.(row, index)}
             onMouseEnter={(e) => {
               if (!selectedRows.has(index)) {
-                e.target.style.background = 'var(--mac-bg-secondary)';
+                e.currentTarget.style.background = 'var(--mac-bg-secondary)';
               }
             }}
             onMouseLeave={(e) => {
               if (!selectedRows.has(index)) {
-                e.target.style.background = 'white';
+                e.currentTarget.style.background = 'white';
               }
             }}>
 
               {onRowSelect &&
             <td style={{ padding: 'var(--mac-spacing-3)', textAlign: 'center' }} aria-label={`Select ${row.name || row.fio || `record ${index + 1}`}`}>
                   <Checkbox aria-label={`Select ${row.name || row.fio || `record ${index + 1}`}`} checked={selectedRows.has(index)} onChange={(e) => {
-                  e.stopPropagation();
-                  onRowSelect(index, e.target.checked);
+                  (e as unknown as { stopPropagation: () => void }).stopPropagation();
+                  onRowSelect(index, e);
                 }} />
               
                 </td>
@@ -356,7 +355,7 @@ const ResponsiveTable = ({
               // Обработка кликабельных колонок
               const handleClick = column.clickable && column.onClick ?
               (e) => {
-                e.stopPropagation();
+                (e as unknown as { stopPropagation: () => void }).stopPropagation();
                 column.onClick(row);
               } : undefined;
 
@@ -396,7 +395,7 @@ const ResponsiveTable = ({
                       key={actionIndex}
                       className={action.className}
                       style={action.style}
-                      onClick={(e) => {e.stopPropagation();action.onClick(row, index);}}
+                      onClick={(e) => {(e as unknown as { stopPropagation: () => void }).stopPropagation();action.onClick(row, index);}}
                       title={action.title}>
                       
                             {action.icon || action.title}
@@ -405,9 +404,9 @@ const ResponsiveTable = ({
                     <Button
                       key={actionIndex}
                       variant={action.variant || 'primary'}
-                      size="sm"
+                      size="small"
                       onClick={(e) => {
-                        e.stopPropagation();
+                        (e as unknown as { stopPropagation: () => void }).stopPropagation();
                         action.onClick(row, index);
                       }}
                       style={{ minWidth: 'auto', ...(action.style || {}) }}

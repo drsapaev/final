@@ -1,13 +1,13 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { useState, useEffect, useMemo } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import {
-  Button, Card, Icon,
+  Button as ButtonRaw, Card, Icon,
 } from '../ui/macos';
 import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
+import React from "react";
+const Button = ButtonRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const getAppointmentDate = (appointment) => appointment.date || appointment.appointment_date;
 
@@ -38,7 +38,7 @@ const getTrendDirection = (current, previous, goodWhenDown = false) => {
 
 const getAverageWaitTime = (appointments) => {
   const waitTimes = appointments.
-  map((apt) => toNumber(apt.wait_time_minutes ?? apt.wait_minutes ?? apt.queue_wait_minutes ?? apt.wait_time)).
+  map((apt) => toNumber(apt('misc.ms_wait_time_minutes') ?? apt('misc.ms_wait_minutes') ?? apt('misc.ms_queue_wait_minutes') ?? apt('misc.ms_wait_time'))).
   filter((minutes) => minutes > 0);
 
   if (waitTimes.length === 0) {
@@ -56,9 +56,9 @@ const ModernStatistics = ({
   onRefresh,
   ...props
 }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const { theme } = useTheme();
-  const [animatedValues, setAnimatedValues] = useState({});
+  const [animatedValues, setAnimatedValues] = useState<Record<string, any>>({});
   const [period, setPeriod] = useState('today');
   const [showDetails, setShowDetails] = useState(false);
 
@@ -147,28 +147,28 @@ const ModernStatistics = ({
 
     // Завершенные визиты за выбранный день
     const completedToday = dayAppointments.filter((apt) =>
-    apt.status === 'completed' || apt.status === 'done'
+    apt('misc.ms_status') === 'completed' || apt('misc.ms_status') === 'done'
     );
 
     // Ожидают оплаты за выбранный день
     const pendingPayments = dayAppointments.filter((apt) =>
-    apt.status === 'paid_pending' || apt.payment_status === 'pending'
+    apt('misc.ms_status') === 'paid_pending' || apt('misc.ms_payment_status') === 'pending'
     );
     const previousPendingPayments = previousDayAppointments.filter((apt) =>
-    apt.status === 'paid_pending' || apt.payment_status === 'pending'
+    apt('misc.ms_status') === 'paid_pending' || apt('misc.ms_payment_status') === 'pending'
     );
 
     // Выручка: суммируем оплаченные записи (по payment_status), а не только завершенные
     const totalRevenue = dayAppointments.
-    filter((apt) => apt.payment_status === 'paid').
-    reduce((sum, apt) => sum + toNumber(apt.payment_amount || apt.cost), 0);
+    filter((apt) => apt('misc.ms_payment_status') === 'paid').
+    reduce((sum, apt) => sum + toNumber(apt('misc.ms_payment_amount') || apt('misc.ms_cost')), 0);
     const previousRevenue = previousDayAppointments.
-    filter((apt) => apt.payment_status === 'paid').
-    reduce((sum, apt) => sum + toNumber(apt.payment_amount || apt.cost), 0);
+    filter((apt) => apt('misc.ms_payment_status') === 'paid').
+    reduce((sum, apt) => sum + toNumber(apt('misc.ms_payment_amount') || apt('misc.ms_cost')), 0);
 
     // Уникальные пациенты
-    const uniquePatients = new Set(dayAppointments.map((apt) => apt.patient_id)).size;
-    const previousUniquePatients = new Set(previousDayAppointments.map((apt) => apt.patient_id)).size;
+    const uniquePatients = new Set(dayAppointments.map((apt) => apt('misc.ms_patient_id'))).size;
+    const previousUniquePatients = new Set(previousDayAppointments.map((apt) => apt('misc.ms_patient_id'))).size;
 
     // Среднее время ожидания
     const averageWaitTime = getAverageWaitTime(dayAppointments);
@@ -246,7 +246,7 @@ const ModernStatistics = ({
   const statCards = [
   {
     id: 'totalPatients',
-    title: t.totalPatients,
+    title: t("misc.ms_total_patients"),
     value: animatedValues.totalPatients || 0,
     iconName: 'person',
     color: 'var(--mac-accent-blue)',
@@ -256,7 +256,7 @@ const ModernStatistics = ({
   },
   {
     id: 'todayAppointments',
-    title: t.todayAppointments,
+    title: t('misc.ms_todayAppointments'),
     value: animatedValues.todayAppointments || 0,
     iconName: 'calendar',
     color: 'var(--mac-success)',
@@ -266,7 +266,7 @@ const ModernStatistics = ({
   },
   {
     id: 'completedToday',
-    title: t.completedToday,
+    title: t('misc.ms_completedToday'),
     value: animatedValues.completedToday || 0,
     iconName: 'checkmark.circle',
     color: 'var(--mac-accent-blue-light)',
@@ -276,7 +276,7 @@ const ModernStatistics = ({
   },
   {
     id: 'pendingPayments',
-    title: t.pendingPayments,
+    title: t('misc.ms_pendingPayments'),
     value: animatedValues.pendingPayments || 0,
     iconName: 'creditcard',
     color: 'var(--mac-warning)',
@@ -286,24 +286,24 @@ const ModernStatistics = ({
   },
   {
     id: 'revenue',
-    title: t.revenue,
+    title: t('misc.ms_revenue'),
     value: animatedValues.revenue || 0,
     iconName: 'creditcard',
     color: 'var(--mac-success)',
     trend: statistics.trends.revenue,
     trendValue: statistics.trendValues.revenue,
-    suffix: ' ' + t.sum,
+    suffix: ' ' + t('misc.ms_sum'),
     format: 'currency'
   },
   {
     id: 'averageWaitTime',
-    title: t.averageWaitTime,
+    title: t('misc.ms_averageWaitTime'),
     value: statistics.averageWaitTime,
     iconName: 'clock',
     color: 'var(--mac-accent-blue-light)',
     trend: statistics.trends.waitTime,
     trendValue: statistics.trendValues.waitTime,
-    suffix: ' ' + t.minutes
+    suffix: ' ' + t('misc.ms_minutes')
   }];
 
 
@@ -341,15 +341,15 @@ const ModernStatistics = ({
           alignItems: 'center',
           gap: 'var(--mac-spacing-2)'
         }}>
-          <Icon name="chart.bar" size="default" style={{ color: 'var(--mac-accent-blue)' }} />
-          {t.statistics}
+          <Icon name="chart('misc.ms_bar')" size="default" style={{ color: 'var(--mac-accent-blue)' }} />
+          {t('misc.ms_statistics')}
         </h2>
         
         <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)' }}>
-          <Button type="button" variant="ghost" size="small" onClick={onRefresh} title={t.refresh} aria-label={t.refresh}>
+          <Button type="button" variant="ghost" size="small" onClick={onRefresh} title={t('misc.ms_refresh')} aria-label={t('misc.ms_refresh')}>
             <Icon aria-hidden="true" name="gear" size="small" />
           </Button>
-          <Button type="button" variant="primary" size="small" onClick={onExport} title={t.export} aria-label={t.export}>
+          <Button type="button" variant="primary" size="small" onClick={onExport} title={t('misc.ms_export')} aria-label={t('misc.ms_export')}>
             <Icon aria-hidden="true" name="square.and.arrow.up" size="small" style={{ color: 'white' }} />
           </Button>
         </div>

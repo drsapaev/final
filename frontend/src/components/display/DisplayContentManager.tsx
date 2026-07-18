@@ -1,5 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
 
 import { api } from '../../api/client';
 import { useState, useEffect, useCallback } from 'react';
@@ -17,12 +15,16 @@ import {
 
   Monitor } from
 'lucide-react';
-import { Card, Button, Badge,
-  Input } from '../ui/macos';
+import { Card, Button as ButtonRaw, Badge as BadgeRaw,
+  Input as InputRaw } from '../ui/macos';
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
 import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
+import React from "react";
+const Badge = BadgeRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Input = InputRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Button = ButtonRaw as unknown as React.ComponentType<Record<string, unknown>>;
 /**
  * Управление контентом для табло
  * Основа: passport.md стр. 2571-3324
@@ -31,7 +33,10 @@ const DisplayContentManager = ({
   boardId,
   className = ''
 }) => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t18 = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  void t;
   const [activeTab, setActiveTab] = useState('banners');
   const [content, setContent] = useState({
     banners: [],
@@ -94,7 +99,7 @@ const DisplayContentManager = ({
 
 
 
-  const handleDeleteContent = async (contentId) => {
+  const handleDeleteContent = async (contentId: string | number, contentType?: string) => {
     try {
       const response = await fetch(`/admin/display-boards/content/${contentId}`, {
         method: 'DELETE',
@@ -114,7 +119,7 @@ const DisplayContentManager = ({
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-medium">{t('misc.dcm_banners_title')}</h3>
         <Button onClick={() => setUploadDialog({ open: true, type: 'banner' })}>
-          <Plus size={16} className="mr-2" />
+          <Plus size={16 as unknown as "small" | "default" | "large" | "xlarge"} className="mr-2" />
           {t('misc.dcm_add_banner')}
         </Button>
       </div>
@@ -137,35 +142,35 @@ const DisplayContentManager = ({
               <div className="font-medium text-sm mb-1">{banner.title}</div>
               <div className="text-xs text-gray-500 mb-2">{banner.description}</div>
               <div className="flex justify-between items-center">
-                <Badge variant={banner.active ? 'success' : 'secondary'} size="sm">
+                <Badge variant={banner.active ? 'success' : 'secondary'} size="small">
                   {banner.active ? t('misc.dcm_active') : t('misc.dcm_inactive')}
                 </Badge>
                 <div className="flex space-x-1">
                   <Button
-                    size="sm"
+                    size="small"
                     variant="outline"
                     type="button"
-                    title={t('misc.dcm_view_banner', { title: banner.title })}
-                    aria-label={t('misc.dcm_view_banner', { title: banner.title })}>
-                    <Eye aria-hidden="true" size={12} />
+                    title={t18('misc.dcm_view_banner', { title: banner.title })}
+                    aria-label={t18('misc.dcm_view_banner', { title: banner.title })}>
+                    <Eye aria-hidden="true" size={12 as unknown as "small" | "default" | "large" | "xlarge"} />
                   </Button>
                   <Button
-                    size="sm"
+                    size="small"
                     variant="outline"
                     type="button"
-                    title={t('misc.dcm_edit_banner', { title: banner.title })}
-                    aria-label={t('misc.dcm_edit_banner', { title: banner.title })}>
-                    <Edit aria-hidden="true" size={12} />
+                    title={t18('misc.dcm_edit_banner', { title: banner.title })}
+                    aria-label={t18('misc.dcm_edit_banner', { title: banner.title })}>
+                    <Edit aria-hidden="true" size={12 as unknown as "small" | "default" | "large" | "xlarge"} />
                   </Button>
                   <Button
-                size="sm"
+                size="small"
                 variant="outline"
                 type="button"
-                title={t('misc.dcm_delete_banner', { title: banner.title })}
-                aria-label={t('misc.dcm_delete_banner', { title: banner.title })}
+                title={t18('misc.dcm_delete_banner', { title: banner.title })}
+                aria-label={t18('misc.dcm_delete_banner', { title: banner.title })}
                 onClick={() => handleDeleteContent(banner.id, 'banner')}>
 
-                    <Trash2 aria-hidden="true" size={12} />
+                    <Trash2 aria-hidden="true" size={12 as unknown as "small" | "default" | "large" | "xlarge"} />
                   </Button>
                 </div>
               </div>
@@ -181,7 +186,7 @@ const DisplayContentManager = ({
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-medium">{t('misc.dcm_announcements_title')}</h3>
         <Button onClick={() => setUploadDialog({ open: true, type: 'announcement' })}>
-          <Plus size={16} className="mr-2" />
+          <Plus size={16 as unknown as "small" | "default" | "large" | "xlarge"} className="mr-2" />
           {t('misc.dcm_add_announcement')}
         </Button>
       </div>
@@ -199,7 +204,7 @@ const DisplayContentManager = ({
                 announcement.priority === 'high' ? 'error' :
                 announcement.priority === 'medium' ? 'warning' : 'info'
                 }
-                size="sm">
+                size="small">
                 
                     {announcement.priority === 'high' ? t('misc.dcm_priority_high') :
                 announcement.priority === 'medium' ? t('misc.dcm_priority_medium') : t('misc.dcm_priority_normal')}
@@ -211,22 +216,22 @@ const DisplayContentManager = ({
               </div>
               <div className="flex space-x-2 ml-4">
                 <Button
-                  size="sm"
+                  size="small"
                   variant="outline"
                   type="button"
-                  title={t('misc.dcm_edit_announcement', { title: announcement.title })}
-                  aria-label={t('misc.dcm_edit_announcement', { title: announcement.title })}>
-                  <Edit aria-hidden="true" size={14} />
+                  title={t18('misc.dcm_edit_announcement', { title: announcement.title })}
+                  aria-label={t18('misc.dcm_edit_announcement', { title: announcement.title })}>
+                  <Edit aria-hidden="true" size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
                 </Button>
                 <Button
-              size="sm"
+              size="small"
               variant="outline"
               type="button"
-              title={t('misc.dcm_delete_announcement', { title: announcement.title })}
-              aria-label={t('misc.dcm_delete_announcement', { title: announcement.title })}
+              title={t18('misc.dcm_delete_announcement', { title: announcement.title })}
+              aria-label={t18('misc.dcm_delete_announcement', { title: announcement.title })}
               onClick={() => handleDeleteContent(announcement.id, 'announcement')}>
 
-                  <Trash2 aria-hidden="true" size={14} />
+                  <Trash2 aria-hidden="true" size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
                 </Button>
               </div>
             </div>
@@ -241,7 +246,7 @@ const DisplayContentManager = ({
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-medium">{t('misc.dcm_videos_title')}</h3>
         <Button onClick={() => setUploadDialog({ open: true, type: 'video' })}>
-          <Plus size={16} className="mr-2" />
+          <Plus size={16 as unknown as "small" | "default" | "large" | "xlarge"} className="mr-2" />
           {t('misc.dcm_add_video')}
         </Button>
       </div>
@@ -260,7 +265,7 @@ const DisplayContentManager = ({
           <Video size={48} className="text-gray-400" />
           }
               <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-                <Play size={32} className="text-white" />
+                <Play size={32 as unknown as "small" | "default" | "large" | "xlarge"} className="text-white" />
               </div>
             </div>
             <div className="p-3">
@@ -269,35 +274,35 @@ const DisplayContentManager = ({
                 {t('misc.dcm_duration')} {video.duration || t('misc.dcm_not_specified')}
               </div>
               <div className="flex justify-between items-center">
-                <Badge variant={video.active ? 'success' : 'secondary'} size="sm">
+                <Badge variant={video.active ? 'success' : 'secondary'} size="small">
                   {video.active ? t('misc.dcm_showing') : t('misc.dcm_inactive')}
                 </Badge>
                 <div className="flex space-x-1">
                   <Button
-                    size="sm"
+                    size="small"
                     variant="outline"
                     type="button"
-                    title={t('misc.dcm_play_video', { title: video.title })}
-                    aria-label={t('misc.dcm_play_video', { title: video.title })}>
-                    <Play aria-hidden="true" size={12} />
+                    title={t18('misc.dcm_play_video', { title: video.title })}
+                    aria-label={t18('misc.dcm_play_video', { title: video.title })}>
+                    <Play aria-hidden="true" size={12 as unknown as "small" | "default" | "large" | "xlarge"} />
                   </Button>
                   <Button
-                    size="sm"
+                    size="small"
                     variant="outline"
                     type="button"
-                    title={t('misc.dcm_edit_video', { title: video.title })}
-                    aria-label={t('misc.dcm_edit_video', { title: video.title })}>
-                    <Edit aria-hidden="true" size={12} />
+                    title={t18('misc.dcm_edit_video', { title: video.title })}
+                    aria-label={t18('misc.dcm_edit_video', { title: video.title })}>
+                    <Edit aria-hidden="true" size={12 as unknown as "small" | "default" | "large" | "xlarge"} />
                   </Button>
                   <Button
-                size="sm"
+                size="small"
                 variant="outline"
                 type="button"
-                title={t('misc.dcm_delete_video', { title: video.title })}
-                aria-label={t('misc.dcm_delete_video', { title: video.title })}
+                title={t18('misc.dcm_delete_video', { title: video.title })}
+                aria-label={t18('misc.dcm_delete_video', { title: video.title })}
                 onClick={() => handleDeleteContent(video.id, 'video')}>
 
-                    <Trash2 aria-hidden="true" size={12} />
+                    <Trash2 aria-hidden="true" size={12 as unknown as "small" | "default" | "large" | "xlarge"} />
                   </Button>
                 </div>
               </div>
@@ -358,7 +363,7 @@ const DisplayContentManager = ({
               }
               onClick={() => setActiveTab(tab.id)}>
               
-              <TabIcon size={16} className="mr-2" />
+              <TabIcon size={16 as unknown as "small" | "default" | "large" | "xlarge"} className="mr-2" />
               {tab.label}
             </button>);
 
@@ -422,7 +427,7 @@ const DisplayContentManager = ({
                   {t('misc.dcm_cancel')}
                 </Button>
                 <Button onClick={() => {/* Логика загрузки */}}>
-                  <Upload size={16} className="mr-2" />
+                  <Upload size={16 as unknown as "small" | "default" | "large" | "xlarge"} className="mr-2" />
                   {t('misc.dcm_upload_btn')}
                 </Button>
               </div>

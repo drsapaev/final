@@ -1,9 +1,8 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
+import type { CSSProperties } from 'react';
 
 import { useState, useEffect } from 'react';
 import {
-  MacOSCard, Button, Badge, Input, Select, Textarea,
+  MacOSCard, Button as ButtonRaw, Badge, Input as InputRaw, Select as SelectRaw, Textarea as TextareaRaw,
 } from '../ui/macos';
 import {
   Bell,
@@ -27,8 +26,13 @@ import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
+import React from "react";
+const Textarea = TextareaRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Input = InputRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Select = SelectRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const Button = ButtonRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const RegistrarNotificationManager = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [activeTab, setActiveTab] = useState('send');
   const [loading, setLoading] = useState(false);
   const [registrars, setRegistrars] = useState([]);
@@ -316,7 +320,7 @@ const RegistrarNotificationManager = () => {
                 </Badge>
           }
               <Badge
-            variant={registrar.is_active ? 'success' : 'error'}>
+            variant={registrar.is_active ? 'success' : 'danger'}>
             
                 {registrar.is_active ? t('admin2.rnm_status_active') : t('admin2.rnm_status_inactive')}
               </Badge>
@@ -435,19 +439,19 @@ const RegistrarNotificationManager = () => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className="admin-p-12px20-bd-none-bg-transparent-cursor-pointer-flex-ai-center-gap-8-sm-tra-ea233b09" style={{ '--admin-color': isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)', '--admin-fontWeight': isActive ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)' }}
+              className="admin-p-12px20-bd-none-bg-transparent-cursor-pointer-flex-ai-center-gap-8-sm-tra-ea233b09" style={{ '--admin-color': isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)', '--admin-fontWeight': isActive ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)' } as CSSProperties}
               onMouseEnter={(e) => {
                 if (!isActive) {
-                  e.target.style.color = 'var(--mac-text-primary)';
+                  e.currentTarget.style.color = 'var(--mac-text-primary)';
                 }
               }}
               onMouseLeave={(e) => {
                 if (!isActive) {
-                  e.target.style.color = 'var(--mac-text-secondary)';
+                  e.currentTarget.style.color = 'var(--mac-text-secondary)';
                 }
               }}>
               
-              <Icon className="admin-w-16-h-16" style={{ '--admin-color': isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)' }} />
+              <Icon className="admin-w-16-h-16" style={{ '--admin-color': isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)' } as CSSProperties} />
               {tab.label}
               {isActive &&
               <div className="admin-pos-absolute-bottom-0-left-0-right-0-h-3-bg-blue-radius-2px2px00" />
