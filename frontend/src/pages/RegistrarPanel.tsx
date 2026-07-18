@@ -4,7 +4,8 @@ import PropTypes from 'prop-types';
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
 import AppointmentContextMenu from '../components/tables/AppointmentContextMenu';
-import ModernTabs from '../components/navigation/ModernTabs';
+import ModernTabsRaw from '../components/navigation/ModernTabs';
+const ModernTabs = ModernTabsRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import {
   Button, Badge, Icon,
   Input } from '../components/ui/macos';
@@ -37,7 +38,8 @@ import { useRegistrarData } from './registrar/useRegistrarData';
 // Decomp 5: record action handlers extracted to useRegistrarActions hook
 import { useRegistrarActions } from './registrar/useRegistrarActions';
 // Decomp 6a: QueueView extracted to component
-import QueueView from './registrar/views/QueueView';
+import QueueViewRaw from './registrar/views/QueueView';
+const QueueView = QueueViewRaw as unknown as React.ComponentType<Record<string, unknown>>;
 // Decomp 6b: WelcomeView extracted to component
 import WelcomeView from './registrar/views/WelcomeView';
 // Strategic Direction 3: navigation helpers for canonical nested routes
@@ -783,7 +785,7 @@ const RegistrarPanel = () => {
       }
       // Загружаем только записи тихо, без смены индикаторов
       logger.info('⏰ Автообновление: вызов loadAppointments (dialog-open resilient)');
-      loadAppointments({ silent: true, source: 'auto_refresh' });
+      loadAppointments({ silent: true, source: 'auto_refresh' } as any);
     }, 30000); // UX Audit R-4.1: 15s → 30s (WebSocket покрывает real-time)
 
     return () => clearInterval(id);
@@ -1837,7 +1839,7 @@ const RegistrarPanel = () => {
               }
               notify.warning('Cancelled ' + successCount + '; failed ' + failedCount);
             }
-            await loadAppointments({ silent: true, source: 'cancel_complete' });
+            await loadAppointments({ silent: true, source: 'cancel_complete' } as any);
           } catch (error: any) {
             logger.error('RegistrarPanel: cancellation failed:', error);
             notify.error(getErrorMessage(error, 'Could not cancel record. Check connection and try again.'));
@@ -1969,14 +1971,14 @@ const RegistrarPanel = () => {
             // Reload data in the background (does not block UI)
             try {
               await Promise.all([
-                loadAppointments({ silent: true, source: 'wizard-complete', force: true }),
+                loadAppointments({ silent: true, source: 'wizard-complete', force: true } as any),
                 loadIntegratedData(),
               ]);
             } catch (refreshError) {
               // Background refresh failed — single silent retry
               logger.warn('First post-wizard reload failed, retrying once:', refreshError);
               try {
-                await loadAppointments({ silent: true, source: 'wizard-complete-retry', force: true });
+                await loadAppointments({ silent: true, source: 'wizard-complete-retry', force: true } as any);
               } catch (retryError) {
                 logger.error('Post-wizard reload retry also failed:', retryError);
               }

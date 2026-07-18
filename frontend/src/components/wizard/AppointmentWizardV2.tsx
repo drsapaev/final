@@ -65,7 +65,8 @@ import './AppointmentWizardV2.css';
 // UX Audit Stage 3 (Wizard issue 5.2):
 // PatientStepV2 и CartStepV2 вынесены в отдельные файлы для уменьшения размера.
 import PatientStepV2 from './PatientStepV2';
-import CartStepV2 from './CartStepV2';
+import CartStepV2Raw from './CartStepV2';
+const CartStepV2 = CartStepV2Raw as unknown as React.ComponentType<Record<string, unknown>>;
 // PR-45 / High-15: extracted sub-components to reduce god component size
 import EditModeBanner from './EditModeBanner';
 import StepProgressIndicator from './StepProgressIndicator';
