@@ -1,4 +1,4 @@
-import React, { type ReactNode, type CSSProperties, type MouseEvent } from 'react';
+import React, { type ReactNode, type CSSProperties, type MouseEvent, type KeyboardEvent } from 'react';
 import PropTypes from 'prop-types';
 import { useTheme } from '../../../contexts/ThemeContext';
 
@@ -132,6 +132,19 @@ const ListItem = React.forwardRef<HTMLLIElement, ListItemProps>(({
   // <button> cannot be a direct child of <ul> (invalid HTML). The
   // forwardRef typing is also for HTMLLIElement, so we keep <li>
   // always and let the cursor/onClick props carry the button affordance.
+  // The onKeyDown stub satisfies jsx-a11y/click-events-have-key-events
+  // when button=true — callers can pass their own handler via ...props.
+  const handleKeyDown = (e: KeyboardEvent<HTMLLIElement>) => {
+    if (!button || disabled) return;
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      // Synthesize a click-like event for parity with <button>.
+      if (onClick) {
+        onClick(e as unknown as MouseEvent<HTMLLIElement>);
+      }
+    }
+  };
+
   return (
     <li
       ref={ref}
@@ -140,7 +153,10 @@ const ListItem = React.forwardRef<HTMLLIElement, ListItemProps>(({
       onClick={disabled ? undefined : onClick}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
+      onKeyDown={handleKeyDown}
       aria-disabled={disabled || undefined}
+      tabIndex={button && !disabled ? 0 : undefined}
+      role={button ? 'button' : undefined}
       {...props}>
 
       {children}
