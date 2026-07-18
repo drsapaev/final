@@ -1,8 +1,8 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { describe, expect, it } from 'vitest';
-import { t, tInterpolate, TRANSLATIONS } from '../../../../i18n/useTranslation';
+import { t as rawT, tInterpolate, TRANSLATIONS } from '../../../../i18n/useTranslation';
+
+// Cast t() to a looser signature so we can test null/undefined/number inputs.
+const t = rawT as unknown as (key: unknown) => unknown;
 
 describe('labTranslations (STRAT#3)', () => {
   describe('t() function', () => {

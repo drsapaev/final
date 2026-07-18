@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 /* eslint-disable react/display-name, react/prop-types */
 import '@testing-library/jest-dom';
 import { fireEvent, render, waitFor } from '@testing-library/react';
@@ -72,7 +69,8 @@ vi.mock('../../ui/macos', async () => {
 import PhotoUploader from '../PhotoUploader';
 
 class TestFileReader {
-  readAsDataURL(file) {
+  onload: ((ev: { target: { result: string } }) => void) | null = null;
+  readAsDataURL(file: { type: string }) {
     setTimeout(() => {
       this.onload?.({
         target: {

@@ -1,19 +1,18 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useEffect, useMemo, useState } from 'react';
-import Nav from '../components/layout/Nav.jsx';
-import RoleGate from '../components/RoleGate.jsx';
+import Nav from '../components/layout/Nav';
+import RoleGateRaw from '../components/RoleGate';
+const RoleGate = RoleGateRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import {
   AppEmpty, AppError, AppLoading, Button, Select,
 } from '../components/ui/macos';
-import { api } from '../api/client.js';
+import { api } from '../api/client';
 import { getActivationStatus } from '../api';
 import { useTheme } from '../contexts/ThemeContext';
 import { useTranslation } from '../i18n/useTranslation';
 
 export default function Activation() {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   useTheme();
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState(null);
@@ -45,9 +44,11 @@ export default function Activation() {
       catch(() => ({ items: [] }))]
       );
       setStatus(st || null);
-      setRows(lst && lst.items || []);
+      const listPayload = lst as { items?: unknown[] } | null;
+      setRows((listPayload && listPayload.items) || []);
     } catch (e) {
-      setErr(e?.data?.detail || e?.message || t('misc.a_oshibka_zagruzki'));
+      const err = e as { data?: { detail?: string }; message?: string };
+      setErr(err?.data?.detail || err?.message || t('misc.a_oshibka_zagruzki'));
     } finally {
       setLoading(false);
     }
@@ -75,7 +76,7 @@ export default function Activation() {
               label={t('misc.a_status_zapisi')}
               options={statusFilterOptions}
               value={filterStatus}
-              onChange={setFilterStatus}
+              onChange={(v: unknown) => setFilterStatus(String(v))}
               size="small"
               style={{ minWidth: 180 }}
             />

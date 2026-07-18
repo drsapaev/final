@@ -1,11 +1,8 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import React, { StrictMode } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ThemeProvider } from '../../contexts/ThemeContext.tsx';
-import { MacOSThemeProvider } from '../../theme/macosTheme.tsx';
+import { ThemeProvider } from '../../contexts/ThemeContext';
+import { MacOSThemeProvider } from '../../theme/macosTheme';
 
 const { apiGet, apiPut, setAuthProfile, getAuthState } = vi.hoisted(() => ({
   apiGet: vi.fn(),
@@ -34,7 +31,7 @@ vi.mock('../../components/security/TwoFactorManager', () => ({
   default: () => <div>Two Factor Stub</div>,
 }));
 
-import UserProfile, { __resetSelfProfileCacheForTests } from '../UserProfile.tsx';
+import UserProfile, { __resetSelfProfileCacheForTests } from '../UserProfile';
 
 function renderUserProfile() {
   return render(

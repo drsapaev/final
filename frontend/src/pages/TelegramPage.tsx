@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useState } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import TelegramManager from '../components/telegram/TelegramManager';
@@ -25,7 +22,8 @@ import {
  * Централизованное управление ботом и уведомлениями
  */
 const TelegramPage = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   useTheme();
   const [activeTab, setActiveTab] = useState('overview');
 

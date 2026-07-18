@@ -1,11 +1,8 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import React, { StrictMode } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ThemeProvider } from '../../../contexts/ThemeContext.tsx';
-import { MacOSThemeProvider } from '../../../theme/macosTheme.tsx';
+import { ThemeProvider } from '../../../contexts/ThemeContext';
+import { MacOSThemeProvider } from '../../../theme/macosTheme';
 
 const {
   apiGet,
@@ -58,7 +55,7 @@ vi.mock('../../../utils/logger', () => ({
 
 import NotificationPreferences, {
   __resetNotificationSettingsCacheForTests,
-} from '../NotificationPreferences.tsx';
+} from '../NotificationPreferences';
 
 const baseSettings = {
   email_appointment_reminder: true,

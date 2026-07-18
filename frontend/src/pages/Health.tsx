@@ -1,17 +1,16 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useEffect, useState } from 'react';
-import { getApiBase } from '../api/client.js';
-import { getHealth, getActivationStatus } from '../api/index.js';
+import type { CSSProperties } from 'react';
+import { getApiBase } from '../api/client';
+import { getHealth, getActivationStatus } from '../api/index';
 import {
   AppEmpty, AppError, AppLoading, Button,
 } from '../components/ui/macos';
-import auth from '../stores/auth.js';
+import auth from '../stores/auth';
 import { useTranslation } from '../i18n/useTranslation';
 
 export default function Health() {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [loading, setLoading] = useState(true);
   const [health, setHealth] = useState(null);
   const [act, setAct] = useState(null);
@@ -49,7 +48,7 @@ export default function Health() {
     setRefreshNonce((value) => value + 1);
   };
 
-  const styles = {
+  const styles: Record<string, CSSProperties> = {
     page: {
       minHeight: '100vh',
       background: 'var(--mac-gradient-window)',

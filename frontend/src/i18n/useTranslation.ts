@@ -71,17 +71,18 @@ export default useTranslation;
 
 // Standalone t() — for non-React contexts (tests, module-level constants).
 // Delegates to react-i18next's i18n.t().
-export const t = (key, params) => {
-  if (key === null || key === undefined || typeof key !== 'string') return key;
-  return i18n.t(key, params);
+const looseT = i18n.t as unknown as (key: string, params?: Record<string, unknown>) => string;
+export const t = (key: string, params?: Record<string, unknown>): string => {
+  if (key === null || key === undefined || typeof key !== 'string') return key as unknown as string;
+  return looseT(key, params);
 };
 
 // Standalone tInterpolate() — for backward compat with labTranslations.tInterpolate.
 // Uses single-brace {param} interpolation.
-export function tInterpolate(key, params = {}) {
-  const template = i18n.t(key);
+export function tInterpolate(key: string, params: Record<string, unknown> = {}) {
+  const template = looseT(key);
   if (!params || typeof params !== 'object') return template;
-  return template.replace(/\{(\w+)\}/g, (match, paramName) => {
+  return template.replace(/\{(\w+)\}/g, (match, paramName: string) => {
     return params[paramName] !== undefined ? String(params[paramName]) : match;
   });
 }

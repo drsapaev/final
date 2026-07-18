@@ -1,17 +1,18 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import RoleGate from '../components/RoleGate.jsx';
-import AppointmentFlow from '../components/AppointmentFlow.jsx';
-import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable.jsx';
+import RoleGateRaw from '../components/RoleGate';
+const RoleGate = RoleGateRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import AppointmentFlowRaw from '../components/AppointmentFlow';
+const AppointmentFlow = AppointmentFlowRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import EnhancedAppointmentsTableRaw from '../components/tables/EnhancedAppointmentsTable';
+const EnhancedAppointmentsTable = EnhancedAppointmentsTableRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import {
   AppEmpty, AppError, Button, Card, CardContent, CardHeader, Checkbox, Input,
 } from '../components/ui/macos';
-import { api } from '../api/client.js';
+import { api } from '../api/client';
 
 import logger from '../utils/logger';
 import { useTranslation } from '../i18n/useTranslation';
+import type { CSSProperties } from 'react';
 function todayStr() {
   const d = new Date();
   const y = d.getFullYear();
@@ -26,7 +27,8 @@ function todayStr() {
  * Для минимальных перезаписей реализуем только чтение и поиск.
  */
 export default function Appointments() {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [date, setDate] = useState(todayStr());
   const [rows, setRows] = useState([]);
   const [q, setQ] = useState('');
@@ -39,7 +41,7 @@ export default function Appointments() {
     setBusy(true);
     setErr('');
     try {
-      let res = await api.get('/appointments', { params: { date, limit: 200 } });
+      let res: any = await api.get('/appointments', { params: { date, limit: 200 } });
       if (!res || (!Array.isArray(res) && !Array.isArray(res?.items))) {
         // fallback на другой ключ параметра
         res = await api.get('/appointments', { params: { d: date, limit: 200 } });
@@ -47,7 +49,8 @@ export default function Appointments() {
       const items = Array.isArray(res?.items) ? res.items : Array.isArray(res) ? res : [];
       setRows(items);
     } catch (e) {
-      setErr(e?.data?.detail || e?.message || t('misc.appo_oshibka_zagruzki_zapisey'));
+      const err = e as { data?: { detail?: string }; message?: string };
+      setErr(err?.data?.detail || err?.message || t('misc.appo_oshibka_zagruzki_zapisey'));
     } finally {
       setBusy(false);
     }
@@ -66,27 +69,27 @@ export default function Appointments() {
     );
   }, [q, rows]);
   const isFilteredEmpty = q.trim().length > 0 && rows.length > 0 && filtered.length === 0;
-  const toolbarStyle = {
+  const toolbarStyle: CSSProperties = {
     display: 'flex',
     alignItems: 'center',
     gap: 12,
     flexWrap: 'wrap'
   };
-  const fieldStyle = {
+  const fieldStyle: CSSProperties = {
     display: 'flex',
     alignItems: 'center',
     gap: 8,
     color: 'var(--mac-text-secondary)',
     fontSize: 13
   };
-  const tableWrapStyle = {
+  const tableWrapStyle: CSSProperties = {
     overflowX: 'auto',
     border: '1px solid var(--mac-card-border)',
     borderRadius: 8,
     background: 'var(--mac-card-bg)',
     marginTop: 16
   };
-  const tableStyle = {
+  const tableStyle: CSSProperties = {
     width: '100%',
     borderCollapse: 'collapse'
   };
