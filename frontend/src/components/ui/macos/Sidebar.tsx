@@ -1,23 +1,74 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, type ReactNode, type CSSProperties, type MouseEvent, type KeyboardEvent } from 'react';
 import PropTypes from 'prop-types';
 import { useTheme } from '../../../contexts/ThemeContext';
 import Button from './Button';
 import Icon from './Icon';
 import { useTranslation } from '../../../i18n/useTranslation';
 
+type SidebarVariant = 'default' | 'compact' | 'inset';
+
+interface SidebarItemData {
+  id: string;
+  label: ReactNode;
+  icon?: string;
+  badge?: ReactNode;
+  tooltip?: string;
+  title?: string;
+  ariaLabel?: string;
+  [key: string]: unknown;
+}
+
+interface SidebarSectionData {
+  title?: string;
+  items?: SidebarItemData[];
+}
+
+interface SidebarProps extends Omit<React.HTMLAttributes<HTMLElement>, 'children' | 'style'> {
+  items?: SidebarItemData[];
+  sections?: SidebarSectionData[] | null;
+  activeItem?: string;
+  onItemClick?: (item: SidebarItemData) => void;
+  collapsible?: boolean;
+  defaultCollapsed?: boolean;
+  collapsed?: boolean;
+  onCollapsedChange?: (collapsed: boolean) => void;
+  header?: ReactNode;
+  footer?: ReactNode;
+  variant?: SidebarVariant;
+  className?: string;
+  style?: CSSProperties;
+}
+
+interface SidebarItemProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'children' | 'style' | 'onClick'> {
+  icon?: string;
+  label: ReactNode;
+  badge?: ReactNode;
+  active?: boolean;
+  onClick?: (e: MouseEvent<HTMLButtonElement>) => void;
+  className?: string;
+  style?: CSSProperties;
+}
+
+interface SidebarSectionProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'children' | 'style' | 'title'> {
+  title?: ReactNode;
+  children?: ReactNode;
+  collapsible?: boolean;
+  defaultCollapsed?: boolean;
+  className?: string;
+  style?: CSSProperties;
+}
+
+interface SidebarStyle extends CSSProperties {
+  transition?: string;
+  WebkitBackdropFilter?: string;
+}
+
 /**
  * macOS-style Sidebar Component
  * Implements Apple's Human Interface Guidelines for sidebar navigation
  */
-const Sidebar = React.forwardRef(({
+const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(({
   items = [],
-  // P-010 fix: optional sections grouping. When provided, items are grouped
-  // under titled section headers. Each section is { title, items: [...] }.
-  // The items prop is still required as a flattened fallback (used when
-  // sections is null/empty, e.g. for compact mobile view or other presets).
   sections = null,
   activeItem,
   onItemClick,
@@ -33,10 +84,12 @@ const Sidebar = React.forwardRef(({
   ...props
 }, ref) => {
   useTheme();
+  const { t } = useTranslation();
+  void t;
   void variant;
   // PR-49: persist collapse state in localStorage (was reset on every refresh)
   const STORAGE_KEY = 'mac-sidebar-collapsed';
-  const [internalCollapsed, setInternalCollapsed] = useState(() => {
+  const [internalCollapsed, setInternalCollapsed] = useState<boolean>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       return saved === 'true';
@@ -45,7 +98,7 @@ const Sidebar = React.forwardRef(({
     }
   });
   const isControlled = typeof collapsed === 'boolean';
-  const isCollapsed = isControlled ? collapsed : internalCollapsed;
+  const isCollapsed = isControlled ? (collapsed as boolean) : internalCollapsed;
 
   // PR-49: persist collapse state when it changes
   useEffect(() => {
@@ -56,15 +109,15 @@ const Sidebar = React.forwardRef(({
     }
   }, [internalCollapsed]);
 
-  const setCollapsed = (nextCollapsed) => {
+  const setCollapsed = (nextCollapsed: boolean) => {
     if (!isControlled) {
       setInternalCollapsed(nextCollapsed);
     }
     onCollapsedChange?.(nextCollapsed);
   };
 
-  const sidebarStyles = {
-    width: isCollapsed ? '72px' : '280px', // Стандартные размеры macOS
+  const sidebarStyles: SidebarStyle = {
+    width: isCollapsed ? '72px' : '280px',
     minHeight: '100vh',
     background: 'var(--mac-gradient-sidebar)',
     borderRight: '1px solid var(--mac-separator)',
@@ -79,7 +132,7 @@ const Sidebar = React.forwardRef(({
     ...style
   };
 
-  const headerStyles = {
+  const headerStyles: CSSProperties = {
     padding: isCollapsed ? '16px 8px' : '16px 20px',
     borderBottom: '1px solid var(--mac-separator)',
     display: 'flex',
@@ -88,7 +141,7 @@ const Sidebar = React.forwardRef(({
     minHeight: '60px'
   };
 
-  const navStyles = {
+  const navStyles: CSSProperties = {
     flex: 1,
     padding: isCollapsed ? '8px' : '16px 12px',
     display: 'flex',
@@ -97,7 +150,7 @@ const Sidebar = React.forwardRef(({
     overflowY: 'auto'
   };
 
-  const footerStyles = {
+  const footerStyles: CSSProperties = {
     padding: isCollapsed ? '8px' : '16px 12px',
     borderTop: '1px solid var(--mac-separator)',
     display: 'flex',
@@ -182,11 +235,11 @@ const Sidebar = React.forwardRef(({
       <nav className="mac-sidebar-nav" style={navStyles}>
         {(() => {
           // P-010 fix: helper to render a single sidebar item button.
-          const renderItem = (item) => {
+          const renderItem = (item: SidebarItemData) => {
             const isActive = activeItem === item.id;
-            const itemAriaLabel = item.ariaLabel || item.tooltip || item.label;
-            const itemTitle = item.tooltip || item.title || (isCollapsed ? item.label : undefined);
-            const itemStyles = {
+            const itemAriaLabel = (item.ariaLabel || item.tooltip || item.label) as string;
+            const itemTitle = (item.tooltip || item.title || (isCollapsed ? (item.label as string) : undefined)) as string | undefined;
+            const itemStyles: CSSProperties = {
               display: 'flex',
               alignItems: 'center',
               padding: isCollapsed ? '10px' : '7px 10px',
@@ -266,7 +319,7 @@ const Sidebar = React.forwardRef(({
           };
 
           // Sprint 8: Section header base style — macOS native: uppercase, muted
-          const sectionHeaderBaseStyle = {
+          const sectionHeaderBaseStyle: CSSProperties = {
             padding: '16px 12px 6px 12px',
             fontSize: 'var(--mac-font-size-xs, 11px)',
             fontWeight: 'var(--mac-font-weight-semibold, 600)',
@@ -291,7 +344,7 @@ const Sidebar = React.forwardRef(({
                       marginTop: sectionIdx > 0 ? '8px' : '0',
                     }}
                     role="heading"
-                    aria-level="3"
+                    aria-level={3}
                     className="mac-sidebar-section-header">
                     {section.title}
                   </div>
@@ -396,7 +449,7 @@ Sidebar.displayName = 'macOS Sidebar';
 /**
  * Sidebar Item Component
  */
-export const SidebarItem = React.forwardRef(({
+export const SidebarItem = React.forwardRef<HTMLButtonElement, SidebarItemProps>(({
   icon,
   label,
   badge,
@@ -409,7 +462,7 @@ export const SidebarItem = React.forwardRef(({
   return (
     <button
       ref={ref}
-      aria-label={label}
+      aria-label={typeof label === 'string' ? label : undefined}
       className={`mac-sidebar-item ${active ? 'mac-sidebar-item--active' : ''} ${className}`}
       style={{
         display: 'flex',
@@ -476,7 +529,7 @@ SidebarItem.displayName = 'macOS Sidebar Item';
 /**
  * Sidebar Section Component
  */
-export const SidebarSection = React.forwardRef(({
+export const SidebarSection = React.forwardRef<HTMLDivElement, SidebarSectionProps>(({
   title,
   children,
   collapsible = false,
@@ -485,14 +538,14 @@ export const SidebarSection = React.forwardRef(({
   style = {},
   ...props
 }, ref) => {
-  const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
+  const [isCollapsed, setIsCollapsed] = useState<boolean>(defaultCollapsed);
 
-  const sectionStyles = {
+  const sectionStyles: CSSProperties = {
     marginBottom: '16px',
     ...style
   };
 
-  const headerStyles = {
+  const headerStyles: CSSProperties = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -501,7 +554,7 @@ export const SidebarSection = React.forwardRef(({
     cursor: collapsible ? 'pointer' : 'default'
   };
 
-  const contentStyles = {
+  const contentStyles: SidebarStyle = {
     display: 'flex',
     flexDirection: 'column',
     gap: '4px',
@@ -516,7 +569,7 @@ export const SidebarSection = React.forwardRef(({
       setIsCollapsed(!isCollapsed);
     }
   };
-  const handleToggleKeyDown = (event) => {
+  const handleToggleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       handleToggle();
