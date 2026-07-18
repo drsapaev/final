@@ -1,7 +1,5 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useState, useEffect } from 'react';
+import type { CSSProperties } from 'react';
 import {
   Users,
   Shield,
@@ -24,8 +22,14 @@ import {
   User } from
 'lucide-react';
 import {
-  MacOSCard, Button, Badge, Input, Select, SegmentedControl, Skeleton,
+  MacOSCard, Button as RawButton, Badge as RawBadge, Input as RawInput, Select as RawSelect, SegmentedControl as RawSegmentedControl, Skeleton as RawSkeleton,
 } from '../ui/macos';
+const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
+const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
+const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
+const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
+const SegmentedControl = RawSegmentedControl as unknown as React.ComponentType<Record<string, unknown>>;
+const Skeleton = RawSkeleton as unknown as React.ComponentType<Record<string, unknown>>;
 import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 
@@ -72,7 +76,8 @@ const normalizeGroupSummary = (payload) => ({
 });
 
 const GroupPermissionsManager = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // Состояние
   const [activeTab, setActiveTab] = useState('users');
   const [loading, setLoading] = useState(false);
@@ -129,7 +134,7 @@ const GroupPermissionsManager = () => {
 
     setLoading(true);
     try {
-      const response = await api.get(`/admin/permissions/users/${userId}/permissions`);
+      const response = await api.get(`/admin/permissions/users/${userId}/permissions`) as any;
       setUserPermissions(normalizeUserPermissions(response.data));
     } catch (error) {
       logger.error('Ошибка загрузки разрешений пользователя:', error);
@@ -144,7 +149,7 @@ const GroupPermissionsManager = () => {
 
     setLoading(true);
     try {
-      const response = await api.get(`/admin/permissions/groups/${groupId}/permissions`);
+      const response = await api.get(`/admin/permissions/groups/${groupId}/permissions`) as any;
       setGroupSummary(normalizeGroupSummary(response.data));
     } catch (error) {
       logger.error('Ошибка загрузки сводки группы:', error);
@@ -164,7 +169,7 @@ const GroupPermissionsManager = () => {
     try {
       const response = await api.get(`/admin/permissions/users/${userId}/permissions/check`, {
         params: { permission }
-      });
+      }) as any;
 
       const hasPermission = Boolean(response.data?.has_permission);
       toast.success(
@@ -182,7 +187,7 @@ const GroupPermissionsManager = () => {
     try {
       const response = await api.post(`/admin/permissions/groups/${groupId}/roles`, {
         role_id: roleId
-      });
+      }) as any;
 
       toast.success(response.data.message);
       await loadGroupSummary(groupId);
@@ -194,7 +199,7 @@ const GroupPermissionsManager = () => {
 
   const revokeRoleFromGroup = async (groupId, roleId) => {
     try {
-      const response = await api.delete(`/admin/permissions/groups/${groupId}/roles/${roleId}`);
+      const response = await api.delete(`/admin/permissions/groups/${groupId}/roles/${roleId}`) as any;
 
       toast.success(response.data.message);
       await loadGroupSummary(groupId);
@@ -250,11 +255,11 @@ const GroupPermissionsManager = () => {
 
   const clearCache = async () => {
     try {
-      const response = await api.post('/admin/permissions/cache/clear');
+      const response = await api.post('/admin/permissions/cache/clear') as any;
       toast.success(response.data.message);
 
       // Обновляем статистику кэша
-      const cacheRes = await api.get('/admin/permissions/cache/stats');
+      const cacheRes = await api.get('/admin/permissions/cache/stats') as any;
       setCacheStats(normalizeCacheStats(cacheRes.data?.cache_stats || cacheRes.data));
     } catch (error) {
       logger.error('Ошибка очистки кэша:', error);
@@ -333,7 +338,7 @@ const GroupPermissionsManager = () => {
           style={{
             '--admin-list-bg': selectedUser?.id === user.id ? 'var(--mac-accent-blue-light)' : 'transparent',
             '--admin-list-border': selectedUser?.id === user.id ? 'var(--mac-accent-blue)' : 'transparent'
-          }}>
+          } as CSSProperties}>
           
               <div className="admin-list-username">
                 {user.username}
@@ -509,7 +514,7 @@ const GroupPermissionsManager = () => {
           style={{
             '--admin-list-bg': selectedGroup?.id === group.id ? 'var(--mac-accent-blue-light)' : 'transparent',
             '--admin-list-border': selectedGroup?.id === group.id ? 'var(--mac-accent-blue)' : 'transparent'
-          }}>
+          } as CSSProperties}>
           
               <div className="admin-list-username">
                 {group.display_name}
@@ -576,7 +581,7 @@ const GroupPermissionsManager = () => {
                         <Badge variant="success">{role.display_name}</Badge>
                         <Button
                   type="button"
-                  size="sm"
+                  size="small"
                   variant="danger"
                   title={`Revoke ${role.display_name} from group`}
                   aria-label={`Revoke ${role.display_name} from group`}
@@ -619,7 +624,7 @@ const GroupPermissionsManager = () => {
                     {t('admin2.gpm_permissions_by_category')}
                   </h4>
                   <div className="admin-max-h-300-overflow">
-                    {Object.entries(groupSummary.permissions_by_category).map(([category, perms]) =>
+                    {Object.entries(groupSummary.permissions_by_category).map(([category, perms]: [string, any]) =>
               <div key={category} className="mb-4">
                         <h5 className="admin-perm-category-h5">
                           {category} ({perms.length})
@@ -749,7 +754,7 @@ const GroupPermissionsManager = () => {
         <SegmentedControl
           aria-label={t('admin2.gpm_tabs_aria_label')}
           value={activeTab}
-          onChange={setActiveTab}
+          onChange={(v: unknown) => setActiveTab(String(v))}
           options={[
             {
               value: 'users',

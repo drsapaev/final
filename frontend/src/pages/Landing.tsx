@@ -1,6 +1,3 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import React, { startTransition, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
@@ -49,7 +46,8 @@ const SECURITY_VISUALS = [Shield, Users, Key, Activity];
 const INTEGRATION_VISUALS = [MessageSquare, CreditCard, CreditCard, CreditCard, Activity, FileText];
 
 function SurfaceLabel({ children }) {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   return <span className="landing-surface-label">{children}</span>;
 }
 
@@ -163,7 +161,7 @@ WorkflowStep.propTypes = {
   title: PropTypes.string,
 };
 
-function ContactRow({ icon: Icon, label, value, href }) {
+function ContactRow({ icon: Icon, label, value, href }: any) {
   const isExternal = href?.startsWith('http');
   const content = href ? (
     <a className="landing-contact-link" href={href} target={isExternal ? '_blank' : undefined} rel={isExternal ? 'noreferrer' : undefined}>
@@ -210,7 +208,8 @@ function toTelUrl(phone) {
 export default function Landing() {
   const navigate = useNavigate();
   const { isDark, toggleTheme } = useTheme();
-  const { availableLanguages, language, setLanguage, t } = useTranslation();
+  const { availableLanguages, language, setLanguage, t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // Map unified language codes to legacy LANDING_COPY keys ('uz-Latn' → 'uz')
   const landingCopyKey = language?.startsWith('uz') ? 'uz' : language?.split('-')[0];
   const copy = LANDING_COPY[landingCopyKey] || LANDING_COPY.ru;
@@ -351,7 +350,7 @@ export default function Landing() {
           <div className="landing-toolbar">
             <Button
               variant="ghost"
-              size="sm"
+              size="small"
               onClick={toggleTheme}
               className="landing-toolbar-button"
               aria-label={isDark ? t('legacy.lightTheme') : t('legacy.darkTheme')}
@@ -367,7 +366,7 @@ export default function Landing() {
               <Button
                 id="landing-lang-trigger"
                 variant="ghost"
-                size="sm"
+                size="small"
                 onClick={() => setShowLangDropdown((v) => !v)}
                 className="landing-toolbar-button landing-language-button"
                 aria-label={copy.languageSwitchLabel}
@@ -416,7 +415,7 @@ export default function Landing() {
               )}
             </div>
 
-            <Button variant="primary" size="sm" onClick={() => navigate('/login')} className="landing-header-login">
+            <Button variant="primary" size="small" onClick={() => navigate('/login')} className="landing-header-login">
               <User size={16} />
               {copy.headerLogin}
             </Button>
@@ -442,12 +441,12 @@ export default function Landing() {
                     - «Связаться с продажами» (outline) → Telegram-чат
                   Hero secondary («Смотреть 2-минутный обзор») оставлен как scroll-to-section,
                   но переименован в «Посмотреть интерфейс» в landingContent.js. */}
-              <Button variant="primary" size="lg" onClick={() => navigate('/login')} className="landing-primary-cta">
+              <Button variant="primary" size="large" onClick={() => navigate('/login')} className="landing-primary-cta">
                 <User size={18} />
                 {copy.headerLogin}
               </Button>
 
-              <Button variant="outline" size="lg" onClick={() => scrollToSection('screens')} className="landing-secondary-cta">
+              <Button variant="outline" size="large" onClick={() => scrollToSection('screens')} className="landing-secondary-cta">
                 <ArrowRight size={18} />
                 {copy.hero.secondaryCta}
               </Button>
@@ -699,7 +698,7 @@ export default function Landing() {
                     остальные 2 → sales contact (Telegram) для персональной консультации. */}
                 <Button
                   variant={plan.featured ? 'primary' : 'outline'}
-                  size="lg"
+                  size="large"
                   onClick={plan.featured ? () => navigate('/login') : handleSalesContact}
                   className="landing-plan-button"
                   title={plan.featured
@@ -753,11 +752,11 @@ export default function Landing() {
                   Final CTA 2 кнопки раньше обе вели на /login.
                   Теперь: primary «Запросить демо» → /login (trial),
                   secondary «Активировать лицензию» → sales contact (Telegram). */}
-              <Button variant="primary" size="lg" onClick={() => navigate('/login')}>
+              <Button variant="primary" size="large" onClick={() => navigate('/login')}>
                 <User size={18} />
                 {copy.finalCta.primaryCta}
               </Button>
-              <Button variant="outline" size="lg" onClick={handleSalesContact}>
+              <Button variant="outline" size="large" onClick={handleSalesContact}>
                 <Key size={18} />
                 {copy.finalCta.secondaryCta}
               </Button>

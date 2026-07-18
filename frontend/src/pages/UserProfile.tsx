@@ -1,7 +1,5 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useEffect, useMemo, useState } from 'react';
+import type { CSSProperties } from 'react';
 import PropTypes from 'prop-types';
 import {
   BadgeCheck,
@@ -21,17 +19,23 @@ import {
 
 import { api } from '../api/client';
 import {
-  Alert,
-  Card,
+  Alert as RawAlert,
+  Card as RawCard,
   CardContent,
   CardHeader,
   CardTitle,
-  Button,
-  Input,
-  Select,
-  Textarea,
+  Button as RawButton,
+  Input as RawInput,
+  Select as RawSelect,
+  Textarea as RawTextarea,
 } from '../components/ui/macos';
-import NotificationPreferences from '../components/settings/NotificationPreferences.jsx';
+const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
+const Card = RawCard as unknown as React.ComponentType<Record<string, unknown>>;
+const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
+const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
+const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
+const Textarea = RawTextarea as unknown as React.ComponentType<Record<string, unknown>>;
+import NotificationPreferences from '../components/settings/NotificationPreferences';
 import TwoFactorManager from '../components/security/TwoFactorManager';
 import { getState as getAuthState, setProfile as setAuthProfile } from '../stores/auth';
 import { getErrorMessage } from '../utils/errorHandler';
@@ -176,7 +180,7 @@ async function fetchSelfProfile(force = false) {
 
   selfProfilePromise = (async () => {
     logger.info('[FIX:PROFILE] Loading self profile from /authentication/profile');
-    const response = await api.get('/authentication/profile');
+    const response = await api.get('/authentication/profile') as any;
     return rememberSelfProfile(response.data);
   })();
 
@@ -276,7 +280,8 @@ ProfileField.propTypes = {
 };
 
 export default function UserProfile() {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
 
   const genderOptions = [
     { value: '', label: t('misc.up_gender_none') },
@@ -291,7 +296,7 @@ export default function UserProfile() {
     { value: 'en', label: 'English' },
   ];
 
-  const [profile, setProfile] = useState(null);
+  const [profile, setProfile] = useState(null as any);
   const [draft, setDraft] = useState(() => normalizeProfileForDraft(null));
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -410,7 +415,7 @@ export default function UserProfile() {
         changedFields: Object.keys(payload).filter((key) => payload[key] !== buildProfilePayload(normalizeProfileForDraft(profile))[key]),
       });
 
-      const response = await api.put('/authentication/profile', payload);
+      const response = await api.put('/authentication/profile', payload) as any;
       const updatedProfile = response.data;
 
       rememberSelfProfile(updatedProfile);

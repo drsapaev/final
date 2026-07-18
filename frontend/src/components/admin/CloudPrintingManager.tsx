@@ -1,18 +1,24 @@
-// @ts-nocheck — Phase 4: file converted .jsx → .tsx but not yet fully typed.
-// Proper typing deferred to Phase 9 cleanup (strict mode).
-
 import { useState, useEffect } from 'react';
+import type { CSSProperties } from 'react';
 import {
   MacOSCard,
-  Button,
-  Badge,
-  Input,
-  Select,
-  SegmentedControl,
-  Textarea,
+  Button as RawButton,
+  Badge as RawBadge,
+  Input as RawInput,
+  Select as RawSelect,
+  SegmentedControl as RawSegmentedControl,
+  Textarea as RawTextarea,
   AppEmpty,
-  Modal,
-  Checkbox } from '../ui/macos';
+  Modal as RawModal,
+  Checkbox as RawCheckbox } from '../ui/macos';
+const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
+const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
+const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
+const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
+const SegmentedControl = RawSegmentedControl as unknown as React.ComponentType<Record<string, unknown>>;
+const Textarea = RawTextarea as unknown as React.ComponentType<Record<string, unknown>>;
+const Modal = RawModal as unknown as React.ComponentType<Record<string, unknown>>;
+const Checkbox = RawCheckbox as unknown as React.ComponentType<Record<string, unknown>>;
 import {
   Printer,
   RefreshCw,
@@ -90,7 +96,8 @@ const normalizeLocalPrinter = (printer, t) => ({
 });
 
 const CloudPrintingManager = () => {
-  const { t } = useTranslation();
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [activeTab, setActiveTab] = useState('printers');
   const [printers, setPrinters] = useState([]);
   const [localPrinters, setLocalPrinters] = useState([]);
@@ -189,7 +196,7 @@ const CloudPrintingManager = () => {
 
   const loadStatistics = async () => {
     try {
-      const response = await api.get('/cloud-printing/statistics');
+      const response = await api.get('/cloud-printing/statistics') as any;
       setStatistics(response.data?.statistics);
     } catch (error) {
       logger.error('Ошибка загрузки статистики:', error);
@@ -221,7 +228,7 @@ const CloudPrintingManager = () => {
     }
 
     try {
-      const response = await api.post('/cloud-printing/print', printForm);
+      const response = await api.post('/cloud-printing/print', printForm) as any;
       if (response.data?.success) {
         toast.success(t('admin2.cp_document_sent'));
         setPrintForm({
@@ -245,7 +252,7 @@ const CloudPrintingManager = () => {
     }
 
     try {
-      const response = await api.post('/cloud-printing/print/medical', medicalForm);
+      const response = await api.post('/cloud-printing/print/medical', medicalForm) as any;
       if (response.data?.success) {
         toast.success(t('admin2.cp_medical_document_sent'));
       } else {
@@ -293,7 +300,7 @@ const CloudPrintingManager = () => {
 
             <div className="admin-action-row-mt-16-gap-8">
               <Button
-                size="sm"
+                size="small"
                 onClick={() => testPrinter(printer.provider, printer.id)}
                 disabled={printer.status !== 'online'}>
 
@@ -301,7 +308,7 @@ const CloudPrintingManager = () => {
                 {t('admin2.cp_test_button')}
               </Button>
               <Button
-                size="sm"
+                size="small"
                 variant="outline"
                 onClick={() => setSelectedPrinter(printer)}>
 
@@ -737,7 +744,7 @@ const CloudPrintingManager = () => {
         <SegmentedControl
           aria-label={t('admin2.cp_tabs_aria')}
           value={activeTab}
-          onChange={setActiveTab}
+          onChange={(v: unknown) => setActiveTab(String(v))}
           options={[
             {
               value: 'printers',
