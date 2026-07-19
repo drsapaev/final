@@ -1,4 +1,4 @@
-fastapi>=0.121,<0.136
+fastapi>=0.121,<0.140
 uvicorn[standard]>=0.29,<0.48
 pydantic>=2.7,<2.13
 pydantic-settings>=2.14.1,<2.15
