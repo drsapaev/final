@@ -16,7 +16,7 @@ export function DentalPatientsTab({
   onDentalChart,
   onTreatment,
   onProsthetic,
-}) {
+}: any) {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   if (patients.length === 0) {
     return (

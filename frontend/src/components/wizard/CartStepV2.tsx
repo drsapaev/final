@@ -39,7 +39,7 @@ const CartStepV2 = ({
   isRepeatEligibilityLoading,
   onApplyRepeatSuggestion,
   repeatSuggestionSummary
-}) => {
+}: any) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // Local state removed - lifted to AppointmentWizardV2
 

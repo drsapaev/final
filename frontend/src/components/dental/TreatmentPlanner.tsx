@@ -227,7 +227,7 @@ const priorityBadgeVariant = {
   low: 'info',
 };
 
-const TreatmentPlanner = ({ visitId, onUpdate }) => {
+const TreatmentPlanner = ({ visitId, onUpdate }: any) => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [treatmentPlan, setTreatmentPlan] = useState({

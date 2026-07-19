@@ -20,8 +20,7 @@ import {
 import { usePWA } from '../hooks/usePWA';
 import MobileNotifications from '../components/mobile/MobileNotifications';
 import OfflineIndicator from '../components/mobile/OfflineIndicator';
-import QueuePositionCardRaw from '../components/mobile/QueuePositionCard';
-const QueuePositionCard = QueuePositionCardRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import QueuePositionCard from '../components/mobile/QueuePositionCard';
 
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';

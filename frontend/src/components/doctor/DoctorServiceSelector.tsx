@@ -36,7 +36,7 @@ const DoctorServiceSelector = ({
   onServicesChange,
   canEditPrices = true,
   className = ''
-}) => {
+}: any) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // Проверяем демо-режим в самом начале
   const isDemoMode = window.location.pathname.includes('/medilab-demo');

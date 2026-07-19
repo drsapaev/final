@@ -25,7 +25,7 @@ const PhoneVerification = ({
   customMessage,
   showPhoneInput = false,
   title  // PR-44 / P0-19: default now comes from useTranslation
-}) => {
+}: any) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // PR-44 / P0-19: title defaults to translated string instead of hardcoded RU
   const displayTitle = title || t('verificationTitle');

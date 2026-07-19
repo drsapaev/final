@@ -56,7 +56,7 @@ import {
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
-const ProcedureTemplates = ({ onSelectProcedure }) => {
+const ProcedureTemplates = ({ onSelectProcedure }: any) => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [templates, setTemplates] = useState([]);

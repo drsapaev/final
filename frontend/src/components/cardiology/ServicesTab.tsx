@@ -9,8 +9,7 @@ import React from 'react';
  * All state stays in the parent. This is a presentational wrapper.
  */
 
-import DoctorServiceSelectorRaw from '../doctor/DoctorServiceSelector';
-const DoctorServiceSelector = DoctorServiceSelectorRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import DoctorServiceSelector from '../doctor/DoctorServiceSelector';
 import { useTranslation } from '../../i18n/useTranslation';
 
 export function ServicesTab() {

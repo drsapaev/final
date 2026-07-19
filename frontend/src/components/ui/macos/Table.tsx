@@ -26,8 +26,13 @@ interface TableProps {
   selectedRows?: number[];
   onRowSelect?: (row: Record<string, unknown>, index: number) => void;
   onSort?: (key: string, direction: SortDirection) => void;
-  size?: TableSize;
-  variant?: TableVariant;
+  onFilter?: () => void;
+  onPageChange?: () => void;
+  pageSize?: number;
+  pagination?: boolean;
+  filterable?: boolean;
+  size?: TableSize | string;
+  variant?: TableVariant | string;
   striped?: boolean;
   hoverable?: boolean;
   className?: string;

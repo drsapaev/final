@@ -24,8 +24,7 @@ const MacOSStatCard = RawMacOSStatCard as unknown as React.ComponentType<Record<
 const MacOSEmptyState = RawMacOSEmptyState as unknown as React.ComponentType<Record<string, unknown>>;
 const Skeleton = RawSkeleton as unknown as React.ComponentType<Record<string, unknown>>;
 const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
-import IconButtonRaw from './IconButton';
-const IconButton = IconButtonRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import IconButton from './IconButton';
 import logger from '../../utils/logger';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
