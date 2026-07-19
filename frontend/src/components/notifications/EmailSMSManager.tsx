@@ -24,7 +24,7 @@ import {
   AppLoading,
   Badge as RawBadge,
   Button as RawButton,
-  Card as RawCard,
+  Card,
   CardContent,
   CardDescription,
   CardHeader,
@@ -37,7 +37,6 @@ import {
 } from '../ui/macos';
 const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
 const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Card = RawCard as unknown as React.ComponentType<Record<string, unknown>>;
 const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
 const Table = RawTable as unknown as React.ComponentType<Record<string, unknown>>;
 const SegmentedControl = RawSegmentedControl as unknown as React.ComponentType<Record<string, unknown>>;

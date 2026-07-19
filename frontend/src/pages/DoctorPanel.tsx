@@ -5,14 +5,13 @@ import '../styles/dark-theme-visibility-fix.css';
 import AIAssistant from '../components/ai/AIAssistant';
 import {
   Button as RawButton,
-  Card as RawCard,
+  Card,
   CardHeader,
   CardContent,
   Badge as RawBadge,
   Skeleton as RawSkeleton,
   Input as RawInput } from '../components/ui/macos';
 const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Card = RawCard as unknown as React.ComponentType<Record<string, unknown>>;
 const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
 const Skeleton = RawSkeleton as unknown as React.ComponentType<Record<string, unknown>>;
 const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;

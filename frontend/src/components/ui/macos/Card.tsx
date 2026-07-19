@@ -9,13 +9,36 @@ type CardShadow = 'none' | 'small' | 'default' | 'large';
 
 interface CardProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'children' | 'style' | 'onClick'> {
   children?: ReactNode;
-  variant?: CardVariant;
-  padding?: CardPadding;
-  shadow?: CardShadow;
+  variant?: CardVariant | string;
+  padding?: CardPadding | string;
+  shadow?: CardShadow | string;
   interactive?: boolean;
   onClick?: (e: MouseEvent<HTMLDivElement>) => void;
   className?: string;
   style?: CSSProperties;
+  // Props passed by legacy callers
+  elevation?: number | string;
+  sx?: Record<string, unknown>;
+  onMouseEnter?: (e: MouseEvent<HTMLDivElement>) => void;
+  onMouseLeave?: (e: MouseEvent<HTMLDivElement>) => void;
+  icon?: ReactNode;
+  action?: ReactNode;
+  size?: string;
+  color?: string;
+  align?: string;
+  display?: string;
+  direction?: string;
+  alignItems?: string;
+  justifyContent?: string;
+  gap?: string | number;
+  mb?: string | number;
+  mt?: string | number;
+  hidden?: boolean;
+  role?: string;
+  type?: string;
+  label?: ReactNode;
+  severity?: string;
+  variant2?: string;
 }
 
 interface CardPartProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'children' | 'style'> {

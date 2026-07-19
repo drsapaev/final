@@ -20,7 +20,7 @@ import {
 import { api } from '../api/client';
 import {
   Alert as RawAlert,
-  Card as RawCard,
+  Card,
   CardContent,
   CardHeader,
   CardTitle,
@@ -30,7 +30,6 @@ import {
   Textarea as RawTextarea,
 } from '../components/ui/macos';
 const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
-const Card = RawCard as unknown as React.ComponentType<Record<string, unknown>>;
 const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
 const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
 const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;

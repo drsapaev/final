@@ -15,10 +15,9 @@ import TwoFactorVerify from '../TwoFactorVerify';
 import ForgotPassword from './ForgotPassword';
 import { formatLoginErrorMessage, LOGIN_ERROR_MESSAGES } from './loginErrorUtils';
 import {
-  Button as RawButton, Card as RawCard, CardHeader, CardTitle, CardContent, Input as RawInput, Checkbox as RawCheckbox, Alert as RawAlert,
+  Button as RawButton, Card, CardHeader, CardTitle, CardContent, Input as RawInput, Checkbox as RawCheckbox, Alert as RawAlert,
 } from '../ui/macos';
 const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Card = RawCard as unknown as React.ComponentType<Record<string, unknown>>;
 const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
 const Checkbox = RawCheckbox as unknown as React.ComponentType<Record<string, unknown>>;
 const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;

@@ -7,7 +7,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Box,
-  Card as RawCard,
+  Card,
   CardContent,
   Typography as RawTypography,
   Button as RawButton,
@@ -24,7 +24,6 @@ import {
   Option as RawOption,
   Textarea as RawTextarea,
 } from '../ui/macos';
-const Card = RawCard as unknown as React.ComponentType<Record<string, unknown>>;
 const Typography = RawTypography as unknown as React.ComponentType<Record<string, unknown>>;
 const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
 const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;

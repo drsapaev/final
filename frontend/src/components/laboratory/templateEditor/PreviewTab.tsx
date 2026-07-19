@@ -1,8 +1,7 @@
 
 import PropTypes from 'prop-types';
-import { Alert, Card as CardRaw } from '../../ui/macos';
+import { Alert, Card } from '../../ui/macos';
 import React from 'react';
-const Card = CardRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import { useTranslation } from '../../../i18n/useTranslation';
 
 /**

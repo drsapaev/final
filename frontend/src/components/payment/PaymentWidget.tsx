@@ -7,7 +7,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Box,
   Badge as RawBadge,
-  Card as RawCard,
+  Card,
   CardContent,
   Typography as RawTypography,
   Button as RawButton,
@@ -15,7 +15,6 @@ import {
   CircularProgress as RawCircularProgress,
   Select as RawSelect,
 } from '../ui/macos';
-const Card = RawCard as unknown as React.ComponentType<Record<string, unknown>>;
 const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
 const Typography = RawTypography as unknown as React.ComponentType<Record<string, unknown>>;
 const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
