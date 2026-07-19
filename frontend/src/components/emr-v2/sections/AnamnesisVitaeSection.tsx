@@ -4,14 +4,13 @@ import { useState, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import EMRSectionRaw from './EMRSection';
 import EMRTextFieldRaw from './EMRTextField';
-import VitalsWidgetRaw from './VitalsWidget';
+import VitalsWidget from './VitalsWidget';
 import { DoctorTemplatesPanel as DTPRaw, DoctorTemplatesButton as DTBRaw } from '../DoctorTemplatesPanel';
 import { useDoctorSectionTemplates } from '../../../hooks/useDoctorSectionTemplates';
 import { useTranslation } from '../../../i18n/useTranslation';
 
 const EMRSection = EMRSectionRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const EMRTextField = EMRTextFieldRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const VitalsWidget = VitalsWidgetRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const DoctorTemplatesPanel = DTPRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const DoctorTemplatesButton = DTBRaw as unknown as React.ComponentType<Record<string, unknown>>;
 

@@ -4,8 +4,7 @@ import PropTypes from 'prop-types';
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
 import AppointmentContextMenu from '../components/tables/AppointmentContextMenu';
-import ModernTabsRaw from '../components/navigation/ModernTabs';
-const ModernTabs = ModernTabsRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import ModernTabs from '../components/navigation/ModernTabs';
 import {
   Button, Badge, Icon,
   Input } from '../components/ui/macos';

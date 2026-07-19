@@ -19,13 +19,12 @@ import { History, Pin, Edit2 } from 'lucide-react';
 import EMRSectionRaw from './EMRSection';
 import EMRSmartFieldV2Raw from './EMRSmartFieldV2';
 import { TreatmentTemplatesButton, TreatmentTemplatesPanel } from '../templates';
-import PrescriptionEditorRaw from './PrescriptionEditor';
+import PrescriptionEditor from './PrescriptionEditor';
 import { useDoctorPhrases } from '../../../hooks/useDoctorPhrases';
 import { useDoctorTreatmentTemplates } from '../../../hooks/useDoctorTreatmentTemplates';
 import logger from '../../../utils/logger';
 import { useTranslation } from '../../../i18n/useTranslation';
 import React from "react";
-const PrescriptionEditor = PrescriptionEditorRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const EMRSection = EMRSectionRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const EMRSmartFieldV2 = EMRSmartFieldV2Raw as unknown as React.ComponentType<Record<string, unknown>>;
 

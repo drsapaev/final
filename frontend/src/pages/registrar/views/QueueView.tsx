@@ -20,8 +20,7 @@
 import React from 'react';
 import { Card, CardHeader, CardContent } from '../../../components/ui/macos';
 import { AnimatedTransition } from '../../../components/ui';
-import ModernQueueManagerRaw from '../../../components/queue/ModernQueueManager';
-const ModernQueueManager = ModernQueueManagerRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import ModernQueueManager from '../../../components/queue/ModernQueueManager';
 import { getLocalDateString } from '../../../utils/dateUtils';
 import logger from '../../../utils/logger';
 // i18n-unification: use unified useTranslation instead of getRegistrarTranslator
