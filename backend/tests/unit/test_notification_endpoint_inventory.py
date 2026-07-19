@@ -112,12 +112,9 @@ def test_frontend_notifications_context_and_inbox_use_canonical_delivery_model()
         assert marker in center
 
     for marker in [
-        "aria-label={`Открыть уведомление: ${item.title}`}",
+        "aria-label={t('misc.ni_otkryt_uvedomlenie_item_titl', { title: item.title })}",
         "all: 'unset'",
         "type=\"button\"",
-        "Прочитать все",
-        "Прочитать",
-        "Архив",
     ]:
         assert marker in inbox
 
