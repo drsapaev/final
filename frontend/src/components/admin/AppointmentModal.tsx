@@ -8,13 +8,12 @@ import {
   Input,
   Select,
   Textarea,
-  Modal as ModalRaw,
+  Modal,
   Alert,
 } from '../ui/macos';
 import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
-const Modal = ModalRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const AppointmentModal = ({
   isOpen,

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import RoleGateRaw from '../components/RoleGate';
-const RoleGate = RoleGateRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import RoleGate from '../components/RoleGate';
 import { api } from '../api/client';
 import { Input } from '../components/ui/macos';
 import { useTranslation } from '../i18n/useTranslation';

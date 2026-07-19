@@ -1,20 +1,18 @@
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState, type ReactNode } from 'react';
 import auth from '../stores/auth';
+
+interface RoleGateProps {
+  allow?: string[];
+  roles?: string[];
+  fallback?: ReactNode;
+  children?: ReactNode;
+}
 
 /**
  * Ограничивает доступ по ролям.
- * Поддерживает оба пропса: `allow` и `roles` (алиасы).
- * МЯГКИЙ РЕЖИМ: если пользователь залогинен, но роль из профиля распознать нельзя,
- *               контент не блокируем (чтобы не ломать UX).
- *
- * Props:
- *  - allow?: string[]
- *  - roles?: string[]        // алиас allow
- *  - fallback?: ReactNode    // что показать при запрете (по умолчанию — предупреждающий бокс)
- *  - children
  */
-export default function RoleGate({ allow = [], roles, fallback, children }) {
+export default function RoleGate({ allow = [], roles, fallback, children }: RoleGateProps) {
   // Читаем состояние из стора и подписываемся на изменения
   const [st, setSt] = useState(auth.getState());
   useEffect(() => auth.subscribe(setSt), []);

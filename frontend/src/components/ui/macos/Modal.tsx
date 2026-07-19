@@ -4,8 +4,8 @@ import { useTheme } from '../../../contexts/ThemeContext';
 import Button from './Button';
 import { useTranslation } from '../../../i18n/useTranslation';
 
-type ModalSize = 'small' | 'default' | 'large' | 'fullscreen';
-type ModalVariant = 'default' | 'compact' | 'sheet';
+type ModalSize = 'small' | 'default' | 'large' | 'fullscreen' | 'sm' | 'md' | 'lg' | string;
+type ModalVariant = 'default' | 'compact' | 'sheet' | string;
 
 interface ModalProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'children' | 'style' | 'title'> {
   isOpen?: boolean;
@@ -19,6 +19,7 @@ interface ModalProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'childre
   closeOnEscape?: boolean;
   className?: string;
   style?: CSSProperties;
+  closable?: boolean;
 }
 
 interface ModalPartProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'children' | 'style'> {

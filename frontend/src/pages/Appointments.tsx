@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import RoleGateRaw from '../components/RoleGate';
-const RoleGate = RoleGateRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import RoleGate from '../components/RoleGate';
 import AppointmentFlowRaw from '../components/AppointmentFlow';
 const AppointmentFlow = AppointmentFlowRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import EnhancedAppointmentsTableRaw from '../components/tables/EnhancedAppointmentsTable';

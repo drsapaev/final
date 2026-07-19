@@ -2,7 +2,7 @@
 import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect } from 'react';
 import { User, Mail, Lock, Shield, Save, AlertCircle } from 'lucide-react';
-import { Modal as ModalRaw } from '../ui/macos';
+import { Modal } from '../ui/macos';
 import { Button } from '../ui/macos';
 import { Checkbox } from '../ui/macos';
 import {
@@ -13,7 +13,6 @@ import { useRoles } from '../../hooks/useRoles';
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
 import React from "react";
-const Modal = ModalRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 /**
  * UserModal - macOS-styled modal for creating/editing users

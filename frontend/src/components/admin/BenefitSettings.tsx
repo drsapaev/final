@@ -23,7 +23,7 @@ import {
   MacOSEmptyState,
   Alert,
   Badge,
-  Modal as ModalRaw,
+  Modal,
   MacOSStatCard,
 } from '../ui/macos';
 import { toast } from 'react-toastify';
@@ -32,7 +32,6 @@ import { fetchBenefitSettings, saveBenefitSettings } from '../../api/adminSettin
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
-const Modal = ModalRaw as unknown as React.ComponentType<Record<string, unknown>>;
 /**
  * Компонент для управления настройками льгот в админке
  */
