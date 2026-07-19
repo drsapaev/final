@@ -19,21 +19,16 @@ import {
 
 import { api } from '../api/client';
 import {
-  Alert as RawAlert,
+  Alert,
   Card,
   CardContent,
   CardHeader,
   CardTitle,
-  Button as RawButton,
-  Input as RawInput,
-  Select as RawSelect,
-  Textarea as RawTextarea,
+  Button,
+  Input,
+  Select,
+  Textarea,
 } from '../components/ui/macos';
-const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
-const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
-const Textarea = RawTextarea as unknown as React.ComponentType<Record<string, unknown>>;
 import NotificationPreferences from '../components/settings/NotificationPreferences';
 import TwoFactorManager from '../components/security/TwoFactorManager';
 import { getState as getAuthState, setProfile as setAuthProfile } from '../stores/auth';

@@ -54,11 +54,8 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import {
-  Button as RawButton, Card, CardHeader, CardContent, Badge as RawBadge, Icon, Input as RawInput,
+  Button, Card, CardHeader, CardContent, Badge, Icon, Input,
 } from '../../../components/ui/macos';
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
 import { AnimatedTransition } from '../../../components/ui';
 import ModernStatistics from '../../../components/statistics/ModernStatistics';
 import EnhancedAppointmentsTable from '../../../components/tables/EnhancedAppointmentsTable';

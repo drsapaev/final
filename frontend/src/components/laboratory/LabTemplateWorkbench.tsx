@@ -1,11 +1,8 @@
 import { useEffect, useMemo, useState, useId } from 'react';
 import PropTypes from 'prop-types';
 import {
-  Alert as RawAlert, Badge as RawBadge, Button as RawButton, Card, CardContent, CardHeader, CardTitle, Icon,
+  Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Icon,
 } from '../ui/macos';
-const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
-const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
 import { useConfirm } from '../common/ConfirmDialog';
 import { labReportingApi } from '../../api/labReporting';
 import './LabTemplateWorkbench.css';

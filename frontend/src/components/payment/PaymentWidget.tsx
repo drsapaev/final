@@ -6,21 +6,15 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Box,
-  Badge as RawBadge,
+  Badge,
   Card,
   CardContent,
-  Typography as RawTypography,
-  Button as RawButton,
-  Alert as RawAlert,
-  CircularProgress as RawCircularProgress,
-  Select as RawSelect,
+  Typography,
+  Button,
+  Alert,
+  CircularProgress,
+  Select,
 } from '../ui/macos';
-const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
-const Typography = RawTypography as unknown as React.ComponentType<Record<string, unknown>>;
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
-const CircularProgress = RawCircularProgress as unknown as React.ComponentType<Record<string, unknown>>;
-const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
 
 import {
   CreditCard,
@@ -563,7 +557,7 @@ const PaymentWidget = ({
 
             {loading ?
             <>
-                <CircularProgress size={20} className="pw-submit-spinner" />
+                <CircularProgress size={20 as never} className="pw-submit-spinner" />
                 {t('payment.pay_widg_processing')}
               </> :
 

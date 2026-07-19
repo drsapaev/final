@@ -10,25 +10,18 @@ import {
   Box,
   Card,
   CardContent,
-  Typography as RawTypography,
-  Button as RawButton,
-  Alert as RawAlert,
-  Progress as RawProgress,
-  Input as RawInput,
-  Select as RawSelect,
-  Option as RawOption,
+  Typography,
+  Button,
+  Alert,
+  Progress,
+  Input,
+  Select as SelectRaw,
+  Option,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
 } from '../ui/macos';
-const Typography = RawTypography as unknown as React.ComponentType<Record<string, unknown>>;
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
-const Progress = RawProgress as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
-const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
-const Option = RawOption as unknown as React.ComponentType<Record<string, unknown>>;
 import {
   Camera,
   Upload,
@@ -49,6 +42,7 @@ import logger from '../../utils/logger';
 import notify from '../../services/notify';
 import { convertHEICToJPEG, isHEICFile } from '../../utils/heicConverter';
 import PropTypes from 'prop-types';
+const Select = SelectRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
@@ -351,7 +345,7 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
                 transition: 'all 0.3s'
               }}>
               
-              <Input {...getBeforeInputProps()} />
+              <input {...getBeforeInputProps() as any} />
               <Upload style={{ width: 48, height: 48, color: 'var(--mac-text-secondary)', marginBottom: 8 }} />
               <Typography variant="body1" color="textSecondary">
                 {isBeforeDragActive ?
@@ -460,7 +454,7 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
                 transition: 'all 0.3s'
               }}>
               
-              <Input {...getAfterInputProps()} />
+              <input {...getAfterInputProps() as any} />
               <Upload style={{ width: 48, height: 48, color: 'var(--mac-text-secondary)', marginBottom: 8 }} />
               <Typography variant="body1" color="textSecondary">
                 {isAfterDragActive ?

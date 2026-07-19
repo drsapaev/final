@@ -24,14 +24,8 @@ import {
 
 'lucide-react';
 import {
-  AppError, AppLoading, MacOSCard, Button as RawButton, Badge as RawBadge, Input as RawInput, Table as RawTable, Checkbox as RawCheckbox, Select as RawSelect,
+  AppError, AppLoading, MacOSCard, Button, Badge, Input, Table, Checkbox, Select,
 } from '../ui/macos';
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
-const Table = RawTable as unknown as React.ComponentType<Record<string, unknown>>;
-const Checkbox = RawCheckbox as unknown as React.ComponentType<Record<string, unknown>>;
-const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
 // UX Audit: ModernDialog для extend-activation диалога (вместо window.prompt).
 import ModernDialog from '../dialogs/ModernDialog';
 
@@ -200,7 +194,7 @@ const ActivationSystem = () => {
     setMessage({ type: 'success', text: t('admin2.act_copied') });
   };
 
-  const filteredActivations = activations.filter((activation) => {
+  const filteredActivations = activations.filter((activation: any) => {
     const matchesSearch = activation.key?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     activation.machine_hash?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || activation.status === statusFilter;
@@ -377,7 +371,7 @@ const ActivationSystem = () => {
             {
               key: 'key',
               title: t('admin2.col_activation_key'),
-              render: (activation) =>
+              render: (activation: any) =>
               <div className="flex items-center justify-center">
                     <Key className="admin-icon-16-mr-8-blue" />
                     <div>
@@ -399,7 +393,7 @@ const ActivationSystem = () => {
             {
               key: 'device',
               title: t('admin2.col_device'),
-              render: (activation) =>
+              render: (activation: any) =>
               <div className="flex items-center justify-center">
                     <Smartphone className="admin-icon-16-mr-8-tertiary" />
                     <div>
@@ -416,7 +410,7 @@ const ActivationSystem = () => {
             {
               key: 'status',
               title: t('admin2.col_active'),
-              render: (activation) => {
+              render: (activation: any) => {
                 const row = activation || {};
                 const status = statusLabels[row.status] || { label: row.status, color: 'secondary' };
                 return <Badge variant={status.color}>{status.label}</Badge>;
@@ -425,7 +419,7 @@ const ActivationSystem = () => {
             {
               key: 'expiry',
               title: t('admin2.col_expiry'),
-              render: (activation) => {
+              render: (activation: any) => {
                 const row = activation || {};
                 const isExpired = row.expiry_date ? new Date(row.expiry_date) < new Date() : false;
                 return (
@@ -445,7 +439,7 @@ const ActivationSystem = () => {
             {
               key: 'created',
               title: t('admin2.col_created'),
-              render: (activation) =>
+              render: (activation: any) =>
               <div className="admin-created-date">
                     {(activation || {}).created_at ? new Date((activation || {}).created_at).toLocaleDateString('ru-RU') : '—'}
                   </div>

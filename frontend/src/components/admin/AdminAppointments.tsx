@@ -11,19 +11,14 @@ import notify from '../../services/notify';
 import { useTranslation } from '../../i18n/useTranslation';
 import {
   Badge,
-  Button as RawButton,
+  Button,
   MacOSCard,
-  MacOSStatCard as RawMacOSStatCard,
-  MacOSEmptyState as RawMacOSEmptyState,
+  MacOSStatCard,
+  MacOSEmptyState,
   Input,
-  Skeleton as RawSkeleton,
-  Select as RawSelect,
+  Skeleton,
+  Select,
 } from '../ui/macos';
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const MacOSStatCard = RawMacOSStatCard as unknown as React.ComponentType<Record<string, unknown>>;
-const MacOSEmptyState = RawMacOSEmptyState as unknown as React.ComponentType<Record<string, unknown>>;
-const Skeleton = RawSkeleton as unknown as React.ComponentType<Record<string, unknown>>;
-const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
 import IconButton from './IconButton';
 import logger from '../../utils/logger';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.

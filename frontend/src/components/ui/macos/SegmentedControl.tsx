@@ -9,6 +9,7 @@ interface SegmentedOption {
   value: SegmentedValue;
   label: ReactNode;
   disabled?: boolean;
+  icon?: ReactNode | React.ComponentType<any>;
 }
 
 interface SegmentedControlProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'children' | 'style' | 'onChange'> {

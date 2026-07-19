@@ -28,21 +28,14 @@ import {
 'lucide-react';
 import {
   MacOSCard,
-  Button as RawButton,
-  Badge as RawBadge,
-  Input as RawInput,
-  Checkbox as RawCheckbox,
-  Table as RawTable,
-  MacOSEmptyState as RawMacOSEmptyState,
-  Select as RawSelect,
+  Button,
+  Badge,
+  Input,
+  Checkbox,
+  Table,
+  MacOSEmptyState,
+  Select,
 } from '../ui/macos';
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
-const Checkbox = RawCheckbox as unknown as React.ComponentType<Record<string, unknown>>;
-const Table = RawTable as unknown as React.ComponentType<Record<string, unknown>>;
-const MacOSEmptyState = RawMacOSEmptyState as unknown as React.ComponentType<Record<string, unknown>>;
-const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
 import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 

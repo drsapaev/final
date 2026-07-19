@@ -5,25 +5,16 @@ import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import {
   MacOSCard,
-  Button as RawButton,
-  Input as RawInput,
-  Select as RawSelect,
-  Table as RawTable,
-  Badge as RawBadge,
-  Modal as RawModal,
-  Alert as RawAlert,
-  Box as RawBox,
-  Typography as RawTypography,
+  Button,
+  Input,
+  Select,
+  Table,
+  Badge,
+  Modal,
+  Alert,
+  Box,
+  Typography,
 } from '../ui/macos';
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
-const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
-const Table = RawTable as unknown as React.ComponentType<Record<string, unknown>>;
-const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
-const Modal = RawModal as unknown as React.ComponentType<Record<string, unknown>>;
-const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
-const Box = RawBox as unknown as React.ComponentType<Record<string, unknown>>;
-const Typography = RawTypography as unknown as React.ComponentType<Record<string, unknown>>;
 import {
   Plus,
   Edit,
@@ -616,7 +607,7 @@ const UserManagement = () => {
           role="menuitem"
           variant="ghost"
           size="small"
-          style={actionMenuItemStyle}
+          style={actionMenuItemStyle as CSSProperties}
           startIcon={<Edit size={16} />}
           onClick={handleEditFromActionsMenu}>
           {t('admin2.um_btn_edit')}
@@ -626,7 +617,7 @@ const UserManagement = () => {
           role="menuitem"
           variant="ghost"
           size="small"
-          style={actionMenuItemStyle}
+          style={actionMenuItemStyle as CSSProperties}
           startIcon={actionsMenuUser.is_active ? <Ban size={16} /> : <CheckCircle size={16} />}
           onClick={handleToggleStatusFromActionsMenu}>
           {actionsMenuUser.is_active ? t('admin2.um_btn_deactivate') : t('admin2.um_btn_activate')}

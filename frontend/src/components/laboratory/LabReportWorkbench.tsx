@@ -5,12 +5,8 @@ import PropTypes from 'prop-types';
 import { toast } from 'react-toastify';  // STRAT#2: retained for backward-compat;
 // новые callers должны использовать useLabToast.interactive* вместо прямого toast.
 import {
-  Alert as RawAlert, Badge as RawBadge, Button as RawButton, Card, CardContent, CardHeader, CardTitle, Icon,
-  Input as RawInput } from '../ui/macos';
-const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
-const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
+  Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Icon,
+  Input } from '../ui/macos';
 import { labReportingApi } from '../../api/labReporting';
 import { api } from '../../api/client';
 import { printService } from '../../services/print';

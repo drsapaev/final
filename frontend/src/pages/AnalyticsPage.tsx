@@ -10,12 +10,8 @@ import PredictiveAnalytics from '../components/analytics/PredictiveAnalytics';
 import AdminRouteSwitcherRaw from '../components/admin/AdminRouteSwitcher';
 const AdminRouteSwitcher = AdminRouteSwitcherRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import {
-  Input as RawInput, Button as RawButton, Select as RawSelect, SegmentedControl as RawSegmentedControl,
+  Input, Button, Select, SegmentedControl,
 } from '../components/ui/macos';
-const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
-const SegmentedControl = RawSegmentedControl as unknown as React.ComponentType<Record<string, unknown>>;
 import logger from '../utils/logger';
 import {
   Calendar,

@@ -4,23 +4,15 @@ import type { CSSProperties } from "react";
 import PropTypes from 'prop-types';
 import {
   MacOSCard,
-  Button as RawButton,
-  Badge as RawBadge,
-  Input as RawInput,
-  Checkbox as RawCheckbox,
-  Select as RawSelect,
-  Textarea as RawTextarea,
-  Skeleton as RawSkeleton,
-  MacOSEmptyState as RawMacOSEmptyState,
+  Button,
+  Badge,
+  Input,
+  Checkbox,
+  Select,
+  Textarea,
+  Skeleton,
+  MacOSEmptyState,
 } from '../ui/macos';
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
-const Checkbox = RawCheckbox as unknown as React.ComponentType<Record<string, unknown>>;
-const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
-const Textarea = RawTextarea as unknown as React.ComponentType<Record<string, unknown>>;
-const Skeleton = RawSkeleton as unknown as React.ComponentType<Record<string, unknown>>;
-const MacOSEmptyState = RawMacOSEmptyState as unknown as React.ComponentType<Record<string, unknown>>;
 import {
   Plus,
   Edit,

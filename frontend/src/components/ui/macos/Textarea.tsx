@@ -18,6 +18,8 @@ interface TextareaProps extends Omit<React.TextareaHTMLAttributes<HTMLTextAreaEl
   // Backward-compat: many callers pass label/rows
   label?: React.ReactNode;
   rows?: number;
+  hint?: React.ReactNode;
+  maxLength?: number;
 }
 
 interface TextareaStyle extends CSSProperties {

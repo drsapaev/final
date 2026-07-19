@@ -21,9 +21,9 @@ interface DropdownRect {
 
 interface SelectProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'children' | 'style' | 'onChange' | 'size' | 'value' | 'defaultValue' | 'label'> {
   options?: Array<SelectOption | SelectValue>;
-  value?: SelectValue;
+  value?: SelectValue | string;
   defaultValue?: SelectValue;
-  onChange?: (value: SelectValue) => void;
+  onChange?: (value: any) => void;
   placeholder?: ReactNode;
   disabled?: boolean;
   size?: SelectSize;

@@ -7,22 +7,17 @@ import { useTranslation } from '../../i18n/useTranslation';
 import { useEffect, useState } from 'react';
 import type { CSSProperties } from 'react';
 import {
-  Alert as RawAlert,
-  Badge as RawBadge,
-  Button as RawButton,
+  Alert,
+  Badge,
+  Button,
   Card,
   CardContent,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
-  Progress as RawProgress,
-  Input as RawInput } from '../ui/macos';
-const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
-const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Progress = RawProgress as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
+  Progress,
+  Input } from '../ui/macos';
 import {
   AlertTriangle,
   BrainCircuit,
@@ -528,7 +523,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }: any) => {
           </h3>
 
           <div {...getRootProps()} style={styles.dropzone(isDragActive)}>
-            <Input {...getInputProps()} />
+            <input {...getInputProps() as any} />
             <CloudUpload size={48} color="var(--mac-text-secondary)" aria-hidden="true" />
             <p style={{ ...styles.mutedText, marginTop: 'var(--mac-spacing-2)' }}>
               {isDragActive

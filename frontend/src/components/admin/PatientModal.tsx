@@ -3,19 +3,13 @@ import { useState, useEffect } from 'react';
 import { Save, User, Mail, Phone, MapPin, Calendar, IdCard, AlertCircle } from 'lucide-react';
 import logger from '../../utils/logger';
 import {
-  Button as RawButton,
-  Input as RawInput,
-  Select as RawSelect,
-  Textarea as RawTextarea,
-  Modal as RawModal,
-  Alert as RawAlert,
+  Button,
+  Input,
+  Select,
+  Textarea,
+  Modal,
+  Alert,
 } from '../ui/macos';
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
-const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
-const Textarea = RawTextarea as unknown as React.ComponentType<Record<string, unknown>>;
-const Modal = RawModal as unknown as React.ComponentType<Record<string, unknown>>;
-const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
 import PropTypes from 'prop-types';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';

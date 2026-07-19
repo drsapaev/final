@@ -15,23 +15,15 @@ import {
 'lucide-react';
 import {
   MacOSCard,
-  Button as RawButton,
-  Badge as RawBadge,
-  Input as RawInput,
-  Select as RawSelect,
-  Checkbox as RawCheckbox,
-  Skeleton as RawSkeleton,
-  MacOSEmptyState as RawMacOSEmptyState,
-  Alert as RawAlert,
+  Button,
+  Badge,
+  Input,
+  Select,
+  Checkbox,
+  Skeleton,
+  MacOSEmptyState,
+  Alert,
 } from '../ui/macos';
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
-const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
-const Checkbox = RawCheckbox as unknown as React.ComponentType<Record<string, unknown>>;
-const Skeleton = RawSkeleton as unknown as React.ComponentType<Record<string, unknown>>;
-const MacOSEmptyState = RawMacOSEmptyState as unknown as React.ComponentType<Record<string, unknown>>;
-const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';

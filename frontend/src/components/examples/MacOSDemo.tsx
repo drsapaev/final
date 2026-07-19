@@ -1,38 +1,26 @@
 import { useState, useEffect } from 'react';
 import type { CSSProperties } from 'react';
 import {
-  Button as RawButton,
-  Input as RawInput,
+  Button,
+  Input,
   Card,
   CardHeader,
   CardTitle,
   CardDescription,
   CardContent,
-  Modal as RawModal,
+  Modal,
   Icon,
-  Badge as RawBadge,
-  Progress as RawProgress,
-  CircularProgress as RawCircularProgress,
+  Badge,
+  Progress,
+  CircularProgress,
   Sidebar,
-  Checkbox as RawCheckbox,
-  Radio as RawRadio,
-  Switch as RawSwitch,
-  Select as RawSelect,
-  SegmentedControl as RawSegmentedControl,
-  Textarea as RawTextarea,
+  Checkbox,
+  Radio,
+  Switch,
+  Select,
+  SegmentedControl,
+  Textarea,
 } from '../ui/macos';
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
-const Modal = RawModal as unknown as React.ComponentType<Record<string, unknown>>;
-const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
-const Progress = RawProgress as unknown as React.ComponentType<Record<string, unknown>>;
-const CircularProgress = RawCircularProgress as unknown as React.ComponentType<Record<string, unknown>>;
-const Checkbox = RawCheckbox as unknown as React.ComponentType<Record<string, unknown>>;
-const Radio = RawRadio as unknown as React.ComponentType<Record<string, unknown>>;
-const Switch = RawSwitch as unknown as React.ComponentType<Record<string, unknown>>;
-const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
-const SegmentedControl = RawSegmentedControl as unknown as React.ComponentType<Record<string, unknown>>;
-const Textarea = RawTextarea as unknown as React.ComponentType<Record<string, unknown>>;
 import './MacOSDemo.css';
 import { AccentPicker } from '../ui/macos';
 import { notify } from '../../services/notify';

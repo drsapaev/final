@@ -2,21 +2,14 @@ import { useState, useEffect, useCallback } from 'react';
 import type { CSSProperties } from 'react';
 import {
   MacOSCard,
-  Button as RawButton,
-  Badge as RawBadge,
-  Input as RawInput,
-  Select as RawSelect,
-  MacOSTab as RawMacOSTab,
-  Table as RawTable,
-  MacOSEmptyState as RawMacOSEmptyState,
+  Button,
+  Badge,
+  Input,
+  Select,
+  MacOSTab,
+  Table,
+  MacOSEmptyState,
 } from '../ui/macos';
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
-const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
-const MacOSTab = RawMacOSTab as unknown as React.ComponentType<Record<string, unknown>>;
-const Table = RawTable as unknown as React.ComponentType<Record<string, unknown>>;
-const MacOSEmptyState = RawMacOSEmptyState as unknown as React.ComponentType<Record<string, unknown>>;
 import {
   Brain,
   TrendingUp,

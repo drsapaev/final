@@ -28,25 +28,16 @@ import {
 'lucide-react';
 import {
   MacOSCard,
-  Button as RawButton,
-  Badge as RawBadge,
-  SegmentedControl as RawSegmentedControl,
-  MacOSStatCard as RawMacOSStatCard,
-  Input as RawInput,
-  Select as RawSelect,
-  MacOSEmptyState as RawMacOSEmptyState,
-  Skeleton as RawSkeleton,
-  Modal as RawModal,
+  Button,
+  Badge,
+  SegmentedControl,
+  MacOSStatCard,
+  Input,
+  Select,
+  MacOSEmptyState,
+  Skeleton,
+  Modal,
 } from '../ui/macos';
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
-const SegmentedControl = RawSegmentedControl as unknown as React.ComponentType<Record<string, unknown>>;
-const MacOSStatCard = RawMacOSStatCard as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
-const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
-const MacOSEmptyState = RawMacOSEmptyState as unknown as React.ComponentType<Record<string, unknown>>;
-const Skeleton = RawSkeleton as unknown as React.ComponentType<Record<string, unknown>>;
-const Modal = RawModal as unknown as React.ComponentType<Record<string, unknown>>;
 import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 

@@ -31,23 +31,15 @@ import {
 } from 'lucide-react';
 import {
   MacOSCard,
-  Button as RawButton,
-  Badge as RawBadge,
-  Input as RawInput,
-  Select as RawSelect,
-  Table as RawTable,
-  MacOSEmptyState as RawMacOSEmptyState,
-  Alert as RawAlert,
-  Checkbox as RawCheckbox,
+  Button,
+  Badge,
+  Input,
+  Select,
+  Table,
+  MacOSEmptyState,
+  Alert,
+  Checkbox,
 } from '../ui/macos';
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
-const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
-const Table = RawTable as unknown as React.ComponentType<Record<string, unknown>>;
-const MacOSEmptyState = RawMacOSEmptyState as unknown as React.ComponentType<Record<string, unknown>>;
-const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
-const Checkbox = RawCheckbox as unknown as React.ComponentType<Record<string, unknown>>;
 import {
   normalizeServiceCode,
   formatServiceCodeInput,

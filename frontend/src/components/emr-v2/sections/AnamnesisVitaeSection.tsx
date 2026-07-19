@@ -5,12 +5,10 @@ import PropTypes from 'prop-types';
 import EMRSection from './EMRSection';
 import EMRTextField from './EMRTextField';
 import VitalsWidget from './VitalsWidget';
-import { DoctorTemplatesPanel as DTPRaw, DoctorTemplatesButton as DTBRaw } from '../DoctorTemplatesPanel';
+import { DoctorTemplatesPanel, DoctorTemplatesButton } from '../DoctorTemplatesPanel';
 import { useDoctorSectionTemplates } from '../../../hooks/useDoctorSectionTemplates';
 import { useTranslation } from '../../../i18n/useTranslation';
 
-const DoctorTemplatesPanel = DTPRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const DoctorTemplatesButton = DTBRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 /**
  * AnamnesisVitaeSection Component

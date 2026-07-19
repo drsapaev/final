@@ -5,22 +5,17 @@ import { useTranslation } from '../../i18n/useTranslation';
 import { useCallback, useEffect, useState } from 'react';
 import type { CSSProperties } from 'react';
 import {
-  Alert as RawAlert,
-  Badge as RawBadge,
-  Button as RawButton,
+  Alert,
+  Badge,
+  Button,
   Card,
   CardContent,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
-  Input as RawInput,
-  Checkbox as RawCheckbox } from '../ui/macos';
-const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
-const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
-const Checkbox = RawCheckbox as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
+  Input,
+  Checkbox } from '../ui/macos';
 import {
   Baby,
   Phone,
@@ -577,7 +572,7 @@ function AddRelationDialog({ open, onClose, patientId, patientName, onSuccess })
         </label>
 
         <label style={styles.checkboxRow}>
-          <Checkbox aria-label="Mark as primary contact" checked={isPrimaryContact} onChange={(event) => setIsPrimaryContact(event.target.checked)}
+          <Checkbox aria-label="Mark as primary contact" checked={isPrimaryContact} onChange={(event: any) => setIsPrimaryContact(event?.target?.checked ?? event)}
           />
           <span style={styles.checkboxText}>
             <span>{t('patient.pat_fam_primary_contact')}</span>

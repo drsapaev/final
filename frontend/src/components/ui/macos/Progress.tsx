@@ -2,7 +2,7 @@ import React, { type CSSProperties } from 'react';
 import PropTypes from 'prop-types';
 import { useTheme } from '../../../contexts/ThemeContext';
 
-type ProgressVariant = 'default' | 'primary' | 'success' | 'warning' | 'danger';
+type ProgressVariant = 'default' | 'primary' | 'success' | 'warning' | 'danger' | 'determinate' | string;
 type ProgressSize = 'small' | 'default' | 'large';
 type CircularProgressSize = 'small' | 'default' | 'large' | 'xlarge';
 type ProgressThickness = 'thin' | 'medium' | 'thick';

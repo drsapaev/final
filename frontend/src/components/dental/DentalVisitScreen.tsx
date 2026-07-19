@@ -36,18 +36,10 @@ import { useState, useEffect, useCallback } from 'react';
 import type { CSSProperties } from 'react';
 import PropTypes from 'prop-types';
 import {
-  Button as RawButton, Card, Badge as RawBadge, Input as RawInput, Textarea as RawTextarea, Label,
+  Button, Card, Badge, Input, Textarea, Label,
   Dialog, DialogTitle, DialogContent, DialogActions,
-  Typography as RawTypography, Box as RawBox, Alert as RawAlert, Skeleton as RawSkeleton,
+  Typography, Box, Alert, Skeleton,
 } from '../ui/macos';
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
-const Textarea = RawTextarea as unknown as React.ComponentType<Record<string, unknown>>;
-const Typography = RawTypography as unknown as React.ComponentType<Record<string, unknown>>;
-const Box = RawBox as unknown as React.ComponentType<Record<string, unknown>>;
-const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
-const Skeleton = RawSkeleton as unknown as React.ComponentType<Record<string, unknown>>;
 import {
   Stethoscope, CheckCircle, ChevronDown, ChevronUp,
   Brain,

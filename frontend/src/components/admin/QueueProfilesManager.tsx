@@ -42,12 +42,9 @@ import {
 import api from '../../services/api';
 import logger from '../../utils/logger';
 import {
-  Select as RawSelect,
-  Input as RawInput,
-  Checkbox as RawCheckbox } from '../ui/macos';
-const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
-const Checkbox = RawCheckbox as unknown as React.ComponentType<Record<string, unknown>>;
+  Select,
+  Input,
+  Checkbox } from '../ui/macos';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
 import { notify } from '../../services/notify';
@@ -931,7 +928,7 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                     {/* Active */}
                     <div className="admin-qp-field">
                         <label className="admin-d-flex-ai-center-gap-8-cur-pointer">
-                            <Checkbox aria-label={t('admin2.qp_active_checkbox_aria')} checked={formData.is_active} onChange={e => setFormData({ ...formData, is_active: e.target.checked })}
+                            <Checkbox aria-label={t('admin2.qp_active_checkbox_aria')} checked={formData.is_active} onChange={(e: any) => setFormData({ ...formData, is_active: e?.target?.checked ?? e })}
                             />
                             <span className="admin-qp-label">{t('admin2.qp_active_label')}</span>
                         </label>
@@ -940,7 +937,7 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                     {/* ⭐ NEW: Show on QR Page */}
                     <div className="admin-qp-field">
                         <label className="admin-d-flex-ai-center-gap-8-cur-pointer">
-                            <Checkbox aria-label={t('admin2.qp_qr_checkbox_aria')} checked={formData.show_on_qr_page} onChange={e => setFormData({ ...formData, show_on_qr_page: e.target.checked })}
+                            <Checkbox aria-label={t('admin2.qp_qr_checkbox_aria')} checked={formData.show_on_qr_page} onChange={(e: any) => setFormData({ ...formData, show_on_qr_page: e?.target?.checked ?? e })}
                             />
                             <span className="admin-qp-label">{t('admin2.qp_qr_label')}</span>
                         </label>

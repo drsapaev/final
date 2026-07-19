@@ -7,10 +7,8 @@ import type { CSSProperties } from 'react';
 import { CreditCard, FlaskConical } from 'lucide-react';
 
 import {
-  Alert as RawAlert, Button, Card, CardContent, Typography as RawTypography,
+  Alert, Button, Card, CardContent, Typography,
   Input } from '../components/ui/macos';
-const Typography = RawTypography as unknown as React.ComponentType<Record<string, unknown>>;
-const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
 import PaymentWidget from '../components/payment/PaymentWidget';
 import { getApiOrigin, setToken, getToken } from '../api/client';
 

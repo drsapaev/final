@@ -5,22 +5,14 @@ import { useState, useEffect } from 'react';
 import type { CSSProperties } from "react";
 import {
   MacOSCard,
-  Button as RawButton,
-  Badge as RawBadge,
-  Input as RawInput,
-  Textarea as RawTextarea,
-  Skeleton as RawSkeleton,
-  MacOSEmptyState as RawMacOSEmptyState,
-  Select as RawSelect,
-  Checkbox as RawCheckbox } from '../ui/macos';
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
-const Textarea = RawTextarea as unknown as React.ComponentType<Record<string, unknown>>;
-const Skeleton = RawSkeleton as unknown as React.ComponentType<Record<string, unknown>>;
-const MacOSEmptyState = RawMacOSEmptyState as unknown as React.ComponentType<Record<string, unknown>>;
-const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
-const Checkbox = RawCheckbox as unknown as React.ComponentType<Record<string, unknown>>;
+  Button,
+  Badge,
+  Input,
+  Textarea,
+  Skeleton,
+  MacOSEmptyState,
+  Select,
+  Checkbox } from '../ui/macos';
 import {
   Percent,
   Plus,

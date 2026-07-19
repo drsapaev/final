@@ -19,13 +19,8 @@ import {
   File } from
 'lucide-react';
 import {
-  MacOSCard, Button as RawButton, Input, Select as RawSelect, Checkbox as RawCheckbox, SegmentedControl as RawSegmentedControl, Skeleton as RawSkeleton,
+  MacOSCard, Button, Input, Select, Checkbox, SegmentedControl, Skeleton,
 } from '../ui/macos';
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
-const Checkbox = RawCheckbox as unknown as React.ComponentType<Record<string, unknown>>;
-const SegmentedControl = RawSegmentedControl as unknown as React.ComponentType<Record<string, unknown>>;
-const Skeleton = RawSkeleton as unknown as React.ComponentType<Record<string, unknown>>;
 import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 

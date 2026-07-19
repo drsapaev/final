@@ -18,20 +18,14 @@ import {
   Ban } from
 'lucide-react';
 import {
-  Input as RawInput,
-  Select as RawSelect,
-  Button as RawButton,
-  Checkbox as RawCheckbox,
-  Badge as RawBadge,
-  SegmentedControl as RawSegmentedControl,
+  Input,
+  Select,
+  Button,
+  Checkbox,
+  Badge,
+  SegmentedControl,
   MacOSCard,
 } from '../ui/macos';
-const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
-const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Checkbox = RawCheckbox as unknown as React.ComponentType<Record<string, unknown>>;
-const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
-const SegmentedControl = RawSegmentedControl as unknown as React.ComponentType<Record<string, unknown>>;
 import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 

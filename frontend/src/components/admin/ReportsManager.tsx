@@ -21,23 +21,15 @@ import {
   FileX,
   Loader2 } from
 'lucide-react';
-import { MacOSCard, Button as RawButton, Badge as RawBadge } from '../ui/macos';
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
+import { MacOSCard, Button, Badge } from '../ui/macos';
 import {
-  MacOSStatCard as RawMacOSStatCard,
-  Table as RawTable,
-  Input as RawInput,
-  MacOSEmptyState as RawMacOSEmptyState,
-  Select as RawSelect,
-  SegmentedControl as RawSegmentedControl,
+  MacOSStatCard,
+  Table,
+  Input,
+  MacOSEmptyState,
+  Select,
+  SegmentedControl,
 } from '../ui/macos';
-const MacOSStatCard = RawMacOSStatCard as unknown as React.ComponentType<Record<string, unknown>>;
-const Table = RawTable as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
-const MacOSEmptyState = RawMacOSEmptyState as unknown as React.ComponentType<Record<string, unknown>>;
-const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
-const SegmentedControl = RawSegmentedControl as unknown as React.ComponentType<Record<string, unknown>>;
 import { toast } from 'react-toastify';
 
 import { api } from '../../api/client';
@@ -342,7 +334,7 @@ const ReportsManager = () => {
         {
           key: 'type',
           header: t('admin2.rm_col_type'),
-          render: (value) =>
+          render: (value: any) =>
           <span className="admin-text-med-primary">
                     {availableReports.find((r) => r.type === value)?.name || value}
                   </span>
@@ -351,7 +343,7 @@ const ReportsManager = () => {
         {
           key: 'generated_at',
           header: t('admin2.rm_col_generated_at'),
-          render: (value) =>
+          render: (value: any) =>
           <span className="admin-span-13-secondary">
                     {new Date(value).toLocaleString()}
                   </span>
@@ -361,7 +353,7 @@ const ReportsManager = () => {
           key: 'actions',
           header: t('admin2.rm_col_actions'),
           align: 'right',
-          render: (row) =>
+          render: (row: any) =>
           <Button
             type="button"
             size="small"
@@ -374,7 +366,7 @@ const ReportsManager = () => {
 
         }]
         }
-        data={reports.slice(0, 5)}
+        data={reports.slice(0, 5) as any[]}
         hoverable={true}
         striped={true} />
 
@@ -427,7 +419,7 @@ const ReportsManager = () => {
         {
           key: 'filename',
           header: t('admin2.rm_col_file'),
-          render: (value) =>
+          render: (value: any) =>
           <div className="admin-flex-center-gap-10">
                     <FileText className="admin-icon-18-tertiary" />
                     <span className="admin-text-med-primary">
@@ -439,7 +431,7 @@ const ReportsManager = () => {
         {
           key: 'size',
           header: t('admin2.rm_col_size'),
-          render: (value) =>
+          render: (value: any) =>
           <span className="admin-span-13-secondary">
                     {formatFileSize(value)}
                   </span>
@@ -448,7 +440,7 @@ const ReportsManager = () => {
         {
           key: 'created_at',
           header: t('admin2.rm_col_created'),
-          render: (value) =>
+          render: (value: any) =>
           <span className="admin-span-13-secondary">
                     {new Date(value).toLocaleString()}
                   </span>
@@ -458,7 +450,7 @@ const ReportsManager = () => {
           key: 'actions',
           header: t('admin2.rm_col_actions'),
           align: 'right',
-          render: (row) =>
+          render: (row: any) =>
           <Button
             type="button"
             size="small"
@@ -472,7 +464,7 @@ const ReportsManager = () => {
 
         }]
         }
-        data={files}
+        data={files as any[]}
         hoverable={true}
         striped={true} />
 

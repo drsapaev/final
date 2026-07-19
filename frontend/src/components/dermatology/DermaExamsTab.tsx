@@ -7,9 +7,9 @@
  */
 import PropTypes from 'prop-types';
 import { MacOSCard, Button, Input, Select as SelectRaw, Textarea, Badge } from '../ui/macos';
-const Select = SelectRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
+const Select = SelectRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 export function DermaExamsTab({
   activeTab,

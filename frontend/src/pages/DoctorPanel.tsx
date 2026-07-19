@@ -4,17 +4,13 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import '../styles/dark-theme-visibility-fix.css';
 import AIAssistant from '../components/ai/AIAssistant';
 import {
-  Button as RawButton,
+  Button,
   Card,
   CardHeader,
   CardContent,
-  Badge as RawBadge,
-  Skeleton as RawSkeleton,
-  Input as RawInput } from '../components/ui/macos';
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
-const Skeleton = RawSkeleton as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
+  Badge,
+  Skeleton,
+  Input } from '../components/ui/macos';
 // R-14: AnimatedTransition moved from native/ to macos/ kit.
 import { AnimatedTransition } from '../components/ui/macos';
 import { useTheme } from '../contexts/ThemeContext';
