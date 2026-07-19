@@ -35,12 +35,19 @@ function matchesQueueSpecialty(item, requestedSpecialty) {
  * Легкий адаптер, который подключает макос-панели к новому ModernQueueManager.
  * Вся бизнес-логика очереди вынесена на backend и в кастомные хуки.
  */
+interface QueueIntegrationProps {
+  specialistId?: string;
+  specialty?: string;
+  onPatientSelect?: (patient: any) => void;
+  onStartVisit?: (patient: any) => void;
+}
+
 const QueueIntegration = ({
   specialistId = '',
   specialty = '',
   onPatientSelect,
   onStartVisit,
-}) => {
+}: QueueIntegrationProps) => {
   const [availableSpecialists, setAvailableSpecialists] = useState([]);
   const [authProfile, setAuthProfile] = useState(auth.getState().profile);
 

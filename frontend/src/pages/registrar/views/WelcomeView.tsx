@@ -61,8 +61,7 @@ const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>
 const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
 import { AnimatedTransition } from '../../../components/ui';
 import ModernStatistics from '../../../components/statistics/ModernStatistics';
-import EnhancedAppointmentsTableRaw from '../../../components/tables/EnhancedAppointmentsTable';
-const EnhancedAppointmentsTable = EnhancedAppointmentsTableRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import EnhancedAppointmentsTable from '../../../components/tables/EnhancedAppointmentsTable';
 import { getLocalDateString, getYesterdayDateString } from '../../../utils/dateUtils';
 import logger from '../../../utils/logger';
 import notify from '../../../services/notify';

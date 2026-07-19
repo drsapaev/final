@@ -8,8 +8,7 @@
  */
 
 import PropTypes from 'prop-types';
-import AIAssistantRaw from '../ai/AIAssistant';
-const AIAssistant = AIAssistantRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import AIAssistant from '../ai/AIAssistant';
 import { useTranslation } from '../../i18n/useTranslation';
 
 interface AiTabProps {

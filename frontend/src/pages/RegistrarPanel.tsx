@@ -2,8 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo, memo, startTransitio
 import type { CSSProperties } from 'react';
 import PropTypes from 'prop-types';
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
-import EnhancedAppointmentsTableRaw from '../components/tables/EnhancedAppointmentsTable';
-const EnhancedAppointmentsTable = EnhancedAppointmentsTableRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
 import AppointmentContextMenu from '../components/tables/AppointmentContextMenu';
 import ModernTabsRaw from '../components/navigation/ModernTabs';
 const ModernTabs = ModernTabsRaw as unknown as React.ComponentType<Record<string, unknown>>;

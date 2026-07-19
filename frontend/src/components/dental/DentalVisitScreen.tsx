@@ -63,8 +63,7 @@ import {
   TOOTH_STATUS_COLORS,
   getToothName,
 } from '../dental/dentalConstants';
-import AIAssistantRaw from '../ai/AIAssistant';
-const AIAssistant = AIAssistantRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import AIAssistant from '../ai/AIAssistant';
 
 // =============================================================================
 // Helpers

@@ -25,14 +25,23 @@ import {
  * Универсальный компонент для назначения следующих визитов
  * Используется во всех панелях врачей
  */
+interface ScheduleNextModalProps {
+  isOpen?: boolean;
+  onClose?: () => void;
+  onSuccess?: (result?: any, formData?: any) => void;
+  patient?: any;
+  theme?: any;
+  specialtyFilter?: string | null;
+}
+
 const ScheduleNextModal = ({
   isOpen,
   onClose,
   onSuccess,
   patient,
   theme,
-  specialtyFilter = null // Фильтр услуг по специальности
-}) => {
+  specialtyFilter = null
+}: ScheduleNextModalProps) => {
   const { getColor, getSpacing, getFontSize } = theme;
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;

@@ -5,11 +5,10 @@ import {
   Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle,
   Icon, Typography,
 } from '../ui/macos';
-import { AIButton, AIAssistant as AIAssistantRaw } from '../ai';
+import { AIButton, AIAssistant } from '../ai';
 // STRAT#22: t() для i18n — AI analysis strings мигрированы.
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
-const AIAssistant = AIAssistantRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 /**
  * P-01 fix: AI-анализ лабораторного бланка перенесён из LabResultsManager
