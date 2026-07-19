@@ -10,17 +10,14 @@
 
 import PropTypes from 'prop-types';
 import { useMemo } from 'react';
-import EMRSectionRaw from './EMRSection';
+import EMRSection from './EMRSection';
 import React from 'react';
-import EMRSmartFieldV2Raw from './EMRSmartFieldV2';
-import EMRTextFieldRaw from './EMRTextField';
+import EMRSmartFieldV2 from './EMRSmartFieldV2';
+import EMRTextField from './EMRTextField';
 import { useDoctorPhrases } from '../../../hooks/useDoctorPhrases';
 import './DiagnosisSection.css';
 import { useTranslation } from '../../../i18n/useTranslation';
 
-const EMRSection = EMRSectionRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const EMRSmartFieldV2 = EMRSmartFieldV2Raw as unknown as React.ComponentType<Record<string, unknown>>;
-const EMRTextField = EMRTextFieldRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 function normalizeTextValue(value) {
     if (typeof value === 'string') {

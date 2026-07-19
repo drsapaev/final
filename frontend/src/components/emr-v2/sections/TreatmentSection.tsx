@@ -16,8 +16,8 @@
 import PropTypes from 'prop-types';
 import { useState, useCallback, useMemo } from 'react';
 import { History, Pin, Edit2 } from 'lucide-react';
-import EMRSectionRaw from './EMRSection';
-import EMRSmartFieldV2Raw from './EMRSmartFieldV2';
+import EMRSection from './EMRSection';
+import EMRSmartFieldV2 from './EMRSmartFieldV2';
 import { TreatmentTemplatesButton, TreatmentTemplatesPanel } from '../templates';
 import PrescriptionEditor from './PrescriptionEditor';
 import { useDoctorPhrases } from '../../../hooks/useDoctorPhrases';
@@ -25,8 +25,6 @@ import { useDoctorTreatmentTemplates } from '../../../hooks/useDoctorTreatmentTe
 import logger from '../../../utils/logger';
 import { useTranslation } from '../../../i18n/useTranslation';
 import React from "react";
-const EMRSection = EMRSectionRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const EMRSmartFieldV2 = EMRSmartFieldV2Raw as unknown as React.ComponentType<Record<string, unknown>>;
 
 /**
  * TreatmentSection Component

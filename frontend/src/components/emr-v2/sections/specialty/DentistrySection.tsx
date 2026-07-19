@@ -12,11 +12,9 @@
 
 import PropTypes from 'prop-types';
 import { useState, useCallback } from 'react';
-import EMRSectionRaw from '../EMRSection';
+import EMRSection from '../EMRSection';
 import React from 'react';
-const EMRSection = EMRSectionRaw as unknown as React.ComponentType<Record<string, unknown>>;
-import EMRTextFieldRaw from '../EMRTextField';
-const EMRTextField = EMRTextFieldRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import EMRTextField from '../EMRTextField';
 import TeethChart from '../../../dental/TeethChart';
 import './DentistrySection.css';
 import { Input, Checkbox } from '../../../ui/macos';
