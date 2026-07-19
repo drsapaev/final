@@ -51,13 +51,25 @@ const defaultTabColor = 'var(--mac-accent)';
 const toGradient = (color) =>
   `linear-gradient(135deg, ${color}, color-mix(in srgb, ${color}, white 14%))`;
 
+interface ModernTabsProps {
+  activeTab?: string;
+  onTabChange?: (tab: string) => void;
+  onProfilesLoaded?: (profiles: any[]) => void;
+  departmentStats?: any;
+  language?: string;
+  theme?: any;
+  dynamicDepartments?: any[];
+}
+
 const ModernTabs = ({
   activeTab,
   onTabChange,
-  onProfilesLoaded, // ⭐ NEW: Callback to pass loaded profiles to parent for SSOT filtering
+  onProfilesLoaded,
   departmentStats = {},
-  language = 'ru'
-}) => {
+  language = 'ru',
+  theme,
+  dynamicDepartments
+}: ModernTabsProps) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [indicatorStyle, setIndicatorStyle] = useState<Record<string, any>>({});
   const [tabs, setTabs] = useState([]);

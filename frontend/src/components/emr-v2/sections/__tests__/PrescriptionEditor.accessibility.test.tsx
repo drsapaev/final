@@ -3,8 +3,7 @@ import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import PrescriptionEditorRaw from '../PrescriptionEditor';
-const PrescriptionEditor = PrescriptionEditorRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import PrescriptionEditor from '../PrescriptionEditor';
 
 describe('PrescriptionEditor accessibility', () => {
   it('renders an aria-label on the delete button', () => {

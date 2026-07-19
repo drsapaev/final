@@ -2,8 +2,7 @@ import { useState } from 'react';
 import {
   Card, Button, Badge,
 } from '../components/ui/macos';
-import ModernTabsRaw from '../components/navigation/ModernTabs';
-const ModernTabs = ModernTabsRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import ModernTabs from '../components/navigation/ModernTabs';
 import { AlertCircle, CheckCircle, XCircle, Info } from 'lucide-react';
 
 import logger from '../utils/logger';

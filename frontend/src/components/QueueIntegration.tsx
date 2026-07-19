@@ -1,9 +1,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
-import ModernQueueManagerRaw from './queue/ModernQueueManager';
+import ModernQueueManager from './queue/ModernQueueManager';
 import React from 'react';
-const ModernQueueManager = ModernQueueManagerRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import { fetchAvailableSpecialists } from '../api/queue';
 import auth from '../stores/auth';
 import logger from '../utils/logger';

@@ -16,7 +16,17 @@ import PropTypes from 'prop-types';
 import AppointmentWizardV2 from '../wizard/AppointmentWizardV2';
 import logger from '../../utils/logger';
 
-const EditPatientModal = ({ isOpen, onClose, patient, onSave, loading = false }) => {
+interface EditPatientModalProps {
+  isOpen?: boolean;
+  onClose?: () => void;
+  patient?: any;
+  onSave?: (data?: any) => void | Promise<void>;
+  loading?: boolean;
+  theme?: any;
+  specialtyFilter?: string;
+}
+
+const EditPatientModal = ({ isOpen, onClose, patient, onSave, loading = false, theme, specialtyFilter }: EditPatientModalProps = {}) => {
   if (!isOpen) {
     return null;
   }

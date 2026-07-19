@@ -29,8 +29,7 @@ const AiTab = AiTabRaw as unknown as React.ComponentType<Record<string, unknown>
 import AppointmentsTab from '../components/cardiology/AppointmentsTab';
 import VisitTab from '../components/cardiology/VisitTab';
 import ScheduleNextModal from '../components/common/ScheduleNextModal';
-import EditPatientModalRaw from '../components/common/EditPatientModal';
-const EditPatientModal = EditPatientModalRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import EditPatientModal from '../components/common/EditPatientModal';
 import { queueService } from '../services/queue';
 import { printPanelTicket } from '../services/panelPrint';
 import QueueIntegration from '../components/QueueIntegration';

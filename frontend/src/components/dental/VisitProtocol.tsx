@@ -11,11 +11,13 @@ import notify from '../../services/notify';
  */
 const VisitProtocol = ({
   patientName,
+  patientId,
+  visitId,
   initialData = null,
   onSave,
   onClose,
   onComplete
-}) => {
+}: any) => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [formData, setFormData] = useState({
