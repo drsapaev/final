@@ -38,12 +38,14 @@ export const REGISTRAR_VIEW_PATHS = {
 export const REGISTRAR_PATH_TO_VIEW = {
   '/registrar/welcome': 'welcome',
   '/registrar/queue': 'queue',
-  // PR-51: /registrar now maps to 'welcome' (was null=worklist).
-  // The welcome dashboard is the registrar's landing page — showing the
-  // worklist table on first login was confusing (no overview, no quick actions).
-  // Worklist is still accessible via the header "Все записи" button or
-  // by navigating to /registrar/worklist.
-  '/registrar': 'welcome',
+  // /registrar maps to null = worklist table (the default landing page).
+  // PR-51 (#2134) temporarily changed this to 'welcome', making the worklist
+  // table inaccessible — the header had no button to navigate back to it,
+  // and no /registrar/worklist route existed. Reverted to null so the
+  // registrar sees the appointments table on login, as before.
+  // Welcome dashboard is still accessible via the "Главная" button in the
+  // header (navigates to /registrar/welcome).
+  '/registrar': null,
 };
 
 /**
