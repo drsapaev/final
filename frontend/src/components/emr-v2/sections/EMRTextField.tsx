@@ -38,7 +38,7 @@ export function EMRTextField({
     className = '',
     id,
     ...rest
-}) {
+}: { value?: string; onChange?: any; isEditable?: boolean; aiEnabled?: boolean; onRequestAI?: any; error?: any; autoFocus?: boolean; onFieldTouch?: any; onBlur?: any; label?: string; placeholder?: string; multiline?: boolean; rows?: number; disabled?: boolean; required?: boolean; className?: string; id?: string; [key: string]: unknown }) {
     const handleChange = (e) => {
         onChange?.(e.target.value);
     };

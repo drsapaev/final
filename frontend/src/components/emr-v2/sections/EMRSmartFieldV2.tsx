@@ -64,7 +64,7 @@ export function EMRSmartFieldV2({
     showAIButton = true,
     experimentalGhostMode = false,
     onTelemetry,
-}) {
+}: any) {
     const [isFocused, setIsFocused] = useState(false);
     const [showPopover, setShowPopover] = useState(false);
     const [ghostText, setGhostText] = useState('');

@@ -26,6 +26,19 @@ import './EMRSection.css';
  * @param {boolean} props.required - Show required indicator
  * @param {boolean} props.disabled - Section is disabled
  */
+interface EMRSectionProps {
+  title?: string;
+  icon?: React.ReactNode;
+  children?: React.ReactNode;
+  defaultOpen?: boolean;
+  badge?: string;
+  headerAction?: React.ReactNode;
+  className?: string;
+  required?: boolean;
+  disabled?: boolean;
+  [key: string]: unknown;
+}
+
 export function EMRSection({
     title,
     icon,
@@ -36,7 +49,7 @@ export function EMRSection({
     className = '',
     required = false,
     disabled = false,
-}) {
+}: EMRSectionProps) {
     const [isOpen, setIsOpen] = React.useState(defaultOpen);
 
     return (

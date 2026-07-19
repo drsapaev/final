@@ -8,11 +8,9 @@
 
 import { useState, useCallback } from 'react';
 import PropTypes from 'prop-types';
-import EMRSectionRaw from './EMRSection';
+import EMRSection from './EMRSection';
 import React from 'react';
-const EMRSection = EMRSectionRaw as unknown as React.ComponentType<Record<string, unknown>>;
-import EMRTextFieldRaw from './EMRTextField';
-const EMRTextField = EMRTextFieldRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import EMRTextField from './EMRTextField';
 import { DoctorTemplatesPanel as DTPRaw, DoctorTemplatesButton as DTBRaw } from '../DoctorTemplatesPanel';
 const DoctorTemplatesPanel = DTPRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const DoctorTemplatesButton = DTBRaw as unknown as React.ComponentType<Record<string, unknown>>;

@@ -19,11 +19,9 @@
 
 import PropTypes from 'prop-types';
 import { useState, useCallback } from 'react';
-import EMRSectionRaw from '../EMRSection';
+import EMRSection from '../EMRSection';
 import React from 'react';
-const EMRTextField = EMRTextFieldRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const EMRSection = EMRSectionRaw as unknown as React.ComponentType<Record<string, unknown>>;
-import EMRTextFieldRaw from '../EMRTextField';
+import EMRTextField from '../EMRTextField';
 import './CardiologySection.css';
 import { Heart, FileText } from 'lucide-react';
 import { useTranslation } from '../../../../i18n/useTranslation';

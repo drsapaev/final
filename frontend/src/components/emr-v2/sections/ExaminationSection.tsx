@@ -9,9 +9,9 @@
 import PropTypes from 'prop-types';
 import { useState, useMemo, useCallback } from 'react';
 
-import EMRSectionRaw from './EMRSection';
+import EMRSection from './EMRSection';
 import React from 'react';
-import EMRSmartFieldV2Raw from './EMRSmartFieldV2';
+import EMRSmartFieldV2 from './EMRSmartFieldV2';
 import ExaminationMatrix from './ExaminationMatrix';
 import { useDoctorPhrases } from '../../../hooks/useDoctorPhrases';
 import { DoctorTemplatesPanel as DTPRaw, DoctorTemplatesButton as DTBRaw } from '../DoctorTemplatesPanel';
@@ -19,8 +19,6 @@ import { useDoctorSectionTemplates } from '../../../hooks/useDoctorSectionTempla
 import logger from '../../../utils/logger';
 import { useTranslation } from '../../../i18n/useTranslation';
 
-const EMRSection = EMRSectionRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const EMRSmartFieldV2 = EMRSmartFieldV2Raw as unknown as React.ComponentType<Record<string, unknown>>;
 const DoctorTemplatesPanel = DTPRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const DoctorTemplatesButton = DTBRaw as unknown as React.ComponentType<Record<string, unknown>>;
 

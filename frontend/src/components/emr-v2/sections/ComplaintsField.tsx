@@ -35,29 +35,18 @@ const useDebounce = (value, delay) => {
 };
 
 const ComplaintsField = ({
-    // Data
     value = '',
     onChange,
-
-    // State
     isEditable = true,
-
-    // AI - теперь возвращает массив вариантов
     aiEnabled = true,
-    onRequestAI,          // (text) => Promise<Array<{id, text, source}>> - 2-3 варианта из шаблонов
-
-    // Validation
+    onRequestAI,
     error,
-
-    // UX
     autoFocus = false,
-    onFieldTouch,         // для telemetry
+    onFieldTouch,
     onBlur,
-
-    // Labels
     label = 'Жалобы',
     placeholder = 'Введите жалобы пациента...'
-}) => {
+}: any) => {
     const complaintsFieldId = useId();
     const textareaRef = useRef(null);
 

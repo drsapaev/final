@@ -65,8 +65,7 @@ const DentistrySection = RawDentistrySection as unknown as React.ComponentType<R
 // P0 fix: LabResultsSection — shows lab panel results to all doctors.
 // Previously doctors had no way to see LabReportInstance data; cardiologist
 // had a separate manual-entry CardioBloodTest table, derma/dental had nothing.
-import LabResultsSectionRaw from './sections/LabResultsSection';
-const LabResultsSection = LabResultsSectionRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import LabResultsSection from './sections/LabResultsSection';
 
 import './EMRContainerV2.css';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.

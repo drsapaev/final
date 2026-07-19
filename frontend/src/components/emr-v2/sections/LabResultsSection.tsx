@@ -20,9 +20,8 @@ import PropTypes from 'prop-types';
 // всеми остальными lab-компонентами. Смешивание двух библиотек иконок
 // (lucide + macos SF-Symbol-style) нарушало Nielsen Heuristic #4
 // (Consistency & Standards) — разные stroke-width, optical size, padding.
-import EMRSectionRaw from './EMRSection';
+import EMRSection from './EMRSection';
 import React from 'react';
-const EMRSection = EMRSectionRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import { labReportingApi } from '../../../api/labReporting';
 import { Badge, Button, Dialog, DialogTitle, DialogContent, DialogActions, Icon } from '../../ui/macos';
 import { useConfirm } from '../../common/ConfirmDialog';

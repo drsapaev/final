@@ -13,12 +13,10 @@
 import PropTypes from 'prop-types';
 import { useState, useCallback, useRef } from 'react';
 import { Camera, X, Image as ImageIcon, Sparkles } from 'lucide-react';
-import EMRSectionRaw from '../EMRSection';
+import EMRSection from '../EMRSection';
 import React from 'react';
-const EMRSection = EMRSectionRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
-import EMRSmartFieldV2Raw from '../EMRSmartFieldV2';
-const EMRSmartFieldV2 = EMRSmartFieldV2Raw as unknown as React.ComponentType<Record<string, unknown>>;
+import EMRSmartFieldV2 from '../EMRSmartFieldV2';
 import { useEMRAI } from '../../../../hooks/useEMRAI';
 import { MCP_PROVIDERS } from '../../../../constants/ai';
 import logger from '../../../../utils/logger';
