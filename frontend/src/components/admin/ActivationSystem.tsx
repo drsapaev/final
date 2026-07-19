@@ -33,8 +33,7 @@ const Table = RawTable as unknown as React.ComponentType<Record<string, unknown>
 const Checkbox = RawCheckbox as unknown as React.ComponentType<Record<string, unknown>>;
 const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
 // UX Audit: ModernDialog для extend-activation диалога (вместо window.prompt).
-import ModernDialogRaw from '../dialogs/ModernDialog';
-const ModernDialog = ModernDialogRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import ModernDialog from '../dialogs/ModernDialog';
 
 import logger from '../../utils/logger';
 import api from '../../api/client';

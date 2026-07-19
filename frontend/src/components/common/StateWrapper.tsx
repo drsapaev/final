@@ -26,11 +26,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 import { MacOSEmptyState } from '../ui/macos';
-import { Skeleton as SkeletonRaw } from '../ui/macos';
+import { Skeleton } from '../ui/macos';
 import { Button } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
-const Skeleton = SkeletonRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const DEFAULT_SKELETON_ROWS = 4;
 

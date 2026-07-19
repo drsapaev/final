@@ -2,8 +2,7 @@ import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { CSSProperties } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import ModernDialogRaw from '../dialogs/ModernDialog';
-const ModernDialog = ModernDialogRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import ModernDialog from '../dialogs/ModernDialog';
 import { toast } from 'react-toastify';
 import PropTypes from 'prop-types';
 // UX Audit Registrar #2: useConfirm hook для замены window.confirm().

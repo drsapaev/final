@@ -2,9 +2,8 @@
 import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { Check, Printer } from 'lucide-react';
-import ModernDialogRaw from './ModernDialog';
+import ModernDialog from './ModernDialog';
 import React from 'react';
-const ModernDialog = ModernDialogRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import { toast } from 'react-toastify';
 // UX Audit R-4.3 (Phase 2): usePaymentMethods hook (future: backend-driven).
 import { usePaymentMethods } from '../../hooks/usePaymentMethods';

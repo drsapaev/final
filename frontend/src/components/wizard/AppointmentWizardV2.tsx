@@ -26,8 +26,7 @@ import {
   RefreshCw } from
 'lucide-react';
 import { toast } from 'react-toastify';
-import ModernDialogRaw from '../dialogs/ModernDialog';
-const ModernDialog = ModernDialogRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import ModernDialog from '../dialogs/ModernDialog';
 import {
   Input, Button, Tooltip,
 } from '../ui/macos';

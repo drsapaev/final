@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { Printer, AlertCircle, Wifi, WifiOff, Printer as PrinterIcon } from 'lucide-react';
-import ModernDialogRaw from './ModernDialog';
+import ModernDialog from './ModernDialog';
 import { printService } from '../../services/print';
 import { toast } from 'react-toastify';
 // UX Audit Registrar #5: все inline-стили перенесены в PrintDialog.css.
@@ -13,7 +13,6 @@ import './PrintDialog.css';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
-const ModernDialog = ModernDialogRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const formatPrintServiceLabel = (service) => {
   if (service == null) return '';

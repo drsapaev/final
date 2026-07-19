@@ -5,7 +5,7 @@ type SkeletonVariant = 'text' | 'circle' | 'rect' | 'card' | 'table' | 'list';
 type SkeletonSize = string | number;
 
 interface SkeletonProps {
-  variant?: SkeletonVariant;
+  variant?: SkeletonVariant | string;
   width?: SkeletonSize;
   height?: SkeletonSize;
   lines?: number;
@@ -13,6 +13,10 @@ interface SkeletonProps {
   animation?: boolean;
   className?: string;
   style?: CSSProperties;
+  count?: number;
+  type?: string;
+  fallback?: ReactNode;
+  borderRadius?: string | number;
 }
 
 const Skeleton = ({

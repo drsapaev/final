@@ -23,7 +23,7 @@ import {
   Button,
   SegmentedControl as SegmentedControlRaw,
   MacOSStatCard,
-  Skeleton as SkeletonRaw,
+  Skeleton,
   MacOSEmptyState,
   Alert,
   Badge,
@@ -40,7 +40,6 @@ import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
 const SegmentedControl = SegmentedControlRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const Skeleton = SkeletonRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const ClinicManagement = () => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [activeTab, setActiveTab] = useState('overview');

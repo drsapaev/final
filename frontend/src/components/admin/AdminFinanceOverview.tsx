@@ -19,7 +19,7 @@ import {
   Button,
   MacOSEmptyState,
   Input,
-  Skeleton as SkeletonRaw,
+  Skeleton,
   Select,
 } from '../ui/macos';
 import useDoctors from '../../hooks/useDoctors';
@@ -33,7 +33,6 @@ import FinanceModal from './FinanceModal';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
 import React from "react";
-const Skeleton = SkeletonRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 function getCategoryOptions(t) {
   return [
