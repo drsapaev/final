@@ -3,10 +3,9 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Database, Download, Shield, Users } from 'lucide-react';
 import {
-  SegmentedControl as SegmentedControlRaw,
+  SegmentedControl,
   MacOSTab } from '../ui/macos';
 import React from 'react';
-const SegmentedControl = SegmentedControlRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import UserManagement from './UserManagement';
 import UserDataTransferManager from './UserDataTransferManager';
 import UserExportManager from './UserExportManager';
