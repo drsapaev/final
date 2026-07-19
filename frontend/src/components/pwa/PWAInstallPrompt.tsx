@@ -108,7 +108,7 @@ const styles = {
 
 const hasNotificationApi = () => typeof window !== 'undefined' && 'Notification' in window;
 
-function CapabilityChipRaw({ children, icon: Icon, variant = 'outline', onClick, ariaLabel }: { children?: React.ReactNode; icon?: React.ComponentType<any>; variant?: string; onClick?: () => void; ariaLabel?: string }) {
+function CapabilityChip({ children, icon: Icon, variant = 'outline', onClick, ariaLabel }: { children?: React.ReactNode; icon?: React.ComponentType<any>; variant?: string; onClick?: () => void; ariaLabel?: string }) {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const content = (
     <span style={styles.chipContent}>
@@ -139,7 +139,7 @@ function CapabilityChipRaw({ children, icon: Icon, variant = 'outline', onClick,
   );
 }
 
-CapabilityChipRaw.propTypes = {
+CapabilityChip.propTypes = {
   ariaLabel: PropTypes.string,
   children: PropTypes.node.isRequired,
   icon: PropTypes.elementType,
@@ -147,7 +147,6 @@ CapabilityChipRaw.propTypes = {
   variant: PropTypes.oneOf(['default', 'primary', 'secondary', 'success', 'warning', 'danger', 'info', 'outline'])
 };
 
-const CapabilityChip = CapabilityChipRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const PWAInstallPrompt = ({ onClose }) => {
   const {

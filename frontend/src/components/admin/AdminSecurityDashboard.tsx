@@ -293,7 +293,7 @@ function BackupTab({ data, onVerify }) {
   );
 }
 
-function SummaryCardRaw({ label, value, variant }: Record<string, unknown>) {
+function SummaryCard({ label, value, variant }: Record<string, unknown>) {
   const colors = {
     default: 'var(--mac-text-primary)',
     warning: 'var(--mac-warning, #f59e0b)',
@@ -314,10 +314,9 @@ function SummaryCardRaw({ label, value, variant }: Record<string, unknown>) {
   );
 }
 
-SummaryCardRaw.propTypes = {
+SummaryCard.propTypes = {
   label: PropTypes.string.isRequired,
   value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
   variant: PropTypes.oneOf(['default', 'warning', 'danger']),
 };
 
-const SummaryCard = SummaryCardRaw as unknown as React.ComponentType<Record<string, unknown>>;
