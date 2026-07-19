@@ -8,7 +8,7 @@ import { useState, useCallback, useRef } from 'react';
 import type { CSSProperties } from 'react';
 import {
   Box,
-  Card as RawCard,
+  Card,
   CardContent,
   Typography as RawTypography,
   Button as RawButton,
@@ -22,7 +22,6 @@ import {
   DialogContent,
   DialogActions,
 } from '../ui/macos';
-const Card = RawCard as unknown as React.ComponentType<Record<string, unknown>>;
 const Typography = RawTypography as unknown as React.ComponentType<Record<string, unknown>>;
 const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
 const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;

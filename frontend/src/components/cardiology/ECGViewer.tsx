@@ -10,7 +10,7 @@ import {
   Alert as RawAlert,
   Badge as RawBadge,
   Button as RawButton,
-  Card as RawCard,
+  Card,
   CardContent,
   Dialog,
   DialogActions,
@@ -21,7 +21,6 @@ import {
 const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
 const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
 const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Card = RawCard as unknown as React.ComponentType<Record<string, unknown>>;
 const Progress = RawProgress as unknown as React.ComponentType<Record<string, unknown>>;
 const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
 import {

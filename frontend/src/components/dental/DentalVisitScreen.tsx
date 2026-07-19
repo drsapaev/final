@@ -36,12 +36,11 @@ import { useState, useEffect, useCallback } from 'react';
 import type { CSSProperties } from 'react';
 import PropTypes from 'prop-types';
 import {
-  Button as RawButton, Card as RawCard, Badge as RawBadge, Input as RawInput, Textarea as RawTextarea, Label,
+  Button as RawButton, Card, Badge as RawBadge, Input as RawInput, Textarea as RawTextarea, Label,
   Dialog, DialogTitle, DialogContent, DialogActions,
   Typography as RawTypography, Box as RawBox, Alert as RawAlert, Skeleton as RawSkeleton,
 } from '../ui/macos';
 const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Card = RawCard as unknown as React.ComponentType<Record<string, unknown>>;
 const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
 const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
 const Textarea = RawTextarea as unknown as React.ComponentType<Record<string, unknown>>;

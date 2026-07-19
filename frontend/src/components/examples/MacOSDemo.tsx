@@ -3,7 +3,7 @@ import type { CSSProperties } from 'react';
 import {
   Button as RawButton,
   Input as RawInput,
-  Card as RawCard,
+  Card,
   CardHeader,
   CardTitle,
   CardDescription,
@@ -23,7 +23,6 @@ import {
 } from '../ui/macos';
 const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
 const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
-const Card = RawCard as unknown as React.ComponentType<Record<string, unknown>>;
 const Modal = RawModal as unknown as React.ComponentType<Record<string, unknown>>;
 const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
 const Progress = RawProgress as unknown as React.ComponentType<Record<string, unknown>>;

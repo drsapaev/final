@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
-  Alert as RawAlert, Badge as RawBadge, Button as RawButton, Card as RawCard, CardContent, CardHeader, Icon,
+  Alert as RawAlert, Badge as RawBadge, Button as RawButton, Card, CardContent, CardHeader, Icon,
 } from '../components/ui/macos';
 const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
 const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
 const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Card = RawCard as unknown as React.ComponentType<Record<string, unknown>>;
 import LabQueueWorkbench from '../components/laboratory/LabQueueWorkbench';
 import LabReportWorkbench from '../components/laboratory/LabReportWorkbench';
 import LabTemplateWorkbench from '../components/laboratory/LabTemplateWorkbench';
