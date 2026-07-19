@@ -36,11 +36,10 @@ import i18n from '../../i18n';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertTriangle, Trash2, AlertOctagon, CheckCircle2 } from 'lucide-react';
-import { Modal as ModalRaw } from '../ui/macos';
+import { Modal } from '../ui/macos';
 import { Button } from '../ui/macos';
 import { Input } from '../ui/macos';
 import React from "react";
-const Modal = ModalRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const INTENT_CONFIG = {
   danger: {

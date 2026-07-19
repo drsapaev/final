@@ -8,13 +8,12 @@ import {
   Checkbox,
   Badge,
   Input,
-  Modal as ModalRaw,
+  Modal,
   Select,
 } from '../ui/macos';
 import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
-const Modal = ModalRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const DoctorModal = ({
   isOpen,

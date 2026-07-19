@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import Nav from '../components/layout/Nav';
-import RoleGateRaw from '../components/RoleGate';
-const RoleGate = RoleGateRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import RoleGate from '../components/RoleGate';
 import {
   AppEmpty, AppError, AppLoading, Button, Select,
 } from '../components/ui/macos';
