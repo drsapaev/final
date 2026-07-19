@@ -13,11 +13,9 @@
 import PropTypes from 'prop-types';
 import { Plus } from 'lucide-react';
 import { Button } from '../ui/macos';
-import ECGViewerRaw from './ECGViewer';
+import ECGViewer from './ECGViewer';
 import React from 'react';
-const ECGViewer = ECGViewerRaw as unknown as React.ComponentType<Record<string, unknown>>;
-import EchoFormRaw from './EchoForm';
-const EchoForm = EchoFormRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import EchoForm from './EchoForm';
 import { useTranslation } from '../../i18n/useTranslation';
 
 /**

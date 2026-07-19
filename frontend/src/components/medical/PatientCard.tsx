@@ -17,7 +17,7 @@ const PatientCard = ({
   onRestore,  // Restore handler
   className = '',
   ...props
-}) => {
+}: any) => {
   const { isDark } = useTheme();
 
   const {

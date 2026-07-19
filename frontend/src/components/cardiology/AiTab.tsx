@@ -12,7 +12,7 @@ import AIAssistant from '../ai/AIAssistant';
 import { useTranslation } from '../../i18n/useTranslation';
 
 interface AiTabProps {
-  onSuggestionSelect: (suggestion: unknown) => void;
+  onSuggestionSelect: (type: string, suggestion: unknown) => void;
 }
 
 export function AiTab({ onSuggestionSelect }: AiTabProps) {

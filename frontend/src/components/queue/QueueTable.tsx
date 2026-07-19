@@ -17,7 +17,7 @@ const QueueTable = ({
     effectiveDoctor = null,
     loading = false,
     t = {}
-}) => {
+}: any) => {
     // If no queue data or no doctor selected
     if (!effectiveDoctor) {
         return (

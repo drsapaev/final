@@ -6,7 +6,7 @@ import { Clock, User } from 'lucide-react';
 import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 
-const QueuePositionCard = ({ queueEntry }) => {
+const QueuePositionCard = ({ queueEntry }: any) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   if (!queueEntry) return null;
 

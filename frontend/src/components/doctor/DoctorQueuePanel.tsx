@@ -61,7 +61,7 @@ const DoctorQueuePanel = ({
   specialty = 'cardiology',
   onPatientSelect,
   className = ''
-}) => {
+}: any) => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // Проверяем демо-режим в самом начале (в демо не скрываем компонент, а показываем моковые данные)

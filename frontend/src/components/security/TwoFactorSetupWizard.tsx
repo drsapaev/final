@@ -28,7 +28,7 @@ import PropTypes from 'prop-types';
  * Мастер настройки Two-Factor Authentication
  * Пошаговая настройка всех методов 2FA
  */
-const TwoFactorSetupWizard = ({ onComplete }) => {
+const TwoFactorSetupWizard = ({ onComplete }: any) => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [currentStep, setCurrentStep] = useState(1);

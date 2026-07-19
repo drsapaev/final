@@ -10,9 +10,9 @@ import React, { type CSSProperties } from "react";
 /**
  * Компонент таблицы
  */
-export function Table({ 
-  data = [], 
-  columns = [], 
+export function Table({
+  data = [],
+  columns = [],
   sortable = true,
   filterable = true,
   pagination = true,
@@ -22,8 +22,8 @@ export function Table({
   onPageChange,
   loading = false,
   emptyMessage = 'Нет данных',
-  ...props 
-}) {
+  ...props
+}: any) {
   const theme = useTheme();
   const { getColor, getSpacing, getFontSize } = theme;
   

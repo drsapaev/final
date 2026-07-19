@@ -70,8 +70,7 @@ vi.mock('../../ui/macos', () => ({
   Alert: DoctorQueuePanelTestMacOSAlert,
 }));
 
-import DoctorQueuePanelRaw from '../DoctorQueuePanel';
-const DoctorQueuePanel = DoctorQueuePanelRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import DoctorQueuePanel from '../DoctorQueuePanel';
 
 describe('DoctorQueuePanel', () => {
   beforeEach(() => {

@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import TwoFactorManager from '../components/security/TwoFactorManager';
-import TwoFactorSetupWizardRaw from '../components/security/TwoFactorSetupWizard';
-const TwoFactorSetupWizard = TwoFactorSetupWizardRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import TwoFactorSetupWizard from '../components/security/TwoFactorSetupWizard';
 import SMSEmail2FA from '../components/security/SMSEmail2FA';
 import { useTranslation } from '../i18n/useTranslation';
 import {

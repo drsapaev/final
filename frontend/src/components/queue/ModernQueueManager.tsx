@@ -21,8 +21,7 @@ import { useQueueManager } from '../../hooks/useQueueManager';
 // UX Audit Stage 3 (Queue issue 7.1):
 // WebSocket подписка для мгновенных обновлений очереди вместо 30s polling.
 import { useQueueWebSocket } from '../../hooks/useQueueWebSocket';
-import QueueTableRaw from './QueueTable';
-const QueueTable = QueueTableRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import QueueTable from './QueueTable';
 import logger from '../../utils/logger';
 import './ModernQueueManager.css';
 

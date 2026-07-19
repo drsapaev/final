@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import RoleGate from '../components/RoleGate';
-import AppointmentFlowRaw from '../components/AppointmentFlow';
-const AppointmentFlow = AppointmentFlowRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import AppointmentFlow from '../components/AppointmentFlow';
 import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
 import {
   AppEmpty, AppError, Button, Card, CardContent, CardHeader, Checkbox, Input,

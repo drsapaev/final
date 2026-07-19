@@ -144,7 +144,7 @@ function buildEchoEmrPayload(existingEmr, echoData) {
   };
 }
 
-const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }) => {
+const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: any) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [echoData, setEchoData] = useState(DEFAULT_ECHO_DATA);
 

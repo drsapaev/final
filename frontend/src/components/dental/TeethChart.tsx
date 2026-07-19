@@ -42,7 +42,7 @@ import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
 const Box = BoxRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
-const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }) => {
+const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }: any) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [teethData, setTeethData] = useState(initialData);
   const [selectedTooth, setSelectedTooth] = useState(null);

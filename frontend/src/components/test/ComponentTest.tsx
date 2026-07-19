@@ -14,11 +14,10 @@ import {
   useModal,
   FormProvider,
   useForm,
-  Table as TableRaw,
+  Table,
   RoleGuard,
   useRoleAccess
 } from '../common';
-const Table = TableRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 /**
  * Тестовый компонент для проверки всех созданных компонентов

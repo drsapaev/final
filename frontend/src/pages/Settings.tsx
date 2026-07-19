@@ -11,8 +11,7 @@ import ColorSchemeSelectorRaw from '../components/admin/ColorSchemeSelector';
 const ColorSchemeSelector = ColorSchemeSelectorRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import { AccentPicker } from '../components/ui/macos';
 
-import PhoneVerificationRaw from '../components/auth/PhoneVerification';
-const PhoneVerification = PhoneVerificationRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import PhoneVerification from '../components/auth/PhoneVerification';
 
 import logger from '../utils/logger';
 import NotificationSystemStatusRaw from '../components/settings/NotificationSystemStatus';
