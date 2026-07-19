@@ -17,13 +17,12 @@ import {
   MacOSCard,
   MacOSEmptyState,
   Input,
-  Skeleton as SkeletonRaw,
+  Skeleton,
   Select,
 } from '../ui/macos';
 import IconButton from './IconButton';
 import logger from '../../utils/logger';
 import React from "react";
-const Skeleton = SkeletonRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 // PR-19: departmentOptions now loaded dynamically from /admin/departments
 // (was hardcoded — new departments didn't appear in filter dropdown)

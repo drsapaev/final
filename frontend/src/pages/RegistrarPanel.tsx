@@ -60,8 +60,7 @@ import {
 import PaymentDialog from '../components/dialogs/PaymentDialog';
 import CancelDialog from '../components/dialogs/CancelDialog';
 import PrintDialog from '../components/dialogs/PrintDialog';
-import ModernDialogRaw from '../components/dialogs/ModernDialog';
-const ModernDialog = ModernDialogRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import ModernDialog from '../components/dialogs/ModernDialog';
 import { printPanelTicketInBrowserAsync } from '../services/panelPrint';
 
 // Современный мастер

@@ -19,7 +19,7 @@ import {
   Button,
   Input,
   Checkbox,
-  Skeleton as SkeletonRaw,
+  Skeleton,
   MacOSEmptyState,
   Alert,
   Badge,
@@ -33,7 +33,6 @@ import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
 const Modal = ModalRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const Skeleton = SkeletonRaw as unknown as React.ComponentType<Record<string, unknown>>;
 /**
  * Компонент для управления настройками льгот в админке
  */

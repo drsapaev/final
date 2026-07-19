@@ -18,7 +18,7 @@ import {
   AlertCircle } from
 'lucide-react';
 import {
-  MacOSCard, Button, Skeleton as SkeletonRaw,
+  MacOSCard, Button, Skeleton,
   Input } from '../ui/macos';
 
 import logger from '../../utils/logger';
@@ -26,7 +26,6 @@ import tokenManager from '../../utils/tokenManager';
 import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
-const Skeleton = SkeletonRaw as unknown as React.ComponentType<Record<string, unknown>>;
 /**
  * Селектор услуг для панели врача
  * Использует справочник из админ панели согласно passport.md стр. 1254

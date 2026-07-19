@@ -5,7 +5,7 @@ import {
   MacOSCard,
   Button,
   Badge,
-  Skeleton as SkeletonRaw,
+  Skeleton,
   Input,
   Select,
   Textarea,
@@ -31,7 +31,6 @@ import { toast } from 'react-toastify';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
-const Skeleton = SkeletonRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const formatFcmTokenStatus = (user, t) => {
   const fallbackLength = typeof user.fcm_token === 'string' ? user.fcm_token.length : 0;
   const tokenLength = Number.isFinite(user.fcm_token_length) ? user.fcm_token_length : fallbackLength;

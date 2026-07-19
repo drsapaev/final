@@ -13,8 +13,7 @@ import {
 import MultipleTicketsPrinter from '../tickets/MultipleTicketsPrinter';
 import { useAsyncAction } from '../../hooks/useAsyncAction';
 import { api } from '../../api/client';
-import ModernDialogRaw from '../dialogs/ModernDialog';
-const ModernDialog = ModernDialogRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import ModernDialog from '../dialogs/ModernDialog';
 import logger from '../../utils/logger';
 import { printPanelTicketInBrowser } from '../../services/panelPrint';
 import notify from '../../services/notify';

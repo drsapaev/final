@@ -2,9 +2,8 @@
 import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { AlertTriangle, X } from 'lucide-react';
-import ModernDialogRaw from './ModernDialog';
+import ModernDialog from './ModernDialog';
 import React from 'react';
-const ModernDialog = ModernDialogRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import { toast } from 'react-toastify';
 // UX Audit Registrar #5: все inline-стили перенесены в CancelDialog.css.
 // useTheme удалён — больше не нужен (всё через macos tokens + [data-theme="dark"]).

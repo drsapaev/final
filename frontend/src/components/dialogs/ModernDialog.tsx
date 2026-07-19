@@ -1,9 +1,38 @@
-import { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, type CSSProperties, type ReactNode } from 'react';
 import PropTypes from 'prop-types';
 import { X } from 'lucide-react';
-// UX Audit Registrar #5: useTheme удалён — все стили в CSS с macos tokens.
 import './ModernDialog.css';
 import { useTranslation } from '../../i18n/useTranslation';
+
+interface DialogAction {
+  label?: string;
+  variant?: string;
+  onClick?: () => void;
+  disabled?: boolean;
+  loading?: boolean;
+  icon?: ReactNode;
+  className?: string;
+  style?: CSSProperties;
+  props?: Record<string, unknown>;
+}
+
+interface ModernDialogProps {
+  isOpen?: boolean;
+  onClose?: () => void;
+  title?: ReactNode;
+  children?: ReactNode;
+  customHeader?: ReactNode;
+  actions?: ReactNode | DialogAction[];
+  maxWidth?: string;
+  maxHeight?: string;
+  showCloseButton?: boolean;
+  closeOnBackdrop?: boolean;
+  closeOnEscape?: boolean;
+  className?: string;
+  dialogClassName?: string;
+  dialogStyle?: CSSProperties;
+  [key: string]: unknown;
+}
 
 const ModernDialog = ({
   isOpen,
@@ -21,7 +50,7 @@ const ModernDialog = ({
   dialogClassName = '',
   dialogStyle = {},
   ...props
-}) => {
+}: ModernDialogProps) => {
   // UX Audit Registrar #5: useTheme() удалён — getColor/theme больше не нужны
   // (все стили перенесены в CSS с macos tokens + [data-theme="dark"] selectors).
   const dialogRef = useRef(null);
@@ -152,11 +181,11 @@ const ModernDialog = ({
         </div>
 
         {/* Действия */}
-        {actions && actions.length > 0 &&
+        {Array.isArray(actions) && actions.length > 0 &&
         <div
           className="modern-dialog-actions modern-dialog-actions--styled">
-          
-            {actions.map((action, index) =>
+
+            {(actions as DialogAction[]).map((action, index) =>
           <button
             key={index}
             type="button"
