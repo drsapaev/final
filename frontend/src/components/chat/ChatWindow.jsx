@@ -1178,6 +1178,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
                                                                         {['👍', '❤️', '😂', '😮', '😢', '🔥'].map((emoji) =>
                             <button
                               key={emoji}
+                              aria-label={`React with ${emoji}`}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 toggleReaction(item.id, emoji);
