@@ -168,6 +168,7 @@ const Select = React.forwardRef(({
           style={trigger}
           aria-haspopup="listbox"
           aria-expanded={isOpen}
+          aria-invalid={!!error}
           disabled={disabled}
           {...props}
         >

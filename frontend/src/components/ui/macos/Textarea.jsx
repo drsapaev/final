@@ -121,6 +121,7 @@ const Textarea = React.forwardRef(({
       onBlur={handleBlur}
       onInput={adjustHeight}
       rows={minRows}
+      aria-invalid={!!error}
       {...props}
     />
   );
