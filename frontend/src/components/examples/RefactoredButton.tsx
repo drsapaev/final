@@ -23,6 +23,23 @@ const unifiedTheme = { colors: { primary: '#007aff', text: '#000', background: '
 
 const { colors, spacing, borderRadius, shadows, typography, transitions } = unifiedTheme;
 
+interface RefactoredButtonProps {
+  children?: React.ReactNode;
+  variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'success' | string;
+  size?: 'small' | 'medium' | 'large' | string;
+  disabled?: boolean;
+  loading?: boolean;
+  icon?: React.ReactNode | React.ComponentType<{ size?: number }>;
+  iconPosition?: 'left' | 'right';
+  fullWidth?: boolean;
+  rounded?: boolean;
+  outlined?: boolean;
+  onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
+  className?: string;
+  type?: 'button' | 'submit' | 'reset';
+  [key: string]: unknown;
+}
+
 const RefactoredButton = ({
   children,
   variant = 'primary',
@@ -38,7 +55,7 @@ const RefactoredButton = ({
   className = '',
   type = 'button',
   ...props
-}) => {
+}: RefactoredButtonProps) => {
   const buttonRef = useRef(null);
 
   // ═══════════════════════════════════════════════════════════════════
@@ -241,7 +258,7 @@ const RefactoredButton = ({
       {/* Icon left */}
       {icon && iconPosition === 'left' && !loading && (
         <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          {React.isValidElement(icon) ? icon : React.createElement(icon as unknown as React.ComponentType<Record<string, unknown>>, { size: 16 })}
+          {React.isValidElement(icon) ? icon : React.createElement(icon as React.ComponentType<{ size?: number }>, { size: 16 })}
         </span>
       )}
 
@@ -260,7 +277,7 @@ const RefactoredButton = ({
       {/* Icon right */}
       {icon && iconPosition === 'right' && !loading && (
         <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          {React.isValidElement(icon) ? icon : React.createElement(icon as unknown as React.ComponentType<Record<string, unknown>>, { size: 16 })}
+          {React.isValidElement(icon) ? icon : React.createElement(icon as React.ComponentType<{ size?: number }>, { size: 16 })}
         </span>
       )}
     </button>

@@ -5,17 +5,14 @@ import PropTypes from 'prop-types';
 import RoleGate from '../components/RoleGate';
 import { api } from '../api/client';
 import { useTheme } from '../contexts/ThemeContext';
-import TwoFactorManagerRaw from '../components/security/TwoFactorManager';
-const TwoFactorManager = TwoFactorManagerRaw as unknown as React.ComponentType<Record<string, unknown>>;
-import ColorSchemeSelectorRaw from '../components/admin/ColorSchemeSelector';
-const ColorSchemeSelector = ColorSchemeSelectorRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import TwoFactorManager from '../components/security/TwoFactorManager';
+import ColorSchemeSelector from '../components/admin/ColorSchemeSelector';
 import { AccentPicker } from '../components/ui/macos';
 
 import PhoneVerification from '../components/auth/PhoneVerification';
 
 import logger from '../utils/logger';
-import NotificationSystemStatusRaw from '../components/settings/NotificationSystemStatus';
-const NotificationSystemStatus = NotificationSystemStatusRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import NotificationSystemStatus from '../components/settings/NotificationSystemStatus';
 // P-013 fix: shared ConfirmDialog hook replacing native confirm() calls.
 import { useConfirm } from '../components/common/ConfirmDialog';
 import './SettingsAnalytics.css';

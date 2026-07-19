@@ -37,8 +37,8 @@ import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
-const CircularProgressAny = CircularProgressRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const ProgressAny = ProgressRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const CircularProgressAny = CircularProgressRaw;
+const ProgressAny = ProgressRaw;
 const SkinAnalysis = ({ photos, visitId, patientId, onAnalysisComplete }) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [analyzing, setAnalyzing] = useState(false);

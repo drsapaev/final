@@ -6,10 +6,7 @@ import { Plus, Search, Filter, Calendar, Stethoscope, Edit, Trash2 } from 'lucid
 
 // Компоненты
 import UnifiedLayout from '../components/layout/UnifiedLayout';
-import { PatientCard as RawPatientCard, MetricCard as RawMetricCard, MedicalTable as RawMedicalTable } from '../components/medical';
-const PatientCard = RawPatientCard as unknown as React.ComponentType<Record<string, unknown>>;
-const MetricCard = RawMetricCard as unknown as React.ComponentType<Record<string, unknown>>;
-const MedicalTable = RawMedicalTable as unknown as React.ComponentType<Record<string, unknown>>;
+import { PatientCard, MetricCard, MedicalTable } from '../components/medical';
 import MedicalCard from '../components/medical/MedicalCard';
 import logger from '../utils/logger';
 import '../styles/full-width.css';

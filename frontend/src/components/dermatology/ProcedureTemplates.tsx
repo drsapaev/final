@@ -14,7 +14,7 @@ import {
   Input,
   Alert,
   Badge,
-  Grid as RawGrid,
+  Grid,
   List,
   Dialog,
   DialogTitle,
@@ -24,7 +24,6 @@ import {
   Option,
   Textarea,
 } from '../ui/macos';
-const Grid = RawGrid as unknown as React.ComponentType<Record<string, unknown>>;
 import {
   Hospital,
   Plus,

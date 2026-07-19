@@ -103,7 +103,7 @@ function ToastContainer({ toasts, onRemove, theme }) {
   return (
     <div style={containerStyle as CSSProperties}>
       {toasts.map((toast) =>
-      <ToastItemAny
+      <ToastItem
         key={toast.id}
         toast={toast}
         onRemove={onRemove}
@@ -117,9 +117,8 @@ function ToastContainer({ toasts, onRemove, theme }) {
 /**
  * Отдельное уведомление
  */
-const ToastItemAny = ToastItem as unknown as React.ComponentType<Record<string, unknown>>;
 
-function ToastItem({ toast, onRemove }) {
+function ToastItem({ toast, onRemove, theme }: { toast: Record<string, unknown>; onRemove: (id: string | number) => void; theme?: string }) {
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
@@ -229,21 +228,21 @@ function ToastItem({ toast, onRemove }) {
   };
 
   return (
-    <div style={getToastStyles(toast.type) as unknown as CSSProperties}>
-      {getIcon(toast.type)}
+    <div style={getToastStyles(toast.type as string) as unknown as CSSProperties}>
+      {getIcon(toast.type as string)}
       <div style={contentStyle as unknown as CSSProperties}>
-        {toast.title && <div style={titleStyle as unknown as CSSProperties}>{toast.title}</div>}
-        {toast.message && <div style={messageStyle}>{toast.message}</div>}
+        {toast.title && <div style={titleStyle as unknown as CSSProperties}>{toast.title as string}</div>}
+        {toast.message && <div style={messageStyle}>{toast.message as string}</div>}
       </div>
       <button
         style={closeButtonStyle}
-        onClick={() => onRemove(toast.id)}
+        onClick={() => onRemove(toast.id as string | number)}
         onMouseOver={(e) => e.currentTarget.style.opacity = '1'}
         onMouseOut={(e) => e.currentTarget.style.opacity = '0.7'}>
 
         ×
       </button>
-      {toast.duration > 0 &&
+      {(toast.duration as number) > 0 &&
       <div style={progressBarStyle as unknown as CSSProperties} />
       }
     </div>);
