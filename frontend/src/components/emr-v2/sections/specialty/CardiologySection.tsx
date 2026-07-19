@@ -36,13 +36,24 @@ import { useTranslation } from '../../../../i18n/useTranslation';
  * @param {Function} props.onChange - Handler для изменения specialty_data
  * @param {boolean} props.disabled - Read-only mode
  */
+interface CardiologySectionProps {
+  ecgData?: Record<string, unknown>;
+  echoData?: Record<string, unknown>;
+  labResults?: Record<string, unknown>;
+  onChange?: ((field: string, value: unknown) => void) | undefined;
+  disabled?: boolean;
+  visitId?: string | number | null | undefined;
+  patientId?: string | number | null | undefined;
+}
+
+
 export function CardiologySection({
   ecgData: ecgDataRaw = {},
   echoData: echoDataRaw = {},
   labResults: labResultsRaw = {},
   onChange,
   disabled = false,
-}) {
+}: CardiologySectionProps) {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const ecgData = ecgDataRaw as Record<string, any>;
   const echoData = echoDataRaw as Record<string, any>;

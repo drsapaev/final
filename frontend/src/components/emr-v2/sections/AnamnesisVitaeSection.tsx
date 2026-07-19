@@ -19,6 +19,18 @@ import { useTranslation } from '../../../i18n/useTranslation';
  * @param {boolean} props.disabled - Read-only mode
  * @param {boolean} props.defaultOpen - Start expanded
  */
+interface AnamnesisVitaeSectionProps {
+  value?: string;
+  onChange?: ((value: string) => void) | undefined;
+  disabled?: boolean;
+  defaultOpen?: boolean;
+  vitals?: Record<string, unknown>;
+  onVitalsChange?: ((v: Record<string, unknown>) => void) | undefined;
+  doctorId?: string | number | null | undefined;
+  specialty?: string;
+}
+
+
 export function AnamnesisVitaeSection({
     value = '',
     onChange,
@@ -26,7 +38,7 @@ export function AnamnesisVitaeSection({
     defaultOpen = true,
     vitals = {},
     onVitalsChange
-}) {
+}: AnamnesisVitaeSectionProps) {
     const [showMyExperience, setShowMyExperience] = useState(false);
 
     // Get section templates (NO icd10 for anamnesis_vitae)

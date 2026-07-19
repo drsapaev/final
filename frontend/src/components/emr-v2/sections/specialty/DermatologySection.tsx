@@ -35,6 +35,28 @@ const i18nT = i18n.t as unknown as (key: string, options?: Record<string, unknow
  * @param {Function} props.onChange - Handler для изменения specialty_data
  * @param {boolean} props.disabled - Read-only mode
  */
+export interface DermatologyPhoto {
+  id: string | number;
+  url?: string;
+  category?: string;
+  analysis?: unknown;
+  file?: File;
+  uploadedAt?: string;
+  [key: string]: unknown;
+}
+
+interface DermatologySectionProps {
+  photos?: DermatologyPhoto[];
+  skinType?: string;
+  conditions?: unknown[];
+  localization?: Record<string, unknown>;
+  onChange?: ((field: string, value: unknown) => void) | undefined;
+  disabled?: boolean;
+  visitId?: string | number | null | undefined;
+  patientId?: string | number | null | undefined;
+}
+
+
 export function DermatologySection({
   photos = [],
   skinType = '',
@@ -42,7 +64,7 @@ export function DermatologySection({
   localization = {} as any,
   onChange,
   disabled = false
-}) {
+}: DermatologySectionProps) {
   const [selectedPhoto, setSelectedPhoto] = useState(null);
   const [analyzingPhoto, setAnalyzingPhoto] = useState(false);
   const fileInputRef = useRef(null);

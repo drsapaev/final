@@ -31,6 +31,25 @@ import { useTranslation } from '../../../i18n/useTranslation';
  * @param {string} props.icd10Code - ICD-10 code for personalized templates
  * @param {string} props.complaints - Complaints text (required for AI)
  */
+interface ExaminationSectionProps {
+  value?: string;
+  onChange?: (value: string, options?: Record<string, unknown>) => void;
+  disabled?: boolean;
+  defaultOpen?: boolean;
+  specialty?: string;
+  icd10Code?: string;
+  complaints?: string;
+  suggestions?: unknown[];
+  aiLoading?: boolean;
+  onApplySuggestion?: ((s: unknown) => void) | undefined;
+  onDismissSuggestion?: ((s: unknown) => void) | undefined;
+  onRequestAI?: ((text: string) => void) | undefined;
+  doctorId?: string | number | null | undefined;
+  experimentalGhostMode?: boolean;
+  onTelemetry?: ((payload: Record<string, unknown>) => void) | undefined;
+}
+
+
 export function ExaminationSection({
   value = '',
   onChange,
@@ -48,7 +67,7 @@ export function ExaminationSection({
   doctorId,
   experimentalGhostMode = false,
   onTelemetry
-}) {
+}: ExaminationSectionProps) {
   const [showMyExperience, setShowMyExperience] = useState(false);
 
   // 🧠 Connect Doctor History (Personal Learning)

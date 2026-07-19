@@ -32,6 +32,17 @@ import { useTranslation } from '../../../i18n/useTranslation';
  * @param {boolean} props.required - Show required indicator
  * @param {boolean} props.defaultOpen - Start expanded
  */
+interface ComplaintsSectionProps {
+  value?: string;
+  onChange?: ((value: string) => void) | undefined;
+  disabled?: boolean;
+  required?: boolean;
+  defaultOpen?: boolean;
+  doctorId?: string | number | null | undefined;
+  specialty?: string;
+}
+
+
 export function ComplaintsSection({
     value = '',
     onChange,
@@ -40,7 +51,7 @@ export function ComplaintsSection({
     defaultOpen = true,
     doctorId,
     specialty = 'general',
-}) {
+}: ComplaintsSectionProps) {
     const [showMyExperience, setShowMyExperience] = useState(false);
 
     // Get section templates (NO icd10 for complaints)

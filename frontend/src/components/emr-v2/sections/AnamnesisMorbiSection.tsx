@@ -28,6 +28,19 @@ import { useTranslation } from '../../../i18n/useTranslation';
  * @param {boolean} props.defaultOpen - Start expanded
  * @param {string} props.icd10Code - ICD-10 code for personalized templates
  */
+interface AnamnesisMorbiSectionProps {
+  value?: string;
+  onChange?: ((value: string) => void) | undefined;
+  disabled?: boolean;
+  defaultOpen?: boolean;
+  icd10Code?: string;
+  onApplySuggestion?: ((s: unknown) => void) | undefined;
+  onDismissSuggestion?: ((s: unknown) => void) | undefined;
+  doctorId?: string | number | null | undefined;
+  specialty?: string;
+}
+
+
 export function AnamnesisMorbiSection({
   value = '',
   onChange,
@@ -39,7 +52,7 @@ export function AnamnesisMorbiSection({
   onDismissSuggestion,
   doctorId,
   specialty = 'general'
-}) {
+}: AnamnesisMorbiSectionProps) {
   const [showMyExperience, setShowMyExperience] = useState(false);
 
   // 📜 Doctor History (Personal Learning) - NOT AI

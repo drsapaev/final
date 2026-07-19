@@ -24,12 +24,20 @@ import { useTranslation } from '../../../i18n/useTranslation';
  * @param {boolean} props.disabled - Read-only mode
  * @param {boolean} props.defaultOpen - Start expanded
  */
+interface NotesSectionProps {
+  value?: string;
+  onChange?: ((value: string) => void) | undefined;
+  disabled?: boolean;
+  defaultOpen?: boolean;
+}
+
+
 export function NotesSection({
     value = '',
     onChange,
     disabled = false,
     defaultOpen = false, // Notes usually collapsed by default
-}) {
+}: NotesSectionProps) {
     const [showMyExperience, setShowMyExperience] = useState(false);
 
     // Get section templates (NO icd10 for notes)

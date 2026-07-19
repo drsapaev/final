@@ -34,33 +34,23 @@ import { isCanonicalSpecialty, normalizeSpecialty } from '../../utils/emrSpecial
 
 // Import modular sections
 import {
-    ComplaintsSection as RawComplaintsSection,
-    AnamnesisMorbiSection as RawAnamnesisMorbiSection,
-    AnamnesisVitaeSection as RawAnamnesisVitaeSection,
-    ExaminationSection as RawExaminationSection,
-    DiagnosisSection as RawDiagnosisSection,
-    TreatmentSection as RawTreatmentSection,
-    RecommendationsSection as RawRecommendationsSection,
-    NotesSection as RawNotesSection,
+    ComplaintsSection,
+    AnamnesisMorbiSection,
+    AnamnesisVitaeSection,
+    ExaminationSection,
+    DiagnosisSection,
+    TreatmentSection,
+    RecommendationsSection,
+    NotesSection,
 } from './sections';
-const ComplaintsSection = RawComplaintsSection as unknown as React.ComponentType<Record<string, unknown>>;
-const AnamnesisMorbiSection = RawAnamnesisMorbiSection as unknown as React.ComponentType<Record<string, unknown>>;
-const AnamnesisVitaeSection = RawAnamnesisVitaeSection as unknown as React.ComponentType<Record<string, unknown>>;
-const ExaminationSection = RawExaminationSection as unknown as React.ComponentType<Record<string, unknown>>;
-const DiagnosisSection = RawDiagnosisSection as unknown as React.ComponentType<Record<string, unknown>>;
-const TreatmentSection = RawTreatmentSection as unknown as React.ComponentType<Record<string, unknown>>;
-const RecommendationsSection = RawRecommendationsSection as unknown as React.ComponentType<Record<string, unknown>>;
-const NotesSection = RawNotesSection as unknown as React.ComponentType<Record<string, unknown>>;
 
 // Import specialty sections (lazy loaded)
 import {
-    CardiologySection as RawCardiologySection,
-    DermatologySection as RawDermatologySection,
-    DentistrySection as RawDentistrySection,
+    CardiologySection,
+    DermatologySection,
+    type DermatologyPhoto,
+    DentistrySection,
 } from './sections/specialty';
-const CardiologySection = RawCardiologySection as unknown as React.ComponentType<Record<string, unknown>>;
-const DermatologySection = RawDermatologySection as unknown as React.ComponentType<Record<string, unknown>>;
-const DentistrySection = RawDentistrySection as unknown as React.ComponentType<Record<string, unknown>>;
 
 // P0 fix: LabResultsSection — shows lab panel results to all doctors.
 // Previously doctors had no way to see LabReportInstance data; cardiologist
@@ -100,7 +90,69 @@ import {
  * @param {string} props.patientName - Patient name (for sticky header)
  * @param {React.ComponentType} props.ICD10Component - Optional ICD10 autocomplete
  */
-export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Component = null }) {
+interface EMRContainerV2Props {
+    visitId: string | number;
+    patientId?: string | number | null;
+    specialty?: string;
+    patientName?: string;
+    ICD10Component?: React.ComponentType<Record<string, unknown>> | null;
+}
+
+interface EMRDataShape {
+    complaints?: string;
+    anamnesis_morbi?: string;
+    anamnesis_vitae?: string;
+    examination?: string;
+    diagnosis?: string;
+    treatment?: string;
+    recommendations?: string;
+    notes?: string;
+    icd10_code?: string;
+    specialty?: string;
+    vitals?: Record<string, unknown>;
+    medications?: { text?: string; list?: unknown[] };
+    specialty_data?: Record<string, unknown>;
+    patient_age?: string | number;
+    patient_gender?: string;
+    [key: string]: unknown;
+}
+
+/** Normalize legacy field values that may be a string OR an object with `.text`. */
+function fieldText(value: unknown): string {
+    if (typeof value === 'string') return value;
+    if (value && typeof value === 'object' && 'text' in value) {
+        const t = (value as { text?: unknown }).text;
+        return typeof t === 'string' ? t : '';
+    }
+    return '';
+}
+
+interface EMRHookResult {
+    data: EMRDataShape | null;
+    status: string;
+    isDirty: boolean;
+    lastSaved: string | null;
+    conflict: unknown;
+    error: unknown;
+    isSaving: boolean;
+    isSigned: boolean;
+    isAmended: boolean;
+    accessDenied: boolean;
+    version: number | null;
+    canUndo: boolean;
+    canRedo: boolean;
+    loadEMR: () => Promise<unknown>;
+    saveEMR: (opts?: Record<string, unknown>) => Promise<unknown>;
+    signEMR: (opts?: Record<string, unknown>) => Promise<unknown>;
+    amendEMR: (reason: string, opts?: Record<string, unknown>) => Promise<unknown>;
+    setField: (field: string, value: unknown) => void;
+    undo: () => void;
+    redo: () => void;
+    reloadFromServer: () => Promise<unknown>;
+    forceOverwrite: () => Promise<unknown>;
+}
+
+export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Component = null }: EMRContainerV2Props) {
     // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
     const [confirmRaw, confirmDialog] = useConfirm();
   const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
@@ -130,10 +182,10 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
         redo,
         reloadFromServer,
         forceOverwrite,
-    } = useEMR(visitId, { specialty: canonicalSpecialty }) as any;
+    } = useEMR(visitId, { specialty: canonicalSpecialty }) as EMRHookResult;
 
     // Get current user (doctor) for history/AI suggestions
-    const { currentUser } = useAppData() as any;
+    const { currentUser } = useAppData() as { currentUser?: { id?: string | number | null } };
     const doctorId = currentUser?.id;
 
     // Autosave setup
@@ -146,7 +198,7 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
         debounceMs: DEBOUNCE.autosave,
         maxWaitMs: 30000,
         enabled: !isSigned && !accessDenied,
-    } as any);
+    });
 
     // Navigation guard
     useBeforeUnload(isDirty);
@@ -160,9 +212,9 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
     const [showAmendForm, setShowAmendForm] = useState(false);
     const [experimentalGhostMode, setExperimentalGhostMode] = useState(false);
 
-    // AI Suggestions state
-    const [aiSuggestions, setAiSuggestions] = useState({} as any);
-    const [aiLoading, setAiLoading] = useState({} as any);
+    // AI Suggestions state — keyed by EMR field name (examination/diagnosis/treatment).
+    const [aiSuggestions, setAiSuggestions] = useState<Record<string, unknown[]>>({});
+    const [aiLoading, setAiLoading] = useState<Record<string, boolean>>({});
 
     // 🔄 Visit Lifecycle Management - критично для безопасности данных
     const visitLifecycle = useVisitLifecycle(visitId, patientId, {
@@ -204,14 +256,16 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
         const specialty = data.specialty || 'general';
         const complaints = (data.complaints || '').trim().toLowerCase();
         const diagnosis = (data.diagnosis || '').trim().toLowerCase();
+        const patientAge = typeof data.patient_age === 'number' ? data.patient_age : String(data.patient_age ?? '');
+        const patientGender = typeof data.patient_gender === 'string' ? data.patient_gender : String(data.patient_gender ?? '');
         return cacheService.generateKey(
             'ai',
             fieldName,
             specialty,
             complaints,
             diagnosis,
-            data.patient_age,
-            data.patient_gender
+            patientAge,
+            patientGender
         );
     }, [data.specialty, data.complaints, data.diagnosis, data.patient_age, data.patient_gender]);
 
@@ -489,7 +543,8 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
 
     // Conflict handlers
     const handleCompareConflict = () => {
-        setSelectedVersion(conflict?.serverVersion);
+        const conflictData = (conflict ?? null) as { serverVersion?: unknown } | null;
+        setSelectedVersion(conflictData?.serverVersion ?? null);
         setShowDiff(true);
     };
 
@@ -576,13 +631,13 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                     {/* UX Audit Doctor M-48: progress indicator for EMR sections. */}
                     {(() => {
                         const sections = [
-                            { name: t('misc.emr_sec_complaints'), filled: !!(data?.complaints?.text || data?.complaints) },
-                            { name: t('misc.emr_sec_anamnesis'), filled: !!(data?.anamnesis_morbi?.text || data?.anamnesis_morbi) },
-                            { name: t('misc.emr_sec_examination'), filled: !!(data?.examination?.text || data?.examination) },
-                            { name: t('misc.emr_sec_diagnosis'), filled: !!(data?.diagnosis?.text || data?.diagnosis) },
-                            { name: t('misc.emr_sec_treatment'), filled: !!(data?.treatment?.text || data?.treatment) },
-                            { name: t('misc.emr_sec_recommendations'), filled: !!(data?.recommendations?.text || data?.recommendations) },
-                            { name: t('misc.emr_sec_notes'), filled: !!(data?.notes?.text || data?.notes) },
+                            { name: t('misc.emr_sec_complaints'), filled: !!(data?.complaints || fieldText(data?.complaints)) },
+                            { name: t('misc.emr_sec_anamnesis'), filled: !!(data?.anamnesis_morbi || fieldText(data?.anamnesis_morbi)) },
+                            { name: t('misc.emr_sec_examination'), filled: !!(data?.examination || fieldText(data?.examination)) },
+                            { name: t('misc.emr_sec_diagnosis'), filled: !!(data?.diagnosis || fieldText(data?.diagnosis)) },
+                            { name: t('misc.emr_sec_treatment'), filled: !!(data?.treatment || fieldText(data?.treatment)) },
+                            { name: t('misc.emr_sec_recommendations'), filled: !!(data?.recommendations || fieldText(data?.recommendations)) },
+                            { name: t('misc.emr_sec_notes'), filled: !!(data?.notes || fieldText(data?.notes)) },
                         ];
                         const filledCount = sections.filter(s => s.filled).length;
                         return (
@@ -720,9 +775,9 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                     {/* Specialty-specific sections */}
                     {data.specialty === 'cardiology' && (
                         <CardiologySection
-                            ecgData={data.specialty_data?.ecg || {}}
-                            echoData={data.specialty_data?.echo || {}}
-                            labResults={data.specialty_data?.cardio_labs || {}}
+                            ecgData={(data.specialty_data?.ecg as Record<string, unknown>) || {}}
+                            echoData={(data.specialty_data?.echo as Record<string, unknown>) || {}}
+                            labResults={(data.specialty_data?.cardio_labs as Record<string, unknown>) || {}}
                             onChange={(field, value) => handleFieldChange('specialty_data')({
                                 ...(data.specialty_data || {}),
                                 [field]: value
@@ -735,10 +790,10 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
 
                     {data.specialty === 'dermatology' && (
                         <DermatologySection
-                            photos={data.specialty_data?.photos || []}
-                            skinType={data.specialty_data?.skin_type || ''}
-                            conditions={data.specialty_data?.conditions || []}
-                            localization={data.specialty_data?.localization || {}}
+                            photos={(data.specialty_data?.photos as DermatologyPhoto[]) || []}
+                            skinType={(data.specialty_data?.skin_type as string) || ''}
+                            conditions={(data.specialty_data?.conditions as unknown[]) || []}
+                            localization={(data.specialty_data?.localization as Record<string, unknown>) || {}}
                             onChange={(field, value) => handleFieldChange('specialty_data')({
                                 ...(data.specialty_data || {}),
                                 [field]: value
@@ -751,11 +806,11 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
 
                     {(data.specialty === 'dentist' || data.specialty === 'dentistry') && (
                         <DentistrySection
-                            toothStatus={data.specialty_data?.tooth_status || {}}
-                            hygieneIndices={data.specialty_data?.hygiene_indices || {}}
-                            periodontalPockets={data.specialty_data?.periodontal_pockets || {}}
-                            measurements={data.specialty_data?.measurements || {}}
-                            radiographs={data.specialty_data?.radiographs || {}}
+                            toothStatus={(data.specialty_data?.tooth_status as Record<string, unknown>) || {}}
+                            hygieneIndices={(data.specialty_data?.hygiene_indices as Record<string, unknown>) || {}}
+                            periodontalPockets={(data.specialty_data?.periodontal_pockets as Record<string, unknown>) || {}}
+                            measurements={(data.specialty_data?.measurements as Record<string, unknown>) || {}}
+                            radiographs={(data.specialty_data?.radiographs as Record<string, unknown>) || {}}
                             onChange={(field, value) => handleFieldChange('specialty_data')({
                                 ...(data.specialty_data || {}),
                                 [field]: value
