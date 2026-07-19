@@ -4,10 +4,9 @@ import { useSearchParams } from 'react-router-dom';
 import { Database, Download, Shield, Users } from 'lucide-react';
 import {
   SegmentedControl as SegmentedControlRaw,
-  MacOSTab as MacOSTabRaw } from '../ui/macos';
+  MacOSTab } from '../ui/macos';
 import React from 'react';
 const SegmentedControl = SegmentedControlRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const MacOSTab = MacOSTabRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import UserManagement from './UserManagement';
 import UserDataTransferManager from './UserDataTransferManager';
 import UserExportManager from './UserExportManager';

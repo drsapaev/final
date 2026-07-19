@@ -14,7 +14,7 @@ interface TabIconProps {
 interface TabDefinition {
   id: TabId;
   label: ReactNode;
-  icon?: ComponentType<TabIconProps>;
+  icon?: ComponentType<TabIconProps> | string;
   badge?: ReactNode;
   disabled?: boolean;
 }
@@ -22,12 +22,15 @@ interface TabDefinition {
 interface MacOSTabProps {
   tabs: TabDefinition[];
   activeTab: TabId;
-  onTabChange: (id: TabId) => void;
-  size?: TabSize;
-  variant?: TabVariant;
+  onTabChange: (id: any) => void;
+  size?: TabSize | string;
+  variant?: TabVariant | string;
   orientation?: TabOrientation;
   className?: string;
   style?: CSSProperties;
+  id?: string;
+  labelledby?: string;
+  role?: string;
 }
 
 interface TabSizeStyle extends CSSProperties {

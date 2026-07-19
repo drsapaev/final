@@ -7,9 +7,8 @@ import DynamicPricingManager from './DynamicPricingManager';
 import DiscountBenefitsManager from './DiscountBenefitsManager';
 import AdminFinanceOverview from './AdminFinanceOverview';
 import ErrorBoundary from '../common/ErrorBoundary';
-import { MacOSTab as MacOSTabRaw } from '../ui/macos';
+import { MacOSTab } from '../ui/macos';
 import React from 'react';
-const MacOSTab = MacOSTabRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import { useTranslation } from '../../i18n/useTranslation';
 
 

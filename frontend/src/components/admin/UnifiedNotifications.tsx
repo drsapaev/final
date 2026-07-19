@@ -4,8 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import FCMManager from './FCMManager';
 import RegistrarNotificationManager from './RegistrarNotificationManager';
 import ErrorBoundary from '../common/ErrorBoundary';
-import { MacOSTab as MacOSTabRaw } from '../ui/macos';
-const MacOSTab = MacOSTabRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import { MacOSTab } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
 
 type NotificationSection = 'fcm' | 'registrar';
@@ -44,8 +43,8 @@ const UnifiedNotifications = () => {
   return (
     <div className="admin-unified-root-no-color">
       <MacOSTab
-        tabs={tabs as unknown as Array<{ id: string; label: string; icon: string; badge?: unknown }>}
-        activeTab={activeTab as unknown as string | number}
+        tabs={tabs}
+        activeTab={activeTab}
         onTabChange={(id) => setActiveTab(id as NotificationSection)} />
       
       <div
