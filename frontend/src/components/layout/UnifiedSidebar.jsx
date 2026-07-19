@@ -268,7 +268,7 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
             e.target.style.filter = 'brightness(1)';
           }}
           title={isCollapsed ? 'Развернуть сайдбар' : 'Свернуть сайдбар'}
-          aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
+          aria-label={isCollapsed ? 'Развернуть сайдбар' : 'Свернуть сайдбар'}>
 
           <Icon name={isCollapsed ? 'ChevronRight' : 'ChevronLeft'} size={16} />
         </button>
@@ -399,7 +399,8 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
             e.target.style.color = isDark ? '#f8fafb' : 'var(--mac-text-primary)';
             e.target.style.filter = 'brightness(1)';
           }}
-          title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}>
+          title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+          aria-label={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}>
 
           <Icon name={isDark ? 'Sun' : 'Moon'} size={isCollapsed ? 16 : 16} />
           {!isCollapsed && (isDark ? 'Light' : 'Dark')}
@@ -430,7 +431,8 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
             e.target.style.color = isDark ? '#f8fafb' : 'var(--mac-text-primary)';
             e.target.style.filter = 'brightness(1)';
           }}
-          title={`Switch to ${language === 'en' ? 'Russian' : 'English'}`}>
+          title={`Switch to ${language === 'en' ? 'Russian' : 'English'}`}
+          aria-label={`Switch to ${language === 'en' ? 'Russian' : 'English'}`}>
 
           <Icon name="Globe" size={isCollapsed ? 16 : 16} />
           {!isCollapsed && (language === 'en' ? 'EN' : 'RU')}
