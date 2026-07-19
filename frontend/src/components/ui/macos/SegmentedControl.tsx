@@ -1,8 +1,8 @@
 import React, { useState, useEffect, type CSSProperties, type ReactNode } from 'react';
 import PropTypes from 'prop-types';
 
-type SegmentedSize = 'small' | 'default' | 'large';
-type SegmentedVariant = 'default' | 'filled' | 'outline';
+type SegmentedSize = 'small' | 'default' | 'large' | 'sm' | 'md' | 'lg' | string;
+type SegmentedVariant = 'default' | 'filled' | 'outline' | string;
 type SegmentedValue = string | number;
 
 interface SegmentedOption {
@@ -21,6 +21,7 @@ interface SegmentedControlProps extends Omit<React.HTMLAttributes<HTMLDivElement
   variant?: SegmentedVariant;
   className?: string;
   style?: CSSProperties;
+  label?: ReactNode;
 }
 
 interface SegmentedStyle extends CSSProperties {
