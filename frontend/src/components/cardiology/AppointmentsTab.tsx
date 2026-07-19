@@ -14,11 +14,10 @@ import React from 'react';
 import { Calendar } from 'lucide-react';
 import { MacOSCard as MacOSCardRaw, Skeleton, MacOSEmptyState } from '../ui/macos';
 import AppointmentSummaryBar from '../doctor/AppointmentSummaryBar';
-import EnhancedAppointmentsTableRaw from '../tables/EnhancedAppointmentsTable';
+import EnhancedAppointmentsTable from '../tables/EnhancedAppointmentsTable';
 import { useTranslation } from '../../i18n/useTranslation';
 
 const MacOSCard = MacOSCardRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const EnhancedAppointmentsTable = EnhancedAppointmentsTableRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 export function AppointmentsTab({
   appointments = [],

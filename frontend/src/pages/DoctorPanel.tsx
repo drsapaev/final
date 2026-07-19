@@ -2,8 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type { CSSProperties } from "react";
 import { useLocation, useNavigate } from 'react-router-dom';
 import '../styles/dark-theme-visibility-fix.css';
-import AIAssistantRaw from '../components/ai/AIAssistant';
-const AIAssistant = AIAssistantRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import AIAssistant from '../components/ai/AIAssistant';
 import {
   Button as RawButton,
   Card as RawCard,

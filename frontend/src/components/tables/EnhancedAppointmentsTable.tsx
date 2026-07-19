@@ -99,6 +99,27 @@ const getEnhancedAppointmentRowKey = (row, index) => {
   return parts.map((part) => String(part)).join(':');
 };
 
+interface EnhancedAppointmentsTableProps {
+  data?: any[];
+  loading?: boolean;
+  onRowClick?: (row: any) => void;
+  onActionClick?: (action: string, row: any, event?: any) => void;
+  theme?: string;
+  language?: string;
+  selectedRows?: Set<unknown>;
+  onRowSelect?: (id: any, checked?: boolean) => void;
+  services?: Record<string, unknown>;
+  outerBorder?: boolean;
+  showCheckboxes?: boolean;
+  view?: string;
+  rawEntries?: any[];
+  appointments?: any[];
+  appointmentsSelected?: Set<unknown>;
+  setAppointmentsSelected?: (rows: Set<unknown>) => void;
+  updateAppointmentStatus?: (id: any, status: any) => void;
+  setShowWizard?: (show: boolean) => void;
+}
+
 const EnhancedAppointmentsTable = ({
   data = [],
   loading = false,
@@ -110,9 +131,9 @@ const EnhancedAppointmentsTable = ({
   onRowSelect,
   services = {},
   outerBorder = true,
-  showCheckboxes = true, // ✅ Новый проп для отключения чекбоксов
-  view = 'registrar' // 'registrar' | 'doctor' — режим отображения
-}) => {
+  showCheckboxes = true,
+  view = 'registrar'
+}: EnhancedAppointmentsTableProps) => {
   const containerRef = useRef(null);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [filterConfig, setFilterConfig] = useState({

@@ -3,14 +3,8 @@ import { useState } from 'react';
 import type { CSSProperties } from 'react';
 import PropTypes from 'prop-types';
 import {
-  Card as RawCard, CardContent, Typography as RawTypography, Alert as RawAlert, Badge as RawBadge, CircularProgress as RawCircularProgress, Button as RawButton,
+  Card, CardContent, Typography, Alert, Badge, CircularProgress, Button,
 } from '../ui/macos';
-const Card = RawCard as unknown as React.ComponentType<Record<string, unknown>>;
-const Typography = RawTypography as unknown as React.ComponentType<Record<string, unknown>>;
-const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
-const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
-const CircularProgress = RawCircularProgress as unknown as React.ComponentType<Record<string, unknown>>;
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
 import { ChevronDown, ChevronUp, Brain, CheckCircle, Copy, RefreshCw } from 'lucide-react';
 import { notify } from '../../services/notify';
 import { apiClient } from '../../api/client';
@@ -101,6 +95,18 @@ function isFallbackProvider(providerName) {
   return normalized === 'mock' || normalized === 'none' || normalized.includes('mock');
 }
 
+interface AIAssistantProps {
+  analysisType?: string;
+  data?: Record<string, unknown>;
+  onResult?: (result: unknown) => void;
+  title?: string;
+  expanded?: boolean;
+  useMCP?: boolean;
+  providerOptions?: string[];
+  specialty?: string;
+  onSuggestionSelect?: (type: string, suggestion: unknown) => void;
+}
+
 const AIAssistant = ({
   analysisType,
   data,
@@ -109,11 +115,9 @@ const AIAssistant = ({
   expanded = true,
   useMCP = true,
   providerOptions = ['deepseek', 'gemini', 'openai', 'default'],
-  // X-1 (UX audit): specialty + onSuggestionSelect — previously ignored by AIAssistant,
-  // causing all 3 panels' AI tabs to be non-functional.
   specialty,
   onSuggestionSelect,
-}) => {
+}: AIAssistantProps) => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [loading, setLoading] = useState(false);
@@ -231,7 +235,7 @@ const AIAssistant = ({
             }
           } else {
             const formData = new FormData();
-            formData.append('image', data.image);
+            formData.append('image', data.image as Blob);
             if (data.metadata) formData.append('metadata', JSON.stringify(data.metadata));
             formData.append('provider', provider);
             response = await apiClient.post('/api/v1/ai/skin-analyze', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
@@ -241,8 +245,8 @@ const AIAssistant = ({
         case 'imaging':
           if (useMCP && data.image) {
             mcpResult = await mcpAPI.analyzeImage(
-              data.image,
-              data.imageType || 'general',
+              data.image as File,
+              (data.imageType as string) || 'general',
               { modality: data.modality, clinicalContext: data.clinicalContext, provider: provider }
             );
             if (mcpResult.status === 'success') {

@@ -29,8 +29,7 @@ vi.mock('../../../api/mcpClient', () => ({
   }
 }));
 
-import AIAssistantRaw from '../AIAssistant';
-const AIAssistant = AIAssistantRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import AIAssistant from '../AIAssistant';
 import { mcpAPI } from '../../../api/mcpClient';
 
 const mcpAPIMocks = mcpAPI as unknown as {

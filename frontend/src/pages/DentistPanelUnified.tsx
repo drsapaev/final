@@ -12,8 +12,7 @@ import {
 import AppointmentSummaryBar from '../components/doctor/AppointmentSummaryBar';
 import auth from '../stores/auth';
 import { apiClient } from '../api/client';
-import AIAssistantRaw from '../components/ai/AIAssistant';
-const AIAssistant = AIAssistantRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import AIAssistant from '../components/ai/AIAssistant';
 import TeethChartRaw from '../components/dental/TeethChart';
 const TeethChart = TeethChartRaw as unknown as React.ComponentType<Record<string, unknown>>;
 import ToothModalRaw from '../components/dental/ToothModal';
@@ -38,13 +37,10 @@ import DentalTemplatesTab from '../components/dental/DentalTemplatesTab';
 import DentalDashboardTab from '../components/dental/DentalDashboardTab';
 import DentalPatientsTabRaw from '../components/dental/DentalPatientsTab';
 const DentalPatientsTab = DentalPatientsTabRaw as unknown as React.ComponentType<Record<string, unknown>>;
-import ScheduleNextModalRaw from '../components/common/ScheduleNextModal';
-const ScheduleNextModal = ScheduleNextModalRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import ScheduleNextModal from '../components/common/ScheduleNextModal';
 import SessionWarningModal from '../components/common/SessionWarningModal';
-import EnhancedAppointmentsTableRaw from '../components/tables/EnhancedAppointmentsTable';
-const EnhancedAppointmentsTable = EnhancedAppointmentsTableRaw as unknown as React.ComponentType<Record<string, unknown>>;
-import QueueIntegrationRaw from '../components/QueueIntegration';
-const QueueIntegration = QueueIntegrationRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
+import QueueIntegration from '../components/QueueIntegration';
 
 import {
   Calendar,
@@ -1859,7 +1855,7 @@ const DentistPanelUnified = () => {
       case 'queue':
         return (
           <QueueIntegration
-            specialistId={user?.doctor_id || user?.specialist_id || ''}
+            specialistId={String(user?.doctor_id || user?.specialist_id || '')}
             specialty="dentistry"
             onPatientSelect={handlePatientSelect}
             onStartVisit={(appointment) => {
