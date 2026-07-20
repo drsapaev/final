@@ -15,7 +15,7 @@ import {
   Alert,
   Progress,
   Input,
-  Select as SelectRaw,
+  Select,
   Option,
   Dialog,
   DialogTitle,
@@ -42,7 +42,6 @@ import logger from '../../utils/logger';
 import notify from '../../services/notify';
 import { convertHEICToJPEG, isHEICFile } from '../../utils/heicConverter';
 import PropTypes from 'prop-types';
-const Select = SelectRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;

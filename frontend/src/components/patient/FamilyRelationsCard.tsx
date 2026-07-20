@@ -249,12 +249,20 @@ const styles: Record<string, CSSProperties> = {
   }
 };
 
+interface FamilyRelationsCardProps {
+  patientId?: string | number | null;
+  patientName?: string;
+  canEdit?: boolean;
+  onFamilyChange?: (family?: unknown[]) => void;
+  [key: string]: unknown;
+}
+
 export default function FamilyRelationsCard({
   patientId,
   patientName,
   canEdit = false,
   onFamilyChange
-}) {
+}: FamilyRelationsCardProps) {
   // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
   const [confirmRaw, confirmDialog] = useConfirm();
   const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;

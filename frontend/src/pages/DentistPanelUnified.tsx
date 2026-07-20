@@ -73,8 +73,7 @@ import {
 } from '../utils/doctorPanelShared';
 import { useVisitLifecycle } from '../hooks/useVisitLifecycle';
 
-const LazyReportsAndAnalyticsRaw = lazy(() => import('../components/dental/ReportsAndAnalytics'));
-const LazyReportsAndAnalytics = LazyReportsAndAnalyticsRaw as unknown as React.ComponentType<Record<string, unknown>>;
+const LazyReportsAndAnalytics = lazy(() => import('../components/dental/ReportsAndAnalytics'));
 
 const API_V1_BASE = getApiBaseUrl();
 const DENTISTRY_WAITING_STATUSES = ['waiting', 'confirmed', 'pending'];
@@ -1987,7 +1986,7 @@ const DentistPanelUnified = () => {
         <LazyReportsAndAnalytics
         patientId={selectedPatient?.id}
         doctorId={user?.id}
-        clinicId={user?.clinic_id}
+        clinicId={user?.clinic_id as string | number | null | undefined}
         initialData={null}
         onSave={(reportData) => {
           logger.info('Сохранение отчета:', reportData);

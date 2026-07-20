@@ -154,8 +154,7 @@ interface EMRHookResult {
 
 export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Component = null }: EMRContainerV2Props) {
     // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
-    const [confirmRaw, confirmDialog] = useConfirm();
-  const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
+    const [confirm, confirmDialog] = useConfirm();
     const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
     const canonicalSpecialty = normalizeSpecialty(specialty);
@@ -971,7 +970,7 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                 onClose={() => setShowHelp(false)}
             />
             {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
-            {confirmDialog as unknown as React.ReactNode}
+            {confirmDialog}
         </div>
     );
 }

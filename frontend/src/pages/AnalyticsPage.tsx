@@ -7,8 +7,7 @@ import KPIMetrics from '../components/analytics/KPIMetrics';
 import AdvancedCharts from '../components/analytics/AdvancedCharts';
 
 import PredictiveAnalytics from '../components/analytics/PredictiveAnalytics';
-import AdminRouteSwitcherRaw from '../components/admin/AdminRouteSwitcher';
-const AdminRouteSwitcher = AdminRouteSwitcherRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import AdminRouteSwitcher from '../components/admin/AdminRouteSwitcher';
 import {
   Input, Button, Select, SegmentedControl,
 } from '../components/ui/macos';

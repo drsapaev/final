@@ -57,8 +57,6 @@ const ServiceChecklist = ({ value = [], onChange, department }: ServiceChecklist
   const groups = [...new Set(depServices.map(s => s.group))];
   const totalCost = depServices.filter(s => value.includes(s.id)).reduce((sum, s) => sum + s.price, 0);
 
-  const CheckboxAny = Checkbox as unknown as React.ComponentType<Record<string, unknown>>;
-
   return (
     <div style={{ border: '1px solid #e5e5e5', borderRadius: 'var(--mac-radius-md)', padding: 'var(--mac-spacing-3)', marginBottom: 'var(--mac-spacing-3)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--mac-spacing-2)' }}>
@@ -70,8 +68,7 @@ const ServiceChecklist = ({ value = [], onChange, department }: ServiceChecklist
           <div style={{ fontWeight: 'var(--mac-font-weight-medium)', fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary)', marginBottom: 'var(--mac-spacing-1)' }}>{group}</div>
           {depServices.filter(s => s.group === group).map(service => (
             <label key={service.id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)', marginBottom: 'var(--mac-spacing-1)' }}>
-              <CheckboxAny aria-label={t('misc.sc_vybrat_uslugu_service_name', { name: service.name })} checked={value.includes(service.id)} onChange={(e: unknown) => {
-                  const checked = (e as unknown as { target: { checked: boolean } }).target.checked;
+              <Checkbox aria-label={t('misc.sc_vybrat_uslugu_service_name', { name: service.name })} checked={value.includes(service.id)} onChange={(checked: boolean) => {
                   const newValue = checked
                     ? [...value, service.id]
                     : value.filter(id => id !== service.id);

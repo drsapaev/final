@@ -19,7 +19,9 @@ interface DropdownRect {
   height: number;
 }
 
-interface SelectProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'children' | 'style' | 'onChange' | 'size' | 'value' | 'defaultValue' | 'label'> {
+interface SelectProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'style' | 'onChange' | 'size' | 'value' | 'defaultValue' | 'label'> {
+  /** Optional children — used by legacy callers that wrap <option> tags inside <select> via this component. */
+  children?: ReactNode;
   options?: Array<SelectOption | SelectValue>;
   value?: SelectValue | string;
   defaultValue?: SelectValue;

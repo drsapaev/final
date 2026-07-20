@@ -37,8 +37,7 @@ import { useRegistrarData } from './registrar/useRegistrarData';
 // Decomp 5: record action handlers extracted to useRegistrarActions hook
 import { useRegistrarActions } from './registrar/useRegistrarActions';
 // Decomp 6a: QueueView extracted to component
-import QueueViewRaw from './registrar/views/QueueView';
-const QueueView = QueueViewRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import QueueView from './registrar/views/QueueView';
 // Decomp 6b: WelcomeView extracted to component
 import WelcomeView from './registrar/views/WelcomeView';
 // Strategic Direction 3: navigation helpers for canonical nested routes

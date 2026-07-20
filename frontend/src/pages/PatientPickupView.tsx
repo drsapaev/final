@@ -10,8 +10,7 @@ import { labReportingApi } from '../api/labReporting';
 import auth from '../stores/auth';
 import logger from '../utils/logger';
 import { openPrintableWindow } from '../utils/printWindow';
-import FamilyRelationsCardRaw from '../components/patient/FamilyRelationsCard';
-const FamilyRelationsCard = FamilyRelationsCardRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import FamilyRelationsCard from '../components/patient/FamilyRelationsCard';
 import {
   AppEmpty, AppError, AppLoading, Button,
 } from '../components/ui/macos';

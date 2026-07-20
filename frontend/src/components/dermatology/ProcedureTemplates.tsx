@@ -20,7 +20,7 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  Select as SelectRaw,
+  Select,
   Option,
   Textarea,
 } from '../ui/macos';
@@ -45,7 +45,6 @@ import {
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
-const Select = SelectRaw as unknown as React.ComponentType<Record<string, unknown>>;
 const ProcedureTemplates = ({ onSelectProcedure }: any) => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;

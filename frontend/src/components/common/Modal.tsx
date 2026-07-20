@@ -90,7 +90,18 @@ export function useModal() {
 /**
  * Контейнер для отображения модальных окон
  */
-function ModalContainer({ modals, onClose, theme }) {
+interface ModalEntry {
+  id: string | number;
+  closable?: boolean;
+  [key: string]: unknown;
+}
+
+interface ModalContainerProps {
+  modals: ModalEntry[];
+  onClose: (id: string | number) => void;
+  theme?: string;
+}
+function ModalContainer({ modals, onClose, theme }: ModalContainerProps) {
 
   const overlayStyle = {
     position: 'fixed',
@@ -480,7 +491,7 @@ ModalContainer.propTypes = {
   theme: PropTypes.any
 };
 
-const ModalContainerAny = ModalContainer as unknown as React.ComponentType<Record<string, unknown>>;
+const ModalContainerAny = ModalContainer;
 
 ModalItem.propTypes = {
   modal: PropTypes.object,

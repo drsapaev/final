@@ -6,10 +6,9 @@
  * Each tab shows a form + history list.
  */
 import PropTypes from 'prop-types';
-import { MacOSCard, Button, Input, Select as SelectRaw, Textarea, Badge } from '../ui/macos';
+import { MacOSCard, Button, Input, Select, Textarea, Badge } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
-const Select = SelectRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 export function DermaExamsTab({
   activeTab,
