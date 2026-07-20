@@ -10,7 +10,6 @@ import { formatLabStatus } from '../components/laboratory/labUiLabels';
 import { labReportingApi } from '../api/labReporting';
 import { getErrorMessage } from '../utils/errorHandler';
 import logger from '../utils/logger';
-import RoleNotificationCenter from '../components/notifications/RoleNotificationCenter';
 import { useSessionTimeoutWarning } from '../hooks/useSessionTimeoutWarning';
 import { useLabHotkeys } from '../hooks/useLabHotkeys';
 import notifyService from '../services/notify';
@@ -797,7 +796,6 @@ export default function LabPanel() {
             </div>
           </div>
         )}
-        <RoleNotificationCenter userRole="lab" />
     </main>
   );
 }

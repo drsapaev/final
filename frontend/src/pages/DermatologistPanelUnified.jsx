@@ -40,7 +40,6 @@ import i18n from '../i18n';
 import { useConfirm } from '../components/common/ConfirmDialog';
 import { useSessionTimeoutWarning } from '../hooks/useSessionTimeoutWarning';
 import { useDermaHotkeys } from '../hooks/useDermaHotkeys';
-import RoleNotificationCenter from '../components/notifications/RoleNotificationCenter';
 import {
   countAppointmentsByStatuses,
   getAllPatientServices,
@@ -1788,7 +1787,6 @@ const DermatologistPanelUnified = () => {
 
       {/* X-13: AIChatWidget removed — AiTab in sidebar provides the same functionality */}
 
-        <RoleNotificationCenter userRole="dermatologist" />
       </div>
     </div>);
 

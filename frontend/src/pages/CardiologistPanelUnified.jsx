@@ -40,7 +40,6 @@ import notify from '../services/notify';
 import { useTranslation } from '../i18n/useTranslation';
 // QW-10 (UX audit): shared ConfirmDialog hook used before completing a visit.
 import { useConfirm } from '../components/common/ConfirmDialog';
-import RoleNotificationCenter from '../components/notifications/RoleNotificationCenter';
 import tokenManager from '../utils/tokenManager';
 import { countAppointmentsByStatuses, SPECIALTY_KEYS, getAllPatientServices, makeEnsureCanonicalVisitId } from '../utils/doctorPanelShared';
 import { useVisitLifecycle } from '../hooks/useVisitLifecycle';
@@ -1982,7 +1981,6 @@ const MacOSCardiologistPanelUnified = () => {
         }
       {/* X-13: AIChatWidget removed — AiTab in sidebar provides the same functionality */}
 
-        <RoleNotificationCenter userRole="cardiologist" />
       </div>
     </div>);
 

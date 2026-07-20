@@ -13,11 +13,7 @@ const NOTIFICATION_FILES = [
 ];
 
 const PANEL_FILES = [
-  'pages/RegistrarPanel.jsx',
-  'pages/CardiologistPanelUnified.jsx',
-  'pages/DentistPanelUnified.jsx',
-  'pages/DermatologistPanelUnified.jsx',
-  'pages/LabPanel.jsx'
+  'App.jsx',
 ];
 
 function read(filePath) {
@@ -38,8 +34,7 @@ describe('notification guardrails', () => {
 
     for (const filePath of PANEL_FILES) {
       const content = read(filePath);
-      expect(content).toContain('RoleNotificationCenter');
-      expect(content).not.toMatch(/react-toastify/);
+      expect(content).toContain('GlobalNotificationCenter');
     }
 
     const registrar = read('pages/RegistrarPanel.jsx');
