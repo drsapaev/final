@@ -158,7 +158,7 @@ const QueueJoin = () => {
         setStep('info');
       }
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       setAvailableSpecialists([]);
       setError(getApiErrorMessage(error, QUEUE_JOIN_MESSAGES.sessionStartFailed));
       setStep('error');
@@ -202,7 +202,7 @@ const QueueJoin = () => {
 
       await startJoinSession();
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       setAvailableSpecialists([]);
       setIsSpecialistsLoading(false);
       setError(getApiErrorMessage(error, QUEUE_JOIN_MESSAGES.qrTokenUnavailable));
@@ -428,7 +428,7 @@ const QueueJoin = () => {
 
       setStep('success');
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       setError(getApiErrorMessage(error, QUEUE_JOIN_MESSAGES.joinFailed));
     } finally {
       setLoading(false);

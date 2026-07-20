@@ -396,7 +396,7 @@ const CashierPanel = () => {
           const patientName = `${patientData.last_name || ''} ${patientData.first_name || ''}`.trim();
           setQuery(patientName);
           logger.info('[Cashier] Patient loaded from URL', { patientId: patientData?.id });
-        } catch (error: any) {
+        } catch (error: unknown) {
           logger.error('[Cashier] Не удалось загрузить пациента:', error);
         }
       };
@@ -499,7 +499,7 @@ const CashierPanel = () => {
         if ((statsResult as any).success && (statsResult as any).data) {
           setStats((statsResult as any).data);
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.error('Error loading stats:', error);
         setStats({
           total_amount: 0,
@@ -544,7 +544,7 @@ const CashierPanel = () => {
           logger.warn('Error loading pending payments:', pendingResult.error);
           setAppointments([]);
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.error('Error loading pending payments:', error);
         setAppointments([]);
       }
@@ -587,7 +587,7 @@ const CashierPanel = () => {
           setPayments([]);
           setTotalPages(1);
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.error('Error loading payment history:', error);
         setPayments([]);
       }
@@ -735,7 +735,7 @@ const CashierPanel = () => {
       setPendingPage(1);
       setRefreshKey((prev) => prev + 1); // Принудительное обновление списка
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('Ошибка обработки платежа:', error);
       const message = getErrorMessage(error, tI18n('cashier.payment_process_failed'));
       setPaymentError(message);
@@ -812,7 +812,7 @@ const CashierPanel = () => {
       } else {
         notify.error(getErrorMessage(result.error, tI18n('cashier.refund_failed')));
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       notify.error(getErrorMessage(error, tI18n('cashier.cancel_failed')));
     } finally {
       setProcessingAction(null);
@@ -885,7 +885,7 @@ const CashierPanel = () => {
       } else {
         notify.error(getErrorMessage(result.error, tI18n('cashier.refund_create_failed')));
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       notify.error(getErrorMessage(error, tI18n('cashier.refund_failed')));
     } finally {
       setProcessingAction(null);
@@ -915,7 +915,7 @@ const CashierPanel = () => {
           logger.warn('[Cashier] Browser receipt print popup blocked, falling back to PDF', {
             paymentId
           });
-        } catch (error: any) {
+        } catch (error: unknown) {
           logger.error('[Cashier] Unexpected browser receipt print error:', error);
         }
       }

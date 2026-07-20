@@ -489,7 +489,7 @@ const DepartmentManagement = () => {
       document.body.removeChild(link);
 
       toast.success(t('admin2.dept_export_success'));
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('Ошибка экспорта:', error);
       toast.error(t('admin2.dept_export_failed'));
     }
@@ -584,7 +584,7 @@ const DepartmentManagement = () => {
         toast.error(errorData.detail || t('admin2.dept_import_failed'));
       }
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('Ошибка импорта:', error);
       toast.error(t('admin2.dept_read_file_failed'));
     }
@@ -651,7 +651,7 @@ const DepartmentManagement = () => {
         const errorMessage = errorData.detail || errorData.message || `HTTP ${response.status}: ${response.statusText}`;
         toast.error(t('admin2.dept_bulk_delete_error', { error: errorMessage }));
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('Ошибка массового удаления:', error);
       toast.error(t('admin2.dept_bulk_delete_failed'));
     }
@@ -687,7 +687,7 @@ const DepartmentManagement = () => {
         const errorMessage = errorData.detail || errorData.message || `HTTP ${response.status}: ${response.statusText}`;
         toast.error(activate ? t('admin2.dept_bulk_activate_error_on', { error: errorMessage }) : t('admin2.dept_bulk_activate_error_off', { error: errorMessage }));
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('Ошибка массовой активации:', error);
       toast.error(activate ? t('admin2.dept_bulk_activate_failed_on') : t('admin2.dept_bulk_activate_failed_off'));
     }

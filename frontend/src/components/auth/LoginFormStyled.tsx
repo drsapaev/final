@@ -139,17 +139,18 @@ const LoginFormStyled = () => {
       try {
         const response = await api.post('/authentication/login', credentials) as any;
         data = response.data;
-      } catch (apiErr: any) {
+      } catch (apiErr: unknown) {
         // Нормализуем ошибку axios и пробрасываем дальше.
-        const normalizedError: any = new Error(formatLoginErrorMessage({
-          responseStatus: apiErr?.response?.status,
-          responseDetail: apiErr?.response?.data?.detail,
-          responseMessage: apiErr?.response?.data?.message,
-          rawMessage: apiErr?.message,
+        const apiErrExtra = apiErr as { response?: { status?: number; data?: { detail?: string; message?: string } }; message?: string };
+        const normalizedError = new Error(formatLoginErrorMessage({
+          responseStatus: apiErrExtra?.response?.status,
+          responseDetail: apiErrExtra?.response?.data?.detail,
+          responseMessage: apiErrExtra?.response?.data?.message,
+          rawMessage: apiErrExtra?.message,
           fallbackMessage: t('misc.lfs_oshibka_avtorizatsii'),
-        }));
-        normalizedError.response = apiErr?.response;
-        normalizedError.rawMessage = apiErr?.message;
+        })) as Error & { response?: unknown; rawMessage?: string };
+        normalizedError.response = apiErrExtra?.response;
+        normalizedError.rawMessage = apiErrExtra?.message;
         throw normalizedError;
       }
 

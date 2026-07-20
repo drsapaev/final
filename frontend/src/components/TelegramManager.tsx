@@ -62,6 +62,10 @@ import {
 'lucide-react';
 import { api } from '../api/client';
 
+interface ErrorWithExtras extends Error {
+  response?: { status?: number; data?: { detail?: string | { message?: string; error?: string } } };
+}
+
 const ONBOARDING_STATUS_FILTER_OPTIONS = [
 { value: 'all', label: 'All statuses' },
 { value: 'pending_review', label: 'Pending review' },
@@ -254,8 +258,10 @@ const TelegramManager = () => {
       setTemplates(normalizedTemplates);
       await loadOnboardingRequests();
       await loadOnboardingAnalytics();
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || e?.message || t('misc.tg_err_load'));
+    } catch (e: unknown) {
+      const detail = (e as ErrorWithExtras)?.response?.data?.detail;
+      const detailStr = typeof detail === 'string' ? detail : (detail?.message ?? '');
+      setError(detailStr || (e as Error)?.message || t('misc.tg_err_load'));
     } finally {
       setLoading(false);
     }
@@ -464,10 +470,10 @@ const TelegramManager = () => {
       'ru, uz';
       setSuccess(t('misc.tg_success_patient_commands', { languages }));
       await loadTelegramData();
-    } catch (e: any) {
-      const detail = e?.response?.data?.detail;
-      const message = typeof detail === 'string' ? detail : detail?.message || detail?.error;
-      setError(message || e?.message || t('misc.tg_err_register_commands'));
+    } catch (e: unknown) {
+      const detail = (e as ErrorWithExtras)?.response?.data?.detail;
+      const message = typeof detail === 'string' ? detail : (detail?.message ?? detail?.error);
+      setError(message || (e as Error)?.message || t('misc.tg_err_register_commands'));
     } finally {
       setRegisteringCommands(false);
     }
@@ -484,10 +490,10 @@ const TelegramManager = () => {
       'read-only staff commands';
       setSuccess(t('misc.tg_success_staff_commands', { commands }));
       await loadTelegramData();
-    } catch (e: any) {
-      const detail = e?.response?.data?.detail;
+    } catch (e: unknown) {
+      const detail = (e as ErrorWithExtras)?.response?.data?.detail;
       const message = typeof detail === 'string' ? detail : detail?.message || detail?.error;
-      setError(message || e?.message || t('misc.tg_err_register_staff_commands'));
+      setError(message || (e as Error)?.message || t('misc.tg_err_register_staff_commands'));
     } finally {
       setRegisteringStaffCommands(false);
     }
@@ -2108,7 +2114,7 @@ const TelegramManager = () => {
                           variant="primary"
                           size="small">
                           
-                            {template.message_type}
+                            {template?.message_type}
                           </Badge>
                         </TableCell>
                         <TableCell>

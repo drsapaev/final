@@ -101,6 +101,11 @@ import ForceMajeureModal from '../components/registrar/ForceMajeureModal';
 import DataSourceIndicator from './registrar/DataSourceIndicator';
 import { generateCSV, downloadCSV } from './registrar/registrarCsv';
 
+interface ErrorWithExtras extends Error {
+  response?: { status?: number; data?: unknown; statusText?: string };
+  code?: string | number;
+}
+
 const RegistrarPanel = () => {
   // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
   const [confirmRaw, confirmDialog] = useConfirm();
@@ -187,9 +192,9 @@ const RegistrarPanel = () => {
 
         // UX Audit R-3.6: убрано логирование patientName (PII leak).
         logger.info('[Registrar] Загружен пациент из URL (patientId matched)');
-      } catch (error: any) {
+      } catch (error: unknown) {
         // 404 — пациент не найден, не логируем как error.
-        const status = error?.response?.status;
+        const status = (error as ErrorWithExtras)?.response?.status;
         if (status !== 404) {
           logger.error('[Registrar] Не удалось загрузить пациента:', error);
         }
@@ -530,8 +535,8 @@ const RegistrarPanel = () => {
           setDataSource('api');
         });
       }
-    } catch (error: any) {
-      if (error?.response?.status === 429) {
+    } catch (error: unknown) {
+      if ((error as ErrorWithExtras)?.response?.status === 429) {
         autoRefreshCooldownUntilRef.current = Date.now() + 60_000;
         autoRefreshCooldownLoggedRef.current = false;
         logger.warn('⏳ Регистраторская очередь ограничена по частоте, включаем cooldown на 60с', {
@@ -542,7 +547,7 @@ const RegistrarPanel = () => {
       }
 
       // Handle axios errors
-      if (error.response?.status === 401) {
+      if ((error as ErrorWithExtras)?.response?.status === 401) {
         // Токен недействителен
         logger.warn('Токен недействителен (401), очищаем и показываем ошибку');
         sessionStorage.removeItem('auth_token');  // PR-39 / P0-2;
@@ -553,7 +558,7 @@ const RegistrarPanel = () => {
         });
       } else {
         // Other errors (network, 404, 500, etc.)
-        logger.error('❌ Backend недоступен для загрузки записей:', error.message);
+        logger.error('❌ Backend недоступен для загрузки записей:', (error as Error)?.message);
         logger.error('❌ Детали ошибки:', error);
         startTransition(() => {
           if (!silent) setDataSource('error');
@@ -678,7 +683,7 @@ const RegistrarPanel = () => {
     try {
       logger.info('RegistrarPanel: load-more delegates to canonical queue loader');
       await loadAppointments({ source: 'load_more', silent: true });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('Ошибка загрузки дополнительных записей:', error);
     } finally {
       setPaginationInfo((prev) => ({ ...prev, loadingMore: false }));
@@ -1838,7 +1843,7 @@ const RegistrarPanel = () => {
               notify.warning('Cancelled ' + successCount + '; failed ' + failedCount);
             }
             await loadAppointments({ silent: true, source: 'cancel_complete' } as any);
-          } catch (error: any) {
+          } catch (error: unknown) {
             logger.error('RegistrarPanel: cancellation failed:', error);
             notify.error(getErrorMessage(error, 'Could not cancel record. Check connection and try again.'));
             throw error;
@@ -1981,7 +1986,7 @@ const RegistrarPanel = () => {
                 logger.error('Post-wizard reload retry also failed:', retryError);
               }
             }
-          } catch (error: any) {
+          } catch (error: unknown) {
             logger.error('Error refreshing data after wizard completion:', error);
             // Не показываем ошибку пользователю, так как запись уже создана
             setShowWizard(false);
@@ -2037,7 +2042,7 @@ const RegistrarPanel = () => {
                 setCustomRescheduleDate('');
                 setCustomRescheduleTime('');
                 loadAppointments({ source: 'reschedule_tomorrow' });
-              } catch (e: any) {
+              } catch (e: unknown) {
                 logger.error('Ошибка переноса на завтра:', e);
                 notify.error(getErrorMessage(e, tI18n('registrarPanel.rp_err_reschedule_failed')));
               }
@@ -2108,7 +2113,7 @@ const RegistrarPanel = () => {
                 setCustomRescheduleDate('');
                 setCustomRescheduleTime('');
                 loadAppointments({ source: 'reschedule_date' });
-              } catch (e: any) {
+              } catch (e: unknown) {
                 logger.error('Ошибка переноса на дату:', e);
                 notify.error(getErrorMessage(e, tI18n('registrarPanel.rp_err_reschedule_failed')));
               }
