@@ -248,7 +248,7 @@ function normalizeClinicBrandingSettings(settings) {
   return normalized;
 }
 
-function resolveQrPayload(row: any, overrides: any = {}): any {
+function resolveQrPayload(row: Record<string, unknown>, overrides: Record<string, unknown> = {}): any {
   return getFirstDefined(
     overrides.qrPayload,
     overrides.qrUrl,
@@ -263,7 +263,7 @@ function resolveQrPayload(row: any, overrides: any = {}): any {
   );
 }
 
-function resolveClinicLogo(row: any, overrides: any = {}, branding: any = {}): any {
+function resolveClinicLogo(row: Record<string, unknown>, overrides: Record<string, unknown> = {}, branding: Record<string, unknown> = {}): any {
   return getFirstDefined(
     overrides.logoUrl,
     row?.logo_url,
@@ -272,7 +272,7 @@ function resolveClinicLogo(row: any, overrides: any = {}, branding: any = {}): a
   );
 }
 
-function resolveClinicName(row: any, overrides: any = {}, branding: any = {}): any {
+function resolveClinicName(row: Record<string, unknown>, overrides: Record<string, unknown> = {}, branding: Record<string, unknown> = {}): any {
   return getFirstDefined(
     overrides.clinicName,
     row?.clinic_name,
@@ -282,7 +282,7 @@ function resolveClinicName(row: any, overrides: any = {}, branding: any = {}): a
   );
 }
 
-function resolveServicePrice(row: any, overrides: any = {}): any {
+function resolveServicePrice(row: Record<string, unknown>, overrides: Record<string, unknown> = {}): any {
   return getFirstDefined(
     overrides.servicePrice,
     row?.service_price,
@@ -329,7 +329,7 @@ function normalizeDisplayLabel(value) {
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-function normalizeTicketSources(row: any, overrides: any = {}): any {
+function normalizeTicketSources(row: Record<string, unknown>, overrides: Record<string, unknown> = {}): any {
   const explicitSources = Array.isArray(overrides.printTickets)
     ? overrides.printTickets.filter(Boolean)
     : null;
@@ -348,7 +348,7 @@ function normalizeTicketSources(row: any, overrides: any = {}): any {
   return [];
 }
 
-function resolveServicePriceForTicket(row: any, source: any, overrides: any = {}): any {
+function resolveServicePriceForTicket(row: Record<string, unknown>, source: Record<string, unknown>, overrides: Record<string, unknown> = {}): any {
   const directPrice = getFirstDefined(
     overrides.servicePrice,
     source?.service_price,
@@ -403,7 +403,7 @@ function resolveServicePriceForTicket(row: any, source: any, overrides: any = {}
   return null;
 }
 
-function resolveTicketCabinet(row: any, source: any = null, overrides: any = {}): any {
+function resolveTicketCabinet(row: Record<string, unknown>, source: Record<string, unknown> = null, overrides: Record<string, unknown> = {}): any {
   return getFirstDefined(
     overrides.cabinet,
     source?.cabinet,
@@ -420,7 +420,7 @@ function resolveTicketCabinet(row: any, source: any = null, overrides: any = {})
   );
 }
 
-function buildPanelTicketPayloadForSource(row: any, source: any, overrides: any = {}): any {
+function buildPanelTicketPayloadForSource(row: Record<string, unknown>, source: Record<string, unknown>, overrides: Record<string, unknown> = {}): any {
   const mergedRow = {
     ...row,
     ...(source && typeof source === 'object' ? source : {}),
@@ -513,7 +513,7 @@ function buildPanelTicketPayloadForSource(row: any, source: any, overrides: any 
   return buildPanelTicketPayload(mergedRow, overrides);
 }
 
-export function resolvePanelTicketPayloads(row: any, overrides: any = {}): any {
+export function resolvePanelTicketPayloads(row: Record<string, unknown>, overrides: Record<string, unknown> = {}): any {
   const ticketSources = normalizeTicketSources(row, overrides);
   if (ticketSources.length === 0) {
     return [buildPanelTicketPayload(row, overrides)];
@@ -542,7 +542,7 @@ export function resolvePanelTicketPayloads(row: any, overrides: any = {}): any {
   return payloads.length > 0 ? payloads : [buildPanelTicketPayload(row, overrides)];
 }
 
-export function buildPanelTicketPayload(row: any, overrides: any = {}): any {
+export function buildPanelTicketPayload(row: Record<string, unknown>, overrides: Record<string, unknown> = {}): any {
   const queueNumber = resolveQueueNumber(row);
   if (!queueNumber) {
     logger.warn('[PanelPrint] Queue number missing in row payload', {
@@ -634,7 +634,7 @@ function renderTicketQrMarkup(qrPayload, visible) {
   return `<div class="qr-wrap">${qrSvg}</div>`;
 }
 
-function renderPanelTicketMarkup(payload: any, settings: any, branding: any, issuedAt: any): string {
+function renderPanelTicketMarkup(payload: Record<string, unknown>, settings: Record<string, unknown>, branding: Record<string, unknown>, issuedAt: unknown): string {
   const clinicName = resolveClinicName(payload, {}, branding);
   const logoUrl = resolveClinicLogo(payload, {}, branding);
   const servicePrice = resolveServicePrice(payload);
@@ -846,7 +846,7 @@ function renderPanelTicketErrorHtml(message, details = '') {
   `;
 }
 
-async function loadPanelTicketRenderContext(row: any, overrides: any = {}): Promise<any> {
+async function loadPanelTicketRenderContext(row: Record<string, unknown>, overrides: Record<string, unknown> = {}): Promise<any> {
   const payloads = resolvePanelTicketPayloads(row, overrides);
 
   const [ticketSettingsResult, clinicSettingsResult] = await Promise.allSettled([
@@ -867,7 +867,7 @@ async function loadPanelTicketRenderContext(row: any, overrides: any = {}): Prom
   return { payloads, settings, branding };
 }
 
-export async function buildPanelTicketPrintableHtml(row: any, overrides: any = {}): Promise<any> {
+export async function buildPanelTicketPrintableHtml(row: Record<string, unknown>, overrides: Record<string, unknown> = {}): Promise<any> {
   const { payloads, settings, branding } = await loadPanelTicketRenderContext(row, overrides);
   return renderPanelTicketHtml(payloads, settings, branding);
 }
@@ -902,7 +902,7 @@ function renderPrintableErrorWindow(printWindow, error, row) {
   }
 }
 
-export async function printPanelTicketInBrowserAsync(row: any, overrides: any = {}): Promise<any> {
+export async function printPanelTicketInBrowserAsync(row: Record<string, unknown>, overrides: Record<string, unknown> = {}): Promise<any> {
   const printWindow = window.open('', '_blank', 'width=420,height=720');
 
   if (!printWindow) {
@@ -919,12 +919,12 @@ export async function printPanelTicketInBrowserAsync(row: any, overrides: any = 
   }
 }
 
-export function printPanelTicketInBrowser(row: any, overrides: any = {}): any {
+export function printPanelTicketInBrowser(row: Record<string, unknown>, overrides: Record<string, unknown> = {}): any {
   void printPanelTicketInBrowserAsync(row, overrides);
   return true;
 }
 
-export async function printPanelTicket(row: any, overrides: any = {}): Promise<any> {
+export async function printPanelTicket(row: Record<string, unknown>, overrides: Record<string, unknown> = {}): Promise<any> {
   const result = await printPanelTicketInBrowserAsync(row, overrides);
   if (!result?.opened) {
     throw new Error('Браузер заблокировал окно печати. Разрешите всплывающие окна для приложения и повторите печать.');
@@ -1136,7 +1136,7 @@ export function buildPanelReceiptPrintableHtml(receiptPayload) {
   `;
 }
 
-export function printPanelReceiptInBrowser(receiptPayload: any): boolean {
+export function printPanelReceiptInBrowser(receiptPayload: Record<string, unknown>): boolean {
   return openPrintableWindow({
     features: 'width=720,height=900',
     html: buildPanelReceiptPrintableHtml(receiptPayload),
