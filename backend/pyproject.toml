@@ -134,7 +134,7 @@ dependencies = [
   "arq>=0.26.0,<0.27",
 
   # Security: rate limiting & file validation
-  "slowapi==0.1.9",
+  "slowapi==0.1.10",
   "python-magic==0.4.27",
 ]
 
