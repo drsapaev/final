@@ -121,7 +121,6 @@ export function useEMR(visitId, { autoLoad = true, specialty = 'general' } = {})
         const loadPromise = (async () => {
             try {
                 const response = await apiClient.get(`/v2/emr/${visitId}`, {
-                    // @ts-expect-error — silent is a custom axios property not in AxiosRequestConfig type
                     silent: true,
                     validateStatus: (status) => status === 404 || (status >= 200 && status < 300),
                 });

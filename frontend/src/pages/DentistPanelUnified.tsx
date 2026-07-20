@@ -187,12 +187,12 @@ const DentistPanelUnified = () => {
     () => loadStoredDentistDocuments().visitProtocols
   );
   const [scheduleNextModal, setScheduleNextModal] = useState({ open: false, patient: null });
-  const [protocolTemplateDraft, setProtocolTemplateDraft] = useState(null as any);
+  const [protocolTemplateDraft, setProtocolTemplateDraft] = useState<Record<string, unknown> | null>(null);
 
   // Состояния для таблицы записей
   const [appointmentsTableData, setAppointmentsTableData] = useState([]);
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
-  const [services, setServices] = useState({} as any);
+  const [services, setServices] = useState<Record<string, unknown>>({});
   const appointmentsTableDataRef = useRef([]);
   const appointmentsLoadPromiseRef = useRef(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -207,7 +207,7 @@ const DentistPanelUnified = () => {
   const [showProtocolTemplates, setShowProtocolTemplates] = useState(false);
   const [showReports, setShowReports] = useState(false);
   // Phase 4+ cleanup: showTreatmentForm/showProstheticForm removed (dead UI).
-  const [dentalChartData, setDentalChartData] = useState(null as any);
+  const [dentalChartData, setDentalChartData] = useState<Record<string, unknown> | null>(null);
 
   // P-022 (workflow audit): wire useVisitLifecycle so the in-memory cache
   // is invalidated when the doctor switches between visits or patients.
@@ -241,8 +241,8 @@ const DentistPanelUnified = () => {
   });
   // Состояние для DentalPriceManager
   const [showPriceManager, setShowPriceManager] = useState(false);
-  const [selectedServiceForPrice, setSelectedServiceForPrice] = useState(null as any);
-  const [selectedTooth, setSelectedTooth] = useState(null as any);
+  const [selectedServiceForPrice, setSelectedServiceForPrice] = useState<{ id?: string | number; name?: string; price?: number; [key: string]: unknown } | null>(null);
+  const [selectedTooth, setSelectedTooth] = useState<{ number: string | number; data: unknown } | string | number | null>(null);
   const [toothModalOpen, setToothModalOpen] = useState(false);
 
   useEffect(() => {
@@ -255,7 +255,7 @@ const DentistPanelUnified = () => {
         DENTIST_DOCUMENTS_STORAGE_KEY,
         JSON.stringify({ visitProtocols: savedVisitProtocols })
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.warn('[Dentist] Не удалось сохранить локальные протоколы визита:', error);
     }
   }, [savedVisitProtocols]);
@@ -291,16 +291,16 @@ const DentistPanelUnified = () => {
         const response = await apiClient.get(`/v2/emr/patient/${patientId}`, {
           params: { limit: 20 },
           silent: true,
-        } as any);
+        });
 
         const summaries = Array.isArray(response.data) ? response.data : [];
         const records = await Promise.all(
           summaries.map(async (summary) => {
             try {
               const emrResponse = await apiClient.get(`/v2/emr/${summary.visit_id}`, {
-                silent: true as any,
+                silent: true,
                 validateStatus: (status) => status === 404 || (status >= 200 && status < 300),
-              } as any);
+              });
 
               if (emrResponse.status === 404) {
                 return null;
@@ -316,11 +316,11 @@ const DentistPanelUnified = () => {
               }
 
               return protocolRecord;
-            } catch (error: any) {
+            } catch (error: unknown) {
               logger.warn('[Dentist] Не удалось загрузить EMR визита для протокола', {
                 patientId,
                 visitId: summary.visit_id,
-                error: error?.message || error,
+                error: (error as Error)?.message || error,
               });
               return null;
             }
@@ -330,7 +330,7 @@ const DentistPanelUnified = () => {
         const filteredRecords = records.filter(Boolean);
         dentistVisitProtocolsCache.set(cacheKey, filteredRecords);
         return filteredRecords;
-      } catch (error: any) {
+      } catch (error: unknown) {
         dentistVisitProtocolsCache.delete(cacheKey);
         throw error;
       } finally {
@@ -349,9 +349,9 @@ const DentistPanelUnified = () => {
 
     try {
       const response = await apiClient.get(`/v2/emr/${visitId}`, {
-        silent: true as any,
+        silent: true,
         validateStatus: (status) => status === 404 || (status >= 200 && status < 300),
-      } as any);
+      });
 
       if (response.status === 404) {
         return null;
@@ -369,17 +369,17 @@ const DentistPanelUnified = () => {
       });
 
       return protocolRecord;
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.warn('[Dentist] Не удалось загрузить протокол визита из EMR v2', {
         visitId,
-        error: error?.message || error,
+        error: (error as Error)?.message || error,
       });
       return null;
     }
   }, []);
 
   // Формы данных
-  const [examinationForm, setExaminationForm] = useState({
+  const [examinationForm, setExaminationForm] = useState<Record<string, string>>({
     patient_id: '',
     examination_date: '',
     oral_hygiene: '',
@@ -391,7 +391,7 @@ const DentistPanelUnified = () => {
     gingival_bleeding: '',
     diagnosis: '',
     recommendations: ''
-  } as any);
+  });
 
 
 
@@ -411,7 +411,7 @@ const DentistPanelUnified = () => {
   // STRAT#34: useTranslation adapter for confirm/notify i18n.
   const { t: tI18n } = useTranslation();
   // C-2 (UX audit): session timeout warning
-  const [sessionWarning, setSessionWarning] = useState(null as any);
+  const [sessionWarning, setSessionWarning] = useState<{ active: boolean } | null>(null);
 
   useSessionTimeoutWarning({
     onWarning: () => setSessionWarning({ active: true }),
@@ -458,7 +458,7 @@ const DentistPanelUnified = () => {
         }
 
         return null;
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.error('[Dentist] Ошибка загрузки услуг:', error);
         return null;
       }
@@ -589,7 +589,7 @@ const DentistPanelUnified = () => {
 
         logger.error('Ошибка загрузки очередей:', response.status);
         return [];
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.error('Ошибка загрузки записей стоматолога:', error);
         return [];
       } finally {
@@ -696,7 +696,7 @@ const DentistPanelUnified = () => {
             logger.info('[Dentist] Пациент вызван:', row.patient_fio);
             await loadDentistryAppointments(true);
           }
-        } catch (error: any) {
+        } catch (error: unknown) {
           logger.error('[Dentist] Ошибка вызова пациента:', error);
         }
         break;
@@ -711,9 +711,9 @@ const DentistPanelUnified = () => {
             specialtyName: tI18n('dental.dental_panel_specialty_name')
           });
           notify.success(printResult?.message || tI18n('dental.dental_panel_ticket_printed', { name: row.patient_fio }));
-        } catch (error: any) {
+        } catch (error: unknown) {
           logger.error('[Dentist] Ошибка печати талона:', error);
-          notify.error(error.message || tI18n('dental.dental_panel_ticket_print_failed'));
+          notify.error((error as Error)?.message || tI18n('dental.dental_panel_ticket_print_failed'));
         }
         break;
       case 'complete':
@@ -739,7 +739,7 @@ const DentistPanelUnified = () => {
           logger.info('[Dentist] Завершение приёма для:', patient.patient_name);
           setSelectedPatient(patient);
           handleTabChange('visit');
-        } catch (error: any) {
+        } catch (error: unknown) {
           logger.error('[Dentist] Ошибка при завершении приёма:', error);
         }
         break;
@@ -784,7 +784,7 @@ const DentistPanelUnified = () => {
       if (refreshedPatients.length > 0) {
         setPatients(refreshedPatients);
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       logger.error('Ошибка загрузки пациентов:', e);
     }
   }, [loadDentistryAppointments, tI18n]);
@@ -821,7 +821,7 @@ const DentistPanelUnified = () => {
         loadPatients(),
         loadServices(),
       ]);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('Ошибка загрузки данных:', error);
     } finally {
       setLoading(false);
@@ -850,10 +850,10 @@ const DentistPanelUnified = () => {
         }
 
         setSavedVisitProtocols((prev) => mergeDentistVisitProtocolCards(prev, backendProtocols));
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.warn('[Dentist] Не удалось синхронизировать историю протоколов из EMR v2', {
           patientId: selectedPatientIdForProtocols,
-          error: error?.message || error,
+          error: (error as Error)?.message || error,
         });
       }
     };
@@ -959,7 +959,7 @@ const DentistPanelUnified = () => {
             logger.info('[Dentist] Пациент из URL не найден в очереди, использую безопасный URL-fallback:', patientObj.patient_name);
           }
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.error('[Dentist] Не удалось загрузить пациента из URL:', error);
       }
     };
@@ -1160,10 +1160,10 @@ const DentistPanelUnified = () => {
         logger.warn('[Dentistry] callNextWaiting(dentistry): failed', err);
         // Не блокируем UI: визит уже завершён, просто информируем
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('[Dentistry] handleCompleteVisit: error', error);
       notify.error(
-        error?.message || tI18n('dental.dental_panel_complete_failed')
+        (error as Error)?.message || tI18n('dental.dental_panel_complete_failed')
       );
     } finally {
       logger.info('[Dentistry] handleCompleteVisit: finish');
@@ -1367,11 +1367,11 @@ const DentistPanelUnified = () => {
 
       setSavedVisitProtocols((prev) => upsertDentistVisitProtocol(prev, backendRecord));
       return backendRecord;
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.warn('[Dentist] Не удалось сохранить протокол визита в EMR v2, сохраняю локальный кеш', {
         visitId: patient.visit_id,
         patientName,
-        error: error?.message || error,
+        error: (error as Error)?.message || error,
       });
 
       setSavedVisitProtocols((prev) => upsertDentistVisitProtocol(prev, localRecord));
@@ -1442,7 +1442,7 @@ const DentistPanelUnified = () => {
         });
         loadDentistryAppointments(true);
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       logger.error('Ошибка сохранения осмотра:', e);
     }
   };
@@ -1588,10 +1588,10 @@ const DentistPanelUnified = () => {
           className="dental-card-btn"
           onClick={() => handleExamination(patient)}
           onKeyDown={(event) => handleCardKeyDown(event, () => handleExamination(patient))}
-          onMouseEnter={(e: any) => {
+          onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
             e.currentTarget.style.background = 'var(--mac-bg-secondary)';
           }}
-          onMouseLeave={(e: any) => {
+          onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
             e.currentTarget.style.background = 'transparent';
           }}>
 
@@ -1632,10 +1632,10 @@ const DentistPanelUnified = () => {
           className="dental-card-btn"
           onClick={() => handleDiagnosis(patient)}
           onKeyDown={(event) => handleCardKeyDown(event, () => handleDiagnosis(patient))}
-          onMouseEnter={(e: any) => {
+          onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
             e.currentTarget.style.background = 'var(--mac-bg-secondary)';
           }}
-          onMouseLeave={(e: any) => {
+          onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
             e.currentTarget.style.background = 'transparent';
           }}>
 
@@ -1693,10 +1693,10 @@ const DentistPanelUnified = () => {
               className="dental-card-btn"
               onClick={() => handleVisitProtocol(patient)}
               onKeyDown={(event) => handleCardKeyDown(event, () => handleVisitProtocol(patient))}
-              onMouseEnter={(e: any) => {
+              onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
                 e.currentTarget.style.background = 'var(--mac-bg-secondary)';
               }}
-              onMouseLeave={(e: any) => {
+              onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
                 e.currentTarget.style.background = 'transparent';
               }}>
 
@@ -1738,10 +1738,10 @@ const DentistPanelUnified = () => {
           className="dental-card-btn"
           onClick={() => handlePhotoArchive(patient)}
           onKeyDown={(event) => handleCardKeyDown(event, () => handlePhotoArchive(patient))}
-          onMouseEnter={(e: any) => {
+          onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
             e.currentTarget.style.background = 'var(--mac-bg-secondary)';
           }}
-          onMouseLeave={(e: any) => {
+          onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
             e.currentTarget.style.background = 'transparent';
           }}>
 
@@ -1795,10 +1795,10 @@ const DentistPanelUnified = () => {
           className="dental-card-btn"
           onClick={() => handleDentalChart(patient)}
           onKeyDown={(event) => handleCardKeyDown(event, () => handleDentalChart(patient))}
-          onMouseEnter={(e: any) => {
+          onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
             e.currentTarget.style.background = 'var(--mac-bg-secondary)';
           }}
-          onMouseLeave={(e: any) => {
+          onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
             e.currentTarget.style.background = 'transparent';
           }}>
 
@@ -2008,11 +2008,11 @@ const DentistPanelUnified = () => {
               onClick={() => setShowDentalChart(false)}
               aria-label={tI18n('dental.dental_panel_chart_modal_close', { name: selectedPatientDisplayName })}
               className="dental-text-desc dental-text-secondary"
-              onMouseEnter={(e: any) => {
+              onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
                 e.currentTarget.style.color = 'var(--mac-text-primary)';
                 e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)';
               }}
-              onMouseLeave={(e: any) => {
+              onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
                 e.currentTarget.style.color = 'var(--mac-text-secondary)';
                 e.currentTarget.style.backgroundColor = 'transparent';
               }}>
@@ -2045,11 +2045,11 @@ const DentistPanelUnified = () => {
               onClick={() => setShowTreatmentPlanner(false)}
               aria-label={tI18n('dental.dental_panel_plan_modal_close', { name: selectedPatientDisplayName })}
               className="dental-text-desc dental-text-secondary"
-              onMouseEnter={(e: any) => {
+              onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
                 e.currentTarget.style.color = 'var(--mac-text-primary)';
                 e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)';
               }}
-              onMouseLeave={(e: any) => {
+              onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
                 e.currentTarget.style.color = 'var(--mac-text-secondary)';
                 e.currentTarget.style.backgroundColor = 'transparent';
               }}>
@@ -2253,8 +2253,8 @@ const DentistPanelUnified = () => {
           setToothModalOpen(false);
           setSelectedTooth(null);
         }}
-        toothNumber={selectedTooth.number}
-        toothData={selectedTooth.data}
+        toothNumber={(selectedTooth as { number?: string | number } | null | undefined)?.number}
+        toothData={(selectedTooth as { data?: unknown } | null | undefined)?.data}
         onSave={(toothNumber, data) => {
           logger.info('Сохранение данных зуба:', toothNumber, data);
           // Обновляем данные зубной карты
