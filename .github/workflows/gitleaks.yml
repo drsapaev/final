@@ -29,7 +29,7 @@ jobs:
 
       - name: Run gitleaks
         id: gitleaks
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Optional: set GITLEAKS_LICENSE for org-wide config / private repos.
