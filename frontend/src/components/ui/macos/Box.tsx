@@ -7,7 +7,7 @@ interface BoxProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'children'
   children?: ReactNode;
   style?: CSSProperties;
   /** Style overrides. Accepts both CSSProperties and MUI-style shorthand (mb, mt, bgcolor, etc.). */
-  sx?: CSSProperties & Record<string, unknown>;
+  sx?: CSSProperties | Record<string, unknown>;
   display?: CSSProperties['display'];
   alignItems?: CSSProperties['alignItems'];
   justifyContent?: CSSProperties['justifyContent'];
