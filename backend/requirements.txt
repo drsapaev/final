@@ -1,5 +1,5 @@
 fastapi>=0.121,<0.136
-uvicorn[standard]>=0.29,<0.48
+uvicorn[standard]>=0.29,<0.52
 pydantic>=2.7,<2.13
 pydantic-settings>=2.14.1,<2.15
 SQLAlchemy>=2.0,<2.1
