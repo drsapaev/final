@@ -52,13 +52,19 @@ const ReportsManager = () => {
   const [availableReports, setAvailableReports] = useState([]);
 
   // Состояние для генерации отчетов
-  const [reportForm, setReportForm] = useState({
+  const [reportForm, setReportForm] = useState<{
+    type: string;
+    format: string;
+    start_date: string;
+    end_date: string;
+    filters: Record<string, unknown>;
+  }>({
     type: '',
     format: 'excel',
     start_date: '',
     end_date: '',
     filters: {}
-  } as any);
+  });
 
   // Состояние для быстрых отчетов
   const [quickReports, setQuickReports] = useState({ daily: null });
@@ -71,12 +77,12 @@ const ReportsManager = () => {
 
   const loadAvailableReports = async () => {
     try {
-      const response = await api.get('/reports/available-reports') as any;
+      const response = (await api.get('/reports/available-reports')) as import('axios').AxiosResponse<{ reports?: Array<{ type?: string; name?: string; [k: string]: unknown }> }>;
       const reports = response.data?.reports || [];
       setAvailableReports(reports);
       setReportForm((prev) => ({
         ...prev,
-        type: reports.some((report) => report.type === prev.type) ? prev.type : ''
+        type: reports.some((report) => (report as { type?: string }).type === prev.type) ? prev.type : ''
       }));
     } catch (error) {
       logger.error('Failed to load available reports:', error);
@@ -88,7 +94,7 @@ const ReportsManager = () => {
 
   const loadReportFiles = async () => {
     try {
-      const response = await api.get('/reports/files') as any;
+      const response = (await api.get('/reports/files')) as import('axios').AxiosResponse<{ files?: Array<{ filename?: string; size?: number; created_at?: string; [k: string]: unknown }> }>;
       setFiles(response.data?.files || []);
     } catch (error) {
       logger.error('Ошибка загрузки файлов отчетов:', error);
@@ -103,7 +109,7 @@ const ReportsManager = () => {
       // endpoints do not exist (verified via backend/openapi.json), so the
       // weekly/monthly KPI cards showed a perpetual loading spinner. Removed
       // those cards; this loader now only fetches daily.
-      const response = await api.get('/reports/daily-summary') as any;
+      const response = (await api.get('/reports/daily-summary')) as import('axios').AxiosResponse<Record<string, unknown>>;
       setQuickReports((prev) => ({ ...prev, daily: response.data }));
     } catch (error) {
       logger.error('Ошибка загрузки быстрых отчетов:', error);
@@ -133,7 +139,7 @@ const ReportsManager = () => {
         end_date: reportForm.end_date || null,
         format: reportForm.format,
         filters: reportForm.filters
-      }) as any;
+      }) as import('axios').AxiosResponse<Record<string, unknown>>;
 
       const data = response.data;
       if (data.success) {
@@ -145,7 +151,7 @@ const ReportsManager = () => {
         // Показываем результат
         setReports((prev) => [data, ...prev]);
       } else {
-        toast.error(data.error || t('admin2.rm_report_generation_error'));
+        toast.error(String(data.error || t('admin2.rm_report_generation_error')));
       }
     } catch (error) {
       logger.error('Ошибка генерации отчета:', error);
@@ -178,8 +184,7 @@ const ReportsManager = () => {
   const downloadFile = async (filename) => {
     try {
       const response = await api.get(`/reports/download/${filename}`, {
-        responseType: 'blob'
-      }) as any;
+        responseType: 'blob' }) as import('axios').AxiosResponse<BlobPart>;
 
       const blob = new Blob([response.data]);
       const url = window.URL.createObjectURL(blob);
@@ -212,8 +217,8 @@ const ReportsManager = () => {
     }
 
     try {
-      const response = await api.post('/reports/cleanup') as any;
-      toast.success(response.data?.message || t('admin2.rm_files_cleaned_success'));
+      const response = (await api.post('/reports/cleanup')) as import('axios').AxiosResponse<Record<string, unknown>>;
+      toast.success(String(response.data?.message ?? '') || t('admin2.rm_files_cleaned_success'));
       loadReportFiles();
     } catch (error) {
       logger.error('Ошибка очистки файлов:', error);
@@ -237,7 +242,7 @@ const ReportsManager = () => {
             value={reportForm.type}
             onChange={(value) => setReportForm((prev) => ({ ...prev, type: value }))}
             options={availableReports.map((report) => ({
-              value: report.type,
+              value: (report as { type?: string }).type,
               label: report.name
             }))}
             size="large"
@@ -334,7 +339,7 @@ const ReportsManager = () => {
         {
           key: 'type',
           header: t('admin2.rm_col_type'),
-          render: (value: any) =>
+          render: (value: unknown) =>
           <span className="admin-text-med-primary">
                     {availableReports.find((r) => r.type === value)?.name || value}
                   </span>
@@ -343,9 +348,9 @@ const ReportsManager = () => {
         {
           key: 'generated_at',
           header: t('admin2.rm_col_generated_at'),
-          render: (value: any) =>
+          render: (value: unknown) =>
           <span className="admin-span-13-secondary">
-                    {new Date(value).toLocaleString()}
+                    {new Date(String(value)).toLocaleString()}
                   </span>
 
         },
@@ -353,20 +358,20 @@ const ReportsManager = () => {
           key: 'actions',
           header: t('admin2.rm_col_actions'),
           align: 'right',
-          render: (row: any) =>
+          render: (row: unknown) =>
           <Button
             type="button"
             size="small"
             variant="outline"
-            title={t('admin2.rm_download_report_aria', { filename: row.filename })}
-            aria-label={t('admin2.rm_download_report_aria', { filename: row.filename })}
-            onClick={() => downloadFile(row.filename)}>
+            title={t('admin2.rm_download_report_aria', { filename: (row as { filename?: string }).filename })}
+            aria-label={t('admin2.rm_download_report_aria', { filename: (row as { filename?: string }).filename })}
+            onClick={() => downloadFile((row as { filename?: string }).filename)}>
                     <Download aria-hidden="true" className="w-4 h-4" />
                   </Button>
 
         }]
         }
-        data={reports.slice(0, 5) as any[]}
+        data={reports.slice(0, 5) as Record<string, unknown>[]}
         hoverable={true}
         striped={true} />
 
@@ -419,11 +424,11 @@ const ReportsManager = () => {
         {
           key: 'filename',
           header: t('admin2.rm_col_file'),
-          render: (value: any) =>
+          render: (value: unknown) =>
           <div className="admin-flex-center-gap-10">
                     <FileText className="admin-icon-18-tertiary" />
                     <span className="admin-text-med-primary">
-                      {value}
+                      {String(value ?? '')}
                     </span>
                   </div>
 
@@ -431,7 +436,7 @@ const ReportsManager = () => {
         {
           key: 'size',
           header: t('admin2.rm_col_size'),
-          render: (value: any) =>
+          render: (value: unknown) =>
           <span className="admin-span-13-secondary">
                     {formatFileSize(value)}
                   </span>
@@ -440,9 +445,9 @@ const ReportsManager = () => {
         {
           key: 'created_at',
           header: t('admin2.rm_col_created'),
-          render: (value: any) =>
+          render: (value: unknown) =>
           <span className="admin-span-13-secondary">
-                    {new Date(value).toLocaleString()}
+                    {new Date(String(value)).toLocaleString()}
                   </span>
 
         },
@@ -450,21 +455,21 @@ const ReportsManager = () => {
           key: 'actions',
           header: t('admin2.rm_col_actions'),
           align: 'right',
-          render: (row: any) =>
+          render: (row: unknown) =>
           <Button
             type="button"
             size="small"
             variant="ghost"
-            title={t('admin2.rm_download_file_aria', { filename: row.filename })}
-            aria-label={t('admin2.rm_download_file_aria', { filename: row.filename })}
-            onClick={() => downloadFile(row.filename)}>
+            title={t('admin2.rm_download_file_aria', { filename: (row as { filename?: string }).filename })}
+            aria-label={t('admin2.rm_download_file_aria', { filename: (row as { filename?: string }).filename })}
+            onClick={() => downloadFile((row as { filename?: string }).filename)}>
 
                     <Download aria-hidden="true" className="admin-icon-18-secondary" />
                   </Button>
 
         }]
         }
-        data={files as any[]}
+        data={files as Record<string, unknown>[]}
         hoverable={true}
         striped={true} />
 
