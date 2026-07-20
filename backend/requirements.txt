@@ -46,7 +46,7 @@ arq>=0.26.0,<0.27
 defusedxml>=0.7.1,<0.8
 
 # F-005: Rate limiting for chat REST endpoints
-slowapi==0.1.9
+slowapi==0.1.10
 
 # F-003: Magic bytes validation for audio uploads
 # System dependency required: apt-get install libmagic1 (see Dockerfile)
