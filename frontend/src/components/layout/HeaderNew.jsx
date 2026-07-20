@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import ReactDOM from 'react-dom';
 import { Sun as LSun, Moon as LMoon, Monitor as LMonitor, Rainbow as LRainbow, Layers as LLayers, Sparkles as LSparkles, Bell as BellIcon } from 'lucide-react';
+import { useNotificationCenter } from '../../contexts/NotificationCenterContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import auth, { setProfile } from '../../stores/auth.js';
 import { useTheme } from '../../contexts/ThemeContext.jsx';
@@ -43,6 +44,7 @@ export default function HeaderNew() {
   const { t, language, setLanguage } = useTranslation();  // PR-50: i18n wired
 
   const [state, setState] = useState(auth.getState());
+  const { inboxOpen, setInboxOpen, getUnreadCount } = useNotificationCenter();
   const [lang, setLang] = useState(language || 'ru');
   const [showThemeMenu, setShowThemeMenu] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);  // PR-50: profile dropdown
@@ -374,15 +376,16 @@ export default function HeaderNew() {
         </div>
     }
 
-      {/* 2.6) Уведомления — PR-50: global notification bell (H-4 fix) */}
+      {/* 2.6) Уведомления — global notification bell, opens inbox via context */}
       {user &&
         <div style={{ flex: '0 0 auto' }}>
           <Button
             variant="ghost"
             size="small"
-            onClick={() => navigate(getRoleHomeRoute(roleNormalized) || '/')}
-            title={t('legacy.hn_notifications_title')}
-            aria-label={t('legacy.hn_notifications_title')}
+            onClick={() => setInboxOpen(!inboxOpen)}
+            title={t('legacy.hn_notifications_title') || 'Уведомления'}
+            aria-label={t('legacy.hn_notifications_title') || 'Уведомления'}
+            aria-expanded={inboxOpen}
             style={{
               width: '36px',
               height: '36px',
@@ -395,6 +398,30 @@ export default function HeaderNew() {
               position: 'relative',
             }}>
             <BellIcon size={16} style={{ color: 'var(--mac-text-primary)' }} />
+            {(() => {
+              const role = String(user?.role || user?.role_name || '').toLowerCase();
+              const normalizedRole = role === 'receptionist' ? 'registrar' : role;
+              const count = getUnreadCount(normalizedRole);
+              return count > 0 ? (
+                <span style={{
+                  position: 'absolute',
+                  top: -3,
+                  right: -3,
+                  minWidth: 16,
+                  height: 16,
+                  padding: '0 4px',
+                  borderRadius: 8,
+                  background: 'var(--mac-error)',
+                  color: 'white',
+                  fontSize: 10,
+                  lineHeight: '16px',
+                  fontWeight: 'var(--mac-font-weight-bold)',
+                  textAlign: 'center',
+                }}>
+                  {count > 99 ? '99+' : count}
+                </span>
+              ) : null;
+            })()}
           </Button>
         </div>
       }

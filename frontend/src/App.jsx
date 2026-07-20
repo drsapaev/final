@@ -20,6 +20,7 @@ import {
 import HeaderNew from './components/layout/HeaderNew.jsx';
 // SW-05 fix: global command palette (Cmd+K)
 import { CommandPalette } from './components/common/CommandPalette';
+import GlobalNotificationCenter from './components/notifications/GlobalNotificationCenter.jsx';
 import Health from './pages/Health.jsx';
 import Landing from './pages/Landing.jsx';
 import LoginFormStyled from './components/auth/LoginFormStyled.jsx';
@@ -371,6 +372,8 @@ function AppShell({ children }) {
       </div>
       {/* SW-05 fix: global command palette — Cmd+K / Ctrl+K to open */}
       <CommandPalette profile={authState.profile} navigate={navigate} />
+      {/* Global notification center — controlled by header bell via context */}
+      <GlobalNotificationCenter />
     </div>
   );
 }

@@ -48,7 +48,6 @@ import { useTranslation } from '../i18n/useTranslation';
 import { useConfirm } from '../components/common/ConfirmDialog';
 import { useSessionTimeoutWarning } from '../hooks/useSessionTimeoutWarning';
 import { useDentalHotkeys } from '../hooks/useDentalHotkeys';
-import RoleNotificationCenter from '../components/notifications/RoleNotificationCenter';
 import {
   DENTIST_DOCUMENTS_STORAGE_KEY,
   parseDentistDocuments,
@@ -2299,7 +2298,6 @@ const DentistPanelUnified = () => {
       }
       {/* X-13: AIChatWidget removed — AiTab in sidebar provides the same functionality */}
 
-      <RoleNotificationCenter userRole="dentist" />
 
       {/* C-1 (UX audit): portal-mounted ConfirmDialog */}
       {confirmDialog}

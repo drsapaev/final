@@ -400,6 +400,7 @@ export function NotificationCenterProvider({ children }) {
   const [unreadSnapshot, setUnreadSnapshot] = useState(EMPTY_UNREAD_SNAPSHOT);
   const [lastSyncAt, setLastSyncAt] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [inboxOpen, setInboxOpen] = useState(false);
   const inboxRef = useRef(inbox);
   const unreadSnapshotRef = useRef(unreadSnapshot);
   const unreadRefreshPromiseRef = useRef(null);
@@ -752,6 +753,8 @@ export function NotificationCenterProvider({ children }) {
     unreadSnapshot,
     lastSyncAt,
     isLoading,
+    inboxOpen,
+    setInboxOpen,
     replaceNotifications,
     updateUnreadSnapshot,
     appendNotification,
@@ -769,6 +772,8 @@ export function NotificationCenterProvider({ children }) {
     unreadSnapshot,
     lastSyncAt,
     isLoading,
+    inboxOpen,
+    setInboxOpen,
     replaceNotifications,
     updateUnreadSnapshot,
     appendNotification,

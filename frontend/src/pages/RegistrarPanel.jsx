@@ -20,7 +20,6 @@ import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
 // Note: getApiOrigin moved to ./registrar/registrarHelpers.js (decomp step 1)
 import notify from '../services/notify';
-import RoleNotificationCenter from '../components/notifications/RoleNotificationCenter';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../components/common/ConfirmDialog';
 // Unified i18n: single useTranslation hook for all UI strings (registrarPanel.*)
@@ -2200,7 +2199,6 @@ const RegistrarPanel = () => {
           loadAppointments({ source: 'force_majeure' });
         }} />
 
-      <RoleNotificationCenter userRole="registrar" />
       {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
       {confirmDialog}
 
