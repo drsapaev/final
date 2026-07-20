@@ -1135,7 +1135,7 @@ const EnhancedAppointmentsTable = ({
               type="text"
               placeholder={t('misc.eat_search')}
               value={filterConfig.search}
-              onChange={(e: any) => setFilterConfig((prev) => ({ ...prev, search: e.target.value }))}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFilterConfig((prev) => ({ ...prev, search: e.target.value }))}
               icon={Search}
               className="eat-search-input" />
 
@@ -1144,7 +1144,7 @@ const EnhancedAppointmentsTable = ({
           {/* Фильтр по статусу */}
           <Select
             value={filterConfig.status}
-            onChange={(e: any) => setFilterConfig((prev) => ({ ...prev, status: e.target.value }))}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFilterConfig((prev) => ({ ...prev, status: e.target.value }))}
             options={[
             { value: '', label: t('misc.eat_filter') },
             { value: 'scheduled', label: t('misc.eat_scheduled') },
@@ -1205,7 +1205,7 @@ const EnhancedAppointmentsTable = ({
               }}
               aria-label={t('misc.eat_select_all')}>
                   <Checkbox aria-label={t('misc.eat_select_all')} checked={selectedRows.size === paginatedData.length && paginatedData.length > 0}
-                  onChange={(e: any) => handleSelectAll(e.target.checked)}
+                  onChange={(checked: boolean) => handleSelectAll(checked)}
                   />
 
                 </th>
@@ -1493,15 +1493,15 @@ const EnhancedAppointmentsTable = ({
                     borderLeft: sessionColor ? `4px solid ${sessionColor}` : 'none',
                     position: 'relative'
                   }}
-                  onMouseEnter={(e: any) => {
+                  onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
                     if (!selectedRows.has(row.id)) {
-                      e.target.closest('tr').style.backgroundColor = 'var(--mac-bg-secondary)';
+                      (e.target as HTMLElement).closest('tr').style.backgroundColor = 'var(--mac-bg-secondary)';
                     }
                   }}
-                  onMouseLeave={(e: any) => {
+                  onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
                     if (!selectedRows.has(row.id)) {
                       // Восстанавливаем фон на основе индекса (для полосатой таблицы)
-                      const tr = e.target.closest('tr');
+                      const tr = (e.target as HTMLElement).closest('tr');
                       if (tr) {
                         tr.style.backgroundColor = index % 2 === 0 ? 'var(--mac-bg-primary)' : 'var(--mac-bg-secondary)';
                       }
@@ -1515,9 +1515,8 @@ const EnhancedAppointmentsTable = ({
                   <td
                     className="eat-td-base"
                     aria-label={`${t('misc.eat_select_all')}: ${row.patient_fio || row.patient_name || row.id}`}>
-                        <Checkbox aria-label={`${t('misc.eat_select_all')}: ${row.patient_fio || row.patient_name || row.id}`} checked={selectedRows.has(row.id)} onChange={(e: any) => {
-                        e?.stopPropagation();
-                        handleRowSelect(row.id, e.target.checked);
+                        <Checkbox aria-label={`${t('misc.eat_select_all')}: ${row.patient_fio || row.patient_name || row.id}`} checked={selectedRows.has(row.id)} onChange={(checked: boolean) => {
+                        handleRowSelect(row.id, checked);
                       }}
                       />
 
@@ -1908,11 +1907,11 @@ const EnhancedAppointmentsTable = ({
                       position: 'relative',
                       zIndex: 100
                     }}
-                    onClick={(e: any) => {
+                    onClick={(e: React.MouseEvent<HTMLElement>) => {
                       // Блокируем клик на строку при клике в ячейке действий
                       e?.stopPropagation();
                     }}
-                    onMouseDown={(e: any) => {
+                    onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
                       // Блокируем mousedown на строку при клике в ячейке действий
                       e?.stopPropagation();
                     }}>
@@ -1932,11 +1931,11 @@ const EnhancedAppointmentsTable = ({
                         {canPay &&
                       <button
                         className="action-button action-button--success"
-                        onMouseDown={(e: any) => {
+                        onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
                           e.preventDefault();
                           e?.stopPropagation();
                         }}
-                        onClick={(e: any) => {
+                        onClick={(e: React.MouseEvent<HTMLElement>) => {
                           e.preventDefault();
                           e?.stopPropagation();
                           onActionClick?.('payment', row, e);
@@ -1951,11 +1950,11 @@ const EnhancedAppointmentsTable = ({
                         {canCall &&
                       <button
                         className="action-button action-button--primary"
-                        onMouseDown={(e: any) => {
+                        onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
                           e.preventDefault();
                           e?.stopPropagation();
                         }}
-                        onClick={(e: any) => {
+                        onClick={(e: React.MouseEvent<HTMLElement>) => {
                           e.preventDefault();
                           e?.stopPropagation();
                           onActionClick?.('call', row, e);
@@ -1970,11 +1969,11 @@ const EnhancedAppointmentsTable = ({
                         {canPrint &&
                       <button
                         className="action-button"
-                        onMouseDown={(e: any) => {
+                        onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
                           e.preventDefault();
                           e?.stopPropagation();
                         }}
-                        onClick={(e: any) => {
+                        onClick={(e: React.MouseEvent<HTMLElement>) => {
                           e.preventDefault();
                           e?.stopPropagation();
                           onActionClick?.('print', row, e);
@@ -1990,11 +1989,11 @@ const EnhancedAppointmentsTable = ({
                         {canComplete &&
                       <button
                         className="action-button"
-                        onMouseDown={(e: any) => {
+                        onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
                           e.preventDefault();
                           e?.stopPropagation();
                         }}
-                        onClick={(e: any) => {
+                        onClick={(e: React.MouseEvent<HTMLElement>) => {
                           e.preventDefault();
                           e?.stopPropagation();
                           onActionClick?.('complete', row, e);
@@ -2032,12 +2031,12 @@ const EnhancedAppointmentsTable = ({
                         {/* Просмотр */}
                         <button
                         className="action-button"
-                        onMouseDown={(e: any) => {
+                        onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
                           e.preventDefault();
                           e?.stopPropagation();
                           logger.log('[EnhancedAppointmentsTable] Кнопка Просмотр нажата:', row);
                         }}
-                        onClick={(e: any) => {
+                        onClick={(e: React.MouseEvent<HTMLElement>) => {
                           e.preventDefault();
                           e?.stopPropagation();
                           onActionClick?.('view', row, e);
@@ -2051,12 +2050,12 @@ const EnhancedAppointmentsTable = ({
                         {/* Редактировать */}
                         <button
                         className="action-button"
-                        onMouseDown={(e: any) => {
+                        onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
                           e.preventDefault();
                           e?.stopPropagation();
                           logger.log('[EnhancedAppointmentsTable] Кнопка Редактировать нажата:', row);
                         }}
-                        onClick={(e: any) => {
+                        onClick={(e: React.MouseEvent<HTMLElement>) => {
                           e.preventDefault();
                           e?.stopPropagation();
                           onActionClick?.('edit', row, e);
@@ -2071,11 +2070,11 @@ const EnhancedAppointmentsTable = ({
                         {canViewEmr &&
                         <button
                         className="action-button action-button--primary"
-                        onMouseDown={(e: any) => {
+                        onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
                           e.preventDefault();
                           e?.stopPropagation();
                         }}
-                        onClick={(e: any) => {
+                        onClick={(e: React.MouseEvent<HTMLElement>) => {
                           e.preventDefault();
                           e?.stopPropagation();
                           onActionClick?.('view_emr', row, e);
@@ -2092,11 +2091,11 @@ const EnhancedAppointmentsTable = ({
                         {canReschedule &&
                       <button
                         className="action-button"
-                        onMouseDown={(e: any) => {
+                        onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
                           e.preventDefault();
                           e?.stopPropagation();
                         }}
-                        onClick={(e: any) => {
+                        onClick={(e: React.MouseEvent<HTMLElement>) => {
                           e.preventDefault();
                           e?.stopPropagation();
                           onActionClick?.('reschedule', row, e);
@@ -2110,11 +2109,11 @@ const EnhancedAppointmentsTable = ({
                         {canCancel &&
                       <button
                         className="action-button"
-                        onMouseDown={(e: any) => {
+                        onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
                           e.preventDefault();
                           e?.stopPropagation();
                         }}
-                        onClick={(e: any) => {
+                        onClick={(e: React.MouseEvent<HTMLElement>) => {
                           e.preventDefault();
                           e?.stopPropagation();
                           onActionClick?.('cancel', row, e);
@@ -2128,11 +2127,11 @@ const EnhancedAppointmentsTable = ({
                         {/* Еще */}
                       <button
                         className="action-button"
-                        onMouseDown={(e: any) => {
+                        onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
                           e.preventDefault();
                           e?.stopPropagation();
                         }}
-                        onClick={(e: any) => {
+                        onClick={(e: React.MouseEvent<HTMLElement>) => {
                           e.preventDefault();
                           e?.stopPropagation();
                           onActionClick?.('more', row, e);
@@ -2147,11 +2146,11 @@ const EnhancedAppointmentsTable = ({
                         {canScheduleNext &&
                       <button
                         className="action-button action-button--primary"
-                        onMouseDown={(e: any) => {
+                        onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
                           e.preventDefault();
                           e?.stopPropagation();
                         }}
-                        onClick={(e: any) => {
+                        onClick={(e: React.MouseEvent<HTMLElement>) => {
                           e.preventDefault();
                           e?.stopPropagation();
                           onActionClick?.('schedule_next', row, e);
@@ -2179,7 +2178,7 @@ const EnhancedAppointmentsTable = ({
             <span>{t('misc.eat_page')}</span>
             <select
             value={currentPage}
-            onChange={(e: any) => setCurrentPage(parseInt(e.target.value))}
+            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setCurrentPage(parseInt(e.target.value))}
             className="eat-pagination-select">
 
               {Array.from({ length: totalPages }, (_, i) =>
