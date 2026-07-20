@@ -409,7 +409,7 @@ const BillingManager = () => {
               <Input
             type="number"
             value={invoiceForm.patient_id}
-            onChange={(e: any) => setInvoiceForm({ ...invoiceForm, patient_id: e.target.value })}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setInvoiceForm({ ...invoiceForm, patient_id: e.target.value })}
             placeholder={t('admin2.bill_patient_id_ph')} />
           
             </div>
@@ -433,20 +433,20 @@ const BillingManager = () => {
               <Input
             type="number"
             value={invoiceForm.due_days}
-            onChange={(e: any) => setInvoiceForm({ ...invoiceForm, due_days: parseInt(e.target.value) })}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setInvoiceForm({ ...invoiceForm, due_days: parseInt(e.target.value) })}
             placeholder="30" />
           
             </div>
 
             <div className="admin-d-flex-ai-center-gap-16">
               <label className="admin-d-flex-ai-center-gap-8-fs-sm-primary-2">
-                <Checkbox aria-label="Auto send invoice" checked={invoiceForm.auto_send} onChange={(e: any) => setInvoiceForm({ ...invoiceForm, auto_send: e.target.checked })}
+                <Checkbox aria-label="Auto send invoice" checked={invoiceForm.auto_send} onChange={(checked: boolean) => setInvoiceForm({ ...invoiceForm, auto_send: checked })}
               className="admin-m-0" />
             
                 {t('admin2.bill_auto_send_label')}
               </label>
               <label className="admin-d-flex-ai-center-gap-8-fs-sm-primary-1">
-                <Checkbox aria-label="Send payment reminders" checked={invoiceForm.send_reminders} onChange={(e: any) => setInvoiceForm({ ...invoiceForm, send_reminders: e.target.checked })}
+                <Checkbox aria-label="Send payment reminders" checked={invoiceForm.send_reminders} onChange={(checked: boolean) => setInvoiceForm({ ...invoiceForm, send_reminders: checked })}
               className="admin-m-0" />
             
                 {t('admin2.bill_reminders_label')}
@@ -474,19 +474,19 @@ const BillingManager = () => {
                 <Input
             placeholder={t('admin2.bill_item_desc_ph')}
             value={item.description}
-            onChange={(e: any) => updateInvoiceItem(index, 'description', e.target.value)} />
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateInvoiceItem(index, 'description', e.target.value)} />
           
                 <Input
             type="number"
             placeholder={t('admin2.bill_item_qty_ph')}
             value={item.quantity}
-            onChange={(e: any) => updateInvoiceItem(index, 'quantity', parseFloat(e.target.value))} />
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateInvoiceItem(index, 'quantity', parseFloat(e.target.value))} />
           
                 <Input
             type="number"
             placeholder={t('admin2.bill_item_price_ph')}
             value={item.unit_price}
-            onChange={(e: any) => updateInvoiceItem(index, 'unit_price', parseFloat(e.target.value))} />
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateInvoiceItem(index, 'unit_price', parseFloat(e.target.value))} />
           
                 <Button
             variant="outline"
@@ -510,7 +510,7 @@ const BillingManager = () => {
               </label>
               <Textarea
             value={invoiceForm.description}
-            onChange={(e: any) => setInvoiceForm({ ...invoiceForm, description: e.target.value })}
+            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setInvoiceForm({ ...invoiceForm, description: e.target.value })}
             placeholder={t('admin2.bill_inv_desc_ph')}
             rows={3} />
           
@@ -562,7 +562,7 @@ const BillingManager = () => {
               <Input
             type="number"
             value={paymentForm.invoice_id}
-            onChange={(e: any) => setPaymentForm({ ...paymentForm, invoice_id: e.target.value })}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPaymentForm({ ...paymentForm, invoice_id: e.target.value })}
             placeholder={t('admin2.bill_inv_id_ph')} />
           
             </div>
@@ -574,7 +574,7 @@ const BillingManager = () => {
               <Input
             type="number"
             value={paymentForm.amount}
-            onChange={(e: any) => setPaymentForm({ ...paymentForm, amount: parseFloat(e.target.value) })}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPaymentForm({ ...paymentForm, amount: parseFloat(e.target.value) })}
             placeholder="0" />
           
             </div>
@@ -597,7 +597,7 @@ const BillingManager = () => {
               </label>
               <Input
             value={paymentForm.reference_number}
-            onChange={(e: any) => setPaymentForm({ ...paymentForm, reference_number: e.target.value })}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPaymentForm({ ...paymentForm, reference_number: e.target.value })}
             placeholder={t('admin2.bill_ref_num_ph')} />
           
             </div>
@@ -608,7 +608,7 @@ const BillingManager = () => {
               </label>
               <Textarea
             value={paymentForm.description}
-            onChange={(e: any) => setPaymentForm({ ...paymentForm, description: e.target.value })}
+            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setPaymentForm({ ...paymentForm, description: e.target.value })}
             placeholder={t('admin2.bill_pay_desc_ph')}
             rows={3} />
           

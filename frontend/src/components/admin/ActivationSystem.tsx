@@ -658,7 +658,7 @@ const ActivationKeyForm = ({ onSave, onCancel }) => {
             <label className="admin-label-flex-center-activation">
               <Checkbox
                 checked={formData.features.full_access}
-                onChange={(e: any) => handleFeatureChange('full_access', e?.target?.checked ?? e)}
+                onChange={(checked: boolean) => handleFeatureChange('full_access', checked)}
                 className="mr-2" />
               <span className="admin-span-sm-primary">{t('admin2.act_form_feature_full_access')}</span>
             </label>
@@ -666,7 +666,7 @@ const ActivationKeyForm = ({ onSave, onCancel }) => {
             <label className="admin-label-flex-center-activation">
               <Checkbox
                 checked={formData.features.ai_features}
-                onChange={(e: any) => handleFeatureChange('ai_features', e?.target?.checked ?? e)}
+                onChange={(checked: boolean) => handleFeatureChange('ai_features', checked)}
                 className="mr-2" />
               <span className="admin-span-sm-primary">{t('admin2.act_form_feature_ai')}</span>
             </label>
@@ -674,7 +674,7 @@ const ActivationKeyForm = ({ onSave, onCancel }) => {
             <label className="admin-label-flex-center-activation">
               <Checkbox
                 checked={formData.features.telegram_integration}
-                onChange={(e: any) => handleFeatureChange('telegram_integration', e?.target?.checked ?? e)}
+                onChange={(checked: boolean) => handleFeatureChange('telegram_integration', checked)}
                 className="mr-2" />
               <span className="admin-span-sm-primary">{t('admin2.act_form_feature_telegram')}</span>
             </label>
@@ -682,7 +682,7 @@ const ActivationKeyForm = ({ onSave, onCancel }) => {
             <label className="admin-label-flex-center-activation">
               <Checkbox
                 checked={formData.features.print_system}
-                onChange={(e: any) => handleFeatureChange('print_system', e?.target?.checked ?? e)}
+                onChange={(checked: boolean) => handleFeatureChange('print_system', checked)}
                 className="mr-2" />
               <span className="admin-span-sm-primary">{t('admin2.act_form_feature_print')}</span>
             </label>

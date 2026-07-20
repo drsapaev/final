@@ -436,14 +436,14 @@ const MacOSDemo = () => {
                             borderBottom: isActive ? '2px solid var(--mac-accent-blue)' : '2px solid transparent',
                             marginBottom: '-1px'
                           }}
-                          onMouseEnter={(e: any) => {
+                          onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
                             if (!isActive) {
-                              e.target.style.color = 'var(--mac-text-primary)';
+                              (e.target as HTMLElement).style.color = 'var(--mac-text-primary)';
                             }
                           }}
-                          onMouseLeave={(e: any) => {
+                          onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
                             if (!isActive) {
-                              e.target.style.color = 'var(--mac-text-secondary)';
+                              (e.target as HTMLElement).style.color = 'var(--mac-text-secondary)';
                             }
                           }}>
 
@@ -507,14 +507,14 @@ const MacOSDemo = () => {
                             position: 'relative',
                             marginBottom: '-1px'
                           }}
-                          onMouseEnter={(e: any) => {
+                          onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
                             if (!isActive) {
-                              e.target.style.color = 'var(--mac-text-primary)';
+                              (e.target as HTMLElement).style.color = 'var(--mac-text-primary)';
                             }
                           }}
-                          onMouseLeave={(e: any) => {
+                          onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
                             if (!isActive) {
-                              e.target.style.color = 'var(--mac-text-secondary)';
+                              (e.target as HTMLElement).style.color = 'var(--mac-text-secondary)';
                             }
                           }}>
 
@@ -590,16 +590,16 @@ const MacOSDemo = () => {
                             transition: 'all var(--mac-duration-normal) var(--mac-ease)',
                             boxShadow: isActive ? 'var(--mac-shadow-sm)' : 'none'
                           }}
-                          onMouseEnter={(e: any) => {
+                          onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
                             if (!isActive) {
-                              e.target.style.backgroundColor = 'var(--mac-bg-tertiary)';
-                              e.target.style.color = 'var(--mac-text-primary)';
+                              (e.target as HTMLElement).style.backgroundColor = 'var(--mac-bg-tertiary)';
+                              (e.target as HTMLElement).style.color = 'var(--mac-text-primary)';
                             }
                           }}
-                          onMouseLeave={(e: any) => {
+                          onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
                             if (!isActive) {
-                              e.target.style.backgroundColor = 'transparent';
-                              e.target.style.color = 'var(--mac-text-secondary)';
+                              (e.target as HTMLElement).style.backgroundColor = 'transparent';
+                              (e.target as HTMLElement).style.color = 'var(--mac-text-secondary)';
                             }
                           }}>
 

@@ -412,8 +412,8 @@ const UserDataTransferManager = () => {
         <div className="admin-flex-col-12">
           {availableDataTypes.map((dataType) =>
         <label key={dataType.key} className="admin-flex-ai-center-gap-12-cursor-pointer-p-8-radius-var--mac-radius-sm-transit-87a65602"
-        onMouseEnter={(e: any) => e.target.style.backgroundColor = 'var(--mac-bg-secondary)'}
-        onMouseLeave={(e: any) => e.target.style.backgroundColor = 'transparent'}>
+        onMouseEnter={(e: React.MouseEvent<HTMLElement>) => (e.target as HTMLElement).style.backgroundColor = 'var(--mac-bg-secondary)'}
+        onMouseLeave={(e: React.MouseEvent<HTMLElement>) => (e.target as HTMLElement).style.backgroundColor = 'transparent'}>
           
               <Checkbox
             checked={selectedDataTypes.includes(dataType.key)}

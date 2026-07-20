@@ -928,7 +928,7 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                     {/* Active */}
                     <div className="admin-qp-field">
                         <label className="admin-d-flex-ai-center-gap-8-cur-pointer">
-                            <Checkbox aria-label={t('admin2.qp_active_checkbox_aria')} checked={formData.is_active} onChange={(e: any) => setFormData({ ...formData, is_active: e?.target?.checked ?? e })}
+                            <Checkbox aria-label={t('admin2.qp_active_checkbox_aria')} checked={formData.is_active} onChange={(checked: boolean) => setFormData({ ...formData, is_active: checked })}
                             />
                             <span className="admin-qp-label">{t('admin2.qp_active_label')}</span>
                         </label>
@@ -937,7 +937,7 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                     {/* ⭐ NEW: Show on QR Page */}
                     <div className="admin-qp-field">
                         <label className="admin-d-flex-ai-center-gap-8-cur-pointer">
-                            <Checkbox aria-label={t('admin2.qp_qr_checkbox_aria')} checked={formData.show_on_qr_page} onChange={(e: any) => setFormData({ ...formData, show_on_qr_page: e?.target?.checked ?? e })}
+                            <Checkbox aria-label={t('admin2.qp_qr_checkbox_aria')} checked={formData.show_on_qr_page} onChange={(checked: boolean) => setFormData({ ...formData, show_on_qr_page: checked })}
                             />
                             <span className="admin-qp-label">{t('admin2.qp_qr_label')}</span>
                         </label>

@@ -1954,7 +1954,7 @@ const MacOSCardiologistPanelUnified = () => {
               <label className="flex items-center cardio-settings-label">
                 <Checkbox
                 checked={settings.showEcgEchoTogether}
-                onChange={(e: any) => setSettings({ ...settings, showEcgEchoTogether: e?.target?.checked ?? e })} />
+                onChange={(checked: boolean) => setSettings({ ...settings, showEcgEchoTogether: checked })} />
 
                 {tI18n('cardio.cardio_panel_settings_show_ecg_echo')}
               </label>

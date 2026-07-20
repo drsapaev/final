@@ -817,7 +817,7 @@ const DepartmentManagement = () => {
                             <Input
                 placeholder={t('admin2.dept_search_placeholder')}
                 value={searchTerm}
-                onChange={(e: any) => setSearchTerm(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
                 className="admin-flex-1" />
                         </div>
 
@@ -853,7 +853,7 @@ const DepartmentManagement = () => {
                                     <Input
                   placeholder={t('admin2.dept_name_ru_ph')}
                   value={formData.name_ru}
-                  onChange={(e: any) => setFormData({ ...formData, name_ru: e.target.value })}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, name_ru: e.target.value })}
                   className={validationErrors.name_ru ? 'admin-input-error' : undefined} />
                 
                                     {validationErrors.name_ru &&
@@ -866,7 +866,7 @@ const DepartmentManagement = () => {
                                     <Input
                   placeholder={t('admin2.dept_name_uz_ph')}
                   value={formData.name_uz}
-                  onChange={(e: any) => setFormData({ ...formData, name_uz: e.target.value })}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, name_uz: e.target.value })}
                   className={validationErrors.name_uz ? 'admin-input-error' : undefined} />
                 
                                     {validationErrors.name_uz &&
@@ -879,7 +879,7 @@ const DepartmentManagement = () => {
                                     <Input
                   placeholder={t('admin2.dept_key_ph')}
                   value={formData.key}
-                  onChange={(e: any) => setFormData({ ...formData, key: e.target.value })}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, key: e.target.value })}
                   className={`admin-grid-col-1${validationErrors.key ? ' admin-input-error' : ''}`} />
                 
                                     {validationErrors.key &&
@@ -893,7 +893,7 @@ const DepartmentManagement = () => {
                   type="number"
                   placeholder={t('admin2.dept_order_ph')}
                   value={formData.display_order}
-                  onChange={(e: any) => setFormData({ ...formData, display_order: parseInt(e.target.value) })}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, display_order: parseInt(e.target.value) })}
                   className={`admin-grid-col-2${validationErrors.display_order ? ' admin-input-error' : ''}`} />
                 
                                     {validationErrors.display_order &&
@@ -903,7 +903,7 @@ const DepartmentManagement = () => {
                 }
                                 </div>
                                 <div className="admin-grid-span-all">
-                                    <Input value={formData.icon} onChange={(e: any) => setFormData({ ...formData, icon: e.target.value })} placeholder={t('admin2.dept_icon_ph')} />
+                                    <Input value={formData.icon} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, icon: e.target.value })} placeholder={t('admin2.dept_icon_ph')} />
                 
                                     {validationErrors.icon &&
                 <div className="admin-error-text-mt">
@@ -915,7 +915,7 @@ const DepartmentManagement = () => {
                                     <Input
                   type="color"
                   value={formData.color}
-                  onChange={(e: any) => setFormData({ ...formData, color: e.target.value })}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, color: e.target.value })}
                   className="admin-grid-col-1" />
                 
                                     <label className="admin-label-hint">
@@ -926,7 +926,7 @@ const DepartmentManagement = () => {
                                     <Textarea
                   placeholder={t('admin2.dept_desc_ph')}
                   value={formData.description || ''}
-                  onChange={(e: any) => setFormData({ ...formData, description: e.target.value })}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, description: e.target.value })}
                   rows={3}
                   className={validationErrors.description ? 'admin-input-error' : undefined} />
                 
@@ -947,7 +947,7 @@ const DepartmentManagement = () => {
                                 <div className="mb-4">
                                     <Checkbox
                   checked={serviceMapping.create_service}
-                  onChange={(e: any) => setServiceMapping({ ...serviceMapping, create_service: e?.target?.checked ?? e })}
+                  onChange={(checked: boolean) => setServiceMapping({ ...serviceMapping, create_service: checked })}
                   label={t('admin2.dept_create_service_label')} />
                 
                                 </div>
@@ -958,7 +958,7 @@ const DepartmentManagement = () => {
                                             <Input
                     placeholder={t('admin2.dept_service_name_ph')}
                     value={serviceMapping.service_name}
-                    onChange={(e: any) => setServiceMapping({ ...serviceMapping, service_name: e.target.value })} />
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setServiceMapping({ ...serviceMapping, service_name: e.target.value })} />
                   
                                         </div>
                                         <div>
@@ -971,7 +971,7 @@ const DepartmentManagement = () => {
                                             <Input
                     placeholder={t('admin2.dept_service_code_ph')}
                     value={serviceMapping.service_code_pattern}
-                    onChange={(e: any) => setServiceMapping({ ...serviceMapping, service_code_pattern: e.target.value.toUpperCase() })} />
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setServiceMapping({ ...serviceMapping, service_code_pattern: e.target.value.toUpperCase() })} />
                   
                                         </div>
                                         <div>
@@ -979,14 +979,14 @@ const DepartmentManagement = () => {
                     type="number"
                     placeholder={t('admin2.dept_service_price_ph')}
                     value={serviceMapping.service_price}
-                    onChange={(e: any) => setServiceMapping({ ...serviceMapping, service_price: e.target.value })} />
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setServiceMapping({ ...serviceMapping, service_price: e.target.value })} />
                   
                                         </div>
                                         <div className="admin-grid-span-all">
                                             <Input
                     placeholder={t('admin2.dept_queue_tag_ph')}
                     value={serviceMapping.queue_tag}
-                    onChange={(e: any) => setServiceMapping({ ...serviceMapping, queue_tag: e.target.value })} />
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setServiceMapping({ ...serviceMapping, queue_tag: e.target.value })} />
                   
                                             <div className="admin-hint-text-12-secondary-mt-4">
                                                 {t('admin2.dept_service_mapping_hint', { key: formData.key || '...' })}
@@ -1076,7 +1076,7 @@ const DepartmentManagement = () => {
                                     <th className="admin-th-w-40">
                                         <Checkbox
                       checked={selectAll}
-                      onChange={(e: any) => handleSelectAll(e.target.checked)} />
+                      onChange={(checked: boolean) => handleSelectAll(checked)} />
                     
                                     </th>
                                     <th className="admin-th-w-60">
@@ -1110,7 +1110,7 @@ const DepartmentManagement = () => {
                                             <td className="admin-td-padded">
                                                 <Checkbox
                           checked={selectedDepartments.includes(dept.id)}
-                          onChange={(e: any) => handleSelectDepartment(dept.id, e.target.checked)} />
+                          onChange={(checked: boolean) => handleSelectDepartment(dept.id, checked)} />
                         
                                             </td>
                                             <td className="admin-td-padded">
@@ -1141,7 +1141,7 @@ const DepartmentManagement = () => {
                                                 <Input
                           type="number"
                           value={dept.display_order || 999}
-                          onChange={(e: any) => {
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                             const newOrder = parseInt(e.target.value) || 999;
                             handleUpdateOrder(dept, newOrder);
                           }}
@@ -1246,7 +1246,7 @@ const DepartmentManagement = () => {
               label={t('admin2.dept_name_ru_ph')}
               placeholder={t('admin2.dept_name_ru_ph')}
               value={formData.name_ru}
-              onChange={(e: any) => setFormData({ ...formData, name_ru: e.target.value })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, name_ru: e.target.value })}
               className={validationErrors.name_ru ? 'admin-input-error' : undefined} />
             
                         {validationErrors.name_ru &&
@@ -1260,7 +1260,7 @@ const DepartmentManagement = () => {
               label={t('admin2.dept_name_uz_ph')}
               placeholder={t('admin2.dept_name_uz_ph')}
               value={formData.name_uz}
-              onChange={(e: any) => setFormData({ ...formData, name_uz: e.target.value })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, name_uz: e.target.value })}
               className={validationErrors.name_uz ? 'admin-input-error' : undefined} />
             
                         {validationErrors.name_uz &&
@@ -1274,7 +1274,7 @@ const DepartmentManagement = () => {
               label={t('admin2.dept_key_label')}
               placeholder={t('admin2.dept_key_ph')}
               value={formData.key}
-              onChange={(e: any) => setFormData({ ...formData, key: e.target.value })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, key: e.target.value })}
               className={`admin-grid-col-1${validationErrors.key ? ' admin-input-error' : ''}`} />
             
                         {validationErrors.key &&
@@ -1289,7 +1289,7 @@ const DepartmentManagement = () => {
               type="number"
               placeholder={t('admin2.dept_order_ph')}
               value={formData.display_order}
-              onChange={(e: any) => setFormData({ ...formData, display_order: parseInt(e.target.value) })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, display_order: parseInt(e.target.value) })}
               className={`admin-grid-col-2${validationErrors.display_order ? ' admin-input-error' : ''}`} />
             
                         {validationErrors.display_order &&
@@ -1299,7 +1299,7 @@ const DepartmentManagement = () => {
             }
                     </div>
                     <div className="admin-grid-span-all">
-                        <Input value={formData.icon} onChange={(e: any) => setFormData({ ...formData, icon: e.target.value })} placeholder={t('admin2.dept_icon_ph')} />
+                        <Input value={formData.icon} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, icon: e.target.value })} placeholder={t('admin2.dept_icon_ph')} />
             
                         {validationErrors.icon &&
             <div className="admin-error-text-mt">
@@ -1312,7 +1312,7 @@ const DepartmentManagement = () => {
               label={t('admin2.dept_color_label')}
               type="color"
               value={formData.color}
-              onChange={(e: any) => setFormData({ ...formData, color: e.target.value })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, color: e.target.value })}
               className="admin-grid-col-2" />
             
                     </div>
@@ -1321,7 +1321,7 @@ const DepartmentManagement = () => {
               label={t('admin2.dept_desc_label')}
               placeholder={t('admin2.dept_desc_ph')}
               value={formData.description || ''}
-              onChange={(e: any) => setFormData({ ...formData, description: e.target.value })}
+              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, description: e.target.value })}
               rows={4}
               className={validationErrors.description ? 'admin-input-error' : undefined} />
             
@@ -1342,7 +1342,7 @@ const DepartmentManagement = () => {
                     <div className="mb-4">
                         <Checkbox
               checked={serviceMapping.create_service}
-              onChange={(e: any) => setServiceMapping({ ...serviceMapping, create_service: e?.target?.checked ?? e })}
+              onChange={(checked: boolean) => setServiceMapping({ ...serviceMapping, create_service: checked })}
               label={t('admin2.dept_create_service_short')} />
             
                     </div>
@@ -1354,7 +1354,7 @@ const DepartmentManagement = () => {
                 label={t('admin2.dept_service_name_label')}
                 placeholder={t('admin2.dept_service_name_label')}
                 value={serviceMapping.service_name}
-                onChange={(e: any) => setServiceMapping({ ...serviceMapping, service_name: e.target.value })} />
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setServiceMapping({ ...serviceMapping, service_name: e.target.value })} />
               
                             </div>
                             <div>
@@ -1371,7 +1371,7 @@ const DepartmentManagement = () => {
                 label={t('admin2.dept_service_code_label')}
                 placeholder={t('admin2.dept_service_code_ph')}
                 value={serviceMapping.service_code_pattern}
-                onChange={(e: any) => setServiceMapping({ ...serviceMapping, service_code_pattern: e.target.value.toUpperCase() })} />
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setServiceMapping({ ...serviceMapping, service_code_pattern: e.target.value.toUpperCase() })} />
               
                             </div>
                             <div>
@@ -1380,7 +1380,7 @@ const DepartmentManagement = () => {
                 type="number"
                 placeholder={t('admin2.dept_service_price_label')}
                 value={serviceMapping.service_price}
-                onChange={(e: any) => setServiceMapping({ ...serviceMapping, service_price: e.target.value })} />
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setServiceMapping({ ...serviceMapping, service_price: e.target.value })} />
               
                             </div>
                             <div className="admin-grid-span-all">
@@ -1388,7 +1388,7 @@ const DepartmentManagement = () => {
                 label={t('admin2.dept_queue_tag_label')}
                 placeholder={t('admin2.dept_queue_tag_ph_modal')}
                 value={serviceMapping.queue_tag}
-                onChange={(e: any) => setServiceMapping({ ...serviceMapping, queue_tag: e.target.value })} />
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setServiceMapping({ ...serviceMapping, queue_tag: e.target.value })} />
               
                                 <div className="admin-hint-text-12-secondary-mt-4">
                                     {t('admin2.dept_service_mapping_hint', { key: formData.key || '...' })}

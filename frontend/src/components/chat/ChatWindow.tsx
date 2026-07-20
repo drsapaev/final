@@ -484,7 +484,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
   // Drag Logic
   const handleMouseDown = (e) => {
     if (isCompactViewport) return;
-    if (e.target.closest('.chat-header') && !e.target.closest('button')) {
+    if ((e.target as HTMLElement).closest('.chat-header') && !(e.target as HTMLElement).closest('button')) {
       setIsDragging(true);
       setDragOffset({
         x: e.clientX - position.x,

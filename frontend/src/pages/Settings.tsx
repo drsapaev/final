@@ -676,7 +676,7 @@ function ProviderModal({ provider, onClose, onSave, title }: any) {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Checkbox id="is_active" aria-label="Provider active" checked={formData.is_active} onChange={(e: any) => setFormData({ ...formData, is_active: e?.target?.checked ?? e })} />
+            <Checkbox id="is_active" aria-label="Provider active" checked={formData.is_active} onChange={(checked: boolean) => setFormData({ ...formData, is_active: checked })} />
             
             <label htmlFor="is_active" className="settings-label-semibold">{t('misc.settings_active')}</label>
           </div>

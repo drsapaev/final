@@ -342,28 +342,28 @@ const DisplayBoardSettings = () => {
 
             <div className="grid grid-cols-2 gap-4">
               <label className="flex items-center">
-                <Checkbox aria-label="Show doctor photos" checked={selectedBoard.show_doctor_photos} onChange={(e: any) => handleBoardSettingChange('show_doctor_photos', e?.target?.checked ?? e)}
+                <Checkbox aria-label="Show doctor photos" checked={selectedBoard.show_doctor_photos} onChange={(checked: boolean) => handleBoardSettingChange('show_doctor_photos', checked)}
                   className="mr-2" />
                 
                 <span className="text-sm font-medium">{t('admin2.db_field_doctor_photos')}</span>
               </label>
 
               <label className="flex items-center">
-                <Checkbox aria-label="Show announcements" checked={selectedBoard.show_announcements} onChange={(e: any) => handleBoardSettingChange('show_announcements', e?.target?.checked ?? e)}
+                <Checkbox aria-label="Show announcements" checked={selectedBoard.show_announcements} onChange={(checked: boolean) => handleBoardSettingChange('show_announcements', checked)}
                   className="mr-2" />
                 
                 <span className="text-sm font-medium">{t('admin2.db_announcements')}</span>
               </label>
 
               <label className="flex items-center">
-                <Checkbox aria-label="Show banners" checked={selectedBoard.show_banners} onChange={(e: any) => handleBoardSettingChange('show_banners', e?.target?.checked ?? e)}
+                <Checkbox aria-label="Show banners" checked={selectedBoard.show_banners} onChange={(checked: boolean) => handleBoardSettingChange('show_banners', checked)}
                   className="mr-2" />
                 
                 <span className="text-sm font-medium">{t('admin2.db_banners')}</span>
               </label>
 
               <label className="flex items-center">
-                <Checkbox aria-label="Show videos" checked={selectedBoard.show_videos} onChange={(e: any) => handleBoardSettingChange('show_videos', e?.target?.checked ?? e)}
+                <Checkbox aria-label="Show videos" checked={selectedBoard.show_videos} onChange={(checked: boolean) => handleBoardSettingChange('show_videos', checked)}
                   className="mr-2" />
                 
                 <span className="text-sm font-medium">{t('admin2.db_field_videos')}</span>
@@ -397,14 +397,14 @@ const DisplayBoardSettings = () => {
 
             <div className="grid grid-cols-2 gap-4">
               <label className="flex items-center">
-                <Checkbox aria-label="Enable sound signals" checked={selectedBoard.sound_enabled} onChange={(e: any) => handleBoardSettingChange('sound_enabled', e?.target?.checked ?? e)}
+                <Checkbox aria-label="Enable sound signals" checked={selectedBoard.sound_enabled} onChange={(checked: boolean) => handleBoardSettingChange('sound_enabled', checked)}
                   className="mr-2" />
                 
                 <span className="text-sm font-medium">{t('admin2.db_field_sound_signals')}</span>
               </label>
 
               <label className="flex items-center">
-                <Checkbox aria-label="Enable voice announcements" checked={selectedBoard.voice_announcements} onChange={(e: any) => handleBoardSettingChange('voice_announcements', e?.target?.checked ?? e)}
+                <Checkbox aria-label="Enable voice announcements" checked={selectedBoard.voice_announcements} onChange={(checked: boolean) => handleBoardSettingChange('voice_announcements', checked)}
                   className="mr-2" />
                 
                 <span className="text-sm font-medium">{t('admin2.db_field_voice_announcements')}</span>

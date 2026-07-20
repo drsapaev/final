@@ -351,19 +351,19 @@ const DiscountBenefitsManager = () => {
       </div>
       <div className="flex flex-wrap gap-4">
           <label className="flex items-center">
-            <Checkbox aria-label="Discount applies to services" checked={discountForm.applies_to_services} onChange={(e: any) => setDiscountForm({ ...discountForm, applies_to_services: e?.target?.checked ?? e })}
+            <Checkbox aria-label="Discount applies to services" checked={discountForm.applies_to_services} onChange={(checked: boolean) => setDiscountForm({ ...discountForm, applies_to_services: checked })}
               className="mr-2" />
         
           {t('admin2.disc_applies_to_services')}
         </label>
           <label className="flex items-center">
-            <Checkbox aria-label="Discount applies to appointments" checked={discountForm.applies_to_appointments} onChange={(e: any) => setDiscountForm({ ...discountForm, applies_to_appointments: e?.target?.checked ?? e })}
+            <Checkbox aria-label="Discount applies to appointments" checked={discountForm.applies_to_appointments} onChange={(checked: boolean) => setDiscountForm({ ...discountForm, applies_to_appointments: checked })}
               className="mr-2" />
         
           {t('admin2.disc_applies_to_appointments')}
         </label>
           <label className="flex items-center">
-            <Checkbox aria-label="Discount can combine with other discounts" checked={discountForm.can_combine_with_others} onChange={(e: any) => setDiscountForm({ ...discountForm, can_combine_with_others: e?.target?.checked ?? e })}
+            <Checkbox aria-label="Discount can combine with other discounts" checked={discountForm.can_combine_with_others} onChange={(checked: boolean) => setDiscountForm({ ...discountForm, can_combine_with_others: checked })}
               className="mr-2" />
         
           {t('admin2.disc_can_combine')}
@@ -476,19 +476,19 @@ const DiscountBenefitsManager = () => {
       </div>
       <div className="flex flex-wrap gap-4">
           <label className="flex items-center">
-            <Checkbox aria-label="Benefit requires documents" checked={benefitForm.requires_document} onChange={(e: any) => setBenefitForm({ ...benefitForm, requires_document: e?.target?.checked ?? e })}
+            <Checkbox aria-label="Benefit requires documents" checked={benefitForm.requires_document} onChange={(checked: boolean) => setBenefitForm({ ...benefitForm, requires_document: checked })}
               className="mr-2" />
         
           {t('admin2.disc_requires_documents')}
         </label>
           <label className="flex items-center">
-            <Checkbox aria-label="Benefit applies to services" checked={benefitForm.applies_to_services} onChange={(e: any) => setBenefitForm({ ...benefitForm, applies_to_services: e?.target?.checked ?? e })}
+            <Checkbox aria-label="Benefit applies to services" checked={benefitForm.applies_to_services} onChange={(checked: boolean) => setBenefitForm({ ...benefitForm, applies_to_services: checked })}
               className="mr-2" />
         
           {t('admin2.disc_applies_to_services')}
         </label>
           <label className="flex items-center">
-            <Checkbox aria-label="Benefit applies to appointments" checked={benefitForm.applies_to_appointments} onChange={(e: any) => setBenefitForm({ ...benefitForm, applies_to_appointments: e?.target?.checked ?? e })}
+            <Checkbox aria-label="Benefit applies to appointments" checked={benefitForm.applies_to_appointments} onChange={(checked: boolean) => setBenefitForm({ ...benefitForm, applies_to_appointments: checked })}
               className="mr-2" />
         
           {t('admin2.disc_applies_to_appointments')}

@@ -1144,7 +1144,7 @@ const EnhancedAppointmentsTable = ({
           {/* Фильтр по статусу */}
           <Select
             value={filterConfig.status}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFilterConfig((prev) => ({ ...prev, status: e.target.value }))}
+            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFilterConfig((prev) => ({ ...prev, status: e.target.value }))}
             options={[
             { value: '', label: t('misc.eat_filter') },
             { value: 'scheduled', label: t('misc.eat_scheduled') },
