@@ -92,11 +92,22 @@ describe('Telegram Mini App onboarding guardrails', () => {
   });
 
   it('emits onboarding telemetry with a safe minimal payload', () => {
-    const telemetryHelper = sourceBetween(
-      appSource,
-      'function emitMiniAppOnboardingTelemetry(event, meta = {}) {',
-      'function emitMiniAppOnboardingStatusTelemetry(status, meta = {}) {'
-    );
+    // The function signature gained TypeScript annotations during the TS
+    // migration (PR #2433): (event, meta = {}) -> (event: string, meta: Record<...> = {}).
+    // Match either form so the test survives future migration churn.
+    const telemetryHelper = appSource.includes(
+      'function emitMiniAppOnboardingTelemetry(event: string, meta:'
+    )
+      ? sourceBetween(
+          appSource,
+          'function emitMiniAppOnboardingTelemetry(event: string, meta:',
+          'function emitMiniAppOnboardingStatusTelemetry('
+        )
+      : sourceBetween(
+          appSource,
+          'function emitMiniAppOnboardingTelemetry(event, meta = {}) {',
+          'function emitMiniAppOnboardingStatusTelemetry(status, meta = {}) {'
+        );
 
     expect(telemetryHelper).toContain('api.post(\'/telemetry\'');
     expect(telemetryHelper).toContain('role: \'patient\'');

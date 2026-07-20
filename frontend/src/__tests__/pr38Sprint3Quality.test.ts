@@ -66,7 +66,10 @@ describe('High-22: Dead code removal', () => {
     const files = collectSourceFiles(srcDir);
     const productionImporters = [];
     for (const file of files) {
-      if (file.includes('/examples/') || file.includes('/__tests__/')) continue;
+      // Normalize to forward slashes so the examples/__tests__ exclusion
+      // works on both POSIX and Windows (path.relative returns OS separators).
+      const normalized = file.replace(/\\/g, '/');
+      if (normalized.includes('/examples/') || normalized.includes('/__tests__/')) continue;
       const src = fs.readFileSync(file, 'utf-8');
       if (/from\s+['"][^'"]*useUtils['"]/.test(src)) {
         productionImporters.push(path.relative(ROOT, file));

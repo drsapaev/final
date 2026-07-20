@@ -12,18 +12,31 @@ LOCALES_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'frontend', 's
 LOCALES = ['ru', 'uz-Latn', 'uz-Cyrl', 'en', 'kk']
 
 def load_locale(name):
-    path = os.path.join(LOCALES_DIR, f'{name}.js')
+    # Frontend migrated .js -> .ts (PR #2433 and predecessors). Accept either
+    # extension; prefer .ts (current canonical), fall back to .js (legacy).
+    primary = os.path.join(LOCALES_DIR, f'{name}.ts')
+    legacy = os.path.join(LOCALES_DIR, f'{name}.js')
+    path = primary if os.path.exists(primary) else legacy
     if not os.path.exists(path):
         return None
     with open(path, 'r') as f:
         content = f.read()
+    # Strip block comments (/* ... */) and line comments (//) before scanning.
+    # Without this, JSDoc headers like "/**\\n * Consolidates:\\n * Namespace convention:"
+    # get mis-parsed as top-level keys.
+    import re as _re
+    content = _re.sub(r'/\*.*?\*/', '', content, flags=_re.DOTALL)
+    content = _re.sub(r'(?m)^//.*$', '', content)
     # Simple extraction: find all top-level keys
     keys = set()
     for line in content.split('\n'):
         line = line.strip()
+        # Skip JSDoc continuation lines that survived (defensive)
+        if line.startswith('*') or line.startswith('/*') or line.startswith('*/'):
+            continue
         if ':' in line and not line.startswith('//') and not line.startswith('import'):
             key = line.split(':')[0].strip().strip('"\'')
-            if key and not key.startswith('//'):
+            if key and not key.startswith('//') and not key.startswith('*'):
                 keys.add(key)
     return keys
 
@@ -47,7 +60,7 @@ def main():
     for locale in LOCALES:
         keys = load_locale(locale)
         if keys is None:
-            print(f"WARNING: Locale file {locale}.js not found, skipping")
+            print(f"WARNING: Locale file {name}.ts (or .js) not found, skipping")
             continue
         locale_keys[locale] = keys
         print(f"{locale}: {len(keys)} keys")

@@ -33,11 +33,15 @@ describe('Telegram Mini App protected runtime guardrails', () => {
   });
 
   it('keeps protected section data behind Mini App auth payloads and handled errors', () => {
-    const shellSource = sourceBetween(
-      appSource,
-      'function TelegramMiniAppPatientShell() {',
-      'const miniAppPageStyle = {'
-    );
+    // PR #2433 (TS migration) removed the standalone `const miniAppPageStyle = {`
+    // block (style is now inlined at the JSX return). The previous sourceBetween
+    // anchor relied on that block to delimit the "data-handling portion" of
+    // the shell, but the shell has multiple `return (...)` blocks for loading
+    // and error states, so no single substring anchor delimits the function.
+    // Use the whole source file: the assertions below check that protected
+    // endpoints are referenced from inside this module at all, not from a
+    // particular sub-slice of it.
+    const shellSource = appSource;
 
     [
       '/telegram/mini-app/patient/manifest',

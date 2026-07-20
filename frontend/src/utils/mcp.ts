@@ -89,7 +89,7 @@ export interface AnalyzeImageData {
 
 const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
-const success = <T>(data: T): McpSuccess<T> => ({ status: 'success', data });
+const success = <T,>(data: T): McpSuccess<T> => ({ status: 'success', data });
 const failure = (error: unknown): McpFailure => ({
   status: 'error',
   error: String(error || 'Unavailable')
