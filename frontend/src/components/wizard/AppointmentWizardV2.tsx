@@ -165,10 +165,10 @@ const AppointmentWizardV2 = ({
   const [errors, setErrors] = useState({} as any);
   const [patientSuggestions, setPatientSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [searchTimeout, setSearchTimeout] = useState(null as any);
+  const [searchTimeout, setSearchTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
   const [isSearchingPatients, setIsSearchingPatients] = useState(false); // UX Audit Registrar #11
-  const [phoneCheckTimeout, setPhoneCheckTimeout] = useState(null as any); // ✅ Timeout для проверки телефона
-  const [phoneError, setPhoneError] = useState(null as any); // ✅ Ошибка уникальности телефона
+  const [phoneCheckTimeout, setPhoneCheckTimeout] = useState<ReturnType<typeof setTimeout> | null>(null); // ✅ Timeout для проверки телефона
+  const [phoneError, setPhoneError] = useState<{ message?: string; patient?: unknown } | null>(null); // ✅ Ошибка уникальности телефона
   const [servicesData, setServicesData] = useState([]);
   const [doctorsData, setDoctorsData] = useState([]);
   const [filteredServices, setFilteredServices] = useState([]);
@@ -285,10 +285,10 @@ const AppointmentWizardV2 = ({
             }
           };
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.warn('[AppointmentWizardV2] Failed to hydrate edit-mode patient gender', {
           patientId,
-          error: error?.message || error
+          error: (error as Error)?.message || error
         });
       }
     };
@@ -386,7 +386,7 @@ const AppointmentWizardV2 = ({
       } else {
         setPhoneError(null);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('Ошибка проверки телефона:', error);
     }
   };
@@ -520,7 +520,7 @@ const AppointmentWizardV2 = ({
 
       setPatientSuggestions(sorted.slice(0, 10)); // Максимум 10 результатов
       setShowSuggestions(true);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('Ошибка поиска пациентов:', error);
     } finally {
       setIsSearchingPatients(false);
@@ -614,7 +614,7 @@ const AppointmentWizardV2 = ({
             const profilesRes = await api.get('/queues/profiles?active_only=true') as any;
             profiles = profilesRes.data?.profiles || [];
             setQueueProfiles(profiles);
-          } catch (e: any) {
+          } catch (e: unknown) {
             logger.error('Failed to load queue profiles for filter:', e);
           }
         }
@@ -642,7 +642,7 @@ const AppointmentWizardV2 = ({
 
         setServicesData(allServices);
         setFilteredServices(allServices);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('Ошибка загрузки услуг:', error);
     }
   }, [activeTab, editMode]);
@@ -837,7 +837,7 @@ const AppointmentWizardV2 = ({
     try {
       const { data } = await api.get('/registrar/doctors');
       setDoctorsData(data);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('Ошибка загрузки врачей:', error);
     }
   }, []);
@@ -950,7 +950,7 @@ const AppointmentWizardV2 = ({
         if (!isCancelled) {
           setRepeatEligibilityByItemId(mergedMap);
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.error('❌ Ошибка preview повторной скидки:', error);
         const fallbackMap = { ...initialMap };
         previewCandidates.forEach((candidate) => {
@@ -1405,7 +1405,7 @@ const AppointmentWizardV2 = ({
         toast.error(t('misc.aw_session_expired'));
         return;
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('❌ Ошибка проверки токена:', error);
       toast.error(t('misc.aw_auth_check_failed'));
       return;
@@ -1513,7 +1513,7 @@ const AppointmentWizardV2 = ({
               // UX Audit Stage 3: заменён raw fetch() PUT на updatePatient().
               await updatePatient(foundPatient.id as string | number, updateData);
               logger.log('✅ Patient data updated');
-            } catch (e: any) {
+            } catch (e: unknown) {
               logger.warn('⚠️ Failed to update patient:', e);
             }
           }
@@ -2181,7 +2181,7 @@ const AppointmentWizardV2 = ({
                       })
                       ));
                       logger.log('✅ Все удаленные записи очереди успешно отменены');
-                    } catch (error: any) {
+                    } catch (error: unknown) {
                       logger.error('❌ Ошибка при отмене записей очереди:', error);
                     }
                   } else {
@@ -2382,9 +2382,9 @@ const AppointmentWizardV2 = ({
 
       onComplete?.(result);
       onClose();
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('Ошибка завершения мастера:', error);
-      toast.error(error.message || t('misc.aw_error_occurred'));
+      toast.error((error as Error)?.message || t('misc.aw_error_occurred'));
     } finally {
       setIsProcessing(false);
     }
@@ -2540,7 +2540,7 @@ const AppointmentWizardV2 = ({
     try {
       await loadServices();
       toast.success(t('misc.aw_services_list_updated'));
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('Ошибка обновления услуг:', error);
       toast.error(t('misc.aw_services_list_update_failed'));
     } finally {
@@ -2649,11 +2649,11 @@ const AppointmentWizardV2 = ({
       title={t('misc.aw_close')}
       aria-label={t('misc.aw_close')}
       style={wizardHeaderCloseStyle}
-      onMouseEnter={(e: any) => {
+      onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
         e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)';
         e.currentTarget.style.borderColor = 'var(--mac-border-secondary)';
       }}
-      onMouseLeave={(e: any) => {
+      onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
         e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)';
         e.currentTarget.style.borderColor = 'var(--mac-border)';
       }}>
@@ -2705,14 +2705,14 @@ const AppointmentWizardV2 = ({
           transform: activeServiceCategory === cat.id ? 'translateY(-1px)' : 'translateY(0)',
           boxShadow: activeServiceCategory === cat.id ? '0 6px 14px rgba(59, 130, 246, 0.08)' : 'var(--mac-shadow-sm)'
         }}
-        onMouseEnter={(e: any) => {
+        onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
           if (activeServiceCategory !== cat.id) {
             e.currentTarget.style.background = 'var(--mac-bg-tertiary)';
             e.currentTarget.style.transform = 'translateY(-1px)';
             e.currentTarget.style.boxShadow = 'var(--mac-shadow-sm)';
           }
         }}
-        onMouseLeave={(e: any) => {
+        onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
           if (activeServiceCategory !== cat.id) {
             e.currentTarget.style.background = 'var(--mac-bg-secondary)';
             e.currentTarget.style.transform = 'translateY(0)';
@@ -2759,14 +2759,14 @@ const AppointmentWizardV2 = ({
           transition: 'all 0.2s',
           boxShadow: 'var(--mac-shadow-sm)'
         }}
-        onMouseEnter={(e: any) => {
+        onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
           if (!isReloadingServices) {
             e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)';
             e.currentTarget.style.borderColor = 'var(--mac-primary)';
             e.currentTarget.style.color = 'var(--mac-primary)';
           }
         }}
-        onMouseLeave={(e: any) => {
+        onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
           e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)';
           e.currentTarget.style.borderColor = 'var(--mac-border)';
           e.currentTarget.style.color = 'var(--mac-text-secondary)';
@@ -2795,12 +2795,12 @@ const AppointmentWizardV2 = ({
           transition: 'all 0.2s',
           boxShadow: 'var(--mac-shadow-sm)'
         }}
-        onMouseEnter={(e: any) => {
+        onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
           e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)';
           e.currentTarget.style.borderColor = 'var(--mac-border-secondary)';
           e.currentTarget.style.color = 'var(--mac-text-primary)';
         }}
-        onMouseLeave={(e: any) => {
+        onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
           e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)';
           e.currentTarget.style.borderColor = 'var(--mac-border)';
           e.currentTarget.style.color = 'var(--mac-text-secondary)';
