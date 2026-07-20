@@ -188,7 +188,7 @@ const CloudPrintingManager = () => {
 
   const loadStatistics = async () => {
     try {
-      const response = await api.get('/cloud-printing/statistics') as any;
+      const response = (await api.get('/cloud-printing/statistics')) as import('axios').AxiosResponse<Record<string, unknown>>;
       setStatistics(response.data?.statistics);
     } catch (error) {
       logger.error('Ошибка загрузки статистики:', error);
@@ -202,10 +202,10 @@ const CloudPrintingManager = () => {
         ? await api.post(`/print/printers/${encodeURIComponent(printerId)}/test`)
         : await api.post(`/cloud-printing/test/${providerName}/${printerId}`);
 
-      if (response.data?.success || response.data?.status === 'printed' || response.data?.message) {
+      if (response.data?.success || response.data?.status === 'printed' || String(response.data?.message ?? '')) {
         toast.success(t('admin2.cp_test_print_sent'));
       } else {
-        toast.error(response.data?.message || t('admin2.cp_test_print_error'));
+        toast.error(String(response.data?.message ?? '') || t('admin2.cp_test_print_error'));
       }
     } catch (error) {
       logger.error('Ошибка тестовой печати:', error);
@@ -220,7 +220,7 @@ const CloudPrintingManager = () => {
     }
 
     try {
-      const response = await api.post('/cloud-printing/print', printForm) as any;
+      const response = (await api.post('/cloud-printing/print', printForm)) as import('axios').AxiosResponse<Record<string, unknown>>;
       if (response.data?.success) {
         toast.success(t('admin2.cp_document_sent'));
         setPrintForm({
@@ -229,7 +229,7 @@ const CloudPrintingManager = () => {
           content: ''
         });
       } else {
-        toast.error(response.data?.message || t('admin2.cp_print_error'));
+        toast.error(String(response.data?.message ?? '') || t('admin2.cp_print_error'));
       }
     } catch (error) {
       logger.error('Ошибка печати:', error);
@@ -244,11 +244,11 @@ const CloudPrintingManager = () => {
     }
 
     try {
-      const response = await api.post('/cloud-printing/print/medical', medicalForm) as any;
+      const response = (await api.post('/cloud-printing/print/medical', medicalForm)) as import('axios').AxiosResponse<Record<string, unknown>>;
       if (response.data?.success) {
         toast.success(t('admin2.cp_medical_document_sent'));
       } else {
-        toast.error(response.data?.message || t('admin2.cp_print_error'));
+        toast.error(String(response.data?.message ?? '') || t('admin2.cp_print_error'));
       }
     } catch (error) {
       logger.error('Ошибка печати медицинского документа:', error);

@@ -85,10 +85,33 @@ const buildPaymentPayload = (form) => ({
 
 const BillingManager = () => {
   const [activeTab, setActiveTab] = useState('invoices');
-  const [invoices, setInvoices] = useState([]);
-  const [payments, setPayments] = useState([]);
-  const [analytics, setAnalytics] = useState(null as any);
-  const [, setSettings] = useState(null);
+  interface Invoice {
+    id: string | number;
+    invoice_number?: string;
+    status?: string;
+    invoice_type?: string;
+    patient_id?: string | number;
+    issue_date?: string;
+    due_date?: string;
+    total_amount?: number;
+    balance?: number;
+    [k: string]: unknown;
+  }
+  interface Payment {
+    id: string | number;
+    payment_number?: string;
+    is_confirmed?: boolean;
+    invoice_id?: string | number;
+    patient_id?: string | number;
+    amount?: number;
+    payment_method?: string;
+    payment_date?: string;
+    [k: string]: unknown;
+  }
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [analytics, setAnalytics] = useState<{ summary?: { total_invoices?: number; total_amount?: number; paid_amount?: number; overdue_amount?: number; recent_invoices?: unknown[]; [k: string]: unknown }; status_breakdown?: Array<{ status?: string; count?: number; [k: string]: unknown }>; [k: string]: unknown } | null>(null);
+  const [, setSettings] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(false);
   const [showCreateInvoice, setShowCreateInvoice] = useState(false);
   const [showRecordPayment, setShowRecordPayment] = useState(false);
@@ -122,7 +145,14 @@ const BillingManager = () => {
   });
 
   // Форма для записи платежа
-  const [paymentForm, setPaymentForm] = useState({
+  const [paymentForm, setPaymentForm] = useState<{
+    invoice_id: string | number;
+    amount: number;
+    payment_method: string;
+    reference_number: string;
+    description: string;
+    notes: string;
+  }>({
     invoice_id: '',
     amount: 0,
     payment_method: 'cash',
@@ -135,16 +165,16 @@ const BillingManager = () => {
     setLoading(true);
     try {
       if (activeTab === 'invoices') {
-        const response = await api.get('/billing/invoices') as any;
-        setInvoices(response.data);
+        const response = (await api.get('/billing/invoices')) as import('axios').AxiosResponse<unknown[]>;
+        setInvoices(response.data as Invoice[]);
       } else if (activeTab === 'payments') {
-        const response = await api.get('/billing/payments') as any;
-        setPayments(response.data);
+        const response = (await api.get('/billing/payments')) as import('axios').AxiosResponse<unknown[]>;
+        setPayments(response.data as Payment[]);
       } else if (activeTab === 'analytics') {
-        const response = await api.get('/billing/analytics') as any;
+        const response = (await api.get('/billing/analytics')) as import('axios').AxiosResponse<Record<string, unknown>>;
         setAnalytics(response.data);
       } else if (activeTab === 'settings') {
-        const response = await api.get('/billing/settings') as any;
+        const response = (await api.get('/billing/settings')) as import('axios').AxiosResponse<Record<string, unknown>>;
         setSettings(response.data);
       }
     } catch (error) {
@@ -218,7 +248,7 @@ const BillingManager = () => {
 
   const handleViewInvoiceHTML = async (invoiceId) => {
     try {
-      const response = await api.get(`/billing/invoices/${invoiceId}/html`) as any;
+      const response = (await api.get(`/billing/invoices/${invoiceId}/html`)) as import('axios').AxiosResponse<Record<string, unknown>>;
       // PR-35 / P0-7: Sanitize backend HTML before writing to a new window.
       // Previously: document.write(response.data.html) wrote raw backend
       // output to a new window — XSS if backend was compromised or if a
@@ -420,7 +450,7 @@ const BillingManager = () => {
               </label>
               <Select
             value={invoiceForm.invoice_type}
-            onChange={(value: any) => setInvoiceForm({ ...invoiceForm, invoice_type: String(value) })}
+            onChange={(value: unknown) => setInvoiceForm({ ...invoiceForm, invoice_type: String(value) })}
             options={invoiceTypeOptions}
             size="large" />
           
@@ -661,7 +691,7 @@ const BillingManager = () => {
                   <div>{t('admin2.bill_method_short')} {paymentMethodLabels[payment.payment_method] || payment.payment_method}</div>
                   <div>{t('admin2.bill_date')} {new Date(payment.payment_date).toLocaleDateString()}</div>
                   {payment.reference_number &&
-              <div>{t('admin2.bill_ref_short')} {payment.reference_number}</div>
+              <div>{t('admin2.bill_ref_short')} {String(payment.reference_number ?? '')}</div>
               }
                 </div>
               </div>
