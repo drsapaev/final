@@ -124,9 +124,9 @@ jobs:
             - 'backend/tests/unit/test_telemetry_onboarding_privacy.py'
             - 'frontend/src/components/TelegramManager.jsx'
             - 'frontend/src/pages/TelegramMiniAppPatientShell.jsx'
-            - 'frontend/src/__tests__/telegramManagerOnboardingRequests.test.js'
-            - 'frontend/src/__tests__/telegramMiniAppOnboardingGuardrails.test.js'
-            - 'frontend/e2e/telegram-miniapp-release-gate.spec.js'
+            - 'frontend/src/__tests__/telegramManagerOnboardingRequests.test.ts'
+            - 'frontend/src/__tests__/telegramMiniAppOnboardingGuardrails.test.ts'
+            - 'frontend/e2e/telegram-miniapp-release-gate.spec.ts'
             - 'scripts/telegram_miniapp_release_gate_score.ps1'
             - 'scripts/run_backend_pytest.ps1'
             - 'scripts/run_python.ps1'
@@ -643,6 +643,12 @@ jobs:
         npm run lint:check
         echo "✅ Frontend lint passed"
 
+    - name: 🔒 Type-check frontend (Phase 0 TS migration gate)
+      run: |
+        cd frontend
+        npm run type-check
+        echo "✅ Frontend type-check passed"
+
     - name: Icon-only controls accessibility sweep
       run: |
         cd frontend
@@ -759,19 +765,20 @@ jobs:
       run: |
         cd frontend
         npx playwright install --with-deps chromium
-        npx playwright test e2e/registrar-time.spec.js --project=chromium
+        # Spec migrated .spec.js -> .spec.ts in PR #2433 (TS migration).
+        npx playwright test e2e/registrar-time.spec.ts --project=chromium
 
     - name: 📸 UX Audit e2e + Visual regression (Chromium)
       run: |
         cd frontend
-        npx playwright test e2e/registrar-ux-audit.spec.js e2e/cashier-ux-audit.spec.js e2e/visual-regression.spec.js --project=chromium
+        npx playwright test e2e/registrar-ux-audit.spec.ts e2e/cashier-ux-audit.spec.ts e2e/visual-regression.spec.ts --project=chromium
       continue-on-error: true  # Visual regression — non-blocking, informational only
 
     - name: 📸 Update visual regression baseline snapshots (manual only)
       if: github.event_name == 'workflow_dispatch' && github.event.inputs.update_snapshots == 'true'
       run: |
         cd frontend
-        npx playwright test e2e/visual-regression.spec.js --project=chromium --update-snapshots
+        npx playwright test e2e/visual-regression.spec.ts --project=chromium --update-snapshots
       continue-on-error: true
 
     - name: 📤 Upload visual regression artifacts
@@ -2068,7 +2075,8 @@ jobs:
       run: |
         cd frontend
         npx playwright install --with-deps chromium
-        npx playwright test e2e/telegram-miniapp-release-gate.spec.js --project=chromium --workers=1 --reporter=line
+        # Spec migrated .spec.js -> .spec.ts in PR #2433 (TS migration).
+        npx playwright test e2e/telegram-miniapp-release-gate.spec.ts --project=chromium --workers=1 --reporter=line
 
     - name: рџ§® Telegram Mini App release score
       shell: pwsh

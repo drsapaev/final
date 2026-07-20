@@ -9,17 +9,41 @@ import pytest
 ROOT = Path(__file__).resolve().parents[3]
 BACKEND_NOTIFICATIONS_PY = ROOT / "backend" / "app" / "api" / "v1" / "endpoints" / "notifications.py"
 BACKEND_WS_PY = ROOT / "backend" / "app" / "api" / "v1" / "endpoints" / "notification_websocket.py"
-FRONTEND_ENDPOINTS_JS = ROOT / "frontend" / "src" / "api" / "endpoints.js"
-FRONTEND_SERVICES_JS = ROOT / "frontend" / "src" / "api" / "services.js"
-FRONTEND_CENTER_JSX = ROOT / "frontend" / "src" / "contexts" / "NotificationCenterContext.jsx"
-FRONTEND_WS_JSX = ROOT / "frontend" / "src" / "contexts" / "NotificationWebSocketContext.jsx"
-FRONTEND_INBOX_JSX = ROOT / "frontend" / "src" / "components" / "notifications" / "NotificationInbox.jsx"
-FRONTEND_PROMPT_JSX = ROOT / "frontend" / "src" / "components" / "chat" / "NotificationPrompt.jsx"
-FRONTEND_ROLE_CENTER_JSX = ROOT / "frontend" / "src" / "components" / "notifications" / "RoleNotificationCenter.jsx"
-CARDIO_PANEL = ROOT / "frontend" / "src" / "pages" / "CardiologistPanelUnified.jsx"
-DENTIST_PANEL = ROOT / "frontend" / "src" / "pages" / "DentistPanelUnified.jsx"
-DERMA_PANEL = ROOT / "frontend" / "src" / "pages" / "DermatologistPanelUnified.jsx"
-LAB_PANEL = ROOT / "frontend" / "src" / "pages" / "LabPanel.jsx"
+
+
+def _src(path: str) -> Path:
+    """Resolve a frontend source path, preferring .ts/.tsx over .js/.jsx.
+
+    Frontend migrated .js -> .ts and .jsx -> .tsx (PR #2433 and predecessors).
+    Tests must accept either extension to survive migration churn.
+    """
+    full = ROOT / path
+    if full.exists():
+        return full
+    # Try the migrated extension
+    if path.endswith(".jsx"):
+        migrated = full.with_suffix(".tsx")
+    elif path.endswith(".js"):
+        migrated = full.with_suffix(".ts")
+    else:
+        migrated = full
+    if migrated.exists():
+        return migrated
+    # Fall back to original (let the failure surface a clear FileNotFoundError)
+    return full
+
+
+FRONTEND_ENDPOINTS_JS = _src("frontend/src/api/endpoints.js")
+FRONTEND_SERVICES_JS = _src("frontend/src/api/services.js")
+FRONTEND_CENTER_JSX = _src("frontend/src/contexts/NotificationCenterContext.jsx")
+FRONTEND_WS_JSX = _src("frontend/src/contexts/NotificationWebSocketContext.jsx")
+FRONTEND_INBOX_JSX = _src("frontend/src/components/notifications/NotificationInbox.jsx")
+FRONTEND_PROMPT_JSX = _src("frontend/src/components/chat/NotificationPrompt.jsx")
+FRONTEND_ROLE_CENTER_JSX = _src("frontend/src/components/notifications/RoleNotificationCenter.jsx")
+CARDIO_PANEL = _src("frontend/src/pages/CardiologistPanelUnified.jsx")
+DENTIST_PANEL = _src("frontend/src/pages/DentistPanelUnified.jsx")
+DERMA_PANEL = _src("frontend/src/pages/DermatologistPanelUnified.jsx")
+LAB_PANEL = _src("frontend/src/pages/LabPanel.jsx")
 
 ROUTE_PATTERN = re.compile(r'@router\.(get|post|put|patch|delete)\("([^"]+)"')
 
@@ -146,10 +170,12 @@ def test_frontend_notifications_prompt_uses_safe_notification_checks() -> None:
 
 
 @pytest.mark.unit
-def test_role_panels_use_shared_notification_center_without_direct_toasts() -> None:
+def test_role_panels_delegate_notifications_to_global_center_without_direct_toasts() -> None:
+    """After #2439, panels no longer import RoleNotificationCenter —
+    GlobalNotificationCenter in App shell handles all panels."""
     page_files = [CARDIO_PANEL, DENTIST_PANEL, DERMA_PANEL, LAB_PANEL]
 
     for path in page_files:
         content = path.read_text(encoding="utf-8")
-        assert "RoleNotificationCenter" in content
+        assert "RoleNotificationCenter" not in content
         assert "react-toastify" not in content

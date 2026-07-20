@@ -10,6 +10,7 @@ on:
       - 'backend/app/api/v1/endpoints/phrase_suggest.py'
       - 'backend/app/services/ai_feature_gating.py'
       - 'backend/app/services/feature_flags.py'
+      - 'frontend/e2e/ai-safety-guardrails.spec.ts'
       - 'frontend/e2e/ai-safety-guardrails.spec.js'
       - '.github/workflows/ai-safety-guardrails.yml'
   pull_request:
@@ -21,6 +22,7 @@ on:
       - 'backend/app/api/v1/endpoints/phrase_suggest.py'
       - 'backend/app/services/ai_feature_gating.py'
       - 'backend/app/services/feature_flags.py'
+      - 'frontend/e2e/ai-safety-guardrails.spec.ts'
       - 'frontend/e2e/ai-safety-guardrails.spec.js'
   schedule:
     # Nightly 02:30 UTC — catch regressions from unrelated refactors
@@ -172,7 +174,17 @@ jobs:
           QA_REGISTRAR_PASSWORD: QA_PASSWORD_123
         run: |
           cd frontend
-          npx playwright test e2e/ai-safety-guardrails.spec.js --project=chromium --reporter=html
+          # Spec migrated .spec.js -> .spec.ts in PR #2433 (TS migration).
+          # Resolve whichever exists; fail loudly if neither.
+          if [ -f e2e/ai-safety-guardrails.spec.ts ]; then
+            SPEC=e2e/ai-safety-guardrails.spec.ts
+          elif [ -f e2e/ai-safety-guardrails.spec.js ]; then
+            SPEC=e2e/ai-safety-guardrails.spec.js
+          else
+            echo "ERROR: ai-safety-guardrails.spec.{ts,js} not found" >&2
+            exit 1
+          fi
+          npx playwright test "$SPEC" --project=chromium --reporter=html
 
       - name: Upload Playwright report
         if: always()

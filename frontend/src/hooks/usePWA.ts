@@ -1,0 +1,280 @@
+import { useState, useEffect, useCallback } from 'react';
+
+import logger from '../utils/logger';
+
+// Window augmentation for PWA internal flags
+interface PWABrowserWindow extends Window {
+  __sw_registration_pending?: boolean;
+  __sw_registered?: boolean;
+  __sw_message_listener_added?: boolean;
+  __PWA_INIT?: boolean;
+}
+function getPWABrowserWindow(): PWABrowserWindow {
+  return window as unknown as PWABrowserWindow;
+}
+/**
+ * Hook для работы с PWA функциональностью
+ * ИСПРАВЛЕНО: Убран избыточный импорт React, добавлены SSR checks
+ */
+export const usePWA = () => {
+  // SSR protection
+  const isClient = typeof window !== 'undefined';
+
+  // ✅ ИСПРАВЛЕНИЕ: Всегда вызываем хуки первыми
+  const [isInstallable, setIsInstallable] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(false);
+  const [isOnline, setIsOnline] = useState(isClient ? window.navigator.onLine : true);
+  const [isServiceWorkerReady, setIsServiceWorkerReady] = useState(false);
+  const [updateAvailable, setUpdateAvailable] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+
+  // Проверка установки PWA
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    // Проверяем, запущено ли приложение в standalone режиме
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+                         (window.navigator as unknown as { standalone?: boolean }).standalone ||
+                         document.referrer.includes('android-app://');
+    
+    setIsInstalled(isStandalone);
+  }, []);
+
+  // Обработка события beforeinstallprompt
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const handleBeforeInstallPrompt = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setIsInstallable(true);
+    };
+
+    const handleAppInstalled = () => {
+      setIsInstalled(true);
+      setIsInstallable(false);
+      setDeferredPrompt(null);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('appinstalled', handleAppInstalled);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
+  }, []);
+
+  // Отслеживание онлайн/офлайн статуса
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Регистрация и обновление Service Worker
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
+    
+    // ✅ ПРЕДОТВРАЩЕНИЕ МНОЖЕСТВЕННОЙ РЕГИСТРАЦИИ
+    // Проверяем, не зарегистрирован ли уже Service Worker
+    if (getPWABrowserWindow().__sw_registration_pending || getPWABrowserWindow().__sw_registered) {
+      // Если регистрация уже идет или завершена, просто проверяем состояние
+      navigator.serviceWorker.ready.then((registration) => {
+        setIsServiceWorkerReady(true);
+        logger.log('Service Worker already registered:', registration);
+      }).catch(() => {
+        // Если регистрация не прошла, попробуем снова
+        getPWABrowserWindow().__sw_registration_pending = false;
+        getPWABrowserWindow().__sw_registered = false;
+      });
+      return;
+    }
+    
+    // Помечаем, что регистрация началась
+    getPWABrowserWindow().__sw_registration_pending = true;
+    
+    navigator.serviceWorker.register('/sw.js')
+      .then((registration) => {
+        getPWABrowserWindow().__sw_registration_pending = false;
+        getPWABrowserWindow().__sw_registered = true;
+        logger.log('Service Worker registered:', registration);
+        setIsServiceWorkerReady(true);
+
+        // Проверка обновлений
+        registration.addEventListener('updatefound', () => {
+          const newWorker = registration.installing;
+          
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              setUpdateAvailable(true);
+            }
+          });
+        });
+      })
+      .catch((error) => {
+        getPWABrowserWindow().__sw_registration_pending = false;
+        getPWABrowserWindow().__sw_registered = false;
+        logger.error('Service Worker registration failed:', error);
+      });
+
+    // Слушаем сообщения от Service Worker (только один раз)
+    if (!getPWABrowserWindow().__sw_message_listener_added) {
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data && event.data.type === 'SYNC_COMPLETE') {
+          logger.log('Background sync completed');
+        }
+      });
+      getPWABrowserWindow().__sw_message_listener_added = true;
+    }
+  }, []);
+
+  // Установка PWA
+  const installPWA = useCallback(async () => {
+    if (typeof window === 'undefined' || !deferredPrompt) return false;
+
+    try {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      
+      if (outcome === 'accepted') {
+        logger.log('PWA installation accepted');
+        setIsInstallable(false);
+        setDeferredPrompt(null);
+        return true;
+      } else {
+        logger.log('PWA installation declined');
+        return false;
+      }
+    } catch (error) {
+      logger.error('PWA installation error:', error);
+      return false;
+    }
+  }, [deferredPrompt]);
+
+  // Обновление Service Worker
+  const updateServiceWorker = useCallback(() => {
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !navigator.serviceWorker.controller) return;
+    
+    navigator.serviceWorker.controller.postMessage({ type: 'SKIP_WAITING' });
+    window.location.reload();
+  }, []);
+
+  // Запрос разрешения на уведомления
+  const requestNotificationPermission = useCallback(async (): Promise<NotificationPermission | 'not-supported'> => {
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      return 'not-supported';
+    }
+
+    if (Notification.permission === 'granted') {
+      return 'granted';
+    }
+
+    if (Notification.permission !== 'denied') {
+      const permission = await Notification.requestPermission();
+      return permission;
+    }
+
+    return 'denied';
+  }, []);
+
+  // Отправка push уведомления
+  interface PushNotificationOptions {
+  body?: string;
+  icon?: string;
+  badge?: string;
+  tag?: string;
+  requireInteraction?: boolean;
+  actions?: Array<{ action: string; title: string; icon?: string }>;
+  data?: unknown;
+}
+
+  const sendNotification = useCallback(async (title: string, options: PushNotificationOptions = {}) => {
+    const permission = await requestNotificationPermission();
+    
+    if (permission === 'granted') {
+      const registration = await navigator.serviceWorker.ready;
+      
+      await registration.showNotification(title, {
+        body: options.body || '',
+        icon: options.icon || '/favicon.ico',
+        badge: options.badge || '/favicon.ico',
+        tag: options.tag || 'clinic-notification',
+        requireInteraction: options.requireInteraction || false,
+        actions: options.actions || [
+          {
+            action: 'explore',
+            title: 'Открыть',
+            icon: '/favicon.ico'
+          },
+          {
+            action: 'close',
+            title: 'Закрыть'
+          }
+        ],
+        ...options
+      });
+      
+      return true;
+    }
+    
+    return false;
+  }, [requestNotificationPermission]);
+
+  // Кэширование URL в Service Worker
+  const cacheUrls = useCallback(async (urls) => {
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !navigator.serviceWorker.controller) return;
+    
+    navigator.serviceWorker.controller.postMessage({
+      type: 'CACHE_URLS',
+      urls
+    });
+  }, []);
+
+  // Проверка поддержки функций
+  const capabilities = {
+    serviceWorker: typeof window !== 'undefined' && 'serviceWorker' in navigator,
+    notifications: typeof window !== 'undefined' && 'Notification' in window,
+    backgroundSync: typeof window !== 'undefined' && 'serviceWorker' in navigator && 'sync' in window.ServiceWorkerRegistration.prototype,
+    periodicSync: typeof window !== 'undefined' && 'serviceWorker' in navigator && 'periodicSync' in window.ServiceWorkerRegistration.prototype,
+    webShare: typeof window !== 'undefined' && 'share' in navigator,
+    clipboard: typeof window !== 'undefined' && 'clipboard' in navigator,
+    geolocation: typeof window !== 'undefined' && 'geolocation' in navigator
+  };
+
+  // Функция для проверки, нужно ли показывать промпт установки
+  const shouldShowInstallPrompt = useCallback(() => {
+    return isInstallable && !isInstalled && deferredPrompt;
+  }, [isInstallable, isInstalled, deferredPrompt]);
+
+  return {
+    // Состояние
+    isInstallable: isClient ? isInstallable : false,
+    isInstalled: isClient ? isInstalled : false,
+    isOnline: isClient ? isOnline : true,
+    isServiceWorkerReady: isClient ? isServiceWorkerReady : false,
+    updateAvailable: isClient ? updateAvailable : false,
+    
+    // Методы
+    installPWA: isClient ? installPWA : () => Promise.resolve(false),
+    updateServiceWorker: isClient ? updateServiceWorker : () => {},
+    requestNotificationPermission: isClient ? requestNotificationPermission : () => Promise.resolve('not-supported'),
+    sendNotification: isClient ? sendNotification : () => Promise.resolve(false),
+    cacheUrls: isClient ? cacheUrls : () => {},
+    shouldShowInstallPrompt: isClient ? shouldShowInstallPrompt : () => false,
+    
+    // Возможности
+    capabilities: isClient ? capabilities : {}
+  };
+};
+
+export default usePWA;

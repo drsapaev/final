@@ -122,6 +122,19 @@ def _read_existing_files(paths: list[str]) -> tuple[str, list[str]]:
     existing: list[str] = []
     for path in paths:
         file_path = Path(path)
+        # Frontend migrated .js -> .ts and .jsx -> .tsx. If the configured
+        # path does not exist, try the migrated extension before giving up.
+        if not file_path.exists():
+            if file_path.suffix == ".js":
+                migrated = file_path.with_suffix(".ts")
+                if migrated.exists():
+                    file_path = migrated
+                    path = migrated.as_posix()
+            elif file_path.suffix == ".jsx":
+                migrated = file_path.with_suffix(".tsx")
+                if migrated.exists():
+                    file_path = migrated
+                    path = migrated.as_posix()
         if file_path.exists():
             existing.append(path)
             chunks.append(file_path.read_text(encoding="utf-8", errors="ignore"))

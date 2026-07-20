@@ -22,6 +22,11 @@ paths = [
   '''frontend/staging\.env\.sample''',
   # OpenAPI spec may contain example tokens
   '''backend/openapi\.json''',
+  # Generated TS types from OpenAPI inherit example/default values that
+  # gitleaks may flag (e.g. ClickConfig.base_url default "https://api.click.uz/v2").
+  # These are documentation strings, not secrets. Regenerable via
+  # `npm run generate:api-types`.
+  '''frontend/src/types/generated/.*\.ts''',
   # Example patient JSON fixtures
   '''backend/test_patient\.json''',
   # CI workflow uses a literal placeholder password for PG service
@@ -82,7 +87,10 @@ tags = ["key", "telegram"]
 [[rules]]
 id = "click-uz-merchant"
 description = "Click.uz merchant/user ID + secret combo"
-regex = '''click\.uz|CLICK_SECRET|CLICK_MERCHANT_USER_ID'''
+# Match Click.uz credential patterns: env-style secret values or merchant
+# identifiers, but NOT the public API base URL `https://api.click.uz/v2`
+# (which is a public documentation endpoint, not a secret).
+regex = '''CLICK_SECRET_KEY|CLICK_MERCHANT_USER_ID|CLICK_SERVICE_ID|CLICK_SECRET\s*[:=]'''
 tags = ["key", "payment"]
 
 [[rules]]

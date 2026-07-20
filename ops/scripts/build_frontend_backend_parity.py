@@ -18,6 +18,25 @@ HTTP_METHODS = {"get", "post", "put", "patch", "delete", "options", "head", "tra
 CRITICAL_PREFIXES = ["/api/v1/auth", "/api/v1/queue", "/api/v1/billing", "/api/v1/emr"]
 CONST_TOKEN_PATTERN = re.compile(r"API_ENDPOINTS((?:\.[A-Z_]+)+)")
 PARAM_PATTERN = re.compile(r"\{[^/]+\}")
+
+
+def _resolve_frontend_path(path: Path) -> Path:
+    """Resolve a frontend source path, preferring .ts/.tsx over .js/.jsx.
+
+    The frontend migrated .js -> .ts and .jsx -> .tsx; this helper keeps the
+    parity script and its CLI defaults working across both layouts.
+    """
+    if path.exists():
+        return path
+    if path.suffix == ".js":
+        migrated = path.with_suffix(".ts")
+        if migrated.exists():
+            return migrated
+    elif path.suffix == ".jsx":
+        migrated = path.with_suffix(".tsx")
+        if migrated.exists():
+            return migrated
+    return path  # let the caller surface a clear FileNotFoundError
 PATH_FRAGMENT_PATTERN = re.compile(r"/[A-Za-z0-9_{}./-]+")
 TEMPLATE_EXPR_PATTERN = re.compile(r"\$\{([^{}]+)\}")
 ROLE_LITERAL_PATTERN = re.compile(r"'([^']+)'|\"([^\"]+)\"")
@@ -101,14 +120,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--endpoints-js",
         type=Path,
-        default=Path("frontend/src/api/endpoints.js"),
-        help="Path to API_ENDPOINTS JS source.",
+        default=Path("frontend/src/api/endpoints.ts"),
+        help="Path to API_ENDPOINTS source (.ts after TS migration, .js legacy).",
     )
     parser.add_argument(
         "--frontend-app",
         type=Path,
-        default=Path("frontend/src/App.jsx"),
-        help="Path to frontend app routes for RBAC alignment.",
+        default=Path("frontend/src/App.tsx"),
+        help="Path to frontend app routes for RBAC alignment (.tsx after TS migration).",
     )
     parser.add_argument(
         "--report-json",
@@ -653,7 +672,11 @@ def _resolve_route_registry_path(frontend_app_path: Path, content: str) -> Path 
         if candidate.exists():
             return candidate
 
-    fallback = frontend_app_path.parent / "routing" / "routeRegistry.js"
+    # Frontend routing registry: TS migration renamed routeRegistry.js -> .ts.
+    # Accept either; prefer the migrated extension when present.
+    fallback_js = frontend_app_path.parent / "routing" / "routeRegistry.js"
+    fallback_ts = frontend_app_path.parent / "routing" / "routeRegistry.ts"
+    fallback = fallback_ts if fallback_ts.exists() else fallback_js
     if fallback.exists():
         return fallback
     return None
@@ -895,11 +918,13 @@ def main() -> int:
 
     backend_ops = parse_openapi_operations(args.openapi)
     frontend_calls = load_frontend_calls(args.inventory)
-    constants = parse_api_endpoints_constants(args.endpoints_js)
+    endpoints_path = _resolve_frontend_path(args.endpoints_js)
+    constants = parse_api_endpoints_constants(endpoints_path)
     parity = build_parity(backend_ops, frontend_calls, constants)
     missing_stats = critical_missing_stats(parity["missing_in_frontend"])
     critical_flows = evaluate_critical_flows(parity)
-    frontend_role_paths = parse_frontend_route_roles(args.frontend_app)
+    frontend_app_path = _resolve_frontend_path(args.frontend_app)
+    frontend_role_paths = parse_frontend_route_roles(frontend_app_path)
     rbac_alignment = evaluate_rbac_alignment(frontend_role_paths)
 
     for prefix, count in missing_stats.items():

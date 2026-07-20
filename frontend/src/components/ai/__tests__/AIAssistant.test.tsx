@@ -1,0 +1,353 @@
+/**
+ * Unit tests for AIAssistant component
+ */
+import React from 'react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { describe, it, beforeEach, expect, vi } from 'vitest';
+import PropTypes from 'prop-types';
+
+function SnackbarProviderMock({ children }) {
+  return <div>{children}</div>;
+}
+
+vi.mock('notistack', () => ({
+  SnackbarProvider: SnackbarProviderMock,
+  useSnackbar: () => ({ enqueueSnackbar: vi.fn() })
+}));
+
+vi.mock('../../../contexts/ThemeContext', () => ({
+  useTheme: () => ({ theme: 'light' })
+}));
+
+vi.mock('../../../api/mcpClient', () => ({
+  mcpAPI: {
+    analyzeComplaint: vi.fn(),
+    suggestICD10: vi.fn(),
+    interpretLabResults: vi.fn(),
+    analyzeSkinLesion: vi.fn(),
+    analyzeImage: vi.fn()
+  }
+}));
+
+import AIAssistant from '../AIAssistant';
+import { mcpAPI } from '../../../api/mcpClient';
+
+const mcpAPIMocks = mcpAPI as unknown as {
+  analyzeComplaint: { mockResolvedValue: (v: unknown) => void; mockRejectedValue: (e: unknown) => void };
+  suggestICD10: { mockResolvedValue: (v: unknown) => void; mockRejectedValue: (e: unknown) => void };
+  interpretLabResults: { mockResolvedValue: (v: unknown) => void; mockRejectedValue: (e: unknown) => void };
+  analyzeSkinLesion: { mockResolvedValue: (v: unknown) => void; mockRejectedValue: (e: unknown) => void };
+  analyzeImage: { mockResolvedValue: (v: unknown) => void; mockRejectedValue: (e: unknown) => void };
+};
+
+const MockWrapper = ({ children }: { children?: React.ReactNode }) => <div>{children}</div>;
+
+
+SnackbarProviderMock.propTypes = {
+  children: PropTypes.node
+};
+
+MockWrapper.propTypes = {
+  ...(MockWrapper.propTypes || {}),
+  children: PropTypes.node,
+};
+
+describe('AIAssistant Component', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe('Complaint Analysis', () => {
+    it('should render complaint analysis assistant', () => {
+      render(
+        <MockWrapper>
+          <AIAssistant
+            analysisType="complaint"
+            data={{
+              complaint: 'Головная боль',
+              patient_age: 30,
+              patient_gender: 'female'
+            }}
+            title="Анализ жалоб"
+            useMCP={true}
+          />
+        </MockWrapper>
+      );
+
+      expect(screen.getByText('Анализ жалоб')).toBeInTheDocument();
+      expect(screen.getByText('MCP')).toBeInTheDocument();
+    });
+
+    it('should analyze complaint on refresh button click', async () => {
+      const mockResult = {
+        status: 'success',
+        data: {
+          preliminary_diagnosis: ['Мигрень', 'Головная боль напряжения'],
+          examinations: [
+            {
+              type: 'Неврологический осмотр',
+              name: 'Оценка неврологического статуса',
+              reason: 'Выявление очаговой симптоматики'
+            }
+          ],
+          lab_tests: ['Общий анализ крови'],
+          urgency: 'планово'
+        }
+      };
+
+      mcpAPIMocks.analyzeComplaint.mockResolvedValue(mockResult);
+
+      render(
+        <MockWrapper>
+          <AIAssistant
+            analysisType="complaint"
+            data={{
+              complaint: 'Головная боль',
+              patient_age: 30,
+              patient_gender: 'female'
+            }}
+            useMCP={true}
+          />
+        </MockWrapper>
+      );
+
+      const refreshButton = screen.getByRole('button', { name: /обновить/i });
+      fireEvent.click(refreshButton);
+
+      await waitFor(() => {
+        expect(mcpAPIMocks.analyzeComplaint).toHaveBeenCalledWith({
+          complaint: 'Головная боль',
+          patientAge: 30,
+          patientGender: 'female',
+          provider: 'deepseek'
+        });
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('Мигрень')).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('ICD10 Suggestions', () => {
+    it('should fetch ICD10 suggestions', async () => {
+      const mockResult = {
+        status: 'success',
+        data: {
+          suggestions: [
+            { code: 'G43.9', name: 'Мигрень неуточненная', relevance: 'высокая' },
+            { code: 'G44.2', name: 'Головная боль напряжения', relevance: 'средняя' }
+          ],
+          clinical_recommendations: 'Клинические рекомендации...'
+        }
+      };
+
+      mcpAPIMocks.suggestICD10.mockResolvedValue(mockResult);
+
+      render(
+        <MockWrapper>
+          <AIAssistant
+            analysisType="icd10"
+            data={{
+              symptoms: ['головная боль'],
+              diagnosis: 'мигрень'
+            }}
+            useMCP={true}
+          />
+        </MockWrapper>
+      );
+
+      const refreshButton = screen.getByRole('button', { name: /обновить/i });
+      fireEvent.click(refreshButton);
+
+      await waitFor(() => {
+        expect(mcpAPIMocks.suggestICD10).toHaveBeenCalledWith({
+          symptoms: ['головная боль'],
+          diagnosis: 'мигрень',
+          specialty: undefined,
+          provider: 'deepseek',
+          maxSuggestions: 5
+        });
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText(/G43.9/)).toBeInTheDocument();
+      });
+    });
+
+    it('should display clinical recommendations for ICD10', async () => {
+      const mockResult = {
+        status: 'success',
+        data: {
+          suggestions: [],
+          clinical_recommendations: '### Клинические рекомендации\n\nДетальное описание...'
+        }
+      };
+
+      mcpAPIMocks.suggestICD10.mockResolvedValue(mockResult);
+
+      render(
+        <MockWrapper>
+          <AIAssistant
+            analysisType="icd10"
+            data={{
+              symptoms: [],
+              diagnosis: 'снижение либидо'
+            }}
+            useMCP={true}
+          />
+        </MockWrapper>
+      );
+
+      const refreshButton = screen.getByRole('button', { name: /обновить/i });
+      fireEvent.click(refreshButton);
+
+      await waitFor(() => {
+        expect(screen.getByText(/Клинические рекомендации/)).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Provider Selection', () => {
+    it('should allow provider selection', () => {
+      render(
+        <MockWrapper>
+          <AIAssistant
+            analysisType="complaint"
+            data={{ complaint: 'Test' }}
+            providerOptions={['deepseek', 'gemini', 'openai']}
+            useMCP={true}
+          />
+        </MockWrapper>
+      );
+
+      expect(screen.getByText('DEEPSEEK')).toBeInTheDocument();
+      expect(screen.getByText('GEMINI')).toBeInTheDocument();
+      expect(screen.getByText('OPENAI')).toBeInTheDocument();
+    });
+
+    it('should change provider on chip click', async () => {
+      const mockResult = {
+        status: 'success',
+        data: {
+          preliminary_diagnosis: ['Test'],
+          examinations: [],
+          lab_tests: [],
+          urgency: 'планово'
+        }
+      };
+      mcpAPIMocks.analyzeComplaint.mockResolvedValue(mockResult);
+
+      render(
+        <MockWrapper>
+          <AIAssistant
+            analysisType="complaint"
+            data={{ complaint: 'Test' }}
+            providerOptions={['deepseek', 'gemini']}
+            useMCP={true}
+          />
+        </MockWrapper>
+      );
+
+      const geminiChip = screen.getByText('GEMINI');
+      fireEvent.click(geminiChip);
+
+      const refreshButton = screen.getByRole('button', { name: /обновить/i });
+      fireEvent.click(refreshButton);
+
+      await waitFor(() => {
+        expect(mcpAPIMocks.analyzeComplaint).toHaveBeenCalledWith({
+          complaint: 'Test',
+          patientAge: undefined,
+          patientGender: undefined,
+          provider: 'gemini'
+        });
+      });
+    });
+  });
+
+  describe('Error Handling', () => {
+    it('should display error message on API failure', async () => {
+      mcpAPIMocks.analyzeComplaint.mockRejectedValue(new Error('API Error'));
+
+      render(
+        <MockWrapper>
+          <AIAssistant
+            analysisType="complaint"
+            data={{ complaint: 'Test' }}
+            useMCP={true}
+          />
+        </MockWrapper>
+      );
+
+      const refreshButton = screen.getByRole('button', { name: /обновить/i });
+      fireEvent.click(refreshButton);
+
+      await waitFor(() => {
+        expect(screen.getByText(/API Error/)).toBeInTheDocument();
+      });
+    });
+
+    it('should show retry suggestion after error', async () => {
+      mcpAPIMocks.analyzeComplaint.mockRejectedValue(new Error('Timeout'));
+
+      render(
+        <MockWrapper>
+          <AIAssistant
+            analysisType="complaint"
+            data={{ complaint: 'Test' }}
+            useMCP={true}
+          />
+        </MockWrapper>
+      );
+
+      const refreshButton = screen.getByRole('button', { name: /обновить/i });
+      fireEvent.click(refreshButton);
+
+      await waitFor(() => {
+        expect(screen.getByText(/Попытка 1/)).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Lab Results Interpretation', () => {
+    it('should interpret lab results via MCP', async () => {
+      const mockResult = {
+        status: 'success',
+        data: {
+          summary: 'Результаты в пределах нормы',
+          abnormal_values: [],
+          recommendations: ['Контроль через 6 месяцев']
+        }
+      };
+
+      mcpAPIMocks.interpretLabResults.mockResolvedValue(mockResult);
+
+      render(
+        <MockWrapper>
+          <AIAssistant
+            analysisType="lab"
+            data={{
+              results: [{ parameter: 'Гемоглобин', value: 140 }],
+              patient_age: 30,
+              patient_gender: 'male'
+            }}
+            useMCP={true}
+          />
+        </MockWrapper>
+      );
+
+      const refreshButton = screen.getByRole('button', { name: /обновить/i });
+      fireEvent.click(refreshButton);
+
+      await waitFor(() => {
+        expect(mcpAPIMocks.interpretLabResults).toHaveBeenCalled();
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText(/в пределах нормы/i)).toBeInTheDocument();
+      });
+    });
+  });
+});
+

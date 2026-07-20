@@ -4,6 +4,7 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import jsxA11y from 'eslint-plugin-jsx-a11y';
 import globals from 'globals';
 import tsParser from '@typescript-eslint/parser';
+import tseslint from '@typescript-eslint/eslint-plugin';
 import noHardcodedColors from './scripts/no-hardcoded-colors.js';
 
 export default [
@@ -130,6 +131,9 @@ export default [
   },
   {
     files: ['**/*.{ts,tsx}'],
+    plugins: {
+      '@typescript-eslint': tseslint,
+    },
     languageOptions: {
       parser: tsParser,
       ecmaVersion: 2022,
@@ -138,6 +142,12 @@ export default [
         ecmaFeatures: {
           jsx: true,
         },
+        // Stabilization Sprint B2: provide project so @typescript-eslint/parser
+        // resolves TS DOM lib types (BodyInit, RequestInit, NotificationOptions,
+        // etc.) via lib.dom.d.ts. ESLint doesn't need these re-declared as
+        // globals — that would duplicate what tsc already knows and create
+        // a maintenance burden (the list drifts from lib.dom.d.ts).
+        project: './tsconfig.json',
       },
       globals: {
         ...globals.browser,
@@ -147,6 +157,16 @@ export default [
     },
     rules: {
       'no-unused-vars': 'off',
+      // Stabilization Sprint B2: turn off no-undef for .ts/.tsx — TypeScript
+      // already does this check via tsc (TS2304: Cannot find name). ESLint's
+      // no-undef doesn't understand TS type declarations (interfaces, types,
+      // DOM lib globals). Verified equivalent: see MIGRATION_BLOCKERS.md B2.
+      'no-undef': 'off',
+      // Phase 0 — TS rules (lenient at start; strict at Phase 9)
+      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-explicit-any': 'off',                       // ← off at start; warn at Phase 9
+      '@typescript-eslint/explicit-function-return-type': 'off',         // ← off at start; warn at Phase 9
+      '@typescript-eslint/explicit-module-boundary-types': 'off',
     },
   },
   {
@@ -179,16 +199,27 @@ export default [
     // =================================================================
     files: [
       'src/api/client.js',
+      'src/api/client.ts',
       'src/api/runtime.js',
+      'src/api/runtime.ts',
       'src/api/setup.js',
+      'src/api/setup.ts',
       'src/api/mcpClient.js',
+      'src/api/mcpClient.ts',
       'src/api/patients.js',
+      'src/api/patients.ts',
       'src/api/payments.js',
+      'src/api/payments.ts',
       'src/utils/tokenManager.js',
+      'src/utils/tokenManager.ts',
       'src/utils/navigation.js',
+      'src/utils/navigation.ts',
       'src/utils/navigationReact.js',
+      'src/utils/navigationReact.ts',
       'src/contexts/ThemeContext.jsx',
+      'src/contexts/ThemeContext.tsx',
       'src/theme/colorScheme.js',
+      'src/theme/colorScheme.ts',
     ],
     rules: {
       'no-restricted-properties': 'off',
@@ -204,6 +235,8 @@ export default [
       'storybook-static/**',
       '*.config.js',
       '*.config.ts',
+      // Phase 0.5: generated OpenAPI types — do not lint (75K lines, auto-regenerated)
+      'src/types/generated/**',
     ],
   },
 ];

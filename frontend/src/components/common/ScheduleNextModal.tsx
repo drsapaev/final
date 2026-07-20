@@ -1,0 +1,664 @@
+import { api } from '../../api/client';
+import { useState, useEffect } from 'react';
+import type { CSSProperties } from 'react';
+import PropTypes from 'prop-types';
+import logger from '../../utils/logger';
+import { getApiOrigin } from '../../api/runtime';
+import tokenManager from '../../utils/tokenManager';
+import { Input } from '../ui/macos';
+import { useTranslation } from '../../i18n/useTranslation';
+import {
+  Calendar,
+  Clock,
+  User,
+
+
+
+  X,
+  Plus,
+  Trash2,
+  CheckCircle,
+  AlertCircle } from
+'lucide-react';
+
+/**
+ * Универсальный компонент для назначения следующих визитов
+ * Используется во всех панелях врачей
+ */
+interface ScheduleNextModalProps {
+  isOpen?: boolean;
+  onClose?: () => void;
+  onSuccess?: (result?: any, formData?: any) => void;
+  patient?: any;
+  theme?: any;
+  specialtyFilter?: string | null;
+}
+
+const ScheduleNextModal = ({
+  isOpen,
+  onClose,
+  onSuccess,
+  patient,
+  theme,
+  specialtyFilter = null
+}: ScheduleNextModalProps) => {
+  const { getColor, getSpacing, getFontSize } = theme;
+  const { t: rawT } = useTranslation();
+  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+
+  // Состояния формы
+  const [formData, setFormData] = useState({
+    patient_id: '',
+    visit_date: '',
+    visit_time: '',
+    services: [{ service_id: '', quantity: 1 }],
+    discount_mode: 'none',
+    all_free: false,
+    confirmation_channel: 'telegram'
+  });
+
+  const [patients, setPatients] = useState([]);
+  const [services, setServices] = useState([]);
+  const [filteredServices, setFilteredServices] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  // Загрузка данных при открытии модала
+  useEffect(() => {
+    if (isOpen) {
+      loadPatients();
+      loadServices();
+
+      // Если передан пациент, устанавливаем его
+      if (patient) {
+        setFormData((prev) => ({ ...prev, patient_id: patient.id }));
+      }
+    }
+  }, [isOpen, patient]);
+
+  // Фильтрация услуг по специальности
+  useEffect(() => {
+    if (services.length > 0) {
+      let filtered = services;
+
+      // Применяем фильтр по специальности если указан
+      if (specialtyFilter) {
+        filtered = services.filter((service) => {
+          const category = service.category?.toLowerCase();
+          const name = service.name?.toLowerCase();
+
+          switch (specialtyFilter) {
+            case 'cardiology':
+              return category?.includes(t('misc.snm_kardio')) ||
+              name?.includes(t('misc.snm_kardio')) ||
+              name?.includes(t('misc.snm_ekg')) ||
+              service.code?.startsWith('K');
+            case 'dermatology':
+              return category?.includes(t('misc.snm_derma')) ||
+              name?.includes(t('misc.snm_derma')) ||
+              name?.includes(t('misc.snm_kozha')) ||
+              service.code?.startsWith('D');
+            case 'dentistry':
+              return category?.includes(t('misc.snm_stomat')) ||
+              name?.includes(t('misc.snm_zub')) ||
+              name?.includes(t('misc.snm_stomat')) ||
+              service.code?.startsWith('S');
+            default:
+              return true;
+          }
+        });
+      }
+
+      setFilteredServices(filtered);
+    }
+  }, [services, specialtyFilter]);
+
+  const loadPatients = async () => {
+    try {
+      const token = tokenManager.getAccessToken();
+      const apiBase = getApiOrigin();
+      const response = await fetch('patients/', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setPatients(data);
+      }
+    } catch (err) {
+      logger.error('Ошибка загрузки пациентов:', err);
+    }
+  };
+
+  const loadServices = async () => {
+    try {
+      const token = tokenManager.getAccessToken();
+      const apiBase = getApiOrigin();
+      const response = await fetch('services', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setServices(data);
+      }
+    } catch (err) {
+      logger.error('Ошибка загрузки услуг:', err);
+    }
+  };
+
+  const handleInputChange = (field, value) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+    setError('');
+  };
+
+  const handleServiceChange = (index, field, value) => {
+    const newServices = [...formData.services];
+    newServices[index] = { ...newServices[index], [field]: value };
+    setFormData((prev) => ({ ...prev, services: newServices }));
+  };
+
+  const addService = () => {
+    setFormData((prev) => ({
+      ...prev,
+      services: [...prev.services, { service_id: '', quantity: 1 }]
+    }));
+  };
+
+  const removeService = (index) => {
+    if (formData.services.length > 1) {
+      const newServices = formData.services.filter((_, i) => i !== index);
+      setFormData((prev) => ({ ...prev, services: newServices }));
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      // Валидация
+      if (!formData.patient_id) {
+        throw new Error(t('misc.snm_err_select_patient'));
+      }
+      if (!formData.visit_date) {
+        throw new Error(t('misc.snm_err_select_visit_date'));
+      }
+      if (formData.services.some((s) => !s.service_id)) {
+        throw new Error(t('misc.snm_err_select_all_services'));
+      }
+
+      const token = tokenManager.getAccessToken();
+      const apiBase = getApiOrigin();
+      const response = await fetch('doctor/visits/schedule-next', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(formData)
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        const normalizedFormData = {
+          ...formData,
+          patient_id: formData.patient_id ? Number(formData.patient_id) : null,
+          services: formData.services.map((service) => ({
+            ...service,
+            service_id: service.service_id ? Number(service.service_id) : service.service_id,
+            quantity: Number(service.quantity || 1)
+          }))
+        };
+
+        logger.info('[DOC-05] schedule-next succeeded', {
+          visitId: result?.visit_id,
+          patientId: normalizedFormData.patient_id,
+          confirmationChannel: result?.confirmation?.channel || normalizedFormData.confirmation_channel
+        });
+
+        if (typeof onSuccess === 'function') {
+          try {
+            onSuccess(result, normalizedFormData);
+          } catch (callbackError) {
+            logger.error('[DOC-05] schedule-next success callback failed', callbackError);
+          }
+        }
+
+        setSuccess(t('misc.snm_visit_scheduled', { token: result.confirmation.token }));
+
+        // Сброс формы через 2 секунды
+        setTimeout(() => {
+          onClose();
+          resetForm();
+        }, 2000);
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || t('misc.snm_err_create_visit'));
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      patient_id: '',
+      visit_date: '',
+      visit_time: '',
+      services: [{ service_id: '', quantity: 1 }],
+      discount_mode: 'none',
+      all_free: false,
+      confirmation_channel: 'telegram'
+    });
+    setError('');
+    setSuccess('');
+  };
+
+  if (!isOpen) return null;
+
+  // Стили
+  const overlayStyle: CSSProperties = {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'color-mix(in srgb, black, transparent 50%)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1000,
+    padding: getSpacing('md')
+  };
+
+  const modalStyle: CSSProperties = {
+    backgroundColor: getColor('background'),
+    borderRadius: 'var(--mac-radius-xl)',
+    padding: getSpacing('xl'),
+    maxWidth: '600px',
+    width: '100%',
+    maxHeight: '90vh',
+    overflowY: 'auto',
+    boxShadow: 'var(--mac-shadow-lg)'
+  };
+
+  const headerStyle: CSSProperties = {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: getSpacing('lg'),
+    paddingBottom: getSpacing('md'),
+    borderBottom: `1px solid ${getColor('border')}`
+  };
+
+  const titleStyle: CSSProperties = {
+    fontSize: getFontSize('xl'),
+    fontWeight: 'var(--mac-font-weight-bold)',
+    color: getColor('text'),
+    margin: 0
+  };
+
+  const closeButtonStyle: CSSProperties = {
+    background: 'none',
+    border: 'none',
+    color: getColor('text-secondary'),
+    cursor: 'pointer',
+    padding: getSpacing('sm'),
+    borderRadius: 'var(--mac-radius-md)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center'
+  };
+
+  const formGroupStyle: CSSProperties = {
+    marginBottom: getSpacing('lg')
+  };
+
+  const labelStyle: CSSProperties = {
+    display: 'block',
+    fontSize: getFontSize('sm'),
+    fontWeight: 'var(--mac-font-weight-semibold)',
+    color: getColor('text'),
+    marginBottom: getSpacing('sm')
+  };
+
+  const inputStyle: CSSProperties = {
+    width: '100%',
+    padding: getSpacing('md'),
+    border: `1px solid ${getColor('border')}`,
+    borderRadius: 'var(--mac-radius-md)',
+    fontSize: getFontSize('sm'),
+    backgroundColor: getColor('background'),
+    color: getColor('text')
+  };
+
+  const selectStyle: CSSProperties = {
+    ...inputStyle,
+    cursor: 'pointer'
+  };
+
+  const buttonStyle: CSSProperties = {
+    padding: `${getSpacing('md')} ${getSpacing('lg')}`,
+    border: 'none',
+    borderRadius: 'var(--mac-radius-md)',
+    fontSize: getFontSize('sm'),
+    fontWeight: 'var(--mac-font-weight-semibold)',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: getSpacing('sm')
+  };
+
+  const primaryButtonStyle: CSSProperties = {
+    ...buttonStyle,
+    backgroundColor: getColor('primary'),
+    color: 'white'
+  };
+
+  const secondaryButtonStyle: CSSProperties = {
+    ...buttonStyle,
+    backgroundColor: getColor('secondary'),
+    color: getColor('text')
+  };
+
+  const dangerButtonStyle: CSSProperties = {
+    ...buttonStyle,
+    backgroundColor: getColor('danger'),
+    color: 'white'
+  };
+
+  const serviceRowStyle: CSSProperties = {
+    display: 'flex',
+    gap: getSpacing('md'),
+    alignItems: 'end',
+    marginBottom: getSpacing('md')
+  };
+
+  const alertStyle: CSSProperties = {
+    padding: getSpacing('md'),
+    borderRadius: 'var(--mac-radius-md)',
+    marginBottom: getSpacing('lg'),
+    display: 'flex',
+    alignItems: 'center',
+    gap: getSpacing('sm')
+  };
+
+  const errorStyle: CSSProperties = {
+    ...alertStyle,
+    backgroundColor: getColor('danger-light'),
+    color: getColor('danger'),
+    border: `1px solid ${getColor('danger')}`
+  };
+
+  const successStyle: CSSProperties = {
+    ...alertStyle,
+    backgroundColor: getColor('success-light'),
+    color: getColor('success'),
+    border: `1px solid ${getColor('success')}`
+  };
+
+  // Определяем заголовок в зависимости от специальности
+  const getModalTitle = () => {
+    switch (specialtyFilter) {
+      case 'cardiology':
+        return t('misc.snm_title_cardiology');
+      case 'dermatology':
+        return t('misc.snm_title_dermatology');
+      case 'dentistry':
+        return t('misc.snm_title_dentistry');
+      default:
+        return t('misc.snm_title_default');
+    }
+  };
+  const handleActivationKeyDown = (event, action) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      action();
+    }
+  };
+
+  return (
+    <div
+      style={overlayStyle}
+      role="button"
+      tabIndex={0}
+      onClick={onClose}
+      onKeyDown={(event) => handleActivationKeyDown(event, onClose)}>
+      <div style={modalStyle} onClickCapture={(e) => e.stopPropagation()}>
+        {/* Заголовок */}
+        <div style={headerStyle}>
+          <h2 style={titleStyle}>{getModalTitle()}</h2>
+          <button
+            style={closeButtonStyle}
+            onClick={onClose}
+            aria-label="Close schedule next visit modal"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Сообщения об ошибках и успехе */}
+        {error &&
+        <div style={errorStyle}>
+            <AlertCircle size={16} />
+            <span>{error}</span>
+          </div>
+        }
+
+        {success &&
+        <div style={successStyle}>
+            <CheckCircle size={16} />
+            <span>{success}</span>
+          </div>
+        }
+
+        {/* Форма */}
+        <form onSubmit={handleSubmit}>
+          {/* Пациент */}
+          <div style={formGroupStyle}>
+            <label htmlFor="schedule-next-patient" style={labelStyle}>
+              <User size={16} style={{ display: 'inline', marginRight: getSpacing('xs') }} />
+              {t('misc.snm_label_patient')}
+            </label>
+            <select
+              id="schedule-next-patient"
+              aria-label="Schedule next visit patient"
+              style={selectStyle}
+              value={formData.patient_id}
+              onChange={(e) => handleInputChange('patient_id', e.target.value)}
+              required>
+              
+              <option value="">{t('misc.snm_select_patient')}</option>
+              {patients.map((p) =>
+              <option key={p.id} value={p.id}>
+                  {p.first_name} {p.last_name} - {p.phone}
+                </option>
+              )}
+            </select>
+          </div>
+
+          {/* Дата и время */}
+          <div style={{ display: 'flex', gap: getSpacing('md') }}>
+            <div style={{ ...formGroupStyle, flex: 1 }}>
+              <label htmlFor="schedule-next-visit-date" style={labelStyle}>
+                <Calendar size={16} style={{ display: 'inline', marginRight: getSpacing('xs') }} />
+                {t('misc.snm_label_visit_date')}
+              </label>
+              <Input
+                id="schedule-next-visit-date"
+                type="date"
+                aria-label="Schedule next visit date"
+                style={inputStyle}
+                value={formData.visit_date}
+                onChange={(e) => handleInputChange('visit_date', e.target.value)}
+                min={new Date().toISOString().split('T')[0]}
+                required />
+              
+            </div>
+
+            <div style={{ ...formGroupStyle, flex: 1 }}>
+              <label htmlFor="schedule-next-visit-time" style={labelStyle}>
+                <Clock size={16} style={{ display: 'inline', marginRight: getSpacing('xs') }} />
+                {t('misc.snm_label_time')}
+              </label>
+              <Input
+                id="schedule-next-visit-time"
+                type="time"
+                aria-label="Schedule next visit time"
+                style={inputStyle}
+                value={formData.visit_time}
+                onChange={(e) => handleInputChange('visit_time', e.target.value)}
+                required />
+              
+            </div>
+          </div>
+
+          {/* Услуги */}
+          <div style={formGroupStyle}>
+            <label style={labelStyle}>
+              {t('misc.snm_label_services')} {specialtyFilter && `(${specialtyFilter === 'cardiology' ? t('misc.snm_specialty_cardiology') :
+              specialtyFilter === 'dermatology' ? t('misc.snm_specialty_dermatology') :
+              specialtyFilter === 'dentistry' ? t('misc.snm_specialty_dentistry') : ''})`}
+            </label>
+            {formData.services.map((service, index) =>
+            <div key={index} style={serviceRowStyle}>
+                <div style={{ flex: 2 }}>
+                  <select
+                  id={`schedule-next-service-${index}`}
+                  aria-label={`Schedule next visit service ${index + 1}`}
+                  style={selectStyle}
+                  value={service.service_id}
+                  onChange={(e) => handleServiceChange(index, 'service_id', e.target.value)}
+                  required>
+                  
+                    <option value="">{t('misc.snm_select_service')}</option>
+                    {filteredServices.map((s) =>
+                  <option key={s.id} value={s.id}>
+                        {t('misc.snm_service_option', { name: s.name, price: s.price })}
+                      </option>
+                  )}
+                  </select>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <Input
+                  id={`schedule-next-service-quantity-${index}`}
+                  type="number"
+                  aria-label={`Schedule next visit service ${index + 1} quantity`}
+                  style={inputStyle}
+                  value={service.quantity}
+                  onChange={(e) => handleServiceChange(index, 'quantity', parseInt(e.target.value))}
+                  min="1"
+                  placeholder={t('misc.snm_qty_placeholder')} />
+                
+                </div>
+                <button
+                type="button"
+                style={dangerButtonStyle}
+                onClick={() => removeService(index)}
+                disabled={formData.services.length === 1}
+                aria-label={`Remove service ${index + 1}`}>
+                
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            )}
+            <button
+              type="button"
+              style={secondaryButtonStyle}
+              onClick={addService}>
+              
+              <Plus size={16} />
+              {t('misc.snm_btn_add_service')}
+            </button>
+          </div>
+
+          {/* Тип визита */}
+          <div style={formGroupStyle}>
+            <label htmlFor="schedule-next-discount-mode" style={labelStyle}>{t('misc.snm_label_visit_type')}</label>
+            <select
+              id="schedule-next-discount-mode"
+              aria-label="Schedule next visit type"
+              style={selectStyle}
+              value={formData.discount_mode}
+              onChange={(e) => handleInputChange('discount_mode', e.target.value)}>
+              
+              <option value="none">{t('misc.snm_visit_type_paid')}</option>
+              <option value="repeat">{t('misc.snm_visit_type_repeat')}</option>
+              <option value="benefit">{t('misc.snm_visit_type_benefit')}</option>
+            </select>
+          </div>
+
+          {/* Канал подтверждения */}
+          <div style={formGroupStyle}>
+            <label htmlFor="schedule-next-confirmation-channel" style={labelStyle}>{t('misc.snm_label_confirmation_channel')}</label>
+            <select
+              id="schedule-next-confirmation-channel"
+              aria-label="Schedule next visit confirmation channel"
+              style={selectStyle}
+              value={formData.confirmation_channel}
+              onChange={(e) => handleInputChange('confirmation_channel', e.target.value)}>
+              
+              <option value="telegram">
+                {t('misc.snm_channel_telegram')}
+              </option>
+              <option value="pwa">
+                {t('misc.snm_channel_pwa')}
+              </option>
+              <option value="phone">
+                {t('misc.snm_channel_phone')}
+              </option>
+            </select>
+          </div>
+
+          {/* Кнопки */}
+          <div style={{ display: 'flex', gap: getSpacing('md'), justifyContent: 'flex-end' }}>
+            <button
+              type="button"
+              style={secondaryButtonStyle}
+              onClick={onClose}
+              disabled={loading}>
+              
+              {t('misc.snm_btn_cancel')}
+            </button>
+            <button
+              type="submit"
+              style={primaryButtonStyle}
+              disabled={loading}>
+              
+              {loading ? t('misc.snm_btn_creating') : t('misc.snm_btn_schedule')}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>);
+
+};
+
+ScheduleNextModal.propTypes = {
+  isOpen: PropTypes.bool.isRequired,
+  onClose: PropTypes.func.isRequired,
+  onSuccess: PropTypes.func,
+  patient: PropTypes.shape({
+    id: PropTypes.oneOfType([PropTypes.string, PropTypes.number])
+  }),
+  theme: PropTypes.shape({
+    getColor: PropTypes.func.isRequired,
+    getSpacing: PropTypes.func.isRequired,
+    getFontSize: PropTypes.func.isRequired
+  }).isRequired,
+  specialtyFilter: PropTypes.oneOf(['cardiology', 'dermatology', 'dentistry', null])
+};
+
+export default ScheduleNextModal;

@@ -1,0 +1,38 @@
+{
+  // Phase 0 — Infrastructure
+  // Plan: JS-to-TS-Migration-Plan v3, section 0.1
+  // Strategy: allowJs + strict:false → gradual migration; strict:true at Phase 9.
+  //
+  // Note: `baseUrl` is removed — deprecated in TS 6.0. With `moduleResolution: "bundler"`,
+  // `paths` resolves relative to the tsconfig.json file location.
+  // Note: brace expansion `{js,jsx,ts,tsx}` is not parsed correctly by TS 6.0 — use separate patterns.
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowJs": true,
+    "checkJs": false,
+    "jsx": "react-jsx",
+    "strict": false,
+    "noImplicitAny": false,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+    "types": ["vitest/globals", "vite/client"]
+  },
+  "include": [
+    "src/**/*.js",
+    "src/**/*.jsx",
+    "src/**/*.ts",
+    "src/**/*.tsx"
+  ],
+  "exclude": ["node_modules", "dist", "e2e"]
+}

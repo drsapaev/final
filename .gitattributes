@@ -1,3 +1,7 @@
 # Shell entrypoints run inside Linux containers and must keep LF endings.
 /.gitattributes text eol=lf
 *.sh text eol=lf
+
+# Phase 0.5: mark generated OpenAPI types as linguist-generated
+# so GitHub PRs don't show 75K lines of auto-generated code in diffs.
+frontend/src/types/generated/** linguist-generated=true
