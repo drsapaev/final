@@ -170,10 +170,12 @@ def test_frontend_notifications_prompt_uses_safe_notification_checks() -> None:
 
 
 @pytest.mark.unit
-def test_role_panels_use_shared_notification_center_without_direct_toasts() -> None:
+def test_role_panels_delegate_notifications_to_global_center_without_direct_toasts() -> None:
+    """After #2439, panels no longer import RoleNotificationCenter —
+    GlobalNotificationCenter in App shell handles all panels."""
     page_files = [CARDIO_PANEL, DENTIST_PANEL, DERMA_PANEL, LAB_PANEL]
 
     for path in page_files:
         content = path.read_text(encoding="utf-8")
-        assert "RoleNotificationCenter" in content
+        assert "RoleNotificationCenter" not in content
         assert "react-toastify" not in content
