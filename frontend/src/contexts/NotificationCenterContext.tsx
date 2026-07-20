@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useMemo, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
 import PropTypes from 'prop-types';
 import { notificationsService } from '../api/services';
 import logger from '../utils/logger';
@@ -165,6 +165,8 @@ interface NotificationCenterContextValue {
   unreadSnapshot: UnreadSnapshot;
   lastSyncAt: string | null;
   isLoading: boolean;
+  inboxOpen: boolean;
+  setInboxOpen: Dispatch<SetStateAction<boolean>>;
   replaceNotifications: (items: RawNotification[] | unknown[], meta?: ReplaceNotificationsMeta) => NormalizedNotification[];
   updateUnreadSnapshot: (snapshot: UnreadSnapshot | Record<string, unknown>, options?: UpdateUnreadSnapshotOptions) => void;
   appendNotification: (event: RawNotification | Record<string, unknown>, source?: string) => NormalizedNotification;
