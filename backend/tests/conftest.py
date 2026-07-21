@@ -2,9 +2,19 @@
 Конфигурация pytest для тестов системы клиники
 """
 
+# ============================================================
+# CRITICAL: Set env flags BEFORE any app imports.
+# rate_limiter.py, config.py, and other modules read these
+# at import-time. If they are set after import, the values
+# are stale and rate limiting stays enabled → 429 failures.
+# ============================================================
+import os
+
+os.environ["TESTING"] = "1"  # must override, not just setdefault
+os.environ.setdefault("ENV", "dev")  # required by SEC-005 model_validator
+
 import asyncio
 import inspect
-import os
 import secrets
 import tempfile
 from datetime import date, datetime
@@ -22,14 +32,9 @@ from app.core.security import get_password_hash
 from app.db import base  # noqa: F401 - импорт для регистрации моделей
 from app.db.base_class import Base
 
-# Ensure app boots in test mode before importing app.main.
-os.environ.setdefault("TESTING", "1")
-
 TEST_ADMIN_PASSWORD = os.getenv("TEST_ADMIN_PASSWORD") or secrets.token_urlsafe(24)
 
 from app.main import app
-
-# ✅ Импортируем все модели явно для гарантии регистрации
 from app.models import (  # noqa: F401
     appointment,
     authentication,
@@ -459,6 +464,48 @@ def admin_auth_headers(client, admin_user, admin_password):
     assert response.status_code == 200
     token = response.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture
+def prod_env(monkeypatch: pytest.MonkeyPatch):
+    """Valid production environment baseline for prod-path tests.
+
+    Provides all env vars required by ``get_settings()`` prod validators.
+    Tests using this fixture should still ``delenv("TESTING")`` to exercise
+    the real prod path, but every *other* fail-closed check is satisfied here.
+
+    When a new prod validator is added to ``get_settings()``, update THIS
+    fixture — not every individual test.
+    """
+    # ── Core identity ──────────────────────────────────────────
+    monkeypatch.setenv("ENV", "production")
+    monkeypatch.setenv("SECRET_KEY", "test-only-prod-secret-key-32chars!!")
+    monkeypatch.delenv("TESTING", raising=False)               # SEC-005
+    monkeypatch.delenv("DISABLE_2FA_REQUIREMENT", raising=False)
+    monkeypatch.delenv("CORS_ALLOW_ALL", raising=False)
+
+    # ── DB ───────────────────────────────────────────────────
+    monkeypatch.setenv(
+        "DATABASE_URL",
+        "postgresql+psycopg://clinic:clinic@localhost:5432/clinicdb",
+    )
+
+    # ── SMS provider (at least one) ────────────────────────────
+    monkeypatch.setenv("ESKIZ_EMAIL", "test@example.invalid")
+    monkeypatch.setenv("ESKIZ_PASSWORD", "test-invalid-secret")
+
+    # ── AI encryption key ──────────────────────────────────────
+    monkeypatch.setenv("ENCRYPTION_KEY", "dGVzdC1vbmx5LWZlcm5ldC1rZXktMzJjaGFycyEh")
+
+    # ── AUTH_SECRET removed so tests can verify fallback ───────
+    monkeypatch.delenv("AUTH_SECRET", raising=False)
+
+    # ── ENABLE_FALLBACK_AUTH / ENABLE_TEST_PAYMENT_INIT ───────
+    # Both default False, but be explicit
+    monkeypatch.delenv("ENABLE_FALLBACK_AUTH", raising=False)
+    monkeypatch.delenv("ENABLE_TEST_PAYMENT_INIT", raising=False)
+
+    return monkeypatch
 
 
 # M4-P0-2: Clear replay-protection cache before each test to prevent

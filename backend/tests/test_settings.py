@@ -156,11 +156,10 @@ def test_mcp_settings_env_file_loading():
 
 
 def test_get_settings_prod_without_secret_key_fails_closed(
-    monkeypatch: pytest.MonkeyPatch,
+    prod_env: pytest.MonkeyPatch,
 ):
     """Regression: production path must fail with ValueError, not UnboundLocalError."""
-    monkeypatch.setenv("ENV", "production")
-    monkeypatch.delenv("SECRET_KEY", raising=False)
+    prod_env.delenv("SECRET_KEY", raising=False)
     _reset_settings_cache()
     try:
         with pytest.raises(ValueError) as exc_info:
@@ -189,17 +188,9 @@ def test_get_settings_dev_defaults_auth_secret_to_secret_key(
 
 
 def test_get_settings_prod_defaults_auth_secret_to_secret_key(
-    monkeypatch: pytest.MonkeyPatch,
+    prod_env: pytest.MonkeyPatch,
 ):
     """AUTH_SECRET is a legacy alias; production startup only requires SECRET_KEY."""
-    monkeypatch.setenv("ENV", "production")
-    monkeypatch.setenv("SECRET_KEY", "b" * 64)
-    monkeypatch.setenv(
-        "DATABASE_URL",
-        "postgresql+psycopg://clinic:clinic@localhost:5432/clinicdb",
-    )
-    monkeypatch.setenv("CORS_ALLOW_ALL", "0")
-    monkeypatch.delenv("AUTH_SECRET", raising=False)
     _reset_settings_cache()
     try:
         settings = get_settings()
@@ -210,12 +201,10 @@ def test_get_settings_prod_defaults_auth_secret_to_secret_key(
 
 
 def test_get_settings_prod_validation_path_uses_env_without_unboundlocal(
-    monkeypatch: pytest.MonkeyPatch,
+    prod_env: pytest.MonkeyPatch,
 ):
     """Regression: env-dependent production checks should run without local var errors."""
-    monkeypatch.setenv("ENV", "production")
-    monkeypatch.setenv("SECRET_KEY", "b" * 64)
-    monkeypatch.setenv("CORS_ALLOW_ALL", "1")
+    prod_env.setenv("CORS_ALLOW_ALL", "1")  # intentionally violate to trigger validator
     _reset_settings_cache()
     try:
         with pytest.raises(ValueError) as exc_info:
