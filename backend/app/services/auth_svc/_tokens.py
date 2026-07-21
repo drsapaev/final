@@ -15,12 +15,17 @@ class TokensMixin(AuthenticationServiceMixinBase):
     def __init__(self):
         self.algorithm = "HS256"
         self.access_token_expire_minutes = settings.ACCESS_TOKEN_EXPIRE_MINUTES
-        self.refresh_token_expire_days = 30
+        self.refresh_token_expire_days = settings.REFRESH_TOKEN_EXPIRE_DAYS
         self.password_reset_expire_hours = 1
         self.email_verification_expire_hours = 24
         self.session_expire_hours = 24
         self.max_login_attempts = 5
         self.lockout_duration_minutes = 15
+
+    def _secret_for(self, token_type: str) -> str:
+        if token_type == "refresh":
+            return settings.REFRESH_TOKEN_SECRET or settings.SECRET_KEY
+        return settings.SECRET_KEY
 
 
     def create_access_token(
@@ -48,7 +53,7 @@ class TokensMixin(AuthenticationServiceMixinBase):
         expire = datetime.now(UTC) + timedelta(days=self.refresh_token_expire_days)
         data.update({"exp": expire})
 
-        encoded_jwt = jwt.encode(data, settings.SECRET_KEY, algorithm=self.algorithm)
+        encoded_jwt = jwt.encode(data, self._secret_for("refresh"), algorithm=self.algorithm)
         return encoded_jwt
 
 
@@ -57,11 +62,19 @@ class TokensMixin(AuthenticationServiceMixinBase):
     ) -> dict[str, Any] | None:
         """Проверяет JWT токен (без проверки blacklist)"""
         try:
-            payload = jwt.decode(
-                token, settings.SECRET_KEY, algorithms=[self.algorithm]
-            )
-            if payload.get("type") != token_type:
+            # peek: читаем type ДО верификации подписи (чтобы выбрать ключ)
+            try:
+                unverified = jwt.decode(token, options={"verify_signature": False})
+            except Exception:
                 return None
+
+            actual_type = unverified.get("type", "access")
+            if actual_type != token_type:
+                return None
+
+            payload = jwt.decode(
+                token, self._secret_for(actual_type), algorithms=[self.algorithm]
+            )
             return payload
         except jwt.ExpiredSignatureError:
             logger.warning("Token expired")

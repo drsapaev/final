@@ -29,9 +29,9 @@ from slowapi.middleware import SlowAPIMiddleware
 
 logger = logging.getLogger(__name__)
 
-# Disable rate limiting in test mode to prevent 429 failures
+# Read at import-time (reliable because conftest.py now sets TESTING=1 BEFORE
+# any app imports — see Layer 1 fix in tests/conftest.py).
 _TESTING = os.getenv("TESTING", "").lower() in ("1", "true", "yes")
-
 
 # ---------------------------------------------------------------------------
 # PR-34: Trusted proxy whitelist for X-Forwarded-For
@@ -132,6 +132,8 @@ _STORAGE_URI = _get_storage_uri() if not _TESTING else None
 
 # PR-34: Use custom get_client_ip instead of slowapi's get_remote_address.
 # Use Redis storage if configured (shared across workers), else in-memory.
+# NOTE: enabled=not _TESTING disables rate limiting in tests at construction
+# time. setup_rate_limiting() also mutates _enabled as a second layer.
 limiter = Limiter(
     key_func=get_client_ip,
     enabled=not _TESTING,
@@ -165,6 +167,20 @@ RATE_LIMITS = {
 
 def setup_rate_limiting(app: FastAPI) -> None:
     """Configure rate limiting middleware on the FastAPI app."""
+    # Layer 2: read settings at app-startup time (not import-time) as a
+    # belt-and-suspenders guard. Mutate the module-level limiter object so
+    # that @rate_limited decorators — which close over it — also see the
+    # disabled flag. (Setting app.state.limiter=None alone does NOT stop
+    # the decorators from enforcing limits.)
+    from app.core.config import get_settings
+    settings = get_settings()
+    if settings.TESTING:
+        limiter._enabled = False  # mutate the shared object decorators reference
+        app.state.limiter = limiter
+        logger.info("Rate limiting disabled for testing (TESTING=1, limiter._enabled=False)")
+        return
+
+    limiter._enabled = True
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
     app.add_middleware(SlowAPIMiddleware)
@@ -176,6 +192,7 @@ def setup_rate_limiting(app: FastAPI) -> None:
     if TRUSTED_PROXIES:
         # PR-34: log only the count, not the actual proxy IPs.
         logger.info("Rate limiter trusting X-Forwarded-For from %d proxy/ies", len(TRUSTED_PROXIES))
+
 
 
 async def _rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:

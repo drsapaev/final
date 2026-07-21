@@ -8,7 +8,7 @@ import secrets
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import AliasChoices, Field, field_validator
+from pydantic import AliasChoices, Field, field_validator, model_validator
 from pydantic_settings import (
     BaseSettings,
     DotEnvSettingsSource,
@@ -69,6 +69,12 @@ class Settings(BaseSettings):
     )
     AUTH_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30  # 30 minutes — use refresh tokens for longer sessions
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    REFRESH_TOKEN_SECRET: str | None = Field(
+        default=None,
+        description="Secret key for JWT refresh token. Defaults to SECRET_KEY when unset."
+    )
+    TESTING: bool = False
     ENABLE_FALLBACK_AUTH: bool = Field(
         default=False,
         description="Enable legacy/fallback auth login endpoints. Keep false outside explicit break-glass/dev use.",
@@ -391,6 +397,24 @@ class Settings(BaseSettings):
             logger.info("[FIX:CORS] Parsed %d CORS origins from env string", len(origins))
             return origins
         return value
+
+    @model_validator(mode="after")
+    def _no_testing_in_production(self) -> Settings:
+        if self.TESTING and self.is_production:
+            raise ValueError(
+                "TESTING=1 is forbidden when ENV=prod/production: "
+                "SecurityMiddleware would be silently disabled."
+            )
+        return self
+
+    @property
+    def is_development(self) -> bool:
+        """True только для явных dev-окружений. Всё остальное трактуется как prod."""
+        return (self.ENV or "").strip().lower() in ("dev", "development", "local")
+
+    @property
+    def is_production(self) -> bool:
+        return not self.is_development
 
 
 # Runtime-only sentinel for missing dev SECRET_KEY; never a stable credential.

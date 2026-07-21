@@ -9,8 +9,8 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-clinic}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-clinic_dev_password}
       POSTGRES_DB: ${POSTGRES_DB:-clinicdb}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required (set it in .env)}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -30,15 +30,15 @@ services:
     restart: unless-stopped
     environment:
       # Local dev core. Override these in your shell or .env only when needed.
-      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-clinic}:${POSTGRES_PASSWORD:-clinic_dev_password}@postgres:5432/${POSTGRES_DB:-clinicdb}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-clinic}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-clinicdb}
       APP_NAME: ${APP_NAME:-Clinic Queue Manager}
       APP_VERSION: ${APP_VERSION:-0.9.0-local}
       ENV: ${ENV:-dev}
       # Auth
-      SECRET_KEY: ${SECRET_KEY:-local-dev-secret-key-for-visual-testing-only-2026}
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required (set it in .env)}
       AUTH_SECRET: ${AUTH_SECRET:-}
       AUTH_ALGORITHM: ${AUTH_ALGORITHM:-HS256}
-      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-10080}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
       # CORS
       CORS_ALLOW_ALL: ${CORS_ALLOW_ALL:-0}
       CORS_DISABLE: ${CORS_DISABLE:-0}
@@ -52,7 +52,7 @@ services:
       PRINTER_USB_PID: ${PRINTER_USB_PID:-}
       # Keep bootstrap admin disabled by default so /setup owns the first admin.
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-local-admin-password}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?ADMIN_PASSWORD is required (set it in .env)}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.local}
       ADMIN_FULL_NAME: ${ADMIN_FULL_NAME:-Local Admin}
       ADMIN_RESET_PASSWORD: ${ADMIN_RESET_PASSWORD:-0}
@@ -64,7 +64,9 @@ services:
       WORKERS: ${WORKERS:-1}
       RUN_ALEMBIC_ON_START: ${RUN_ALEMBIC_ON_START:-1}
       # Redis (for WebSocket pubsub + arq task queue)
-      ARQ_REDIS_URL: ${ARQ_REDIS_URL:-redis://redis:6379/0}
+      ARQ_REDIS_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379/0
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required (set it in .env)}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
       # Sentry (DSN is public send-only key — safe to commit; ENV/TRACES_RATE
       # can be overridden in .env file)
       SENTRY_DSN: ${SENTRY_DSN:-https://65b5195082de2f0522c27dd6695536b7@o4511673323749376.ingest.us.sentry.io/4511673347670016}
@@ -121,13 +123,22 @@ services:
     image: redis:7-alpine
     container_name: clinic-redis
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    command:
+      - "redis-server"
+      - "--appendonly"
+      - "yes"
+      - "--maxmemory"
+      - "256mb"
+      - "--maxmemory-policy"
+      - "allkeys-lru"
+      - "--requirepass"
+      - "${REDIS_PASSWORD:?REDIS_PASSWORD is required (set it in .env)}"
     volumes:
       - redis_data:/data
     ports:
       - "127.0.0.1:${REDIS_PORT:-6379}:6379"
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 10s
       timeout: 3s
       retries: 6
@@ -143,12 +154,12 @@ services:
     container_name: clinic-worker
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-clinic}:${POSTGRES_PASSWORD:-clinic_dev_password}@postgres:5432/${POSTGRES_DB:-clinicdb}
-      ARQ_REDIS_URL: redis://redis:6379/0
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-clinic}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-clinicdb}
+      ARQ_REDIS_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379/0
       APP_NAME: ${APP_NAME:-Clinic Queue Manager}
       APP_VERSION: ${APP_VERSION:-0.9.0-local}
       ENV: ${ENV:-dev}
-      SECRET_KEY: ${SECRET_KEY:-local-dev-secret-key-for-visual-testing-only-2026}
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required (set it in .env)}
       TIMEZONE: ${TIMEZONE:-Asia/Tashkent}
       # Sentry (DSN is public send-only key — safe to commit)
       SENTRY_DSN: ${SENTRY_DSN:-https://65b5195082de2f0522c27dd6695536b7@o4511673323749376.ingest.us.sentry.io/4511673347670016}

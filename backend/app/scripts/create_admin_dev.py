@@ -106,7 +106,11 @@ def upsert_admin() -> None:
             print(f"✅ Пользователь '{admin_username}' уже существует — оставляю как есть.")
             return
 
-        row: Dict[str, Any] = {"username": admin_username, pwd_col: _password_value(pwd_col)}
+        row: Dict[str, Any] = {
+            "username": admin_username,
+            "role": "Admin",  # explicit: this is the admin bootstrapper
+            pwd_col: _password_value(pwd_col),
+        }
         for key, value in {
             "is_active": True,
             "is_superuser": True,

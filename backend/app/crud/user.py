@@ -71,7 +71,8 @@ def create_user(db: Session, user_data: dict) -> User:
     if "password" in user_data:
         user_data["hashed_password"] = pwd_context.hash(user_data.pop("password"))
 
-    # Устанавливаем значения по умолчанию
+    # Устанавливаем значения по умолчанию (least privilege)
+    user_data.setdefault("role", "Patient")
     user_data.setdefault("is_active", True)
     user_data.setdefault("is_superuser", False)
     user_data.setdefault("created_at", datetime.now(UTC))

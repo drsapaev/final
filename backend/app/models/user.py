@@ -39,7 +39,9 @@ class User(Base):
     full_name: Mapped[str | None] = mapped_column(String(100), default=None)
     email: Mapped[str | None] = mapped_column(String(120), default=None)
     hashed_password: Mapped[str] = mapped_column(String(255))
-    role: Mapped[str] = mapped_column(String(20), default="Admin")
+    # Least privilege: users created without an explicit role get
+    # minimal permissions, not Admin.
+    role: Mapped[str] = mapped_column(String(20), default="Patient", nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_superuser: Mapped[bool] = mapped_column(Boolean, default=False)
     # Требуется смена пароля при следующем входе

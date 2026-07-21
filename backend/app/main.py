@@ -158,9 +158,9 @@ app = FastAPI(
     Authentication via ?token= query parameter (JWT).
     """,
     version=settings.APP_VERSION,
-    openapi_url="/openapi.json",
-    docs_url="/docs",
-    redoc_url="/redoc",
+    openapi_url=None if settings.is_production else "/openapi.json",
+    docs_url=None if settings.is_production else "/docs",
+    redoc_url=None if settings.is_production else "/redoc",
     lifespan=lifespan,
     openapi_tags=[
         {"name": "auth", "description": "Authentication and authorization"},
@@ -213,7 +213,6 @@ from app.ws.queue_ws import router as queue_ws_router  # noqa: E402
 from app.ws.queue_ws import ws_queue  # noqa: E402
 
 app.include_router(queue_ws_router)  # /ws/queue
-app.add_api_websocket_route("/ws/dev-queue", ws_queue)
 app.add_api_websocket_route("/ws/chat", chat_websocket_handler)  # User-to-user chat
 
 # -----------------------------------------------------------------------------
@@ -265,8 +264,8 @@ log.info("Rate limiting middleware registered")
 from app.middleware.security_middleware import SecurityMiddleware  # noqa: E402
 from app.middleware.tenant_scope_middleware import TenantScopeMiddleware  # noqa: E402
 
-if TESTING:
-    log.info("Security middleware skipped in testing mode (TESTING=1)")
+if settings.TESTING and settings.is_development:
+    log.warning("Security middleware SKIPPED: TESTING=1 in development mode")
 else:
     app.add_middleware(SecurityMiddleware)
     log.info("Security middleware registered")
@@ -318,7 +317,13 @@ if not CORS_DISABLE:
     cfg = {
         "allow_credentials": True,
         "allow_methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        "allow_headers": ["*"],
+        "allow_headers": [
+            "Authorization",
+            "Content-Type",
+            "X-Request-ID",
+            "Idempotency-Key",
+            "X-CSRF-Token",
+        ],
     }
     if CORS_ALLOW_ALL:
         app.add_middleware(CORSMiddleware, allow_origins=["*"], **cfg)
@@ -599,19 +604,19 @@ except Exception as e:
         pass
 
 
-@app.get("/_routes")
-def _routes():
-    items = []
-    for r in app.router.routes:
-        items.append(
-            {
-                "type": r.__class__.__name__,
-                "path": getattr(r, "path", ""),
-                "methods": list(getattr(r, "methods", []) or []),
-                "name": getattr(r, "name", ""),
-            }
-        )
-    return items
+# Dev-only diagnostic endpoints. In production they are not registered at all -
+# less code = smaller attack surface (SEC-002, SEC-003).
+if settings.is_development:
+    @app.get("/_routes", include_in_schema=False)
+    def _routes():
+        return [
+            {"path": getattr(r, "path", ""), "methods": sorted(list(getattr(r, "methods", []) or [])), "name": getattr(r, "name", "")}
+            for r in app.router.routes
+        ]
+
+    app.add_api_websocket_route("/ws/dev-queue", ws_queue)
+else:
+    log.info("Dev-only endpoints (/_routes, /ws/dev-queue) disabled in production")
 
 
 # --- END app/main.py ---

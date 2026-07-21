@@ -22,11 +22,8 @@ class AuthenticationService(
     """Composed of focused mixin modules."""
 
     def __init__(self):
-        self.algorithm = "HS256"
-        self.access_token_expire_minutes = settings.ACCESS_TOKEN_EXPIRE_MINUTES
-        self.refresh_token_expire_days = 30
-        self.password_reset_expire_hours = 1
-        self.email_verification_expire_hours = 24
-        self.session_expire_hours = 24
-        self.max_login_attempts = 5
-        self.lockout_duration_minutes = 15
+        # Delegate to MRO so TokensMixin.__init__() (the single source of
+        # truth) runs and sets all token/session/lockout attributes from
+        # settings.  Do NOT re-set them here — that was the bug that caused
+        # refresh_token_expire_days=30 despite settings.REFRESH_TOKEN_EXPIRE_DAYS=7.
+        super().__init__()
