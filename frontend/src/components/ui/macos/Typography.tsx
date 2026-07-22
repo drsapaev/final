@@ -10,6 +10,7 @@ interface TypographyProps {
   paragraph?: boolean;
   component?: string | React.ComponentType<any>;
   className?: string;
+  id?: string;
   fontWeight?: number | string;
   align?: string;
   display?: string;

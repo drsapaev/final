@@ -46,6 +46,18 @@ export function useEMRAutosave({
     onAutosaveStart,
     onAutosaveSuccess,
     onAutosaveError,
+}: {
+    isDirty: boolean;
+    isSaving: boolean;
+    isSigned: boolean;
+    status: string;
+    saveEMR: (opts?: Record<string, unknown>) => Promise<unknown>;
+    debounceMs?: number;
+    maxWaitMs?: number;
+    enabled?: boolean;
+    onAutosaveStart?: () => void;
+    onAutosaveSuccess?: (result: unknown) => void;
+    onAutosaveError?: (error: unknown) => void;
 }) {
     // Use refs to avoid recreating timers on each render
     const debounceTimerRef = useRef(null);
@@ -107,7 +119,7 @@ export function useEMRAutosave({
         try {
             onAutosaveStart?.();
 
-            const result = await saveEMR({ isDraft: true });
+            const result = await saveEMR({ isDraft: true }) as { accessDenied?: boolean; conflict?: unknown } | undefined;
 
             if (result?.accessDenied) {
                 errorCountRef.current = MAX_CONSECUTIVE_ERRORS;
@@ -127,7 +139,7 @@ export function useEMRAutosave({
 
             // Check for conflict
             if (result?.conflict) {
-                onAutosaveError?.({ type: 'conflict', ...result });
+                onAutosaveError?.({ type: 'conflict', ...(result as Record<string, unknown>) });
             } else {
                 onAutosaveSuccess?.(result);
             }

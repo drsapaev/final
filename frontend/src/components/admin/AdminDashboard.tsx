@@ -250,12 +250,10 @@ const AdminDashboard = () => {
     },
   ], [stats]);
 
-  const AdminRouteSwitcherAny = AdminRouteSwitcher as unknown as React.ComponentType<Record<string, unknown>>;
-
   return (
     <ErrorBoundary>
       <div className="flex flex-col gap-6">
-        <AdminRouteSwitcherAny current="dashboard" />
+        <AdminRouteSwitcher current="dashboard" />
 
         {statsLoading ? (
           <div className="admin-kpi-grid" aria-label={t('admin2.adm_kpi_loading_aria')} aria-busy="true">

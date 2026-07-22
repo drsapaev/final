@@ -49,11 +49,11 @@ const TelegramManager = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [activeTab, setActiveTab] = useState('overview');
-  const [botStatus, setBotStatus] = useState(null as any);
-  const [settings, setSettings] = useState({} as any);
-  const [templates, setTemplates] = useState({} as any);
+  const [botStatus, setBotStatus] = useState<Record<string, unknown> | null>(null);
+  const [settings, setSettings] = useState<Record<string, unknown>>({});
+  const [templates, setTemplates] = useState<Record<string, unknown>>({});
   const [users, setUsers] = useState([]);
-  const [stats, setStats] = useState(null as any);
+  const [stats, setStats] = useState<Record<string, unknown> | null>(null);
   const [showTestModal, setShowTestModal] = useState(false);
   const [testMessage, setTestMessage] = useState('');
   const [testChatId, setTestChatId] = useState('');
@@ -302,17 +302,17 @@ const TelegramManager = () => {
               <div className="text-center p-4 bg-blue-50 rounded-lg">
                 <Users className="w-8 h-8 text-blue-600 mx-auto mb-2" />
                 <div className="text-sm font-medium text-blue-800">{t('misc.tm_metric_users')}</div>
-                <div className="text-xs text-blue-600">{t('misc.tm_metric_users_total', { count: botStatus.stats?.total_users || 0 })}</div>
+                <div className="text-xs text-blue-600">{t('misc.tm_metric_users_total', { count: (botStatus.stats as Record<string, unknown>)?.total_users || 0 })}</div>
               </div>
               <div className="text-center p-4 bg-green-50 rounded-lg">
                 <Activity className="w-8 h-8 text-green-600 mx-auto mb-2" />
                 <div className="text-sm font-medium text-green-800">{t('misc.tm_metric_active')}</div>
-                <div className="text-xs text-green-600">{t('misc.tm_metric_active_users', { count: botStatus.stats?.active_users || 0 })}</div>
+                <div className="text-xs text-green-600">{t('misc.tm_metric_active_users', { count: (botStatus.stats as Record<string, unknown>)?.active_users || 0 })}</div>
               </div>
               <div className="text-center p-4 bg-purple-50 rounded-lg">
                 <FileText className="w-8 h-8 text-purple-600 mx-auto mb-2" />
                 <div className="text-sm font-medium text-purple-800">{t('misc.tm_metric_templates')}</div>
-                <div className="text-xs text-purple-600">{t('misc.tm_metric_templates_count', { count: botStatus.stats?.templates || 0 })}</div>
+                <div className="text-xs text-purple-600">{t('misc.tm_metric_templates_count', { count: (botStatus.stats as Record<string, unknown>)?.templates || 0 })}</div>
               </div>
             </div>
 
@@ -361,19 +361,19 @@ const TelegramManager = () => {
           <h3 className="text-lg font-semibold mb-4">{t('misc.tm_title_stats_30_days')}</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="text-center">
-              <div className="text-2xl font-bold text-blue-600">{stats.messages_sent || 0}</div>
+              <div className="text-2xl font-bold text-blue-600">{Number(stats.messages_sent ?? 0)}</div>
               <div className="text-sm text-gray-600">{t('misc.tm_stat_sent')}</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">{stats.messages_delivered || 0}</div>
+              <div className="text-2xl font-bold text-green-600">{Number(stats.messages_delivered ?? 0)}</div>
               <div className="text-sm text-gray-600">{t('misc.tm_stat_delivered')}</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-red-600">{stats.messages_failed || 0}</div>
+              <div className="text-2xl font-bold text-red-600">{Number(stats.messages_failed ?? 0)}</div>
               <div className="text-sm text-gray-600">{t('misc.tm_stat_errors')}</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-purple-600">{stats.total_users || 0}</div>
+              <div className="text-2xl font-bold text-purple-600">{Number(stats.total_users ?? 0)}</div>
               <div className="text-sm text-gray-600">{t('misc.tm_stat_users_count')}</div>
             </div>
           </div>
@@ -396,7 +396,7 @@ const TelegramManager = () => {
               <Input
               type="password"
               aria-label="Telegram bot token"
-              value={settings.bot_token || ''}
+              value={String(settings.bot_token ?? '')}
               onChange={(e) => setSettings({ ...settings, bot_token: e.target.value })}
               placeholder="123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
               className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
@@ -422,7 +422,7 @@ const TelegramManager = () => {
             <Input
             type="url"
             aria-label="Telegram webhook URL"
-            value={settings.webhook_url || ''}
+            value={String(settings.webhook_url ?? '')}
             onChange={(e) => setSettings({ ...settings, webhook_url: e.target.value })}
             placeholder="https://yourdomain.com/api/v1/telegram/webhook"
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
@@ -452,7 +452,7 @@ const TelegramManager = () => {
                 {t('misc.tm_label_default_language')}
               </label>
               <select
-              value={settings.default_language || 'ru'}
+              value={String(settings.default_language ?? 'ru')}
               onChange={(e) => setSettings({ ...settings, default_language: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
               

@@ -36,18 +36,10 @@ import { useState, useEffect, useCallback } from 'react';
 import type { CSSProperties } from 'react';
 import PropTypes from 'prop-types';
 import {
-  Button as RawButton, Card, Badge as RawBadge, Input as RawInput, Textarea as RawTextarea, Label,
+  Button, Card, Badge, Input, Textarea, Label,
   Dialog, DialogTitle, DialogContent, DialogActions,
-  Typography as RawTypography, Box as RawBox, Alert as RawAlert, Skeleton as RawSkeleton,
+  Typography, Box, Alert, Skeleton,
 } from '../ui/macos';
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
-const Textarea = RawTextarea as unknown as React.ComponentType<Record<string, unknown>>;
-const Typography = RawTypography as unknown as React.ComponentType<Record<string, unknown>>;
-const Box = RawBox as unknown as React.ComponentType<Record<string, unknown>>;
-const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
-const Skeleton = RawSkeleton as unknown as React.ComponentType<Record<string, unknown>>;
 import {
   Stethoscope, CheckCircle, ChevronDown, ChevronUp,
   Brain,
@@ -92,7 +84,7 @@ const loadExistingEMR = async (visitId: string | number) => {
     const response = await apiClient.get(`/v2/emr/${visitId}`, {
       silent: true,
       validateStatus: (status: number) => status === 404 || (status >= 200 && status < 300),
-    } as Record<string, unknown>) as any;
+    } as Record<string, unknown>);
     if (response.status === 404) return null;
     return response.data;
   } catch (error) {
@@ -523,7 +515,12 @@ const DentalVisitScreen = ({
   patient,
   onCompleteVisit,
   loading: parentLoading,
-}: any) => {
+}: {
+  patient?: { visit_id?: string | number; patient_id?: string | number; id?: string | number; patient?: { id?: string | number } };
+  onCompleteVisit?: () => void;
+  loading?: boolean;
+  [k: string]: unknown;
+}) => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [emrData, setEmrData] = useState(EMPTY_EMR_DATA);
@@ -583,7 +580,7 @@ const DentalVisitScreen = ({
       const response = await apiClient.get(`/v2/emr/patient/${patientId}`, {
         silent: true,
         validateStatus: (status: number) => status === 404 || (status >= 200 && status < 300),
-      } as Record<string, unknown>) as any;
+      } as Record<string, unknown>);
       if (response.status === 404) {
         setHistory([]);
       } else {
@@ -749,7 +746,7 @@ const DentalVisitScreen = ({
           onClose={() => { setToothModalOpen(false); setSelectedTooth(null); }}
           toothNumber={selectedTooth.number}
           toothData={selectedTooth.data}
-          onSave={handleToothSave}
+          onSave={(data: unknown) => handleToothSave(selectedTooth?.number, data)}
           visitId={visitId}
         />
       )}

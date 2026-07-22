@@ -213,6 +213,18 @@ export function Form({
 /**
  * Компонент поля ввода
  */
+interface FormFieldProps {
+  name: string;
+  label?: React.ReactNode;
+  type?: string;
+  placeholder?: string;
+  required?: boolean;
+  validationRules?: Record<string, unknown>;
+  formId?: string;
+  style?: React.CSSProperties;
+  [key: string]: unknown;
+}
+
 export function FormField({
   name,
   label,
@@ -222,7 +234,7 @@ export function FormField({
   validationRules = {},
   formId,
   ...props
-}) {
+}: FormFieldProps) {
   const { form, setValue, setTouched, setError } = useForm(formId);
   const theme = useTheme();
   const { getColor, getSpacing, getFontSize } = theme;
@@ -318,7 +330,7 @@ export function FormField({
   const requiredStyle = {
     color: getColor('error', 'main')
   };
-  const inputId = props.id || `field-${name}`;
+  const inputId = (props.id as string | undefined) || `field-${name}`;
   const errorId = `error-${name}`;
 
   return (
@@ -361,6 +373,18 @@ FormField.propTypes = {
 /**
  * Компонент текстовой области
  */
+interface FormTextAreaProps {
+  name: string;
+  label?: React.ReactNode;
+  placeholder?: string;
+  required?: boolean;
+  validationRules?: Record<string, unknown>;
+  formId?: string;
+  rows?: number;
+  style?: React.CSSProperties;
+  [key: string]: unknown;
+}
+
 export function FormTextArea({
   name,
   label,
@@ -370,7 +394,7 @@ export function FormTextArea({
   formId,
   rows = 4,
   ...props
-}) {
+}: FormTextAreaProps) {
   const { form, setValue, setTouched, setError } = useForm(formId);
   const theme = useTheme();
   const { getColor, getSpacing, getFontSize } = theme;
@@ -446,7 +470,7 @@ export function FormTextArea({
   const requiredStyle = {
     color: getColor('error', 'main')
   };
-  const inputId = props.id || `field-${name}`;
+  const inputId = (props.id as string | undefined) || `field-${name}`;
   const errorId = `error-${name}`;
 
   return (
@@ -469,7 +493,7 @@ export function FormTextArea({
         aria-invalid={!!(error && touched)}
         aria-describedby={error && touched ? errorId : undefined}
         aria-required={required}
-        style={textareaStyle}
+        style={textareaStyle as React.CSSProperties}
         {...props} />
       
       
@@ -489,6 +513,18 @@ FormTextArea.propTypes = {
 /**
  * Компонент селекта
  */
+interface FormSelectProps {
+  name: string;
+  label?: React.ReactNode;
+  options?: Array<{ value: string; label: string } | string>;
+  placeholder?: string;
+  required?: boolean;
+  validationRules?: Record<string, unknown>;
+  formId?: string;
+  style?: React.CSSProperties;
+  [key: string]: unknown;
+}
+
 export function FormSelect({
   name,
   label,
@@ -498,7 +534,7 @@ export function FormSelect({
   validationRules = {},
   formId,
   ...props
-}) {
+}: FormSelectProps) {
   const { form, setValue, setTouched, setError } = useForm(formId);
   const theme = useTheme();
   const { getColor, getSpacing, getFontSize } = theme;
@@ -562,7 +598,7 @@ export function FormSelect({
   const requiredStyle = {
     color: getColor('error', 'main')
   };
-  const inputId = props.id || `field-${name}`;
+  const inputId = (props.id as string | undefined) || `field-${name}`;
   const errorId = `error-${name}`;
 
   return (
@@ -587,11 +623,14 @@ export function FormSelect({
         {...props}>
         
         <option value="">{placeholder}</option>
-        {options.map((option) =>
-        <option key={option.value} value={option.value}>
-            {option.label}
+        {options.map((option) => {
+          const opt = typeof option === 'string' ? { value: option, label: option } : option;
+          return (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
           </option>
-        )}
+          );
+        })}
       </select>
       
       {error && touched &&

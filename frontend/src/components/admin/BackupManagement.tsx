@@ -14,24 +14,16 @@ import {
 'lucide-react';
 import {
   MacOSCard,
-  Button as RawButton,
-  Badge as RawBadge,
+  Button,
+  Badge,
   Input,
-  Select as RawSelect,
-  Textarea as RawTextarea,
-  Checkbox as RawCheckbox,
-  Skeleton as RawSkeleton,
-  MacOSEmptyState as RawMacOSEmptyState,
-  Alert as RawAlert,
+  Select,
+  Textarea,
+  Checkbox,
+  Skeleton,
+  MacOSEmptyState,
+  Alert,
 } from '../ui/macos';
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
-const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
-const Textarea = RawTextarea as unknown as React.ComponentType<Record<string, unknown>>;
-const Checkbox = RawCheckbox as unknown as React.ComponentType<Record<string, unknown>>;
-const Skeleton = RawSkeleton as unknown as React.ComponentType<Record<string, unknown>>;
-const MacOSEmptyState = RawMacOSEmptyState as unknown as React.ComponentType<Record<string, unknown>>;
-const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
@@ -111,10 +103,10 @@ const BackupManagement = () => {
   const loadBackups = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await api.get('/clinic/backups') as any;
+      const response = (await api.get('/clinic/backups')) as import('axios').AxiosResponse<Record<string, unknown>>;
       const nextBackups = Array.isArray(response.data)
-        ? response.data
-        : response.data?.backups || [];
+        ? (response.data as unknown[])
+        : (response.data?.backups as unknown[]) || [];
       setBackups(nextBackups);
       setStats(deriveBackupStats(nextBackups));
     } catch (error) {
@@ -176,7 +168,7 @@ const BackupManagement = () => {
 
   const handleCleanupExpired = async () => {
     try {
-      const response = await api.post('/clinic/backups/cleanup') as any;
+      const response = (await api.post('/clinic/backups/cleanup')) as import('axios').AxiosResponse<Record<string, unknown>>;
       const cleanedCount = response.data?.cleaned_count ?? 0;
       setMessage({
         type: 'success',
@@ -429,7 +421,7 @@ const BackupManagement = () => {
             <div className="flex flex-col gap-3">
               <div className="admin-flex-center-12">
                 <Checkbox
-                checked={formData.compression}
+                checked={Boolean(formData.compression)}
                 onChange={(checked) => setFormData({ ...formData, compression: checked })} />
               
                 <span className="admin-fs-sm-primary-2">
@@ -438,7 +430,7 @@ const BackupManagement = () => {
               </div>
               <div className="admin-flex-center-12">
                 <Checkbox
-                checked={formData.encryption}
+                checked={Boolean(formData.encryption)}
                 onChange={(checked) => setFormData({ ...formData, encryption: checked })} />
               
                 <span className="admin-fs-sm-primary-1">

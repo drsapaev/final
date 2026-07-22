@@ -54,11 +54,8 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import {
-  Button as RawButton, Card, CardHeader, CardContent, Badge as RawBadge, Icon, Input as RawInput,
+  Button, Card, CardHeader, CardContent, Badge, Icon, Input,
 } from '../../../components/ui/macos';
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
 import { AnimatedTransition } from '../../../components/ui';
 import ModernStatistics from '../../../components/statistics/ModernStatistics';
 import EnhancedAppointmentsTable from '../../../components/tables/EnhancedAppointmentsTable';
@@ -590,13 +587,14 @@ const WelcomeView = React.memo(({
                     break;
                   case 'more':{
                       // Показать контекстное меню с дополнительными действиями
-                      const rect = event?.target?.getBoundingClientRect();
+                      const evt = event as { target?: HTMLElement; clientX?: number; clientY?: number } | undefined;
+                      const rect = evt?.target?.getBoundingClientRect();
                       setContextMenu({
                         open: true,
                         row,
                         position: {
-                          x: rect?.right || event?.clientX || 0,
-                          y: rect?.top || event?.clientY || 0
+                          x: rect?.right || evt?.clientX || 0,
+                          y: rect?.top || evt?.clientY || 0
                         }
                       });
                       break;

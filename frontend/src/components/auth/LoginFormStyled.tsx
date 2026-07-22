@@ -9,18 +9,14 @@ import { getRouteForProfile } from '../../constants/routes';
 import { getCanonicalRouteById, getEffectiveRouteByPath } from '../../routing/routeSelectors';
 import { useSetupStatus } from '../../hooks/useSetupStatus';
 import * as _tokens from '../../theme/tokens';
-const colors = (_tokens as any).colors || {};
+const colors = ((_tokens as Record<string, unknown>).colors || {}) as Record<string, unknown>;
 import { BRAND } from '../../config/brand';
 import TwoFactorVerify from '../TwoFactorVerify';
 import ForgotPassword from './ForgotPassword';
 import { formatLoginErrorMessage, LOGIN_ERROR_MESSAGES } from './loginErrorUtils';
 import {
-  Button as RawButton, Card, CardHeader, CardTitle, CardContent, Input as RawInput, Checkbox as RawCheckbox, Alert as RawAlert,
+  Button, Card, CardHeader, CardTitle, CardContent, Input, Checkbox, Alert,
 } from '../ui/macos';
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
-const Checkbox = RawCheckbox as unknown as React.ComponentType<Record<string, unknown>>;
-const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 
@@ -90,10 +86,10 @@ const LoginFormStyled = () => {
     boxShadow: '0 8px 20px color-mix(in srgb, var(--mac-accent-blue, #007aff), transparent 72%)',
   };
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{ username: string; password: string }>({
     username: '',
     password: '',
-  } as any);
+  });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -141,19 +137,20 @@ const LoginFormStyled = () => {
       // обрабатывает CSRF, refresh-token и rate-limit — всё в одном месте.
       let data;
       try {
-        const response = await api.post('/authentication/login', credentials) as any;
+        const response = (await api.post('/authentication/login', credentials)) as import('axios').AxiosResponse<Record<string, unknown>>;
         data = response.data;
-      } catch (apiErr: any) {
+      } catch (apiErr: unknown) {
         // Нормализуем ошибку axios и пробрасываем дальше.
-        const normalizedError: any = new Error(formatLoginErrorMessage({
-          responseStatus: apiErr?.response?.status,
-          responseDetail: apiErr?.response?.data?.detail,
-          responseMessage: apiErr?.response?.data?.message,
-          rawMessage: apiErr?.message,
+        const apiErrExtra = apiErr as { response?: { status?: number; data?: { detail?: string; message?: string } }; message?: string };
+        const normalizedError = new Error(formatLoginErrorMessage({
+          responseStatus: apiErrExtra?.response?.status,
+          responseDetail: apiErrExtra?.response?.data?.detail,
+          responseMessage: apiErrExtra?.response?.data?.message,
+          rawMessage: apiErrExtra?.message,
           fallbackMessage: t('misc.lfs_oshibka_avtorizatsii'),
-        }));
-        normalizedError.response = apiErr?.response;
-        normalizedError.rawMessage = apiErr?.message;
+        })) as Error & { response?: unknown; rawMessage?: string };
+        normalizedError.response = apiErrExtra?.response;
+        normalizedError.rawMessage = apiErrExtra?.message;
         throw normalizedError;
       }
 
@@ -276,7 +273,7 @@ const LoginFormStyled = () => {
           setRefreshToken(response.data.refresh_token);
         }
 
-        const profileResponse = await api.get('/auth/me') as any;
+        const profileResponse = (await api.get('/auth/me')) as import('axios').AxiosResponse<Record<string, unknown>>;
         setProfile(profileResponse.data);
 
         // UX Audit Stage 1 (Login issue 3.7):
@@ -361,7 +358,7 @@ const LoginFormStyled = () => {
     return (
       <div style={{
         minHeight: '100vh',
-        background: `linear-gradient(135deg, ${colors.primary[500]} 0%, ${colors.primary[700]} 100%)`,
+        background: `linear-gradient(135deg, ${colors.primary as string[500]} 0%, ${colors.primary as string[700]} 100%)`,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -383,7 +380,7 @@ const LoginFormStyled = () => {
             <div style={{
               width: '60px',
               height: '60px',
-              background: `linear-gradient(135deg, ${colors.primary[500]} 0%, ${colors.primary[700]} 100%)`,
+              background: `linear-gradient(135deg, ${colors.primary as string[500]} 0%, ${colors.primary as string[700]} 100%)`,
               borderRadius: '50%',
               display: 'flex',
               alignItems: 'center',
@@ -404,13 +401,13 @@ const LoginFormStyled = () => {
             <h1 style={{
               fontSize: 'var(--mac-font-size-3xl)',
               fontWeight: 'var(--mac-font-weight-bold)',
-              color: colors.semantic.text.primary,
+              color: (colors.semantic as { text?: { primary?: string } })?.text?.primary,
               margin: '0 0 8px 0'
             }}>
               Двухфакторная аутентификация
             </h1>
             <p style={{
-              color: colors.semantic.text.secondary,
+              color: (colors.semantic as { text?: { secondary?: string } })?.text?.secondary,
               margin: '0',
               fontSize: 'var(--mac-font-size-base)'
             }}>
@@ -445,14 +442,14 @@ const LoginFormStyled = () => {
                     style={{
                       flex: 1,
                       padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
-                      background: isActive ? colors.primary[500] : 'transparent',
-                      color: isActive ? 'white' : colors.semantic.text.secondary,
+                      background: isActive ? colors.primary as string[500] : 'transparent',
+                      color: isActive ? 'white' : (colors.semantic as { text?: { secondary?: string } })?.text?.secondary,
                       border: '1px solid var(--mac-border)',
                       borderRadius: 'var(--mac-radius-sm)',
                       fontSize: 'var(--mac-font-size-xs)',
                       cursor: 'pointer',
                       font: 'inherit',
-                      outline: isActive ? `2px solid ${colors.primary[500]}` : 'none',
+                      outline: isActive ? `2px solid ${colors.primary as string[500]}` : 'none',
                       outlineOffset: '2px',
                     }}
                   >

@@ -20,7 +20,7 @@ type ValidatorFn = (value: unknown) => boolean;
 type CurriedValidator = (param: unknown) => ValidatorFn;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- validators return mixed types; Phase 9 cleanup
-export const validators: Record<string, (...args: any[]) => any> = {
+export const validators: Record<string, (...args: unknown[]) => any> = {
   required: (value: unknown): boolean => {
     if (typeof value === 'string') return value.trim() !== '';
     return value != null && value !== '';

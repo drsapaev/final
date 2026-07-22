@@ -32,6 +32,18 @@ import { useTranslation } from '../../../../i18n/useTranslation';
  * @param {Function} props.onChange - Handler для изменения specialty_data
  * @param {boolean} props.disabled - Read-only mode
  */
+interface DentistrySectionProps {
+  toothStatus?: Record<string, unknown>;
+  hygieneIndex?: Record<string, unknown>;
+  hygieneIndices?: Record<string, unknown>;
+  periodontalPockets?: Record<string, unknown>;
+  measurements?: Record<string, unknown>;
+  radiographs?: Record<string, unknown>;
+  onChange?: ((field: string, value: unknown) => void) | undefined;
+  disabled?: boolean;
+}
+
+
 export function DentistrySection({
     toothStatus: toothStatusRaw = {},
     hygieneIndices: hygieneIndicesRaw = {},
@@ -40,7 +52,7 @@ export function DentistrySection({
     radiographs: radiographsRaw = {},
     onChange,
     disabled = false,
-}) {
+}: DentistrySectionProps) {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
     const hygieneIndices = hygieneIndicesRaw as Record<string, any>;
   const toothStatus = toothStatusRaw as Record<string, any>;

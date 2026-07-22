@@ -22,26 +22,19 @@ import { tokenManager } from '../../utils/tokenManager';
 import {
   AppEmpty,
   AppLoading,
-  Badge as RawBadge,
-  Button as RawButton,
+  Badge,
+  Button,
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-  Input as RawInput,
-  Table as RawTable,
-  SegmentedControl as RawSegmentedControl,
-  Select as RawSelect,
-  Textarea as RawTextarea,
+  Input,
+  Table,
+  SegmentedControl,
+  Select,
+  Textarea,
 } from '../ui/macos';
-const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
-const Table = RawTable as unknown as React.ComponentType<Record<string, unknown>>;
-const SegmentedControl = RawSegmentedControl as unknown as React.ComponentType<Record<string, unknown>>;
-const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
-const Textarea = RawTextarea as unknown as React.ComponentType<Record<string, unknown>>;
 
 const pageStyles: CSSProperties = {
   display: 'flex',

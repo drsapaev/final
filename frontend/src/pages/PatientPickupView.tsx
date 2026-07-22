@@ -10,8 +10,7 @@ import { labReportingApi } from '../api/labReporting';
 import auth from '../stores/auth';
 import logger from '../utils/logger';
 import { openPrintableWindow } from '../utils/printWindow';
-import FamilyRelationsCardRaw from '../components/patient/FamilyRelationsCard';
-const FamilyRelationsCard = FamilyRelationsCardRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import FamilyRelationsCard from '../components/patient/FamilyRelationsCard';
 import {
   AppEmpty, AppError, AppLoading, Button,
 } from '../components/ui/macos';
@@ -20,8 +19,8 @@ import { useTranslation } from '../i18n/useTranslation';
 
 // Get user role for role-based UI
 const getUserRole = () => {
-  const st = auth.getState() as any;
-  const profile = st.profile || st.user || {};
+  const st = auth.getState() as { profile?: Record<string, unknown> };
+  const profile = st.profile || st.profile || {};
   return String(profile?.role || profile?.role_name || '').toLowerCase();
 };
 
@@ -69,12 +68,12 @@ export default function PatientPickupView() {
 
     try {
       // Load patient info
-      const patientRes = await api.get(`/patients/${patientId}`) as any;
+      const patientRes = (await api.get(`/patients/${patientId}`)) as import('axios').AxiosResponse<Record<string, unknown>>;
       setPatient(patientRes.data);
 
       // Load lab results
       try {
-        const labReportInstances = await labReportingApi.listInstances({ patient_id: patientId, limit: 100 }) as any[];
+        const labReportInstances = (await labReportingApi.listInstances({ patient_id: patientId, limit: 100 })) as unknown[];
         setLabResults(labReportInstances || []);
       } catch {
         setLabResults([]);
@@ -82,8 +81,8 @@ export default function PatientPickupView() {
 
       // Load visit history
       try {
-        const visitsRes = await api.get('/registrar/visits', { params: { patient_id: patientId } }) as any;
-        setVisits(visitsRes.data || []);
+        const visitsRes = (await api.get('/registrar/visits', { params: { patient_id: patientId } })) as import('axios').AxiosResponse<Record<string, unknown>>;
+        setVisits((visitsRes.data as unknown as unknown[]) || []);
       } catch {
         setVisits([]);
       }
@@ -152,7 +151,7 @@ export default function PatientPickupView() {
   };
 
   // Handle print
-  const handlePrint = (_lab?: any) => {
+  const handlePrint = (_lab?: unknown) => {
     const visitsHtml = visits.length
       ? visits.map((visit) => `
         <tr>

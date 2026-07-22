@@ -19,21 +19,16 @@ import {
 
 import { api } from '../api/client';
 import {
-  Alert as RawAlert,
+  Alert,
   Card,
   CardContent,
   CardHeader,
   CardTitle,
-  Button as RawButton,
-  Input as RawInput,
-  Select as RawSelect,
-  Textarea as RawTextarea,
+  Button,
+  Input,
+  Select,
+  Textarea,
 } from '../components/ui/macos';
-const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
-const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
-const Textarea = RawTextarea as unknown as React.ComponentType<Record<string, unknown>>;
 import NotificationPreferences from '../components/settings/NotificationPreferences';
 import TwoFactorManager from '../components/security/TwoFactorManager';
 import { getState as getAuthState, setProfile as setAuthProfile } from '../stores/auth';
@@ -179,7 +174,7 @@ async function fetchSelfProfile(force = false) {
 
   selfProfilePromise = (async () => {
     logger.info('[FIX:PROFILE] Loading self profile from /authentication/profile');
-    const response = await api.get('/authentication/profile') as any;
+    const response = (await api.get('/authentication/profile')) as import('axios').AxiosResponse<Record<string, unknown>>;
     return rememberSelfProfile(response.data);
   })();
 
@@ -295,7 +290,7 @@ export default function UserProfile() {
     { value: 'en', label: 'English' },
   ];
 
-  const [profile, setProfile] = useState(null as any);
+  const [profile, setProfile] = useState<Record<string, unknown> | null>(null);
   const [draft, setDraft] = useState(() => normalizeProfileForDraft(null));
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -414,7 +409,7 @@ export default function UserProfile() {
         changedFields: Object.keys(payload).filter((key) => payload[key] !== buildProfilePayload(normalizeProfileForDraft(profile))[key]),
       });
 
-      const response = await api.put('/authentication/profile', payload) as any;
+      const response = (await api.put('/authentication/profile', payload)) as import('axios').AxiosResponse<Record<string, unknown>>;
       const updatedProfile = response.data;
 
       rememberSelfProfile(updatedProfile);
@@ -489,7 +484,7 @@ export default function UserProfile() {
 
             <div style={{ flex: '1 1 280px', minWidth: 240 }}>
               <h1 style={{ margin: '0 0 8px 0', fontSize: 30, lineHeight: 1.1 }}>
-                {profile.full_name || profile.username}
+                {String(profile.full_name ?? '') || String(profile.username ?? '')}
               </h1>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 10 }}>
                 {summaryBadges.map((badge) => (
@@ -512,7 +507,7 @@ export default function UserProfile() {
                 ))}
               </div>
               <div style={{ color: 'var(--mac-text-secondary)', fontSize: 14 }}>
-                {profile.role} · {profile.email || t('misc.up_email_not_set')}
+                {String(profile.role ?? '')} · {String(profile.email ?? '') || t('misc.up_email_not_set')}
               </div>
             </div>
 
@@ -547,7 +542,7 @@ export default function UserProfile() {
             <ProfileMetaCard
               icon={UserRound}
               label={t('misc.up_label_username')}
-              value={profile.username}
+              value={String(profile.username ?? '')}
               accent="linear-gradient(135deg, var(--mac-accent), color-mix(in srgb, var(--mac-accent), white 20%))"
             />
             <ProfileMetaCard

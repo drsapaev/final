@@ -31,6 +31,7 @@ import { queueService } from '../services/queue';
 import { printService } from '../services/print';
 import { getApiBaseUrl } from '../api/runtime';
 import { api } from '../api/client';  // PR-53: replace raw fetch with axios
+import type { AxiosResponse } from 'axios';
 import { resolveCanonicalVisitId } from '../utils/canonicalVisit';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
@@ -176,7 +177,7 @@ const DermatologistPanelUnified = () => {
   const { t: tI18n } = useTranslation();
   const t = tI18n as unknown as (key: string, options?: Record<string, unknown>) => string;
   // QW-6 (UX audit): session timeout warning
-  const [sessionWarning, setSessionWarning] = useState(null as any);
+  const [sessionWarning, setSessionWarning] = useState<{ active: boolean } | null>(null);
 
   useSessionTimeoutWarning({
     onWarning: () => setSessionWarning({ active: true }),
@@ -230,7 +231,7 @@ const DermatologistPanelUnified = () => {
   // Состояния для таблицы записей
   const [appointments, setAppointments] = useState([]);
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
-  const [services, setServices] = useState({} as any);
+  const [services, setServices] = useState<Record<string, unknown>>({});
   const appointmentsLoadPromiseRef = useRef(null);
   const urlResolutionRef = useRef({ search: '', refreshAttempted: false, notified: false });
 
@@ -268,9 +269,14 @@ const DermatologistPanelUnified = () => {
 
   // Дополнительные состояния из старого файла
   const [patients, setPatients] = useState([]);
-  const [currentAppointment, setCurrentAppointment] = useState(null as any);
-  const [emr, setEmr] = useState(null as any);
-  const [prescription, setPrescription] = useState(null as any);
+  const [currentAppointment, setCurrentAppointment] = useState<{
+    visit_id?: string | number;
+    patient_name?: string;
+    status?: string;
+    [key: string]: unknown;
+  } | null>(null);
+  const [emr, setEmr] = useState<Record<string, unknown> | null>(null);
+  const [prescription, setPrescription] = useState<Record<string, unknown> | null>(null);
   const [canCreatePrescription, setCanCreatePrescription] = useState(false);
   const [doctorPrice, setDoctorPrice] = useState('');
 
@@ -349,17 +355,17 @@ const DermatologistPanelUnified = () => {
       try {
         const token = tokenManager.getAccessToken();
         if (!token) return {};
-        const response = await api.get('/registrar/services') as any;
+        const response = (await api.get('/registrar/services')) as AxiosResponse<Record<string, unknown>>;
         if (response.status < 400) {
-          const data = response.data;
-          const servicesData = data.services_by_group || {};
+          const data = response.data as Record<string, unknown>;
+          const servicesData = (data.services_by_group as Record<string, unknown>) || {};
           setServices(servicesData);
           dermatologyRequestCache.services.data = servicesData;
           logger.info('[Dermatology] Услуги загружены:', Object.keys(servicesData).length, 'групп');
           return servicesData;
         }
         return dermatologyRequestCache.services.data || {};
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.error('[Dermatology] Ошибка загрузки услуг:', error);
         return dermatologyRequestCache.services.data || {};
       }
@@ -412,7 +418,7 @@ const DermatologistPanelUnified = () => {
         // Используем комбинированный подход: получаем данные из queues для услуг и из БД для payment_status
         // PR-47: removed unused `today` variable
         // 1. Получаем очереди для информации об услугах
-        const queuesResponse = await api.get('/registrar/queues/today') as any;
+        const queuesResponse = (await api.get('/registrar/queues/today')) as AxiosResponse<Record<string, unknown>>;
 
         const allAppointments = [];
         if (queuesResponse.status < 400) {
@@ -489,7 +495,7 @@ const DermatologistPanelUnified = () => {
         dermatologyRequestCache.appointments.data = enrichedAppointmentsData;
         logger.info('[Dermatology] Загружено записей:', enrichedAppointmentsData.length);
         return enrichedAppointmentsData;
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.error('[Dermatology] Ошибка загрузки записей:', error);
         return [];
       } finally {
@@ -622,13 +628,13 @@ const DermatologistPanelUnified = () => {
             break;
           }
           const token = tokenManager.getAccessToken();
-          const response = await api.post(`/doctor/queue/${queueEntryId}/start-visit`) as any;
+          const response = (await api.post(`/doctor/queue/${queueEntryId}/start-visit`)) as AxiosResponse<Record<string, unknown>>;
 
           if (response.status < 400) {
             logger.info('[Dermatology] Пациент вызван:', row.patient_fio);
             await loadDermatologyAppointments();
           }
-        } catch (error: any) {
+        } catch (error: unknown) {
           logger.error('[Dermatology] Ошибка вызова пациента:', error);
         }
         break;
@@ -643,9 +649,9 @@ const DermatologistPanelUnified = () => {
             specialtyName: t('derma.derma_panel_specialty_name')
           });
           notify.success(printResult?.message || t('derma.derma_panel_ticket_printed', { name: row.patient_fio }));
-        } catch (error: any) {
+        } catch (error: unknown) {
           logger.error('[Dermatology] Ошибка печати талона:', error);
-          notify.error(error.message || t('derma.derma_panel_ticket_print_failed'));
+          notify.error((error as Error)?.message || t('derma.derma_panel_ticket_print_failed'));
         }
         break;
       case 'complete':
@@ -674,7 +680,7 @@ const DermatologistPanelUnified = () => {
           setSelectedPatient(patient);
           setCurrentAppointment(patient);
           handleTabChange('visit');
-        } catch (error: any) {
+        } catch (error: unknown) {
           logger.error('[Dermatology] Ошибка при завершении приёма:', error);
         }
         break;
@@ -715,7 +721,7 @@ const DermatologistPanelUnified = () => {
     try {
       setLoading(true);
       await loadDermatologyAppointments();
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('Ошибка загрузки пациентов:', error);
     } finally {
       setLoading(false);
@@ -738,7 +744,7 @@ const DermatologistPanelUnified = () => {
     const loadPromise = (async () => {
       dermatologyRequestCache.skinExaminations.lastAttemptAt = Date.now();
       try {
-        const response = await api.get('/derma/examinations?limit=100') as any;
+        const response = (await api.get('/derma/examinations?limit=100')) as AxiosResponse<Record<string, unknown>>;
         if (response.status < 400) {
           const data = response.data;
           const nextSkinExaminations = Array.isArray(data) ? data : [];
@@ -780,7 +786,7 @@ const DermatologistPanelUnified = () => {
     const loadPromise = (async () => {
       dermatologyRequestCache.cosmeticProcedures.lastAttemptAt = Date.now();
       try {
-        const response = await api.get('/derma/procedures?limit=100') as any;
+        const response = (await api.get('/derma/procedures?limit=100')) as AxiosResponse<Record<string, unknown>>;
         if (response.status < 400) {
           const data = response.data;
           const nextCosmeticProcedures = Array.isArray(data) ? data : [];
@@ -814,18 +820,18 @@ const DermatologistPanelUnified = () => {
       const token = tokenManager.getAccessToken();
       if (!token) return;
 
-      const skinResponse = await api.get(`/derma/examinations?patient_id=${patientId}&limit=10`) as any;
+      const skinResponse = (await api.get(`/derma/examinations?patient_id=${patientId}&limit=10`)) as AxiosResponse<Record<string, unknown>>;
       if (skinResponse.status < 400) {
         const skinData = skinResponse.data;
         setSkinExaminations(Array.isArray(skinData) ? skinData : []);
       }
 
-      const cosmeticResponse = await api.get(`/derma/procedures?patient_id=${patientId}&limit=10`) as any;
+      const cosmeticResponse = (await api.get(`/derma/procedures?patient_id=${patientId}&limit=10`)) as AxiosResponse<Record<string, unknown>>;
       if (cosmeticResponse.status < 400) {
         const cosmeticData = cosmeticResponse.data;
         setCosmeticProcedures(Array.isArray(cosmeticData) ? cosmeticData : []);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('[Dermatology] Ошибка загрузки данных пациента:', error);
     }
   }, [getSelectedPatientId]);
@@ -1001,7 +1007,7 @@ const DermatologistPanelUnified = () => {
               : t('derma.derma_panel_patient_not_found')
           );
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.error('[Dermatology] Не удалось загрузить пациента из URL:', error);
         notify.error(t('derma.patient_load_failed'));
       }
@@ -1024,32 +1030,33 @@ const DermatologistPanelUnified = () => {
 
     const loadCanonicalStatus = async () => {
       try {
-        const response = await api.get(`/appointments/${appointmentId}/status`) as any;
+        const response = (await api.get(`/appointments/${appointmentId}/status`)) as AxiosResponse<Record<string, unknown>>;
 
         if (response.status >= 400) {
           return;
         }
 
-        const statusData = response.data;
+        const statusData = response.data as Record<string, unknown>;
         if (!isMounted) {
           return;
         }
 
-        setEmr(statusData.emr || null);
-        setPrescription(statusData.prescription || null);
+        setEmr((statusData.emr as Record<string, unknown>) || null);
+        setPrescription((statusData.prescription as Record<string, unknown>) || null);
         setCanCreatePrescription(statusData.can_create_prescription === true);
 
-        const normalizedStatusVisitId = normalizeNumericId(statusData.visit_id);
+        const normalizedStatusVisitId = normalizeNumericId(statusData.visit_id as string | number | null | undefined);
         const normalizedCurrentVisitId = normalizeNumericId(currentAppointment?.visit_id);
         if (normalizedStatusVisitId && normalizedStatusVisitId !== normalizedCurrentVisitId) {
           setCurrentAppointment((prev) => prev ? { ...prev, visit_id: normalizedStatusVisitId } : prev);
         }
 
-        const normalizedAppointmentStatus = statusData.appointment?.status || null;
+        const appointmentData = statusData.appointment as { status?: string } | undefined;
+        const normalizedAppointmentStatus = appointmentData?.status || null;
         if (normalizedAppointmentStatus) {
           setCurrentAppointment((prev) => prev ? { ...prev, status: normalizedAppointmentStatus } : prev);
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.warn('[Dermatology] Не удалось загрузить canonical status:', error);
       }
     };
@@ -1069,7 +1076,7 @@ const DermatologistPanelUnified = () => {
         notify.error(t('derma.no_entry_for_prescription'));
         return;
       }
-      const response = await api.post(`/appointments/${appointmentId}/prescription`, prescriptionData) as any;
+      const response = (await api.post(`/appointments/${appointmentId}/prescription`, prescriptionData)) as AxiosResponse<Record<string, unknown>>;
 
       if (response.status < 400) {
         const savedPrescription = response.data;
@@ -1079,7 +1086,7 @@ const DermatologistPanelUnified = () => {
         const error = response.data;
         notify.error(error.detail || t('derma.derma_panel_prescription_save_failed_short'));
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('DermatologistPanel: Save prescription error:', error);
       notify.error(t('derma.prescription_save_failed'));
     }
@@ -1109,7 +1116,7 @@ const DermatologistPanelUnified = () => {
     };
 
     try {
-      const result: any = await printService.printPrescription(payload);
+      const result = await printService.printPrescription(payload) as { success?: boolean; error?: string; data?: { message?: string; printer?: string; job_id?: string } };
 
       if (!result.success) {
         throw new Error(result.error || t('derma.derma_panel_prescription_print_failed'));
@@ -1122,9 +1129,9 @@ const DermatologistPanelUnified = () => {
         printer: result.data?.printer || null,
         jobId: result.data?.job_id || null
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('[Dermatology] Prescription print error:', error);
-      notify.error(error.message || t('derma.derma_panel_prescription_print_failed'));
+      notify.error((error as Error)?.message || t('derma.derma_panel_prescription_print_failed'));
       throw error;
     }
   };
@@ -1179,14 +1186,14 @@ const DermatologistPanelUnified = () => {
       // X-2 (UX audit): fetch latest EMR data for the payload
       let emrPayload = { complaint: '', diagnosis: '', icd10: '', notes: '' };
       try {
-        const emrRes = await api.get(`/v2/emr/${selectedPatient?.visit_id || currentAppointment?.visit_id}`) as any;
+        const emrRes = (await api.get(`/v2/emr/${selectedPatient?.visit_id || currentAppointment?.visit_id}`)) as AxiosResponse<Record<string, unknown>>;
         if (emrRes.status < 400) {
-          const emrData = emrRes.data;
+          const emrData = emrRes.data as Record<string, unknown>;
           emrPayload = {
-            complaint: emrData?.complaints || '',
-            diagnosis: emrData?.diagnosis || '',
-            icd10: emrData?.icd10_code || emrData?.icd10 || '',
-            notes: emrData?.notes || '',
+            complaint: (emrData?.complaints as string) || '',
+            diagnosis: (emrData?.diagnosis as string) || '',
+            icd10: (emrData?.icd10_code as string) || (emrData?.icd10 as string) || '',
+            notes: (emrData?.notes as string) || '',
           };
         }
       } catch (emrErr) {
@@ -1235,9 +1242,9 @@ const DermatologistPanelUnified = () => {
         logger.warn('[Dermatology] callNextWaiting(dermatology): failed', err);
       }
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('[Dermatology] handleSaveVisit: error', error);
-      notify.error(error.message || t('derma.derma_panel_complete_failed'));
+      notify.error((error as Error)?.message || t('derma.derma_panel_complete_failed'));
     } finally {
       logger.info('[Dermatology] handleSaveVisit: finish');
       setLoading(false);
@@ -1255,7 +1262,7 @@ const DermatologistPanelUnified = () => {
       };
       logger.info('[Dermatology] Сохранение осмотра кожи', payload);
 
-      const response = await api.post('/derma/examinations', payload) as any;
+      const response = (await api.post('/derma/examinations', payload)) as AxiosResponse<Record<string, unknown>>;
 
       if (response.status < 400) {
         setShowSkinForm(false);
@@ -1274,11 +1281,11 @@ const DermatologistPanelUnified = () => {
         loadPatientData();
         notify.success(t('derma.skin_exam_saved'));
       } else {
-        const detail = await response.text();
+        const detail = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
         logger.error('[Dermatology] Ошибка ответа при сохранении осмотра', { status: response.status, detail });
         notify.error(t('derma.skin_exam_save_failed'));
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('Ошибка сохранения осмотра:', error);
       notify.error(t('derma.skin_exam_save_failed'));
     }
@@ -1295,7 +1302,7 @@ const DermatologistPanelUnified = () => {
       };
       logger.info('[Dermatology] Сохранение косметической процедуры', payload);
 
-      const response = await api.post('/derma/procedures', payload) as any;
+      const response = (await api.post('/derma/procedures', payload)) as AxiosResponse<Record<string, unknown>>;
 
       if (response.status < 400) {
         setShowCosmeticForm(false);
@@ -1312,11 +1319,11 @@ const DermatologistPanelUnified = () => {
         loadPatientData();
         notify.success(t('derma.procedure_saved'));
       } else {
-        const detail = await response.text();
+        const detail = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
         logger.error('[Dermatology] Ошибка ответа при сохранении процедуры', { status: response.status, detail });
         notify.error(t('derma.procedure_save_failed'));
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('Ошибка сохранения процедуры:', error);
       notify.error(t('derma.procedure_save_failed'));
     }
@@ -1525,8 +1532,8 @@ const DermatologistPanelUnified = () => {
                     {t('derma.derma_panel_emr_title')}
                   </h4>
                   <EMRContainerV2
-                  visitId={currentAppointment?.visit_id}
-                  patientId={currentAppointment?.patient_id}
+                  visitId={currentAppointment?.visit_id as string | number | undefined}
+                  patientId={currentAppointment?.patient_id as string | number | null | undefined}
                   specialty="dermatology" />
 
                 </div>
@@ -1655,9 +1662,9 @@ const DermatologistPanelUnified = () => {
                       // Добавляем процедуру в список услуг
                       setSelectedServices((prev) => [...prev, {
                         id: Date.now(),
-                        name: procedure.name,
-                        price: procedure.price,
-                        duration: procedure.duration
+                        name: (procedure as { name?: string }).name,
+                        price: (procedure as { price?: number }).price,
+                        duration: (procedure as { duration?: number }).duration
                       }]);
                     }} />
 
@@ -1665,7 +1672,7 @@ const DermatologistPanelUnified = () => {
                     <div className="derma-p-4 derma-mt-16">
                       <ServiceChecklist
                       value={selectedServices}
-                      onChange={(v: any) => setSelectedServices(v)}
+                      onChange={(v: unknown) => setSelectedServices(v as never[])}
                       department="derma" />
 
                     </div>

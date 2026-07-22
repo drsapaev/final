@@ -15,23 +15,15 @@ import {
 'lucide-react';
 import {
   MacOSCard,
-  Button as RawButton,
-  Badge as RawBadge,
-  Input as RawInput,
-  Select as RawSelect,
-  Checkbox as RawCheckbox,
-  Skeleton as RawSkeleton,
-  MacOSEmptyState as RawMacOSEmptyState,
-  Alert as RawAlert,
+  Button,
+  Badge,
+  Input,
+  Select,
+  Checkbox,
+  Skeleton,
+  MacOSEmptyState,
+  Alert,
 } from '../ui/macos';
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
-const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
-const Checkbox = RawCheckbox as unknown as React.ComponentType<Record<string, unknown>>;
-const Skeleton = RawSkeleton as unknown as React.ComponentType<Record<string, unknown>>;
-const MacOSEmptyState = RawMacOSEmptyState as unknown as React.ComponentType<Record<string, unknown>>;
-const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
@@ -64,7 +56,7 @@ const BranchManagement = () => {
   const [editingBranch, setEditingBranch] = useState(null);
   const [message, setMessage] = useState({ type: '', text: '' });
   const [stats, setStats] = useState(null);
-  const [formErrors, setFormErrors] = useState({} as any);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   // Форма филиала
   const [formData, setFormData] = useState({
@@ -76,7 +68,7 @@ const BranchManagement = () => {
     status: 'active',
     capacity: 50,
     services_available: ['cardiology', 'dermatology', 'stomatology']
-  } as any);
+  } as Record<string, unknown>);
 
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
@@ -138,10 +130,10 @@ const BranchManagement = () => {
   const loadBranches = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await api.get('/clinic/branches') as any;
+      const response = (await api.get('/clinic/branches')) as import('axios').AxiosResponse<Record<string, unknown>>;
       const nextBranches = Array.isArray(response.data)
-        ? response.data
-        : response.data?.branches || [];
+        ? (response.data as unknown[])
+        : (response.data?.branches as unknown[]) || [];
       setBranches(nextBranches);
       setStats(deriveBranchStats(nextBranches));
     } catch (error) {
@@ -164,7 +156,7 @@ const BranchManagement = () => {
       setFormErrors({});
 
       const normalizedPhone = normalizeBranchPhone(formData.phone);
-      if (formData.phone.trim() && normalizedPhone === null) {
+      if (String(formData.phone ?? '').trim() && normalizedPhone === null) {
         setFormErrors({ phone: t('admin2.br_phone_format_error') });
         setMessage({
           type: 'error',
@@ -270,7 +262,7 @@ const BranchManagement = () => {
         <div className="admin-d-flex-gap-24-fw-wrap-1">
             <div className="text-center">
               <div className="admin-fs-2xl-fw-bold-blue-mb-4-1">
-                {stats.total_branches}
+                {String(stats.total_branches ?? "")}
               </div>
               <div className="text-sm text-[var(--mac-text-secondary)]">
                 {t('admin2.br_stat_total')}
@@ -278,7 +270,7 @@ const BranchManagement = () => {
             </div>
             <div className="text-center">
               <div className="admin-fs-2xl-fw-bold-success-mb-4-1">
-                {stats.active_branches}
+                {String(stats.active_branches ?? "")}
               </div>
               <div className="text-sm text-[var(--mac-text-secondary)]">
                 {t('admin2.br_stat_active')}
@@ -364,7 +356,7 @@ const BranchManagement = () => {
                 <Input
                 type="text"
                 required
-                value={formData.name}
+                value={String(formData.name ?? '')}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 placeholder={t('admin2.br_placeholder_name')} />
               
@@ -376,7 +368,7 @@ const BranchManagement = () => {
                 <Input
                 type="text"
                 required
-                value={formData.code}
+                value={String(formData.code ?? '')}
                 onChange={(e) => setFormData({ ...formData, code: e.target.value })}
                 placeholder={t('admin2.br_placeholder_code')} />
               
@@ -387,7 +379,7 @@ const BranchManagement = () => {
                 </label>
                 <Input
                 type="text"
-                value={formData.address}
+                value={String(formData.address ?? '')}
                 onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                 placeholder={t('admin2.br_placeholder_address')} />
               
@@ -398,7 +390,7 @@ const BranchManagement = () => {
                 </label>
                 <Input
                 type="tel"
-                value={formData.phone}
+                value={String(formData.phone ?? '')}
                 onChange={(e) => {
                   setFormData({ ...formData, phone: e.target.value });
                   if (formErrors.phone) {
@@ -418,7 +410,7 @@ const BranchManagement = () => {
                 </label>
                 <Input
                 type="email"
-                value={formData.email}
+                value={String(formData.email ?? '')}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 placeholder={t('admin2.br_placeholder_email')} />
               
@@ -429,7 +421,7 @@ const BranchManagement = () => {
                 </label>
                 <Select
                 aria-label={t('admin2.br_status_select_aria')}
-                value={formData.status}
+                value={String(formData.status ?? '')}
                 onChange={(value: unknown) => setFormData({ ...formData, status: String(value) })}
                 options={statusOptions.map((option) => ({ value: option.value, label: option.label }))}
                 size="large" />
@@ -440,7 +432,7 @@ const BranchManagement = () => {
                 </label>
                 <Input
                 type="number"
-                value={formData.capacity}
+                value={String(formData.capacity ?? '')}
                 onChange={(e) => setFormData({ ...formData, capacity: parseInt(e.target.value) })}
                 placeholder={t('admin2.br_placeholder_capacity')} />
               
@@ -455,17 +447,17 @@ const BranchManagement = () => {
                 {specialtyOptions.map((specialty) =>
               <label key={specialty.value} className="admin-d-flex-ai-center-gap-8-fs-sm-primary">
                     <Checkbox
-                  checked={formData.services_available.includes(specialty.value)}
+                  checked={(formData.services_available as unknown[]).includes(specialty.value)}
                   onChange={(checked) => {
                     if (checked) {
                       setFormData({
                         ...formData,
-                        services_available: [...formData.services_available, specialty.value]
+                        services_available: [...(formData.services_available as unknown[]), specialty.value]
                       });
                     } else {
                       setFormData({
                         ...formData,
-                        services_available: formData.services_available.filter((s) => s !== specialty.value)
+                        services_available: (formData.services_available as unknown[]).filter((s) => s !== specialty.value)
                       });
                     }
                   }} />

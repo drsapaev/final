@@ -13,6 +13,8 @@ interface MacOSEmptyStateProps {
   style?: CSSProperties;
   message?: React.ReactNode;
   type?: string;
+  children?: React.ReactNode;
+  iconStyle?: CSSProperties;
 }
 
 const MacOSEmptyState = ({

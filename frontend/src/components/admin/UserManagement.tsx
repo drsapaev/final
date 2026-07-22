@@ -5,25 +5,16 @@ import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import {
   MacOSCard,
-  Button as RawButton,
-  Input as RawInput,
-  Select as RawSelect,
-  Table as RawTable,
-  Badge as RawBadge,
-  Modal as RawModal,
-  Alert as RawAlert,
-  Box as RawBox,
-  Typography as RawTypography,
+  Button,
+  Input,
+  Select,
+  Table,
+  Badge,
+  Modal,
+  Alert,
+  Box,
+  Typography,
 } from '../ui/macos';
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
-const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
-const Table = RawTable as unknown as React.ComponentType<Record<string, unknown>>;
-const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
-const Modal = RawModal as unknown as React.ComponentType<Record<string, unknown>>;
-const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
-const Box = RawBox as unknown as React.ComponentType<Record<string, unknown>>;
-const Typography = RawTypography as unknown as React.ComponentType<Record<string, unknown>>;
 import {
   Plus,
   Edit,
@@ -169,17 +160,17 @@ const UserManagement = () => {
     try {
       setLoading(true);
       // PR-22: use pagination — was per_page=100 with no pagination UI
-      const params: any = { page, per_page: perPage };
+      const params: Record<string, unknown> = { page, per_page: perPage };
       if (roleFilter) params.role = roleFilter;
       if (statusFilter) params.status = statusFilter;
       if (searchTerm) params.search = searchTerm;
-      const response = await api.get('/users/users', { params }) as any;
-      setUsers(response.data.users || response.data || []);
-      setTotalPages(response.data.total_pages || 1);
-      setTotalUsers(response.data.total || 0);
+      const response = (await api.get('/users/users', { params })) as import('axios').AxiosResponse<Record<string, unknown>>;
+      setUsers((response.data.users as unknown as unknown[]) || (response.data as unknown as unknown[]) || []);
+      setTotalPages(Number(response.data.total_pages ?? 1));
+      setTotalUsers(Number(response.data.total ?? 0));
       setError('');
     } catch (err) {
-      const errorMessage = err.response?.data?.detail || err.message || t('admin2.um_error_connection');
+      const errorMessage = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || (err as Error)?.message || t('admin2.um_error_connection');
       setError(errorMessage);
       logger.error('Ошибка загрузки пользователей:', err);
     } finally {
@@ -201,7 +192,7 @@ const UserManagement = () => {
       setShowUserModal(false);
       setSelectedUser(null);
     } catch (err) {
-      const errorMessage = err.response?.data?.detail || err.message || t('admin2.um_error_save');
+      const errorMessage = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || (err as Error)?.message || t('admin2.um_error_save');
       setError(errorMessage);
       logger.error('Ошибка сохранения пользователя:', err);
       throw err; // UserModal catch block will handle specific errors if needed
@@ -229,7 +220,7 @@ const UserManagement = () => {
       setShowDeleteDialog(false);
       setSelectedUser(null);
     } catch (err) {
-      const errorMessage = err.response?.data?.detail || err.message || t('admin2.um_error_delete');
+      const errorMessage = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || (err as Error)?.message || t('admin2.um_error_delete');
 
       if (errorMessage.includes('связанные данные') || errorMessage.includes('деактивировать')) {
         setDeleteDialogMode('deactivate');
@@ -293,7 +284,7 @@ const UserManagement = () => {
       setError('');
       loadUsers(currentPage);
     } catch (err) {
-      const errorMessage = err.response?.data?.detail || err.message || t('admin2.um_error_status_change');
+      const errorMessage = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || (err as Error)?.message || t('admin2.um_error_status_change');
       setError(errorMessage);
       logger.error('Ошибка изменения статуса пользователя:', err);
     }
@@ -616,7 +607,7 @@ const UserManagement = () => {
           role="menuitem"
           variant="ghost"
           size="small"
-          style={actionMenuItemStyle}
+          style={actionMenuItemStyle as CSSProperties}
           startIcon={<Edit size={16} />}
           onClick={handleEditFromActionsMenu}>
           {t('admin2.um_btn_edit')}
@@ -626,7 +617,7 @@ const UserManagement = () => {
           role="menuitem"
           variant="ghost"
           size="small"
-          style={actionMenuItemStyle}
+          style={actionMenuItemStyle as CSSProperties}
           startIcon={actionsMenuUser.is_active ? <Ban size={16} /> : <CheckCircle size={16} />}
           onClick={handleToggleStatusFromActionsMenu}>
           {actionsMenuUser.is_active ? t('admin2.um_btn_deactivate') : t('admin2.um_btn_activate')}

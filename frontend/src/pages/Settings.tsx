@@ -5,17 +5,14 @@ import PropTypes from 'prop-types';
 import RoleGate from '../components/RoleGate';
 import { api } from '../api/client';
 import { useTheme } from '../contexts/ThemeContext';
-import TwoFactorManagerRaw from '../components/security/TwoFactorManager';
-const TwoFactorManager = TwoFactorManagerRaw as unknown as React.ComponentType<Record<string, unknown>>;
-import ColorSchemeSelectorRaw from '../components/admin/ColorSchemeSelector';
-const ColorSchemeSelector = ColorSchemeSelectorRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import TwoFactorManager from '../components/security/TwoFactorManager';
+import ColorSchemeSelector from '../components/admin/ColorSchemeSelector';
 import { AccentPicker } from '../components/ui/macos';
 
 import PhoneVerification from '../components/auth/PhoneVerification';
 
 import logger from '../utils/logger';
-import NotificationSystemStatusRaw from '../components/settings/NotificationSystemStatus';
-const NotificationSystemStatus = NotificationSystemStatusRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import NotificationSystemStatus from '../components/settings/NotificationSystemStatus';
 // P-013 fix: shared ConfirmDialog hook replacing native confirm() calls.
 import { useConfirm } from '../components/common/ConfirmDialog';
 import './SettingsAnalytics.css';
@@ -66,7 +63,7 @@ export default function Settings() {void
   // P-013 fix: shared ConfirmDialog hook (replaces 1 native confirm() call).
   const [confirmRaw, confirmDialog] = useConfirm();
   const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
-  const [tab, setTab] = useState('license' as any);
+  const [tab, setTab] = useState<'license' | 'printer' | 'online_queue' | 'display_board' | 'payment_providers' | 'notifications' | 'appearance' | 'security'>('license');
 
   // license tab
   const [status, setStatus] = useState(null);
@@ -82,7 +79,7 @@ export default function Settings() {void
 
   async function loadStatus() {
     try {
-      const st = await api.get('/activation/status') as any;
+      const st = (await api.get('/activation/status')) as import('axios').AxiosResponse<Record<string, unknown>>;
       setStatus(st?.data ?? st ?? null);
     } catch {
       setStatus(null);
@@ -93,8 +90,8 @@ export default function Settings() {void
     setBusyAct(true);
     setErrAct('');
     try {
-      const response = await api.post('/activation/activate', { key }) as any;
-      const res = response?.data ?? response;
+      const response = (await api.post('/activation/activate', { key })) as import('axios').AxiosResponse<Record<string, unknown>>;
+      const res = (response?.data ?? response) as { ok?: boolean; reason?: string };
       if (!res?.ok) {
         setErrAct(res?.reason || t('misc.settings_activation_failed'));
       }
@@ -110,8 +107,8 @@ export default function Settings() {void
   async function loadProviders() {
     setLoadingProviders(true);
     try {
-      const response = await api.get('/admin/providers') as any;
-      setProviders(response || []);
+      const response = (await api.get('/admin/providers')) as import('axios').AxiosResponse<Record<string, unknown>>;
+      setProviders((response?.data as unknown as unknown[]) || []);
     } catch (error) {
       logger.error('Ошибка загрузки провайдеров:', error);
     } finally {
@@ -176,16 +173,16 @@ export default function Settings() {void
     setErrCat('');
     try {
       // Ожидаем форму {items:[{key,value}]} или массив объектов
-      const res = await api.get('/settings', { params: { category } }) as any;
-      const data = res?.data ?? res;
-      let arr = [];
+      const res = await api.get('/settings', { params: { category } }) as import('axios').AxiosResponse<Record<string, unknown>>;
+      const data = (res?.data ?? res) as { items?: unknown[]; [k: string]: unknown };
+      let arr: unknown[] = [];
       if (Array.isArray(data?.items)) arr = data.items;else
       if (Array.isArray(data)) arr = data;else
       if (data && typeof data === 'object') {
         // возможный словарь
         arr = Object.entries(data).map(([k, v]) => ({ key: k, value: v }));
       }
-      setItems(arr.map((x) => ({ key: x.key ?? x.name ?? '', value: x.value ?? '' })));
+      setItems(arr.map((x) => ({ key: (x as { key?: string }).key ?? (x as { name?: string }).name ?? '', value: (x as { value?: unknown }).value ?? '' })));
     } catch (e) {
       setErrCat(e?.data?.detail || e?.message || t('misc.settings_load_error'));
       setItems([]);
@@ -364,7 +361,7 @@ export default function Settings() {void
                 </>
             }
 
-              {tab === 'payment_providers' &&
+              {(tab as string) === 'payment_providers' &&
             <div className="settings-tab-content">
                   <div className="settings-card">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
@@ -504,10 +501,10 @@ function ProviderCard({ provider, onEdit, onDelete }) {
 }
 
 // Модальное окно для добавления/редактирования провайдера
-function ProviderModal({ provider, onClose, onSave, title }: any) {
+function ProviderModal({ provider, onClose, onSave, title }: { provider?: Record<string, unknown>; onClose?: () => void; onSave?: (data: unknown) => void; title?: string }) {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<Record<string, unknown>>({
     name: provider?.name || '',
     code: provider?.code || '',
     description: provider?.description || '',
@@ -515,7 +512,7 @@ function ProviderModal({ provider, onClose, onSave, title }: any) {
     secret_key: provider?.secret_key || '',
     webhook_url: provider?.webhook_url || '',
     api_url: provider?.api_url || ''
-  } as any);
+  });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -571,7 +568,7 @@ function ProviderModal({ provider, onClose, onSave, title }: any) {
             <Input
               type="text"
               aria-label="Provider name"
-              value={formData.name}
+              value={formData.name as string}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               required
               style={{
@@ -590,7 +587,7 @@ function ProviderModal({ provider, onClose, onSave, title }: any) {
             <Input
               type="text"
               aria-label="Provider code"
-              value={formData.code}
+              value={formData.code as string}
               onChange={(e) => setFormData({ ...formData, code: e.target.value })}
               required
               style={{
@@ -608,7 +605,7 @@ function ProviderModal({ provider, onClose, onSave, title }: any) {
             <label style={{ display: 'block', marginBottom: 4, fontWeight: 'var(--mac-font-weight-semibold)' }}>{t('misc.settings_description')}</label>
             <textarea
               aria-label="Provider description"
-              value={formData.description}
+              value={formData.description as string}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               rows={3}
               style={{
@@ -628,7 +625,7 @@ function ProviderModal({ provider, onClose, onSave, title }: any) {
             <Input
               type="password"
               aria-label="Provider secret key"
-              value={formData.secret_key}
+              value={formData.secret_key as string}
               onChange={(e) => setFormData({ ...formData, secret_key: e.target.value })}
               required
               style={{
@@ -647,7 +644,7 @@ function ProviderModal({ provider, onClose, onSave, title }: any) {
             <Input
               type="url"
               aria-label="Provider webhook URL"
-              value={formData.webhook_url}
+              value={formData.webhook_url as string}
               onChange={(e) => setFormData({ ...formData, webhook_url: e.target.value })}
               style={{
                 width: '100%',
@@ -665,7 +662,7 @@ function ProviderModal({ provider, onClose, onSave, title }: any) {
             <Input
               type="url"
               aria-label="Provider API URL"
-              value={formData.api_url}
+              value={formData.api_url as string}
               onChange={(e) => setFormData({ ...formData, api_url: e.target.value })}
               style={{
                 width: '100%',
@@ -679,7 +676,7 @@ function ProviderModal({ provider, onClose, onSave, title }: any) {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Checkbox id="is_active" aria-label="Provider active" checked={formData.is_active} onChange={(e: any) => setFormData({ ...formData, is_active: e?.target?.checked ?? e })} />
+            <Checkbox id="is_active" aria-label="Provider active" checked={Boolean(formData.is_active as boolean)} onChange={(checked: boolean) => setFormData({ ...formData, is_active: checked })} />
             
             <label htmlFor="is_active" className="settings-label-semibold">{t('misc.settings_active')}</label>
           </div>

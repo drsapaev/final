@@ -62,7 +62,7 @@ const formatDateSeparator = (dateStr, t) => {
 };
 
 // Группировка сообщений по датам
-const groupMessagesByDate = (msgs) => {
+const groupMessagesByDate = (msgs: Array<{ id?: string | number; created_at?: string | number | Date; [k: string]: unknown }>): Array<{ type: string; id?: string; date?: string | number | Date; [k: string]: unknown }> => {
   if (!msgs || msgs.length === 0) return [];
 
   const groups = [];
@@ -89,7 +89,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
   const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
   const [authState, setAuthState] = useState(auth.getState());
   const user = authState.profile;
-  const { addToast } = useToast() as any;
+  const { addToast } = useToast() as { addToast: (toast: unknown) => void };
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;  // PR-72
   const {
@@ -199,9 +199,8 @@ const ChatWindow = ({ isOpen, onClose }) => {
       if (item.message_type === 'voice') return 90;
       return 70;
     },
-    overscan: 15,
-    scrollToAlignment: 'end'
-  } as any);
+    overscan: 15
+  } as unknown as Parameters<typeof useVirtualizer>[0]);
 
   // Scroll to bottom effect
   useLayoutEffect(() => {
@@ -377,7 +376,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
       // (was: fetch('/messages/send-voice') — no /api/v1 prefix, no CSRF, no token refresh)
       const response = await api.post('/messages/send-voice', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
-      }) as any;
+      }) as import('axios').AxiosResponse<Record<string, unknown>>;
 
       // PR-68: axios response already has .data, no need for .json()
       // Обновляем только список бесед - сообщение придет через WebSocket
@@ -484,7 +483,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
   // Drag Logic
   const handleMouseDown = (e) => {
     if (isCompactViewport) return;
-    if (e.target.closest('.chat-header') && !e.target.closest('button')) {
+    if ((e.target as HTMLElement).closest('.chat-header') && !(e.target as HTMLElement).closest('button')) {
       setIsDragging(true);
       setDragOffset({
         x: e.clientX - position.x,
@@ -600,13 +599,13 @@ const ChatWindow = ({ isOpen, onClose }) => {
   };
 
   // Filtered Conversations
-  const filteredConversations = conversations.filter((c: any) => {
+  const filteredConversations = conversations.filter((c: Record<string, unknown>) => {
     const matchesSearch = !convSearchQuery ||
-    c.user_name && c.user_name.toLowerCase().includes(convSearchQuery.toLowerCase()) ||
-    c.last_message && c.last_message.toLowerCase().includes(convSearchQuery.toLowerCase());
+    c.user_name && String(c.user_name ?? '').toLowerCase().includes(convSearchQuery.toLowerCase()) ||
+    c.last_message && String(c.last_message ?? '').toLowerCase().includes(convSearchQuery.toLowerCase());
 
     const matchesFilter = convFilter === 'all' ||
-    convFilter === 'unread' && c.unread_count > 0;
+    convFilter === 'unread' && Number(c.unread_count ?? 0) > 0;
 
     return matchesSearch && matchesFilter;
   });
@@ -1038,7 +1037,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
                 }}>
                 
                                         {rowVirtualizer.getVirtualItems().map((virtualItem) => {
-                  const item: any = groupedMessages[virtualItem.index];
+                  const item: Record<string, unknown> = groupedMessages[virtualItem.index];
                   return (
                     <div
                       key={virtualItem.key}
@@ -1077,7 +1076,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
                           <>
                                                                         <VoiceMessage
                               message={item}
-                              fileUrl={item.file_url} />
+                              fileUrl={String(item.file_url ?? '')} />
                             
                                                                         <div className="message-meta">
                                                                             <span className="message-time">{formatMessageTime(item.created_at)}</span>
@@ -1094,21 +1093,21 @@ const ChatWindow = ({ isOpen, onClose }) => {
                                                                             {item.message_type === 'image' ?
                               <div className="message-image">
                                                                                     <img
-                                  src={item.content}
+                                  src={String(item.content ?? '')}
                                   alt="Attached"
                                   role="button"
                                   tabIndex={0}
                                   aria-label={t('misc.cw_open_image_aria')}
-                                  onClick={() => window.open(item.content, '_blank')}
-                                  onKeyDown={(event) => handleActivationKeyDown(event, () => window.open(item.content, '_blank'))}
+                                  onClick={() => window.open(String(item.content ?? ''), '_blank')}
+                                  onKeyDown={(event) => handleActivationKeyDown(event, () => window.open(String(item.content ?? ''), '_blank'))}
                                   style={{ cursor: 'pointer', maxWidth: '100%', borderRadius: 8 }} />
                                 
                                                                                 </div> :
                               (item.message_type === 'file' || (item.file_id && item.file_url && item.message_type !== 'voice')) ?
                               <div className="message-file">
-                                                                                    <a href={item.content} target="_blank" rel="noopener noreferrer" className="file-link">
+                                                                                    <a href={String(item.content ?? '')} target="_blank" rel="noopener noreferrer" className="file-link">
                                                                                         <Paperclip size={16} />
-                                                                                        <span>{item.content.split('name=')[1] || t('misc.cw_file_default')}</span>
+                                                                                        <span>{String(item.content).split('name=')[1] || t('misc.cw_file_default')}</span>
                                                                                     </a>
                                                                                 </div> :
 
@@ -1129,12 +1128,12 @@ const ChatWindow = ({ isOpen, onClose }) => {
 
                                 }}>
                                 
-                                                                                    {item.content}
+                                                                                    {String(item.content ?? '')}
                                                                                 </ReactMarkdown>
                               }
 
-                                                                            {item.message_type === 'text' && item.content && item.content.match(/https?:\/\/[^\s]+/) &&
-                              <LinkPreview url={item.content.match(/https?:\/\/[^\s]+/)[0]} />
+                                                                            {item.message_type === 'text' && String(item.content ?? '') && String(item.content).match(/https?:\/\/[^\s]+/) &&
+                              <LinkPreview url={String(item.content).match(/https?:\/\/[^\s]+/)[0]} />
                               }
                                                                         </div>
                                                                         <div className="message-meta">
@@ -1148,7 +1147,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
                                                                     </>
                           }
 
-                                                                {item.reactions && item.reactions.length > 0 &&
+                                                                {item.reactions && (item.reactions as unknown[]).length > 0 &&
                           <div className="message-reactions">
                                                                         {Object.entries(groupReactions(item.reactions)).map(([emoji, userIds]: [string, any]) =>
                             <span

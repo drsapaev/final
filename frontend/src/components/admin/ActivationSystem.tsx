@@ -24,14 +24,8 @@ import {
 
 'lucide-react';
 import {
-  AppError, AppLoading, MacOSCard, Button as RawButton, Badge as RawBadge, Input as RawInput, Table as RawTable, Checkbox as RawCheckbox, Select as RawSelect,
+  AppError, AppLoading, MacOSCard, Button, Badge, Input, Table, Checkbox, Select,
 } from '../ui/macos';
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
-const Table = RawTable as unknown as React.ComponentType<Record<string, unknown>>;
-const Checkbox = RawCheckbox as unknown as React.ComponentType<Record<string, unknown>>;
-const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
 // UX Audit: ModernDialog для extend-activation диалога (вместо window.prompt).
 import ModernDialog from '../dialogs/ModernDialog';
 
@@ -64,8 +58,21 @@ const ActivationSystem = () => {
   const [confirmRaw, confirmDialog] = useConfirm();
   const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
   const [loading, setLoading] = useState(true);
-  const [activations, setActivations] = useState([] as any[]);
-  const [stats, setStats] = useState(null as any);
+  
+interface Activation {
+  key?: string;
+  machine_hash?: string;
+  status?: string;
+  expiry_date?: string;
+  meta?: Record<string, unknown>;
+  issued_at?: string;
+  activated_at?: string;
+  revoked_at?: string;
+  [k: string]: unknown;
+}
+
+const [activations, setActivations] = useState<Activation[]>([]);
+  const [stats, setStats] = useState<Record<string, unknown> | null>(null);
   const [serverStatus, setServerStatus] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -125,7 +132,7 @@ const ActivationSystem = () => {
         })
       };
 
-      const response = await api.post('/activation/issue', payload) as any;
+      const response = (await api.post('/activation/issue', payload)) as import('axios').AxiosResponse<Record<string, unknown>>;
       const result = response.data || {};
       setMessage({ type: 'success', text: t('admin2.act_key_created') });
       setShowCreateForm(false);
@@ -200,7 +207,7 @@ const ActivationSystem = () => {
     setMessage({ type: 'success', text: t('admin2.act_copied') });
   };
 
-  const filteredActivations = activations.filter((activation) => {
+  const filteredActivations = activations.filter((activation: Activation) => {
     const matchesSearch = activation.key?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     activation.machine_hash?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || activation.status === statusFilter;
@@ -299,7 +306,7 @@ const ActivationSystem = () => {
       <div className="admin-grid-auto-200">
         <MacOSCard className="admin-card-p-24-center">
           <div className="admin-stat-num-2xl-bold-dynamic-mb-8 admin-stat-blue">
-            {stats.total_activations || 0}
+            {Number(stats.total_activations ?? 0)}
           </div>
           <div className="admin-stat-label-sm-secondary-block-activation">
             {t('admin2.act_stat_total')}
@@ -307,7 +314,7 @@ const ActivationSystem = () => {
         </MacOSCard>
         <MacOSCard className="admin-card-p-24-center">
           <div className="admin-stat-num-2xl-bold-dynamic-mb-8 admin-stat-success">
-            {stats.active_activations || 0}
+            {Number(stats.active_activations ?? 0)}
           </div>
           <div className="admin-stat-label-sm-secondary-block-activation">
             {t('admin2.act_stat_active')}
@@ -315,7 +322,7 @@ const ActivationSystem = () => {
         </MacOSCard>
         <MacOSCard className="admin-card-p-24-center">
           <div className="admin-stat-num-2xl-bold-dynamic-mb-8 admin-stat-warning">
-            {stats.trial_activations || 0}
+            {Number(stats.trial_activations ?? 0)}
           </div>
           <div className="admin-stat-label-sm-secondary-block-activation">
             {t('admin2.act_stat_trial')}
@@ -323,7 +330,7 @@ const ActivationSystem = () => {
         </MacOSCard>
         <MacOSCard className="admin-card-p-24-center">
           <div className="admin-stat-num-2xl-bold-dynamic-mb-8 admin-stat-error">
-            {stats.expired_activations || 0}
+            {Number(stats.expired_activations ?? 0)}
           </div>
           <div className="admin-stat-label-sm-secondary-block-activation">
             {t('admin2.act_stat_expired')}
@@ -377,7 +384,7 @@ const ActivationSystem = () => {
             {
               key: 'key',
               title: t('admin2.col_activation_key'),
-              render: (activation) =>
+              render: (activation: Activation) =>
               <div className="flex items-center justify-center">
                     <Key className="admin-icon-16-mr-8-blue" />
                     <div>
@@ -399,7 +406,7 @@ const ActivationSystem = () => {
             {
               key: 'device',
               title: t('admin2.col_device'),
-              render: (activation) =>
+              render: (activation: Activation) =>
               <div className="flex items-center justify-center">
                     <Smartphone className="admin-icon-16-mr-8-tertiary" />
                     <div>
@@ -416,7 +423,7 @@ const ActivationSystem = () => {
             {
               key: 'status',
               title: t('admin2.col_active'),
-              render: (activation) => {
+              render: (activation: Activation) => {
                 const row = activation || {};
                 const status = statusLabels[row.status] || { label: row.status, color: 'secondary' };
                 return <Badge variant={status.color}>{status.label}</Badge>;
@@ -425,7 +432,7 @@ const ActivationSystem = () => {
             {
               key: 'expiry',
               title: t('admin2.col_expiry'),
-              render: (activation) => {
+              render: (activation: Activation) => {
                 const row = activation || {};
                 const isExpired = row.expiry_date ? new Date(row.expiry_date) < new Date() : false;
                 return (
@@ -445,9 +452,9 @@ const ActivationSystem = () => {
             {
               key: 'created',
               title: t('admin2.col_created'),
-              render: (activation) =>
+              render: (activation: Activation) =>
               <div className="admin-created-date">
-                    {(activation || {}).created_at ? new Date((activation || {}).created_at).toLocaleDateString('ru-RU') : '—'}
+                    {(activation || {}).created_at ? new Date(String((activation || {}).created_at)).toLocaleDateString('ru-RU') : '—'}
                   </div>
 
             },
@@ -664,7 +671,7 @@ const ActivationKeyForm = ({ onSave, onCancel }) => {
             <label className="admin-label-flex-center-activation">
               <Checkbox
                 checked={formData.features.full_access}
-                onChange={(e: any) => handleFeatureChange('full_access', e?.target?.checked ?? e)}
+                onChange={(checked: boolean) => handleFeatureChange('full_access', checked)}
                 className="mr-2" />
               <span className="admin-span-sm-primary">{t('admin2.act_form_feature_full_access')}</span>
             </label>
@@ -672,7 +679,7 @@ const ActivationKeyForm = ({ onSave, onCancel }) => {
             <label className="admin-label-flex-center-activation">
               <Checkbox
                 checked={formData.features.ai_features}
-                onChange={(e: any) => handleFeatureChange('ai_features', e?.target?.checked ?? e)}
+                onChange={(checked: boolean) => handleFeatureChange('ai_features', checked)}
                 className="mr-2" />
               <span className="admin-span-sm-primary">{t('admin2.act_form_feature_ai')}</span>
             </label>
@@ -680,7 +687,7 @@ const ActivationKeyForm = ({ onSave, onCancel }) => {
             <label className="admin-label-flex-center-activation">
               <Checkbox
                 checked={formData.features.telegram_integration}
-                onChange={(e: any) => handleFeatureChange('telegram_integration', e?.target?.checked ?? e)}
+                onChange={(checked: boolean) => handleFeatureChange('telegram_integration', checked)}
                 className="mr-2" />
               <span className="admin-span-sm-primary">{t('admin2.act_form_feature_telegram')}</span>
             </label>
@@ -688,7 +695,7 @@ const ActivationKeyForm = ({ onSave, onCancel }) => {
             <label className="admin-label-flex-center-activation">
               <Checkbox
                 checked={formData.features.print_system}
-                onChange={(e: any) => handleFeatureChange('print_system', e?.target?.checked ?? e)}
+                onChange={(checked: boolean) => handleFeatureChange('print_system', checked)}
                 className="mr-2" />
               <span className="admin-span-sm-primary">{t('admin2.act_form_feature_print')}</span>
             </label>

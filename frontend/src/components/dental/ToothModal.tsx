@@ -7,23 +7,17 @@ import { useTranslation } from '../../i18n/useTranslation';
 import { useEffect, useState } from 'react';
 import type { CSSProperties } from 'react';
 import {
-  Alert as RawAlert,
-  Badge as RawBadge,
-  Button as RawButton,
+  Alert,
+  Badge,
+  Button,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
-  Input as RawInput,
-  Select as RawSelect,
-  Textarea as RawTextarea,
+  Input,
+  Select,
+  Textarea,
 } from '../ui/macos';
-const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
-const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
-const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
-const Textarea = RawTextarea as unknown as React.ComponentType<Record<string, unknown>>;
 import {
   Activity,
   CheckCircle,
@@ -65,7 +59,7 @@ async function loadExistingEmrDraft(visitId: string | number) {
     validateStatus: (status: number) => status === 404 || (status >= 200 && status < 300),
   } as Record<string, unknown>) as unknown as { data?: Record<string, unknown> };
 
-  return (response as any).status === 404 ? null : response.data;
+  return (response as { status?: number }).status === 404 ? null : response.data;
 }
 
 function buildToothEmrPayload(existingEmr, toothNumber, toothData) {
@@ -222,10 +216,10 @@ const ToothModal = ({
   open,
   onClose,
   toothNumber,
-  toothData = {} as any,
+  toothData = {} as Record<string, unknown>,
   onSave,
   visitId
-}: any) => {
+}: { toothData?: Record<string, unknown>; onClose?: () => void; onSave?: (data: unknown) => void; toothNumber?: string | number; visitId?: string | number; open?: boolean; [k: string]: unknown }) => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [formData, setFormData] = useState({
@@ -250,18 +244,19 @@ const ToothModal = ({
 
   useEffect(() => {
     if (open && toothData) {
+      const td = toothData as Record<string, unknown>;
       setFormData({
-        status: toothData.status || '',
-        procedures: toothData.procedures || [],
-        material: toothData.material || '',
-        notes: toothData.notes || '',
-        price: toothData.price || 0,
-        nextVisitDate: toothData.nextVisitDate || '',
-        requiresFollowUp: toothData.requiresFollowUp || false,
-        shade: toothData.shade || '',
-        fitQuality: toothData.fitQuality || toothData.fit_quality || '',
-        warrantyPeriod: toothData.warrantyPeriod || toothData.warranty_period || '',
-        patientSatisfaction: toothData.patientSatisfaction || toothData.patient_satisfaction || '',
+        status: String(td.status ?? ''),
+        procedures: (td.procedures as unknown[]) || [],
+        material: String(td.material ?? ''),
+        notes: String(td.notes ?? ''),
+        price: Number(td.price ?? 0),
+        nextVisitDate: String(td.nextVisitDate ?? ''),
+        requiresFollowUp: Boolean(td.requiresFollowUp ?? false),
+        shade: String(td.shade ?? ''),
+        fitQuality: String(td.fitQuality ?? td.fit_quality ?? ''),
+        warrantyPeriod: String(td.warrantyPeriod ?? td.warranty_period ?? ''),
+        patientSatisfaction: String(td.patientSatisfaction ?? td.patient_satisfaction ?? ''),
       });
 
       setHistory([]);
@@ -328,7 +323,7 @@ const ToothModal = ({
         );
       }
       
-      onSave && onSave(toothNumber, dataToSave);
+      onSave && onSave(dataToSave);
       onClose();
       
     } catch (error) {
@@ -351,7 +346,7 @@ const ToothModal = ({
             {t('dental.dental_tm_tooth_prefix')}{toothNumber} - {getToothName(toothNumber)}
           </h2>
           <Badge variant="primary" size="small">
-            {`${Math.floor(toothNumber / 10)} ${t('dental.dental_tm_quadrant_suffix')}`}
+            {`${Math.floor(Number(toothNumber) / 10)} ${t('dental.dental_tm_quadrant_suffix')}`}
           </Badge>
         </div>
       </DialogTitle>

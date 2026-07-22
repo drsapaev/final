@@ -6,8 +6,7 @@
  * Each tab shows a form + history list.
  */
 import PropTypes from 'prop-types';
-import { MacOSCard, Button, Input, Select as SelectRaw, Textarea, Badge } from '../ui/macos';
-const Select = SelectRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import { MacOSCard, Button, Input, Select, Textarea, Badge } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
 
@@ -55,7 +54,7 @@ export function DermaExamsTab({
                 </div>
                 <div>
                   <label className="derma-form-label">{t('derma.derma_exams_skin_type')}</label>
-                  <Select aria-label={t('derma.derma_exams_skin_type')} value={skinExamination.skin_type || ''} onChange={(v: any) => setSkinExamination({ ...skinExamination, skin_type: String(v) })}>
+                  <Select aria-label={t('derma.derma_exams_skin_type')} value={skinExamination.skin_type || ''} onChange={(v: unknown) => setSkinExamination({ ...skinExamination, skin_type: String(v) })}>
                     <option value="">{t('derma.derma_exams_select')}</option>
                     <option value="normal">{t('derma.derma_exams_skin_type_normal')}</option>
                     <option value="dry">{t('derma.derma_exams_skin_type_dry')}</option>

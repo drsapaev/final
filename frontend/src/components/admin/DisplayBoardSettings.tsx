@@ -39,10 +39,10 @@ const DisplayBoardSettings = () => {
   const [boards, setBoards] = useState([]); // P2 fix: restored value (was const [, setX]; used in loadDisplayData L75)
   const [selectedBoard, setSelectedBoard] = useState(null);
   const [themes, setThemes] = useState([]);
-  const [stats, setStats] = useState({} as any);
+  const [stats, setStats] = useState<Record<string, unknown>>({});
   const [banners] = useState([]);
   const [showBannerForm, setShowBannerForm] = useState(false); // P2 fix: restored value (used at L545 onClick)
-  const [testResults, setTestResults] = useState({} as any);
+  const [testResults, setTestResults] = useState<Record<string, { testing?: boolean; success?: boolean; message?: string; error?: string; [k: string]: unknown }>>({});
   const [message, setMessage] = useState({ type: '', text: '' });
 
   // Опции конфиденциальности
@@ -111,11 +111,11 @@ const DisplayBoardSettings = () => {
       setSaving(true);
       setMessage({ type: '', text: '' });
 
-      const response = await api.put(`/admin/display/boards/${selectedBoard.id}`, selectedBoard) as any;
+      const response = (await api.put(`/admin/display/boards/${selectedBoard.id}`, selectedBoard)) as import('axios').AxiosResponse<Record<string, unknown>>;
 
       if (response.status >= 200 && response.status < 300) {
         const result = response.data;
-        setMessage({ type: 'success', text: result.message });
+        setMessage({ type: 'success', text: String(result.message ?? '') });
       } else {
         throw new Error(t('admin2.db2_save_error'));
       }
@@ -145,7 +145,7 @@ const DisplayBoardSettings = () => {
         }
       };
 
-      const response = await api.post(`/admin/display/boards/${selectedBoard.id}/test`, testData) as any;
+      const response = (await api.post(`/admin/display/boards/${selectedBoard.id}/test`, testData)) as import('axios').AxiosResponse<Record<string, unknown>>;
 
       if (response.status >= 200 && response.status < 300) {
         const result = response.data;
@@ -246,19 +246,19 @@ const DisplayBoardSettings = () => {
       {/* Статистика */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <MacOSCard className="p-4 text-center">
-          <div className="text-2xl font-bold text-blue-600">{stats.total_boards || 0}</div>
+          <div className="text-2xl font-bold text-blue-600">{Number(stats.total_boards ?? 0)}</div>
           <div className="text-sm text-gray-600">{t('admin2.db_stat_total_boards')}</div>
         </MacOSCard>
         <MacOSCard className="p-4 text-center">
-          <div className="text-2xl font-bold text-green-600">{stats.total_calls_today || 0}</div>
+          <div className="text-2xl font-bold text-green-600">{Number(stats.total_calls_today ?? 0)}</div>
           <div className="text-sm text-gray-600">{t('admin2.db_stat_calls_today')}</div>
         </MacOSCard>
         <MacOSCard className="p-4 text-center">
-          <div className="text-2xl font-bold text-orange-600">{stats.total_announcements || 0}</div>
+          <div className="text-2xl font-bold text-orange-600">{Number(stats.total_announcements ?? 0)}</div>
           <div className="text-sm text-gray-600">{t('admin2.db_stat_announcements')}</div>
         </MacOSCard>
         <MacOSCard className="p-4 text-center">
-          <div className="text-2xl font-bold text-purple-600">{Math.round(stats.uptime_percentage || 0)}%</div>
+          <div className="text-2xl font-bold text-purple-600">{Math.round(Number(stats.uptime_percentage ?? 0))}%</div>
           <div className="text-sm text-gray-600">{t('admin2.db_stat_uptime')}</div>
         </MacOSCard>
       </div>
@@ -342,28 +342,28 @@ const DisplayBoardSettings = () => {
 
             <div className="grid grid-cols-2 gap-4">
               <label className="flex items-center">
-                <Checkbox aria-label="Show doctor photos" checked={selectedBoard.show_doctor_photos} onChange={(e: any) => handleBoardSettingChange('show_doctor_photos', e?.target?.checked ?? e)}
+                <Checkbox aria-label="Show doctor photos" checked={selectedBoard.show_doctor_photos} onChange={(checked: boolean) => handleBoardSettingChange('show_doctor_photos', checked)}
                   className="mr-2" />
                 
                 <span className="text-sm font-medium">{t('admin2.db_field_doctor_photos')}</span>
               </label>
 
               <label className="flex items-center">
-                <Checkbox aria-label="Show announcements" checked={selectedBoard.show_announcements} onChange={(e: any) => handleBoardSettingChange('show_announcements', e?.target?.checked ?? e)}
+                <Checkbox aria-label="Show announcements" checked={selectedBoard.show_announcements} onChange={(checked: boolean) => handleBoardSettingChange('show_announcements', checked)}
                   className="mr-2" />
                 
                 <span className="text-sm font-medium">{t('admin2.db_announcements')}</span>
               </label>
 
               <label className="flex items-center">
-                <Checkbox aria-label="Show banners" checked={selectedBoard.show_banners} onChange={(e: any) => handleBoardSettingChange('show_banners', e?.target?.checked ?? e)}
+                <Checkbox aria-label="Show banners" checked={selectedBoard.show_banners} onChange={(checked: boolean) => handleBoardSettingChange('show_banners', checked)}
                   className="mr-2" />
                 
                 <span className="text-sm font-medium">{t('admin2.db_banners')}</span>
               </label>
 
               <label className="flex items-center">
-                <Checkbox aria-label="Show videos" checked={selectedBoard.show_videos} onChange={(e: any) => handleBoardSettingChange('show_videos', e?.target?.checked ?? e)}
+                <Checkbox aria-label="Show videos" checked={selectedBoard.show_videos} onChange={(checked: boolean) => handleBoardSettingChange('show_videos', checked)}
                   className="mr-2" />
                 
                 <span className="text-sm font-medium">{t('admin2.db_field_videos')}</span>
@@ -397,14 +397,14 @@ const DisplayBoardSettings = () => {
 
             <div className="grid grid-cols-2 gap-4">
               <label className="flex items-center">
-                <Checkbox aria-label="Enable sound signals" checked={selectedBoard.sound_enabled} onChange={(e: any) => handleBoardSettingChange('sound_enabled', e?.target?.checked ?? e)}
+                <Checkbox aria-label="Enable sound signals" checked={selectedBoard.sound_enabled} onChange={(checked: boolean) => handleBoardSettingChange('sound_enabled', checked)}
                   className="mr-2" />
                 
                 <span className="text-sm font-medium">{t('admin2.db_field_sound_signals')}</span>
               </label>
 
               <label className="flex items-center">
-                <Checkbox aria-label="Enable voice announcements" checked={selectedBoard.voice_announcements} onChange={(e: any) => handleBoardSettingChange('voice_announcements', e?.target?.checked ?? e)}
+                <Checkbox aria-label="Enable voice announcements" checked={selectedBoard.voice_announcements} onChange={(checked: boolean) => handleBoardSettingChange('voice_announcements', checked)}
                   className="mr-2" />
                 
                 <span className="text-sm font-medium">{t('admin2.db_field_voice_announcements')}</span>

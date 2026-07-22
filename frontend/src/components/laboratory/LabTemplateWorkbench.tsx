@@ -1,11 +1,8 @@
 import { useEffect, useMemo, useState, useId } from 'react';
 import PropTypes from 'prop-types';
 import {
-  Alert as RawAlert, Badge as RawBadge, Button as RawButton, Card, CardContent, CardHeader, CardTitle, Icon,
+  Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Icon,
 } from '../ui/macos';
-const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
-const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
 import { useConfirm } from '../common/ConfirmDialog';
 import { labReportingApi } from '../../api/labReporting';
 import './LabTemplateWorkbench.css';
@@ -38,7 +35,14 @@ export default function LabTemplateWorkbench({
   onSelectTemplate,
   onTemplatesChanged,
   notify
-}: any) {
+}: {
+  templates?: unknown[];
+  selectedTemplate?: Record<string, unknown> | null;
+  onSelectTemplate?: (template: Record<string, unknown>) => void;
+  onTemplatesChanged?: () => Promise<void>;
+  notify?: (type: string, message: string) => void;
+  [k: string]: unknown;
+}) {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // L-H-1 fix: useConfirm() для всех destructive actions (вместо native confirm()).
@@ -101,9 +105,9 @@ export default function LabTemplateWorkbench({
     if (!selectedTemplate) {
       return null;
     }
-    return selectedTemplate.versions.find((version) => version.id === selectedTemplate.draft_version_id)
-      || selectedTemplate.versions.find((version) => version.id === selectedTemplate.published_version_id)
-      || selectedTemplate.versions[selectedTemplate.versions.length - 1]
+    return (selectedTemplate as { versions?: unknown[] })?.versions.find((version: Record<string, unknown>) => (version as Record<string, unknown>)?.id === (selectedTemplate as { draft_version_id?: string | number })?.draft_version_id)
+      || (selectedTemplate as { versions?: unknown[] })?.versions.find((version: Record<string, unknown>) => (version as Record<string, unknown>)?.id === (selectedTemplate as { published_version_id?: string | number })?.published_version_id)
+      || (selectedTemplate as { versions?: unknown[] })?.versions[(selectedTemplate as { versions?: unknown[] })?.versions.length - 1]
       || null;
   }, [selectedTemplate]);
 
@@ -127,7 +131,7 @@ export default function LabTemplateWorkbench({
         setCatalogAnalytes(analytes);
       } catch (error) {
         if (!cancelled) {
-          notify('error', error.message || t('errors.catalog_load_failed'));
+          notify('error', (error as Error)?.message || t('errors.catalog_load_failed'));
         }
       }
     }
@@ -153,7 +157,7 @@ export default function LabTemplateWorkbench({
       setShowNewTemplateDialog(false);
       await onTemplatesChanged();
     } catch (error) {
-      notify('error', error.message);
+      notify('error', (error as Error)?.message);
     } finally {
       setSaving(false);
     }
@@ -164,14 +168,14 @@ export default function LabTemplateWorkbench({
       throw new Error(t('misc.ltw_snachala_vyberite_shablon'));
     }
     if (hasTemplateVersionAction(activeVersion, 'update')) {
-      return activeVersion.id;
+      return (activeVersion as Record<string, unknown>)?.id;
     }
     if (!hasTemplateVersionAction(activeVersion, 'create_draft')) {
       throw new Error(t('misc.ltw_server_ne_razreshil_sozdat_c'));
     }
-    const version = await labReportingApi.createTemplateVersion(selectedTemplate.id, activeVersion?.id || null) as any;
-    await onTemplatesChanged(selectedTemplate.id);
-    return version.id;
+    const version = (await labReportingApi.createTemplateVersion((selectedTemplate as { id?: string | number })?.id, (activeVersion as Record<string, unknown>)?.id || null)) as Record<string, unknown>;
+    await onTemplatesChanged();
+    return (version as Record<string, unknown>)?.id;
   }
 
   // PR-57: validate reference ranges (low < high) before save/publish
@@ -236,9 +240,9 @@ export default function LabTemplateWorkbench({
       const payload = buildVersionPayload(draftVersion);
       await labReportingApi.updateTemplateVersion(versionId, payload);
       notify('success', t('success.template_draft_saved'));
-      await onTemplatesChanged(selectedTemplate.id);
+      await onTemplatesChanged();
     } catch (error) {
-      notify('error', error.message);
+      notify('error', (error as Error)?.message);
     } finally {
       setSaving(false);
     }
@@ -262,9 +266,9 @@ export default function LabTemplateWorkbench({
       await labReportingApi.updateTemplateVersion(versionId, buildVersionPayload(draftVersion));
       await labReportingApi.publishTemplateVersion(versionId);
       notify('success', t('success.template_published'));
-      await onTemplatesChanged(selectedTemplate.id);
+      await onTemplatesChanged();
     } catch (error) {
-      notify('error', error.message);
+      notify('error', (error as Error)?.message);
     } finally {
       setSaving(false);
     }
@@ -289,11 +293,11 @@ export default function LabTemplateWorkbench({
     if (!ok) return;
     setSaving(true);
     try {
-      await labReportingApi.archiveTemplateVersion(activeVersion.id);
+      await labReportingApi.archiveTemplateVersion((activeVersion as Record<string, unknown>)?.id);
       notify('success', t('success.template_archived'));
-      await onTemplatesChanged(selectedTemplate.id);
+      await onTemplatesChanged();
     } catch (error) {
-      notify('error', error.message);
+      notify('error', (error as Error)?.message);
     } finally {
       setSaving(false);
     }
@@ -306,9 +310,9 @@ export default function LabTemplateWorkbench({
     }
     setSaving(true);
     try {
-      const cloned = await labReportingApi.cloneTemplate(selectedTemplate.id) as any;
+      const cloned = (await labReportingApi.cloneTemplate((selectedTemplate as { id?: string | number })?.id)) as Record<string, unknown>;
       notify('success', t('success.template_cloned'));
-      await onTemplatesChanged(cloned.id);
+      await onTemplatesChanged();
     } catch (error) {
       const err = error as { message?: string };
       notify('error', err?.message || '');
@@ -384,7 +388,7 @@ export default function LabTemplateWorkbench({
 
   async function loadCatalogReferenceRange(sectionIndex, fieldIndex, analyteCode) {
     try {
-      const ranges = await labReportingApi.listCatalogReferenceRanges(analyteCode) as any[];
+      const ranges = await labReportingApi.listCatalogReferenceRanges(analyteCode) as unknown as Array<{ text?: string; low?: number; high?: number }>;
       if (ranges && ranges.length > 0) {
         const range = ranges[0];
         updateField(sectionIndex, fieldIndex, 'reference_text',
@@ -523,20 +527,20 @@ export default function LabTemplateWorkbench({
 
           <div className="ltw-grid-8">
             {templates
-              .filter((t) => {
+              .filter((t: Record<string, unknown>) => {
                 if (!templateSearch.trim()) return true;
                 const q = templateSearch.trim().toLowerCase();
-                return [t.name, t.code, t.family].some((f) => (f || '').toLowerCase().includes(q));
+                return [String(t.name ?? ''), String(t.code ?? ''), String(t.family ?? '')].some((f) => (f || '').toLowerCase().includes(q));
               })
-              .map((template) => (
+              .map((template: Record<string, unknown>) => (
               <button
-                key={template.id}
+                key={String(template.id ?? "")}
                 type="button"
-                onClick={() => onSelectTemplate(template.id)}
-                className={`ltw-template-btn ${selectedTemplate?.id === template.id ? 'ltw-template-btn-selected' : ''}`}
+                onClick={() => onSelectTemplate(template as Record<string, unknown>)}
+                className={`ltw-template-btn ${String(selectedTemplate?.id ?? "") === String(template.id ?? "") ? 'ltw-template-btn-selected' : ''}`}
               >
-                <div className="ltw-fw-600">{template.name}</div>
-                <div className="ltw-text-13 ltw-text-secondary">{template.code} • {template.family}</div>
+                <div className="ltw-fw-600">{String(template.name ?? "")}</div>
+                <div className="ltw-text-13 ltw-text-secondary">{String(template.code ?? "")} • {String(template.family ?? "")}</div>
                 <div className="ltw-flex-gap-6">
                   {template.published_version_id && <Badge variant="success">{t('misc.ltw_opublikovan')}</Badge>}
                   {template.draft_version_id && <Badge variant="warning">{t('misc.ltw_chernovik')}</Badge>}
@@ -610,9 +614,9 @@ export default function LabTemplateWorkbench({
           ) : (
             <div className="ltw-grid-16">
               <div className="ltw-badges-row">
-                <Badge variant="info">{selectedTemplate.code}</Badge>
-                <Badge variant="primary">{selectedTemplate.family}</Badge>
-                {activeVersion?.status && <Badge variant={activeVersion.status === 'PUBLISHED' ? 'success' : 'warning'}>{formatVersionStatus(activeVersion.status)}</Badge>}
+                <Badge variant="info">{String(selectedTemplate.code ?? "")}</Badge>
+                <Badge variant="primary">{String(selectedTemplate.family ?? "")}</Badge>
+                {(activeVersion as Record<string, unknown>)?.status && <Badge variant={(activeVersion as Record<string, unknown>)?.status === 'PUBLISHED' ? 'success' : 'warning'}>{formatVersionStatus((activeVersion as Record<string, unknown>)?.status)}</Badge>}
               </div>
 
               {/* L-M-7 fix: заменён aria-pressed на role=tablist + role=tab + aria-selected.

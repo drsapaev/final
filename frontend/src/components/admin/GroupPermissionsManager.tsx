@@ -22,14 +22,8 @@ import {
   User } from
 'lucide-react';
 import {
-  MacOSCard, Button as RawButton, Badge as RawBadge, Input as RawInput, Select as RawSelect, SegmentedControl as RawSegmentedControl, Skeleton as RawSkeleton,
+  MacOSCard, Button, Badge, Input, Select, SegmentedControl, Skeleton,
 } from '../ui/macos';
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
-const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
-const SegmentedControl = RawSegmentedControl as unknown as React.ComponentType<Record<string, unknown>>;
-const Skeleton = RawSkeleton as unknown as React.ComponentType<Record<string, unknown>>;
 import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 
@@ -134,7 +128,7 @@ const GroupPermissionsManager = () => {
 
     setLoading(true);
     try {
-      const response = await api.get(`/admin/permissions/users/${userId}/permissions`) as any;
+      const response = (await api.get(`/admin/permissions/users/${userId}/permissions`)) as import('axios').AxiosResponse<Record<string, unknown>>;
       setUserPermissions(normalizeUserPermissions(response.data));
     } catch (error) {
       logger.error('Ошибка загрузки разрешений пользователя:', error);
@@ -149,7 +143,7 @@ const GroupPermissionsManager = () => {
 
     setLoading(true);
     try {
-      const response = await api.get(`/admin/permissions/groups/${groupId}/permissions`) as any;
+      const response = (await api.get(`/admin/permissions/groups/${groupId}/permissions`)) as import('axios').AxiosResponse<Record<string, unknown>>;
       setGroupSummary(normalizeGroupSummary(response.data));
     } catch (error) {
       logger.error('Ошибка загрузки сводки группы:', error);
@@ -167,9 +161,9 @@ const GroupPermissionsManager = () => {
 
   const checkUserPermission = async (userId, permission) => {
     try {
-      const response = await api.get(`/admin/permissions/users/${userId}/permissions/check`, {
+      const response = (await api.get(`/admin/permissions/users/${userId}/permissions/check`, {
         params: { permission }
-      }) as any;
+      })) as import('axios').AxiosResponse<Record<string, unknown>>;
 
       const hasPermission = Boolean(response.data?.has_permission);
       toast.success(
@@ -185,11 +179,11 @@ const GroupPermissionsManager = () => {
 
   const assignRoleToGroup = async (groupId, roleId) => {
     try {
-      const response = await api.post(`/admin/permissions/groups/${groupId}/roles`, {
+      const response = (await api.post(`/admin/permissions/groups/${groupId}/roles`, {
         role_id: roleId
-      }) as any;
+      })) as import('axios').AxiosResponse<Record<string, unknown>>;
 
-      toast.success(response.data.message);
+      toast.success(String(response.data.message));
       await loadGroupSummary(groupId);
     } catch (error) {
       logger.error('Ошибка назначения роли:', error);
@@ -199,9 +193,9 @@ const GroupPermissionsManager = () => {
 
   const revokeRoleFromGroup = async (groupId, roleId) => {
     try {
-      const response = await api.delete(`/admin/permissions/groups/${groupId}/roles/${roleId}`) as any;
+      const response = (await api.delete(`/admin/permissions/groups/${groupId}/roles/${roleId}`)) as import('axios').AxiosResponse<Record<string, unknown>>;
 
-      toast.success(response.data.message);
+      toast.success(String(response.data.message));
       await loadGroupSummary(groupId);
     } catch (error) {
       logger.error('Ошибка отзыва роли:', error);
@@ -255,11 +249,11 @@ const GroupPermissionsManager = () => {
 
   const clearCache = async () => {
     try {
-      const response = await api.post('/admin/permissions/cache/clear') as any;
-      toast.success(response.data.message);
+      const response = (await api.post('/admin/permissions/cache/clear')) as import('axios').AxiosResponse<Record<string, unknown>>;
+      toast.success(String(response.data.message));
 
       // Обновляем статистику кэша
-      const cacheRes = await api.get('/admin/permissions/cache/stats') as any;
+      const cacheRes = (await api.get('/admin/permissions/cache/stats')) as import('axios').AxiosResponse<Record<string, unknown>>;
       setCacheStats(normalizeCacheStats(cacheRes.data?.cache_stats || cacheRes.data));
     } catch (error) {
       logger.error('Ошибка очистки кэша:', error);

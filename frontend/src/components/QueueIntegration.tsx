@@ -37,8 +37,8 @@ function matchesQueueSpecialty(item, requestedSpecialty) {
 interface QueueIntegrationProps {
   specialistId?: string;
   specialty?: string;
-  onPatientSelect?: (patient: any) => void;
-  onStartVisit?: (patient: any) => void;
+  onPatientSelect?: (patient: Record<string, unknown>) => void;
+  onStartVisit?: (patient: Record<string, unknown>) => void;
 }
 
 const QueueIntegration = ({

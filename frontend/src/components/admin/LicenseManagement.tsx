@@ -22,23 +22,15 @@ import {
 'lucide-react';
 import {
   MacOSCard,
-  Button as RawButton,
-  Badge as RawBadge,
-  Input as RawInput,
-  Select as RawSelect,
-  Textarea as RawTextarea,
-  Skeleton as RawSkeleton,
-  MacOSEmptyState as RawMacOSEmptyState,
-  Alert as RawAlert,
+  Button,
+  Badge,
+  Input,
+  Select,
+  Textarea,
+  Skeleton,
+  MacOSEmptyState,
+  Alert,
 } from '../ui/macos';
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
-const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
-const Textarea = RawTextarea as unknown as React.ComponentType<Record<string, unknown>>;
-const Skeleton = RawSkeleton as unknown as React.ComponentType<Record<string, unknown>>;
-const MacOSEmptyState = RawMacOSEmptyState as unknown as React.ComponentType<Record<string, unknown>>;
-const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
@@ -88,7 +80,7 @@ const LicenseManagement = () => {
     cost: 0,
     seats: 1,
     description: ''
-  } as any);
+  } as Record<string, unknown>);
 
   const statusOptions = [
   { value: 'active', label: t('admin2.lm_status_active'), color: 'success' },
@@ -109,10 +101,10 @@ const LicenseManagement = () => {
   const loadLicenses = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await api.get('/clinic/licenses') as any;
+      const response = (await api.get('/clinic/licenses')) as import('axios').AxiosResponse<Record<string, unknown>>;
       const nextLicenses = Array.isArray(response.data)
-        ? response.data
-        : response.data?.licenses || [];
+        ? (response.data as unknown[])
+        : (response.data?.licenses as unknown[]) || [];
       setLicenses(nextLicenses);
       setStats(deriveLicenseStats(nextLicenses));
     } catch (error) {
@@ -130,7 +122,7 @@ const LicenseManagement = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.name.trim() || !formData.type || !formData.license_key.trim()) {
+    if (!String(formData.name ?? '').trim() || !formData.type || !String(formData.license_key ?? '').trim()) {
       setMessage({ type: 'error', text: t('admin2.lm_msg_required') });
       return;
     }
@@ -357,7 +349,7 @@ const LicenseManagement = () => {
                 <Input
                 type="text"
                 required
-                value={formData.name}
+                value={String(formData.name ?? '')}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 placeholder={t('admin2.lm_field_name_placeholder')} />
               
@@ -368,7 +360,7 @@ const LicenseManagement = () => {
                 </label>
                 <Select
                 aria-label={t('admin2.lm_field_type_aria')}
-                value={formData.type}
+                value={String(formData.type ?? '')}
                 onChange={(value: unknown) => setFormData({ ...formData, type: String(value) })}
                 options={[
                   { value: '', label: t('admin2.lm_field_type_select_option') },
@@ -383,7 +375,7 @@ const LicenseManagement = () => {
                 <Input
                 type="text"
                 required
-                value={formData.license_key}
+                value={String(formData.license_key ?? '')}
                 onChange={(e) => setFormData({ ...formData, license_key: e.target.value })}
                 placeholder={t('admin2.lm_field_license_key_placeholder')} />
               
@@ -394,7 +386,7 @@ const LicenseManagement = () => {
                 </label>
                 <Input
                 type="text"
-                value={formData.vendor}
+                value={String(formData.vendor ?? '')}
                 onChange={(e) => setFormData({ ...formData, vendor: e.target.value })}
                 placeholder={t('admin2.lm_field_vendor_placeholder')} />
               
@@ -405,7 +397,7 @@ const LicenseManagement = () => {
                 </label>
                 <Select
                 aria-label={t('admin2.lm_field_status_aria')}
-                value={formData.status}
+                value={String(formData.status ?? '')}
                 onChange={(value: unknown) => setFormData({ ...formData, status: String(value) })}
                 options={statusOptions.map((option) => ({ value: option.value, label: option.label }))}
                 size="large" />
@@ -416,7 +408,7 @@ const LicenseManagement = () => {
                 </label>
                 <Input
                 type="date"
-                value={formData.purchase_date}
+                value={String(formData.purchase_date ?? '')}
                 onChange={(e) => setFormData({ ...formData, purchase_date: e.target.value })} />
               
               </div>
@@ -426,7 +418,7 @@ const LicenseManagement = () => {
                 </label>
                 <Input
                 type="date"
-                value={formData.expiry_date}
+                value={String(formData.expiry_date ?? '')}
                 onChange={(e) => setFormData({ ...formData, expiry_date: e.target.value })} />
               
               </div>
@@ -436,7 +428,7 @@ const LicenseManagement = () => {
                 </label>
                 <Input
                 type="number"
-                value={formData.cost}
+                value={String(formData.cost ?? '')}
                 onChange={(e) => setFormData({ ...formData, cost: parseFloat(e.target.value) })}
                 placeholder={t('admin2.lm_field_cost_placeholder')} />
               
@@ -448,7 +440,7 @@ const LicenseManagement = () => {
                 <Input
                 type="number"
                 min="1"
-                value={formData.seats}
+                value={String(formData.seats ?? '')}
                 onChange={(e) => setFormData({ ...formData, seats: parseInt(e.target.value) })}
                 placeholder={t('admin2.lm_field_seats_placeholder')} />
               
@@ -460,7 +452,7 @@ const LicenseManagement = () => {
                 {t('admin2.lm_field_description')}
               </label>
               <Textarea
-              value={formData.description}
+              value={String(formData.description ?? '')}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               placeholder={t('admin2.lm_field_description_placeholder')}
               rows={3} />

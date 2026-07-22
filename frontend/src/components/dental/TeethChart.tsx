@@ -9,7 +9,7 @@
  */
 import { useState } from 'react';
 import {
-  Box as BoxRaw,
+  Box,
   Card,
   CardContent,
   Typography,
@@ -40,7 +40,6 @@ import {
 } from './dentalConstants';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
-const Box = BoxRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }: any) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;

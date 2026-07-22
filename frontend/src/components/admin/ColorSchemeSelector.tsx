@@ -188,7 +188,7 @@ export default function ColorSchemeSelector() {
         <Select
           id={quickSelectId}
           value={colorScheme}
-          onChange={(v: any) => setColorScheme(String(v))}
+          onChange={(v: unknown) => setColorScheme(String(v))}
           aria-describedby={helpTextId}
           options={colorSchemes.map((scheme) => ({
             value: scheme.id,

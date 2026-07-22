@@ -65,7 +65,7 @@ export default function Search() {
 
         // Also get visits for patient with this ID
         try {
-          const patientVisitsRes = await api.get(`/visits/visits?patient_id=${visitId}&limit=20`) as any;
+          const patientVisitsRes = (await api.get(`/visits/visits?patient_id=${visitId}&limit=20`)) as import('axios').AxiosResponse<Record<string, unknown>>;
           if (Array.isArray(patientVisitsRes.data)) {
             // Merge without duplicates
             const existingIds = new Set(visitsData.map(v => v.id));

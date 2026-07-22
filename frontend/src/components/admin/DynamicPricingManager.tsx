@@ -4,23 +4,15 @@ import type { CSSProperties } from "react";
 import PropTypes from 'prop-types';
 import {
   MacOSCard,
-  Button as RawButton,
-  Badge as RawBadge,
-  Input as RawInput,
-  Checkbox as RawCheckbox,
-  Select as RawSelect,
-  Textarea as RawTextarea,
-  Skeleton as RawSkeleton,
-  MacOSEmptyState as RawMacOSEmptyState,
+  Button,
+  Badge,
+  Input,
+  Checkbox,
+  Select,
+  Textarea,
+  Skeleton,
+  MacOSEmptyState,
 } from '../ui/macos';
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
-const Checkbox = RawCheckbox as unknown as React.ComponentType<Record<string, unknown>>;
-const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
-const Textarea = RawTextarea as unknown as React.ComponentType<Record<string, unknown>>;
-const Skeleton = RawSkeleton as unknown as React.ComponentType<Record<string, unknown>>;
-const MacOSEmptyState = RawMacOSEmptyState as unknown as React.ComponentType<Record<string, unknown>>;
 import {
   Plus,
   Edit,
@@ -204,7 +196,7 @@ const DynamicPricingManager = () => {
   const [pricingRules, setPricingRules] = useState([]);
   const [servicePackages, setServicePackages] = useState([]);
   const [services, setServices] = useState([]);
-  const [analytics, setAnalytics] = useState(null as any);
+  const [analytics, setAnalytics] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(false);
   const [showCreateRule, setShowCreateRule] = useState(false);
   const [showCreatePackage, setShowCreatePackage] = useState(false);
@@ -248,7 +240,7 @@ const DynamicPricingManager = () => {
     try {
       // Загружаем услуги
       try {
-        const response = await api.get('/services') as any;
+        const response = (await api.get('/services')) as import('axios').AxiosResponse<Record<string, unknown>>;
         setServices(Array.isArray(response.data) ? response.data : []);
       } catch (e) {
         logger.error('Failed to load services:', e);
@@ -258,7 +250,7 @@ const DynamicPricingManager = () => {
       if (activeTab === 'rules') {
         // Загружаем правила ценообразования
         try {
-          const response = await api.get('/dynamic-pricing/pricing-rules') as any;
+          const response = (await api.get('/dynamic-pricing/pricing-rules')) as import('axios').AxiosResponse<Record<string, unknown>>;
           setPricingRules(Array.isArray(response.data) ? response.data : []);
         } catch (e) {
           logger.error('Failed to load pricing rules:', e);
@@ -267,7 +259,7 @@ const DynamicPricingManager = () => {
       } else if (activeTab === 'packages') {
         // Загружаем пакеты услуг
         try {
-          const response = await api.get('/dynamic-pricing/service-packages') as any;
+          const response = (await api.get('/dynamic-pricing/service-packages')) as import('axios').AxiosResponse<Record<string, unknown>>;
           setServicePackages(Array.isArray(response.data) ? response.data : []);
         } catch (e) {
           logger.error('Failed to load packages:', e);
@@ -276,7 +268,7 @@ const DynamicPricingManager = () => {
       } else if (activeTab === 'analytics') {
         // Загружаем аналитику
         try {
-          const response = await api.get('/dynamic-pricing/pricing-analytics') as any;
+          const response = (await api.get('/dynamic-pricing/pricing-analytics')) as import('axios').AxiosResponse<Record<string, unknown>>;
           setAnalytics(response.data);
         } catch (e) {
           logger.error('Failed to load analytics:', e);
@@ -404,7 +396,7 @@ const DynamicPricingManager = () => {
 
   const handleUpdateDynamicPrices = async () => {
     try {
-      const response = await api.post('/dynamic-pricing/update-dynamic-prices') as any;
+      const response = (await api.post('/dynamic-pricing/update-dynamic-prices')) as import('axios').AxiosResponse<Record<string, unknown>>;
       toast.success(t('admin2.dp_prices_updated', { updated: response.data.updated_count, total: response.data.total_services }));
     } catch (error) {
       logger.error('Ошибка обновления цен:', error);
@@ -464,7 +456,7 @@ const DynamicPricingManager = () => {
                 <div className="admin-flex-1">
                   <div className="admin-card-title-badges">
                     <h4 className="admin-rule-header">
-                      {rule.name}
+                      {(rule as { name?: string })?.name}
                     </h4>
                     <Badge variant={rule.is_active ? 'success' : 'secondary'}>
                       {rule.is_active ? t('admin2.dp_rule_active') : t('admin2.dp_rule_inactive')}
@@ -509,7 +501,7 @@ const DynamicPricingManager = () => {
               className="admin-icon-btn-32"
               title={rule.is_active ? t('admin2.dp_pause_rule_title') : t('admin2.dp_activate_rule_title')}
               type="button"
-              aria-label={rule.is_active ? t('admin2.dp_pause_rule_aria', { name: rule.name || rule.id }) : t('admin2.dp_activate_rule_aria', { name: rule.name || rule.id })}>
+              aria-label={rule.is_active ? t('admin2.dp_pause_rule_aria', { name: (rule as { name?: string })?.name || rule.id }) : t('admin2.dp_activate_rule_aria', { name: (rule as { name?: string })?.name || rule.id })}>
 
                     {rule.is_active ? <Pause aria-hidden="true" size={16} /> : <Play aria-hidden="true" size={16} />}
                   </Button>
@@ -519,7 +511,7 @@ const DynamicPricingManager = () => {
               className="admin-icon-btn-32"
               title={t('admin2.dp_edit_rule_title')}
               type="button"
-              aria-label={t('admin2.dp_edit_rule_aria', { name: rule.name || rule.id })}>
+              aria-label={t('admin2.dp_edit_rule_aria', { name: (rule as { name?: string })?.name || rule.id })}>
 
                     <Edit aria-hidden="true" size={16} />
                   </Button>
@@ -529,7 +521,7 @@ const DynamicPricingManager = () => {
               className="admin-icon-btn-32"
               title={t('admin2.dp_delete_rule_title_btn')}
               type="button"
-              aria-label={t('admin2.dp_delete_rule_aria', { name: rule.name || rule.id })}>
+              aria-label={t('admin2.dp_delete_rule_aria', { name: (rule as { name?: string })?.name || rule.id })}>
 
                     <Trash2 aria-hidden="true" size={16} />
                   </Button>
@@ -728,7 +720,7 @@ const DynamicPricingManager = () => {
                 <div className="admin-flex-1">
                   <div className="admin-card-title-badges">
                     <h4 className="admin-rule-header">
-                      {pkg.name}
+                      {(pkg as { name?: string })?.name}
                     </h4>
                     <Badge variant={pkg.is_active ? 'success' : 'secondary'}>
                       {pkg.is_active ? t('admin2.dp_package_active') : t('admin2.dp_package_inactive')}
@@ -776,7 +768,7 @@ const DynamicPricingManager = () => {
               className="admin-icon-btn-32"
               title={t('admin2.dp_edit_package_title')}
               type="button"
-              aria-label={t('admin2.dp_edit_package_aria', { name: pkg.name || pkg.id })}>
+              aria-label={t('admin2.dp_edit_package_aria', { name: (pkg as { name?: string })?.name || pkg.id })}>
 
                     <Edit aria-hidden="true" size={16} />
                   </Button>
@@ -786,7 +778,7 @@ const DynamicPricingManager = () => {
               className="admin-icon-btn-32"
               title={t('admin2.dp_delete_package_title_btn')}
               type="button"
-              aria-label={t('admin2.dp_delete_package_aria', { name: pkg.name || pkg.id })}>
+              aria-label={t('admin2.dp_delete_package_aria', { name: (pkg as { name?: string })?.name || pkg.id })}>
 
                     <Trash2 aria-hidden="true" size={16} />
                   </Button>
@@ -918,12 +910,12 @@ const DynamicPricingManager = () => {
               </h4>
             </div>
             <div className="admin-stats-value-success">
-              {t('admin2.dp_value_currency', { value: analytics.summary?.total_savings?.toLocaleString() || 0, currency: t('admin2.dp_currency') })}
+              {t('admin2.dp_value_currency', { value: (analytics.summary as { total_savings?: number })?.total_savings?.toLocaleString() || 0, currency: t('admin2.dp_currency') })}
             </div>
             <p className="admin-stats-label">
               {t('admin2.dp_analytics_period', {
-                start: analytics.period?.start_date ? new Date(analytics.period.start_date).toLocaleDateString() : '',
-                end: analytics.period?.end_date ? new Date(analytics.period.end_date).toLocaleDateString() : ''
+                start: (analytics.period as { start_date?: string })?.start_date ? new Date((analytics.period as { start_date?: string })?.start_date).toLocaleDateString() : '',
+                end: (analytics.period as { end_date?: string })?.end_date ? new Date((analytics.period as { end_date?: string })?.end_date).toLocaleDateString() : ''
               })}
             </p>
           </MacOSCard>
@@ -936,7 +928,7 @@ const DynamicPricingManager = () => {
               </h4>
             </div>
             <div className="admin-stats-value-primary">
-              {analytics.summary?.active_rules_count || 0}
+              {Number((analytics.summary as { active_rules_count?: number })?.active_rules_count ?? 0)}
             </div>
             <p className="admin-stats-label">
               {t('admin2.dp_analytics_active_rules_sub')}
@@ -951,7 +943,7 @@ const DynamicPricingManager = () => {
               </h4>
             </div>
             <div className="admin-stats-value-primary">
-              {analytics.summary?.active_packages_count || 0}
+              {Number((analytics.summary as { active_packages_count?: number })?.active_packages_count ?? 0)}
             </div>
             <p className="admin-stats-label">
               {t('admin2.dp_analytics_active_packages_sub')}
@@ -972,17 +964,17 @@ const DynamicPricingManager = () => {
             {t('admin2.dp_analytics_rules_stats')}
           </h4>
           <div className="flex flex-col gap-2">
-            {analytics.rules_statistics.map((rule, index) =>
+            {(analytics.rules_statistics as unknown[] ?? []).map((rule, index) =>
         <div key={index} className="admin-stat-list-row">
                 <span className="admin-text-med-primary">
-                  {rule.name}
+                  {(rule as { name?: string })?.name}
                 </span>
                 <div className="admin-flex-center-16-sm">
                   <span className="text-[var(--mac-text-secondary)]">
-                    {t('admin2.dp_uses_count', { count: rule.uses })}
+                    {t('admin2.dp_uses_count', { count: (rule as { uses?: number })?.uses })}
                   </span>
                   <span className="text-[var(--mac-success)]">
-                    {t('admin2.dp_savings_value', { value: rule.total_savings?.toLocaleString() || 0, currency: t('admin2.dp_currency') })}
+                    {t('admin2.dp_savings_value', { value: (rule as { total_savings?: number })?.total_savings?.toLocaleString() || 0, currency: t('admin2.dp_currency') })}
                   </span>
                 </div>
               </div>
@@ -997,17 +989,17 @@ const DynamicPricingManager = () => {
             {t('admin2.dp_analytics_packages_stats')}
           </h4>
           <div className="flex flex-col gap-2">
-            {analytics.packages_statistics.map((pkg, index) =>
+            {(analytics.packages_statistics as unknown[] ?? []).map((pkg, index) =>
         <div key={index} className="admin-stat-list-row">
                 <span className="admin-text-med-primary">
-                  {pkg.name}
+                  {(pkg as { name?: string })?.name}
                 </span>
                 <div className="admin-flex-center-16-sm">
                   <span className="text-[var(--mac-text-secondary)]">
-                    {t('admin2.dp_purchases_count', { count: pkg.purchases })}
+                    {t('admin2.dp_purchases_count', { count: (pkg as { purchases?: number })?.purchases })}
                   </span>
                   <span className="text-[var(--mac-success)]">
-                    {t('admin2.dp_savings_value', { value: pkg.total_savings?.toLocaleString() || 0, currency: t('admin2.dp_currency') })}
+                    {t('admin2.dp_savings_value', { value: (pkg as { total_savings?: number })?.total_savings?.toLocaleString() || 0, currency: t('admin2.dp_currency') })}
                   </span>
                 </div>
               </div>

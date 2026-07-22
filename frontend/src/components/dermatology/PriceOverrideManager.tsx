@@ -54,7 +54,7 @@ const PriceOverrideManager = ({
     try {
       const response = await api.get('/derma/price-overrides', {
         params: { visit_id: visitId }
-      }) as any;
+      }) as import('axios').AxiosResponse<Record<string, unknown>>;
       setPriceOverrides(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       logger.error('Error loading price overrides:', error);
@@ -91,7 +91,7 @@ const PriceOverrideManager = ({
         new_price: priceNum,
         reason: reason,
         details: details || null
-      }) as any;
+      }) as import('axios').AxiosResponse<Record<string, unknown>>;
 
       if (response.status >= 200 && response.status < 300) {
         const result = response.data;
@@ -205,10 +205,10 @@ const PriceOverrideManager = ({
               transition: 'all var(--mac-duration-fast) var(--mac-ease)',
               padding: 'var(--mac-spacing-1)'
             }}
-            onMouseEnter={(e: any) => {
+            onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
               e.currentTarget.style.color = 'var(--mac-text-primary)';
             }}
-            onMouseLeave={(e: any) => {
+            onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
               e.currentTarget.style.color = 'var(--mac-text-secondary)';
             }}>
             
@@ -257,12 +257,12 @@ const PriceOverrideManager = ({
                     transition: 'all var(--mac-duration-fast) var(--mac-ease)'
                   }}
                   onFocus={(e) => {
-                    e.target.style.borderColor = 'var(--mac-accent)';
-                    e.target.style.boxShadow = 'var(--mac-focus-ring)';
+                    (e.target as HTMLElement).style.borderColor = 'var(--mac-accent)';
+                    (e.target as HTMLElement).style.boxShadow = 'var(--mac-focus-ring)';
                   }}
                   onBlur={(e) => {
-                    e.target.style.borderColor = 'var(--mac-border)';
-                    e.target.style.boxShadow = 'none';
+                    (e.target as HTMLElement).style.borderColor = 'var(--mac-border)';
+                    (e.target as HTMLElement).style.boxShadow = 'none';
                   }}
                   placeholder={t('derma.derma_price_ph_new_price')}
                   inputMode="numeric" />
@@ -298,12 +298,12 @@ const PriceOverrideManager = ({
                   transition: 'all var(--mac-duration-fast) var(--mac-ease)'
                 }}
                 onFocus={(e) => {
-                  e.target.style.borderColor = 'var(--mac-accent)';
-                  e.target.style.boxShadow = 'var(--mac-focus-ring)';
+                  (e.target as HTMLElement).style.borderColor = 'var(--mac-accent)';
+                  (e.target as HTMLElement).style.boxShadow = 'var(--mac-focus-ring)';
                 }}
                 onBlur={(e) => {
-                  e.target.style.borderColor = 'var(--mac-border)';
-                  e.target.style.boxShadow = 'none';
+                  (e.target as HTMLElement).style.borderColor = 'var(--mac-border)';
+                  (e.target as HTMLElement).style.boxShadow = 'none';
                 }}>
                 
                 <option value="">{t('derma.derma_price_select_reason')}</option>
@@ -333,12 +333,12 @@ const PriceOverrideManager = ({
                   transition: 'all var(--mac-duration-fast) var(--mac-ease)'
                 }}
                 onFocus={(e) => {
-                  e.target.style.borderColor = 'var(--mac-accent)';
-                  e.target.style.boxShadow = 'var(--mac-focus-ring)';
+                  (e.target as HTMLElement).style.borderColor = 'var(--mac-accent)';
+                  (e.target as HTMLElement).style.boxShadow = 'var(--mac-focus-ring)';
                 }}
                 onBlur={(e) => {
-                  e.target.style.borderColor = 'var(--mac-border)';
-                  e.target.style.boxShadow = 'none';
+                  (e.target as HTMLElement).style.borderColor = 'var(--mac-border)';
+                  (e.target as HTMLElement).style.boxShadow = 'none';
                 }}
                 placeholder={t('derma.derma_price_ph_custom_reason')} />
 
@@ -376,12 +376,12 @@ const PriceOverrideManager = ({
                   fontFamily: 'inherit'
                 }}
                 onFocus={(e) => {
-                  e.target.style.borderColor = 'var(--mac-accent)';
-                  e.target.style.boxShadow = 'var(--mac-focus-ring)';
+                  (e.target as HTMLElement).style.borderColor = 'var(--mac-accent)';
+                  (e.target as HTMLElement).style.boxShadow = 'var(--mac-focus-ring)';
                 }}
                 onBlur={(e) => {
-                  e.target.style.borderColor = 'var(--mac-border)';
-                  e.target.style.boxShadow = 'none';
+                  (e.target as HTMLElement).style.borderColor = 'var(--mac-border)';
+                  (e.target as HTMLElement).style.boxShadow = 'none';
                 }}
                 placeholder={t('derma.derma_price_ph_details')} />
               
@@ -408,16 +408,16 @@ const PriceOverrideManager = ({
                 transition: 'all var(--mac-duration-normal) var(--mac-ease)',
                 fontWeight: 'var(--mac-font-weight-medium)'
               }}
-              onMouseEnter={(e: any) => {
+              onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
                 if (!isLoading && newPrice && reason) {
-                  e.target.style.background = 'var(--mac-accent-orange-hover)';
-                  e.target.style.transform = 'translateY(-1px)';
+                  (e.target as HTMLElement).style.background = 'var(--mac-accent-orange-hover)';
+                  (e.target as HTMLElement).style.transform = 'translateY(-1px)';
                 }
               }}
-              onMouseLeave={(e: any) => {
+              onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
                 if (!isLoading && newPrice && reason) {
-                  e.target.style.background = 'var(--mac-accent-orange)';
-                  e.target.style.transform = 'translateY(0)';
+                  (e.target as HTMLElement).style.background = 'var(--mac-accent-orange)';
+                  (e.target as HTMLElement).style.transform = 'translateY(0)';
                 }
               }}>
               

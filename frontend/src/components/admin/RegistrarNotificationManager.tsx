@@ -163,7 +163,7 @@ const RegistrarNotificationManager = () => {
             </label>
             <Select
             value={notificationForm.alert_type}
-            onChange={(value: any) => setNotificationForm({ ...notificationForm, alert_type: String(value) })}
+            onChange={(value: unknown) => setNotificationForm({ ...notificationForm, alert_type: String(value) })}
             options={[
             { value: 'system_error', label: t('admin2.rnm_type_system_error') },
             { value: 'payment_issue', label: t('admin2.rnm_type_payment_issue') },
@@ -183,7 +183,7 @@ const RegistrarNotificationManager = () => {
             </label>
             <Select
             value={notificationForm.priority}
-            onChange={(value: any) => setNotificationForm({ ...notificationForm, priority: String(value) })}
+            onChange={(value: unknown) => setNotificationForm({ ...notificationForm, priority: String(value) })}
             options={[
             { value: 'normal', label: t('admin2.rnm_priority_normal') },
             { value: 'warning', label: t('admin2.rnm_priority_warning') },

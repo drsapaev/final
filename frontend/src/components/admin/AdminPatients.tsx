@@ -227,14 +227,14 @@ const AdminPatients = () => {
           />
           <Select
             value={filterGender}
-            onChange={(v: any) => setFilterGender(String(v))}
+            onChange={(v: unknown) => setFilterGender(String(v))}
             options={genderOptions}
             size="large"
             aria-label={t('admin2.ap_filter_gender_aria')}
           />
           <Select
             value={filterAgeRange}
-            onChange={(v: any) => setFilterAgeRange(String(v))}
+            onChange={(v: unknown) => setFilterAgeRange(String(v))}
             options={ageOptions}
             size="large"
             aria-label={t('admin2.ap_filter_age_aria')}
@@ -248,7 +248,7 @@ const AdminPatients = () => {
             <div style={{ marginTop: '8px' }}>
               <Select
                 value={filterBloodType}
-                onChange={(v: any) => setFilterBloodType(String(v))}
+                onChange={(v: unknown) => setFilterBloodType(String(v))}
                 options={bloodTypeOptions}
                 size="large"
                 aria-label={t('admin2.ap_filter_blood_type_aria')}

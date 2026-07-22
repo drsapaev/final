@@ -6,7 +6,8 @@ type SpacingValue = number | string;
 interface BoxProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'children' | 'style'> {
   children?: ReactNode;
   style?: CSSProperties;
-  sx?: CSSProperties;
+  /** Style overrides. Accepts both CSSProperties and MUI-style shorthand (mb, mt, bgcolor, etc.). */
+  sx?: CSSProperties | Record<string, unknown>;
   display?: CSSProperties['display'];
   alignItems?: CSSProperties['alignItems'];
   justifyContent?: CSSProperties['justifyContent'];

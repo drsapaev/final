@@ -7,15 +7,10 @@ import KPIMetrics from '../components/analytics/KPIMetrics';
 import AdvancedCharts from '../components/analytics/AdvancedCharts';
 
 import PredictiveAnalytics from '../components/analytics/PredictiveAnalytics';
-import AdminRouteSwitcherRaw from '../components/admin/AdminRouteSwitcher';
-const AdminRouteSwitcher = AdminRouteSwitcherRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import AdminRouteSwitcher from '../components/admin/AdminRouteSwitcher';
 import {
-  Input as RawInput, Button as RawButton, Select as RawSelect, SegmentedControl as RawSegmentedControl,
+  Input, Button, Select, SegmentedControl,
 } from '../components/ui/macos';
-const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
-const SegmentedControl = RawSegmentedControl as unknown as React.ComponentType<Record<string, unknown>>;
 import logger from '../utils/logger';
 import {
   Calendar,
@@ -107,7 +102,7 @@ const analyticsInsetSurface = 'color-mix(in srgb, var(--mac-card-bg), white 78%)
 const analyticsTextPrimary = 'color-mix(in srgb, var(--mac-text-primary), black 72%)';
 const analyticsTextSecondary = 'color-mix(in srgb, var(--mac-text-secondary), black 48%)';
 
-function AnalyticsSectionCard({ title, subtitle, children, action, compact = false }: any) {
+function AnalyticsSectionCard({ title, subtitle, children, action, compact = false }: { title?: React.ReactNode; subtitle?: React.ReactNode; children?: React.ReactNode; action?: React.ReactNode; compact?: boolean }) {
   return (
     <section style={{
       background: analyticsSurface,
@@ -468,9 +463,9 @@ export default function AnalyticsPage() {
 
       const response = await api.get(`/analytics/export/comprehensive/export/${format}?${params}`, {
         responseType: 'blob'
-      }) as any;
+      }) as import('axios').AxiosResponse<BlobPart>;
 
-      const blob = new Blob([response?.data ?? response], {
+      const blob = new Blob([response?.data ?? (response as unknown as BlobPart)], {
         type: format === 'json' ? 'application/json' :
         format === 'csv' ? 'text/csv' :
         format === 'pdf' ? 'application/pdf' :

@@ -97,7 +97,7 @@ MetricCard.propTypes = {
   value: PropTypes.string.isRequired,
 };
 
-function SectionShell({ title, description, action, children }: any) {
+function SectionShell({ title, description, action, children }: { title?: React.ReactNode; description?: React.ReactNode; action?: React.ReactNode; children?: React.ReactNode }) {
   return (
     <Card shadow="default">
       <CardHeader style={{ paddingBottom: 12 }}>
@@ -131,7 +131,7 @@ SectionShell.propTypes = {
   title: PropTypes.string.isRequired,
 };
 
-function EmptyState({ icon: Icon, title, description, action }: any) {
+function EmptyState({ icon: Icon, title, description, action }: { icon?: React.ComponentType<{ size?: number; className?: string }>; title?: React.ReactNode; description?: React.ReactNode; action?: React.ReactNode }) {
   return (
     <div
       className="theme-empty-state"
@@ -296,7 +296,7 @@ export default function TwoFactorManager() {
 
   async function loadStatus() {
     try {
-      const response = await api.get('/2fa/status') as any;
+      const response = (await api.get('/2fa/status')) as import('axios').AxiosResponse<Record<string, unknown>>;
       const data = response.data;
       setStatus(data);
       if (data?.enabled) {
@@ -310,8 +310,8 @@ export default function TwoFactorManager() {
 
   async function loadDevices() {
     try {
-      const response = await api.get('/2fa/devices') as any;
-      setDevices(response.data?.devices || []);
+      const response = (await api.get('/2fa/devices')) as import('axios').AxiosResponse<Record<string, unknown>>;
+      setDevices((response.data?.devices as unknown[]) || []);
     } catch (err) {
       logger.error('Error loading devices:', err);
     }
@@ -319,8 +319,8 @@ export default function TwoFactorManager() {
 
   async function loadSecurityLogs() {
     try {
-      const response = await api.get('/2fa/security-logs') as any;
-      setSecurityLogs(response.data?.logs || []);
+      const response = (await api.get('/2fa/security-logs')) as import('axios').AxiosResponse<Record<string, unknown>>;
+      setSecurityLogs((response.data?.logs as unknown[]) || []);
     } catch (err) {
       logger.error('Error loading security logs:', err);
     }
@@ -328,8 +328,8 @@ export default function TwoFactorManager() {
 
   async function loadRecoveryMethods() {
     try {
-      const response = await api.get('/2fa/recovery-methods') as any;
-      setRecoveryMethods(response.data?.methods || []);
+      const response = (await api.get('/2fa/recovery-methods')) as import('axios').AxiosResponse<Record<string, unknown>>;
+      setRecoveryMethods((response.data?.methods as unknown[]) || []);
     } catch (err) {
       logger.error('Error loading recovery methods:', err);
     }
@@ -344,8 +344,8 @@ export default function TwoFactorManager() {
     try {
       setLoading(true);
       setError('');
-      const response = await api.get('/2fa/backup-codes') as any;
-      setBackupCodes(response.data?.backup_codes || []);
+      const response = (await api.get('/2fa/backup-codes')) as import('axios').AxiosResponse<Record<string, unknown>>;
+      setBackupCodes((response.data?.backup_codes as unknown[]) || []);
       logger.info('[FIX:2FA] Loaded backup codes for enabled 2FA');
     } catch (err) {
       logger.error('Error loading backup codes:', err);
@@ -362,12 +362,12 @@ export default function TwoFactorManager() {
     setConfirmRegenerate(false);
 
     try {
-      const response = await api.post('/2fa/setup', {
+      const response = (await api.post('/2fa/setup', {
         recovery_email: status?.recovery_email || '',
         recovery_phone: status?.recovery_phone || '',
-      }) as any;
+      })) as import('axios').AxiosResponse<Record<string, unknown>>;
       setSetupData(response.data);
-      setBackupCodes(response.data?.backup_codes || []);
+      setBackupCodes((response.data?.backup_codes as unknown[]) || []);
       setVerificationCode('');
       setSuccess(t('misc.tfm_setup_qr_prompt'));
       logger.info('[FIX:2FA] 2FA setup created, waiting for verify-setup');
@@ -392,12 +392,12 @@ export default function TwoFactorManager() {
       logger.info('[FIX:2FA] Verifying 2FA setup');
       const response = await api.post('/2fa/verify-setup', null, {
         params: { totp_code: verificationCode },
-      }) as any;
+      }) as import('axios').AxiosResponse<Record<string, unknown>>;
       if (response.data?.success) {
         setSuccess(t('misc.tfm_enable_success'));
         await loadStatus();
       } else {
-        setError(response.data?.detail || response.data?.message || t('misc.tfm_verify_code_invalid'));
+        setError(String(response.data?.detail || response.data?.message || t('misc.tfm_verify_code_invalid')));
       }
     } catch (err) {
       logger.error('Error verifying 2FA setup:', err);
@@ -447,8 +447,8 @@ export default function TwoFactorManager() {
 
     try {
       logger.info('[FIX:2FA] Regenerating backup codes via supported endpoint');
-      const response = await api.post('/2fa/backup-codes/regenerate') as any;
-      setBackupCodes(response.data?.backup_codes || []);
+      const response = (await api.post('/2fa/backup-codes/regenerate')) as import('axios').AxiosResponse<Record<string, unknown>>;
+      setBackupCodes((response.data?.backup_codes as unknown[]) || []);
       setConfirmRegenerate(false);
       setSuccess(t('misc.tfm_regenerate_success'));
     } catch (err) {

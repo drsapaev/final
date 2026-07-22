@@ -396,7 +396,7 @@ async function requestNotificationSettings(userId) {
     if (!shouldFallbackToDirectApi(error)) {
       throw error;
     }
-    const response = await api.get(`/notifications/settings/${userId}`) as any;
+    const response = (await api.get(`/notifications/settings/${userId}`)) as import('axios').AxiosResponse<Record<string, unknown>>;
     return response.data;
   }
 }
@@ -408,33 +408,33 @@ async function persistNotificationSettings(userId, payload) {
     if (!shouldFallbackToDirectApi(error)) {
       throw error;
     }
-    const response = await api.put(`/notifications/settings/${userId}`, payload) as any;
+    const response = (await api.put(`/notifications/settings/${userId}`, payload)) as import('axios').AxiosResponse<Record<string, unknown>>;
     return response.data;
   }
 }
 
-async function requestNotificationPolicy(userId: any) {
+async function requestNotificationPolicy(userId: string | number) {
   try {
-    const payload = await notificationsService.getPolicy(userId) as any;
+    const payload = (await notificationsService.getPolicy(userId)) as Record<string, unknown>;
     return payload?.policy || {};
   } catch (error) {
     if (!shouldFallbackToDirectApi(error)) {
       throw error;
     }
-    const response = await api.get(`/notifications/settings/${userId}/policy`) as any;
+    const response = (await api.get(`/notifications/settings/${userId}/policy`)) as import('axios').AxiosResponse<Record<string, unknown>>;
     return response?.data?.policy || {};
   }
 }
 
-async function persistNotificationPolicy(userId: any, payload: any) {
+async function persistNotificationPolicy(userId: string | number, payload: Record<string, unknown>) {
   try {
-    const response = await notificationsService.updatePolicy(userId, payload) as any;
+    const response = (await notificationsService.updatePolicy(userId, payload)) as Record<string, unknown>;
     return response?.policy || payload;
   } catch (error) {
     if (!shouldFallbackToDirectApi(error)) {
       throw error;
     }
-    const response = await api.put(`/notifications/settings/${userId}/policy`, payload) as any;
+    const response = (await api.put(`/notifications/settings/${userId}/policy`, payload)) as import('axios').AxiosResponse<Record<string, unknown>>;
     return response?.data?.policy || payload;
   }
 }
@@ -575,12 +575,12 @@ export default function NotificationPreferences() {
   const [success, setSuccess] = useState('');
   const [lastSavedAt, setLastSavedAt] = useState(null);
   const [userId, setUserId] = useState(null);
-  const [settings, setSettings] = useState(null as any);
+  const [settings, setSettings] = useState<Record<string, unknown> | null>(null);
   const [draft, setDraft] = useState(null);
   const [policyLoading, setPolicyLoading] = useState(false);
   const [policyError, setPolicyError] = useState('');
   const [policyLoaded, setPolicyLoaded] = useState(false);
-  const [policySettings, setPolicySettings] = useState(null as any);
+  const [policySettings, setPolicySettings] = useState<Record<string, unknown> | null>(null);
   const [policyDraft, setPolicyDraft] = useState(null);
 
   useEffect(() => {

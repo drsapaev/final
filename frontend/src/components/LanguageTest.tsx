@@ -5,7 +5,6 @@ import {
   Select, Button,
 } from './ui/macos';
 import React from 'react';
-const SelectAny = Select as unknown as React.ComponentType<Record<string, unknown>>;
 
 /**
  * Тестовый компонент для проверки работы селектора языка
@@ -40,7 +39,7 @@ const LanguageTest = () => {
 
       <div style={{ marginBottom: 'var(--mac-spacing-5)' }}>
         <h2>{t('misc.lt_selektor_yazyka')}</h2>
-        <SelectAny
+        <Select
           value={language}
           onChange={(e: unknown) => setLanguage((e as unknown as { target: { value: string } }).target.value)}
           style={{ width: '200px' }}
@@ -54,7 +53,7 @@ const LanguageTest = () => {
           ) : (
             <option disabled>{t('misc.lt_zagruzka_yazykov')}</option>
           )}
-        </SelectAny>
+        </Select>
       </div>
 
       <div style={{ marginBottom: 'var(--mac-spacing-5)' }}>

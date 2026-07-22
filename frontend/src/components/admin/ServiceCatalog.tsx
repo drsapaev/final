@@ -31,23 +31,15 @@ import {
 } from 'lucide-react';
 import {
   MacOSCard,
-  Button as RawButton,
-  Badge as RawBadge,
-  Input as RawInput,
-  Select as RawSelect,
-  Table as RawTable,
-  MacOSEmptyState as RawMacOSEmptyState,
-  Alert as RawAlert,
-  Checkbox as RawCheckbox,
+  Button,
+  Badge,
+  Input,
+  Select,
+  Table,
+  MacOSEmptyState,
+  Alert,
+  Checkbox,
 } from '../ui/macos';
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
-const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
-const Table = RawTable as unknown as React.ComponentType<Record<string, unknown>>;
-const MacOSEmptyState = RawMacOSEmptyState as unknown as React.ComponentType<Record<string, unknown>>;
-const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
-const Checkbox = RawCheckbox as unknown as React.ComponentType<Record<string, unknown>>;
 import {
   normalizeServiceCode,
   formatServiceCodeInput,
@@ -238,7 +230,7 @@ const ServiceCatalog = () => {
         );
 
         try {
-          const response = await api.put(`/services/${editingService.id}`, serviceData) as any;
+          const response = (await api.put(`/services/${editingService.id}`, serviceData)) as import('axios').AxiosResponse<Record<string, unknown>>;
           savedService = response.data;
 
           // Обновляем с реальными данными от сервера
@@ -253,7 +245,7 @@ const ServiceCatalog = () => {
           throw error;
         }
       } else {
-        const response = await api.post('/services', serviceData) as any;
+        const response = (await api.post('/services', serviceData)) as import('axios').AxiosResponse<Record<string, unknown>>;
         savedService = response.data;
 
         // ✅ ОПТИМИСТИЧНОЕ ДОБАВЛЕНИЕ: Добавляем в список сразу
@@ -320,7 +312,7 @@ const ServiceCatalog = () => {
         prevServices.map(s => s.id === serviceId ? { ...s, active: false } : s)
       );
 
-      const response = await api.delete(`/services/${serviceId}`) as any;
+      const response = (await api.delete(`/services/${serviceId}`)) as import('axios').AxiosResponse<Record<string, unknown>>;
 
       // Обновляем с реальными данными от сервера
       if (response.data.active === false) {
@@ -329,7 +321,7 @@ const ServiceCatalog = () => {
         );
       }
 
-      setMessage({ type: 'success', text: response.data.message || t('admin2.sc_service_deleted') });
+      setMessage({ type: 'success', text: String(response.data.message || t('admin2.sc_service_deleted')) });
     } catch (error) {
       // ❌ ОТКАТ: Возвращаем старое состояние при ошибке
       setServices(oldServices);
@@ -481,7 +473,7 @@ const ServiceCatalog = () => {
               onChange={(value: unknown) => setSelectedCategory(String(value))}
               options={[
               { value: 'all', label: t('admin2.sc_filter_category_all') },
-              ...categories.map((category) => ({
+              ...categories.map((category: { id?: string | number; name_ru?: string; specialty?: string }) => ({
                 value: category.id,
                 label: category.name_ru
               }))]
@@ -769,12 +761,12 @@ const ServiceCatalog = () => {
 
 // Компонент формы услуги с вкладками
 // ⭐ SSOT: Redesigned with tabs for better UX, removed duplicate fields
-const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMessage, onSave, onCancel, departments }: any) => {
+const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMessage, onSave, onCancel, departments }: { service?: Record<string, unknown>; categories?: unknown[]; doctors?: unknown[]; queueProfiles?: unknown[]; setMessage?: (msg: { type: string; text: string }) => void; onSave?: (serviceData: Record<string, unknown>) => Promise<void>; onCancel?: () => void; departments?: unknown[] }) => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [activeTab, setActiveTab] = useState('basic'); // 'basic', 'queue', 'options'
   const [showPreview, setShowPreview] = useState(false); // ✅ PREVIEW: Show changes preview
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<Record<string, unknown>>({
     name: service?.name || '',
     code: service?.code || service?.service_code || '', // Unified: use code as primary
     category_id: service?.category_id || '',
@@ -788,7 +780,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
     requires_doctor: service?.requires_doctor || false,
     is_consultation: service?.is_consultation || false,
     allow_doctor_price_override: service?.allow_doctor_price_override || false
-  } as any);
+  });
 
   // State для проверки дубликатов
   const [codeWarning, setCodeWarning] = useState('');
@@ -796,7 +788,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
 
   // Async проверка дубликатов для code
   useEffect(() => {
-    if (!formData.code || formData.code.length < 2) {
+    if (!formData.code || String(formData.code ?? '').length < 2) {
       setCodeWarning('');
       return;
     }
@@ -810,8 +802,8 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
     const timeoutId = setTimeout(async () => {
       try {
         setCheckingDuplicates(true);
-        const response = await api.get('/services') as any;
-        const services = response.data;
+        const response = (await api.get('/services')) as import('axios').AxiosResponse<Record<string, unknown>>;
+        const services = (response.data as unknown as Array<{ code?: string; service_code?: string; id?: string | number; name?: string }>) || [];
         const duplicate = services.find(
           (s) => (s.code === normalizedCode || s.service_code === normalizedCode) && s.id !== service?.id
         );
@@ -831,15 +823,15 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
   }, [formData.code, service?.id, t]);
 
   const selectedFormCategory = categories.find(
-    (category) => category.id === parseInt(formData.category_id, 10)
-  );
+    (category: unknown) => (category as { id?: number })?.id === parseInt(String(formData.category_id), 10)
+  ) as { specialty?: string } | undefined;
   const selectedServiceGroup = resolveServiceGroup({
     queueTag: formData.queue_tag,
     departmentKey: formData.department_key,
     categorySpecialty: selectedFormCategory?.specialty
   });
   const allowedPrefixes = getAllowedPrefixesForGroup(selectedServiceGroup);
-  const normalizedCode = formData.code ? normalizeServiceCode(formData.code) : '';
+  const normalizedCode = formData.code ? normalizeServiceCode(String(formData.code)) : '';
   const codePrefix = normalizedCode ? normalizedCode.charAt(0).toUpperCase() : '';
   const codePrefixMismatch =
     Boolean(
@@ -855,12 +847,12 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
     : '';
 
   // Auto-extract category_code from code prefix (guarded by prefix alignment checks)
-  const derivedCategoryCode = formData.code ? formData.code.charAt(0).toUpperCase() : '';
+  const derivedCategoryCode = formData.code ? String(formData.code).charAt(0).toUpperCase() : '';
 
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    if (!formData.name.trim()) {
+    if (!String(formData.name ?? '').trim()) {
       notify.warning(t('admin2.service_name_required'));
       return;
     }
@@ -895,10 +887,10 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
     const canonicalCode = normalizedCode || null;
     const apiData = {
       ...formData,
-      price: formData.price ? parseFloat(formData.price) : null,
-      category_id: formData.category_id ? parseInt(formData.category_id) : null,
-      doctor_id: formData.doctor_id ? parseInt(formData.doctor_id) : null,
-      duration_minutes: parseInt(formData.duration_minutes) || 30,
+      price: formData.price ? parseFloat(String(formData.code ?? '')) : null,
+      category_id: formData.category_id ? parseInt(String(formData.code ?? '')) : null,
+      doctor_id: formData.doctor_id ? parseInt(String(formData.code ?? '')) : null,
+      duration_minutes: parseInt(String(formData.code ?? '')) || 30,
       code: canonicalCode,
       service_code: canonicalCode, // Sync for backwards compatibility
       category_code: derivedCategoryCode || null // Auto-derived from code
@@ -925,12 +917,13 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
 
     // ⭐ SSOT: Sync queue_tag with department_key
     if (field === 'queue_tag' && normalizedValue) {
-      const matchingProfile = queueProfiles.find((p) =>
-      (p.queue_tags || []).includes(normalizedValue) || p.key === normalizedValue
-      );
+      const matchingProfile = queueProfiles.find((p: unknown) => {
+        const profile = p as { queue_tags?: string[]; key?: string };
+        return (profile.queue_tags || []).includes(normalizedValue) || profile.key === normalizedValue;
+      });
 
       if (matchingProfile) {
-        setFormData((prev) => ({ ...prev, [field]: normalizedValue, department_key: matchingProfile.key }));
+        setFormData((prev) => ({ ...prev, [field]: normalizedValue, department_key: (matchingProfile as { key?: string })?.key }));
         return;
       }
     }
@@ -985,7 +978,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
               </label>
               <Input
               type="text"
-              value={formData.name}
+              value={formData.name as string}
               onChange={(e) => handleChange('name', e.target.value)}
               required />
             </div>
@@ -996,7 +989,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
               </label>
               <Input
               type="text"
-              value={formData.code}
+              value={formData.code as string}
               onChange={(e) => handleChange('code', e.target.value)}
               placeholder="K01"
               maxLength={3} />
@@ -1041,11 +1034,11 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
                 {t('admin2.sc_form_category_label')}
               </label>
               <Select
-              value={formData.category_id}
+              value={formData.category_id as string}
               onChange={(value: unknown) => handleChange('category_id', String(value))}
               options={[
               { value: '', label: t('admin2.sc_form_category_ph') },
-              ...categories.map((category) => ({
+              ...categories.map((category: { id?: string | number; name_ru?: string; specialty?: string }) => ({
                 value: category.id,
                 label: `${category.name_ru} (${category.specialty})`
               }))]
@@ -1059,14 +1052,14 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
               <div className="admin-form-row-gap-8">
                 <Input
                 type="number"
-                value={formData.price}
+                value={formData.price as string}
                 onChange={(e) => handleChange('price', parseFloat(e.target.value) || '')}
                 min="0"
                 step="0.01"
                 className="admin-input-flex-1" />
 
                 <Select
-                value={formData.currency}
+                value={formData.currency as string}
                 onChange={(value: unknown) => handleChange('currency', String(value))}
                 options={[
                 { value: 'UZS', label: 'UZS' },
@@ -1082,7 +1075,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
               </label>
               <Input
               type="number"
-              value={formData.duration_minutes}
+              value={formData.duration_minutes as string}
               onChange={(e) => handleChange('duration_minutes', parseInt(e.target.value) || 30)}
               min="5"
               step="5" />
@@ -1093,11 +1086,11 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
                 {t('admin2.sc_form_doctor_label')}
               </label>
               <Select
-              value={formData.doctor_id}
+              value={formData.doctor_id as string}
               onChange={(value: unknown) => handleChange('doctor_id', String(value))}
               options={[
               { value: '', label: t('admin2.sc_form_doctor_all') },
-              ...doctors.map((doctor) => ({
+              ...doctors.map((doctor: { id?: string | number; user?: { id?: string | number; full_name?: string }; specialty?: string; full_name?: string }) => ({
                 value: doctor.id,
                 label: `${doctor.user?.full_name || t('admin2.sc_cell_doctor_default', { id: doctor.id })} (${doctor.specialty})`
               }))]
@@ -1120,13 +1113,13 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
                 {t('admin2.sc_form_queue_tag_label')}
               </label>
               <Select
-              value={formData.queue_tag}
+              value={formData.queue_tag as string}
               onChange={(value: unknown) => handleChange('queue_tag', String(value))}
               options={[
               { value: '', label: t('admin2.sc_form_queue_no_queue') },
               ...queueProfiles.
-              filter((profile) => profile.is_active !== false).
-              map((profile) => ({
+              filter((profile: { is_active?: boolean; queue_tags?: string[]; key?: string; title_ru?: string; title?: string }) => profile.is_active !== false).
+              map((profile: { is_active?: boolean; queue_tags?: string[]; key?: string; title_ru?: string; title?: string }) => ({
                 value: profile.queue_tags?.[0] || profile.key,
                 label: profile.title_ru || profile.title
               }))]
@@ -1136,7 +1129,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
             {formData.queue_tag &&
           <div className="admin-success-banner-catalog">
                 <p className="admin-p-14-success-m0">
-                  {t('admin2.sc_form_queue_active_hint_prefix')} <strong>{formData.queue_tag}</strong>
+                  {t('admin2.sc_form_queue_active_hint_prefix')} <strong>{String(formData.queue_tag ?? '')}</strong>
                 </p>
               </div>
           }
@@ -1149,25 +1142,25 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
             <div className="admin-grid-auto-200-12">
               <Checkbox
               id="active"
-              checked={formData.active}
+              checked={Boolean(formData.active as boolean)}
               onChange={(checked) => handleChange('active', checked)}
               label={t('admin2.sc_form_active_label')} />
 
               <Checkbox
               id="requires_doctor"
-              checked={formData.requires_doctor}
+              checked={Boolean(formData.requires_doctor as boolean)}
               onChange={(checked) => handleChange('requires_doctor', checked)}
               label={t('admin2.sc_form_requires_doctor_label')} />
 
               <Checkbox
               id="is_consultation"
-              checked={formData.is_consultation}
+              checked={Boolean(formData.is_consultation as boolean)}
               onChange={(checked) => handleChange('is_consultation', checked)}
               label={t('admin2.sc_form_is_consultation_label')} />
 
               <Checkbox
               id="allow_doctor_price_override"
-              checked={formData.allow_doctor_price_override}
+              checked={Boolean(formData.allow_doctor_price_override as boolean)}
               onChange={(checked) => handleChange('allow_doctor_price_override', checked)}
               label={t('admin2.sc_form_allow_override_label')} />
 

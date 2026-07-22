@@ -5,12 +5,8 @@ import PropTypes from 'prop-types';
 import { toast } from 'react-toastify';  // STRAT#2: retained for backward-compat;
 // новые callers должны использовать useLabToast.interactive* вместо прямого toast.
 import {
-  Alert as RawAlert, Badge as RawBadge, Button as RawButton, Card, CardContent, CardHeader, CardTitle, Icon,
-  Input as RawInput } from '../ui/macos';
-const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
-const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
+  Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Icon,
+  Input } from '../ui/macos';
 import { labReportingApi } from '../../api/labReporting';
 import { api } from '../../api/client';
 import { printService } from '../../services/print';
@@ -190,7 +186,7 @@ export default function LabReportWorkbench({
     };
   }, [isDirty, canSaveDraft, saving, draftValues]);
 
-  const handleCreateInstance = useCallback(async (templateIdOverride = null, options: any = {}) => {
+  const handleCreateInstance = useCallback(async (templateIdOverride = null, options: Record<string, unknown> = {}) => {
     const templateId = templateIdOverride || selectedTemplateId;
     if (!selectedAppointment?.patient_id || !templateId) {
       notify('error', t('errors.select_patient_template'));
@@ -285,7 +281,7 @@ export default function LabReportWorkbench({
       }, expectedUpdatedAt);
     }
     if (payload.length > 0) {
-      const response = await labReportingApi.bulkSaveValues(activeInstance.id, payload, expectedUpdatedAt) as any;
+      const response = (await labReportingApi.bulkSaveValues(activeInstance.id, payload, expectedUpdatedAt)) as Record<string, unknown>;
       latestInstance = response.instance;
     }
     onInstanceChange(latestInstance);
@@ -352,7 +348,7 @@ export default function LabReportWorkbench({
     setBusyAction('finalize');
     try {
       const latest = await persistDraft();
-      const finalized = await labReportingApi.finalize((latest || activeInstance).id) as any;
+      const finalized = await labReportingApi.finalize((latest || activeInstance).id) as Record<string, unknown>;
       onInstanceChange(finalized);
       await onRefreshHistory(finalized.patient_id);
       await onRefreshRecentReports?.();
@@ -384,7 +380,7 @@ export default function LabReportWorkbench({
     setSaving(true);
     setBusyAction('revise');
     try {
-      const revised = await labReportingApi.revise(activeInstance.id) as any;
+      const revised = (await labReportingApi.revise(activeInstance.id)) as Record<string, unknown>;
       onInstanceChange(revised);
       await onRefreshHistory(revised.patient_id);
       await onRefreshRecentReports?.();
@@ -411,17 +407,17 @@ export default function LabReportWorkbench({
     try {
       const printResult = await printService.printLabResults(
         buildLabPrintPayload(activeInstance, selectedAppointment)
-      ) as any;
+      ) as Record<string, unknown>;
 
       if (printResult.success) {
-        const printed = await labReportingApi.markPrinted(activeInstance.id) as any;
+        const printed = (await labReportingApi.markPrinted(activeInstance.id)) as Record<string, unknown>;
         onInstanceChange(printed);
         await onRefreshHistory(printed.patient_id);
         await onRefreshRecentReports?.();
         await onQueueChanged?.();
         setPrintFeedback({
           severity: 'success',
-          text: `${t('workbench.print_sent')}${printResult.data?.printer ? ` (${printResult.data.printer})` : ''}.`
+          text: `${t('workbench.print_sent')}${(printResult as { data?: { printer?: string } })?.data?.printer ? ` (${(printResult as { data?: { printer?: string } })?.data?.printer})` : ''}.`
         });
         // PR-59: auto-dismiss success feedback after 5 seconds
         setTimeout(() => setPrintFeedback(null), 5000);
@@ -460,7 +456,7 @@ export default function LabReportWorkbench({
       const popup = window.open(url, '_blank', 'noopener,noreferrer');
       // WF-05 fix: не помечаем как PRINTED при неудаче popup.
       if (popup) {
-        const printed = await labReportingApi.markPrinted(activeInstance.id) as any;
+        const printed = (await labReportingApi.markPrinted(activeInstance.id)) as Record<string, unknown>;
         onInstanceChange(printed);
         await onRefreshHistory(printed.patient_id);
         await onRefreshRecentReports?.();

@@ -36,8 +36,7 @@ import { useRegistrarData } from './registrar/useRegistrarData';
 // Decomp 5: record action handlers extracted to useRegistrarActions hook
 import { useRegistrarActions } from './registrar/useRegistrarActions';
 // Decomp 6a: QueueView extracted to component
-import QueueViewRaw from './registrar/views/QueueView';
-const QueueView = QueueViewRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import QueueView from './registrar/views/QueueView';
 // Decomp 6b: WelcomeView extracted to component
 import WelcomeView from './registrar/views/WelcomeView';
 // Strategic Direction 3: navigation helpers for canonical nested routes
@@ -100,6 +99,11 @@ import ForceMajeureModal from '../components/registrar/ForceMajeureModal';
 // UX Audit Registrar #14: extracted DataSourceIndicator and CSV utilities.
 import DataSourceIndicator from './registrar/DataSourceIndicator';
 import { generateCSV, downloadCSV } from './registrar/registrarCsv';
+
+interface ErrorWithExtras extends Error {
+  response?: { status?: number; data?: unknown; statusText?: string };
+  code?: string | number;
+}
 
 const RegistrarPanel = () => {
   // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
@@ -187,9 +191,9 @@ const RegistrarPanel = () => {
 
         // UX Audit R-3.6: убрано логирование patientName (PII leak).
         logger.info('[Registrar] Загружен пациент из URL (patientId matched)');
-      } catch (error: any) {
+      } catch (error: unknown) {
         // 404 — пациент не найден, не логируем как error.
-        const status = error?.response?.status;
+        const status = (error as ErrorWithExtras)?.response?.status;
         if (status !== 404) {
           logger.error('[Registrar] Не удалось загрузить пациента:', error);
         }
@@ -212,7 +216,7 @@ const RegistrarPanel = () => {
   const [paymentDialog, setPaymentDialog] = useState({ open: false, row: null, paid: false, source: null });
   const [recordPreviewDialog, setRecordPreviewDialog] = useState({ open: false, row: null });
   // ✅ State for rescheduling
-  const [rescheduleData, setRescheduleData] = useState(null as any);
+  const [rescheduleData, setRescheduleData] = useState<Record<string, unknown> | null>(null);
 
   // ✅ State for Force Majeure modal
   const [forceMajeureModal, setForceMajeureModal] = useState({ open: false, specialistId: null, specialistName: '' });
@@ -238,7 +242,7 @@ const RegistrarPanel = () => {
   // ✅ Используется только новый мастер (V2)
   const [showWizard, setShowWizard] = useState(false);
   const [wizardEditMode, setWizardEditMode] = useState(false); // ✨ НОВОЕ: Режим редактирования
-  const [wizardInitialData, setWizardInitialData] = useState(null as any); // ✨ НОВОЕ: Данные для редактирования
+  const [wizardInitialData, setWizardInitialData] = useState<Record<string, unknown> | null>(null); // ✨ НОВОЕ: Данные для редактирования
   const [showPaymentManager, setShowPaymentManager] = useState(false); // Для модуля оплаты
   const [isProcessing, setIsProcessing] = useState(false); // Состояние обработки
 
@@ -262,7 +266,7 @@ const RegistrarPanel = () => {
     resolveRescheduleVisitId,
     removeRescheduledAppointmentFromView,
   } = useRegistrarReschedule({ setAppointments });
-  const [doctors, setDoctors] = useState([]);const [services, setServices] = useState({} as any);const [showCalendar, setShowCalendar] = useState(false);const [historyDate, setHistoryDate] = useState(getLocalDateString());const [tempDateInput, setTempDateInput] = useState(getLocalDateString()); // Выбор врача остаётся явным: URL-параметр или ручной выбор в очереди
+  const [doctors, setDoctors] = useState([]);const [services, setServices] = useState<Record<string, unknown>>({});const [showCalendar, setShowCalendar] = useState(false);const [historyDate, setHistoryDate] = useState(getLocalDateString());const [tempDateInput, setTempDateInput] = useState(getLocalDateString()); // Выбор врача остаётся явным: URL-параметр или ручной выбор в очереди
   // Unified i18n hook: single source of truth for all translations.
   // - registrarPanel.* — flat UI keys (tabs, statuses, headings, buttons)
   // - registrar.*      — confirm dialog titles/messages + notify messages
@@ -308,7 +312,7 @@ const RegistrarPanel = () => {
 
 
   // Улучшенная загрузка записей с поддержкой тихого режима
-  const loadAppointments = useCallback(async (options: any = {}) => {
+  const loadAppointments = useCallback(async (options: Record<string, unknown> = {}) => {
     const { silent = false } = options || {};
     const callSource = String(options?.source || 'unknown');
     const isAutoRefreshCall = callSource === 'auto_refresh';
@@ -359,7 +363,7 @@ const RegistrarPanel = () => {
 
 
 
-      const response = await api.get('/registrar/queues/today', { params: { target_date: dateParam } }) as any;
+      const response = await api.get('/registrar/queues/today', { params: { target_date: dateParam } }) as import('axios').AxiosResponse<Record<string, unknown>>;
 
       // Axios successful response
       const data = response.data;
@@ -530,8 +534,8 @@ const RegistrarPanel = () => {
           setDataSource('api');
         });
       }
-    } catch (error: any) {
-      if (error?.response?.status === 429) {
+    } catch (error: unknown) {
+      if ((error as ErrorWithExtras)?.response?.status === 429) {
         autoRefreshCooldownUntilRef.current = Date.now() + 60_000;
         autoRefreshCooldownLoggedRef.current = false;
         logger.warn('⏳ Регистраторская очередь ограничена по частоте, включаем cooldown на 60с', {
@@ -542,7 +546,7 @@ const RegistrarPanel = () => {
       }
 
       // Handle axios errors
-      if (error.response?.status === 401) {
+      if ((error as ErrorWithExtras)?.response?.status === 401) {
         // Токен недействителен
         logger.warn('Токен недействителен (401), очищаем и показываем ошибку');
         sessionStorage.removeItem('auth_token');  // PR-39 / P0-2;
@@ -553,7 +557,7 @@ const RegistrarPanel = () => {
         });
       } else {
         // Other errors (network, 404, 500, etc.)
-        logger.error('❌ Backend недоступен для загрузки записей:', error.message);
+        logger.error('❌ Backend недоступен для загрузки записей:', (error as Error)?.message);
         logger.error('❌ Детали ошибки:', error);
         startTransition(() => {
           if (!silent) setDataSource('error');
@@ -678,7 +682,7 @@ const RegistrarPanel = () => {
     try {
       logger.info('RegistrarPanel: load-more delegates to canonical queue loader');
       await loadAppointments({ source: 'load_more', silent: true });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('Ошибка загрузки дополнительных записей:', error);
     } finally {
       setPaginationInfo((prev) => ({ ...prev, loadingMore: false }));
@@ -783,7 +787,7 @@ const RegistrarPanel = () => {
       }
       // Загружаем только записи тихо, без смены индикаторов
       logger.info('⏰ Автообновление: вызов loadAppointments (dialog-open resilient)');
-      loadAppointments({ silent: true, source: 'auto_refresh' } as any);
+      loadAppointments({ silent: true, source: 'auto_refresh' } as Record<string, unknown>);
     }, 30000); // UX Audit R-4.1: 15s → 30s (WebSocket покрывает real-time)
 
     return () => clearInterval(id);
@@ -1716,13 +1720,14 @@ const RegistrarPanel = () => {
                     break;
                   case 'more':{
                       // Показать контекстное меню с дополнительными действиями
-                      const rect = event?.target?.getBoundingClientRect();
+                      const evt = event as { target?: HTMLElement; clientX?: number; clientY?: number } | undefined;
+                      const rect = evt?.target?.getBoundingClientRect();
                       setContextMenu({
                         open: true,
                         row,
                         position: {
-                          x: rect?.right || event?.clientX || 0,
-                          y: rect?.top || event?.clientY || 0
+                          x: rect?.right || evt?.clientX || 0,
+                          y: rect?.top || evt?.clientY || 0
                         }
                       });
                       break;
@@ -1837,8 +1842,8 @@ const RegistrarPanel = () => {
               }
               notify.warning('Cancelled ' + successCount + '; failed ' + failedCount);
             }
-            await loadAppointments({ silent: true, source: 'cancel_complete' } as any);
-          } catch (error: any) {
+            await loadAppointments({ silent: true, source: 'cancel_complete' } as Record<string, unknown>);
+          } catch (error: unknown) {
             logger.error('RegistrarPanel: cancellation failed:', error);
             notify.error(getErrorMessage(error, 'Could not cancel record. Check connection and try again.'));
             throw error;
@@ -1969,19 +1974,19 @@ const RegistrarPanel = () => {
             // Reload data in the background (does not block UI)
             try {
               await Promise.all([
-                loadAppointments({ silent: true, source: 'wizard-complete', force: true } as any),
+                loadAppointments({ silent: true, source: 'wizard-complete' } as Record<string, unknown>),
                 loadIntegratedData(),
               ]);
             } catch (refreshError) {
               // Background refresh failed — single silent retry
               logger.warn('First post-wizard reload failed, retrying once:', refreshError);
               try {
-                await loadAppointments({ silent: true, source: 'wizard-complete-retry', force: true } as any);
+                await loadAppointments({ silent: true, source: 'wizard-complete-retry' } as Record<string, unknown>);
               } catch (retryError) {
                 logger.error('Post-wizard reload retry also failed:', retryError);
               }
             }
-          } catch (error: any) {
+          } catch (error: unknown) {
             logger.error('Error refreshing data after wizard completion:', error);
             // Не показываем ошибку пользователю, так как запись уже создана
             setShowWizard(false);
@@ -2037,7 +2042,7 @@ const RegistrarPanel = () => {
                 setCustomRescheduleDate('');
                 setCustomRescheduleTime('');
                 loadAppointments({ source: 'reschedule_tomorrow' });
-              } catch (e: any) {
+              } catch (e: unknown) {
                 logger.error('Ошибка переноса на завтра:', e);
                 notify.error(getErrorMessage(e, tI18n('registrarPanel.rp_err_reschedule_failed')));
               }
@@ -2108,7 +2113,7 @@ const RegistrarPanel = () => {
                 setCustomRescheduleDate('');
                 setCustomRescheduleTime('');
                 loadAppointments({ source: 'reschedule_date' });
-              } catch (e: any) {
+              } catch (e: unknown) {
                 logger.error('Ошибка переноса на дату:', e);
                 notify.error(getErrorMessage(e, tI18n('registrarPanel.rp_err_reschedule_failed')));
               }

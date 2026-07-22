@@ -104,27 +104,27 @@ const PhotoArchive = ({
     }
   };
 
-  const handleFileUpload = (files: any) => {
-    Array.from(files).forEach((file: any) => {
+  const handleFileUpload = (files: unknown) => {
+    Array.from(files as ArrayLike<unknown>).forEach((file: unknown) => {
       const reader = new FileReader();
-      reader.onload = (e: any) => {
+      reader.onload = (e: ProgressEvent<FileReader>) => {
         const mediaFile = {
           id: Date.now() + Math.random(),
-          name: file.name,
-          type: file.type,
-          size: file.size,
-          url: e.target.result,
+          name: (file as File).name,
+          type: (file as File).type,
+          size: (file as File).size,
+          url: (e.target as EventTarget & { result: string }).result,
           category: 'photo',
           tooth: '',
           date: new Date().toISOString().split('T')[0],
           description: '',
           tags: [],
           uploadedAt: new Date().toISOString(),
-          isRadiograph: file.type.includes('image') && (
-          file.name.toLowerCase().includes('xray') ||
-          file.name.toLowerCase().includes('panoramic') ||
-          file.name.toLowerCase().includes('cbct') ||
-          file.name.toLowerCase().includes('periapical'))
+          isRadiograph: (file as File).type.includes('image') && (
+          (file as File).name.toLowerCase().includes('xray') ||
+          (file as File).name.toLowerCase().includes('panoramic') ||
+          (file as File).name.toLowerCase().includes('cbct') ||
+          (file as File).name.toLowerCase().includes('periapical'))
 
         };
 
@@ -133,7 +133,7 @@ const PhotoArchive = ({
           mediaFiles: [...prev.mediaFiles, mediaFile]
         }));
       };
-      reader.readAsDataURL(file);
+      reader.readAsDataURL(file as Blob);
     });
   };
   const openFileViewer = (file) => {
@@ -187,7 +187,7 @@ const PhotoArchive = ({
   // Фильтрация файлов
   const filteredFiles = formData.mediaFiles.filter((file) => {
     const matchesSearch = !formData.searchQuery ||
-    file.name.toLowerCase().includes(formData.searchQuery.toLowerCase()) ||
+    (file as File).name.toLowerCase().includes(formData.searchQuery.toLowerCase()) ||
     file.description.toLowerCase().includes(formData.searchQuery.toLowerCase());
 
     const matchesCategory = formData.filters.category === 'all' ||
@@ -248,16 +248,16 @@ const PhotoArchive = ({
         onClick={() => openFileViewer(file)}
         onKeyDown={(event) => handleActivationKeyDown(event, () => openFileViewer(file))}>
         
-            {file.type.startsWith('image/') ?
+            {(file as File).type.startsWith('image/') ?
         <img
           src={file.url}
-          alt={file.name}
+          alt={(file as File).name}
           className="w-full h-full object-cover" /> :
 
 
         <div className="text-center">
                 <FileImage className="h-12 w-12 text-gray-400 mx-auto mb-2" />
-                <span className="text-sm text-gray-600">{file.name}</span>
+                <span className="text-sm text-gray-600">{(file as File).name}</span>
               </div>
         }
             
@@ -273,7 +273,7 @@ const PhotoArchive = ({
           {/* Информация о файле */}
           <div className="p-3">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium truncate">{file.name}</span>
+              <span className="text-sm font-medium truncate">{(file as File).name}</span>
               <div className="flex items-center gap-1">
                 {file.category === 'photo' && <Camera className="h-3 w-3 text-blue-500" />}
                 {file.category === 'radiograph' && <FileText className="h-3 w-3 text-red-500" />}
@@ -305,14 +305,14 @@ const PhotoArchive = ({
         <div className="mt-2 flex gap-1">
                 <button
             onClick={() => handleFileUpdate(file.id, {})}
-            aria-label={t('dental.dental_pa_aria_edit_file', { name: file.name })}
+            aria-label={t('dental.dental_pa_aria_edit_file', { name: (file as File).name })}
             className="flex-1 px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200">
             
                   <Edit className="h-3 w-3 mx-auto" />
                 </button>
                 <button
             onClick={() => handleFileDelete(file.id)}
-            aria-label={t('dental.dental_pa_aria_delete_file', { name: file.name })}
+            aria-label={t('dental.dental_pa_aria_delete_file', { name: (file as File).name })}
             className="flex-1 px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200">
             
                   <Trash2 className="h-3 w-3 mx-auto" />
@@ -335,15 +335,15 @@ const PhotoArchive = ({
             <div
           className="w-16 h-16 bg-gray-100 rounded flex items-center justify-center cursor-pointer"
           role="button"
-          aria-label={t('dental.dental_pa_aria_open_file', { name: file.name })}
+          aria-label={t('dental.dental_pa_aria_open_file', { name: (file as File).name })}
           tabIndex={0}
           onClick={() => openFileViewer(file)}
           onKeyDown={(event) => handleActivationKeyDown(event, () => openFileViewer(file))}>
           
-              {file.type.startsWith('image/') ?
+              {(file as File).type.startsWith('image/') ?
           <img
             src={file.url}
-            alt={file.name}
+            alt={(file as File).name}
             className="w-full h-full object-cover rounded" /> :
 
 
@@ -354,7 +354,7 @@ const PhotoArchive = ({
             {/* Информация */}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
-                <span className="font-medium truncate">{file.name}</span>
+                <span className="font-medium truncate">{(file as File).name}</span>
                 <div className="flex items-center gap-1">
                   {file.category === 'photo' && <Camera className="h-4 w-4 text-blue-500" />}
                   {file.category === 'radiograph' && <FileText className="h-4 w-4 text-red-500" />}
@@ -376,7 +376,7 @@ const PhotoArchive = ({
                     </span>
               }
                   <span className="text-xs text-gray-500">
-                    {(file.size / 1024 / 1024).toFixed(2)} MB
+                    {((file as File).size / 1024 / 1024).toFixed(2)} MB
                   </span>
                 </div>
                 
@@ -405,7 +405,7 @@ const PhotoArchive = ({
               setShowImageViewer(true);
             }}
             className="p-2 text-gray-500 hover:text-blue-600"
-            aria-label={t('dental.dental_pa_aria_view_file', { name: file.name })}
+            aria-label={t('dental.dental_pa_aria_view_file', { name: (file as File).name })}
             title={t('dental.dental_pa_title_view')}>
             
                 <Eye className="h-4 w-4" />
@@ -415,11 +415,11 @@ const PhotoArchive = ({
             onClick={() => {
               const link = document.createElement('a');
               link.href = file.url;
-              link.download = file.name;
+              link.download = (file as File).name;
               link.click();
             }}
             className="p-2 text-gray-500 hover:text-green-600"
-            aria-label={t('dental.dental_pa_aria_download_file', { name: file.name })}
+            aria-label={t('dental.dental_pa_aria_download_file', { name: (file as File).name })}
             title={t('dental.dental_pa_title_download')}>
             
                 <Download className="h-4 w-4" />
@@ -429,7 +429,7 @@ const PhotoArchive = ({
           <button
             onClick={() => handleFileDelete(file.id)}
             className="p-2 text-gray-500 hover:text-red-600"
-            aria-label={t('dental.dental_pa_aria_delete_file', { name: file.name })}
+            aria-label={t('dental.dental_pa_aria_delete_file', { name: (file as File).name })}
             title={t('dental.dental_pa_title_delete')}>
             
                   <Trash2 className="h-4 w-4" />
@@ -475,28 +475,28 @@ const PhotoArchive = ({
                   <div
                 className="aspect-video bg-gray-100 flex items-center justify-center cursor-pointer"
                 role="button"
-                aria-label={t('dental.dental_pa_aria_open_file', { name: file.name })}
+                aria-label={t('dental.dental_pa_aria_open_file', { name: (file as File).name })}
                 tabIndex={0}
                 onClick={() => openFileViewer(file)}
                 onKeyDown={(event) => handleActivationKeyDown(event, () => openFileViewer(file))}>
                 
-                    {file.type.startsWith('image/') ?
+                    {(file as File).type.startsWith('image/') ?
                 <img
                   src={file.url}
-                  alt={file.name}
+                  alt={(file as File).name}
                   className="w-full h-full object-cover" /> :
 
 
                 <div className="text-center">
                         <FileImage className="h-8 w-8 text-gray-400 mx-auto mb-1" />
-                        <span className="text-xs text-gray-600">{file.name}</span>
+                        <span className="text-xs text-gray-600">{(file as File).name}</span>
                       </div>
                 }
                   </div>
                   
                   <div className="p-3">
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-medium truncate">{file.name}</span>
+                      <span className="text-sm font-medium truncate">{(file as File).name}</span>
                       <div className="flex items-center gap-1">
                         {file.category === 'photo' && <Camera className="h-3 w-3 text-blue-500" />}
                         {file.category === 'radiograph' && <FileText className="h-3 w-3 text-red-500" />}

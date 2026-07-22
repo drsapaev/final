@@ -32,10 +32,10 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
       const response = await api.post('/2fa/setup', {
         recovery_email: recoveryEmail || null,
         recovery_phone: recoveryPhone || null
-      }) as any;
+      }) as import('axios').AxiosResponse<Record<string, unknown>>;
 
       setSetupData(response);
-      setBackupCodes(response.backup_codes);
+      setBackupCodes((response.data?.backup_codes as unknown[]) || []);
       setStep(2);
     } catch (err) {
       setError(err.response?.data?.detail || t('misc.tfs_oshibka_nastroyki_2fa'));
@@ -56,13 +56,13 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
     try {
       const response = await api.post('/2fa/verify-setup', null, {
         params: { totp_code: totpCode }
-      }) as any;
+      }) as import('axios').AxiosResponse<Record<string, unknown>>;
 
-      if (response.success) {
+      if (response.data?.success) {
         setSuccess(t('misc.tfs_2fa_uspeshno_nastroena'));
         setStep(3);
       } else {
-        setError(response.message || t('misc.tfs_nevernyy_kod'));
+        setError(String(response.data?.message || t('misc.tfs_nevernyy_kod')));
       }
     } catch (err) {
       setError(err.response?.data?.detail || t('misc.tfs_oshibka_verifikatsii'));

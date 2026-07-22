@@ -9,31 +9,21 @@ import {
   Box,
   Card,
   CardContent,
-  Typography as RawTypography,
-  Button as RawButton,
-  Input as RawInput,
-  Alert as RawAlert,
-  Badge as RawBadge,
-  Grid as RawGrid,
-  List as RawList,
+  Typography,
+  Button,
+  Input,
+  Alert,
+  Badge,
+  Grid,
+  List,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
-  Select as RawSelect,
-  Option as RawOption,
-  Textarea as RawTextarea,
+  Select,
+  Option,
+  Textarea,
 } from '../ui/macos';
-const Typography = RawTypography as unknown as React.ComponentType<Record<string, unknown>>;
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
-const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
-const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
-const Grid = RawGrid as unknown as React.ComponentType<Record<string, unknown>>;
-const List = RawList as unknown as React.ComponentType<Record<string, unknown>>;
-const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
-const Option = RawOption as unknown as React.ComponentType<Record<string, unknown>>;
-const Textarea = RawTextarea as unknown as React.ComponentType<Record<string, unknown>>;
 import {
   Hospital,
   Plus,
@@ -55,7 +45,7 @@ import {
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
-const ProcedureTemplates = ({ onSelectProcedure }: any) => {
+const ProcedureTemplates = ({ onSelectProcedure, visitId }: { onSelectProcedure?: (procedure: unknown) => void; visitId?: string | number }) => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [templates, setTemplates] = useState([]);

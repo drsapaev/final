@@ -12,9 +12,8 @@ import {
   Share2,
 } from 'lucide-react';
 import {
-  Alert as RawAlert, Badge, Button, Card, CardContent,
+  Alert, Badge, Button, Card, CardContent,
 } from '../components/ui/macos';
-const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
 
 // API клиент
 import { api as apiClient } from '../api/client';

@@ -54,11 +54,11 @@ const toGradient = (color) =>
 interface ModernTabsProps {
   activeTab?: string;
   onTabChange?: (tab: string) => void;
-  onProfilesLoaded?: (profiles: any[]) => void;
-  departmentStats?: any;
+  onProfilesLoaded?: (profiles: unknown[]) => void;
+  departmentStats?: Record<string, unknown>;
   language?: string;
-  theme?: any;
-  dynamicDepartments?: any[];
+  theme?: string;
+  dynamicDepartments?: unknown[];
 }
 
 const ModernTabs = ({
@@ -220,7 +220,7 @@ const ModernTabs = ({
 
   // Получение статистики для отдела
   const getStats = (tabKey) => {
-    const stats = departmentStats[tabKey] || {};
+    const stats = (departmentStats[tabKey] || {}) as Record<string, unknown>;
     return {
       todayCount: stats.todayCount || 0,
       hasActiveQueue: stats.hasActiveQueue || false,
@@ -238,7 +238,7 @@ const ModernTabs = ({
         <div
           key="queue"
           className="status-indicator queue"
-          title={`${t('queue.queue')}: ${stats.todayCount}`}>
+          title={`${t('queue.queue')}: ${String(stats.todayCount ?? '')}`}>
 
           <Clock size={10} />
         </div>
@@ -257,14 +257,14 @@ const ModernTabs = ({
       );
     }
 
-    if (stats.todayCount > 0) {
+    if (Number(stats.todayCount ?? 0) > 0) {
       indicators.push(
         <div
           key="count"
           className="status-indicator count"
-          title={`${t('queue.today')}: ${stats.todayCount}`}>
+          title={`${t('queue.today')}: ${String(stats.todayCount ?? '')}`}>
 
-          {stats.todayCount}
+          {String(stats.todayCount ?? '')}
         </div>
       );
     }

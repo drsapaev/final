@@ -38,12 +38,12 @@ export default function Appointments() {
     setBusy(true);
     setErr('');
     try {
-      let res: any = await api.get('/appointments', { params: { date, limit: 200 } });
-      if (!res || (!Array.isArray(res) && !Array.isArray(res?.items))) {
+      let res = (await api.get('/appointments', { params: { date, limit: 200 } })) as import('axios').AxiosResponse<Record<string, unknown>>;
+      if (!res || (!Array.isArray(res) && !Array.isArray(res?.data?.items))) {
         // fallback на другой ключ параметра
         res = await api.get('/appointments', { params: { d: date, limit: 200 } });
       }
-      const items = Array.isArray(res?.items) ? res.items : Array.isArray(res) ? res : [];
+      const items = Array.isArray(res?.data?.items) ? (res.data.items as unknown[]) : Array.isArray(res?.data) ? (res.data as unknown[]) : [];
       setRows(items);
     } catch (e) {
       const err = e as { data?: { detail?: string }; message?: string };

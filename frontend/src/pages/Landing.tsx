@@ -161,7 +161,7 @@ WorkflowStep.propTypes = {
   title: PropTypes.string,
 };
 
-function ContactRow({ icon: Icon, label, value, href }: any) {
+function ContactRow({ icon: Icon, label, value, href }: { icon?: React.ComponentType<{ size?: number }>; label?: string; value?: string; href?: string }) {
   const isExternal = href?.startsWith('http');
   const content = href ? (
     <a className="landing-contact-link" href={href} target={isExternal ? '_blank' : undefined} rel={isExternal ? 'noreferrer' : undefined}>

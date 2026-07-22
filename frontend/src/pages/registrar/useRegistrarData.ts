@@ -67,9 +67,9 @@ export const useRegistrarData = ({
           api.get('/registrar/departments?active_only=true'),
         ]);
 
-        const doctorsRes = (doctorsResult.status === 'fulfilled' ? doctorsResult.value : { ok: false }) as any;
-        const servicesRes = (servicesResult.status === 'fulfilled' ? servicesResult.value : { ok: false }) as any;
-        const departmentsRes = (departmentsResult.status === 'fulfilled' ? departmentsResult.value : { success: false }) as any;
+        const doctorsRes = (doctorsResult.status === 'fulfilled' ? doctorsResult.value : { ok: false }) as { ok?: boolean; data?: unknown[]; [k: string]: unknown };
+        const servicesRes = (servicesResult.status === 'fulfilled' ? servicesResult.value : { ok: false }) as { ok?: boolean; data?: unknown[]; [k: string]: unknown };
+        const departmentsRes = (departmentsResult.status === 'fulfilled' ? departmentsResult.value : { success: false }) as { success?: boolean; data?: unknown[]; [k: string]: unknown };
 
         if (doctorsResult.status === 'fulfilled') {
           logger.info('📊 Ответ врачей: OK');
@@ -104,8 +104,8 @@ export const useRegistrarData = ({
 
         if (doctorsRes && doctorsRes.data) {
           try {
-            const doctorsData = doctorsRes.data;
-            const apiDoctors = doctorsData.doctors || [];
+            const doctorsData = doctorsRes.data as unknown as Record<string, unknown>;
+            const apiDoctors = (doctorsData.doctors as unknown[]) || [];
             logger.info('✅ Данные врачей получены:', apiDoctors.length, 'врачей');
             if (apiDoctors.length > 0) {
               setDoctors(apiDoctors);
@@ -121,7 +121,7 @@ export const useRegistrarData = ({
 
         // Обработка отделений
         if (departmentsRes && departmentsRes.data) {
-          const depts = departmentsRes.data.data || [];
+          const depts = ((departmentsRes.data as unknown as { data?: unknown[] }).data) || [];
           if (Array.isArray(depts) && depts.length > 0) {
             setDynamicDepartments(depts);
             logger.info('✅ Отделения обновлены из API:', depts.length);
@@ -130,8 +130,8 @@ export const useRegistrarData = ({
 
         if (servicesRes && servicesRes.data) {
           try {
-            const servicesData = servicesRes.data;
-            const apiServices = servicesData.services_by_group || {};
+            const servicesData = servicesRes.data as unknown as Record<string, unknown>;
+            const apiServices = (servicesData.services_by_group as Record<string, unknown>) || {};
             logger.info('✅ Данные услуг получены:', Object.keys(apiServices));
             if (Object.keys(apiServices).length > 0) {
               setServices(apiServices);
@@ -204,24 +204,24 @@ export const useRegistrarData = ({
   // ───────────────────────────────────────────────────────────
   // enrichAppointmentsWithPatientData: enrich records with patient display fields
   // ───────────────────────────────────────────────────────────
-  const enrichAppointmentsWithPatientData = useCallback(async (appointments: any[]) => {
-    const enrichedAppointments = await Promise.all(appointments.map(async (apt: any) => {
+  const enrichAppointmentsWithPatientData = useCallback(async (appointments: Record<string, unknown>[]) => {
+    const enrichedAppointments = await Promise.all(appointments.map(async (apt: Record<string, unknown>) => {
       let enrichedApt = { ...apt };
 
       // Обогащаем данными пациента
-      if (apt.patient_id && (!hasBackendPatientDisplayContract(apt) || !hasBackendPatientGenderContract(apt))) {
-        const patient: any = await fetchPatientData(apt.patient_id);
+      if (apt.patient_id as string | number && (!hasBackendPatientDisplayContract(apt) || !hasBackendPatientGenderContract(apt))) {
+        const patient: Record<string, unknown> = await fetchPatientData(apt.patient_id as string | number);
         if (patient) {
           let patient_fio: string = '';
-          if (patient.last_name && patient.first_name) {
-            patient_fio = `${patient.last_name} ${patient.first_name}`;
-            if (patient.middle_name) {
-              patient_fio += ` ${patient.middle_name}`;
+          if (String(patient.last_name ?? '') && String(patient.first_name ?? '')) {
+            patient_fio = `${String(patient.last_name ?? '')} ${String(patient.first_name ?? '')}`;
+            if (String(patient.middle_name ?? '')) {
+              patient_fio += ` ${String(patient.middle_name ?? '')}`;
             }
-          } else if (patient.last_name) {
-            patient_fio = patient.last_name;
-          } else if (patient.first_name) {
-            patient_fio = patient.first_name;
+          } else if (String(patient.last_name ?? '')) {
+            patient_fio = String(patient.last_name ?? '');
+          } else if (String(patient.first_name ?? '')) {
+            patient_fio = String(patient.first_name ?? '');
           } else {
             patient_fio = `Пациент ID=${patient.id}`;
           }
@@ -231,7 +231,7 @@ export const useRegistrarData = ({
             ...enrichedApt,
             patient_fio: patient_fio.trim() || `Пациент ID=${patient.id}`,
             patient_phone: patient.phone,
-            patient_birth_year: patient.birth_date ? new Date(patient.birth_date).getFullYear() : null,
+            patient_birth_year: patient.birth_date ? new Date(String(patient.birth_date)).getFullYear() : null,
             patient_gender: patientGender,
             gender: patientGender,
             sex: patientGender,
