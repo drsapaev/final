@@ -529,7 +529,7 @@ const EmailSMSManager = () => {
           <Select
             label={t('misc.esm_label_priority')}
             value={smsForm.priority}
-            onChange={(value) => setSmsForm({ ...smsForm, priority: value })}
+            onValueChange={(value) => setSmsForm({ ...smsForm, priority: String(value) })}
             options={priorityOptions(t)}
           />
         </div>
@@ -564,7 +564,7 @@ const EmailSMSManager = () => {
           <Select
             label={t('misc.esm_label_bulk_type')}
             value={bulkForm.type}
-            onChange={(value) => setBulkForm({ ...bulkForm, type: value, template: '' })}
+            onValueChange={(value) => setBulkForm({ ...bulkForm, type: String(value), template: '' })}
             options={bulkTypeOptions}
           />
           <Input
@@ -589,7 +589,7 @@ const EmailSMSManager = () => {
           <Select
             label={t('misc.esm_label_template')}
             value={bulkForm.template}
-            onChange={(value) => setBulkForm({ ...bulkForm, template: value })}
+            onValueChange={(value) => setBulkForm({ ...bulkForm, template: String(value) })}
             options={currentBulkTemplates}
           />
         </div>

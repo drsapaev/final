@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, type CSSProperties, type ReactNode,
 import PropTypes from 'prop-types';
 import { createPortal } from 'react-dom';
 import { useTranslation } from '../../../i18n/useTranslation';
+import { toFormValue } from '../../../utils/formValue';
 
 type SelectSize = 'small' | 'default' | 'large';
 type SelectValue = string | number;
@@ -19,13 +20,34 @@ interface DropdownRect {
   height: number;
 }
 
+/**
+ * Event-like object emitted by Select's `onChange`.
+ * Compatible with legacy callers that do `e.target.value`.
+ * @deprecated Use `onValueChange` instead for new code.
+ */
+export interface SelectChangeEvent {
+  target: {
+    value: string;
+    name?: string;
+  };
+}
+
 interface SelectProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'style' | 'onChange' | 'size' | 'value' | 'defaultValue' | 'label'> {
   /** Optional children — used by legacy callers that wrap <option> tags inside <select> via this component. */
   children?: ReactNode;
   options?: Array<SelectOption | SelectValue>;
   value?: SelectValue | string;
   defaultValue?: SelectValue;
-  onChange?: (value: any) => void;
+  /**
+   * Legacy event-like handler. Receives a synthetic event with `target.value`.
+   * @deprecated Use `onValueChange` for new code — it passes the raw value directly.
+   */
+  onChange?: (event: SelectChangeEvent) => void;
+  /**
+   * Value-based handler. Receives the selected value directly (string or number).
+   * Preferred over `onChange` for new code.
+   */
+  onValueChange?: (value: SelectValue) => void;
   placeholder?: ReactNode;
   disabled?: boolean;
   size?: SelectSize;
@@ -59,6 +81,7 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(({
   value: valueProp,
   defaultValue,
   onChange,
+  onValueChange,
   placeholder = 'Select…',
   disabled = false,
   size = 'default',
@@ -145,7 +168,10 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(({
   const setAndClose = (val: SelectValue) => {
     if (disabled) return;
     if (valueProp === undefined) setValue(val);
-    onChange && onChange(val);
+    // Emit value-based event for new callers
+    onValueChange?.(val);
+    // Emit event-like object for legacy callers (deprecated)
+    onChange?.({ target: { value: toFormValue(val) } });
     setIsOpen(false);
   };
 

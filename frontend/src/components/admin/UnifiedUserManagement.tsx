@@ -71,7 +71,7 @@ const UnifiedUserManagement = () => {
       <MacOSTab
         tabs={tabs}
         activeTab={activeTab}
-        onTabChange={setActiveTab} />
+        onTabChange={(id) => setActiveTab(String(id))} />
       
       <div className="admin-unified-content">
         {/* P-025 fix: ErrorBoundary catches runtime errors in child panels

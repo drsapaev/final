@@ -383,11 +383,7 @@ const CloudPrintingManager = () => {
               <Select
               id="provider"
               value={printForm.provider_name}
-              onChange={(value) => setPrintForm({
-                ...printForm,
-                provider_name: value,
-                printer_id: ''
-              })}
+              onValueChange={(value) => setPrintForm({ ...printForm, provider_name: String(value), printer_id: '' })}
               options={[
                 { value: '', label: t('admin2.cp_select_provider') },
                 ...getProviderOptions(providers, t)
@@ -401,7 +397,7 @@ const CloudPrintingManager = () => {
               <Select
               id="printer"
               value={printForm.printer_id}
-              onChange={(value) => setPrintForm({ ...printForm, printer_id: value })}
+              onValueChange={(value) => setPrintForm({ ...printForm, printer_id: String(value) })}
               options={[
               { value: '', label: t('admin2.cp_select_printer') },
               ...getPrinterOptions(printers, printForm.provider_name, t)]
@@ -425,7 +421,7 @@ const CloudPrintingManager = () => {
               <Select
               id="format"
               value={printForm.format}
-              onChange={(value) => setPrintForm({ ...printForm, format: value })}
+              onValueChange={(value) => setPrintForm({ ...printForm, format: String(value) })}
               options={[
               { value: 'html', label: 'HTML' },
               { value: 'text', label: t('admin2.cp_format_text') },
@@ -501,11 +497,7 @@ const CloudPrintingManager = () => {
               <Select
               id="med-provider"
               value={medicalForm.provider_name}
-              onChange={(value) => setMedicalForm({
-                ...medicalForm,
-                provider_name: value,
-                printer_id: ''
-              })}
+              onValueChange={(value) => setMedicalForm({ ...medicalForm, provider_name: String(value), printer_id: '' })}
               options={[
                 { value: '', label: t('admin2.cp_select_provider') },
                 ...getProviderOptions(providers, t)
@@ -518,7 +510,7 @@ const CloudPrintingManager = () => {
               <Select
               id="med-printer"
               value={medicalForm.printer_id}
-              onChange={(value) => setMedicalForm({ ...medicalForm, printer_id: value })}
+              onValueChange={(value) => setMedicalForm({ ...medicalForm, printer_id: String(value) })}
               options={[
                 { value: '', label: t('admin2.cp_select_printer') },
                 ...getPrinterOptions(printers, medicalForm.provider_name, t)
@@ -531,7 +523,7 @@ const CloudPrintingManager = () => {
               <Select
               id="doc-type"
               value={medicalForm.document_type}
-              onChange={(value) => setMedicalForm({ ...medicalForm, document_type: value })}
+              onValueChange={(value) => setMedicalForm({ ...medicalForm, document_type: String(value) })}
               options={[
                 { value: 'prescription', label: t('admin2.cp_doc_type_prescription') },
                 { value: 'receipt', label: t('admin2.cp_doc_type_receipt') },

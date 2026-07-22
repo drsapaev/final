@@ -615,7 +615,7 @@ const BillingManager = () => {
               </label>
               <Select
             value={paymentForm.payment_method}
-            onChange={(value) => setPaymentForm({ ...paymentForm, payment_method: value })}
+            onValueChange={(value) => setPaymentForm({ ...paymentForm, payment_method: String(value) })}
             options={paymentMethodOptions}
             size="large" />
           

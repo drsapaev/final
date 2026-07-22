@@ -316,7 +316,7 @@ const WebhookManager = () => {
                 </label>
                 <Select
                 value={String(filters.status ?? "")}
-                onChange={(value) => setFilters({ ...filters, status: value })}
+                onValueChange={(value) => setFilters({ ...filters, status: String(value) })}
                 options={[
                 { value: '', label: t('admin2.wh_status_all') },
                 { value: 'active', label: t('admin2.wh_status_active') },
@@ -333,7 +333,7 @@ const WebhookManager = () => {
                 </label>
                 <Select
                 value={String(filters.event_type ?? "")}
-                onChange={(value) => setFilters({ ...filters, event_type: value })}
+                onValueChange={(value) => setFilters({ ...filters, event_type: String(value) })}
                 options={[
                 { value: '', label: t('admin2.wh_events_all') },
                 { value: 'patient.created', label: t('admin2.wh_event_patient_created') },
@@ -534,7 +534,7 @@ const WebhookManager = () => {
                 <Select
                 value={selectedWebhook?.id ? String(selectedWebhook.id) : ''}
                 onChange={(value) => {
-                  const webhook = webhooks.find((w) => String(w.id) === value);
+                  const webhook = webhooks.find((w) => String(w.id) === String(value));
                   setSelectedWebhook(webhook);
                   if (webhook) loadWebhookCalls(webhook.id);
                 }}
@@ -551,7 +551,7 @@ const WebhookManager = () => {
                 </label>
                 <Select
                 value={String(filters.call_status ?? '')}
-                onChange={(value) => setFilters({ ...filters, call_status: value })}
+                onValueChange={(value) => setFilters({ ...filters, call_status: String(value) })}
                 options={[
                 { value: '', label: t('admin2.wh_status_all') },
                 { value: 'success', label: t('admin2.wh_call_filter_success') },

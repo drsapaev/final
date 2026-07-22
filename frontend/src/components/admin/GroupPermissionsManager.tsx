@@ -438,8 +438,8 @@ const GroupPermissionsManager = () => {
                     <div className="admin-flex-1">
                       <Select
                   value={permissionToCheck}
-                  onChange={(value) => {
-                    setPermissionToCheck(value);
+                  onValueChange={(value) => {
+                    setPermissionToCheck(String(value));
                     if (value) {
                       checkUserPermission(selectedUser.id, value);
                     }
@@ -592,10 +592,10 @@ const GroupPermissionsManager = () => {
                     <div className="admin-flex-1">
                       <Select
                   value={roleToAssign}
-                  onChange={(value) => {
-                    setRoleToAssign(value);
+                  onValueChange={(value) => {
+                    setRoleToAssign(String(value));
                     if (value) {
-                      assignRoleToGroup(selectedGroup.id, parseInt(value));
+                      assignRoleToGroup(selectedGroup.id, parseInt(String(value)));
                       setRoleToAssign('');
                     }
                   }}

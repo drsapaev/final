@@ -22,7 +22,7 @@ interface TabDefinition {
 interface MacOSTabProps {
   tabs: TabDefinition[];
   activeTab: TabId;
-  onTabChange: (id: any) => void;
+  onTabChange: (id: TabId) => void;
   size?: TabSize | string;
   variant?: TabVariant | string;
   orientation?: TabOrientation;

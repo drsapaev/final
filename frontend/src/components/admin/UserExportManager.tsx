@@ -250,7 +250,7 @@ const UserExportManager = () => {
           </label>
           <Select
           value={exportForm.format}
-          onChange={(value) => setExportForm((prev) => ({ ...prev, format: value }))}
+          onValueChange={(value) => setExportForm((prev) => ({ ...prev, format: String(value) }))}
           options={[
           { value: 'csv', label: 'CSV' },
           { value: 'excel', label: 'Excel (XLSX)' },
@@ -367,7 +367,7 @@ const UserExportManager = () => {
             value={exportForm.filters.role}
             onChange={(value) => setExportForm((prev) => ({
               ...prev,
-              filters: { ...prev.filters, role: value }
+              filters: { ...prev.filters, role: String(value) }
             }))}
             options={userRoles}
             size="large"
@@ -385,7 +385,7 @@ const UserExportManager = () => {
               ...prev,
               filters: {
                 ...prev.filters,
-                is_active: value === '' ? null : value === 'true'
+                is_active: String(value) === '' ? null : String(value) === 'true'
               }
             }))}
             options={[

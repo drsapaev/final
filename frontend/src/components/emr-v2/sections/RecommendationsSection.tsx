@@ -74,7 +74,7 @@ export function RecommendationsSection({
       
             <EMRTextField
         value={value}
-        onChange={onChange}
+        onValueChange={onChange}
         placeholder="Рекомендации пациенту, режим, диета..."
         multiline
         rows={2}
