@@ -28,6 +28,39 @@ import {
 } from '../ui/macos';
 import { api } from '../../api/client';
 
+// === Domain types ===
+// Shape returned by GET /admin/ai/stats?days_back=7. The backend response is
+// dynamic, so we expose the canonical fields the UI reads and let extra
+// fields ride along via the index signature.
+interface AIStats {
+  total_requests?: number;
+  successful_requests?: number;
+  cache_hit_rate?: number;
+  total_tokens_used?: number;
+  [key: string]: unknown;
+}
+
+// Provider form shape — produced/edited by <ProviderForm /> and consumed by
+// handleSaveProvider. Fields are all optional because the form supports both
+// create (no provider) and edit (existing provider) flows.
+interface AIProviderFormData {
+  name: string;
+  display_name: string;
+  api_key: string;
+  api_url: string;
+  model: string;
+  temperature: number;
+  max_tokens: number;
+  active: boolean;
+  is_default: boolean;
+  capabilities: string[];
+  enabled?: boolean;
+  cache_enabled?: boolean;
+  require_consent_for_files?: boolean;
+  anonymize_data?: boolean;
+  [key: string]: unknown;
+}
+
 import logger from '../../utils/logger';
 import { notify } from '../../services/notify';
 const AISettings = () => {
@@ -36,7 +69,7 @@ const AISettings = () => {
   const [loading, setLoading] = useState(true);
   const [providers, setProviders] = useState([]);
   const [systemSettings, setSystemSettings] = useState({});
-  const [stats, setStats] = useState({} as any);
+  const [stats, setStats] = useState<AIStats>({});
   const [editingProvider, setEditingProvider] = useState(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [showApiKeys, setShowApiKeys] = useState({});
@@ -455,7 +488,7 @@ const AISettings = () => {
 const ProviderForm = ({ provider, providerConfigs, onSave, onCancel }) => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<AIProviderFormData>({
     name: provider?.name || '',
     display_name: provider?.display_name || '',
     api_key: provider?.api_key || '',
@@ -466,7 +499,7 @@ const ProviderForm = ({ provider, providerConfigs, onSave, onCancel }) => {
     active: provider?.active || false,
     is_default: provider?.is_default || false,
     capabilities: provider?.capabilities || ['text']
-  } as any);
+  });
 
   const handleSubmit = (e) => {
     e.preventDefault();
