@@ -2,21 +2,14 @@ import { useState, useEffect, useCallback } from 'react';
 import type { CSSProperties } from 'react';
 import {
   MacOSCard,
-  Button as RawButton,
-  Badge as RawBadge,
-  Input as RawInput,
-  Select as RawSelect,
-  MacOSTab as RawMacOSTab,
-  Table as RawTable,
-  MacOSEmptyState as RawMacOSEmptyState,
+  Button,
+  Badge,
+  Input,
+  Select,
+  MacOSTab,
+  Table,
+  MacOSEmptyState,
 } from '../ui/macos';
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
-const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
-const MacOSTab = RawMacOSTab as unknown as React.ComponentType<Record<string, unknown>>;
-const Table = RawTable as unknown as React.ComponentType<Record<string, unknown>>;
-const MacOSEmptyState = RawMacOSEmptyState as unknown as React.ComponentType<Record<string, unknown>>;
 import {
   Brain,
   TrendingUp,
@@ -76,7 +69,7 @@ const AIAnalytics = () => {
       if (filters.userId) params.append('user_id', filters.userId);
       if (filters.aiFunction) params.append('ai_function', filters.aiFunction);
 
-      const response = await api.get(`/analytics/ai/usage-analytics?${params}`) as any;
+      const response = (await api.get(`/analytics/ai/usage-analytics?${params}`)) as import('axios').AxiosResponse<Record<string, unknown>>;
       setUsageAnalytics(response.data);
     } catch (error) {
       logger.error('Ошибка загрузки аналитики AI:', error);
@@ -94,7 +87,7 @@ const AIAnalytics = () => {
         end_date: dateRange.endDate
       });
 
-      const response = await api.get(`/analytics/ai/learning-insights?${params}`) as any;
+      const response = (await api.get(`/analytics/ai/learning-insights?${params}`)) as import('axios').AxiosResponse<Record<string, unknown>>;
       setLearningInsights(response.data);
     } catch (error) {
       logger.error('Ошибка загрузки инсайтов обучения:', error);
@@ -106,7 +99,7 @@ const AIAnalytics = () => {
 
   const loadUsageSummary = useCallback(async () => {
     try {
-      const response = await api.get('/analytics/ai/usage-summary?days=30') as any;
+      const response = await api.get('/analytics/ai/usage-summary?days=30') as import('axios').AxiosResponse<Record<string, unknown>>;
       setUsageSummary(response.data);
     } catch (error) {
       logger.error('Ошибка загрузки сводки AI:', error);
@@ -127,7 +120,7 @@ const AIAnalytics = () => {
         group_by: 'day'
       });
 
-      const response = await api.get(`/analytics/ai/cost-analysis?${params}`) as any;
+      const response = (await api.get(`/analytics/ai/cost-analysis?${params}`)) as import('axios').AxiosResponse<Record<string, unknown>>;
       setCostAnalysis(response.data);
     } catch (error) {
       logger.error('Ошибка загрузки анализа затрат:', error);
@@ -145,7 +138,7 @@ const AIAnalytics = () => {
         days: '30'
       });
 
-      const response = await api.get(`/analytics/ai/model-comparison?${params}`) as any;
+      const response = (await api.get(`/analytics/ai/model-comparison?${params}`)) as import('axios').AxiosResponse<Record<string, unknown>>;
       setModelComparison(response.data);
     } catch (error) {
       logger.error('Ошибка загрузки сравнения моделей:', error);
@@ -158,7 +151,7 @@ const AIAnalytics = () => {
   const optimizeModels = async () => {
     setLoading(true);
     try {
-      const response = await api.post('/analytics/ai/optimize-models') as any;
+      const response = await api.post('/analytics/ai/optimize-models') as import('axios').AxiosResponse<Record<string, unknown>>;
       toast.success(t('misc.aia_optimization_started'));
       logger.log('Результат оптимизации:', response.data);
     } catch (error) {
@@ -177,7 +170,7 @@ const AIAnalytics = () => {
         start_date: dateRange.startDate,
         end_date: dateRange.endDate,
         anonymize: true
-      }) as any;
+      }) as import('axios').AxiosResponse<Record<string, unknown>>;
       toast.success(t('misc.aia_dataset_generated', { dataType }));
       logger.log('Информация о датасете:', response.data);
     } catch (error) {

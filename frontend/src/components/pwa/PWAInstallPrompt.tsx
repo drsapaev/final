@@ -112,7 +112,7 @@ function CapabilityChip({ children, icon: Icon, variant = 'outline', onClick, ar
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const content = (
     <span style={styles.chipContent}>
-      {Icon && React.createElement(Icon as unknown as React.ComponentType<Record<string, unknown>>, { size: 13, "aria-hidden": "true" })}
+      {Icon && React.createElement(Icon, { size: 13, "aria-hidden": "true" })}
       {String(children)}
     </span>
   );

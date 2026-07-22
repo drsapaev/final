@@ -51,37 +51,59 @@ import { useTranslation } from '../../i18n/useTranslation';
  * Отчеты и аналитика для стоматологической ЭМК
  * Включает статистику по пациентам, врачам, клинике, процедурам
  */
+interface AnalyticsItem {
+  month?: string;
+  category?: string;
+  status?: string;
+  age?: string;
+  gender?: string;
+  revenue?: number;
+  count?: number;
+  percentage?: number;
+  id?: string | number;
+  name?: string;
+  specialty?: string;
+  patients?: number;
+  appointments?: number;
+  rating?: number;
+  efficiency?: number;
+  growth?: number;
+  [key: string]: unknown;
+}
+
 const EMPTY_ANALYTICS_DATA = {
   overview: {
     totalPatients: 0,
     totalAppointments: 0,
     totalRevenue: 0,
     averageRating: 0,
-    growthRate: null
+    growthRate: null as number | null
   },
   patients: {
     newPatients: 0,
     returningPatients: 0,
-    ageGroups: [],
-    genderDistribution: []
+    ageGroups: [] as AnalyticsItem[],
+    genderDistribution: [] as AnalyticsItem[]
   },
-  doctors: [],
-  procedures: [],
+  doctors: [] as AnalyticsItem[],
+  procedures: [] as AnalyticsItem[],
   revenue: {
-    monthly: [],
-    byCategory: []
+    monthly: [] as AnalyticsItem[],
+    byCategory: [] as AnalyticsItem[]
   },
   appointments: {
     total: 0,
     completed: 0,
     cancelled: 0,
     noShow: 0,
-    byStatus: [],
-    byDay: []
+    byStatus: [] as AnalyticsItem[],
+    byDay: [] as AnalyticsItem[]
   }
-};
+} as const;
 
-const hasAnalyticsData = (data) =>
+type AnalyticsData = typeof EMPTY_ANALYTICS_DATA;
+
+const hasAnalyticsData = (data: Partial<AnalyticsData> | null | undefined): boolean =>
   Boolean(
     data?.overview?.totalPatients ||
     data?.overview?.totalAppointments ||
@@ -95,15 +117,26 @@ const hasAnalyticsData = (data) =>
     data?.appointments?.byStatus?.length
   );
 
+interface ReportsAndAnalyticsProps {
+  initialData?: AnalyticsData | null;
+  onClose?: () => void;
+  patientId?: string | number | null;
+  doctorId?: string | number | null;
+  clinicId?: string | number | null;
+  onSave?: (reportData: unknown) => void;
+  [key: string]: unknown;
+}
+
 const ReportsAndAnalytics = ({
   initialData = null,
-  onClose
-}) => {
+  onClose,
+  ...props
+}: ReportsAndAnalyticsProps) => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [activeTab, setActiveTab] = useState('overview');
   const [dateRange, setDateRange] = useState('30d');
-  const analyticsData = initialData || EMPTY_ANALYTICS_DATA;
+  const analyticsData: AnalyticsData = initialData ?? EMPTY_ANALYTICS_DATA;
   const reportHasData = hasAnalyticsData(analyticsData);
 
   // Обработчики

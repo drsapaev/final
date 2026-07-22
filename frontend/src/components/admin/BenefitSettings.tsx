@@ -60,7 +60,7 @@ const BenefitSettings = () => {
       const data = await fetchBenefitSettings();
       setSettings(data);
       setOriginalSettings(data);
-      setLastUpdated(new Date(data?.updated_at as any));
+      setLastUpdated(new Date(String(data?.updated_at ?? '')));
     } catch (error) {
       logger.error('Error loading benefit settings:', error);
       setError(error.response?.data?.detail || t('admin2.bs_error_load_settings'));
@@ -122,7 +122,7 @@ const BenefitSettings = () => {
   }
 
   // Критическая ошибка загрузки
-  if (error && !settings?.updated_at as any) {
+  if (error && !settings?.updated_at) {
     return (
       <div className="admin-benefit-container">
         <MacOSCard className="p-6">

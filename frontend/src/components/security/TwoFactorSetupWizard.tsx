@@ -28,7 +28,7 @@ import PropTypes from 'prop-types';
  * Мастер настройки Two-Factor Authentication
  * Пошаговая настройка всех методов 2FA
  */
-const TwoFactorSetupWizard = ({ onComplete }: any) => {
+const TwoFactorSetupWizard = ({ onComplete, onCancel }: { onComplete?: () => void; onCancel?: () => void }) => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [currentStep, setCurrentStep] = useState(1);
@@ -90,17 +90,17 @@ const TwoFactorSetupWizard = ({ onComplete }: any) => {
         method: selectedMethod,
         recovery_email: recoveryEmail || null,
         recovery_phone: recoveryPhone || null,
-      }) as unknown as { json: () => Promise<any>; ok: boolean; status: number; data: any };
+      }) as unknown as { json: () => Promise<Record<string, unknown>>; ok: boolean; status: number; data: Record<string, unknown> };
 
       const data = await response.json();
 
       if (response.ok) {
         setSetupData(data);
-        setBackupCodes(data.backup_codes || []);
+        setBackupCodes((data.backup_codes as unknown[]) || []);
         setCurrentStep(3);
         setSuccess(t('misc.tfsw_setup_created'));
       } else {
-        setError(data.detail || t('misc.tfsw_setup_error'));
+        setError(String(data.detail || t('misc.tfsw_setup_error')));
       }
     } catch {
       setError(t('misc.tfsw_setup_error'));
@@ -122,7 +122,7 @@ const TwoFactorSetupWizard = ({ onComplete }: any) => {
       const response = await api.post('/2fa/verify-setup', {
         method: selectedMethod,
         code: verificationCode,
-      }) as unknown as { json: () => Promise<any>; ok: boolean; status: number; data: any };
+      }) as unknown as { json: () => Promise<Record<string, unknown>>; ok: boolean; status: number; data: Record<string, unknown> };
 
       const data = await response.json();
 
@@ -130,7 +130,7 @@ const TwoFactorSetupWizard = ({ onComplete }: any) => {
         setCurrentStep(4);
         setSuccess(t('misc.tfsw_code_confirmed'));
       } else {
-        setError(data.detail || t('misc.tfsw_invalid_code'));
+        setError(String(data.detail || t('misc.tfsw_invalid_code')));
       }
     } catch {
       setError(t('misc.tfsw_code_verify_error'));

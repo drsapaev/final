@@ -7,25 +7,19 @@ import { useTranslation } from '../../i18n/useTranslation';
 import { Fragment, useState } from 'react';
 import type { CSSProperties } from 'react';
 import {
-  Alert as RawAlert,
-  Badge as RawBadge,
-  Button as RawButton,
+  Alert,
+  Badge,
+  Button,
   Card,
   CardContent,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
-  Input as RawInput,
-  Select as RawSelect,
-  Textarea as RawTextarea,
+  Input,
+  Select,
+  Textarea,
 } from '../ui/macos';
-const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
-const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
-const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
-const Textarea = RawTextarea as unknown as React.ComponentType<Record<string, unknown>>;
 import {
   CalendarDays,
   ClipboardList,
@@ -61,7 +55,7 @@ async function loadExistingEmrDraft(visitId: string | number) {
   const response = await api.get(`/v2/emr/${visitId}`, {
     silent: true,
     validateStatus: (status: number) => status === 404 || (status >= 200 && status < 300),
-  } as Record<string, unknown>) as any;
+  } as Record<string, unknown>);
 
   return response.status === 404 ? null : response.data;
 }
@@ -227,7 +221,7 @@ const priorityBadgeVariant = {
   low: 'info',
 };
 
-const TreatmentPlanner = ({ visitId, onUpdate }: any) => {
+const TreatmentPlanner = ({ visitId, onUpdate, patientId, teethData }: { visitId?: string | number; onUpdate?: () => void; patientId?: string | number; teethData?: Record<string, unknown> }) => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [treatmentPlan, setTreatmentPlan] = useState({
@@ -303,7 +297,7 @@ const TreatmentPlanner = ({ visitId, onUpdate }: any) => {
         `/v2/emr/${visitId}`,
         buildTreatmentPlanEmrPayload(existingEmr, treatmentPlan)
       );
-      onUpdate && onUpdate(treatmentPlan);
+      onUpdate && onUpdate();
     } catch (error) {
       logger.error('Ошибка сохранения плана:', error);
       notify.error(t('dental2.treatment_plan_save_failed'));

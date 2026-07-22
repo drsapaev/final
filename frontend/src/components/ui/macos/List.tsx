@@ -7,6 +7,8 @@ type DividerVariant = 'fullWidth' | 'inset' | 'middle';
 type DividerOrientation = 'horizontal' | 'vertical';
 
 interface ListProps extends Omit<React.HTMLAttributes<HTMLUListElement>, 'children' | 'style'> {
+  items?: unknown[];
+  size?: string;
   children?: ReactNode;
   className?: string;
   style?: CSSProperties;

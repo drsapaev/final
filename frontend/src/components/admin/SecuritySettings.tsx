@@ -18,20 +18,14 @@ import {
   Ban } from
 'lucide-react';
 import {
-  Input as RawInput,
-  Select as RawSelect,
-  Button as RawButton,
-  Checkbox as RawCheckbox,
-  Badge as RawBadge,
-  SegmentedControl as RawSegmentedControl,
+  Input,
+  Select,
+  Button,
+  Checkbox,
+  Badge,
+  SegmentedControl,
   MacOSCard,
 } from '../ui/macos';
-const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
-const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Checkbox = RawCheckbox as unknown as React.ComponentType<Record<string, unknown>>;
-const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
-const SegmentedControl = RawSegmentedControl as unknown as React.ComponentType<Record<string, unknown>>;
 import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 
@@ -80,9 +74,9 @@ const SecuritySettings = ({
     backupFrequency: 'daily', // daily, weekly, monthly
     backupRetention: 30, // дни
     encryptBackups: true
-  } as any);
+  } as Record<string, unknown>);
 
-  const [errors, setErrors] = useState({} as any);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState('password');
   const [showPasswords, setShowPasswords] = useState({
@@ -110,13 +104,13 @@ const SecuritySettings = ({
 
     if (!formData.newPassword) {
       newErrors.newPassword = t('admin2.ss_err_new_required');
-    } else if (formData.newPassword.length < formData.passwordMinLength) {
-      newErrors.newPassword = t('admin2.ss_err_new_min_length', { min: formData.passwordMinLength });
-    } else if (formData.passwordRequireUppercase && !/[A-Z]/.test(formData.newPassword)) {
+    } else if (String(formData.newPassword ?? '').length < Number(formData.passwordMinLength ?? 8)) {
+      newErrors.newPassword = t('admin2.ss_err_new_min_length', { min: Number(formData.passwordMinLength ?? 0) });
+    } else if (formData.passwordRequireUppercase && !/[A-Z]/.test(String(formData.newPassword ?? ''))) {
       newErrors.newPassword = t('admin2.ss_err_new_uppercase');
-    } else if (formData.passwordRequireNumbers && !/\d/.test(formData.newPassword)) {
+    } else if (formData.passwordRequireNumbers && !/\d/.test(String(formData.newPassword ?? ''))) {
       newErrors.newPassword = t('admin2.ss_err_new_numbers');
-    } else if (formData.passwordRequireSymbols && !/[!@#$%^&*(),.?":{}|<>]/.test(formData.newPassword)) {
+    } else if (formData.passwordRequireSymbols && !/[!@#$%^&*(),.?":{}|<>]/.test(String(formData.newPassword ?? ''))) {
       newErrors.newPassword = t('admin2.ss_err_new_symbols');
     }
 
@@ -243,7 +237,7 @@ const SecuritySettings = ({
                 <div className="admin-pos-relative">
                   <Input
                   type={showPasswords.current ? 'text' : 'password'}
-                  value={formData.currentPassword}
+                  value={String(formData.currentPassword ?? '')}
                   onChange={(e) => handleChange('currentPassword', e.target.value)}
                   placeholder={t('admin2.ss_ph_current_password')}
                   autoComplete="current-password"
@@ -274,7 +268,7 @@ const SecuritySettings = ({
                 <div className="admin-pos-relative">
                   <Input
                   type={showPasswords.new ? 'text' : 'password'}
-                  value={formData.newPassword}
+                  value={String(formData.newPassword ?? '')}
                   onChange={(e) => handleChange('newPassword', e.target.value)}
                   placeholder={t('admin2.ss_ph_new_password')}
                   autoComplete="new-password"
@@ -305,7 +299,7 @@ const SecuritySettings = ({
                 <div className="admin-pos-relative">
                   <Input
                   type={showPasswords.confirm ? 'text' : 'password'}
-                  value={formData.confirmPassword}
+                  value={String(formData.confirmPassword ?? '')}
                   onChange={(e) => handleChange('confirmPassword', e.target.value)}
                   placeholder={t('admin2.ss_ph_confirm_password')}
                   autoComplete="new-password"
@@ -349,7 +343,7 @@ const SecuritySettings = ({
                   </p>
                 </div>
                 <Checkbox
-                checked={formData.twoFactorEnabled}
+                checked={Boolean(formData.twoFactorEnabled ?? false)}
                 onChange={(checked) => handleChange('twoFactorEnabled', checked)} />
               
               </div>
@@ -360,7 +354,7 @@ const SecuritySettings = ({
                     {t('admin2.ss_label_2fa_method')}
                   </label>
                   <Select
-                value={formData.twoFactorMethod}
+                value={String(formData.twoFactorMethod ?? '')}
                 onChange={(value) => handleChange('twoFactorMethod', value)}
                 options={[
                 { value: 'sms', label: 'SMS' },
@@ -452,7 +446,7 @@ const SecuritySettings = ({
                 </label>
                 <Input
                 type="number"
-                value={formData.passwordMinLength}
+                value={String(formData.passwordMinLength ?? '')}
                 onChange={(e) => handleChange('passwordMinLength', parseInt(e.target.value))}
                 min="6"
                 max="32" />
@@ -465,7 +459,7 @@ const SecuritySettings = ({
                 </label>
                 <Input
                 type="number"
-                value={formData.passwordExpiryDays}
+                value={String(formData.passwordExpiryDays ?? '')}
                 onChange={(e) => handleChange('passwordExpiryDays', parseInt(e.target.value))}
                 min="30"
                 max="365" />
@@ -478,7 +472,7 @@ const SecuritySettings = ({
                 </label>
                 <Input
                 type="number"
-                value={formData.maxLoginAttempts}
+                value={String(formData.maxLoginAttempts ?? '')}
                 onChange={(e) => handleChange('maxLoginAttempts', parseInt(e.target.value))}
                 min="3"
                 max="10" />
@@ -491,7 +485,7 @@ const SecuritySettings = ({
                 </label>
                 <Input
                 type="number"
-                value={formData.lockoutDuration}
+                value={String(formData.lockoutDuration ?? '')}
                 onChange={(e) => handleChange('lockoutDuration', parseInt(e.target.value))}
                 min="5"
                 max="60" />
@@ -501,25 +495,25 @@ const SecuritySettings = ({
 
             <div className="flex flex-col gap-4">
               <Checkbox
-              checked={formData.passwordRequireUppercase}
+              checked={Boolean(formData.passwordRequireUppercase ?? false)}
               onChange={(checked) => handleChange('passwordRequireUppercase', checked)}
               label={t('admin2.ss_label_require_uppercase')} />
             
 
               <Checkbox
-              checked={formData.passwordRequireNumbers}
+              checked={Boolean(formData.passwordRequireNumbers ?? false)}
               onChange={(checked) => handleChange('passwordRequireNumbers', checked)}
               label={t('admin2.ss_label_require_numbers')} />
             
 
               <Checkbox
-              checked={formData.passwordRequireSymbols}
+              checked={Boolean(formData.passwordRequireSymbols ?? false)}
               onChange={(checked) => handleChange('passwordRequireSymbols', checked)}
               label={t('admin2.ss_label_require_symbols')} />
             
 
               <Checkbox
-              checked={formData.blockSuspiciousIPs}
+              checked={Boolean(formData.blockSuspiciousIPs ?? false)}
               onChange={(checked) => handleChange('blockSuspiciousIPs', checked)}
               label={t('admin2.ss_label_block_suspicious_ips')} />
             

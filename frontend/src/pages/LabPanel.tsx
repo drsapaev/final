@@ -1,11 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
-  Alert as RawAlert, Badge as RawBadge, Button as RawButton, Card, CardContent, CardHeader, Icon,
+  Alert, Badge, Button, Card, CardContent, CardHeader, Icon,
 } from '../components/ui/macos';
-const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
-const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
 import LabQueueWorkbench from '../components/laboratory/LabQueueWorkbench';
 import LabReportWorkbench from '../components/laboratory/LabReportWorkbench';
 import LabTemplateWorkbench from '../components/laboratory/LabTemplateWorkbench';
@@ -121,13 +118,13 @@ export default function LabPanel() {
   //   - info/success — 5 секунд (как раньше)
   //   - error с retryAction показывает кнопку «Повторить»
   //   - любой клик по Alert закрывает его
-  const [message, setMessage] = useState({} as any);
+  const [message, setMessage] = useState<{ text?: string; type?: string; retryAction?: () => void; [k: string]: unknown }>({});
 
-  const notify = useCallback((type: any, text: any, options: any = {}) => {
+  const notify = useCallback((type: string, text: string, options: Record<string, unknown> = {}) => {
     setMessage({
       type,
       text,
-      retryAction: typeof options.retryAction === 'function' ? options.retryAction : null,
+      retryAction: typeof options.retryAction === 'function' ? (options.retryAction as () => void) : null,
       retryLabel: options.retryLabel || t('misc.lp_povtorit'),
     });
   }, []);
@@ -254,11 +251,11 @@ export default function LabPanel() {
       // loadMoreAppointments() догружает следующие.
       //
       // STRAT#16: передаём signal для отмены запроса при быстром повторе.
-      const payload = await labReportingApi.listQueueToday(null, {
+      const payload = (await labReportingApi.listQueueToday(null, {
         limit: LAB_QUEUE_PAGE_SIZE,
         offset: 0,
         signal: controller.signal,
-      }) as any;
+      })) as Record<string, unknown>;
       const queueEntries = normalizeListPayload(payload?.entries ?? []);
       setAppointments(queueEntries);
       setQueueTotal(payload?.total ?? queueEntries.length);
@@ -307,11 +304,11 @@ export default function LabPanel() {
 
     setLoadingMore(true);
     try {
-      const payload = await labReportingApi.listQueueToday(null, {
+      const payload = (await labReportingApi.listQueueToday(null, {
         limit: LAB_QUEUE_PAGE_SIZE,
         offset: queueOffset,
         signal: controller.signal,
-      }) as any;
+      })) as Record<string, unknown>;
       const newEntries = normalizeListPayload(payload?.entries ?? []);
       setAppointments((current) => [...current, ...newEntries]);
       setQueueOffset((current) => current + newEntries.length);
@@ -336,12 +333,12 @@ export default function LabPanel() {
 
   const loadTemplates = useCallback(async (preferredTemplateId = null) => {
     try {
-      const summary = await labReportingApi.listTemplates() as any;
+      const summary = await labReportingApi.listTemplates() as Record<string, unknown>;
       const templateSummary = normalizeListPayload(summary);
       setTemplates(templateSummary);
       const templateId = preferredTemplateId || selectedTemplate?.id || templateSummary[0]?.id || null;
       if (templateId) {
-        const detail = await labReportingApi.getTemplate(templateId) as any;
+        const detail = (await labReportingApi.getTemplate(templateId)) as Record<string, unknown>;
         setSelectedTemplate(detail);
       } else {
         setSelectedTemplate(null);
@@ -371,7 +368,7 @@ export default function LabPanel() {
       return;
     }
     try {
-      const history = await labReportingApi.listInstances({ patient_id: patientId, limit: 50 }) as any;
+      const history = (await labReportingApi.listInstances({ patient_id: patientId, limit: 50 })) as Record<string, unknown>;
       setReportHistory(normalizeListPayload(history));
     } catch (error) {
       logger.error('[LabPanel] loadReportHistory failed', error);
@@ -386,7 +383,7 @@ export default function LabPanel() {
 
   const loadRecentReports = useCallback(async () => {
     try {
-      const instances = await labReportingApi.listInstances({ limit: 50 }) as any;
+      const instances = (await labReportingApi.listInstances({ limit: 50 })) as Record<string, unknown>;
       setRecentReports(normalizeListPayload(instances));
     } catch (error) {
       logger.error('[LabPanel] loadRecentReports failed', error);
@@ -415,7 +412,7 @@ export default function LabPanel() {
 
     setTemplateResolutionLoading(true);
     try {
-      const resolution = await labReportingApi.resolveTemplateOptions(payload) as any;
+      const resolution = (await labReportingApi.resolveTemplateOptions(payload)) as Record<string, unknown>;
       setTemplateResolution(resolution);
       if (appointment?.appointment_id && resolution?.visit_id && !appointment.visit_id) {
         mergeResolvedVisitIntoState(appointment.appointment_id, resolution.visit_id);
@@ -440,7 +437,7 @@ export default function LabPanel() {
       return;
     }
     try {
-      const instance = await labReportingApi.getInstance(instanceId) as any;
+      const instance = (await labReportingApi.getInstance(instanceId)) as { patient_snapshot?: { patient_id?: string | number; [k: string]: unknown }; [k: string]: unknown };
       setActiveInstance(instance);
       if (instance.patient_snapshot?.patient_id) {
         // L-M-2 fix: дедупликация loadReportHistory.
@@ -636,7 +633,7 @@ export default function LabPanel() {
                       }}
                     >
                       <Icon name="arrow.clockwise" size={14 as never} />
-                      {message.retryLabel || t('misc.lp_povtorit')}
+                      {String(message.retryLabel || t('misc.lp_povtorit'))}
                     </Button>
                   )}
                   <Button
@@ -707,7 +704,7 @@ export default function LabPanel() {
           selectedTemplate={selectedTemplate}
           onSelectTemplate={async (templateId) => {
             try {
-              const template = await labReportingApi.getTemplate(templateId) as any;
+              const template = (await labReportingApi.getTemplate(templateId)) as Record<string, unknown>;
               setSelectedTemplate(template);
             } catch (error) {
               notify('error', getErrorMessage(error, t('misc.lp_ne_udalos_zagruzit_shablon_p')));

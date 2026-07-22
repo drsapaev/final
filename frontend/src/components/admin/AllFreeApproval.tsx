@@ -208,7 +208,7 @@ const AllFreeApproval = () => {
               <Select
                 aria-label={t('admin2.af_filter_aria')}
                 value={statusFilter}
-                onChange={(v: any) => setStatusFilter(String(v))}
+                onChange={(v: unknown) => setStatusFilter(String(v))}
                 options={[
                   { value: 'pending', label: t('admin2.af_filter_pending') },
                   { value: 'approved', label: t('admin2.af_filter_approved') },

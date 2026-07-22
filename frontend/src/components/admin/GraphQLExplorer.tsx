@@ -2,15 +2,11 @@ import { useState, useEffect } from 'react';
 import type { CSSProperties } from 'react';
 import {
   MacOSCard,
-  Button as RawButton,
-  Textarea as RawTextarea,
-  Alert as RawAlert,
-  Skeleton as RawSkeleton,
+  Button,
+  Textarea,
+  Alert,
+  Skeleton,
 } from '../ui/macos';
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Textarea = RawTextarea as unknown as React.ComponentType<Record<string, unknown>>;
-const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
-const Skeleton = RawSkeleton as unknown as React.ComponentType<Record<string, unknown>>;
 import {
   Database,
   Play,

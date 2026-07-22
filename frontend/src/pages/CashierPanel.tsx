@@ -311,7 +311,7 @@ const createGroupedCashierPayment = async (appointment, paymentData) => {
     amount: paymentData.amount,
     method: paymentData.method,
     note: paymentData.note || 'Grouped cashier payment'
-  }) as any;
+  }) as import('axios').AxiosResponse<Record<string, unknown>>;
 
   return response.data;
 };
@@ -391,12 +391,12 @@ const CashierPanel = () => {
           const token = tokenManager.getAccessToken();
           if (!token) return;
 
-          const response = await api.get(`/patients/${patientIdFromUrl}`) as any;
+          const response = (await api.get(`/patients/${patientIdFromUrl}`)) as import('axios').AxiosResponse<Record<string, unknown>>;
           const patientData = response.data;
           const patientName = `${patientData.last_name || ''} ${patientData.first_name || ''}`.trim();
           setQuery(patientName);
           logger.info('[Cashier] Patient loaded from URL', { patientId: patientData?.id });
-        } catch (error: any) {
+        } catch (error: unknown) {
           logger.error('[Cashier] Не удалось загрузить пациента:', error);
         }
       };
@@ -407,8 +407,8 @@ const CashierPanel = () => {
   const [status, setStatus] = useState('all');
   const [payments, setPayments] = useState([]);
   const [appointments, setAppointments] = useState([]);
-  const [paymentSuccess, setPaymentSuccess] = useState(null as any);
-  const [paymentError, setPaymentError] = useState(null as any);
+  const [paymentSuccess, setPaymentSuccess] = useState<Record<string, unknown> | null>(null);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
 
   // Состояния для календаря
   const [dateMode, setDateMode] = useState('single'); // 'single' | 'range'
@@ -422,13 +422,13 @@ const CashierPanel = () => {
   // ✅ УЛУЧШЕНИЕ: Новые состояния для отмены платежа
   // UX Audit #2.1: контекст отменяемого платежа (id + patient + amount) —
   // показывается в диалоге, чтобы кассир видел, ЧТО именно он отменяет.
-  const [cancelPaymentContext, setCancelPaymentContext] = useState(null as any);
+  const [cancelPaymentContext, setCancelPaymentContext] = useState<{ id?: string | number; [k: string]: unknown } | null>(null);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
 
   // UX Audit #4.5: anti-double-click state для action-кнопок.
   // Хранит {type, id} текущего action; пока не null — все action-кнопки disabled.
-  const [processingAction, setProcessingAction] = useState(null as any);
+  const [processingAction, setProcessingAction] = useState<{ type?: string; id?: string | number } | null>(null);
 
   // UX Audit #4.2: client-side sort state для таба «История платежей».
   // Сортировка применяется к уже загруженным filteredPayments (после groupPaymentsByPatientAndTime).
@@ -451,7 +451,16 @@ const CashierPanel = () => {
   const [refreshKey, setRefreshKey] = useState(0);
 
   // ✅ УЛУЧШЕНИЕ: Статистика из API
-  const [stats, setStats] = useState({
+  const [stats, setStats] = useState<{
+    total_amount: number;
+    cash_amount: number;
+    card_amount: number;
+    pending_count: number;
+    pending_amount: number;
+    paid_count: number;
+    cancelled_count: number;
+    [k: string]: unknown;
+  }>({
     total_amount: 0,
     cash_amount: 0,
     card_amount: 0,
@@ -496,10 +505,10 @@ const CashierPanel = () => {
           date_from: date_from || undefined,
           date_to: date_to || undefined
         });
-        if ((statsResult as any).success && (statsResult as any).data) {
-          setStats((statsResult as any).data);
+        if ((statsResult as { success?: boolean }).success && (statsResult as { data?: Record<string, unknown> }).data) {
+          setStats((statsResult as { data?: Record<string, unknown> }).data as typeof stats);
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.error('Error loading stats:', error);
         setStats({
           total_amount: 0,
@@ -544,7 +553,7 @@ const CashierPanel = () => {
           logger.warn('Error loading pending payments:', pendingResult.error);
           setAppointments([]);
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.error('Error loading pending payments:', error);
         setAppointments([]);
       }
@@ -587,7 +596,7 @@ const CashierPanel = () => {
           setPayments([]);
           setTotalPages(1);
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.error('Error loading payment history:', error);
         setPayments([]);
       }
@@ -636,14 +645,14 @@ const CashierPanel = () => {
 
   // Deferred #1: session timeout warning — prevents silent JWT expiry while
   // cashier is processing a payment. Mirrors all other clinical panels.
-  const [sessionWarning, setSessionWarning] = useState(null as any);
+  const [sessionWarning, setSessionWarning] = useState<{ active: boolean; expiresAt?: number } | null>(null);
   // UX Audit #2.5: счётчик секунд до истечения сессии.
-  const [sessionSecondsLeft, setSessionSecondsLeft] = useState(null as any);
+  const [sessionSecondsLeft, setSessionSecondsLeft] = useState<number | null>(null);
   useSessionTimeoutWarning({
     onWarning: (expiresAt) => {
       // UX Audit #2.5: сохраняем expiresAt для счётчика обратного отсчёта.
       const ms = expiresAt ? (Number(expiresAt) - Date.now()) : 60 * 1000;
-      setSessionWarning({ active: true, expiresAt });
+      setSessionWarning({ active: true, expiresAt: expiresAt ? Number(expiresAt) : undefined });
       setSessionSecondsLeft(Math.max(0, Math.floor(ms / 1000)));
     },
     onExpired: () => {
@@ -718,15 +727,15 @@ const CashierPanel = () => {
       if (groupedPayment) {
         await createGroupedCashierPayment(appointment, paymentData);
       } else {
-        const result: any = await paymentsHook.createPayment({
+        const result = await paymentsHook.createPayment({
           visit_id: visitId,
           amount: paymentData.amount,
           method: paymentData.method,
           note: paymentData.note || tI18n('cashier.payment_note_default')
         });
 
-        if (!result.success) {
-          throw new Error(tI18n('cashier.payment_visit_failed', { visitId, error: result.error }));
+        if (!(result as { success?: boolean }).success) {
+          throw new Error(tI18n('cashier.payment_visit_failed', { visitId, error: (result as { error?: string }).error }));
         }
       }
 
@@ -735,7 +744,7 @@ const CashierPanel = () => {
       setPendingPage(1);
       setRefreshKey((prev) => prev + 1); // Принудительное обновление списка
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('Ошибка обработки платежа:', error);
       const message = getErrorMessage(error, tI18n('cashier.payment_process_failed'));
       setPaymentError(message);
@@ -802,17 +811,17 @@ const CashierPanel = () => {
     try {
       // UX Audit #4.5: anti-double-click protection.
       setProcessingAction({ type: 'cancel', id: cancelPaymentContext.id });
-      const result: any = await paymentsHook.cancelPayment(cancelPaymentContext.id, cancelReason.trim());
-      if (result.success) {
+      const result = await paymentsHook.cancelPayment(cancelPaymentContext.id, cancelReason.trim());
+      if ((result as { success?: boolean }).success) {
         setCancelDialogOpen(false);
         setCancelPaymentContext(null);
         setCancelReason('');
         notify.info(tI18n('cashier.payment_cancelled'));
         triggerDataReload();
       } else {
-        notify.error(getErrorMessage(result.error, tI18n('cashier.refund_failed')));
+        notify.error(getErrorMessage((result as { error?: string }).error, tI18n('cashier.refund_failed')));
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       notify.error(getErrorMessage(error, tI18n('cashier.cancel_failed')));
     } finally {
       setProcessingAction(null);
@@ -822,15 +831,15 @@ const CashierPanel = () => {
   // ✅ УЛУЧШЕНИЕ: Экспорт в CSV через серверный endpoint
   const exportToCSV = async () => {
     const { date_from, date_to } = getDateParams();
-    const result: any = await paymentsHook.exportPayments({
+    const result = await paymentsHook.exportPayments({
       date_from: date_from || undefined,
       date_to: date_to || undefined
     });
 
-      if (!result.success) {
+      if (!(result as { success?: boolean }).success) {
         notify.error(
           getErrorMessage(
-            result.error,
+            (result as { error?: string }).error,
             tI18n('cashier.export_failed')
           )
         );
@@ -848,7 +857,7 @@ const CashierPanel = () => {
 
   // ✅ v2.0: Состояние для возврата
   const [refundDialogOpen, setRefundDialogOpen] = useState(false);
-  const [refundPaymentId, setRefundPaymentId] = useState(null as any);
+  const [refundPaymentId, setRefundPaymentId] = useState<string | number | null>(null);
   const [refundPaymentAmount, setRefundPaymentAmount] = useState(0);
   const [refundAmount, setRefundAmount] = useState('');
   const [refundReason, setRefundReason] = useState('');
@@ -871,21 +880,21 @@ const CashierPanel = () => {
     try {
       // UX Audit #4.5: anti-double-click protection.
       setProcessingAction({ type: 'refund', id: refundPaymentId });
-      const result: any = await paymentsHook.refundPayment(refundPaymentId, {
+      const result = await paymentsHook.refundPayment(refundPaymentId, {
         amount: parseFloat(refundAmount),
         reason: refundReason
       });
-      if (result.success) {
+      if ((result as { success?: boolean }).success) {
         setRefundDialogOpen(false);
         setRefundPaymentId(null);
         setRefundReason('');
         setRefundAmount('');
-        notify.success(tI18n('cashier.refund_success_amount', { amount: result.data.refunded_amount }));
+        notify.success(tI18n('cashier.refund_success_amount', { amount: ((result as { data?: { refunded_amount?: number } }).data?.refunded_amount) }));
         triggerDataReload();
       } else {
-        notify.error(getErrorMessage(result.error, tI18n('cashier.refund_create_failed')));
+        notify.error(getErrorMessage((result as { error?: string }).error, tI18n('cashier.refund_create_failed')));
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       notify.error(getErrorMessage(error, tI18n('cashier.refund_failed')));
     } finally {
       setProcessingAction(null);
@@ -915,14 +924,14 @@ const CashierPanel = () => {
           logger.warn('[Cashier] Browser receipt print popup blocked, falling back to PDF', {
             paymentId
           });
-        } catch (error: any) {
+        } catch (error: unknown) {
           logger.error('[Cashier] Unexpected browser receipt print error:', error);
         }
       }
 
-      const result: any = await paymentsHook.getReceipt(paymentId);
-      if (!result.success) {
-        notify.error(getErrorMessage(result.error, tI18n('cashier.receipt_load_failed')));
+      const result = await paymentsHook.getReceipt(paymentId);
+      if (!(result as { success?: boolean }).success) {
+        notify.error(getErrorMessage((result as { error?: string }).error, tI18n('cashier.receipt_load_failed')));
         return;
       }
 
@@ -933,17 +942,17 @@ const CashierPanel = () => {
   };
 
   // ✅ v2.0: Состояние для почасовой статистики
-  const [hourlyStats, setHourlyStats] = useState([]);
+  const [hourlyStats, setHourlyStats] = useState<unknown[]>([]);
   const [showHourlyChart, setShowHourlyChart] = useState(false);
 
   // ✅ v2.0: Загрузка почасовой статистики
   const loadHourlyStats = async () => {
-    const result: any = await paymentsHook.getHourlyStats({ target_date: selectedDate });
-    if (result.success) {
-      setHourlyStats(result.data);
+    const result = await paymentsHook.getHourlyStats({ target_date: selectedDate });
+    if ((result as { success?: boolean }).success) {
+      setHourlyStats(((result as { data?: unknown }).data as unknown[]) || []);
       setShowHourlyChart(true);
     } else {
-      notify.error(getErrorMessage(result.error, tI18n('cashier.stats_load_failed')));
+      notify.error(getErrorMessage((result as { error?: string }).error, tI18n('cashier.stats_load_failed')));
     }
   };
 
@@ -1061,7 +1070,7 @@ const CashierPanel = () => {
       }
     });
 
-    return Object.values(grouped).map((group: any) => ({
+    return Object.values(grouped).map((group: { services: unknown[]; services_names: unknown[]; service?: unknown; total_amount?: number; amount?: number; patient?: unknown; date?: string; time?: string; id?: string | number; payment_id?: string | number; method?: string; status?: string; [k: string]: unknown }) => ({
       ...group,
       services: Array.from(new Set(group.services.filter(Boolean))),
       services_names: Array.from(new Set(group.services_names.filter(Boolean))),
@@ -1607,16 +1616,16 @@ const CashierPanel = () => {
                                 </div>
                               </td>
                               <td className="cashier-text-sm cashier-text-primary">
-                                {row.patient}
+                                {String(row.patient ?? '')}
                               </td>
                               <td className="cashier-text-sm cashier-text-primary">
                                 {/* PR-43 / Medium-24: services info rendered from row.service
                                     (single service name). Multi-service breakdown requires
                                     backend changes to the history endpoint payload. */}
-                                 {row.service || '—'}
+                                 {String(row.service ?? '—')}
                               </td>
                               <td className="cashier-text-sm cashier-text-primary">
-                                {row.method}
+                                {String(row.method ?? '')}
                               </td>
                               <td className="cashier-text-sm cashier-text-primary">
                                 {format(row.total_amount || row.amount || 0)}
@@ -1755,12 +1764,12 @@ const CashierPanel = () => {
                   </Typography>
                   {cancelPaymentContext.patient && (
                     <Typography variant="body1">
-                      {tI18n('cashier.patient_label')} <strong>{cancelPaymentContext.patient}</strong>
+                      {tI18n('cashier.patient_label')} <strong>{String(cancelPaymentContext.patient)}</strong>
                     </Typography>
                   )}
-                  {cancelPaymentContext.amount > 0 && (
+                  {Number(cancelPaymentContext.amount ?? 0) > 0 && (
                     <Typography variant="body1">
-                      {tI18n('cashier.amount_label')} <strong>{format(cancelPaymentContext.amount)}</strong>
+                      {tI18n('cashier.amount_label')} <strong>{format(Number(cancelPaymentContext.amount ?? 0))}</strong>
                     </Typography>
                   )}
                 </div>
@@ -1873,7 +1882,7 @@ const CashierPanel = () => {
                     {tI18n('cashier.amount_label')} {format(Number(paymentSuccess.amount) || 0)}
                   </Typography>
                   }
-                  {paymentSuccess.change_due > 0 &&
+                  {Number(paymentSuccess.change_due ?? 0) > 0 &&
                   <Typography variant="body2" color="textSecondary">
                     {tI18n('cashier.change_label')} {format(Number(paymentSuccess.change_due))}
                   </Typography>
@@ -1952,10 +1961,10 @@ const CashierPanel = () => {
               {tI18n('cashier.hourly_stats_dialog_title', { date: selectedDate })}
             </DialogTitle>
             <DialogContent>
-              {hourlyStats.filter((h) => h.count > 0).length > 0 ? (
+              {hourlyStats.filter((h) => Number((h as { count?: number }).count ?? 0) > 0).length > 0 ? (
                 <div className="cashier-hourly-chart">
                   <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={hourlyStats.filter((h) => h.count > 0)}>
+                    <BarChart data={hourlyStats.filter((h) => Number((h as { count?: number }).count ?? 0) > 0)}>
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--mac-border, #d8dde8)" />
                       <XAxis
                         dataKey="hour"

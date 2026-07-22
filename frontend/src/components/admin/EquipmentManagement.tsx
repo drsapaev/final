@@ -19,23 +19,15 @@ import {
 'lucide-react';
 import {
   MacOSCard,
-  Button as RawButton,
-  Badge as RawBadge,
-  Input as RawInput,
-  Select as RawSelect,
-  Textarea as RawTextarea,
-  Skeleton as RawSkeleton,
-  MacOSEmptyState as RawMacOSEmptyState,
-  Alert as RawAlert,
+  Button,
+  Badge,
+  Input,
+  Select,
+  Textarea,
+  Skeleton,
+  MacOSEmptyState,
+  Alert,
 } from '../ui/macos';
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
-const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
-const Textarea = RawTextarea as unknown as React.ComponentType<Record<string, unknown>>;
-const Skeleton = RawSkeleton as unknown as React.ComponentType<Record<string, unknown>>;
-const MacOSEmptyState = RawMacOSEmptyState as unknown as React.ComponentType<Record<string, unknown>>;
-const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
@@ -115,7 +107,7 @@ const EquipmentManagement = () => {
     maintenance_date: '',
     cost: 0,
     description: ''
-  } as any);
+  } as Record<string, unknown>);
 
   const statusOptions = getStatusOptions(t);
   const typeOptions = getTypeOptions(t);
@@ -124,10 +116,10 @@ const EquipmentManagement = () => {
   const loadEquipment = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await api.get('/clinic/equipment') as any;
+      const response = (await api.get('/clinic/equipment')) as import('axios').AxiosResponse<Record<string, unknown>>;
       const nextEquipment = Array.isArray(response.data)
-        ? response.data
-        : response.data?.equipment || [];
+        ? (response.data as unknown[])
+        : (response.data?.equipment as unknown[]) || [];
       setEquipment(nextEquipment);
       setStats(deriveEquipmentStats(nextEquipment));
     } catch (error) {
@@ -141,10 +133,10 @@ const EquipmentManagement = () => {
 
   const loadBranches = useCallback(async () => {
     try {
-      const response = await api.get('/clinic/branches') as any;
+      const response = (await api.get('/clinic/branches')) as import('axios').AxiosResponse<Record<string, unknown>>;
       const nextBranches = Array.isArray(response.data)
-        ? response.data
-        : response.data?.branches || [];
+        ? (response.data as unknown[])
+        : (response.data?.branches as unknown[]) || [];
       setBranches(nextBranches);
     } catch (error) {
       logger.error('Ошибка загрузки филиалов:', error);
@@ -160,7 +152,7 @@ const EquipmentManagement = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const hasBranch = formData.branch_id !== null && formData.branch_id !== undefined && formData.branch_id !== '';
-    if (!formData.name.trim() || !formData.type || !hasBranch) {
+    if (!String(formData.name ?? '').trim() || !formData.type || !hasBranch) {
       setMessage({ type: 'error', text: t('admin2.em_required_fields') });
       return;
     }
@@ -270,7 +262,7 @@ const EquipmentManagement = () => {
         <div className="admin-d-flex-gap-24-fw-wrap">
             <div className="text-center">
               <div className="admin-fs-2xl-fw-bold-blue-mb-4">
-                {stats.total_equipment}
+                {String(stats.total_equipment ?? "")}
               </div>
               <div className="text-sm text-[var(--mac-text-secondary)]">
                 {t('admin2.em_stat_total')}
@@ -278,7 +270,7 @@ const EquipmentManagement = () => {
             </div>
             <div className="text-center">
               <div className="admin-fs-2xl-fw-bold-success-mb-4">
-                {stats.active_equipment}
+                {String(stats.active_equipment ?? "")}
               </div>
               <div className="text-sm text-[var(--mac-text-secondary)]">
                 {t('admin2.em_stat_active')}
@@ -384,7 +376,7 @@ const EquipmentManagement = () => {
                 <Input
                 type="text"
                 required
-                value={formData.name}
+                value={String(formData.name ?? '')}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 placeholder={t('admin2.em_name_ph')} />
 
@@ -395,7 +387,7 @@ const EquipmentManagement = () => {
                 </label>
                 <Select
                 aria-label={t('admin2.em_type_aria')}
-                value={formData.type}
+                value={String(formData.type ?? '')}
                 onChange={(value: unknown) => setFormData({ ...formData, type: String(value) })}
                 options={[
                   { value: '', label: t('admin2.em_select_type') },
@@ -409,7 +401,7 @@ const EquipmentManagement = () => {
                 </label>
                 <Input
                 type="text"
-                value={formData.model}
+                value={String(formData.model ?? '')}
                 onChange={(e) => setFormData({ ...formData, model: e.target.value })}
                 placeholder={t('admin2.em_model_ph')} />
 
@@ -420,7 +412,7 @@ const EquipmentManagement = () => {
                 </label>
                 <Input
                 type="text"
-                value={formData.serial_number}
+                value={String(formData.serial_number ?? '')}
                 onChange={(e) => setFormData({ ...formData, serial_number: e.target.value })}
                 placeholder={t('admin2.em_serial_ph')} />
 
@@ -445,7 +437,7 @@ const EquipmentManagement = () => {
                 </label>
                 <Select
                 aria-label={t('admin2.em_status_aria')}
-                value={formData.status}
+                value={String(formData.status ?? '')}
                 onChange={(value: unknown) => setFormData({ ...formData, status: String(value) })}
                 options={statusOptions.map((option) => ({ value: option.value, label: option.label }))}
                 size="large" />
@@ -456,7 +448,7 @@ const EquipmentManagement = () => {
                 </label>
                 <Input
                 type="date"
-                value={formData.purchase_date}
+                value={String(formData.purchase_date ?? '')}
                 onChange={(e) => setFormData({ ...formData, purchase_date: e.target.value })} />
 
               </div>
@@ -466,7 +458,7 @@ const EquipmentManagement = () => {
                 </label>
                 <Input
                 type="date"
-                value={formData.warranty_expiry}
+                value={String(formData.warranty_expiry ?? '')}
                 onChange={(e) => setFormData({ ...formData, warranty_expiry: e.target.value })} />
 
               </div>
@@ -476,7 +468,7 @@ const EquipmentManagement = () => {
                 </label>
                 <Input
                 type="date"
-                value={formData.maintenance_date}
+                value={String(formData.maintenance_date ?? '')}
                 onChange={(e) => setFormData({ ...formData, maintenance_date: e.target.value })} />
 
               </div>
@@ -486,7 +478,7 @@ const EquipmentManagement = () => {
                 </label>
                 <Input
                 type="number"
-                value={formData.cost}
+                value={String(formData.cost ?? '')}
                 onChange={(e) => setFormData({ ...formData, cost: parseFloat(e.target.value) })}
                 placeholder={t('admin2.em_cost_ph')} />
 
@@ -498,7 +490,7 @@ const EquipmentManagement = () => {
                 {t('admin2.em_label_description')}
               </label>
               <Textarea
-              value={formData.description}
+              value={String(formData.description ?? '')}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               placeholder={t('admin2.em_description_ph')}
               rows={3} />

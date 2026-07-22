@@ -11,10 +11,7 @@ vi.mock('../../../contexts/ThemeContext', () => ({
   }),
 }));
 
-import { FormField as FormFieldRaw, FormProvider, FormSelect as FormSelectRaw, FormTextArea as FormTextAreaRaw } from '../Form';
-const FormField = FormFieldRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const FormTextArea = FormTextAreaRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const FormSelect = FormSelectRaw as unknown as React.ComponentType<Record<string, unknown>>;
+import { FormField, FormProvider, FormSelect, FormTextArea } from '../Form';
 
 function renderWithProvider(ui) {
   return render(<FormProvider>{ui}</FormProvider>);

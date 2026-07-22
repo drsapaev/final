@@ -19,10 +19,10 @@ import logger from '../../utils/logger';
 interface EditPatientModalProps {
   isOpen?: boolean;
   onClose?: () => void;
-  patient?: any;
-  onSave?: (data?: any) => void | Promise<void>;
+  patient?: Record<string, unknown>;
+  onSave?: (data?: Record<string, unknown>) => void | Promise<void>;
   loading?: boolean;
-  theme?: any;
+  theme?: unknown;
   specialtyFilter?: string;
 }
 

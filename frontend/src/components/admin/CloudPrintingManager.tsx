@@ -2,23 +2,15 @@ import { useState, useEffect } from 'react';
 import type { CSSProperties } from 'react';
 import {
   MacOSCard,
-  Button as RawButton,
-  Badge as RawBadge,
-  Input as RawInput,
-  Select as RawSelect,
-  SegmentedControl as RawSegmentedControl,
-  Textarea as RawTextarea,
+  Button,
+  Badge,
+  Input,
+  Select,
+  SegmentedControl,
+  Textarea,
   AppEmpty,
-  Modal as RawModal,
-  Checkbox as RawCheckbox } from '../ui/macos';
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
-const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
-const SegmentedControl = RawSegmentedControl as unknown as React.ComponentType<Record<string, unknown>>;
-const Textarea = RawTextarea as unknown as React.ComponentType<Record<string, unknown>>;
-const Modal = RawModal as unknown as React.ComponentType<Record<string, unknown>>;
-const Checkbox = RawCheckbox as unknown as React.ComponentType<Record<string, unknown>>;
+  Modal,
+  Checkbox } from '../ui/macos';
 import {
   Printer,
   RefreshCw,
@@ -196,7 +188,7 @@ const CloudPrintingManager = () => {
 
   const loadStatistics = async () => {
     try {
-      const response = await api.get('/cloud-printing/statistics') as any;
+      const response = (await api.get('/cloud-printing/statistics')) as import('axios').AxiosResponse<Record<string, unknown>>;
       setStatistics(response.data?.statistics);
     } catch (error) {
       logger.error('Ошибка загрузки статистики:', error);
@@ -210,10 +202,10 @@ const CloudPrintingManager = () => {
         ? await api.post(`/print/printers/${encodeURIComponent(printerId)}/test`)
         : await api.post(`/cloud-printing/test/${providerName}/${printerId}`);
 
-      if (response.data?.success || response.data?.status === 'printed' || response.data?.message) {
+      if (response.data?.success || response.data?.status === 'printed' || String(response.data?.message ?? '')) {
         toast.success(t('admin2.cp_test_print_sent'));
       } else {
-        toast.error(response.data?.message || t('admin2.cp_test_print_error'));
+        toast.error(String(response.data?.message ?? '') || t('admin2.cp_test_print_error'));
       }
     } catch (error) {
       logger.error('Ошибка тестовой печати:', error);
@@ -228,7 +220,7 @@ const CloudPrintingManager = () => {
     }
 
     try {
-      const response = await api.post('/cloud-printing/print', printForm) as any;
+      const response = (await api.post('/cloud-printing/print', printForm)) as import('axios').AxiosResponse<Record<string, unknown>>;
       if (response.data?.success) {
         toast.success(t('admin2.cp_document_sent'));
         setPrintForm({
@@ -237,7 +229,7 @@ const CloudPrintingManager = () => {
           content: ''
         });
       } else {
-        toast.error(response.data?.message || t('admin2.cp_print_error'));
+        toast.error(String(response.data?.message ?? '') || t('admin2.cp_print_error'));
       }
     } catch (error) {
       logger.error('Ошибка печати:', error);
@@ -252,11 +244,11 @@ const CloudPrintingManager = () => {
     }
 
     try {
-      const response = await api.post('/cloud-printing/print/medical', medicalForm) as any;
+      const response = (await api.post('/cloud-printing/print/medical', medicalForm)) as import('axios').AxiosResponse<Record<string, unknown>>;
       if (response.data?.success) {
         toast.success(t('admin2.cp_medical_document_sent'));
       } else {
-        toast.error(response.data?.message || t('admin2.cp_print_error'));
+        toast.error(String(response.data?.message ?? '') || t('admin2.cp_print_error'));
       }
     } catch (error) {
       logger.error('Ошибка печати медицинского документа:', error);
@@ -423,7 +415,7 @@ const CloudPrintingManager = () => {
               <Input
               id="title"
               value={printForm.title}
-              onChange={(e) => setPrintForm({ ...printForm, title: e.target.value })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPrintForm({ ...printForm, title: e.target.value })}
               placeholder={t('admin2.cp_document_title_placeholder')} />
             
             </div>
@@ -452,17 +444,17 @@ const CloudPrintingManager = () => {
                 min="1"
                 max="10"
                 value={printForm.copies}
-                onChange={(e) => setPrintForm({ ...printForm, copies: parseInt(e.target.value) })} />
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPrintForm({ ...printForm, copies: parseInt(e.target.value) })} />
               
               </div>
               <div className="flex items-center justify-center gap-2">
-                <Checkbox id="color" aria-label="Enable color printing" checked={printForm.color} onChange={(e) => setPrintForm({ ...printForm, color: e.target.checked })}
+                <Checkbox id="color" aria-label="Enable color printing" checked={printForm.color} onChange={(checked: boolean) => setPrintForm({ ...printForm, color: checked })}
                 className="admin-checkbox-m0" />
               
                 <label className="admin-label-block-sm-primary" htmlFor="color">{t('admin2.cp_color')}</label>
               </div>
               <div className="flex items-center justify-center gap-2">
-                <Checkbox id="duplex" aria-label="Enable duplex printing" checked={printForm.duplex} onChange={(e) => setPrintForm({ ...printForm, duplex: e.target.checked })}
+                <Checkbox id="duplex" aria-label="Enable duplex printing" checked={printForm.duplex} onChange={(checked: boolean) => setPrintForm({ ...printForm, duplex: checked })}
                 className="admin-checkbox-m0" />
               
                 <label className="admin-label-block-sm-primary" htmlFor="duplex">{t('admin2.cp_duplex')}</label>
@@ -476,7 +468,7 @@ const CloudPrintingManager = () => {
           
           <Textarea
           value={printForm.content}
-          onChange={(e) => setPrintForm({ ...printForm, content: e.target.value })}
+          onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setPrintForm({ ...printForm, content: e.target.value })}
           placeholder={t('admin2.cp_content_placeholder')}
           rows={15}
           className="w-full" />
@@ -555,7 +547,7 @@ const CloudPrintingManager = () => {
               <Input
               id="patient-name"
               value={medicalForm.patient_data.patient_name}
-              onChange={(e) => setMedicalForm({
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMedicalForm({
                 ...medicalForm,
                 patient_data: { ...medicalForm.patient_data, patient_name: e.target.value }
               })}
@@ -568,7 +560,7 @@ const CloudPrintingManager = () => {
                 <Input
                 id="patient-age"
                 value={medicalForm.patient_data.age}
-                onChange={(e) => setMedicalForm({
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMedicalForm({
                   ...medicalForm,
                   patient_data: { ...medicalForm.patient_data, age: e.target.value }
                 })}
@@ -579,7 +571,7 @@ const CloudPrintingManager = () => {
                 <Input
                 id="patient-phone"
                 value={medicalForm.patient_data.phone}
-                onChange={(e) => setMedicalForm({
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMedicalForm({
                   ...medicalForm,
                   patient_data: { ...medicalForm.patient_data, phone: e.target.value }
                 })}
@@ -600,7 +592,7 @@ const CloudPrintingManager = () => {
                   <Input
                 id="diagnosis"
                 value={medicalForm.template_data.diagnosis}
-                onChange={(e) => setMedicalForm({
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMedicalForm({
                   ...medicalForm,
                   template_data: { ...medicalForm.template_data, diagnosis: e.target.value }
                 })}
@@ -611,7 +603,7 @@ const CloudPrintingManager = () => {
                   <Textarea
                 id="prescription"
                 value={medicalForm.template_data.prescription_text}
-                onChange={(e) => setMedicalForm({
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setMedicalForm({
                   ...medicalForm,
                   template_data: { ...medicalForm.template_data, prescription_text: e.target.value }
                 })}
@@ -623,7 +615,7 @@ const CloudPrintingManager = () => {
                   <Input
                 id="doctor"
                 value={medicalForm.template_data.doctor_name}
-                onChange={(e) => setMedicalForm({
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMedicalForm({
                   ...medicalForm,
                   template_data: { ...medicalForm.template_data, doctor_name: e.target.value }
                 })}
@@ -639,7 +631,7 @@ const CloudPrintingManager = () => {
                   <Input
                 id="queue-number"
                 value={medicalForm.template_data.queue_number}
-                onChange={(e) => setMedicalForm({
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMedicalForm({
                   ...medicalForm,
                   template_data: { ...medicalForm.template_data, queue_number: e.target.value }
                 })}
@@ -650,7 +642,7 @@ const CloudPrintingManager = () => {
                   <Input
                 id="ticket-doctor"
                 value={medicalForm.template_data.doctor_name}
-                onChange={(e) => setMedicalForm({
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMedicalForm({
                   ...medicalForm,
                   template_data: { ...medicalForm.template_data, doctor_name: e.target.value }
                 })}
@@ -661,7 +653,7 @@ const CloudPrintingManager = () => {
                   <Input
                 id="cabinet"
                 value={medicalForm.template_data.cabinet}
-                onChange={(e) => setMedicalForm({
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMedicalForm({
                   ...medicalForm,
                   template_data: { ...medicalForm.template_data, cabinet: e.target.value }
                 })}
@@ -677,7 +669,7 @@ const CloudPrintingManager = () => {
                   <Textarea
                 id="examination"
                 value={medicalForm.template_data.examination_results}
-                onChange={(e) => setMedicalForm({
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setMedicalForm({
                   ...medicalForm,
                   template_data: { ...medicalForm.template_data, examination_results: e.target.value }
                 })}
@@ -689,7 +681,7 @@ const CloudPrintingManager = () => {
                   <Textarea
                 id="conclusion"
                 value={medicalForm.template_data.conclusion}
-                onChange={(e) => setMedicalForm({
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setMedicalForm({
                   ...medicalForm,
                   template_data: { ...medicalForm.template_data, conclusion: e.target.value }
                 })}
@@ -701,7 +693,7 @@ const CloudPrintingManager = () => {
                   <Input
                 id="report-doctor"
                 value={medicalForm.template_data.doctor_name}
-                onChange={(e) => setMedicalForm({
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMedicalForm({
                   ...medicalForm,
                   template_data: { ...medicalForm.template_data, doctor_name: e.target.value }
                 })}

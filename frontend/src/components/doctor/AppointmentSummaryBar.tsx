@@ -4,7 +4,7 @@ import {
   Badge, Button,
 } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
-import type { CSSProperties, ReactNode, ComponentType } from 'react';
+import type { CSSProperties, ComponentType } from 'react';
 
 const summaryBarStyle: CSSProperties = {
   display: 'flex',
@@ -35,8 +35,8 @@ interface AppointmentSummaryBarProps {
   onRefresh: () => void;
   refreshDisabled?: boolean;
   refreshLabel?: string;
-  BadgeComponent?: ComponentType<Record<string, unknown>>;
-  ButtonComponent?: ComponentType<Record<string, unknown>>;
+  BadgeComponent?: ComponentType<React.HTMLAttributes<HTMLSpanElement> & { variant?: string; children?: React.ReactNode }>;
+  ButtonComponent?: ComponentType<React.ButtonHTMLAttributes<HTMLButtonElement> & { children?: React.ReactNode }>;
   buttonProps?: { style?: CSSProperties; [key: string]: unknown };
 }
 
@@ -46,8 +46,8 @@ export default function AppointmentSummaryBar({
   onRefresh,
   refreshDisabled = false,
   refreshLabel = 'Обновить',
-  BadgeComponent = Badge as unknown as ComponentType<Record<string, unknown>>,
-  ButtonComponent = Button as unknown as ComponentType<Record<string, unknown>>,
+  BadgeComponent = Badge,
+  ButtonComponent = Button,
   buttonProps = {}
 }: AppointmentSummaryBarProps) {
   const { t: rawT } = useTranslation();

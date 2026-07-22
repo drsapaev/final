@@ -62,6 +62,10 @@ import {
 'lucide-react';
 import { api } from '../api/client';
 
+interface ErrorWithExtras extends Error {
+  response?: { status?: number; data?: { detail?: string | { message?: string; error?: string } } };
+}
+
 const ONBOARDING_STATUS_FILTER_OPTIONS = [
 { value: 'all', label: 'All statuses' },
 { value: 'pending_review', label: 'Pending review' },
@@ -115,16 +119,86 @@ const ONBOARDING_REASON_LABELS = {
   other: 'Other'
 };
 
+interface BotContract {
+  route?: string;
+  endpoint?: string;
+  role_checks?: Array<{ command?: string; [k: string]: unknown }>;
+  commands?: Array<{ command?: string; [k: string]: unknown }>;
+  operations?: Array<{ command?: string; [k: string]: unknown }>;
+  storage_contract?: Record<string, unknown>;
+  registration_endpoint_published?: boolean;
+  runtime_registration_enabled?: boolean;
+  registration_enabled?: boolean;
+  state_changing_actions_enabled?: boolean;
+  deny_only_runtime_enabled?: boolean;
+  confirmation_token_runtime_enabled?: boolean;
+  runtime_guard_enabled?: boolean;
+  ready?: boolean;
+  adapters?: Array<{ domain?: string; runtime_enabled?: boolean; telegram_commands?: Array<unknown>; [k: string]: unknown }>;
+  blocked_by?: Array<unknown>;
+  event_types?: Array<unknown>;
+  recorded_event_types?: Array<unknown>;
+  pending_event_types?: Array<unknown>;
+  runtime_menu_enabled?: boolean;
+  domain_data_commands_enabled?: boolean;
+  domain_data_commands_status?: string;
+  domain_data_command_keys?: Array<unknown>;
+  role_count?: number;
+  idempotency_request_hash_runtime_enabled?: boolean;
+  runtime_blocked_by?: Array<unknown>;
+  domain_adapter_contract?: BotContract;
+  [k: string]: unknown;
+}
+
+interface BotStatusEntry {
+  features?: Array<{ enabled?: boolean; key?: string; route?: string; endpoint?: string; contract?: BotContract; [k: string]: unknown }>;
+  commands?: Record<string, unknown>;
+  supported_languages?: Array<string | { code?: string; label?: string; [k: string]: unknown }>;
+  readiness?: Record<string, unknown> & { ready?: boolean; runtime_guard_enabled?: boolean };
+  supported_roles?: string[];
+  read_only_menu_contract?: Record<string, unknown>;
+  role_menus?: Record<string, unknown>;
+  role_checks?: Record<string, unknown>;
+  token_contract?: Record<string, unknown>;
+  linking_contract?: Record<string, unknown>;
+  role_linking?: Record<string, unknown>;
+  linking_runtime_contract?: Record<string, unknown>;
+  link_token_validation_contract?: Record<string, unknown> & { storage_contract?: Record<string, unknown> };
+  link_token_storage_contract?: Record<string, unknown>;
+  authorization_contract?: BotContract & { authorization?: Record<string, unknown> };
+  authorization?: Record<string, unknown>;
+  command_registration_contract?: BotContract;
+  command_contract?: BotContract;
+  confirmation_contract?: BotContract;
+  confirmations?: BotContract;
+  domain_adapter_contract?: BotContract;
+  audit_contract?: BotContract;
+  audit?: BotContract;
+  role_menu_enablement_contract?: BotContract & { menu_item_count?: number };
+  read_only_runtime_enabled?: boolean;
+  read_only_menu_events_enabled?: boolean;
+  registration_endpoint_published?: boolean;
+  runtime_registration_enabled?: boolean;
+  registration_enabled?: boolean;
+  [k: string]: unknown;
+}
+
+interface BotStatus {
+  patient_bot?: BotStatusEntry;
+  staff_bot?: BotStatusEntry;
+  [k: string]: unknown;
+}
+
 const TelegramManager = () => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
-  const [botStatus, setBotStatus] = useState(null as any);
+  const [botStatus, setBotStatus] = useState<BotStatus | null>(null);
   const [templates, setTemplates] = useState([]);
   const [onboardingRequests, setOnboardingRequests] = useState([]);
   const [onboardingTotal, setOnboardingTotal] = useState(0);
-  const [onboardingReviewForms, setOnboardingReviewForms] = useState({} as any);
+  const [onboardingReviewForms, setOnboardingReviewForms] = useState<Record<string, Record<string, unknown>>>({});
   const [onboardingActionId, setOnboardingActionId] = useState('');
-  const [onboardingAnalytics, setOnboardingAnalytics] = useState(null as any);
+  const [onboardingAnalytics, setOnboardingAnalytics] = useState<{ dashboard?: { pendingRequests?: number; overdueRequests?: number; todaySubmitted?: number; linkedOrCreatedToday?: number; averageReviewTimeMinutes?: number; conversionRate?: number; [k: string]: unknown }; [k: string]: unknown } | null>(null);
   const [onboardingStatusFilter, setOnboardingStatusFilter] = useState('all');
   const [onboardingSort, setOnboardingSort] = useState('newest');
   const [onboardingDialog, setOnboardingDialog] = useState({
@@ -140,12 +214,12 @@ const TelegramManager = () => {
   const [registeringCommands, setRegisteringCommands] = useState(false);
   const [registeringStaffCommands, setRegisteringStaffCommands] = useState(false);
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
-  const [templateForm, setTemplateForm] = useState({
+  const [templateForm, setTemplateForm] = useState<Record<string, unknown>>({
     name: '',
     message_type: 'text',
     content: '',
     is_active: true
-  } as any);
+  });
 
   useEffect(() => {
     loadTelegramData();
@@ -155,7 +229,7 @@ const TelegramManager = () => {
     loadOnboardingRequests();
   }, [onboardingStatusFilter, onboardingSort]);
 
-  const getOnboardingSearchPayload = (request: any, form: any = {}) => {
+  const getOnboardingSearchPayload = (request: Record<string, unknown>, form: Record<string, unknown> = {}) => {
     const contactName = getOnboardingValue(request, 'contactName', 'contact_name', '');
     const contactPhone = getOnboardingValue(request, 'contactPhone', 'contact_phone', '');
     const desiredBranch = getOnboardingValue(request, 'desiredBranch', 'desired_branch', '');
@@ -168,7 +242,7 @@ const TelegramManager = () => {
     filter(Boolean).join(' ').trim();
 
     return {
-      ...(form.phone || contactPhone ? { phone: (form.phone || contactPhone).trim() } : {}),
+      ...(form.phone || contactPhone ? { phone: String(form.phone || contactPhone).trim() } : {}),
       ...(draftName ? { name: draftName } : {}),
       ...(desiredBranch ? { branch: desiredBranch } : {}),
       ...(desiredDoctorId ? { doctorId: Number(desiredDoctorId) } : {}),
@@ -219,7 +293,7 @@ const TelegramManager = () => {
 
       const statusData = statusRes?.data || {};
       const integrationData = integrationRes?.data || {};
-      const templatesData: any = templatesRes?.data || {};
+      const templatesData = (templatesRes?.data as Record<string, unknown>) || {};
       setBotStatus({
         bot_active: Boolean(integrationData.active ?? statusData.active ?? statusData.configured),
         webhook_configured: Boolean(integrationData.webhook_set || statusData.webhook_configured || statusData.webhook_set),
@@ -254,8 +328,10 @@ const TelegramManager = () => {
       setTemplates(normalizedTemplates);
       await loadOnboardingRequests();
       await loadOnboardingAnalytics();
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || e?.message || t('misc.tg_err_load'));
+    } catch (e: unknown) {
+      const detail = (e as ErrorWithExtras)?.response?.data?.detail;
+      const detailStr = typeof detail === 'string' ? detail : (detail?.message ?? '');
+      setError(detailStr || (e as Error)?.message || t('misc.tg_err_load'));
     } finally {
       setLoading(false);
     }
@@ -266,7 +342,7 @@ const TelegramManager = () => {
       const statusFilterValue = onboardingStatusFilter === 'all' ? '' : onboardingStatusFilter;
       const response = await api.get('/telegram/onboarding/requests', {
         params: { status_filter: statusFilterValue, limit: 40 }
-      }) as any;
+      }) as import('axios').AxiosResponse<Record<string, unknown>>;
       const data = response?.data || {};
       const items = Array.isArray(data.items) ? data.items : [];
       const hydratedItems = await hydrateOnboardingRequests(items);
@@ -279,7 +355,7 @@ const TelegramManager = () => {
 
   const loadOnboardingAnalytics = async () => {
     try {
-      const response = await api.get('/telegram/onboarding/analytics/summary') as any;
+      const response = (await api.get('/telegram/onboarding/analytics/summary')) as import('axios').AxiosResponse<Record<string, unknown>>;
       setOnboardingAnalytics(response?.data || null);
     } catch (_err) {
       setOnboardingAnalytics(null);
@@ -293,7 +369,7 @@ const TelegramManager = () => {
       const response = await api.get('/telegram/onboarding/requests/export', {
         params: { status_filter: statusFilterValue },
         responseType: 'blob'
-      }) as any;
+      }) as import('axios').AxiosResponse<BlobPart>;
       const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8' });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -366,15 +442,15 @@ const TelegramManager = () => {
 
   const handleOnboardingReviewAction = async (requestId, action, options = {}) => {
     const request = onboardingRequests.find((item) => item.id === requestId) || {};
-    const form: any = onboardingReviewForms[requestId] || {};
-    const safeNote = (form.safeNote || '').trim();
+    const form: Record<string, unknown> = onboardingReviewForms[requestId] || {};
+    const safeNote = String(form.safeNote || '').trim();
     const reasonCode = form.reasonCode || undefined;
     const actionKey = `${action}:${requestId}`;
     let endpoint = `/telegram/onboarding/requests/${requestId}/${action}`;
-    let payload: any = { reasonCode, safeNote: safeNote || undefined };
+    let payload: Record<string, unknown> = { reasonCode, safeNote: safeNote || undefined };
 
     if (action === 'link-existing') {
-      const candidateId = (options as any).candidateId || form.selectedCandidateId || onboardingDialog.candidateId;
+      const candidateId = (options as Record<string, unknown>).candidateId || form.selectedCandidateId || onboardingDialog.candidateId;
       if (!candidateId) {
         setError('Select a duplicate candidate before linking.');
         return;
@@ -389,10 +465,10 @@ const TelegramManager = () => {
       const contactName = getOnboardingValue(request, 'contactName', 'contact_name', '');
       const contactPhone = getOnboardingValue(request, 'contactPhone', 'contact_phone', '');
       const nameParts = splitOnboardingContactName(contactName);
-      const lastName = (form.lastName || nameParts.lastName || '').trim();
-      const firstName = (form.firstName || nameParts.firstName || '').trim();
-      const middleName = (form.middleName || nameParts.middleName || '').trim();
-      const phone = (form.phone || contactPhone || '').trim();
+      const lastName = String(form.lastName || nameParts.lastName || '').trim();
+      const firstName = String(form.firstName || nameParts.firstName || '').trim();
+      const middleName = String(form.middleName || nameParts.middleName || '').trim();
+      const phone = String(form.phone || contactPhone || '').trim();
 
       if (!lastName || !firstName) {
         setError('Enter first and last name before creating a Patient.');
@@ -458,16 +534,16 @@ const TelegramManager = () => {
       setError('');
       setSuccess('');
       setRegisteringCommands(true);
-      const response = await api.post('/admin/telegram/register-patient-commands') as any;
+      const response = (await api.post('/admin/telegram/register-patient-commands')) as import('axios').AxiosResponse<Record<string, unknown>>;
       const languages = Array.isArray(response?.data?.registered_languages) ?
       response.data.registered_languages.join(', ') :
       'ru, uz';
       setSuccess(t('misc.tg_success_patient_commands', { languages }));
       await loadTelegramData();
-    } catch (e: any) {
-      const detail = e?.response?.data?.detail;
-      const message = typeof detail === 'string' ? detail : detail?.message || detail?.error;
-      setError(message || e?.message || t('misc.tg_err_register_commands'));
+    } catch (e: unknown) {
+      const detail = (e as ErrorWithExtras)?.response?.data?.detail;
+      const message = typeof detail === 'string' ? detail : (detail?.message ?? detail?.error);
+      setError(message || (e as Error)?.message || t('misc.tg_err_register_commands'));
     } finally {
       setRegisteringCommands(false);
     }
@@ -478,16 +554,16 @@ const TelegramManager = () => {
       setError('');
       setSuccess('');
       setRegisteringStaffCommands(true);
-      const response = await api.post('/admin/telegram/register-staff-commands') as any;
+      const response = (await api.post('/admin/telegram/register-staff-commands')) as import('axios').AxiosResponse<Record<string, unknown>>;
       const commands = Array.isArray(response?.data?.registered_commands) ?
       response.data.registered_commands.join(', ') :
       'read-only staff commands';
       setSuccess(t('misc.tg_success_staff_commands', { commands }));
       await loadTelegramData();
-    } catch (e: any) {
-      const detail = e?.response?.data?.detail;
+    } catch (e: unknown) {
+      const detail = (e as ErrorWithExtras)?.response?.data?.detail;
       const message = typeof detail === 'string' ? detail : detail?.message || detail?.error;
-      setError(message || e?.message || t('misc.tg_err_register_staff_commands'));
+      setError(message || (e as Error)?.message || t('misc.tg_err_register_staff_commands'));
     } finally {
       setRegisteringStaffCommands(false);
     }
@@ -687,7 +763,7 @@ const TelegramManager = () => {
     return command?.label || fallback;
   };
   const patientLanguageSummary = patientBotLanguages.length ?
-  patientBotLanguages.map((item) => item.label).join(', ') :
+  patientBotLanguages.map((item) => (typeof item === 'string' ? item : (item.label ?? item.code ?? ''))).join(', ') :
   t('misc.tg_lang_russian');
   const patientCapabilities = [
     {
@@ -838,8 +914,10 @@ const TelegramManager = () => {
     { value: 'photo', label: t('misc.tg_tpl_type_photo') },
     { value: 'document', label: t('misc.tg_tpl_type_document') }
   ];
-  const getOnboardingValue = (request: any, camelKey: string, snakeKey: string, fallback: any = '') =>
-    request?.[camelKey] ?? request?.[snakeKey] ?? fallback;
+  const getOnboardingValue = (request: Record<string, unknown>, camelKey: string, snakeKey: string, fallback: string = ''): string => {
+    const value = request?.[camelKey] ?? request?.[snakeKey] ?? fallback;
+    return typeof value === 'string' ? value : (value == null ? fallback : String(value));
+  }
   const splitOnboardingContactName = (value) => {
     const parts = String(value || '').trim().split(/\s+/).filter(Boolean);
     return {
@@ -881,14 +959,16 @@ const TelegramManager = () => {
     if (ageMinutes >= 60) return { label: 'Waiting 1h', variant: 'warning' };
     return { label: 'New', variant: 'primary' };
   };
-  const getCandidateValue = (candidate: any, camelKey: string, snakeKey: string, fallback: any = '') =>
-  candidate?.[camelKey] ?? candidate?.[snakeKey] ?? fallback;
+  const getCandidateValue = <T = string>(candidate: Record<string, unknown>, camelKey: string, snakeKey: string, fallback: T): T => {
+    const value = candidate?.[camelKey] ?? candidate?.[snakeKey] ?? fallback;
+    return (value == null ? fallback : value) as T;
+  }
   const getCandidateTopScore = (request) => {
     const duplicateCandidates = Array.isArray(request?.duplicateCandidates) ? request.duplicateCandidates : [];
     const snapshotCandidates = Array.isArray(request?.duplicateReviewSnapshot?.topCandidates) ? request.duplicateReviewSnapshot.topCandidates : [];
     const candidates = duplicateCandidates.length ? duplicateCandidates : snapshotCandidates;
     if (!candidates.length) return 0;
-    return Number(getCandidateValue(candidates[0], 'matchScore', 'match_score', 0)) || 0;
+    return Number(getCandidateValue(candidates[0], 'matchScore', 'match_score', '0')) || 0;
   };
   const getVisibleDuplicateCandidates = (request) => {
     if (Array.isArray(request?.duplicateCandidates) && request.duplicateCandidates.length) {
@@ -916,7 +996,7 @@ const TelegramManager = () => {
   };
   const formatCandidateReasons = (candidate) => {
     const reasons = [];
-    const matchReasons = getCandidateValue(candidate, 'matchReasons', 'match_reasons', {});
+    const matchReasons = getCandidateValue<Record<string, unknown>>(candidate, 'matchReasons', 'match_reasons', {});
     if (matchReasons?.phone_match || matchReasons?.phoneMatch) reasons.push('Phone match');
     const similarity = Number(matchReasons?.name_similarity ?? matchReasons?.nameSimilarity ?? 0);
     if (similarity > 0) reasons.push(`Name similarity ${Math.round(similarity * 100)}%`);
@@ -962,18 +1042,18 @@ const TelegramManager = () => {
   filter((request) => onboardingStatusFilter === 'all' ? true : request.status === onboardingStatusFilter).
   sort((left, right) => {
     if (onboardingSort === 'oldest') {
-      return new Date(getOnboardingValue(left, 'createdAt', 'created_at', 0)).getTime() -
-      new Date(getOnboardingValue(right, 'createdAt', 'created_at', 0)).getTime();
+      return new Date(getOnboardingValue(left, 'createdAt', 'created_at', '0')).getTime() -
+      new Date(getOnboardingValue(right, 'createdAt', 'created_at', '0')).getTime();
     }
     if (onboardingSort === 'highest_confidence') {
       return getCandidateTopScore(right) - getCandidateTopScore(left);
     }
     if (onboardingSort === 'sla_overdue') {
-      return new Date(getOnboardingValue(left, 'createdAt', 'created_at', 0)).getTime() -
-      new Date(getOnboardingValue(right, 'createdAt', 'created_at', 0)).getTime();
+      return new Date(getOnboardingValue(left, 'createdAt', 'created_at', '0')).getTime() -
+      new Date(getOnboardingValue(right, 'createdAt', 'created_at', '0')).getTime();
     }
-    return new Date(getOnboardingValue(right, 'createdAt', 'created_at', 0)).getTime() -
-    new Date(getOnboardingValue(left, 'createdAt', 'created_at', 0)).getTime();
+    return new Date(getOnboardingValue(right, 'createdAt', 'created_at', '0')).getTime() -
+    new Date(getOnboardingValue(left, 'createdAt', 'created_at', '0')).getTime();
   });
   const onboardingSummaryCards = [
   {
@@ -987,7 +1067,7 @@ const TelegramManager = () => {
     onboardingRequests.filter((item) => getOnboardingAgeBadge(getOnboardingValue(item, 'createdAt', 'created_at', '')).label === 'Overdue').length
   },
   {
-    label: 'Today\'s submitted',
+    label: "Today's submitted",
     value: onboardingAnalytics?.dashboard?.todaySubmitted ?? 0
   },
   {
@@ -1042,7 +1122,7 @@ const TelegramManager = () => {
     flex: '0 0 auto'
   };
   const dialogRequest = onboardingRequests.find((item) => item.id === onboardingDialog.requestId) || null;
-  const dialogForm = onboardingDialog.requestId ? onboardingReviewForms[onboardingDialog.requestId] || {} : {};
+  const dialogForm: Record<string, unknown> = onboardingDialog.requestId ? onboardingReviewForms[onboardingDialog.requestId] || {} : {};
   const dialogContactName = dialogRequest ?
   getOnboardingValue(dialogRequest, 'contactName', 'contact_name', '') :
   '';
@@ -1075,7 +1155,7 @@ const TelegramManager = () => {
   }
 
   return (
-    <Box sx={{ padding: '12px' } as any}>
+    <Box sx={{ padding: '12px' }}>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h4" component="h1">
           {t('misc.tg_title')}
@@ -1136,7 +1216,7 @@ const TelegramManager = () => {
                         {t('misc.tg_patient_bot_title')}
                       </Typography>
                       <Badge variant={enabledPatientFeatures.length ? 'success' : 'warning'} size="small">
-                        {patientBot.version || 'v1'}
+                        {String(patientBot.version ?? 'v1')}
                       </Badge>
                     </Box>
                     <Box
@@ -1335,7 +1415,7 @@ const TelegramManager = () => {
                   <ListItemText
                     primary={t('misc.tg_patient_languages')}
                     secondary={patientBotLanguages.length ?
-                    patientBotLanguages.map((item) => item.label).join(', ') :
+                    patientBotLanguages.map((item) => (typeof item === 'string' ? item : (item.label ?? item.code ?? ''))).join(', ') :
                     t('misc.tg_lang_russian')} />
 
                 </ListItem>
@@ -1419,7 +1499,7 @@ const TelegramManager = () => {
                   <ListItemText
                     primary="Staff link token validation"
                     secondary={staffLinkTokenValidationContract.contract_version ?
-                    `${staffLinkTokenValidationContract.token_properties?.length || 0} token checks; helper: ${staffLinkTokenValidationContract.runtime_helper_available ? 'available' : 'planned'}; storage: ${staffLinkTokenValidationContract.storage_migration_required ? 'migration required' : 'ready'}` :
+                    `${(staffLinkTokenValidationContract.token_properties as Array<unknown>)?.length || 0} token checks; helper: ${staffLinkTokenValidationContract.runtime_helper_available ? 'available' : 'planned'}; storage: ${staffLinkTokenValidationContract.storage_migration_required ? 'migration required' : 'ready'}` :
                     'Staff link token validation contract not published'} />
 
                   <Badge
@@ -1436,7 +1516,7 @@ const TelegramManager = () => {
                   <ListItemText
                     primary="Staff link token storage"
                     secondary={staffLinkTokenStorageContract.contract_version ?
-                    `${staffLinkTokenStorageContract.table || 'token table'}; indexes: ${staffLinkTokenStorageContract.required_indexes?.length || 0}; migration: ${staffLinkTokenStorageContract.migration_created ? 'created' : 'required'}` :
+                    `${staffLinkTokenStorageContract.table || 'token table'}; indexes: ${(staffLinkTokenStorageContract.required_indexes as Array<unknown>)?.length || 0}; migration: ${staffLinkTokenStorageContract.migration_created ? 'created' : 'required'}` :
                     'Staff link token storage contract not published'} />
 
                   <Badge
@@ -1598,7 +1678,7 @@ const TelegramManager = () => {
                     </ListItemIcon>
                     <ListItemText
                       primary="Telegram API"
-                      secondary={botStatus.webhook_error} />
+                      secondary={String(botStatus.webhook_error ?? '')} />
 
                   </ListItem>
                 }
@@ -1751,7 +1831,7 @@ const TelegramManager = () => {
                 <Box display="flex" sx={{ flexDirection: 'column' }} gap={2}>
                   {visibleOnboardingRequests.map((request) => {
                     const requestId = request.id;
-                    const form: any = onboardingReviewForms[requestId] || {};
+                    const form: Record<string, unknown> = onboardingReviewForms[requestId] || {};
                     const contactName = getOnboardingValue(request, 'contactName', 'contact_name', 'No name');
                     const contactPhone = getOnboardingValue(request, 'contactPhone', 'contact_phone', 'No phone');
                     const desiredService = getOnboardingValue(request, 'desiredService', 'desired_service', 'Service not selected');
@@ -1875,7 +1955,7 @@ const TelegramManager = () => {
                                   const recentVisitSummary = getCandidateValue(candidate, 'recentVisitSummary', 'recent_visit_summary', '');
                                   const branch = getCandidateValue(candidate, 'branch', 'branch', '');
                                   const riskLevel = getCandidateValue(candidate, 'riskLevel', 'risk_level', 'low');
-                                  const matchScore = Number(getCandidateValue(candidate, 'matchScore', 'match_score', 0)) || 0;
+                                  const matchScore = Number(getCandidateValue<number>(candidate, 'matchScore', 'match_score', 0)) || 0;
                                   return (
                                     <Box
                                       key={candidateId}
@@ -1955,7 +2035,7 @@ const TelegramManager = () => {
                                     variant="contained"
                                     size="small"
                                     disabled={actionBusy || !duplicateCandidates.length}
-                                    onClick={() => openOnboardingActionDialog(requestId, 'link-existing', form.selectedCandidateId || '')}>
+                                    onClick={() => openOnboardingActionDialog(requestId, 'link-existing', String(form.selectedCandidateId || ''))}>
                                     <UserCheck size={16 as never} />
                                     Link this patient
                                   </Button>
@@ -2108,7 +2188,7 @@ const TelegramManager = () => {
                           variant="primary"
                           size="small">
                           
-                            {template.message_type}
+                            {template?.message_type}
                           </Badge>
                         </TableCell>
                         <TableCell>
@@ -2187,7 +2267,7 @@ const TelegramManager = () => {
                     value={dialogSelectedCandidateId}
                     options={dialogDuplicateCandidates.map((candidate) => ({
                       value: getCandidateValue(candidate, 'candidateId', 'candidate_id', ''),
-                      label: `${getCandidateValue(candidate, 'maskedName', 'masked_name', 'Masked patient')} - ${Math.round((Number(getCandidateValue(candidate, 'matchScore', 'match_score', 0)) || 0) * 100)}%`
+                      label: `${getCandidateValue(candidate, 'maskedName', 'masked_name', 'Masked patient')} - ${Math.round((Number(getCandidateValue<number>(candidate, 'matchScore', 'match_score', 0)) || 0) * 100)}%`
                     }))}
                     onChange={(value) => updateOnboardingReviewForm(onboardingDialog.requestId, 'selectedCandidateId', value)}
                     style={{ width: '100%' }} />
@@ -2234,7 +2314,7 @@ const TelegramManager = () => {
                       { value: '', label: 'No candidate selected' },
                       ...dialogDuplicateCandidates.map((candidate) => ({
                         value: getCandidateValue(candidate, 'candidateId', 'candidate_id', ''),
-                        label: `${getCandidateValue(candidate, 'maskedName', 'masked_name', 'Masked patient')} - ${Math.round((Number(getCandidateValue(candidate, 'matchScore', 'match_score', 0)) || 0) * 100)}%`
+                        label: `${getCandidateValue(candidate, 'maskedName', 'masked_name', 'Masked patient')} - ${Math.round((Number(getCandidateValue<number>(candidate, 'matchScore', 'match_score', 0)) || 0) * 100)}%`
                       }))
                     ]}
                     onChange={(value) => updateOnboardingReviewForm(onboardingDialog.requestId, 'selectedCandidateId', value)}
@@ -2248,24 +2328,24 @@ const TelegramManager = () => {
                   }}>
                   <Input
                     label="Last name"
-                    value={dialogForm.lastName ?? dialogNameParts.lastName}
+                    value={(dialogForm.lastName as string | undefined) ?? dialogNameParts.lastName}
                     onChange={(event) => updateOnboardingReviewForm(onboardingDialog.requestId, 'lastName', event.target.value)}
                     placeholder="Last name"
                     required />
                   <Input
                     label="First name"
-                    value={dialogForm.firstName ?? dialogNameParts.firstName}
+                    value={(dialogForm.firstName as string | undefined) ?? dialogNameParts.firstName}
                     onChange={(event) => updateOnboardingReviewForm(onboardingDialog.requestId, 'firstName', event.target.value)}
                     placeholder="First name"
                     required />
                   <Input
                     label="Middle name"
-                    value={dialogForm.middleName ?? dialogNameParts.middleName}
+                    value={(dialogForm.middleName as string | undefined) ?? dialogNameParts.middleName}
                     onChange={(event) => updateOnboardingReviewForm(onboardingDialog.requestId, 'middleName', event.target.value)}
                     placeholder="Middle name" />
                   <Input
                     label="Phone"
-                    value={dialogForm.phone ?? dialogContactPhone}
+                    value={(dialogForm.phone as string | undefined) ?? dialogContactPhone}
                     onChange={(event) => updateOnboardingReviewForm(onboardingDialog.requestId, 'phone', event.target.value)}
                     placeholder="+998..." />
                 </Box>
@@ -2273,12 +2353,12 @@ const TelegramManager = () => {
                   <>
                     <Select
                       label="Override reason"
-                      value={dialogForm.reasonCode || ''}
+                      value={(dialogForm.reasonCode as string) || ''}
                       options={dialogReasonOptions}
                       onChange={(value) => updateOnboardingReviewForm(onboardingDialog.requestId, 'reasonCode', value)}
                       style={{ width: '100%' }} />
                     <Switch
-                      checked={Boolean(dialogForm.confirmCreateDespiteDuplicates)}
+                      checked={Boolean(dialogForm.confirmCreateDespiteDuplicates as boolean)}
                       onChange={(checked) => updateOnboardingReviewForm(onboardingDialog.requestId, 'confirmCreateDespiteDuplicates', checked)}
                       label="I reviewed duplicates and still want to create a new patient" />
                   </>
@@ -2289,7 +2369,7 @@ const TelegramManager = () => {
             {['request-more-info', 'reject'].includes(onboardingDialog.action) ? (
               <Select
                 label="Reason code"
-                value={dialogForm.reasonCode || ''}
+                value={(dialogForm.reasonCode as string) || ''}
                 options={dialogReasonOptions}
                 onChange={(value) => updateOnboardingReviewForm(onboardingDialog.requestId, 'reasonCode', value)}
                 style={{ width: '100%' }} />
@@ -2298,7 +2378,7 @@ const TelegramManager = () => {
             {['create-patient', 'request-more-info', 'reject', 'link-existing'].includes(onboardingDialog.action) ? (
               <Textarea
                 label="Safe staff note"
-                value={dialogForm.safeNote || ''}
+                value={(dialogForm.safeNote as string) || ''}
                 maxLength={512}
                 minRows={3}
                 maxRows={5}
@@ -2340,7 +2420,7 @@ const TelegramManager = () => {
             <Grid item xs={12} sm={6}>
               <Input
                 label={t('misc.tg_field_template_name')}
-                value={templateForm.name}
+                value={templateForm.name as string}
                 onChange={(e) => setTemplateForm({ ...templateForm, name: e.target.value })}
                 style={{ width: '100%' }}
                 required />
@@ -2349,7 +2429,7 @@ const TelegramManager = () => {
             <Grid item xs={12} sm={6}>
               <Select
                 label={t('misc.tg_field_message_type')}
-                value={templateForm.message_type}
+                value={templateForm.message_type as string}
                 options={templateTypeOptions}
                 onChange={(messageType) => setTemplateForm({ ...templateForm, message_type: messageType })}
                 style={{ width: '100%' }} />
@@ -2359,7 +2439,7 @@ const TelegramManager = () => {
                 label={t('misc.tg_field_message_content')}
                 minRows={6}
                 maxRows={8}
-                value={templateForm.content}
+                value={templateForm.content as string}
                 onChange={(e) => setTemplateForm({ ...templateForm, content: e.target.value })}
                 required
                 style={{ width: '100%' }}
@@ -2369,7 +2449,7 @@ const TelegramManager = () => {
             <Grid item xs={12}>
               <Switch
                 label={t('misc.tg_field_active_template')}
-                checked={templateForm.is_active}
+                checked={Boolean(templateForm.is_active as boolean)}
                 onChange={(isActive) => setTemplateForm({ ...templateForm, is_active: isActive })} />
 
             </Grid>

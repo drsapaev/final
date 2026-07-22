@@ -14,13 +14,11 @@ import React from 'react';
 import EMRSmartFieldV2 from './EMRSmartFieldV2';
 import ExaminationMatrix from './ExaminationMatrix';
 import { useDoctorPhrases } from '../../../hooks/useDoctorPhrases';
-import { DoctorTemplatesPanel as DTPRaw, DoctorTemplatesButton as DTBRaw } from '../DoctorTemplatesPanel';
+import { DoctorTemplatesPanel, DoctorTemplatesButton } from '../DoctorTemplatesPanel';
 import { useDoctorSectionTemplates } from '../../../hooks/useDoctorSectionTemplates';
 import logger from '../../../utils/logger';
 import { useTranslation } from '../../../i18n/useTranslation';
 
-const DoctorTemplatesPanel = DTPRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const DoctorTemplatesButton = DTBRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 /**
  * ExaminationSection Component
@@ -33,6 +31,25 @@ const DoctorTemplatesButton = DTBRaw as unknown as React.ComponentType<Record<st
  * @param {string} props.icd10Code - ICD-10 code for personalized templates
  * @param {string} props.complaints - Complaints text (required for AI)
  */
+interface ExaminationSectionProps {
+  value?: string;
+  onChange?: (value: string, options?: Record<string, unknown>) => void;
+  disabled?: boolean;
+  defaultOpen?: boolean;
+  specialty?: string;
+  icd10Code?: string;
+  complaints?: string;
+  suggestions?: unknown[];
+  aiLoading?: boolean;
+  onApplySuggestion?: ((s: unknown) => void) | undefined;
+  onDismissSuggestion?: ((s: unknown) => void) | undefined;
+  onRequestAI?: ((text: string) => void) | undefined;
+  doctorId?: string | number | null | undefined;
+  experimentalGhostMode?: boolean;
+  onTelemetry?: ((payload: Record<string, unknown>) => void) | undefined;
+}
+
+
 export function ExaminationSection({
   value = '',
   onChange,
@@ -50,7 +67,7 @@ export function ExaminationSection({
   doctorId,
   experimentalGhostMode = false,
   onTelemetry
-}) {
+}: ExaminationSectionProps) {
   const [showMyExperience, setShowMyExperience] = useState(false);
 
   // 🧠 Connect Doctor History (Personal Learning)

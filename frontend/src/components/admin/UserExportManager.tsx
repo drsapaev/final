@@ -19,13 +19,8 @@ import {
   File } from
 'lucide-react';
 import {
-  MacOSCard, Button as RawButton, Input, Select as RawSelect, Checkbox as RawCheckbox, SegmentedControl as RawSegmentedControl, Skeleton as RawSkeleton,
+  MacOSCard, Button, Input, Select, Checkbox, SegmentedControl, Skeleton,
 } from '../ui/macos';
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
-const Checkbox = RawCheckbox as unknown as React.ComponentType<Record<string, unknown>>;
-const SegmentedControl = RawSegmentedControl as unknown as React.ComponentType<Record<string, unknown>>;
-const Skeleton = RawSkeleton as unknown as React.ComponentType<Record<string, unknown>>;
 import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 
@@ -98,8 +93,8 @@ const UserExportManager = () => {
   const loadExportFiles = async () => {
     setLoading(true);
     try {
-      const response = await api.get('/users/users/export/files') as any;
-      setExportFiles(response.data.files || []);
+      const response = (await api.get('/users/users/export/files')) as import('axios').AxiosResponse<Record<string, unknown>>;
+      setExportFiles((response.data.files as unknown[]) || []);
     } catch (error) {
       logger.error('Ошибка загрузки файлов экспорта:', error);
       toast.error(t('admin2.ue_load_error_toast'));
@@ -127,17 +122,17 @@ const UserExportManager = () => {
         include_audit_logs: exportForm.include_audit_logs
       };
 
-      const response = await api.post('/users/users/export', exportData) as any;
+      const response = (await api.post('/users/users/export', exportData)) as import('axios').AxiosResponse<Record<string, unknown>>;
 
       if (response.data.success) {
-        toast.success(response.data.message);
+        toast.success(String(response.data.message));
         // Переключаемся на вкладку файлов и обновляем список
         setActiveTab('files');
         setTimeout(() => {
           loadExportFiles();
         }, 2000); // Даем время на создание файла
       } else {
-        toast.error(response.data.message);
+        toast.error(String(response.data.message));
       }
     } catch (error) {
       logger.error('Ошибка экспорта:', error);
@@ -151,10 +146,10 @@ const UserExportManager = () => {
     try {
       const response = await api.get(`/users/users/export/download/${filename}`, {
         responseType: 'blob'
-      }) as any;
+      }) as import('axios').AxiosResponse<Record<string, unknown>>;
 
       // Создаем ссылку для скачивания
-      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const url = window.URL.createObjectURL(new Blob([response.data as unknown as BlobPart]));
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', filename);

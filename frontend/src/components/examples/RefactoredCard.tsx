@@ -22,6 +22,21 @@ const unifiedTheme = { colors: { primary: '#007aff', text: '#000', background: '
 
 const { colors, spacing, borderRadius, shadows, typography, transitions } = unifiedTheme;
 
+interface RefactoredCardProps {
+  children?: React.ReactNode;
+  variant?: 'default' | 'elevated' | 'outlined' | 'filled' | string;
+  hoverable?: boolean;
+  clickable?: boolean;
+  onClick?: (e: React.MouseEvent<HTMLDivElement> | React.KeyboardEvent<HTMLDivElement>) => void;
+  header?: React.ReactNode;
+  footer?: React.ReactNode;
+  title?: React.ReactNode;
+  description?: React.ReactNode;
+  className?: string;
+  style?: CSSProperties;
+  [key: string]: unknown;
+}
+
 const RefactoredCard = ({
   children,
   variant = 'default',
@@ -35,7 +50,7 @@ const RefactoredCard = ({
   className = '',
   style = {},
   ...props
-}) => {
+}: RefactoredCardProps) => {
   const [isHovered, setIsHovered] = useState(false);
 
   // ═══════════════════════════════════════════════════════════════════
@@ -195,7 +210,7 @@ const RefactoredCard = ({
       style={cardStyles as unknown as CSSProperties}
       onMouseEnter={() => hoverable && setIsHovered(true)}
       onMouseLeave={() => hoverable && setIsHovered(false)}
-      onClick={clickable ? onClick : undefined}
+      onClick={clickable ? (onClick as React.MouseEventHandler<HTMLDivElement>) : undefined}
       onKeyDown={clickable ? handleCardKeyDown : undefined}
       role={clickable ? 'button' : 'region'}
       tabIndex={clickable ? 0 : undefined}
@@ -241,7 +256,7 @@ RefactoredCard.propTypes = {
   style: PropTypes.object,
 };
 
-const RefactoredCardAny = RefactoredCard as unknown as React.ComponentType<Record<string, unknown>>;
+const RefactoredCardAny = RefactoredCard;
 
 export default RefactoredCard;
 

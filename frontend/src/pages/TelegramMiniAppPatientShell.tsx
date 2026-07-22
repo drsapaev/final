@@ -46,11 +46,11 @@ const MINI_APP_EXPIRED_ENTRY_TOKEN_REASONS = new Set(['entry_token_invalid', 'en
 const MINI_APP_HANDLED_ERROR_REQUEST_CONFIG = {
   silent: true,
   expectedErrorStatuses: [400, 403, 503],
-} as any;
+} as Record<string, unknown>;
 const MINI_APP_TELEMETRY_REQUEST_CONFIG = {
   silent: true,
   expectedErrorStatuses: [400, 404, 422, 503],
-} as any;
+} as Record<string, unknown>;
 const MINI_APP_ONBOARDING_STATUS_EVENTS = {
   pending_review: 'patient_onboarding_pending_review',
   needs_more_info: 'patient_onboarding_needs_more_info',
@@ -440,7 +440,7 @@ function TelegramMiniAppPatientShell() {
     payload: null,
     error: null,
   });
-  const [formAnswers, setFormAnswers] = useState({} as any);
+  const [formAnswers, setFormAnswers] = useState<Record<string, unknown>>({});
   const [formSubmit, setFormSubmit] = useState({
     status: 'idle',
     formId: null,
@@ -904,7 +904,7 @@ function TelegramMiniAppPatientShell() {
     setFormAnswers((current) => ({
       ...current,
       [formId]: {
-        ...(current[formId] || {}),
+        ...((current[formId] as Record<string, unknown>) || {}),
         [field.key]: value,
       },
     }));

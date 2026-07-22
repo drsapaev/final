@@ -262,7 +262,7 @@ const AdminFinanceOverview = () => {
           </div>
           <Select
             value={filterType}
-            onChange={(value: any) => setFilterType(String(value))}
+            onChange={(value: unknown) => setFilterType(String(value))}
             options={[
               { value: '', label: t('admin2.fo_filter_type_all') },
               { value: 'income', label: t('admin2.fo_filter_type_income') },
@@ -271,12 +271,12 @@ const AdminFinanceOverview = () => {
           />
           <Select
             value={filterCategory}
-            onChange={(value: any) => setFilterCategory(String(value))}
+            onChange={(value: unknown) => setFilterCategory(String(value))}
             options={getCategoryOptions(t)}
           />
           <Select
             value={filterDateRange}
-            onChange={(value: any) => setFilterDateRange(String(value))}
+            onChange={(value: unknown) => setFilterDateRange(String(value))}
             options={[
               { value: '', label: t('admin2.fo_filter_date_all') },
               { value: 'today', label: t('admin2.fo_filter_date_today') },
@@ -287,7 +287,7 @@ const AdminFinanceOverview = () => {
           />
           <Select
             value={financeFilterStatus}
-            onChange={(value: any) => setFinanceFilterStatus(String(value))}
+            onChange={(value: unknown) => setFinanceFilterStatus(String(value))}
             options={[
               { value: '', label: t('admin2.fo_filter_status_all') },
               { value: 'pending', label: t('admin2.fo_status_pending') },

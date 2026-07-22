@@ -4,12 +4,10 @@ import { useState, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import EMRSection from './EMRSection';
 import EMRTextField from './EMRTextField';
-import { DoctorTemplatesPanel as DTPRaw, DoctorTemplatesButton as DTBRaw } from '../DoctorTemplatesPanel';
+import { DoctorTemplatesPanel, DoctorTemplatesButton } from '../DoctorTemplatesPanel';
 import { useDoctorSectionTemplates } from '../../../hooks/useDoctorSectionTemplates';
 import { useTranslation } from '../../../i18n/useTranslation';
 
-const DoctorTemplatesPanel = DTPRaw as unknown as React.ComponentType<Record<string, unknown>>;
-const DoctorTemplatesButton = DTBRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 /**
  * RecommendationsSection Component
@@ -21,13 +19,22 @@ const DoctorTemplatesButton = DTBRaw as unknown as React.ComponentType<Record<st
  * @param {boolean} props.defaultOpen - Start expanded
  * @param {string} props.icd10Code - ICD-10 code for personalized templates
  */
+interface RecommendationsSectionProps {
+  value?: string;
+  onChange?: ((value: string) => void) | undefined;
+  disabled?: boolean;
+  defaultOpen?: boolean;
+  icd10Code?: string;
+}
+
+
 export function RecommendationsSection({
   value = '',
   onChange,
   disabled = false,
   defaultOpen = true,
   icd10Code = ''
-}) {
+}: RecommendationsSectionProps) {
   const [showMyExperience, setShowMyExperience] = useState(false);
 
   // Get templates from hook

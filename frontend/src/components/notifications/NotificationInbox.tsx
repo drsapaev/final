@@ -330,7 +330,7 @@ export default function NotificationInbox({ userRole, onClose }) {
 
           <Select
             value={statusFilter}
-            onChange={(v: any) => setStatusFilter(String(v))}
+            onChange={(v: unknown) => setStatusFilter(String(v))}
             options={STATUS_FILTER_OPTIONS}
             size="small"
             style={{ minWidth: 190 }}

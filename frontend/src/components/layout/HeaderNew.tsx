@@ -109,7 +109,8 @@ export default function HeaderNew() {
     }
   };
 
-  const user = (state as any).profile || (state as any).user || null;
+  const stateTyped = state as { profile?: Record<string, unknown>; user?: Record<string, unknown> };
+  const user = stateTyped.profile || stateTyped.user || null;
   const role = user?.role || user?.role_name || 'Guest';
   const roleLower = String(role).toLowerCase();
   // Normalize receptionist to registrar for UI consistency
@@ -556,7 +557,7 @@ export default function HeaderNew() {
             }}>
             <Icon name="person" size="small" style={{ color: 'var(--mac-text-primary)' }} />
             <span style={{ fontWeight: 'var(--mac-font-weight-semibold)' }}>
-              {user.full_name || user.username || t('legacy.hn_profile_fallback')}
+              {String(user?.full_name ?? '') || String(user?.username ?? '') || t('legacy.hn_profile_fallback')}
             </span>
           </Button>
           {showProfileMenu && (

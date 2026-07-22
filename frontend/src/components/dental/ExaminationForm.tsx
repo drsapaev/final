@@ -28,7 +28,7 @@ const ExaminationForm = ({
   initialData = null,
   onSave,
   onClose
-}: any) => {
+}: { patientId?: string | number; initialData?: Record<string, unknown> | null; onSave?: (data: unknown) => void; onClose?: () => void }) => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [formData, setFormData] = useState({

@@ -7,22 +7,17 @@ import { useTranslation } from '../../i18n/useTranslation';
 import { useEffect, useState } from 'react';
 import type { CSSProperties } from 'react';
 import {
-  Alert as RawAlert,
-  Badge as RawBadge,
-  Button as RawButton,
+  Alert,
+  Badge,
+  Button,
   Card,
   CardContent,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
-  Progress as RawProgress,
-  Input as RawInput } from '../ui/macos';
-const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
-const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Progress = RawProgress as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
+  Progress,
+  Input } from '../ui/macos';
 import {
   AlertTriangle,
   BrainCircuit,
@@ -237,7 +232,7 @@ const styles: Record<string, any> = {
   },
 };
 
-const ECGViewer = ({ visitId, patientId, onDataUpdate }: any) => {
+const ECGViewer = ({ visitId, patientId, onDataUpdate }: { visitId?: string | number; patientId?: string | number; onDataUpdate?: (data: unknown) => void }) => {
   const { t: tI18n } = useTranslation();
   const t = tI18n as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [ecgFiles, setEcgFiles] = useState([]);
@@ -273,15 +268,15 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }: any) => {
       
       try {
         const formData = new FormData();
-        formData.append('file', file);
+        formData.append('file', String(file));
         formData.append('file_type', 'medical_record');
         formData.append('title', file.name);
         formData.append('tags', 'ecg,cardiology');
         if (patientId) {
-          formData.append('patient_id', patientId);
+          formData.append('patient_id', String(patientId));
         }
         if (visitId) {
-          formData.append('visit_id', visitId);
+          formData.append('visit_id', String(visitId));
         }
         
         const response = await api.post('/files/upload', formData, {
@@ -311,7 +306,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }: any) => {
         }
 
         setUploadProgress(0);
-        onDataUpdate && onDataUpdate();
+        onDataUpdate?.(undefined);
         
       } catch (error) {
         logger.error('Ошибка загрузки ЭКГ:', error);
@@ -331,12 +326,12 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }: any) => {
   const parseECGFileData = async (originalFile, uploadedFile) => {
     try {
       // Сначала пробуем локальный парсинг
-      const parseResult = await parseECGFile(originalFile) as any;
+      const parseResult = await parseECGFile(originalFile) as unknown as Record<string, unknown>;
       
       if (parseResult.success && parseResult.parameters) {
         const analysis = analyzeECGParameters(parseResult.parameters);
         const enrichedParams = {
-          ...parseResult.parameters,
+          ...(parseResult.parameters as Record<string, unknown>),
           ...analysis,
         };
         
@@ -363,16 +358,16 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }: any) => {
               visit_id: visitId ? Number(visitId) : null,
               file_id: uploadedFile.id,
               ecg_date: new Date().toISOString().slice(0, 10),
-              heart_rate: enrichedParams.heart_rate ?? enrichedParams.heartRate ?? null,
-              pr_interval: enrichedParams.pr_interval ?? enrichedParams.prInterval ?? null,
-              qrs_duration: enrichedParams.qrs_duration ?? enrichedParams.qrsDuration ?? null,
-              qt_interval: enrichedParams.qt_interval ?? enrichedParams.qtInterval ?? null,
-              qt_corrected: enrichedParams.qt_corrected ?? enrichedParams.qtCorrected ?? null,
-              rhythm: enrichedParams.rhythm ?? null,
-              st_segment: enrichedParams.st_segment ?? enrichedParams.stSegment ?? null,
-              t_wave: enrichedParams.t_wave ?? enrichedParams.tWave ?? null,
-              axis: enrichedParams.axis ?? null,
-              interpretation: enrichedParams.interpretation ?? null,
+              heart_rate: (enrichedParams as Record<string, unknown>).heart_rate ?? (enrichedParams as Record<string, unknown>).heartRate ?? null,
+              pr_interval: (enrichedParams as Record<string, unknown>).pr_interval ?? (enrichedParams as Record<string, unknown>).prInterval ?? null,
+              qrs_duration: (enrichedParams as Record<string, unknown>).qrs_duration ?? (enrichedParams as Record<string, unknown>).qrsDuration ?? null,
+              qt_interval: (enrichedParams as Record<string, unknown>).qt_interval ?? (enrichedParams as Record<string, unknown>).qtInterval ?? null,
+              qt_corrected: (enrichedParams as Record<string, unknown>).qt_corrected ?? (enrichedParams as Record<string, unknown>).qtCorrected ?? null,
+              rhythm: (enrichedParams as Record<string, unknown>).rhythm ?? null,
+              st_segment: (enrichedParams as Record<string, unknown>).st_segment ?? (enrichedParams as Record<string, unknown>).stSegment ?? null,
+              t_wave: (enrichedParams as Record<string, unknown>).t_wave ?? (enrichedParams as Record<string, unknown>).tWave ?? null,
+              axis: (enrichedParams as Record<string, unknown>).axis ?? null,
+              interpretation: (enrichedParams as Record<string, unknown>).interpretation ?? null,
               source: 'device',
               parameters: enrichedParams,
             });
@@ -390,11 +385,11 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }: any) => {
   };
 
   const openFileBlobUrl = async (fileId, mode = 'preview') => {
-    const response = await api.get(`/files/${fileId}/${mode}`, {
+    const response = (await api.get(`/files/${fileId}/${mode}`, {
       responseType: 'blob',
-    }) as any;
+    })) as import('axios').AxiosResponse<Record<string, unknown>>;
 
-    return window.URL.createObjectURL(response.data);
+    return window.URL.createObjectURL(response.data as unknown as Blob);
   };
 
   const downloadFile = async (file) => {
@@ -423,14 +418,14 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }: any) => {
     setAnalysisResult(null);
     
     try {
-      const response = await api.post('/ai/ecg-interpret', {
+      const response = (await api.post('/ai/ecg-interpret', {
         file_id: file.id,
         visit_id: visitId,
         patient_id: patientId,
-      }) as any;
+      })) as import('axios').AxiosResponse<Record<string, unknown>>;
       
       setAnalysisResult(response.data);
-      onDataUpdate && onDataUpdate();
+      onDataUpdate?.(undefined);
       
     } catch (error) {
       logger.error('Ошибка AI анализа:', error);
@@ -484,7 +479,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }: any) => {
     try {
       await api.delete(`/files/${fileId}`);
       setEcgFiles(prev => prev.filter(f => f.id !== fileId));
-      onDataUpdate && onDataUpdate();
+      onDataUpdate?.(undefined);
     } catch (error) {
       logger.error('Ошибка удаления файла:', error);
       notify.error(t('final.ecg_delete_failed'));
@@ -528,7 +523,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }: any) => {
           </h3>
 
           <div {...getRootProps()} style={styles.dropzone(isDragActive)}>
-            <Input {...getInputProps()} />
+            <input {...getInputProps() as Record<string, unknown>} />
             <CloudUpload size={48} color="var(--mac-text-secondary)" aria-hidden="true" />
             <p style={{ ...styles.mutedText, marginTop: 'var(--mac-spacing-2)' }}>
               {isDragActive

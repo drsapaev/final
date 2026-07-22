@@ -35,14 +35,36 @@ const i18nT = i18n.t as unknown as (key: string, options?: Record<string, unknow
  * @param {Function} props.onChange - Handler для изменения specialty_data
  * @param {boolean} props.disabled - Read-only mode
  */
+export interface DermatologyPhoto {
+  id: string | number;
+  url?: string;
+  category?: string;
+  analysis?: unknown;
+  file?: File;
+  uploadedAt?: string;
+  [key: string]: unknown;
+}
+
+interface DermatologySectionProps {
+  photos?: DermatologyPhoto[];
+  skinType?: string;
+  conditions?: unknown[];
+  localization?: Record<string, unknown>;
+  onChange?: ((field: string, value: unknown) => void) | undefined;
+  disabled?: boolean;
+  visitId?: string | number | null | undefined;
+  patientId?: string | number | null | undefined;
+}
+
+
 export function DermatologySection({
   photos = [],
   skinType = '',
   conditions = [],
-  localization = {} as any,
+  localization = {} as Record<string, unknown>,
   onChange,
   disabled = false
-}) {
+}: DermatologySectionProps) {
   const [selectedPhoto, setSelectedPhoto] = useState(null);
   const [analyzingPhoto, setAnalyzingPhoto] = useState(false);
   const fileInputRef = useRef(null);
@@ -137,7 +159,7 @@ export function DermatologySection({
                 <label className="dermatology-label">{i18nT('misc.ds_tip_kozhi')}</label>
                 <select
           value={skinType}
-          onChange={(e: any) => handleSkinTypeChange(e.target.value)}
+          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleSkinTypeChange(e.target.value)}
           disabled={disabled}
           className="dermatology-select">
           
@@ -156,8 +178,8 @@ export function DermatologySection({
                 <div className="dermatology-conditions">
                     {[i18nT('misc.ds_akne'), i18nT('misc.ds_rozatsea'), i18nT('misc.ds_ekzema'), i18nT('misc.ds_psoriaz'), i18nT('misc.ds_pigmentatsiya'), i18nT('misc.ds_morschiny')].map((condition) =>
           <label key={condition} className="dermatology-checkbox">
-                            <Checkbox aria-label={i18nT('misc.ds_sostoyanie_kozhi_condition', { condition: condition })} checked={conditions.includes(condition)} onChange={(e: any) => {
-                if (e.target.checked) {
+                            <Checkbox aria-label={i18nT('misc.ds_sostoyanie_kozhi_condition', { condition: condition })} checked={conditions.includes(condition)} onChange={(checked: boolean) => {
+                if (checked) {
                   handleConditionAdd(condition);
                 } else {
                   handleConditionRemove(condition);

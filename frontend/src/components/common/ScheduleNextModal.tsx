@@ -28,9 +28,9 @@ import {
 interface ScheduleNextModalProps {
   isOpen?: boolean;
   onClose?: () => void;
-  onSuccess?: (result?: any, formData?: any) => void;
-  patient?: any;
-  theme?: any;
+  onSuccess?: (result?: unknown, formData?: Record<string, unknown>) => void;
+  patient?: Record<string, unknown>;
+  theme?: { getColor: (color: string, shade?: number | string) => string; getSpacing: (size: string) => string; getFontSize: (size: string) => string; isDark?: boolean };
   specialtyFilter?: string | null;
 }
 
@@ -72,7 +72,7 @@ const ScheduleNextModal = ({
 
       // Если передан пациент, устанавливаем его
       if (patient) {
-        setFormData((prev) => ({ ...prev, patient_id: patient.id }));
+        setFormData((prev) => ({ ...prev, patient_id: String(patient.id ?? '') }));
       }
     }
   }, [isOpen, patient]);

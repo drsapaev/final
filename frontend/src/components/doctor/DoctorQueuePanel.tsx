@@ -20,17 +20,12 @@ import {
 'lucide-react';
 import {
   MacOSCard,
-  Button as RawButton,
-  Badge as RawBadge,
-  Skeleton as RawSkeleton,
-  MacOSEmptyState as RawMacOSEmptyState,
-  Alert as RawAlert,
+  Button,
+  Badge,
+  Skeleton,
+  MacOSEmptyState,
+  Alert,
 } from '../ui/macos';
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
-const Skeleton = RawSkeleton as unknown as React.ComponentType<Record<string, unknown>>;
-const MacOSEmptyState = RawMacOSEmptyState as unknown as React.ComponentType<Record<string, unknown>>;
-const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
 import {
   formatRegistrarTime,
   getRegistrarTimestampDisplay,
@@ -61,7 +56,7 @@ const DoctorQueuePanel = ({
   specialty = 'cardiology',
   onPatientSelect,
   className = ''
-}: any) => {
+}: { specialty?: string; onPatientSelect?: (patient: Record<string, unknown>) => void; className?: string }) => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // Проверяем демо-режим в самом начале (в демо не скрываем компонент, а показываем моковые данные)

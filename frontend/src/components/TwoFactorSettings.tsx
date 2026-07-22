@@ -41,7 +41,7 @@ const TwoFactorSettings = () => {
 
   const loadStatus = async () => {
     try {
-      const response = await api.get('/2fa/status') as any;
+      const response = (await api.get('/2fa/status')) as import('axios').AxiosResponse<Record<string, unknown>>;
       setStatus(response);
     } catch {
       setError(t('misc.tfs_load_status_error'));
@@ -50,8 +50,8 @@ const TwoFactorSettings = () => {
 
   const loadDevices = async () => {
     try {
-      const response = await api.get('/2fa/devices') as any;
-      setDevices(response.devices || []);
+      const response = (await api.get('/2fa/devices')) as import('axios').AxiosResponse<Record<string, unknown>>;
+      setDevices((response.data?.devices as unknown[]) || []);
     } catch (err) {
       logger.error('Error loading devices:', err);
     }
@@ -59,8 +59,8 @@ const TwoFactorSettings = () => {
 
   const loadBackupCodes = async () => {
     try {
-      const response = await api.get('/2fa/backup-codes') as any;
-      setBackupCodes(response.backup_codes || []);
+      const response = (await api.get('/2fa/backup-codes')) as import('axios').AxiosResponse<Record<string, unknown>>;
+      setBackupCodes((response.data?.backup_codes as unknown[]) || []);
       setShowBackupCodes(true);
     } catch {
       setError(t('misc.tfs_load_backup_codes_error'));
@@ -78,12 +78,12 @@ const TwoFactorSettings = () => {
     setError('');
 
     try {
-      const response = await api.post('/2fa/disable', {
+      const response = (await api.post('/2fa/disable', {
         password,
         totp_code: totpCode
-      }) as any;
+      })) as import('axios').AxiosResponse<Record<string, unknown>>;
 
-      if (response.success) {
+      if (response.data?.success) {
         setSuccess(t('misc.tfs_disable_success'));
         loadStatus();
       } else {
@@ -114,8 +114,8 @@ const TwoFactorSettings = () => {
     setError('');
 
     try {
-      const response = await api.post('/2fa/backup-codes/regenerate') as any;
-      setBackupCodes(response.backup_codes || []);
+      const response = (await api.post('/2fa/backup-codes/regenerate')) as import('axios').AxiosResponse<Record<string, unknown>>;
+      setBackupCodes((response.data?.backup_codes as unknown[]) || []);
       setShowBackupCodes(true);
       setSuccess(t('misc.tfs_regenerate_success'));
     } catch (err) {

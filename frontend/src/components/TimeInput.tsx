@@ -50,10 +50,8 @@ export default function TimeInput({
     ...style,
   };
 
-  const MacInput = Input as unknown as React.ComponentType<Record<string, unknown>>;
-
   return (
-    <MacInput
+    <Input
       aria-label={ariaLabel}
       type="text"
       placeholder="HH:MM"

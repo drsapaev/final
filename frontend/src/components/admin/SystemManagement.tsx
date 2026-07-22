@@ -28,21 +28,14 @@ import {
 'lucide-react';
 import {
   MacOSCard,
-  Button as RawButton,
-  Badge as RawBadge,
-  Input as RawInput,
-  Checkbox as RawCheckbox,
-  Table as RawTable,
-  MacOSEmptyState as RawMacOSEmptyState,
-  Select as RawSelect,
+  Button,
+  Badge,
+  Input,
+  Checkbox,
+  Table,
+  MacOSEmptyState,
+  Select,
 } from '../ui/macos';
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
-const Checkbox = RawCheckbox as unknown as React.ComponentType<Record<string, unknown>>;
-const Table = RawTable as unknown as React.ComponentType<Record<string, unknown>>;
-const MacOSEmptyState = RawMacOSEmptyState as unknown as React.ComponentType<Record<string, unknown>>;
-const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
 import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 
@@ -59,12 +52,12 @@ const SystemManagement = () => {
   const [loading, setLoading] = useState(false);
 
   // Состояние мониторинга
-  const [systemHealth, setSystemHealth] = useState(null as any);
-  const [systemMetrics, setSystemMetrics] = useState(null as any);
+  const [systemHealth, setSystemHealth] = useState<Record<string, unknown> | null>(null);
+  const [systemMetrics, setSystemMetrics] = useState<Record<string, unknown> | null>(null);
   const [alerts, setAlerts] = useState([]);
   // UX Audit Admin #4.8: alerts display limit for pagination.
   const [alertsLimit, setAlertsLimit] = useState(10);
-  const [thresholds, setThresholds] = useState({} as any);
+  const [thresholds, setThresholds] = useState<Record<string, unknown>>({});
 
   // Состояние бэкапов
   const [backups, setBackups] = useState([]);
@@ -72,7 +65,7 @@ const SystemManagement = () => {
     backup_type: 'database',
     include_files: true,
     description: ''
-  } as any);
+  } as Record<string, unknown>);
 
   useEffect(() => {
     if (activeTab === 'monitoring') {
@@ -143,8 +136,8 @@ const SystemManagement = () => {
 
   const loadBackups = async () => {
     try {
-      const response = await api.get('/system/backup/list') as any;
-      setBackups(response.data?.backups || []);
+      const response = await api.get('/system/backup/list') as import('axios').AxiosResponse<Record<string, unknown>>;
+      setBackups((response.data?.backups as unknown[]) || []);
     } catch (error) {
       logger.error('Ошибка загрузки бэкапов:', error);
     }
@@ -153,12 +146,12 @@ const SystemManagement = () => {
   const createBackup = async () => {
     setLoading(true);
     try {
-      const response = await api.post('/system/backup/create', backupForm) as any;
+      const response = await api.post('/system/backup/create', backupForm) as import('axios').AxiosResponse<Record<string, unknown>>;
       if (response.data?.success) {
         toast.success(t('admin2.sm_backup_creating'));
         setTimeout(() => loadBackups(), 2000); // Обновляем список через 2 секунды
       } else {
-        toast.error(response.data?.error || t('admin2.sm_backup_create_error'));
+        toast.error(String(response.data?.error || t('admin2.sm_backup_create_error')));
       }
     } catch (error) {
       logger.error('Ошибка создания бэкапа:', error);
@@ -183,12 +176,12 @@ const SystemManagement = () => {
     }
 
     try {
-      const response = await api.delete(`/system/backup/${backupName}`) as any;
+      const response = (await api.delete(`/system/backup/${backupName}`)) as import('axios').AxiosResponse<Record<string, unknown>>;
       if (response.data?.success) {
         toast.success(t('admin2.sm_backup_deleted'));
         loadBackups();
       } else {
-        toast.error(response.data?.error || t('admin2.sm_backup_delete_error'));
+        toast.error(String(response.data?.error || t('admin2.sm_backup_delete_error')));
       }
     } catch (error) {
       logger.error('Ошибка удаления бэкапа:', error);
@@ -268,7 +261,7 @@ const SystemManagement = () => {
       <div className="admin-grid-auto-200">
             <div className="text-center">
               <div className="admin-stat-value-dynamic" style={{ '--admin-stat-color': getStatusColor(systemHealth.overall_status) } as CSSProperties}>
-                {systemHealth.overall_status?.toUpperCase()}
+                {String(systemHealth.overall_status ?? '').toUpperCase()}
               </div>
               <div className="admin-text-sm-secondary">
                 {t('admin2.sm_overall_status')}
@@ -303,17 +296,17 @@ const SystemManagement = () => {
                 <Cpu className="w-4 h-4" />
                 CPU
               </h4>
-              <Badge variant={systemMetrics.cpu?.usage_percent > 80 ? 'error' : 'success'}>
-                {systemMetrics.cpu?.usage_percent?.toFixed(1)}%
+              <Badge variant={(systemMetrics.cpu as { usage_percent?: number })?.usage_percent > 80 ? 'error' : 'success'}>
+                {(systemMetrics.cpu as { usage_percent?: number })?.usage_percent?.toFixed(1)}%
               </Badge>
             </div>
             <div className="flex flex-col gap-2">
               <div className="admin-text-sm-primary">
-                {t('admin2.sm_cores', { count: systemMetrics.cpu?.count })}
+                {t('admin2.sm_cores', { count: (systemMetrics.cpu as { count?: number })?.count })}
             </div>
-              {systemMetrics.cpu?.frequency &&
+              {(systemMetrics.cpu as { frequency?: number })?.frequency &&
           <div className="admin-text-sm-primary">
-                  {t('admin2.sm_frequency', { freq: systemMetrics.cpu.frequency.toFixed(0) })}
+                  {t('admin2.sm_frequency', { freq: (systemMetrics.cpu as { frequency?: number }).frequency.toFixed(0) })}
                 </div>
           }
             </div>
@@ -326,19 +319,19 @@ const SystemManagement = () => {
                 <MemoryStick className="w-4 h-4" />
                 {t('admin2.sm_memory')}
               </h4>
-              <Badge variant={systemMetrics.memory?.usage_percent > 85 ? 'error' : 'success'}>
-                {systemMetrics.memory?.usage_percent?.toFixed(1)}%
+              <Badge variant={(systemMetrics.memory as { usage_percent?: number })?.usage_percent > 85 ? 'error' : 'success'}>
+                {(systemMetrics.memory as { usage_percent?: number })?.usage_percent?.toFixed(1)}%
               </Badge>
             </div>
             <div className="flex flex-col gap-2">
               <div className="admin-text-sm-primary">
-                {t('admin2.sm_total')} {formatBytes(systemMetrics.memory?.total)}
+                {t('admin2.sm_total')} {formatBytes((systemMetrics.memory as { total?: number })?.total)}
               </div>
               <div className="admin-text-sm-primary">
-                {t('admin2.sm_used')} {formatBytes(systemMetrics.memory?.used)}
+                {t('admin2.sm_used')} {formatBytes((systemMetrics.memory as { used?: number })?.used)}
               </div>
               <div className="admin-text-sm-primary">
-                {t('admin2.sm_available')} {formatBytes(systemMetrics.memory?.available)}
+                {t('admin2.sm_available')} {formatBytes((systemMetrics.memory as { available?: number })?.available)}
             </div>
             </div>
           </MacOSCard>
@@ -350,19 +343,19 @@ const SystemManagement = () => {
                 <HardDrive className="w-4 h-4" />
                 {t('admin2.sm_disk')}
               </h4>
-              <Badge variant={systemMetrics.disk?.usage_percent > 90 ? 'error' : 'success'}>
-                {systemMetrics.disk?.usage_percent?.toFixed(1)}%
+              <Badge variant={(systemMetrics.disk as { usage_percent?: number })?.usage_percent > 90 ? 'error' : 'success'}>
+                {(systemMetrics.disk as { usage_percent?: number })?.usage_percent?.toFixed(1)}%
               </Badge>
             </div>
             <div className="flex flex-col gap-2">
               <div className="admin-text-sm-primary">
-                {t('admin2.sm_total')} {formatBytes(systemMetrics.disk?.total)}
+                {t('admin2.sm_total')} {formatBytes((systemMetrics.disk as { total?: number })?.total)}
               </div>
               <div className="admin-text-sm-primary">
-                {t('admin2.sm_used')} {formatBytes(systemMetrics.disk?.used)}
+                {t('admin2.sm_used')} {formatBytes((systemMetrics.disk as { used?: number })?.used)}
               </div>
               <div className="admin-text-sm-primary">
-                {t('admin2.sm_free')} {formatBytes(systemMetrics.disk?.free)}
+                {t('admin2.sm_free')} {formatBytes((systemMetrics.disk as { free?: number })?.free)}
             </div>
             </div>
           </MacOSCard>
@@ -435,7 +428,7 @@ const SystemManagement = () => {
               {t('admin2.sm_backup_type')}
             </label>
             <Select
-            value={backupForm.backup_type}
+            value={backupForm.backup_type as string}
             onChange={(value) => setBackupForm((prev) => ({ ...prev, backup_type: value }))}
             options={[
             { value: 'database', label: t('admin2.sm_backup_type_database') },
@@ -450,7 +443,7 @@ const SystemManagement = () => {
           <div className="flex items-center justify-center">
             <label className="admin-label-flex-pointer">
               <Checkbox
-              checked={backupForm.include_files}
+              checked={Boolean(backupForm.include_files as boolean)}
               onChange={(checked) => setBackupForm((prev) => ({ ...prev, include_files: checked }))}
               className="mr-2" />
 
@@ -576,7 +569,7 @@ const SystemManagement = () => {
                 </label>
                 <Input
                 type="number"
-                value={thresholds.cpu_usage || 80}
+                value={Number(thresholds.cpu_usage ?? 80)}
                 onChange={(e) => setThresholds((prev) => ({ ...prev, cpu_usage: parseInt(e.target.value) }))}
                 min="0"
                 max="100"
@@ -589,7 +582,7 @@ const SystemManagement = () => {
                 </label>
                 <Input
                 type="number"
-                value={thresholds.memory_usage || 85}
+                value={Number(thresholds.memory_usage ?? 85)}
                 onChange={(e) => setThresholds((prev) => ({ ...prev, memory_usage: parseInt(e.target.value) }))}
                 min="0"
                 max="100"
@@ -602,7 +595,7 @@ const SystemManagement = () => {
                 </label>
                 <Input
                 type="number"
-                value={thresholds.disk_usage || 90}
+                value={Number(thresholds.disk_usage ?? 90)}
                 onChange={(e) => setThresholds((prev) => ({ ...prev, disk_usage: parseInt(e.target.value) }))}
                 min="0"
                 max="100"
@@ -674,7 +667,7 @@ const SystemManagement = () => {
         <div className="flex items-center justify-center gap-2">
           {systemHealth &&
           <Badge variant={systemHealth.overall_status === 'healthy' ? 'success' : 'error'}>
-              {systemHealth.overall_status}
+              {String(systemHealth.overall_status ?? '')}
             </Badge>
           }
         </div>

@@ -2,21 +2,14 @@ import { useState, useEffect, useCallback } from 'react';
 import type { CSSProperties } from 'react';
 import {
   MacOSCard,
-  Button as RawButton,
-  Badge as RawBadge,
-  Input as RawInput,
-  Select as RawSelect,
-  SegmentedControl as RawSegmentedControl,
-  Skeleton as RawSkeleton,
-  MacOSEmptyState as RawMacOSEmptyState,
+  Button,
+  Badge,
+  Input,
+  Select,
+  SegmentedControl,
+  Skeleton,
+  MacOSEmptyState,
 } from '../ui/macos';
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
-const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
-const SegmentedControl = RawSegmentedControl as unknown as React.ComponentType<Record<string, unknown>>;
-const Skeleton = RawSkeleton as unknown as React.ComponentType<Record<string, unknown>>;
-const MacOSEmptyState = RawMacOSEmptyState as unknown as React.ComponentType<Record<string, unknown>>;
 import {
   Activity,
   Wifi,
@@ -48,21 +41,21 @@ const MedicalEquipmentManager = () => {
   const [devices, setDevices] = useState([]);
   const [measurements, setMeasurements] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [selectedDevice, setSelectedDevice] = useState(null as any);
-  const [overview, setOverview] = useState(null as any);
+  const [selectedDevice, setSelectedDevice] = useState<Record<string, unknown> | null>(null);
+  const [overview, setOverview] = useState<Record<string, unknown> | null>(null);
 
   // Состояние для измерения
   const [measurementForm, setMeasurementForm] = useState({
     device_id: '',
     patient_id: ''
-  } as any);
+  } as Record<string, unknown>);
 
   // Состояние для фильтров
   const [filters, setFilters] = useState({
     device_type: '',
     status: '',
     location: ''
-  } as any);
+  } as Record<string, unknown>);
 
   useEffect(() => {
     loadDevices();
@@ -72,8 +65,8 @@ const MedicalEquipmentManager = () => {
   const loadDevices = async () => {
     setLoading(true);
     try {
-      const response = await api.get('/medical-equipment/devices') as any;
-      setDevices(response.data.devices || []);
+      const response = await api.get('/medical-equipment/devices') as import('axios').AxiosResponse<Record<string, unknown>>;
+      setDevices((response.data.devices as unknown[]) || []);
     } catch (error) {
       // P0 fix: removed mock-device fallback. Was showing fabricated "Тонометр
       // Omron M3" / "Термометр Braun" devices on API failure — admin could act
@@ -88,8 +81,8 @@ const MedicalEquipmentManager = () => {
 
   const loadOverview = async () => {
     try {
-      const response = await api.get('/medical-equipment/statistics/overview') as any;
-      setOverview(response.data.overview);
+      const response = await api.get('/medical-equipment/statistics/overview') as import('axios').AxiosResponse<Record<string, unknown>>;
+      setOverview(response.data.overview as Record<string, unknown>);
     } catch (error) {
       // P0 fix: removed mock-overview fallback. Was showing fabricated stats
       // (2 devices, 15 measurements) on API failure. Now zeroes — render uses
@@ -108,11 +101,11 @@ const MedicalEquipmentManager = () => {
   const loadMeasurements = useCallback(async () => {
     setLoading(true);
     try {
-      const params: any = {};
+      const params: Record<string, unknown> = {};
       if (filters.device_type) params.device_type = filters.device_type;
 
-      const response = await api.get('/medical-equipment/measurements', { params }) as any;
-      setMeasurements(response.data.measurements || []);
+      const response = await api.get('/medical-equipment/measurements', { params }) as import('axios').AxiosResponse<Record<string, unknown>>;
+      setMeasurements((response.data.measurements as unknown[]) || []);
     } catch (error) {
       // P0 fix: removed mock-measurements fallback. Was showing fabricated
       // blood-pressure/thermometer readings on API failure.
@@ -131,13 +124,13 @@ const MedicalEquipmentManager = () => {
 
   const connectDevice = async (deviceId) => {
     try {
-      const response = await api.post(`/medical-equipment/devices/${deviceId}/connect`) as any;
+      const response = (await api.post(`/medical-equipment/devices/${deviceId}/connect`)) as import('axios').AxiosResponse<Record<string, unknown>>;
       const data = response.data;
       if (data.success) {
         toast.success(t('admin2.equip_toast_connected'));
         loadDevices();
       } else {
-        toast.error(data.message || t('admin2.equip_toast_connect_failed'));
+        toast.error(String(data.message || t('admin2.equip_toast_connect_failed')));
       }
     } catch (error) {
       logger.error('Ошибка подключения устройства:', error);
@@ -147,13 +140,13 @@ const MedicalEquipmentManager = () => {
 
   const disconnectDevice = async (deviceId) => {
     try {
-      const response = await api.post(`/medical-equipment/devices/${deviceId}/disconnect`) as any;
+      const response = (await api.post(`/medical-equipment/devices/${deviceId}/disconnect`)) as import('axios').AxiosResponse<Record<string, unknown>>;
       const data = response.data;
       if (data.success) {
         toast.success(t('admin2.equip_toast_disconnected'));
         loadDevices();
       } else {
-        toast.error(data.message || t('admin2.equip_toast_disconnect_failed'));
+        toast.error(String(data.message || t('admin2.equip_toast_disconnect_failed')));
       }
     } catch (error) {
       logger.error('Ошибка отключения устройства:', error);
@@ -186,13 +179,13 @@ const MedicalEquipmentManager = () => {
 
   const calibrateDevice = async (deviceId) => {
     try {
-      const response = await api.post(`/medical-equipment/devices/${deviceId}/calibrate`) as any;
+      const response = (await api.post(`/medical-equipment/devices/${deviceId}/calibrate`)) as import('axios').AxiosResponse<Record<string, unknown>>;
       const data = response.data;
       if (data.success) {
         toast.success(t('admin2.equip_toast_calibrate_done'));
         loadDevices();
       } else {
-        toast.error(data.message || t('admin2.equip_toast_calibrate_failed'));
+        toast.error(String(data.message || t('admin2.equip_toast_calibrate_failed')));
       }
     } catch (error) {
       logger.error('Ошибка калибровки:', error);
@@ -202,7 +195,7 @@ const MedicalEquipmentManager = () => {
 
   const runDiagnostics = async (deviceId) => {
     try {
-      const response = await api.post(`/medical-equipment/devices/${deviceId}/diagnostics`) as any;
+      const response = (await api.post(`/medical-equipment/devices/${deviceId}/diagnostics`)) as import('axios').AxiosResponse<Record<string, unknown>>;
       const data = response.data;
       setSelectedDevice({ ...selectedDevice, diagnostics: data });
       toast.success(t('admin2.equip_toast_diagnostics_done'));
@@ -268,10 +261,10 @@ const MedicalEquipmentManager = () => {
   const filteredDevices = devices.filter((device) => {
     if (filters.device_type && device.device_type !== filters.device_type) return false;
     if (filters.status && device.status !== filters.status) return false;
-    if (filters.location && !device.location.toLowerCase().includes(filters.location.toLowerCase())) return false;
+    if (filters.location && !device.location.toString().toLowerCase().includes(filters.location.toString().toLowerCase())) return false;
     return true;
   });
-  const hasDeviceFilters = Boolean(filters.device_type || filters.status || filters.location.trim());
+  const hasDeviceFilters = Boolean(filters.device_type || filters.status || filters.location.toString().trim());
   const devicesEmptyTitle = hasDeviceFilters ? t('admin2.equip_empty_filtered_title') : t('admin2.equip_empty_title');
   const devicesEmptyDescription = hasDeviceFilters ?
   t('admin2.equip_empty_filtered_desc') :
@@ -297,7 +290,7 @@ const MedicalEquipmentManager = () => {
     <div className="admin-grid-auto-200-mb-24">
           <MacOSCard className="p-0">
             <div className="admin-stat-number-accent-mb-8">
-              {overview.total_devices}
+              {String(overview.total_devices ?? '')}
             </div>
             <div className="admin-text-sm-secondary">
               {t('admin2.equip_stat_total_devices')}
@@ -305,7 +298,7 @@ const MedicalEquipmentManager = () => {
           </MacOSCard>
           <MacOSCard className="p-0">
             <div className="admin-stat-number-success-mb-8">
-              {overview.online_devices}
+              {String(overview.online_devices ?? '')}
             </div>
             <div className="admin-text-sm-secondary">
               {t('admin2.equip_stat_online')}
@@ -313,7 +306,7 @@ const MedicalEquipmentManager = () => {
           </MacOSCard>
           <MacOSCard className="p-0">
             <div className="admin-stat-number-error-mb-8">
-              {overview.offline_devices}
+              {String(overview.offline_devices ?? '')}
             </div>
             <div className="admin-text-sm-secondary">
               {t('admin2.equip_stat_offline')}
@@ -321,7 +314,7 @@ const MedicalEquipmentManager = () => {
           </MacOSCard>
           <MacOSCard className="p-0">
             <div className="admin-stat-number-purple-mb-8">
-              {overview.total_measurements}
+              {String(overview.total_measurements ?? '')}
             </div>
             <div className="admin-text-sm-secondary">
               {t('admin2.equip_stat_total_measurements')}
@@ -406,7 +399,7 @@ const MedicalEquipmentManager = () => {
             <label htmlFor="device-type-filter" className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">{t('admin2.equip_filter_device_type')}</label>
             <Select
             id="device-type-filter"
-            value={filters.device_type}
+            value={filters.device_type as string}
             onChange={(value: unknown) => setFilters({ ...filters, device_type: String(value) })}
             options={[
             { value: '', label: t('admin2.equip_filter_all_types') },
@@ -424,7 +417,7 @@ const MedicalEquipmentManager = () => {
             <label htmlFor="status-filter" className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">{t('common.status')}</label>
             <Select
             id="status-filter"
-            value={filters.status}
+            value={filters.status as string}
             onChange={(value: unknown) => setFilters({ ...filters, status: String(value) })}
             options={[
             { value: '', label: t('admin2.equip_filter_all_statuses') },
@@ -440,7 +433,7 @@ const MedicalEquipmentManager = () => {
             <label htmlFor="location-filter" className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">{t('admin2.equip_filter_location')}</label>
             <Input
             id="location-filter"
-            value={filters.location}
+            value={filters.location as string}
             onChange={(e) => setFilters({ ...filters, location: e.target.value })}
             placeholder={t('admin2.equip_filter_location_ph')} />
           
@@ -453,12 +446,12 @@ const MedicalEquipmentManager = () => {
         {filteredDevices.map((device) => {
         const DeviceIcon = getDeviceIcon(device.device_type);
         return (
-          <MacOSCard key={device.id} className="p-4">
+          <MacOSCard key={String(device.id ?? '')} className="p-4">
               <div className="admin-flex-between-flex-start-mb-12">
                 <div className="flex items-center justify-center gap-2">
                   <DeviceIcon size={20} className="admin-icon-blue" />
                   <div>
-                    <h4 className="admin-device-h4">{device.name}</h4>
+                    <h4 className="admin-device-h4">{String(device.name ?? '')}</h4>
                     <p className="admin-setting-desc">{getDeviceTypeName(device.device_type)}</p>
                   </div>
                 </div>
@@ -468,10 +461,10 @@ const MedicalEquipmentManager = () => {
               </div>
 
               <div className="admin-flex-col-8-sm mb-4">
-                <div><strong>{t('admin2.equip_field_manufacturer')}</strong> {device.manufacturer}</div>
-                <div><strong>{t('admin2.equip_field_model')}</strong> {device.model}</div>
+                <div><strong>{t('admin2.equip_field_manufacturer')}</strong> {String(device.manufacturer ?? '')}</div>
+                <div><strong>{t('admin2.equip_field_model')}</strong> {String(device.model ?? '')}</div>
                 <div><strong>{t('admin2.equip_field_location')}</strong> {device.location || t('admin2.equip_not_specified')}</div>
-                <div><strong>{t('admin2.equip_field_serial')}</strong> {device.serial_number}</div>
+                <div><strong>{t('admin2.equip_field_serial')}</strong> {String(device.serial_number ?? '')}</div>
               </div>
 
               <div className="admin-flex-wrap-8">
@@ -541,7 +534,7 @@ const MedicalEquipmentManager = () => {
               <label htmlFor="measurement-device" className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">{t('admin2.equip_field_device')}</label>
               <Select
               id="measurement-device"
-              value={measurementForm.device_id}
+              value={measurementForm.device_id as string}
               onChange={(value: unknown) => setMeasurementForm({ ...measurementForm, device_id: String(value) })}
               options={[
               { value: '', label: t('admin2.equip_select_device') },
@@ -549,7 +542,7 @@ const MedicalEquipmentManager = () => {
               filter((d) => d.status === 'online').
               map((device) => ({
                 value: String(device.id),
-                label: `${device.name} (${getDeviceTypeName(device.device_type)})`
+                label: `${String(device.name ?? '')} (${getDeviceTypeName(device.device_type)})`
               }))]
               }
               size="large" />
@@ -560,7 +553,7 @@ const MedicalEquipmentManager = () => {
               <label htmlFor="measurement-patient" className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">{t('admin2.equip_patient_id_label')}</label>
               <Input
               id="measurement-patient"
-              value={measurementForm.patient_id}
+              value={measurementForm.patient_id as string}
               onChange={(e) => setMeasurementForm({ ...measurementForm, patient_id: e.target.value })}
               placeholder={t('admin2.equip_patient_id_ph')} />
             
@@ -584,10 +577,10 @@ const MedicalEquipmentManager = () => {
             map((device) => {
               const DeviceIcon = getDeviceIcon(device.device_type);
               return (
-                <div key={device.id} className="admin-measurement-device-row">
+                <div key={String(device.id ?? '')} className="admin-measurement-device-row">
                       <div className="flex items-center justify-center gap-2">
                         <DeviceIcon size={16} className="admin-icon-blue" />
-                        <span className="admin-text-sm-primary">{device.name}</span>
+                        <span className="admin-text-sm-primary">{String(device.name ?? '')}</span>
                       </div>
                       <Badge variant="success">{t('admin2.equip_status_ready')}</Badge>
                     </div>);
@@ -632,7 +625,7 @@ const MedicalEquipmentManager = () => {
               <label htmlFor="measurements-device-type" className="block text-sm font-medium text-[var(--mac-text-secondary)] mb-2">{t('admin2.equip_filter_device_type')}</label>
               <Select
                 id="measurements-device-type"
-                value={filters.device_type}
+                value={filters.device_type as string}
                 onChange={(value: unknown) => setFilters({ ...filters, device_type: String(value) })}
                 options={[
                 { value: '', label: t('admin2.equip_filter_all_types') },
@@ -662,7 +655,7 @@ const MedicalEquipmentManager = () => {
                   <div className="admin-flex-center-8-mb-8">
                     <Badge variant="outline">{getDeviceTypeName(measurement.device_type)}</Badge>
                     <span className="admin-text-sm-secondary">
-                      {new Date(measurement.timestamp).toLocaleString()}
+                      {new Date(String(measurement.timestamp)).toLocaleString()}
                     </span>
                     {measurement.quality_score &&
                   <Badge variant={measurement.quality_score > 0.8 ? 'success' : 'warning'}>
@@ -673,11 +666,11 @@ const MedicalEquipmentManager = () => {
 
                   <div className="admin-grid-auto-200">
                     <div>
-                      <strong>{t('admin2.equip_field_device')}</strong> {measurement.device_id}
+                      <strong>{t('admin2.equip_field_device')}</strong> {String(measurement.device_id ?? '')}
                     </div>
                     {measurement.patient_id &&
                   <div>
-                        <strong>{t('admin2.equip_field_patient')}</strong> {measurement.patient_id}
+                        <strong>{t('admin2.equip_field_patient')}</strong> {String(measurement.patient_id ?? '')}
                       </div>
                   }
                     <div>
@@ -785,12 +778,12 @@ const MedicalEquipmentManager = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
               <div className="space-y-3">
-                <div><strong>{t('admin2.equip_field_name')}</strong> {selectedDevice.name}</div>
+                <div><strong>{t('admin2.equip_field_name')}</strong> {String(selectedDevice.name ?? '')}</div>
                 <div><strong>{t('admin2.equip_field_type')}</strong> {getDeviceTypeName(selectedDevice.device_type)}</div>
-                <div><strong>{t('admin2.equip_field_manufacturer')}</strong> {selectedDevice.manufacturer}</div>
-                <div><strong>{t('admin2.equip_field_model')}</strong> {selectedDevice.model}</div>
-                <div><strong>{t('admin2.equip_field_serial')}</strong> {selectedDevice.serial_number}</div>
-                <div><strong>{t('admin2.equip_field_firmware')}</strong> {selectedDevice.firmware_version}</div>
+                <div><strong>{t('admin2.equip_field_manufacturer')}</strong> {String(selectedDevice.manufacturer ?? '')}</div>
+                <div><strong>{t('admin2.equip_field_model')}</strong> {String(selectedDevice.model ?? '')}</div>
+                <div><strong>{t('admin2.equip_field_serial')}</strong> {String(selectedDevice.serial_number ?? '')}</div>
+                <div><strong>{t('admin2.equip_field_firmware')}</strong> {String(selectedDevice.firmware_version ?? '')}</div>
               </div>
 
               <div className="flex flex-col gap-3">
@@ -800,13 +793,13 @@ const MedicalEquipmentManager = () => {
                     {getStatusText(selectedDevice.status)}
                   </Badge>
                 </div>
-                <div><strong>{t('admin2.equip_field_location')}</strong> {selectedDevice.location || t('admin2.equip_not_specified')}</div>
-                <div><strong>{t('admin2.equip_field_connection_type')}</strong> {selectedDevice.connection_type}</div>
+                <div><strong>{t('admin2.equip_field_location')}</strong> {String(selectedDevice.location ?? '') || t('admin2.equip_not_specified')}</div>
+                <div><strong>{t('admin2.equip_field_connection_type')}</strong> {String(selectedDevice.connection_type ?? '')}</div>
                 {selectedDevice.last_seen &&
-              <div><strong>{t('admin2.equip_field_last_seen')}</strong> {new Date(selectedDevice.last_seen).toLocaleString()}</div>
+              <div><strong>{t('admin2.equip_field_last_seen')}</strong> {new Date(String(selectedDevice.last_seen)).toLocaleString()}</div>
               }
                 {selectedDevice.calibration_date &&
-              <div><strong>{t('admin2.equip_field_calibration_date')}</strong> {new Date(selectedDevice.calibration_date).toLocaleString()}</div>
+              <div><strong>{t('admin2.equip_field_calibration_date')}</strong> {new Date(String(selectedDevice.calibration_date)).toLocaleString()}</div>
               }
               </div>
             </div>
@@ -815,11 +808,11 @@ const MedicalEquipmentManager = () => {
           <div className="mb-6">
                 <h4 className="font-medium mb-2">{t('admin2.equip_diagnostics_results')}</h4>
                 <div className="space-y-2">
-                  {Object.entries(selectedDevice.diagnostics.tests).map(([test, result]: [string, any]) =>
+                  {Object.entries((selectedDevice.diagnostics as { tests?: Record<string, unknown> })?.tests || {}).map(([test, result]: [string, unknown]) =>
               <div key={test} className="flex justify-between items-center p-2 bg-gray-50 rounded">
                       <span>{test}</span>
-                      <Badge variant={result.passed ? 'success' : 'destructive'}>
-                        {result.passed ? t('admin2.equip_test_passed') : t('admin2.equip_test_failed')}
+                      <Badge variant={(result as { passed?: boolean })?.passed ? 'success' : 'destructive'}>
+                        {(result as { passed?: boolean })?.passed ? t('admin2.equip_test_passed') : t('admin2.equip_test_failed')}
                       </Badge>
                     </div>
               )}

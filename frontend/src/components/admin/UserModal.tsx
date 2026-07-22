@@ -164,7 +164,14 @@ const UserModal = ({
   };
 
   // Form field wrapper with icon
-  const FormField = ({ label, required, icon: Icon, error, children }) => (
+  interface FormFieldProps {
+    label?: React.ReactNode;
+    required?: boolean;
+    icon?: React.ComponentType<{ className?: string }>;
+    error?: string;
+    children?: React.ReactNode;
+  }
+  const FormField = ({ label, required, icon: Icon, error, children }: FormFieldProps) => (
     <div className="admin-mb-16">
       <label className="admin-usermodal-label">
         {label} {required && <span className="admin-required-asterisk">*</span>}
@@ -179,8 +186,6 @@ const UserModal = ({
     </div>
   );
 
-
-  const FormFieldAny = FormField as unknown as React.ComponentType<Record<string, unknown>>;
 
 FormField.propTypes = {
     ...(FormField.propTypes || {}),
@@ -201,7 +206,7 @@ FormField.propTypes = {
     >
       <form onSubmit={handleSubmit}>
         {/* Username */}
-        <FormFieldAny
+        <FormField
           label={t('admin2.umdl_field_username')}
           required
           icon={User}
@@ -215,20 +220,20 @@ FormField.propTypes = {
             error={!!errors.username}
             className="admin-input-pl-40"
           />
-        </FormFieldAny>
+        </FormField>
 
         {/* Full Name */}
-        <FormFieldAny label={t('admin2.umdl_field_full_name')}>
+        <FormField label={t('admin2.umdl_field_full_name')}>
           <Input
             type="text"
             value={formData.full_name}
             onChange={(e) => handleChange('full_name', e.target.value)}
             placeholder={t('admin2.umdl_ph_full_name')}
           />
-        </FormFieldAny>
+        </FormField>
 
         {/* Email */}
-        <FormFieldAny
+        <FormField
           label="Email"
           required
           icon={Mail}
@@ -242,10 +247,10 @@ FormField.propTypes = {
             error={!!errors.email}
             className="admin-input-pl-40"
           />
-        </FormFieldAny>
+        </FormField>
 
         {/* Role */}
-        <FormFieldAny label={t('admin2.umdl_field_role')} icon={Shield}>
+        <FormField label={t('admin2.umdl_field_role')} icon={Shield}>
           <Select
             value={formData.role}
             onChange={(value) => handleChange('role', value)}
@@ -253,7 +258,7 @@ FormField.propTypes = {
             size="large"
             className="admin-input-pl-40"
           />
-        </FormFieldAny>
+        </FormField>
 
         {/* Status */}
         <div className="admin-mb-16">
@@ -268,7 +273,7 @@ FormField.propTypes = {
         </div>
 
         {/* Password */}
-        <FormFieldAny
+        <FormField
           label={user ? t('admin2.umdl_field_password_new') : t('admin2.umdl_field_password')}
           required={!user}
           icon={Lock}
@@ -282,11 +287,11 @@ FormField.propTypes = {
             error={!!errors.password}
             className="admin-input-pl-40"
           />
-        </FormFieldAny>
+        </FormField>
 
         {/* Confirm Password */}
         {formData.password && (
-          <FormFieldAny
+          <FormField
             label={t('admin2.umdl_field_password_confirm')}
             required
             icon={Lock}
@@ -300,7 +305,7 @@ FormField.propTypes = {
               error={!!errors.confirmPassword}
               className="admin-input-pl-40"
             />
-          </FormFieldAny>
+          </FormField>
         )}
 
         {/* Action Buttons */}

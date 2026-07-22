@@ -28,25 +28,16 @@ import {
 'lucide-react';
 import {
   MacOSCard,
-  Button as RawButton,
-  Badge as RawBadge,
-  SegmentedControl as RawSegmentedControl,
-  MacOSStatCard as RawMacOSStatCard,
-  Input as RawInput,
-  Select as RawSelect,
-  MacOSEmptyState as RawMacOSEmptyState,
-  Skeleton as RawSkeleton,
-  Modal as RawModal,
+  Button,
+  Badge,
+  SegmentedControl,
+  MacOSStatCard,
+  Input,
+  Select,
+  MacOSEmptyState,
+  Skeleton,
+  Modal,
 } from '../ui/macos';
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Badge = RawBadge as unknown as React.ComponentType<Record<string, unknown>>;
-const SegmentedControl = RawSegmentedControl as unknown as React.ComponentType<Record<string, unknown>>;
-const MacOSStatCard = RawMacOSStatCard as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
-const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
-const MacOSEmptyState = RawMacOSEmptyState as unknown as React.ComponentType<Record<string, unknown>>;
-const Skeleton = RawSkeleton as unknown as React.ComponentType<Record<string, unknown>>;
-const Modal = RawModal as unknown as React.ComponentType<Record<string, unknown>>;
 import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 
@@ -62,7 +53,7 @@ const WebhookManager = () => {
   const [activeTab, setActiveTab] = useState('webhooks');
   const [webhooks, setWebhooks] = useState([]);
   const [calls, setCalls] = useState([]);
-  const [stats, setStats] = useState(null as any);
+  const [stats, setStats] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedWebhook, setSelectedWebhook] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -73,7 +64,7 @@ const WebhookManager = () => {
     event_type: '',
     search: '',
     call_status: ''
-  } as any);
+  } as Record<string, unknown>);
 
   // Загрузка данных
   const loadWebhooks = useCallback(async () => {
@@ -184,11 +175,11 @@ const WebhookManager = () => {
   };
 
   // Фильтрация webhook'ов
-  const filteredWebhooks = webhooks.filter((webhook) => {
-    if (filters.status && webhook.status !== filters.status) return false;
-    if (filters.event_type && !webhook.events.includes(filters.event_type)) return false;
-    if (filters.search && !webhook.name.toLowerCase().includes(filters.search.toLowerCase()) &&
-    !webhook.url.toLowerCase().includes(filters.search.toLowerCase())) return false;
+  const filteredWebhooks = webhooks.filter((webhook: Record<string, unknown>) => {
+    if (filters.status && String(webhook.status ?? '') !== filters.status) return false;
+    if (filters.event_type && !(webhook.events as unknown[])?.includes(filters.event_type)) return false;
+    if (filters.search && !String(webhook.name ?? '').toLowerCase().includes(String(filters.search ?? '').toLowerCase()) &&
+    !String(webhook.url ?? '').toLowerCase().includes(String(filters.search ?? '').toLowerCase())) return false;
     return true;
   });
 
@@ -258,28 +249,28 @@ const WebhookManager = () => {
       <div className="admin-grid-gtc-rauto-fitcminmax200pxc1fr-gap-16">
           <MacOSStatCard
           title={t('admin2.wh_stat_total')}
-          value={stats.total_webhooks}
+          value={String((stats as Record<string, unknown>)?.total_webhooks ?? "")}
           icon={Globe}
           color="blue" />
 
           
           <MacOSStatCard
           title={t('admin2.wh_stat_active')}
-          value={stats.active_webhooks}
+          value={String((stats as Record<string, unknown>)?.active_webhooks ?? "")}
           icon={CheckCircle}
           color="green" />
 
           
           <MacOSStatCard
           title={t('admin2.wh_stat_calls_24h')}
-          value={stats.recent_24h.total_calls}
+          value={String(((stats as Record<string, unknown>)?.recent_24h as Record<string, unknown>)?.total_calls ?? "")}
           icon={Activity}
           color="orange" />
 
           
           <MacOSStatCard
           title={t('admin2.wh_stat_success_rate')}
-          value={`${stats.recent_24h.success_rate.toFixed(1)}%`}
+          value={`${Number(((stats as Record<string, unknown>)?.recent_24h as Record<string, unknown>)?.success_rate ?? 0).toFixed(1) ?? '0'}%`}
           icon={Zap}
           color="blue" />
 
@@ -312,7 +303,7 @@ const WebhookManager = () => {
                 <Input
                 type="text"
                 placeholder={t('admin2.wh_search_ph')}
-                value={filters.search}
+                value={String(filters.search ?? "")}
                 onChange={(e) => setFilters({ ...filters, search: e.target.value })}
                 icon={Search}
                 iconPosition="left" />
@@ -324,7 +315,7 @@ const WebhookManager = () => {
                   {t('admin2.wh_status_label')}
                 </label>
                 <Select
-                value={filters.status}
+                value={String(filters.status ?? "")}
                 onChange={(value) => setFilters({ ...filters, status: value })}
                 options={[
                 { value: '', label: t('admin2.wh_status_all') },
@@ -341,7 +332,7 @@ const WebhookManager = () => {
                   {t('admin2.wh_event_type_label')}
                 </label>
                 <Select
-                value={filters.event_type}
+                value={String(filters.event_type ?? "")}
                 onChange={(value) => setFilters({ ...filters, event_type: value })}
                 options={[
                 { value: '', label: t('admin2.wh_events_all') },
@@ -368,26 +359,26 @@ const WebhookManager = () => {
           {/* Список webhook'ов */}
           <div className="flex flex-col gap-4">
             {filteredWebhooks.map((webhook) =>
-          <MacOSCard key={webhook.id} className="p-6">
+          <MacOSCard key={String(webhook.id ?? "")} className="p-6">
                 <div className="admin-flex-ai-start-jc-between">
                   <div className="admin-flex-1">
                     <div className="admin-flex-ai-center-gap-12-mb-8">
                       <h3 className="admin-lg-semi-primary-m-0">
-                        {webhook.name}
+                        {String(webhook.name ?? "")}
                       </h3>
                       {getStatusBadge(webhook.status, webhook.is_active)}
                     </div>
                     
                     {webhook.description &&
                 <p className="admin-secondary-sm-mb-8">
-                        {webhook.description}
+                        {String(webhook.description ?? "")}
                       </p>
                 }
                     
                     <div className="admin-flex-ai-center-gap-16-sm-tertiary-mb-12">
                       <span className="flex items-center justify-center admin-gap-4">
                         <Globe className="w-4 h-4" />
-                        {webhook.url}
+                        {String(webhook.url ?? "")}
                       </span>
                       <span className="flex items-center justify-center admin-gap-4">
                         <Activity className="w-4 h-4" />
@@ -559,7 +550,7 @@ const WebhookManager = () => {
                   {t('admin2.wh_call_status_label')}
                 </label>
                 <Select
-                value={filters.call_status || ''}
+                value={String(filters.call_status ?? '')}
                 onChange={(value) => setFilters({ ...filters, call_status: value })}
                 options={[
                 { value: '', label: t('admin2.wh_status_all') },

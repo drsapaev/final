@@ -42,12 +42,9 @@ import {
 import api from '../../services/api';
 import logger from '../../utils/logger';
 import {
-  Select as RawSelect,
-  Input as RawInput,
-  Checkbox as RawCheckbox } from '../ui/macos';
-const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
-const Checkbox = RawCheckbox as unknown as React.ComponentType<Record<string, unknown>>;
+  Select,
+  Input,
+  Checkbox } from '../ui/macos';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
 import { notify } from '../../services/notify';
@@ -113,10 +110,10 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
         try {
             setLoading(true);
             setError(null);
-            const response = await api.get('/queues/profiles?active_only=false') as any;
-            setProfiles(response.data.profiles || []);
+            const response = (await api.get('/queues/profiles?active_only=false')) as import('axios').AxiosResponse<Record<string, unknown>>;
+            setProfiles((response.data.profiles as unknown[]) || []);
             setSelectedProfiles([]); // Clear selection on reload
-            logger.info(`Loaded ${response.data.profiles?.length || 0} queue profiles`);
+            logger.info(`Loaded ${(response.data?.profiles as unknown[])?.length || 0} queue profiles`);
         } catch (err) {
             logger.error('Error loading queue profiles:', err);
             setError(t('admin2.qp_load_failed'));
@@ -128,8 +125,8 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
     useEffect(() => {
         loadProfiles();
         // PR-21: load departments for department_key Select
-        api.get('/admin/departments').then((res: any) => {
-            setDepartments(res.data?.data || []);
+        api.get('/admin/departments').then((res: import('axios').AxiosResponse<Record<string, unknown>>) => {
+            setDepartments((res.data?.data as unknown[]) || []);
         }).catch(err => logger.error('Failed to load departments:', err));
     }, [loadProfiles]);
 
@@ -354,22 +351,22 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
 
             for (let i = 1; i < lines.length; i++) {
                 const values = lines[i].split(',').map(v => v.replace(/^"|"$/g, '').replace(/""/g, '"'));
-                const profile: any = {};
+                const profile: Record<string, unknown> = {};
 
-                headers.forEach((header: any, index: number) => {
+                headers.forEach((header: unknown, index: number) => {
                     const value = values[index];
                     switch (header) {
                         case 'queue_tags':
-                            profile[header] = value ? value.split(';').filter(Boolean) : [];
+                            profile[header as string] = value ? value.split(';').filter(Boolean) : [];
                             break;
                         case 'display_order':
-                            profile[header] = parseInt(value) || 0;
+                            profile[header as string] = parseInt(value) || 0;
                             break;
                         case 'is_active':
-                            profile[header] = value !== 'false';
+                            profile[header as string] = value !== 'false';
                             break;
                         default:
-                            profile[header] = value || '';
+                            profile[header as string] = value || '';
                     }
                 });
 
@@ -740,29 +737,29 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
     );
 };
 // Profile form component with show_on_qr_page support
-const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = false, departments = [] }: any) => {
+const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = false, departments = [] }: { profile?: Record<string, unknown>; onSubmit?: (data: unknown) => void; onCancel?: () => void; saving?: boolean; isDark?: boolean; isEdit?: boolean; departments?: unknown[] }) => {
     const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
     const availableIcons = getAvailableIcons(t);
-    const [formData, setFormData] = useState({
+    const [formData, setFormData] = useState<Record<string, unknown>>({
         key: profile?.key || '',
         title: profile?.title || '',
         title_ru: profile?.title_ru || '',
-        queue_tags: (profile?.queue_tags || []).join(', '),
+        queue_tags: ((profile?.queue_tags as unknown[]) || []).join(', '),
         department_key: profile?.department_key || '',
         display_order: profile?.order || 0,
         is_active: profile?.is_active !== false,
         show_on_qr_page: profile?.show_on_qr_page !== false, // ⭐ NEW: QR page visibility
         icon: profile?.icon || 'Package',
         color: profile?.color || '#718096',
-    } as any);
+    });
 
     const handleSubmit = (e) => {
         e.preventDefault();
         onSubmit({
             ...formData,
-            queue_tags: formData.queue_tags.split(',').map(t => t.trim()).filter(Boolean),
-            display_order: parseInt(formData.display_order, 10) || 0,
+            queue_tags: String(formData.queue_tags || '').split(',').map(t => t.trim()).filter(Boolean),
+            display_order: parseInt(String(formData.display_order), 10) || 0,
         });
     };
     const handleActivationKeyDown = (event, action) => {
@@ -802,7 +799,7 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                             <Input
                                 className="admin-qp-input" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' } as CSSProperties}
                                 aria-label={t('admin2.qp_key_input_aria')}
-                                value={formData.key}
+                                value={formData.key as string}
                                 onChange={e => setFormData({ ...formData, key: e.target.value })}
                                 placeholder={t('admin2.qp_key_ph')}
                                 required
@@ -819,7 +816,7 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                             <Input
                                 className="admin-qp-input" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' } as CSSProperties}
                                 aria-label={t('admin2.qp_title_en_aria')}
-                                value={formData.title}
+                                value={formData.title as string}
                                 onChange={e => setFormData({ ...formData, title: e.target.value })}
                                 placeholder="Cardiology"
                                 required
@@ -830,7 +827,7 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                             <Input
                                 className="admin-qp-input" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' } as CSSProperties}
                                 aria-label={t('admin2.qp_title_ru_aria')}
-                                value={formData.title_ru}
+                                value={formData.title_ru as string}
                                 onChange={e => setFormData({ ...formData, title_ru: e.target.value })}
                                 placeholder={t('admin2.qp_title_ru_ph')}
                             />
@@ -843,7 +840,7 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                         <Input
                             className="admin-qp-input" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' } as CSSProperties}
                             aria-label="Queue Tags"
-                            value={formData.queue_tags}
+                            value={formData.queue_tags as string}
                             onChange={e => setFormData({ ...formData, queue_tags: e.target.value })}
                             placeholder="cardio, cardiology, cardiology_common"
                         />
@@ -856,11 +853,11 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                         <select
                             className="admin-w-100pct-p-10px-12px-radius-8-bd-1px-solid-var-mac-bo-primary-fs-14-bsz-border-box-w-100-bgc-dyn"
                             style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)' } as CSSProperties}
-                            value={formData.department_key}
+                            value={formData.department_key as string}
                             onChange={e => setFormData({ ...formData, department_key: e.target.value })}
                         >
                             <option value="">{t('admin2.qp_department_none')}</option>
-                            {departments.map(d => (
+                            {departments.map((d: { key?: string; name_ru?: string }) => (
                                 <option key={d.key} value={d.key}>{d.name_ru || d.key}</option>
                             ))}
                         </select>
@@ -875,7 +872,7 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                             type="number"
                             aria-label={t('admin2.qp_order_aria')}
                             min="0"
-                            value={formData.display_order}
+                            value={formData.display_order as string}
                             onChange={e => setFormData({ ...formData, display_order: e.target.value })}
                         />
                     </div>
@@ -921,7 +918,7 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                             <Input
                                 type="color"
                                 aria-label={t('admin2.qp_custom_color_aria')}
-                                value={formData.color}
+                                value={formData.color as string}
                                 onChange={e => setFormData({ ...formData, color: e.target.value })}
                                 className="admin-w-32-h-32-bd-none-cur-pointer"
                             />
@@ -931,7 +928,7 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                     {/* Active */}
                     <div className="admin-qp-field">
                         <label className="admin-d-flex-ai-center-gap-8-cur-pointer">
-                            <Checkbox aria-label={t('admin2.qp_active_checkbox_aria')} checked={formData.is_active} onChange={e => setFormData({ ...formData, is_active: e.target.checked })}
+                            <Checkbox aria-label={t('admin2.qp_active_checkbox_aria')} checked={Boolean(formData.is_active as boolean)} onChange={(checked: boolean) => setFormData({ ...formData, is_active: checked })}
                             />
                             <span className="admin-qp-label">{t('admin2.qp_active_label')}</span>
                         </label>
@@ -940,7 +937,7 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                     {/* ⭐ NEW: Show on QR Page */}
                     <div className="admin-qp-field">
                         <label className="admin-d-flex-ai-center-gap-8-cur-pointer">
-                            <Checkbox aria-label={t('admin2.qp_qr_checkbox_aria')} checked={formData.show_on_qr_page} onChange={e => setFormData({ ...formData, show_on_qr_page: e.target.checked })}
+                            <Checkbox aria-label={t('admin2.qp_qr_checkbox_aria')} checked={Boolean(formData.show_on_qr_page as boolean)} onChange={(checked: boolean) => setFormData({ ...formData, show_on_qr_page: checked })}
                             />
                             <span className="admin-qp-label">{t('admin2.qp_qr_label')}</span>
                         </label>

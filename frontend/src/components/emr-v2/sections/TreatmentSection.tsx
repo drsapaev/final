@@ -39,6 +39,27 @@ import React from "react";
  * @param {string} props.specialty - Doctor specialty for templates
  * @param {string} props.icd10Code - Current ICD-10 code for personalized templates
  */
+interface TreatmentSectionProps {
+  value?: string;
+  onChange?: (value: string, options?: Record<string, unknown>) => void;
+  medications?: unknown[];
+  onMedicationsChange?: ((list: unknown[]) => void) | undefined;
+  disabled?: boolean;
+  defaultOpen?: boolean;
+  specialty?: string;
+  icd10Code?: string;
+  complaints?: string;
+  suggestions?: unknown[];
+  aiLoading?: boolean;
+  onApplySuggestion?: ((s: unknown) => void) | undefined;
+  onDismissSuggestion?: ((s: unknown) => void) | undefined;
+  onRequestAI?: ((text: string) => void) | undefined;
+  doctorId?: string | number | null | undefined;
+  experimentalGhostMode?: boolean;
+  onTelemetry?: ((payload: Record<string, unknown>) => void) | undefined;
+}
+
+
 export function TreatmentSection({
   value = '',
   onChange,
@@ -58,7 +79,7 @@ export function TreatmentSection({
   doctorId,
   experimentalGhostMode = false,
   onTelemetry
-}) {
+}: TreatmentSectionProps) {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [showTemplates, setShowTemplates] = useState(false);
   const [showMyExperience, setShowMyExperience] = useState(false);

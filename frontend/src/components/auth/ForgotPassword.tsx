@@ -155,7 +155,7 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
     setLoading(true);
     setInlineError('');
     try {
-      const response = await api.post('/password-reset/initiate', { phone: contact }) as any;
+      const response = (await api.post('/password-reset/initiate', { phone: contact })) as import('axios').AxiosResponse<Record<string, unknown>>;
       if (response.data.success) {
         toast.success(t('final.fp_sms_sent'));
         setStep('phone-verify');
@@ -174,7 +174,7 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
     setLoading(true);
     setInlineError('');
     try {
-      const response = await api.post('/password-reset/initiate', { email: contact }) as any;
+      const response = (await api.post('/password-reset/initiate', { email: contact })) as import('axios').AxiosResponse<Record<string, unknown>>;
       if (response.data.success) {
         toast.success(t('final.fp_email_sent_to') + ' ' + contact);
         setStep('email-verify');
@@ -217,12 +217,12 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
     }
     setLoading(true);
     try {
-      const response = await api.post('/password-reset/verify-phone', {
+      const response = (await api.post('/password-reset/verify-phone', {
         phone: contact,
         verification_code: verificationCode,
-      }) as any;
+      })) as import('axios').AxiosResponse<Record<string, unknown>>;
       if (response.data.success) {
-        setResetToken(response.data.reset_token);
+        setResetToken(String(response.data.reset_token));
         setStep('reset-password');
         toast.success(t('final.fp_phone_confirmed'));
       }
@@ -239,7 +239,7 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
     setLoading(true);
     setInlineError('');
     try {
-      const response = await api.post('/password-reset/initiate', { phone: contact }) as any;
+      const response = (await api.post('/password-reset/initiate', { phone: contact })) as import('axios').AxiosResponse<Record<string, unknown>>;
       if (response.data.success) {
         toast.success(t('final.fp_sms_sent'));
         startResendCountdown();
@@ -265,10 +265,10 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
     }
     setLoading(true);
     try {
-      const response = await api.post('/password-reset/confirm', {
+      const response = (await api.post('/password-reset/confirm', {
         token: resetToken,
         new_password: newPassword,
-      }) as any;
+      })) as import('axios').AxiosResponse<Record<string, unknown>>;
       if (response.data.success) {
         setStep('success');
         toast.success(t('final.fp_success'));

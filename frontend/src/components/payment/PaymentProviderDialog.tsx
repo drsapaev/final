@@ -111,18 +111,18 @@ const PaymentProviderDialog = ({
           provider,
           return_url: `${window.location.origin}/payment/success`,
           cancel_url: `${window.location.origin}/payment/cancel`
-        }) as any;
+        }) as import('axios').AxiosResponse<Record<string, unknown>>;
 
         const data = response.data;
 
         if (data.success) {
-          setPaymentUrl(data.payment_url);
+          setPaymentUrl(String(data.payment_url));
           setProviderPaymentId(data.provider_payment_id);
           setPaymentState('processing');
 
           // Автоматически открываем ссылку на оплату
-          if (data.payment_url) {
-            window.open(data.payment_url, '_blank');
+          if (String(data.payment_url)) {
+            window.open(String(data.payment_url), '_blank');
 
             // Начинаем polling через 10 секунд
             setTimeout(() => {
@@ -130,7 +130,7 @@ const PaymentProviderDialog = ({
             }, 10000);
           }
         } else {
-          throw new Error(data.error_message || t('payment.pay_dlg_create_payment_failed'));
+          throw new Error(String(data.error_message) || t('payment.pay_dlg_create_payment_failed'));
         }
 
         return data;
@@ -174,7 +174,7 @@ const PaymentProviderDialog = ({
   };
 
   const checkPaymentStatus = async () => {
-    const response = await api.get(`/registrar/invoice/${invoiceId}/status`) as any;
+    const response = (await api.get(`/registrar/invoice/${invoiceId}/status`)) as import('axios').AxiosResponse<Record<string, unknown>>;
 
     if (response.status >= 200 && response.status < 300) {
       const data = response.data;

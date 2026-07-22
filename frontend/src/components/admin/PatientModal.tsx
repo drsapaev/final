@@ -3,19 +3,13 @@ import { useState, useEffect } from 'react';
 import { Save, User, Mail, Phone, MapPin, Calendar, IdCard, AlertCircle } from 'lucide-react';
 import logger from '../../utils/logger';
 import {
-  Button as RawButton,
-  Input as RawInput,
-  Select as RawSelect,
-  Textarea as RawTextarea,
-  Modal as RawModal,
-  Alert as RawAlert,
+  Button,
+  Input,
+  Select,
+  Textarea,
+  Modal,
+  Alert,
 } from '../ui/macos';
-const Button = RawButton as unknown as React.ComponentType<Record<string, unknown>>;
-const Input = RawInput as unknown as React.ComponentType<Record<string, unknown>>;
-const Select = RawSelect as unknown as React.ComponentType<Record<string, unknown>>;
-const Textarea = RawTextarea as unknown as React.ComponentType<Record<string, unknown>>;
-const Modal = RawModal as unknown as React.ComponentType<Record<string, unknown>>;
-const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
 import PropTypes from 'prop-types';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
@@ -49,8 +43,8 @@ const PatientModal = ({
     allergies: '',
     chronicDiseases: '',
     notes: ''
-  } as any);
-  const [errors, setErrors] = useState({} as any);
+  } as Record<string, unknown>);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
@@ -107,28 +101,28 @@ const PatientModal = ({
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
-    if (!formData.firstName.trim()) {
+    if (!String(formData.firstName ?? '').trim()) {
       newErrors.firstName = t('admin2.pm_err_first_name_required');
     }
 
-    if (!formData.lastName.trim()) {
+    if (!String(formData.lastName ?? '').trim()) {
       newErrors.lastName = t('admin2.pm_err_last_name_required');
     }
 
-    if (!formData.phone.trim()) {
+    if (!String(formData.phone ?? '').trim()) {
       newErrors.phone = t('admin2.pm_err_phone_required');
-    } else if (!/^\+998\s?\d{2}\s?\d{3}\s?\d{2}\s?\d{2}$/.test(formData.phone.replace(/\s/g, ''))) {
+    } else if (!/^\+998\s?\d{2}\s?\d{3}\s?\d{2}\s?\d{2}$/.test(String(formData.phone ?? '').replace(/\s/g, ''))) {
       newErrors.phone = t('admin2.pm_err_phone_format');
     }
 
-    if (formData.email && !/\S+@\S+\.\S+/.test(formData.email)) {
+    if (formData.email && !/\S+@\S+\.\S+/.test(String(formData.email ?? ''))) {
       newErrors.email = t('admin2.pm_err_email_format');
     }
 
     if (!formData.birthDate) {
       newErrors.birthDate = t('admin2.pm_err_birth_date_required');
     } else {
-      const birthDate = new Date(formData.birthDate);
+      const birthDate = new Date(String(formData.birthDate));
       const today = new Date();
       const age = today.getFullYear() - birthDate.getFullYear();
       if (age < 0 || age > 120) {
@@ -141,7 +135,7 @@ const PatientModal = ({
     }
 
     // Passport is now optional for quick registration
-    // if (!formData.passport.trim()) {
+    // if (!String(formData.passport ?? '').trim()) {
     //   newErrors.passport = 'Паспортные данные обязательны';
     // }
 
@@ -157,22 +151,22 @@ const PatientModal = ({
     setIsSubmitting(true);
     try {
       const patientData = {
-        firstName: formData.firstName.trim(),
-        lastName: formData.lastName.trim(),
-        middleName: formData.middleName.trim(),
-        email: formData.email.trim() || null,
-        phone: formData.phone.trim(),
+        firstName: String(formData.firstName ?? '').trim(),
+        lastName: String(formData.lastName ?? '').trim(),
+        middleName: String(formData.middleName ?? '').trim(),
+        email: String(formData.email ?? '').trim() || null,
+        phone: String(formData.phone ?? '').trim(),
         birthDate: formData.birthDate,
         gender: formData.gender,
-        address: formData.address.trim() || null,
-        passport: formData.passport.trim(),
-        insuranceNumber: formData.insuranceNumber.trim() || null,
-        emergencyContact: formData.emergencyContact.trim() || null,
-        emergencyPhone: formData.emergencyPhone.trim() || null,
+        address: String(formData.address ?? '').trim() || null,
+        passport: String(formData.passport ?? '').trim(),
+        insuranceNumber: String(formData.insuranceNumber ?? '').trim() || null,
+        emergencyContact: String(formData.emergencyContact ?? '').trim() || null,
+        emergencyPhone: String(formData.emergencyPhone ?? '').trim() || null,
         bloodType: formData.bloodType || null,
-        allergies: formData.allergies.trim() || null,
-        chronicDiseases: formData.chronicDiseases.trim() || null,
-        notes: formData.notes.trim() || null
+        allergies: String(formData.allergies ?? '').trim() || null,
+        chronicDiseases: String(formData.chronicDiseases ?? '').trim() || null,
+        notes: String(formData.notes ?? '').trim() || null
       };
 
       await onSave(patientData);
@@ -256,7 +250,7 @@ const PatientModal = ({
               </label>
               <Input
                 type="text"
-                value={formData.lastName}
+                value={String(formData.lastName ?? '')}
                 onChange={(e) => handleChange('lastName', e.target.value)}
                 placeholder={t('admin2.pm_ph_last_name')}
                 error={errors.lastName}
@@ -277,7 +271,7 @@ const PatientModal = ({
               </label>
               <Input
                 type="text"
-                value={formData.firstName}
+                value={String(formData.firstName ?? '')}
                 onChange={(e) => handleChange('firstName', e.target.value)}
                 placeholder={t('admin2.pm_ph_first_name')}
                 error={errors.firstName} />
@@ -297,7 +291,7 @@ const PatientModal = ({
               </label>
               <Input
                 type="text"
-                value={formData.middleName}
+                value={String(formData.middleName ?? '')}
                 onChange={(e) => handleChange('middleName', e.target.value)}
                 placeholder={t('admin2.pm_ph_middle_name')} />
 
@@ -312,14 +306,14 @@ const PatientModal = ({
               </label>
               <Input
                 type="date"
-                value={formData.birthDate}
+                value={String(formData.birthDate ?? '')}
                 onChange={(e) => handleChange('birthDate', e.target.value)}
                 error={errors.birthDate}
                 icon={Calendar} />
 
               {formData.birthDate &&
               <p className="admin-fs-xs-secondary-mt-4-ml-2">
-                  {t('admin2.pm_age_text', { age: new Date().getFullYear() - new Date(formData.birthDate).getFullYear() })}
+                  {t('admin2.pm_age_text', { age: new Date().getFullYear() - new Date(String(formData.birthDate)).getFullYear() })}
                 </p>
               }
               {errors.birthDate &&
@@ -336,7 +330,7 @@ const PatientModal = ({
                 {t('admin2.pm_label_gender')}
               </label>
               <Select
-                value={formData.gender}
+                value={String(formData.gender ?? '')}
                 onChange={(value) => handleChange('gender', value)}
                 options={[
                 { value: '', label: t('admin2.pm_gender_placeholder') },
@@ -369,7 +363,7 @@ const PatientModal = ({
               </label>
               <Input
                 type="tel"
-                value={formData.phone}
+                value={String(formData.phone ?? '')}
                 onChange={handlePhoneChange}
                 placeholder="+998 90 123 45 67"
                 error={errors.phone}
@@ -390,7 +384,7 @@ const PatientModal = ({
               </label>
               <Input
                 type="email"
-                value={formData.email}
+                value={String(formData.email ?? '')}
                 onChange={(e) => handleChange('email', e.target.value)}
                 placeholder="ivan@example.com"
                 error={errors.email}
@@ -412,7 +406,7 @@ const PatientModal = ({
             </label>
             <Input
               type="text"
-              value={formData.address}
+              value={String(formData.address ?? '')}
               onChange={(e) => handleChange('address', e.target.value)}
               placeholder={t('admin2.pm_ph_address')}
               icon={MapPin} />
@@ -433,7 +427,7 @@ const PatientModal = ({
               </label>
               <Input
                 type="text"
-                value={formData.passport}
+                value={String(formData.passport ?? '')}
                 onChange={(e) => handleChange('passport', e.target.value)}
                 placeholder="AA1234567"
                 error={errors.passport}
@@ -459,7 +453,7 @@ const PatientModal = ({
               </label>
               <Input
                 type="text"
-                value={formData.insuranceNumber}
+                value={String(formData.insuranceNumber ?? '')}
                 onChange={(e) => handleChange('insuranceNumber', e.target.value)}
                 placeholder="12345678901234" />
 
@@ -479,7 +473,7 @@ const PatientModal = ({
               </label>
               <Input
                 type="text"
-                value={formData.emergencyContact}
+                value={String(formData.emergencyContact ?? '')}
                 onChange={(e) => handleChange('emergencyContact', e.target.value)}
                 placeholder={t('admin2.pm_ph_emergency_contact')} />
 
@@ -490,7 +484,7 @@ const PatientModal = ({
               </label>
               <Input
                 type="tel"
-                value={formData.emergencyPhone}
+                value={String(formData.emergencyPhone ?? '')}
                 onChange={(e) => handleChange('emergencyPhone', e.target.value)}
                 placeholder="+998 90 987 65 43"
                 icon={Phone} />
@@ -510,7 +504,7 @@ const PatientModal = ({
                 {t('admin2.pm_label_blood_type')}
               </label>
               <Select
-                value={formData.bloodType}
+                value={String(formData.bloodType ?? '')}
                 onChange={(value) => handleChange('bloodType', value)}
                 options={[
                 { value: '', label: t('admin2.pm_blood_type_not_specified') },
@@ -532,7 +526,7 @@ const PatientModal = ({
               </label>
               <Input
                 type="text"
-                value={formData.allergies}
+                value={String(formData.allergies ?? '')}
                 onChange={(e) => handleChange('allergies', e.target.value)}
                 placeholder={t('admin2.pm_ph_allergies')} />
 
@@ -543,7 +537,7 @@ const PatientModal = ({
               {t('admin2.pm_label_chronic')}
             </label>
             <Textarea
-              value={formData.chronicDiseases}
+              value={String(formData.chronicDiseases ?? '')}
               onChange={(e) => handleChange('chronicDiseases', e.target.value)}
               placeholder={t('admin2.pm_ph_chronic')}
               rows={3} />
@@ -561,7 +555,7 @@ const PatientModal = ({
               {t('admin2.pm_label_notes')}
             </label>
             <Textarea
-              value={formData.notes}
+              value={String(formData.notes ?? '')}
               onChange={(e) => handleChange('notes', e.target.value)}
               placeholder={t('admin2.pm_ph_notes')}
               rows={3} />

@@ -1,11 +1,8 @@
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import type { CSSProperties } from 'react';
 import {
-  Box as RawBox, Card, CardContent, Typography as RawTypography, Button, Alert as RawAlert,
+  Box, Card, CardContent, Typography, Button, Alert,
 } from '../components/ui/macos';
-const Typography = RawTypography as unknown as React.ComponentType<Record<string, unknown>>;
-const Alert = RawAlert as unknown as React.ComponentType<Record<string, unknown>>;
-const Box = RawBox as unknown as React.ComponentType<Record<string, unknown>>;
 import { XCircle as CancelIcon, Home as HomeIcon, Headset as SupportIcon } from 'lucide-react';
 import { useTranslation } from '../i18n/useTranslation';
 

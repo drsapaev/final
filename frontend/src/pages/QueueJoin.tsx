@@ -79,7 +79,7 @@ const QueueJoin = () => {
     patientName: '',
     phone: '',
     telegramId: ''
-  } as any);
+  } as Record<string, unknown>);
   const [selectedSpecialists, setSelectedSpecialists] = useState([]); // Выбранные специалисты для общего QR
   const [availableSpecialists, setAvailableSpecialists] = useState([]); // Список доступных специалистов из API
   const [isSpecialistsLoading, setIsSpecialistsLoading] = useState(true);
@@ -158,7 +158,7 @@ const QueueJoin = () => {
         setStep('info');
       }
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       setAvailableSpecialists([]);
       setError(getApiErrorMessage(error, QUEUE_JOIN_MESSAGES.sessionStartFailed));
       setStep('error');
@@ -202,7 +202,7 @@ const QueueJoin = () => {
 
       await startJoinSession();
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       setAvailableSpecialists([]);
       setIsSpecialistsLoading(false);
       setError(getApiErrorMessage(error, QUEUE_JOIN_MESSAGES.qrTokenUnavailable));
@@ -259,7 +259,7 @@ const QueueJoin = () => {
   const handleFormSubmit = async (e) => {
     e.preventDefault();
 
-    if (!formData.patientName.trim() || !formData.phone.trim()) {
+    if (!String(formData.patientName ?? '').trim() || !String(formData.phone ?? '').trim()) {
       setError(QUEUE_JOIN_MESSAGES.requiredFields);
       return;
     }
@@ -290,8 +290,8 @@ const QueueJoin = () => {
 
     try {
       // Валидация данных перед отправкой
-      const trimmedPatientName = formData.patientName.trim();
-      const trimmedPhone = formData.phone.trim();
+      const trimmedPatientName = String(formData.patientName ?? '').trim();
+      const trimmedPhone = String(formData.phone ?? '').trim();
 
       if (trimmedPatientName.length < 2) {
         setError(QUEUE_JOIN_MESSAGES.nameTooShort);
@@ -341,11 +341,11 @@ const QueueJoin = () => {
 
       // Подготавливаем данные запроса
       // ✅ ИСПРАВЛЕНО: Используем уже нормализованный номер из валидации
-      const requestBody: any = {
+      const requestBody: Record<string, unknown> = {
         session_token: currentSessionToken,
         patient_name: trimmedPatientName,
         phone: normalizedPhone, // ✅ Отправляем нормализованный номер (12 цифр: 998XXXXXXXXX)
-        telegram_id: formData.telegramId ? parseInt(formData.telegramId) : null
+        telegram_id: formData.telegramId ? parseInt(String(formData.telegramId ?? '')) : null
       };
 
       // Если выбраны специалисты (общий QR), добавляем их в запрос
@@ -428,7 +428,7 @@ const QueueJoin = () => {
 
       setStep('success');
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       setError(getApiErrorMessage(error, QUEUE_JOIN_MESSAGES.joinFailed));
     } finally {
       setLoading(false);
@@ -1277,7 +1277,7 @@ const QueueJoin = () => {
                     name="patient_name"
                     type="text"
                     aria-label={t('misc.qj_form_aria_full_name')}
-                    value={formData.patientName}
+                    value={String(formData.patientName ?? '')}
                     onChange={(e) => handleInputChange('patientName', e.target.value)}
                     style={{
                       width: '100%',
@@ -1306,7 +1306,7 @@ const QueueJoin = () => {
                     autoComplete="name"
                     autoFocus
                     aria-required="true"
-                    aria-invalid={Boolean(error && !formData.patientName.trim())}
+                    aria-invalid={Boolean(error && !String(formData.patientName ?? '').trim())}
                     aria-describedby={error ? 'queue-join-error' : undefined}
                     required
                   />
@@ -1328,7 +1328,7 @@ const QueueJoin = () => {
                     name="phone"
                     type="tel"
                     aria-label={t('misc.qj_form_aria_phone')}
-                    value={formData.phone}
+                    value={String(formData.phone ?? '')}
                     onChange={handlePhoneChange}
                     onKeyDown={(e) => {
                       // Разрешаем: цифры, Backspace, Delete, стрелки, Tab, Enter
@@ -1382,7 +1382,7 @@ const QueueJoin = () => {
                     autoComplete="tel"
                     inputMode="tel"
                     aria-required="true"
-                    aria-invalid={Boolean(error && !formData.phone.trim())}
+                    aria-invalid={Boolean(error && !String(formData.phone ?? '').trim())}
                     aria-describedby={error ? 'queue-join-error queue-phone-hint' : 'queue-phone-hint'}
                     required
                   />
@@ -1408,7 +1408,7 @@ const QueueJoin = () => {
                   name="telegram_id"
                   type="number"
                   aria-label={t('misc.qj_form_aria_telegram')}
-                  value={formData.telegramId}
+                  value={String(formData.telegramId ?? '')}
                   onChange={(e) => handleInputChange('telegramId', e.target.value)}
                   style={{
                     width: '100%',

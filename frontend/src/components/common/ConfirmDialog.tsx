@@ -71,6 +71,20 @@ const DEFAULT_INTENT = 'warning';
  * Declarative ConfirmDialog. Use this if you prefer to manage isOpen state
  * in the parent component. For most use cases, useConfirm() below is simpler.
  */
+interface ConfirmDialogProps {
+  isOpen?: boolean;
+  onClose?: () => void;
+  onConfirm?: () => void;
+  title?: React.ReactNode;
+  message?: React.ReactNode;
+  description?: React.ReactNode;
+  confirmLabel?: React.ReactNode;
+  cancelLabel?: React.ReactNode;
+  intent?: 'danger' | 'warning' | 'destructive' | 'primary' | string;
+  requireText?: string | null;
+  [key: string]: unknown;
+}
+
 export function ConfirmDialog({
   isOpen,
   onClose,
@@ -82,7 +96,7 @@ export function ConfirmDialog({
   cancelLabel = 'Отмена',
   intent = DEFAULT_INTENT,
   requireText = null, // optional: require user to type this exact text to enable confirm
-}) {
+}: ConfirmDialogProps) {
   const config = INTENT_CONFIG[intent] || INTENT_CONFIG[DEFAULT_INTENT];
   const Icon = config.icon;
   const [typedText, setTypedText] = useState('');
@@ -290,9 +304,8 @@ export function useConfirm() {
   }, []);
 
   // Render the dialog via portal to document.body so it overlays everything
-  const ConfirmDialogSelf = ConfirmDialog as unknown as React.ComponentType<Record<string, unknown>>;
   const dialog = typeof document !== 'undefined' ? createPortal(
-    <ConfirmDialogSelf
+    <ConfirmDialog
       isOpen={state.isOpen}
       onClose={handleClose}
       onConfirm={handleConfirm}
@@ -301,7 +314,10 @@ export function useConfirm() {
     document.body
   ) : null;
 
-  return [confirm, dialog];
+  return [confirm, dialog] as [
+    (options: Record<string, unknown>) => Promise<boolean>,
+    React.ReactNode
+  ];
 }
 
 export default ConfirmDialog;

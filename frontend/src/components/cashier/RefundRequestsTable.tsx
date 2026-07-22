@@ -333,7 +333,7 @@ const RefundRequestsTable = ({ onRefresh }) => {
           <Select
             id="refund-request-filter"
             value={filter}
-            onChange={(v: any) => setFilter(String(v))}
+            onChange={(v: unknown) => setFilter(String(v))}
             options={getRefundFilterOptions(t)}
             size="default"
             aria-label={t('misc.rrt_filtr_zayavok_na_vozvrat')}

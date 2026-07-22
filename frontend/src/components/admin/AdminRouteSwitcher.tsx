@@ -111,13 +111,18 @@ const getRouteIconStyle = (isActive) => ({
   flex: '0 0 auto',
 });
 
-export default function AdminRouteSwitcher() {
+interface AdminRouteSwitcherProps {
+  /** Optional override for the active route id; if omitted, derived from location. */
+  current?: string;
+}
+
+export default function AdminRouteSwitcher({ current }: AdminRouteSwitcherProps = {}) {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const navigate = useNavigate();
   const location = useLocation();
 
   const currentRoute = getEffectiveRouteByPath(location.pathname);
-  const activeId = SWITCHER_ROUTE_IDS.includes(currentRoute?.id) ? currentRoute.id : 'admin-dashboard';
+  const activeId = current ?? (SWITCHER_ROUTE_IDS.includes(currentRoute?.id) ? currentRoute.id : 'admin-dashboard');
   const switcherRoutes = buildSwitcherRoutes(t);
 
   return (

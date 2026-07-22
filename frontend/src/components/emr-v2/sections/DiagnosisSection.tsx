@@ -50,6 +50,26 @@ function normalizeTextValue(value) {
  * @param {boolean} props.defaultOpen - Start expanded
  * @param {React.ComponentType} props.ICD10Component - Optional ICD10 autocomplete component
  */
+interface DiagnosisSectionProps {
+  diagnosis?: string;
+  icd10Code?: string;
+  onDiagnosisChange?: ((v: string) => void) | undefined;
+  onIcd10Change?: ((v: string) => void) | undefined;
+  disabled?: boolean;
+  defaultOpen?: boolean;
+  ICD10Component?: React.ComponentType<Record<string, unknown>> | null;
+  suggestions?: unknown[];
+  aiLoading?: boolean;
+  onApplySuggestion?: ((s: unknown) => void) | undefined;
+  onDismissSuggestion?: ((s: unknown) => void) | undefined;
+  onRequestAI?: ((text: string) => void) | undefined;
+  doctorId?: string | number | null | undefined;
+  specialty?: string;
+  experimentalGhostMode?: boolean;
+  onTelemetry?: ((payload: Record<string, unknown>) => void) | undefined;
+}
+
+
 export function DiagnosisSection({
     diagnosis = '',
     icd10Code = '',
@@ -68,7 +88,7 @@ export function DiagnosisSection({
     specialty = 'general',
     experimentalGhostMode = false,
     onTelemetry,
-}) {
+}: DiagnosisSectionProps) {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
     const diagnosisText = normalizeTextValue(diagnosis);
     const icd10Text = normalizeTextValue(icd10Code);

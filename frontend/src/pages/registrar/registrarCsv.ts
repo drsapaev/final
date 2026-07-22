@@ -34,7 +34,7 @@ function maskPhoneForCSV(phone: unknown): string {
  * @param {boolean} options.includeTimestamps - include date/time/changed columns (default: false)
  * @returns {string} CSV content with BOM-safe headers
  */
-export function generateCSV(data: any[], options: Record<string, unknown> = {}) {
+export function generateCSV(data: Record<string, unknown>[], options: Record<string, unknown> = {}) {
   const {
     maskPhone = true,
     includeAddress = false,
@@ -70,9 +70,9 @@ export function generateCSV(data: any[], options: Record<string, unknown> = {}) 
     );
     if (includeTimestamps) {
       baseRow.push(
-        row.appointment_date || row.created_at?.split('T')[0] || '',
+        row.appointment_date || String(row.created_at ?? '').split('T')[0] || '',
         row.appointment_time || '',
-        row.updated_at ? row.updated_at.split('T')[0] : '',
+        row.updated_at ? String(row.updated_at).split('T')[0] : '',
       );
     }
     baseRow.push(row.status || '', row.cost || row.total_amount || '');

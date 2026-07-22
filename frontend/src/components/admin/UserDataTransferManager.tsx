@@ -78,7 +78,7 @@ const UserDataTransferManager = () => {
 
   const loadAvailableDataTypes = async () => {
     try {
-      const response = await api.get('/admin/user-data/transfer/data-types') as any;
+      const response = await api.get('/admin/user-data/transfer/data-types') as import('axios').AxiosResponse<Record<string, unknown>>;
       setAvailableDataTypes(normalizeDataTypes(response.data));
     } catch (error) {
       logger.error('Ошибка загрузки типов данных:', error);
@@ -107,7 +107,7 @@ const UserDataTransferManager = () => {
 
   const getUserDataSummary = async (userId) => {
     try {
-      const response = await api.get(`/admin/user-data/users/${userId}/data-summary`) as any;
+      const response = (await api.get(`/admin/user-data/users/${userId}/data-summary`)) as import('axios').AxiosResponse<Record<string, unknown>>;
       setUserDataSummary(normalizeDataSummary(response.data));
     } catch (error) {
       logger.error('Ошибка получения сводки данных:', error);
@@ -122,11 +122,11 @@ const UserDataTransferManager = () => {
     }
 
     try {
-      const response = await api.post(`/admin/user-data/transfer/validate?source_user_id=${sourceUser.id}&target_user_id=${targetUser.id}`) as any;
-      const validation = response.data || {};
+      const response = (await api.post(`/admin/user-data/transfer/validate?source_user_id=${sourceUser.id}&target_user_id=${targetUser.id}`)) as import('axios').AxiosResponse<Record<string, unknown>>;
+      const validation = (response.data as { valid?: boolean; message?: string; appointments?: unknown; visits?: unknown; queue_entries?: unknown; [k: string]: unknown }) || {};
 
       if (!validation.valid) {
-        toast.error(validation.message || 'Transfer validation failed');
+        toast.error(String(validation.message || 'Transfer validation failed'));
         return false;
       }
 
@@ -150,8 +150,8 @@ const UserDataTransferManager = () => {
         target_user_id: targetUser.id,
         data_types: selectedDataTypes,
         confirmation_required: false
-      }) as any;
-      const transferResult = response.data || {};
+      }) as import('axios').AxiosResponse<Record<string, unknown>>;
+      const transferResult = (response.data as { success?: boolean; transferred?: { appointments?: { success?: boolean; count?: number }; visits?: { success?: boolean; count?: number }; queue_entries?: { success?: boolean; count?: number }; [k: string]: unknown }; [k: string]: unknown }) || {};
 
       if (transferResult.success) {
         toast.success(t('admin2.udtm_success_transferred'));
@@ -194,7 +194,7 @@ const UserDataTransferManager = () => {
 
   const loadTransferHistory = async () => {
     try {
-      const response = await api.get('/admin/user-data/transfer/history?limit=50') as any;
+      const response = await api.get('/admin/user-data/transfer/history?limit=50') as import('axios').AxiosResponse<Record<string, unknown>>;
       setTransferHistory(toArray(response.data, ['history', 'items', 'results']));
     } catch (error) {
       logger.error('Ошибка загрузки истории:', error);
@@ -204,7 +204,7 @@ const UserDataTransferManager = () => {
 
   const loadStatistics = async () => {
     try {
-      const response = await api.get('/admin/user-data/transfer/statistics?period_days=30') as any;
+      const response = await api.get('/admin/user-data/transfer/statistics?period_days=30') as import('axios').AxiosResponse<Record<string, unknown>>;
       setStatistics(normalizeStatistics(response.data));
     } catch (error) {
       logger.error('Ошибка загрузки статистики:', error);
@@ -412,8 +412,8 @@ const UserDataTransferManager = () => {
         <div className="admin-flex-col-12">
           {availableDataTypes.map((dataType) =>
         <label key={dataType.key} className="admin-flex-ai-center-gap-12-cursor-pointer-p-8-radius-var--mac-radius-sm-transit-87a65602"
-        onMouseEnter={(e: any) => e.target.style.backgroundColor = 'var(--mac-bg-secondary)'}
-        onMouseLeave={(e: any) => e.target.style.backgroundColor = 'transparent'}>
+        onMouseEnter={(e: React.MouseEvent<HTMLElement>) => (e.target as HTMLElement).style.backgroundColor = 'var(--mac-bg-secondary)'}
+        onMouseLeave={(e: React.MouseEvent<HTMLElement>) => (e.target as HTMLElement).style.backgroundColor = 'transparent'}>
           
               <Checkbox
             checked={selectedDataTypes.includes(dataType.key)}
