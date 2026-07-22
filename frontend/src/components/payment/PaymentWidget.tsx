@@ -504,7 +504,7 @@ const PaymentWidget = ({
           id="payment-provider"
           label={t('payment.pay_widg_method_label')}
           value={selectedProvider}
-          onChange={(value) => setSelectedProvider(value)}
+          onValueChange={(value) => setSelectedProvider(String(value))}
           disabled={loading}
           className="pw-select-margin"
           options={providers.map((provider) => ({

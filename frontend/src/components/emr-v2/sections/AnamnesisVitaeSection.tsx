@@ -90,7 +90,7 @@ export function AnamnesisVitaeSection({
 
             <EMRTextField
                 value={value}
-                onChange={onChange}
+                onValueChange={onChange}
                 placeholder="Хронические заболевания, аллергии, наследственность..."
                 multiline
                 rows={3}

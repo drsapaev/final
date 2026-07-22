@@ -157,7 +157,7 @@ export function DiagnosisSection({
                     ) : (
                         <EMRTextField
                             value={icd10Text}
-                            onChange={onIcd10Change}
+                            onValueChange={onIcd10Change}
                             placeholder={t('misc.ds_naprimer_j06_9')}
                             disabled={disabled}
                             label={t('misc.ds_kod_mkb_10')}

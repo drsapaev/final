@@ -26,9 +26,42 @@ import { Input } from '../../ui/macos';
  * @param {string} props.className - Additional CSS class
  * @param {string} props.id - Input ID
  */
+/**
+ * Event-like object for EMRTextField's legacy `onChange`.
+ * @deprecated Use `onValueChange` for new code.
+ */
+export interface EMRTextFieldChangeEvent {
+  target: { value: string; name?: string };
+}
+
+interface EMRTextFieldProps {
+  value?: string;
+  /** @deprecated Use onValueChange instead. */
+  onChange?: (event: EMRTextFieldChangeEvent) => void;
+  /** Value-based handler — receives the string value directly. */
+  onValueChange?: (value: string) => void;
+  isEditable?: boolean;
+  aiEnabled?: boolean;
+  onRequestAI?: (text: string) => void;
+  error?: string;
+  autoFocus?: boolean;
+  onFieldTouch?: () => void;
+  onBlur?: () => void;
+  label?: string;
+  placeholder?: string;
+  multiline?: boolean;
+  rows?: number;
+  disabled?: boolean;
+  required?: boolean;
+  className?: string;
+  id?: string;
+  [key: string]: unknown;
+}
+
 export function EMRTextField({
     value = '',
     onChange,
+    onValueChange,
     placeholder = '',
     multiline = false,
     rows = 3,
@@ -38,9 +71,11 @@ export function EMRTextField({
     className = '',
     id,
     ...rest
-}: { value?: string; onChange?: any; isEditable?: boolean; aiEnabled?: boolean; onRequestAI?: any; error?: any; autoFocus?: boolean; onFieldTouch?: any; onBlur?: any; label?: string; placeholder?: string; multiline?: boolean; rows?: number; disabled?: boolean; required?: boolean; className?: string; id?: string; [key: string]: unknown }) {
-    const handleChange = (e) => {
-        onChange?.(e.target.value);
+}: EMRTextFieldProps) {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        const val = e.target.value;
+        onValueChange?.(val);
+        onChange?.({ target: { value: val } });
     };
 
     const inputId = id || `emr-field-${Math.random().toString(36).substr(2, 9)}`;

@@ -61,7 +61,7 @@ const UnifiedFinance = ({ renderFinance }) => {
       <MacOSTab
         tabs={tabs}
         activeTab={activeTab}
-        onTabChange={setActiveTab} />
+        onTabChange={(id) => setActiveTab(String(id))} />
       
       <div className="admin-unified-content">
         <ErrorBoundary>

@@ -77,7 +77,7 @@ export function NotesSection({
         >
             <EMRTextField
                 value={value}
-                onChange={onChange}
+                onValueChange={onChange}
                 placeholder="Дополнительные заметки врача..."
                 multiline
                 rows={2}

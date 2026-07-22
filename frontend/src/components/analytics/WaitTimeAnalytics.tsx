@@ -763,7 +763,7 @@ const WaitTimeAnalytics = () => {
       <MacOSTab
         tabs={tabs}
         activeTab={activeTab}
-        onTabChange={setActiveTab} />
+        onTabChange={(id) => setActiveTab(String(id))} />
       
 
       {/* Содержимое вкладок */}

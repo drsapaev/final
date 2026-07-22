@@ -400,7 +400,7 @@ const ToothModal = ({
           <Select
             label={t('dental.dental_tm_material_label')}
             value={formData.material}
-            onChange={(value) => setFormData({ ...formData, material: value })}
+            onValueChange={(value) => setFormData({ ...formData, material: String(value) })}
             options={[
               { value: '', label: t('dental.dental_tm_no_material') },
               ...Object.entries(MATERIALS).map(([key, material]) => ({
@@ -437,7 +437,7 @@ const ToothModal = ({
               <Select
                 label={t('dental.dental_tm_fit_quality_label')}
                 value={formData.fitQuality}
-                onChange={(value) => setFormData({ ...formData, fitQuality: value })}
+                onValueChange={(value) => setFormData({ ...formData, fitQuality: String(value) })}
                 options={[
                   { value: '', label: '—' },
                   { value: 'excellent', label: t('dental.dental_tm_fit_excellent') },
@@ -458,7 +458,7 @@ const ToothModal = ({
               <Select
                 label={t('dental.dental_tm_patient_satisfaction_label')}
                 value={formData.patientSatisfaction}
-                onChange={(value) => setFormData({ ...formData, patientSatisfaction: value })}
+                onValueChange={(value) => setFormData({ ...formData, patientSatisfaction: String(value) })}
                 options={[
                   { value: '', label: '—' },
                   { value: '5', label: t('dental.dental_tm_sat_5') },
