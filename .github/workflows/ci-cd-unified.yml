@@ -649,6 +649,11 @@ jobs:
         npm run type-check
         echo "✅ Frontend type-check passed"
 
+    - name: 🚫 Type debt gate (prevents new `any`/`@ts-ignore`/`@ts-nocheck`)
+      run: |
+        cd frontend
+        npm run type-debt:check
+
     - name: Icon-only controls accessibility sweep
       run: |
         cd frontend
