@@ -47,7 +47,7 @@ const ModernQueueManager = ({
     closeReceptionForDoctor,
     callNextPatientInQueue
 
-  } = useQueueManager() as any;
+  } = useQueueManager();
 
   const [internalDoctor, setInternalDoctor] = useState('');
   const [internalDate, setInternalDate] = useState(getLocalDateString());

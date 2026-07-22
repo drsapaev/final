@@ -10,6 +10,132 @@ import {
   callNextQueuePatient,
 } from '../api/queue';
 
+// === Domain value objects ===
+// These describe the canonical shapes produced by the queue API and consumed
+// by ModernQueueManager, IntegrationDemo, and other callers. The index
+// signature lets extra backend fields ride along without forcing `any`.
+
+export interface QueueSpecialist {
+  id: number | string;
+  doctor_name?: string;
+  full_name?: string;
+  name?: string;
+  user?: { full_name?: string };
+  specialty?: string;
+  specialty_display?: string;
+  cabinet?: string | number;
+  department?: string;
+  [key: string]: unknown;
+}
+
+export interface QueueStats {
+  total_entries?: number;
+  total?: number;
+  totalEntries?: number;
+  waiting?: number;
+  waiting_entries?: number;
+  waitingCount?: number;
+  completed?: number;
+  served?: number;
+  served_count?: number;
+  [key: string]: unknown;
+}
+
+export interface QueueEntry {
+  id?: number;
+  status?: string;
+  patient_name?: string;
+  phone?: string;
+  [key: string]: unknown;
+}
+
+export interface QueueData {
+  id?: number;
+  entries?: QueueEntry[];
+  stats?: QueueStats | null;
+  statistics?: QueueStats | null;
+  opened_at?: string | null;
+  is_open?: boolean;
+  online_start_time?: string;
+  specialist_id?: number | string;
+  specialty?: string;
+  queue_id?: number;
+  [key: string]: unknown;
+}
+
+export interface QrData {
+  qr_code_base64?: string;
+  day?: string;
+  specialist_name?: string;
+  is_clinic_wide?: boolean;
+  department_name?: string;
+  department?: string;
+  target_date?: string;
+  token?: string;
+  expires_at?: string;
+  [key: string]: unknown;
+}
+
+export interface QueuePayload {
+  queues?: QueueData[];
+  [key: string]: unknown;
+}
+
+export interface LoadQueueSnapshotArgs {
+  specialistId: string | number;
+  targetDate: string;
+  doctor?: QueueSpecialist;
+}
+
+export interface GenerateDoctorQRCodeArgs {
+  specialistId: string | number;
+  targetDate: string;
+  department?: string;
+  specialistName?: string;
+  expiresHours?: number;
+}
+
+export interface GenerateClinicQRCodeArgs {
+  targetDate: string;
+  expiresHours?: number;
+}
+
+export interface ReceptionSlotArgs {
+  specialistId: string | number;
+  targetDate: string;
+}
+
+// Backend response for reception-slot operations and queue/call-next.
+// Backend returns a dynamic object; we expose the canonical fields the UI
+// reads and let extra fields ride along via the index signature.
+export interface QueueActionResponse {
+  success?: boolean;
+  message?: string;
+  patient?: {
+    id?: number;
+    name?: string;
+    number?: number | string;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+}
+
+export interface UseQueueManagerReturn {
+  loading: boolean;
+  specialists: QueueSpecialist[];
+  queueData: QueueData | null;
+  statistics: QueueStats | null;
+  qrData: QrData | null;
+  loadSpecialists: () => Promise<QueueSpecialist[]>;
+  loadQueueSnapshot: (args: LoadQueueSnapshotArgs) => Promise<QueueData | null>;
+  generateDoctorQRCode: (args: GenerateDoctorQRCodeArgs) => Promise<QrData>;
+  generateClinicQRCode: (args: GenerateClinicQRCodeArgs) => Promise<QrData>;
+  openReceptionForDoctor: (args: ReceptionSlotArgs) => Promise<QueueActionResponse>;
+  closeReceptionForDoctor: (args: ReceptionSlotArgs) => Promise<QueueActionResponse>;
+  callNextPatientInQueue: (args: ReceptionSlotArgs) => Promise<QueueActionResponse>;
+  setQrData: (data: QrData | null) => void;
+}
+
 const toError = (err: unknown, fallback: string): Error => {
   if (err instanceof Error) {
     return err;
@@ -25,7 +151,11 @@ const toError = (err: unknown, fallback: string): Error => {
   return new Error(fallback);
 };
 
-const pickQueueForDoctor = (payload, specialistId, doctor) => {
+const pickQueueForDoctor = (
+  payload: QueuePayload | null | undefined,
+  specialistId: string | number,
+  doctor?: QueueSpecialist,
+): QueueData | null => {
   if (!payload?.queues) {
     logger.warn('[useQueueManager] pickQueueForDoctor: payload.queues отсутствует');
     return null;
@@ -80,23 +210,23 @@ const pickQueueForDoctor = (payload, specialistId, doctor) => {
   return foundQueue || null;
 };
 
-const buildStatsFromEntries = (entries: unknown[] = []) => ({
+const buildStatsFromEntries = (entries: QueueEntry[] = []): QueueStats => ({
   total_entries: entries.length,
-  waiting: entries.filter((entry: Record<string, unknown>) => entry.status === 'waiting').length,
-  completed: entries.filter((entry: Record<string, unknown>) => entry.status === 'completed').length,
+  waiting: entries.filter((entry) => entry.status === 'waiting').length,
+  completed: entries.filter((entry) => entry.status === 'completed').length,
 });
 
-export const useQueueManager = () => {
+export const useQueueManager = (): UseQueueManagerReturn => {
   const [loading, setLoading] = useState<boolean>(false);
-  const [specialists, setSpecialists] = useState<unknown[]>([]);
-  const [queueData, setQueueData] = useState<unknown>(null);
-  const [statistics, setStatistics] = useState<unknown>(null);
-  const [qrData, setQrData] = useState<unknown>(null);
+  const [specialists, setSpecialists] = useState<QueueSpecialist[]>([]);
+  const [queueData, setQueueData] = useState<QueueData | null>(null);
+  const [statistics, setStatistics] = useState<QueueStats | null>(null);
+  const [qrData, setQrData] = useState<QrData | null>(null);
 
   const loadSpecialists = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await fetchAvailableSpecialists();
+      const data = (await fetchAvailableSpecialists()) as QueueSpecialist[];
       setSpecialists(data);
       return data;
     } catch (err: unknown) {
@@ -107,15 +237,15 @@ export const useQueueManager = () => {
   }, []);
 
   const loadQueueSnapshot = useCallback(
-    async ({ specialistId, targetDate, doctor }) => {
+    async ({ specialistId, targetDate, doctor }: LoadQueueSnapshotArgs): Promise<QueueData | null> => {
       if (!specialistId) {
         return null;
       }
 
       setLoading(true);
       try {
-        const payload = await fetchQueuesToday(targetDate);
-        const queue =
+        const payload = (await fetchQueuesToday(targetDate)) as QueuePayload;
+        const queue: QueueData =
           pickQueueForDoctor(payload, specialistId, doctor) || {
             id: Number(specialistId),
             entries: [],
@@ -125,7 +255,7 @@ export const useQueueManager = () => {
 
         setQueueData(queue);
 
-        const statsPayload =
+        const statsPayload: QueueStats =
           queue.stats ||
           queue.statistics ||
           buildStatsFromEntries(queue.entries);
@@ -165,19 +295,19 @@ export const useQueueManager = () => {
       department,
       specialistName,
       expiresHours = 24,
-    }) => {
+    }: GenerateDoctorQRCodeArgs) => {
       if (!specialistId || !targetDate) {
         throw new Error('Выберите врача и дату');
       }
 
       setLoading(true);
       try {
-        const payload = await generateDoctorQrToken({
+        const payload = (await generateDoctorQrToken({
           specialistId,
           department,
           targetDate,
           expiresHours,
-        });
+        })) as QrData;
         setQrData({
           ...payload,
           specialist_name: payload.specialist_name || specialistName || 'Врач',
@@ -195,17 +325,17 @@ export const useQueueManager = () => {
   );
 
   const generateClinicQRCode = useCallback(
-    async ({ targetDate, expiresHours = 24 }) => {
+    async ({ targetDate, expiresHours = 24 }: GenerateClinicQRCodeArgs) => {
       if (!targetDate) {
         throw new Error('Выберите дату');
       }
 
       setLoading(true);
       try {
-        const payload = await generateClinicQrToken({
+        const payload = (await generateClinicQrToken({
           targetDate,
           expiresHours,
-        });
+        })) as QrData;
         setQrData({
           ...payload,
           specialist_name: 'Все специалисты',
@@ -223,17 +353,18 @@ export const useQueueManager = () => {
   );
 
   const openReceptionForDoctor = useCallback(
-    async ({ specialistId, targetDate }) => {
+    async ({ specialistId, targetDate }: ReceptionSlotArgs): Promise<QueueActionResponse> => {
       if (!specialistId) {
         throw new Error('Выберите врача');
       }
 
       setLoading(true);
       try {
-        return await openReceptionSlot({
+        const result = (await openReceptionSlot({
           day: targetDate,
           specialistId,
-        });
+        })) as QueueActionResponse;
+        return result;
       } catch (err: unknown) {
         throw toError(err, 'Ошибка открытия приема');
       } finally {
@@ -245,17 +376,18 @@ export const useQueueManager = () => {
 
   // UX Audit Registrar #7: closeReceptionForDoctor — закрытие приёма.
   const closeReceptionForDoctor = useCallback(
-    async ({ specialistId, targetDate }) => {
+    async ({ specialistId, targetDate }: ReceptionSlotArgs): Promise<QueueActionResponse> => {
       if (!specialistId) {
         throw new Error('Выберите врача');
       }
 
       setLoading(true);
       try {
-        return await closeReceptionSlot({
+        const result = (await closeReceptionSlot({
           day: targetDate,
           specialistId,
-        });
+        })) as QueueActionResponse;
+        return result;
       } catch (err: unknown) {
         throw toError(err, 'Ошибка закрытия приема');
       } finally {
@@ -266,17 +398,18 @@ export const useQueueManager = () => {
   );
 
   const callNextPatientInQueue = useCallback(
-    async ({ specialistId, targetDate }) => {
+    async ({ specialistId, targetDate }: ReceptionSlotArgs): Promise<QueueActionResponse> => {
       if (!specialistId) {
         throw new Error('Выберите врача');
       }
 
       setLoading(true);
       try {
-        return await callNextQueuePatient({
+        const result = (await callNextQueuePatient({
           specialistId,
           targetDate,
-        });
+        })) as QueueActionResponse;
+        return result;
       } catch (err: unknown) {
         throw toError(err, 'Ошибка вызова пациента');
       } finally {
