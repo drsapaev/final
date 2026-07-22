@@ -439,7 +439,7 @@ const GroupPermissionsManager = () => {
                       <Select
                   value={permissionToCheck}
                   onChange={(value) => {
-                    setPermissionToCheck(value);
+                    setPermissionToCheck(String(value));
                     if (value) {
                       checkUserPermission(selectedUser.id, value);
                     }
@@ -593,9 +593,9 @@ const GroupPermissionsManager = () => {
                       <Select
                   value={roleToAssign}
                   onChange={(value) => {
-                    setRoleToAssign(value);
+                    setRoleToAssign(String(value));
                     if (value) {
-                      assignRoleToGroup(selectedGroup.id, parseInt(value));
+                      assignRoleToGroup(selectedGroup.id, parseInt(String(value)));
                       setRoleToAssign('');
                     }
                   }}

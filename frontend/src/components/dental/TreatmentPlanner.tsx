@@ -509,7 +509,7 @@ const TreatmentPlanner = ({ visitId, onUpdate, patientId, teethData }: { visitId
               <Select
                 label={t('dental.dental_tp_priority_label')}
                 value={stageForm.priority}
-                onChange={(value) => setStageForm({ ...stageForm, priority: value })}
+                onChange={(value: unknown) => setStageForm({ ...stageForm, priority: String(value) })}
                 options={Object.entries(PRIORITIES).map(([key, priority]) => ({
                   value: key,
                   label: priority.label,

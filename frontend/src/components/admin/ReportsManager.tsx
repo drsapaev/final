@@ -240,7 +240,7 @@ const ReportsManager = () => {
             <label className="admin-label-block-13-500-secondary-mb-8">{t('admin2.rm_label_type')}</label>
             <Select
             value={reportForm.type}
-            onChange={(value) => setReportForm((prev) => ({ ...prev, type: value }))}
+            onChange={(value) => setReportForm((prev) => ({ ...prev, type: String(value) }))}
             options={availableReports.map((report) => ({
               value: (report as { type?: string }).type,
               label: report.name
@@ -254,7 +254,7 @@ const ReportsManager = () => {
             <label className="admin-label-block-13-500-secondary-mb-8">{t('admin2.rm_label_format')}</label>
             <Select
             value={reportForm.format}
-            onChange={(value) => setReportForm((prev) => ({ ...prev, format: value }))}
+            onChange={(value) => setReportForm((prev) => ({ ...prev, format: String(value) }))}
             options={[
             { value: 'json', label: 'JSON' },
             { value: 'excel', label: 'Excel' },
