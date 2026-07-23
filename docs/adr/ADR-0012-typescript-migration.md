@@ -400,6 +400,17 @@ Error distribution collected via `npx tsc --noEmit --pretty false`:
 The most mechanical phase. Errors are mostly TS7006 (untyped function parameters)
 and TS7031 (untyped destructured bindings).
 
+**Milestones:**
+
+| Milestone | Target | Strategy |
+|-----------|--------|----------|
+| G1-A | ≤ 4,500 | React event-handler autofix (~1,000 errors) + hooks/contexts (577 errors) |
+| G1-B | ≤ 3,000 | api + stores + top-20 components (~1,500 errors) |
+| G1-C | ≤ 1,500 | Remaining TS7006 + TS7031 batch (~1,500 errors) |
+| G1-D | 0 | TS7053 + TS7016 + cleanup (~1,500 errors) |
+
+Each milestone lowers the baseline via `npm run strict:baseline:update` and commits the new `strict-baseline.json`. This creates visible progress and prevents the 5,417 number from feeling overwhelming.
+
 **Strategy:**
 
 1. **Day 1: hooks + contexts** (577 errors) — highest cascade effect. Typing
@@ -528,10 +539,28 @@ This three-level boundary separates **migration** (complete) from **quality impr
 A CI gate (`scripts/strict-baseline-check.mjs`) was added in Phase H to prevent regression during the Phase G migration:
 
 - **`scripts/strict-baseline.json`** — records the current error count for `noImplicitAny` (5,417) and `strictNullChecks` (4,998)
-- **`npm run strict:baseline`** — runs `tsc` with each flag temporarily enabled and verifies the error count does not exceed the baseline
+- **`npm run strict:baseline`** — runs `tsc` with each flag temporarily enabled and verifies the error count does not exceed the baseline. Output shows delta with positive feedback: `🎉 N fewer errors — run 'npm run strict:baseline:update' to lock in progress!`
+- **`npm run strict:baseline:update`** — recalculates current error counts and writes them to `strict-baseline.json`. Use this after fixing errors to lock in progress.
 - **CI step** — `📊 Strict baseline gate` runs after the type-debt gate in `ci-cd-unified.yml`
 
-This allows developers to fix strict-mode errors incrementally without blocking PRs: existing errors are grandfathered, but new errors fail CI. To reduce the baseline: fix errors → `node scripts/strict-baseline-check.mjs --update` → commit.
+**Workflow for reducing strict-mode debt:**
+
+```bash
+# 1. Fix some noImplicitAny errors in source files
+# 2. Verify the error count dropped
+npm run strict:baseline
+# Output: ✅ noImplicitAny: 5310 errors (baseline: 5417, delta: -107) 🎉 107 fewer errors!
+
+# 3. Lock in the progress
+npm run strict:baseline:update
+# This rewrites scripts/strict-baseline.json with the new lower count
+
+# 4. Commit the updated baseline alongside your source fixes
+git add scripts/strict-baseline.json frontend/src/...
+git commit -m "G1-A: fix 107 noImplicitAny errors in hooks/"
+```
+
+This allows developers to fix strict-mode errors incrementally without blocking PRs: existing errors are grandfathered, but new errors fail CI.
 
 ### G1 semi-automatic approach (revised after autofix experiment)
 

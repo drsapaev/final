@@ -78,7 +78,9 @@ for (const flag of ['noImplicitAny', 'strictNullChecks']) {
   const status = actualCount <= baselineCount ? '✅' : '❌';
   const delta = actualCount - baselineCount;
   const deltaStr = delta > 0 ? `+${delta}` : delta === 0 ? '0' : `${delta}`;
-  console.log(`  ${status} ${flag}: ${actualCount} errors (baseline: ${baselineCount}, delta: ${deltaStr})`);
+  const feedback = delta < 0 ? ` 🎉 ${Math.abs(delta)} fewer errors — run 'npm run strict:baseline:update' to lock in progress!`
+    : delta > 0 ? ` ⚠️ ${delta} new errors introduced!` : '';
+  console.log(`  ${status} ${flag}: ${actualCount} errors (baseline: ${baselineCount}, delta: ${deltaStr})${feedback}`);
 
   if (isUpdate) {
     baseline.flags[flag].totalErrors = actualCount;
