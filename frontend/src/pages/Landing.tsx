@@ -800,7 +800,7 @@ export default function Landing() {
                       key={link.label}
                       href={link.href}
                       className="landing-footer-link"
-                      onClick={(e) => handleFooterLinkClick(e, link.href)}
+                      onClick={(e: React.MouseEvent<HTMLElement>) => handleFooterLinkClick(e, link.href)}
                     >
                       {link.label}
                     </a>

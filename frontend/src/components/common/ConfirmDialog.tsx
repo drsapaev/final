@@ -195,7 +195,7 @@ export function ConfirmDialog({
                 id="confirm-dialog-require-text"
                 type="text"
                 value={typedText}
-                onChange={(e) => setTypedText(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setTypedText(e.target.value)}
                 autoFocus
                 aria-label={`Введите ${requireText} для подтверждения действия`}
                 style={{

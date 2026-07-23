@@ -206,7 +206,7 @@ const AIChatWidget = ({
           ref={inputRef}
           aria-label={t('misc.acw_soobschenie_dlya_ai_chata')}
           value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
+          onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setInputValue(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={t('misc.acw_vvedite_soobschenie')}
           disabled={loading || streaming}

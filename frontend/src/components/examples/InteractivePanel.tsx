@@ -121,7 +121,7 @@ const InteractivePanel = ({
           <Button
             variant="ghost"
             size="small"
-            onClick={(e) => {
+            onClick={(e: React.MouseEvent<HTMLElement>) => {
               e.stopPropagation();
               setIsExpanded(!isExpanded);
             }}

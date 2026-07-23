@@ -514,8 +514,8 @@ function AddRelationDialog({ open, onClose, patientId, patientName, onSuccess })
             <Input
               aria-label="Search patient by name or phone"
               value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              onKeyDown={(event) => event.key === 'Enter' && handleSearch()}
+              onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSearchQuery(event.target.value)}
+              onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => event.key === 'Enter' && handleSearch()}
               style={styles.input}
             />
           </label>
@@ -559,7 +559,7 @@ function AddRelationDialog({ open, onClose, patientId, patientName, onSuccess })
           <span style={styles.label}>{t('patient.pat_fam_relation_type')}</span>
           <select
             value={relationType}
-            onChange={(event) => setRelationType(event.target.value)}
+            onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setRelationType(event.target.value)}
             style={styles.input}
           >
             {Object.entries(RELATION_TYPES).map(([key, { labelKey }]) => (
@@ -573,7 +573,7 @@ function AddRelationDialog({ open, onClose, patientId, patientName, onSuccess })
           <textarea
             aria-label="Family relation description"
             value={description}
-            onChange={(event) => setDescription(event.target.value)}
+            onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setDescription(event.target.value)}
             style={styles.textarea}
             placeholder={t('patient.pat_fam_description_placeholder')}
           />

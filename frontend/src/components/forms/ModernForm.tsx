@@ -243,7 +243,7 @@ export const FormGroup = ({
         role="button"
         tabIndex={0}
         onClick={() => setExpanded(!expanded)}
-        onKeyDown={(event) => {
+        onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => {
           if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault();
             setExpanded(!expanded);

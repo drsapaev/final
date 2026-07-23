@@ -160,7 +160,7 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
                             type="number"
                             aria-label={t('payment.pay_cash_amount_aria')}
                             value={paymentData.amount}
-                            onChange={(e) => setPaymentData(prev => ({ ...prev, amount: e.target.value }))}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setPaymentData(prev => ({ ...prev, amount: e.target.value }))}
                             placeholder={t('payment.pay_cash_amount_placeholder')}
                             required
                         />
@@ -174,7 +174,7 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
                             id="cash-payment-method"
                             aria-label={t('payment.pay_cash_method_aria')}
                             value={paymentData.method}
-                            onChange={(value) => setPaymentData(prev => ({ ...prev, method: value as unknown as string }))}
+                            onChange={(value: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setPaymentData(prev => ({ ...prev, method: value as unknown as string }))}
                             options={getPaymentMethodOptions(t)}
                             className="cpm-select-full"
                         />
@@ -190,7 +190,7 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
                                 type="number"
                                 aria-label={t('payment.pay_cash_received_aria')}
                                 value={paymentData.receivedAmount}
-                                onChange={(e) => setPaymentData(prev => ({ ...prev, receivedAmount: e.target.value }))}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setPaymentData(prev => ({ ...prev, receivedAmount: e.target.value }))}
                                 placeholder={t('payment.pay_cash_received_placeholder')}
                                 error={insufficientCash}
                             />
@@ -242,7 +242,7 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
                             id="cash-payment-note"
                             aria-label={t('payment.pay_cash_note_aria')}
                             value={paymentData.note}
-                            onChange={(e) => setPaymentData(prev => ({ ...prev, note: e.target.value }))}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setPaymentData(prev => ({ ...prev, note: e.target.value }))}
                             placeholder={t('payment.pay_cash_note_placeholder')}
                             minRows={3}
                         />

@@ -124,14 +124,14 @@ function PatientBookingPanel() {
             // L-M-11 fix: min=today — запрещаем past-dates на клиенте
             min={getTodayDateInputValue()}
             required
-            onChange={(event) => handleChange('appointmentDate', event.target.value)}
+            onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('appointmentDate', event.target.value)}
           />
           <Input
             type="time"
             label={t('patient.pat_book_label_time')}
             value={bookingForm.appointmentTime}
             disabled={isBusy}
-            onChange={(event) => handleChange('appointmentTime', event.target.value)}
+            onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('appointmentTime', event.target.value)}
           />
           <Input
             label={t('patient.pat_book_label_department')}
@@ -139,14 +139,14 @@ function PatientBookingPanel() {
             disabled={isBusy}
             maxLength={64}
             placeholder={t('patient.pat_book_placeholder_department')}
-            onChange={(event) => handleChange('department', event.target.value)}
+            onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('department', event.target.value)}
           />
           <Input
             label={t('patient.pat_book_label_services')}
             value={bookingForm.servicesText}
             disabled={isBusy}
             placeholder={t('patient.pat_book_placeholder_services')}
-            onChange={(event) => handleChange('servicesText', event.target.value)}
+            onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('servicesText', event.target.value)}
           />
           <div className="pp-grid-span-2">
             <Textarea
@@ -157,7 +157,7 @@ function PatientBookingPanel() {
               maxRows={6}
               maxLength={1000}
               placeholder={t('patient.pat_book_placeholder_notes')}
-              onChange={(event) => handleChange('notes', event.target.value)}
+              onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('notes', event.target.value)}
             />
           </div>
 

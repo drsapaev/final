@@ -349,7 +349,7 @@ const [activations, setActivations] = useState<Activation[]>([]);
             <Input
               type="text"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSearchTerm(e.target.value)}
               placeholder={t('admin2.act_search_placeholder')}
               className="w-full" />
           </div>
@@ -613,7 +613,7 @@ const ActivationKeyForm = ({ onSave, onCancel }) => {
             </label>
             <Select
               value={formData.key_type}
-              onChange={(value) => handleChange('key_type', value)}
+              onChange={(value: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('key_type', value)}
               options={[
               { value: 'trial', label: t('admin2.act_form_type_trial') },
               { value: 'full', label: t('admin2.act_form_type_full') },
@@ -632,7 +632,7 @@ const ActivationKeyForm = ({ onSave, onCancel }) => {
               min="1"
               max="3650"
               value={formData.duration_days}
-              onChange={(e) => handleChange('duration_days', parseInt(e.target.value))}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('duration_days', parseInt(e.target.value))}
               className="w-full" />
           </div>
 
@@ -645,7 +645,7 @@ const ActivationKeyForm = ({ onSave, onCancel }) => {
               min="1"
               max="100"
               value={formData.max_devices}
-              onChange={(e) => handleChange('max_devices', parseInt(e.target.value))}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('max_devices', parseInt(e.target.value))}
               className="w-full" />
           </div>
 
@@ -656,7 +656,7 @@ const ActivationKeyForm = ({ onSave, onCancel }) => {
             <Input
               type="text"
               value={formData.description}
-              onChange={(e) => handleChange('description', e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('description', e.target.value)}
               placeholder={t('admin2.act_form_description_ph')}
               className="w-full" />
           </div>

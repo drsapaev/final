@@ -150,9 +150,9 @@ const MacOSPagination = ({
       {showFirstLast &&
       <button
         onClick={() => handlePageClick(1)}
-        onKeyDown={(e) => handleKeyDown(e, 1)}
-        onMouseEnter={(e) => handleMouseEnter(e, false, currentPage === 1)}
-        onMouseLeave={(e) => handleMouseLeave(e, false)}
+        onKeyDown={(e: React.KeyboardEvent<HTMLElement>) => handleKeyDown(e, 1)}
+        onMouseEnter={(e: React.MouseEvent<HTMLElement>) => handleMouseEnter(e, false, currentPage === 1)}
+        onMouseLeave={(e: React.MouseEvent<HTMLElement>) => handleMouseLeave(e, false)}
         onFocus={handleFocus}
         onBlur={handleBlur}
         style={buttonStyle(false, currentPage === 1)}
@@ -173,9 +173,9 @@ const MacOSPagination = ({
       <button
         key={page}
         onClick={() => handlePageClick(page)}
-        onKeyDown={(e) => handleKeyDown(e, page)}
-        onMouseEnter={(e) => handleMouseEnter(e, page === currentPage, false)}
-        onMouseLeave={(e) => handleMouseLeave(e, page === currentPage)}
+        onKeyDown={(e: React.KeyboardEvent<HTMLElement>) => handleKeyDown(e, page)}
+        onMouseEnter={(e: React.MouseEvent<HTMLElement>) => handleMouseEnter(e, page === currentPage, false)}
+        onMouseLeave={(e: React.MouseEvent<HTMLElement>) => handleMouseLeave(e, page === currentPage)}
         onFocus={handleFocus}
         onBlur={handleBlur}
         style={buttonStyle(page === currentPage)}
@@ -195,9 +195,9 @@ const MacOSPagination = ({
       {showFirstLast && totalPages > 1 &&
       <button
         onClick={() => handlePageClick(totalPages)}
-        onKeyDown={(e) => handleKeyDown(e, totalPages)}
-        onMouseEnter={(e) => handleMouseEnter(e, false, currentPage === totalPages)}
-        onMouseLeave={(e) => handleMouseLeave(e, false)}
+        onKeyDown={(e: React.KeyboardEvent<HTMLElement>) => handleKeyDown(e, totalPages)}
+        onMouseEnter={(e: React.MouseEvent<HTMLElement>) => handleMouseEnter(e, false, currentPage === totalPages)}
+        onMouseLeave={(e: React.MouseEvent<HTMLElement>) => handleMouseLeave(e, false)}
         onFocus={handleFocus}
         onBlur={handleBlur}
         style={buttonStyle(false, currentPage === totalPages)}

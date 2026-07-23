@@ -204,7 +204,7 @@ const DentalPriceManager = ({
                   type="text"
                   aria-label={t('dental.dental_dpm_aria_final_price')}
                   value={finalPrice}
-                  onChange={(e) => setFinalPrice(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFinalPrice(e.target.value)}
                   className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                   placeholder={t('dental.dental_dpm_placeholder_price')}
                   inputMode="numeric" />
@@ -220,7 +220,7 @@ const DentalPriceManager = ({
                 id="dental-price-reason"
                 aria-label={t('dental.dental_dpm_aria_reason')}
                 value={reason}
-                onChange={(e) => setReason(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setReason(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white mb-2">
                 
                 <option value="">{t('dental.dental_dpm_select_reason')}</option>
@@ -236,7 +236,7 @@ const DentalPriceManager = ({
                 type="text"
                 aria-label={t('dental.dental_dpm_aria_custom_reason')}
                 value={reason}
-                onChange={(e) => setReason(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setReason(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                 placeholder={t('dental.dental_dpm_placeholder_custom_reason')} />
 
@@ -251,7 +251,7 @@ const DentalPriceManager = ({
                 id="dental-treatment-details"
                 aria-label={t('dental.dental_dpm_aria_details')}
                 value={details}
-                onChange={(e) => setDetails(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setDetails(e.target.value)}
                 rows={3}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                 placeholder={t('dental.dental_dpm_placeholder_details')} />

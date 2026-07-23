@@ -162,7 +162,7 @@ export function EMRHistoryPanel({
                                     key={revision.id}
                                     className={`emr-history-panel__item ${isCurrentVersion ? 'emr-history-panel__item--current' : ''} ${isSelected ? 'emr-history-panel__item--selected' : ''}`}
                                     onClick={() => onSelectVersion?.(revision.version)}
-                                    onKeyDown={(event) => {
+                                    onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => {
                                         if (event.key === 'Enter' || event.key === ' ') {
                                             event.preventDefault();
                                             onSelectVersion?.(revision.version);

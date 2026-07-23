@@ -255,7 +255,7 @@ const AdminFinanceOverview = () => {
               type="text"
               placeholder={t('admin2.fo_search_placeholder')}
               value={financeSearchTerm}
-              onChange={(event) => setFinanceSearchTerm(event.target.value)}
+              onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFinanceSearchTerm(event.target.value)}
               icon={Search}
               iconPosition="left"
             />
@@ -356,10 +356,10 @@ const AdminFinanceOverview = () => {
                   <tr
                     key={transaction.id}
                     className="admin-bd-b-1px-solid-var-mac-se-tr-all-var-mac-duration"
-                    onMouseEnter={(event) => {
+                    onMouseEnter={(event: React.MouseEvent<HTMLElement>) => {
                       event.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)';
                     }}
-                    onMouseLeave={(event) => {
+                    onMouseLeave={(event: React.MouseEvent<HTMLElement>) => {
                       event.currentTarget.style.backgroundColor = 'transparent';
                     }}
                   >
@@ -412,10 +412,10 @@ const AdminFinanceOverview = () => {
                           type="button"
                           onClick={() => handleEditTransaction(transaction)}
                           className="admin-p-var-mac-spacing-2-radius-var-mac-radius-sm-bgc-transparent-bd-none-cur-pointer-secondary-tr-all-var-mac-duration"
-                          onMouseEnter={(event) => {
+                          onMouseEnter={(event: React.MouseEvent<HTMLElement>) => {
                             event.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)';
                           }}
-                          onMouseLeave={(event) => {
+                          onMouseLeave={(event: React.MouseEvent<HTMLElement>) => {
                             event.currentTarget.style.backgroundColor = 'transparent';
                           }}
                           aria-label={t('admin2.fo_edit_aria')}
@@ -427,10 +427,10 @@ const AdminFinanceOverview = () => {
                           type="button"
                           onClick={() => handleDeleteTransaction(transaction)}
                           className="admin-p-var-mac-spacing-2-radius-var-mac-radius-sm-bgc-transparent-bd-none-cur-pointer-error-tr-all-var-mac-duration"
-                          onMouseEnter={(event) => {
+                          onMouseEnter={(event: React.MouseEvent<HTMLElement>) => {
                             event.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)';
                           }}
-                          onMouseLeave={(event) => {
+                          onMouseLeave={(event: React.MouseEvent<HTMLElement>) => {
                             event.currentTarget.style.backgroundColor = 'transparent';
                           }}
                           aria-label={t('admin2.fo_delete_aria')}

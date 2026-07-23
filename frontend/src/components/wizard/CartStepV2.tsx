@@ -552,7 +552,7 @@ const CartStepV2 = ({
                       </label>
                       <select
                     value={item.doctor_id || ''}
-                    onChange={(e) => onUpdateItem?.(item.id, 'doctor_id', e.target.value ? Number(e.target.value) : null)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => onUpdateItem?.(item.id, 'doctor_id', e.target.value ? Number(e.target.value) : null)}
                     style={{
                       width: '100%',
                       fontSize: 'var(--mac-font-size-xs)',

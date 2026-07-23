@@ -435,7 +435,7 @@ const ScheduleNextModal = ({
       role="button"
       tabIndex={0}
       onClick={onClose}
-      onKeyDown={(event) => handleActivationKeyDown(event, onClose)}>
+      onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => handleActivationKeyDown(event, onClose)}>
       <div style={modalStyle} onClickCapture={(e) => e.stopPropagation()}>
         {/* Заголовок */}
         <div style={headerStyle}>
@@ -477,7 +477,7 @@ const ScheduleNextModal = ({
               aria-label="Schedule next visit patient"
               style={selectStyle}
               value={formData.patient_id}
-              onChange={(e) => handleInputChange('patient_id', e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleInputChange('patient_id', e.target.value)}
               required>
               
               <option value="">{t('misc.snm_select_patient')}</option>
@@ -502,7 +502,7 @@ const ScheduleNextModal = ({
                 aria-label="Schedule next visit date"
                 style={inputStyle}
                 value={formData.visit_date}
-                onChange={(e) => handleInputChange('visit_date', e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleInputChange('visit_date', e.target.value)}
                 min={new Date().toISOString().split('T')[0]}
                 required />
               
@@ -519,7 +519,7 @@ const ScheduleNextModal = ({
                 aria-label="Schedule next visit time"
                 style={inputStyle}
                 value={formData.visit_time}
-                onChange={(e) => handleInputChange('visit_time', e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleInputChange('visit_time', e.target.value)}
                 required />
               
             </div>
@@ -540,7 +540,7 @@ const ScheduleNextModal = ({
                   aria-label={`Schedule next visit service ${index + 1}`}
                   style={selectStyle}
                   value={service.service_id}
-                  onChange={(e) => handleServiceChange(index, 'service_id', e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleServiceChange(index, 'service_id', e.target.value)}
                   required>
                   
                     <option value="">{t('misc.snm_select_service')}</option>
@@ -558,7 +558,7 @@ const ScheduleNextModal = ({
                   aria-label={`Schedule next visit service ${index + 1} quantity`}
                   style={inputStyle}
                   value={service.quantity}
-                  onChange={(e) => handleServiceChange(index, 'quantity', parseInt(e.target.value))}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleServiceChange(index, 'quantity', parseInt(e.target.value))}
                   min="1"
                   placeholder={t('misc.snm_qty_placeholder')} />
                 
@@ -592,7 +592,7 @@ const ScheduleNextModal = ({
               aria-label="Schedule next visit type"
               style={selectStyle}
               value={formData.discount_mode}
-              onChange={(e) => handleInputChange('discount_mode', e.target.value)}>
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleInputChange('discount_mode', e.target.value)}>
               
               <option value="none">{t('misc.snm_visit_type_paid')}</option>
               <option value="repeat">{t('misc.snm_visit_type_repeat')}</option>
@@ -608,7 +608,7 @@ const ScheduleNextModal = ({
               aria-label="Schedule next visit confirmation channel"
               style={selectStyle}
               value={formData.confirmation_channel}
-              onChange={(e) => handleInputChange('confirmation_channel', e.target.value)}>
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleInputChange('confirmation_channel', e.target.value)}>
               
               <option value="telegram">
                 {t('misc.snm_channel_telegram')}

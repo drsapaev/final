@@ -653,7 +653,7 @@ export default function UserProfile() {
                 <ProfileField label={t('misc.up_label_full_name')}>
                   <Input
                     value={draft.full_name}
-                    onChange={(event) => updateDraft('full_name', event.target.value)}
+                    onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateDraft('full_name', event.target.value)}
                     icon={UserRound}
                     placeholder={t('misc.up_placeholder_full_name')}
                   />
@@ -662,7 +662,7 @@ export default function UserProfile() {
                   <Input
                     type="email"
                     value={draft.email}
-                    onChange={(event) => updateDraft('email', event.target.value)}
+                    onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateDraft('email', event.target.value)}
                     icon={Mail}
                     placeholder="user@example.com"
                   />
@@ -670,7 +670,7 @@ export default function UserProfile() {
                 <ProfileField label={t('misc.up_label_phone')}>
                   <Input
                     value={draft.phone}
-                    onChange={(event) => updateDraft('phone', event.target.value)}
+                    onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateDraft('phone', event.target.value)}
                     icon={Phone}
                     placeholder="+998901234567"
                   />
@@ -679,7 +679,7 @@ export default function UserProfile() {
                   <Input
                     type="date"
                     value={draft.date_of_birth}
-                    onChange={(event) => updateDraft('date_of_birth', event.target.value)}
+                    onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateDraft('date_of_birth', event.target.value)}
                     icon={CalendarDays}
                   />
                 </ProfileField>
@@ -708,49 +708,49 @@ export default function UserProfile() {
                 <ProfileField label={t('misc.up_label_first_name')}>
                   <Input
                     value={draft.first_name}
-                    onChange={(event) => updateDraft('first_name', event.target.value)}
+                    onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateDraft('first_name', event.target.value)}
                     placeholder={t('misc.up_placeholder_first_name')}
                   />
                 </ProfileField>
                 <ProfileField label={t('misc.up_label_last_name')}>
                   <Input
                     value={draft.last_name}
-                    onChange={(event) => updateDraft('last_name', event.target.value)}
+                    onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateDraft('last_name', event.target.value)}
                     placeholder={t('misc.up_placeholder_last_name')}
                   />
                 </ProfileField>
                 <ProfileField label={t('misc.up_label_middle_name')}>
                   <Input
                     value={draft.middle_name}
-                    onChange={(event) => updateDraft('middle_name', event.target.value)}
+                    onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateDraft('middle_name', event.target.value)}
                     placeholder={t('misc.up_placeholder_middle_name')}
                   />
                 </ProfileField>
                 <ProfileField label={t('misc.up_label_gender')}>
                   <Select
                     value={draft.gender}
-                    onChange={(event) => updateDraft('gender', event.target.value)}
+                    onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateDraft('gender', event.target.value)}
                     options={genderOptions}
                   />
                 </ProfileField>
                 <ProfileField label={t('misc.up_label_language')}>
                   <Select
                     value={draft.language}
-                    onChange={(event) => updateDraft('language', event.target.value)}
+                    onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateDraft('language', event.target.value)}
                     options={languageOptions}
                   />
                 </ProfileField>
                 <ProfileField label={t('misc.up_label_timezone')}>
                   <Select
                     value={draft.timezone}
-                    onChange={(event) => updateDraft('timezone', event.target.value)}
+                    onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateDraft('timezone', event.target.value)}
                     options={timezoneOptions}
                   />
                 </ProfileField>
                 <ProfileField label={t('misc.up_label_nationality')}>
                   <Input
                     value={draft.nationality}
-                    onChange={(event) => updateDraft('nationality', event.target.value)}
+                    onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateDraft('nationality', event.target.value)}
                     icon={Languages}
                     placeholder={t('misc.up_placeholder_nationality')}
                   />
@@ -758,7 +758,7 @@ export default function UserProfile() {
                 <ProfileField label={t('misc.up_label_website')}>
                   <Input
                     value={draft.website}
-                    onChange={(event) => updateDraft('website', event.target.value)}
+                    onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateDraft('website', event.target.value)}
                     icon={Globe}
                     placeholder="https://example.com"
                   />
@@ -769,7 +769,7 @@ export default function UserProfile() {
                 <ProfileField label={t('misc.up_label_avatar_url')}>
                   <Input
                     value={draft.avatar_url}
-                    onChange={(event) => updateDraft('avatar_url', event.target.value)}
+                    onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateDraft('avatar_url', event.target.value)}
                     icon={Globe}
                     placeholder="https://..."
                   />
@@ -777,7 +777,7 @@ export default function UserProfile() {
                 <ProfileField label={t('misc.up_label_bio')}>
                   <Textarea
                     value={draft.bio}
-                    onChange={(event) => updateDraft('bio', event.target.value)}
+                    onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateDraft('bio', event.target.value)}
                     placeholder={t('misc.up_placeholder_bio')}
                     minRows={4}
                     maxRows={8}

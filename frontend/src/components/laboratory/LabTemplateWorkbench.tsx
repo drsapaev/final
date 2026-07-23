@@ -508,7 +508,7 @@ export default function LabTemplateWorkbench({
             <input
               type="search"
               value={templateSearch}
-              onChange={(e) => setTemplateSearch(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setTemplateSearch(e.target.value)}
               placeholder={t('misc.ltw_poisk_po_nazvaniyu_kodu_seme')}
               aria-label={t('misc.ltw_poisk_shablonov')}
               className="ltw-search-input"
@@ -635,7 +635,7 @@ export default function LabTemplateWorkbench({
                       aria-controls={`ltw-tabpanel-${tab.id}`}
                       tabIndex={isActive ? 0 : -1}
                       onClick={() => setEditorTab(tab.id)}
-                      onKeyDown={(e) => {
+                      onKeyDown={(e: React.KeyboardEvent<HTMLElement>) => {
                         const idx = EDITOR_TABS.findIndex((t) => t.id === tab.id);
                         let nextIdx = null;
                         if (e.key === 'ArrowRight' || e.key === 'ArrowDown') nextIdx = (idx + 1) % EDITOR_TABS.length;

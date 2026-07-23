@@ -466,7 +466,7 @@ const GraphQLExplorer = () => {
 
           <Textarea
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setQuery(e.target.value)}
           placeholder={t('admin2.gql_placeholder_query')}
           minRows={10}
           maxRows={18}
@@ -478,7 +478,7 @@ const GraphQLExplorer = () => {
             <label className="admin-d-block-fs-sm-fw-med-primary-mb-8">{t('admin2.gql_label_variables')}</label>
             <Textarea
             value={variables}
-            onChange={(e) => setVariables(e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setVariables(e.target.value)}
             placeholder='{"key": "value"}'
             minRows={5}
             maxRows={10}

@@ -277,7 +277,7 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
               <Input
                 label={t('derma.derma_photo_zone')}
                 value={metadata.zone}
-                onChange={(e) => setMetadata({ ...metadata, zone: e.target.value })}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setMetadata({ ...metadata, zone: e.target.value })}
                 placeholder={t('derma.derma_photo_ph_zone')} />
               
             </div>
@@ -286,7 +286,7 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
               <Select
                 label={t('derma.derma_photo_angle')}
                 value={metadata.angle}
-                onChange={(e) => setMetadata({ ...metadata, angle: e.target.value })}>
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setMetadata({ ...metadata, angle: e.target.value })}>
                 
                 <Option value="front">{t('derma.derma_photo_angle_front')}</Option>
                 <Option value="side">{t('derma.derma_photo_angle_side')}</Option>
@@ -299,7 +299,7 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
               <Select
                 label={t('derma.derma_photo_lighting')}
                 value={metadata.lighting}
-                onChange={(e) => setMetadata({ ...metadata, lighting: e.target.value })}>
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setMetadata({ ...metadata, lighting: e.target.value })}>
                 
                 <Option value="natural">{t('derma.derma_photo_lighting_natural')}</Option>
                 <Option value="artificial">{t('derma.derma_photo_lighting_artificial')}</Option>
@@ -311,7 +311,7 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
               <Select
                 label={t('derma.derma_photo_flash')}
                 value={metadata.flash ? 'yes' : 'no'}
-                onChange={(e) => setMetadata({ ...metadata, flash: e.target.value === 'yes' })}>
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setMetadata({ ...metadata, flash: e.target.value === 'yes' })}>
                 
                 <Option value="no">{t('derma.derma_photo_flash_no')}</Option>
                 <Option value="yes">{t('derma.derma_photo_flash_yes')}</Option>
@@ -388,7 +388,7 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
                     borderRadius: 8
                   }}
                   onClick={() => openViewer(photo, 'before')}
-                  onKeyDown={(event) => {
+                  onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => {
                     if (event.key === 'Enter' || event.key === ' ') {
                       event.preventDefault();
                       openViewer(photo, 'before');
@@ -497,7 +497,7 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
                     borderRadius: 8
                   }}
                   onClick={() => openViewer(photo, 'after')}
-                  onKeyDown={(event) => {
+                  onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => {
                     if (event.key === 'Enter' || event.key === ' ') {
                       event.preventDefault();
                       openViewer(photo, 'after');

@@ -295,7 +295,7 @@ export function Table({
                       aria-label={`Filter ${String(column.title ?? column.header ?? column.label ?? '')}`}
                       placeholder={`Фильтр по ${String(column.title ?? column.header ?? column.label ?? '').toLowerCase()}`}
                       value={filters[column.key] || ''}
-                      onChange={(e) => handleFilter(column.key, e.target.value)}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleFilter(column.key, e.target.value)}
                       style={filterInputStyle as CSSProperties}
                     />
                   )}
@@ -317,10 +317,10 @@ export function Table({
               <tr
                 key={String(row.id ?? index)}
                 style={rowStyle as CSSProperties}
-                onMouseEnter={(e) => {
+                onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
                   e.currentTarget.style.backgroundColor = getColor('background', 'tertiary');
                 }}
-                onMouseLeave={(e) => {
+                onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
                   e.currentTarget.style.backgroundColor = 'transparent';
                 }}
               >

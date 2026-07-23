@@ -310,7 +310,7 @@ const GroupPermissionsManager = () => {
         <Input
         placeholder={t('admin2.gpm_search_users_ph')}
         value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
+        onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSearchTerm(e.target.value)}
         className="mb-4" />
       
         
@@ -324,7 +324,7 @@ const GroupPermissionsManager = () => {
             setSelectedUser(user);
             loadUserPermissions(user.id);
           }}
-          onKeyDown={(event) => handleActivationKeyDown(event, () => {
+          onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => handleActivationKeyDown(event, () => {
             setSelectedUser(user);
             loadUserPermissions(user.id);
           })}
@@ -486,7 +486,7 @@ const GroupPermissionsManager = () => {
         <Input
         placeholder={t('admin2.gpm_search_groups_ph')}
         value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
+        onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSearchTerm(e.target.value)}
         className="mb-4" />
       
         
@@ -500,7 +500,7 @@ const GroupPermissionsManager = () => {
             setSelectedGroup(group);
             loadGroupSummary(group.id);
           }}
-          onKeyDown={(event) => handleActivationKeyDown(event, () => {
+          onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => handleActivationKeyDown(event, () => {
             setSelectedGroup(group);
             loadGroupSummary(group.id);
           })}

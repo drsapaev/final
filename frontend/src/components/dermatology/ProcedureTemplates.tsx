@@ -320,7 +320,7 @@ const ProcedureTemplates = ({ onSelectProcedure, visitId }: { onSelectProcedure?
               role="button"
               tabIndex={0}
               onClick={() => handleSelectTemplate(template)}
-              onKeyDown={(event) => {
+              onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => {
                 if (event.key === 'Enter' || event.key === ' ') {
                   event.preventDefault();
                   handleSelectTemplate(template);
@@ -353,7 +353,7 @@ const ProcedureTemplates = ({ onSelectProcedure, visitId }: { onSelectProcedure?
                     </div>
                     
                     <button
-                    onClick={(e) => {
+                    onClick={(e: React.MouseEvent<HTMLElement>) => {
                       e.stopPropagation();
                       handleEdit(template);
                     }}
@@ -470,7 +470,7 @@ const ProcedureTemplates = ({ onSelectProcedure, visitId }: { onSelectProcedure?
               <div style={{ fontSize: 12, color: 'var(--mac-text-secondary)', marginBottom: 6 }}>{t('derma.derma_proc_field_name')}</div>
               <Input
                 value={templateForm.name}
-                onChange={(e) => setTemplateForm({ ...templateForm, name: e.target.value })} />
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setTemplateForm({ ...templateForm, name: e.target.value })} />
               
             </Grid>
             
@@ -478,7 +478,7 @@ const ProcedureTemplates = ({ onSelectProcedure, visitId }: { onSelectProcedure?
               <div style={{ fontSize: 12, color: 'var(--mac-text-secondary)', marginBottom: 6 }}>{t('derma.derma_proc_field_category')}</div>
               <Select
                 value={templateForm.category}
-                onChange={(e) => setTemplateForm({ ...templateForm, category: e.target.value })}>
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setTemplateForm({ ...templateForm, category: e.target.value })}>
                 
                 <Option value="injection">{t('derma.derma_proc_category_injection')}</Option>
                 <Option value="hardware">{t('derma.derma_proc_category_hardware')}</Option>
@@ -491,7 +491,7 @@ const ProcedureTemplates = ({ onSelectProcedure, visitId }: { onSelectProcedure?
               <div style={{ fontSize: 12, color: 'var(--mac-text-secondary)', marginBottom: 6 }}>{t('common.description')}</div>
               <Textarea
                 value={templateForm.description}
-                onChange={(e) => setTemplateForm({ ...templateForm, description: e.target.value })}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setTemplateForm({ ...templateForm, description: e.target.value })}
                 rows={3} />
               
             </Grid>
@@ -501,7 +501,7 @@ const ProcedureTemplates = ({ onSelectProcedure, visitId }: { onSelectProcedure?
               <Input
                 type="number"
                 value={templateForm.duration}
-                onChange={(e) => setTemplateForm({ ...templateForm, duration: parseInt(e.target.value || '0', 10) })} />
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setTemplateForm({ ...templateForm, duration: parseInt(e.target.value || '0', 10) })} />
               
             </Grid>
             
@@ -510,7 +510,7 @@ const ProcedureTemplates = ({ onSelectProcedure, visitId }: { onSelectProcedure?
               <Input
                 type="number"
                 value={templateForm.price}
-                onChange={(e) => setTemplateForm({ ...templateForm, price: e.target.value })} />
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setTemplateForm({ ...templateForm, price: e.target.value })} />
               
             </Grid>
             
@@ -525,7 +525,7 @@ const ProcedureTemplates = ({ onSelectProcedure, visitId }: { onSelectProcedure?
                     <Input
                     placeholder={t('derma.derma_proc_ph_material_name')}
                     value={material.name}
-                    onChange={(e) => {
+                    onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
                       const newMaterials = [...templateForm.materials];
                       newMaterials[index].name = e.target.value;
                       setTemplateForm({ ...templateForm, materials: newMaterials });
@@ -536,7 +536,7 @@ const ProcedureTemplates = ({ onSelectProcedure, visitId }: { onSelectProcedure?
                     <Input
                     placeholder={t('derma.derma_proc_ph_material_qty')}
                     value={material.quantity}
-                    onChange={(e) => {
+                    onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
                       const newMaterials = [...templateForm.materials];
                       newMaterials[index].quantity = e.target.value;
                       setTemplateForm({ ...templateForm, materials: newMaterials });
@@ -547,7 +547,7 @@ const ProcedureTemplates = ({ onSelectProcedure, visitId }: { onSelectProcedure?
                     <Input
                     placeholder={t('derma.derma_proc_ph_material_unit')}
                     value={material.unit}
-                    onChange={(e) => {
+                    onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
                       const newMaterials = [...templateForm.materials];
                       newMaterials[index].unit = e.target.value;
                       setTemplateForm({ ...templateForm, materials: newMaterials });
@@ -572,7 +572,7 @@ const ProcedureTemplates = ({ onSelectProcedure, visitId }: { onSelectProcedure?
                 sx={{ mb: 1 }}
                 placeholder={t('derma.derma_proc_ph_step', { n: index + 1 })}
                 value={step}
-                onChange={(e) => {
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
                   const newSteps = [...templateForm.steps];
                   newSteps[index] = e.target.value;
                   setTemplateForm({ ...templateForm, steps: newSteps });
@@ -590,7 +590,7 @@ const ProcedureTemplates = ({ onSelectProcedure, visitId }: { onSelectProcedure?
               <Textarea
                 rows={3}
                 value={templateForm.aftercare}
-                onChange={(e) => setTemplateForm({ ...templateForm, aftercare: e.target.value })} />
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setTemplateForm({ ...templateForm, aftercare: e.target.value })} />
               
             </Grid>
           </Grid>

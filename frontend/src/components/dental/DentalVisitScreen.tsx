@@ -170,7 +170,7 @@ const AnamnesisSection = ({ value, onChange, disabled }) => {
         id="dental-anamnesis"
         aria-label={t('dental.dental_dvs_anamnesis_aria')}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => onChange(e.target.value)}
         placeholder={t('dental.dental_dvs_anamnesis_placeholder')}
         minRows={2}
         disabled={disabled}
@@ -246,7 +246,7 @@ const DiagnosisSection = ({ diagnosis, icd10, onDiagnosisChange, onIcd10Change, 
           id="dental-diagnosis"
           aria-label={t('dental.dental_dvs_diagnosis_aria')}
           value={diagnosis}
-          onChange={(e) => onDiagnosisChange(e.target.value)}
+          onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => onDiagnosisChange(e.target.value)}
           placeholder={t('dental.dental_dvs_diagnosis_placeholder')}
           disabled={disabled}
           style={{ width: '100%', boxSizing: 'border-box' }}
@@ -260,7 +260,7 @@ const DiagnosisSection = ({ diagnosis, icd10, onDiagnosisChange, onIcd10Change, 
           id="dental-icd10"
           aria-label={t('dental.dental_dvs_icd10_aria')}
           value={icd10}
-          onChange={(e) => onIcd10Change(e.target.value)}
+          onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => onIcd10Change(e.target.value)}
           placeholder="K02.1"
           disabled={disabled}
           style={{ width: '100%', boxSizing: 'border-box' }}
@@ -339,7 +339,7 @@ const CollapsibleExtras = ({ hygieneIndices, onHygieneChange, disabled }) => {
                 type="number"
                 aria-label={t('dental.dental_dvs_aria_ohis')}
                 value={hygieneIndices?.ohis || ''}
-                onChange={(e) => onHygieneChange('ohis', e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => onHygieneChange('ohis', e.target.value)}
                 placeholder="0.0 - 6.0"
                 disabled={disabled}
                 style={{ width: '100%', boxSizing: 'border-box' }}
@@ -352,7 +352,7 @@ const CollapsibleExtras = ({ hygieneIndices, onHygieneChange, disabled }) => {
                 type="number"
                 aria-label={t('dental.dental_dvs_aria_pli')}
                 value={hygieneIndices?.pli || ''}
-                onChange={(e) => onHygieneChange('pli', e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => onHygieneChange('pli', e.target.value)}
                 placeholder="0.0 - 3.0"
                 disabled={disabled}
                 style={{ width: '100%', boxSizing: 'border-box' }}
@@ -365,7 +365,7 @@ const CollapsibleExtras = ({ hygieneIndices, onHygieneChange, disabled }) => {
                 type="number"
                 aria-label={t('dental.dental_dvs_aria_cpi')}
                 value={hygieneIndices?.cpi || ''}
-                onChange={(e) => onHygieneChange('cpi', e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => onHygieneChange('cpi', e.target.value)}
                 placeholder="0 - 4"
                 disabled={disabled}
                 style={{ width: '100%', boxSizing: 'border-box' }}
@@ -378,7 +378,7 @@ const CollapsibleExtras = ({ hygieneIndices, onHygieneChange, disabled }) => {
                 type="number"
                 aria-label={t('dental.dental_dvs_aria_bleeding')}
                 value={hygieneIndices?.bleeding || ''}
-                onChange={(e) => onHygieneChange('bleeding', e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => onHygieneChange('bleeding', e.target.value)}
                 placeholder="0 - 100"
                 disabled={disabled}
                 style={{ width: '100%', boxSizing: 'border-box' }}
@@ -691,7 +691,7 @@ const DentalVisitScreen = ({
             {/* Anamnesis — 1-2 строки, всегда виден */}
             <AnamnesisSection
               value={emrData.anamnesis_morbi || emrData.complaints || ''}
-              onChange={(v) => updateField('anamnesis_morbi', v)}
+              onChange={(v: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateField('anamnesis_morbi', v)}
               disabled={saving}
             />
 

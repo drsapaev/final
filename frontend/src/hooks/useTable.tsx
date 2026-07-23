@@ -273,12 +273,12 @@ export const TableHeader = ({
             transition: prefersReducedMotion ? 'none' : 'background-color 0.2s ease'
           }}
           onClick={() => sortable && column.sortable !== false && onSort(column?.key)}
-          onMouseEnter={(e) => {
+          onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
             if (sortable && column.sortable !== false && !prefersReducedMotion) {
               (e.target as HTMLElement).style.backgroundColor = 'var(--mac-bg-secondary)';
             }
           }}
-          onMouseLeave={(e) => {
+          onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
             if (!prefersReducedMotion) {
               (e.target as HTMLElement).style.backgroundColor = 'var(--mac-bg-secondary)';
             }
@@ -359,12 +359,12 @@ export const TableRow = ({
         transition: prefersReducedMotion ? 'none' : 'background-color 0.2s ease'
       }}
       onClick={handleClick}
-      onMouseEnter={(e) => {
+      onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
         if (onClick && !prefersReducedMotion) {
           (e.target as HTMLElement).style.backgroundColor = 'var(--mac-bg-secondary)';
         }
       }}
-      onMouseLeave={(e) => {
+      onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
         if (onClick && !prefersReducedMotion) {
           (e.target as HTMLElement).style.backgroundColor = selected ? 'var(--mac-accent-bg)' : 'var(--mac-bg-primary)';
         }
@@ -395,12 +395,12 @@ export const TableRow = ({
             borderRadius: 'var(--mac-radius-sm)',
             transition: prefersReducedMotion ? 'none' : 'all 0.2s ease'
           }}
-          onMouseEnter={(e) => {
+          onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
             if (!prefersReducedMotion) {
               (e.target as HTMLElement).style.backgroundColor = 'var(--mac-bg-secondary)';
             }
           }}
-          onMouseLeave={(e) => {
+          onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
             if (!prefersReducedMotion) {
               (e.target as HTMLElement).style.backgroundColor = 'transparent';
             }
@@ -544,12 +544,12 @@ export const TablePagination = ({
             cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
             transition: prefersReducedMotion ? 'none' : 'all 0.2s ease'
           }}
-          onMouseEnter={(e) => {
+          onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
             if (currentPage !== 1 && !prefersReducedMotion) {
               (e.target as HTMLElement).style.backgroundColor = 'var(--mac-bg-secondary)';
             }
           }}
-          onMouseLeave={(e) => {
+          onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
             if (currentPage !== 1 && !prefersReducedMotion) {
               (e.target as HTMLElement).style.backgroundColor = 'var(--mac-bg-primary)';
             }
@@ -578,12 +578,12 @@ export const TablePagination = ({
                   minWidth: '40px',
                   transition: prefersReducedMotion ? 'none' : 'all 0.2s ease'
                 }}
-                onMouseEnter={(e) => {
+                onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
                   if (pageNumber !== currentPage && !prefersReducedMotion) {
                     (e.target as HTMLElement).style.backgroundColor = pageNumber === currentPage ? 'var(--mac-accent-blue-hover)' : 'var(--mac-bg-secondary)';
                   }
                 }}
-                onMouseLeave={(e) => {
+                onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
                   if (pageNumber !== currentPage && !prefersReducedMotion) {
                     (e.target as HTMLElement).style.backgroundColor = pageNumber === currentPage ? 'var(--mac-accent-blue)' : 'var(--mac-bg-primary)';
                   }
@@ -609,12 +609,12 @@ export const TablePagination = ({
             cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
             transition: prefersReducedMotion ? 'none' : 'all 0.2s ease'
           }}
-          onMouseEnter={(e) => {
+          onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
             if (currentPage !== totalPages && !prefersReducedMotion) {
               (e.target as HTMLElement).style.backgroundColor = 'var(--mac-bg-secondary)';
             }
           }}
-          onMouseLeave={(e) => {
+          onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
             if (currentPage !== totalPages && !prefersReducedMotion) {
               (e.target as HTMLElement).style.backgroundColor = 'var(--mac-bg-primary)';
             }
@@ -676,12 +676,12 @@ export const TableSearch = ({
           outline: 'none',
           transition: prefersReducedMotion ? 'none' : 'border-color 0.2s ease'
         }}
-        onFocus={(e) => {
+        onFocus={(e: React.FocusEvent<HTMLElement>) => {
           if (!prefersReducedMotion) {
             (e.target as HTMLElement).style.borderColor = 'var(--mac-accent-blue)';
           }
         }}
-        onBlur={(e) => {
+        onBlur={(e: React.FocusEvent<HTMLElement>) => {
           if (!prefersReducedMotion) {
             (e.target as HTMLElement).style.borderColor = 'var(--mac-border)';
           }

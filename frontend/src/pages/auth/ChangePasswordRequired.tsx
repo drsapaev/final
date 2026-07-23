@@ -212,7 +212,7 @@ export default function ChangePasswordRequired({ currentPassword }) {
                             type={showCurrentPassword ? 'text' : 'password'}
                             placeholder={t('misc.cpr_tekuschiy_parol')}
                             value={formData.currentPassword}
-                            onChange={(e) => setFormData({ ...formData, currentPassword: e.target.value })}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFormData({ ...formData, currentPassword: e.target.value })}
                             required
                             style={{ paddingRight: '40px' }}
                         />
@@ -232,7 +232,7 @@ export default function ChangePasswordRequired({ currentPassword }) {
                             type={showNewPassword ? 'text' : 'password'}
                             placeholder={t('misc.cpr_novyy_parol')}
                             value={formData.newPassword}
-                            onChange={(e) => setFormData({ ...formData, newPassword: e.target.value })}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFormData({ ...formData, newPassword: e.target.value })}
                             required
                             style={{ paddingRight: '40px' }}
                         />
@@ -265,7 +265,7 @@ export default function ChangePasswordRequired({ currentPassword }) {
                             type={showConfirmPassword ? 'text' : 'password'}
                             placeholder={t('misc.cpr_podtverdite_novyy_parol')}
                             value={formData.confirmPassword}
-                            onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFormData({ ...formData, confirmPassword: e.target.value })}
                             required
                             style={{ paddingRight: '40px' }}
                         />

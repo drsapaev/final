@@ -137,7 +137,7 @@ export function TreatmentTemplatesPanel({
                 tabIndex={0}
                 aria-label={t18('misc.ttp_zakryt_panel_shablonov_leche')}
                 onClick={handleClose}
-                onKeyDown={(event) => handleActivationKeyDown(event, handleClose)} />
+                onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => handleActivationKeyDown(event, handleClose)} />
 
             {/* Panel */}
             <div className="treatment-templates-panel">
@@ -156,7 +156,7 @@ export function TreatmentTemplatesPanel({
                         aria-label={t18('misc.ttp_poisk_shablona_lecheniya')}
                         placeholder={t18('misc.ttp_poisk_shablona')}
                         value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSearchQuery(e.target.value)}
                         autoFocus
                     />
                 </div>
@@ -188,7 +188,7 @@ export function TreatmentTemplatesPanel({
                                     onClick={() => handlePreview(template)}
                                     role="button"
                                     tabIndex={0}
-                                    onKeyDown={(event) => handleActivationKeyDown(event, () => handlePreview(template))}
+                                    onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => handleActivationKeyDown(event, () => handlePreview(template))}
                                 >
                                     <span className="treatment-templates-item-title">{template.title}</span>
                                     <span className="treatment-templates-item-body">{template.body}</span>

@@ -265,7 +265,7 @@ const FinanceModal = ({
                   </label>
                   <Select
                     value={String(formData.type ?? '')}
-                    onChange={(value) => handleChange('type', value)}
+                    onChange={(value: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('type', value)}
                     options={getTransactionTypeOptions(t)}
                     size="large"
                     className="admin-w-full" />
@@ -284,7 +284,7 @@ const FinanceModal = ({
                   </label>
                   <Select
                     value={String(formData.category ?? '')}
-                    onChange={(value) => handleChange('category', value)}
+                    onChange={(value: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('category', value)}
                     options={[
                       { value: '', label: t('admin2.fm_placeholder_category') },
                       ...(String(formData.type ?? '') === 'income' ? getIncomeCategories(t) : getExpenseCategories(t)).map((category) => ({
@@ -315,7 +315,7 @@ const FinanceModal = ({
                       type="number"
                       aria-label="Finance transaction amount"
                       value={String(formData.amount ?? '')}
-                      onChange={(e) => handleChange('amount', e.target.value)}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('amount', e.target.value)}
                       className={`w-full pl-10 pr-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent admin-modal-input-bd-dyn ${
                         errors.amount ? 'border-red-500' : 'border-gray-300'
                       }`}
@@ -349,7 +349,7 @@ const FinanceModal = ({
                       type="date"
                       aria-label="Finance transaction date"
                       value={String(formData.transactionDate ?? '')}
-                      onChange={(e) => handleChange('transactionDate', e.target.value)}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('transactionDate', e.target.value)}
                       className={`w-full pl-10 pr-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent admin-modal-input-bd-dyn ${
                         errors.transactionDate ? 'border-red-500' : 'border-gray-300'
                       }`}
@@ -373,7 +373,7 @@ const FinanceModal = ({
                 <textarea
                   aria-label="Finance transaction description"
                   value={String(formData.description ?? '')}
-                  onChange={(e) => handleChange('description', e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('description', e.target.value)}
                   className={`w-full px-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent admin-modal-input-bd-dyn ${
                     errors.description ? 'border-red-500' : 'border-gray-300'
                   }`}
@@ -403,7 +403,7 @@ const FinanceModal = ({
                   </label>
                   <Select
                     value={String(formData.patientId ?? '') === '' ? '' : String(formData.patientId)}
-                    onChange={(value) => handleChange('patientId', value)}
+                    onChange={(value: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('patientId', value)}
                     options={[
                       { value: '', label: t('admin2.fm_placeholder_patient') },
                       ...patients.map((patient) => ({
@@ -424,7 +424,7 @@ const FinanceModal = ({
                   </label>
                   <Select
                     value={String(formData.doctorId ?? '') === '' ? '' : String(formData.doctorId)}
-                    onChange={(value) => handleChange('doctorId', value)}
+                    onChange={(value: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('doctorId', value)}
                     options={[
                       { value: '', label: t('admin2.fm_placeholder_doctor') },
                       ...doctors.map((doctor) => ({
@@ -451,7 +451,7 @@ const FinanceModal = ({
                   </label>
                   <Select
                     value={String(formData.paymentMethod ?? '')}
-                    onChange={(value) => handleChange('paymentMethod', value)}
+                    onChange={(value: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('paymentMethod', value)}
                     options={getPaymentMethodOptions(t)}
                     size="large"
                     className="admin-w-full" />
@@ -464,7 +464,7 @@ const FinanceModal = ({
                   </label>
                   <Select
                     value={String(formData.status ?? '')}
-                    onChange={(value) => handleChange('status', value)}
+                    onChange={(value: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('status', value)}
                     options={getStatusOptions(t)}
                     size="large"
                     className="admin-w-full" />
@@ -483,7 +483,7 @@ const FinanceModal = ({
                       type="text"
                       aria-label="Finance card or transaction reference"
                       value={String(formData.reference ?? '')}
-                      onChange={(e) => handleChange('reference', e.target.value)}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('reference', e.target.value)}
                       className={`w-full pl-10 pr-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent admin-modal-input-bd-dyn ${
                         errors.reference ? 'border-red-500' : 'border-gray-300'
                       }`}
@@ -513,7 +513,7 @@ const FinanceModal = ({
                 <textarea
                   aria-label="Finance transaction notes"
                   value={String(formData.notes ?? '')}
-                  onChange={(e) => handleChange('notes', e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('notes', e.target.value)}
                   className="w-full px-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent admin-form-control"
                   rows={3}
                   placeholder={t('admin2.fm_placeholder_notes')}

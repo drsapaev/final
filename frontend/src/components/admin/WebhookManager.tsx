@@ -304,7 +304,7 @@ const WebhookManager = () => {
                 type="text"
                 placeholder={t('admin2.wh_search_ph')}
                 value={String(filters.search ?? "")}
-                onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFilters({ ...filters, search: e.target.value })}
                 icon={Search}
                 iconPosition="left" />
 
@@ -533,7 +533,7 @@ const WebhookManager = () => {
                 </label>
                 <Select
                 value={selectedWebhook?.id ? String(selectedWebhook.id) : ''}
-                onChange={(value) => {
+                onChange={(value: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
                   const webhook = webhooks.find((w) => String(w.id) === String(value));
                   setSelectedWebhook(webhook);
                   if (webhook) loadWebhookCalls(webhook.id);

@@ -722,7 +722,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                 {editingProfile && (
                     <ProfileForm
                         profile={editingProfile}
-                        onSubmit={(data) => handleUpdate(editingProfile.key, data)}
+                        onSubmit={(data: React.FormEvent<HTMLFormElement>) => handleUpdate(editingProfile.key, data)}
                         onCancel={() => setEditingProfile(null)}
                         saving={saving}
                         isDark={isDark}
@@ -776,7 +776,7 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
             tabIndex={0}
             aria-label={t('admin2.qp_close_form_aria')}
             onClick={onCancel}
-            onKeyDown={(event) => handleActivationKeyDown(event, onCancel)}>
+            onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => handleActivationKeyDown(event, onCancel)}>
             <div className="admin-qp-modal" style={{ '--admin-bgc0': isDark ? 'var(--mac-bg-primary)' : 'white' } as CSSProperties} onClickCapture={e => e.stopPropagation()}>
                 <div className="admin-qp-modal-header">
                     <h3 className="admin-qp-modal-title">

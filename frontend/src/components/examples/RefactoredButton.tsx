@@ -241,13 +241,13 @@ const RefactoredButton = ({
       style={buttonStyles}
       onClick={handleClick}
       disabled={disabled || loading}
-      onMouseEnter={(e) => {
+      onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
         if (!disabled && !loading) {
           e.currentTarget.style.boxShadow = variantStyles.hoverShadow;
           e.currentTarget.style.transform = 'translateY(-1px)';
         }
       }}
-      onMouseLeave={(e) => {
+      onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
         if (!disabled && !loading) {
           e.currentTarget.style.boxShadow = variantStyles.shadow;
           e.currentTarget.style.transform = 'translateY(0)';

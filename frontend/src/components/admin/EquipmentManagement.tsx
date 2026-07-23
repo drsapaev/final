@@ -298,7 +298,7 @@ const EquipmentManagement = () => {
               aria-label={t('admin2.em_search_aria')}
               placeholder={t('admin2.em_search_placeholder')}
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSearchTerm(e.target.value)}
               className="admin-pl-40" />
             
             <Search aria-hidden="true" className="admin-pos-absolute-left-12-top-50pct-tf-translateY-50-tertiary-w-16-h-16" />
@@ -377,7 +377,7 @@ const EquipmentManagement = () => {
                 type="text"
                 required
                 value={String(formData.name ?? '')}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFormData({ ...formData, name: e.target.value })}
                 placeholder={t('admin2.em_name_ph')} />
 
               </div>
@@ -402,7 +402,7 @@ const EquipmentManagement = () => {
                 <Input
                 type="text"
                 value={String(formData.model ?? '')}
-                onChange={(e) => setFormData({ ...formData, model: e.target.value })}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFormData({ ...formData, model: e.target.value })}
                 placeholder={t('admin2.em_model_ph')} />
 
               </div>
@@ -413,7 +413,7 @@ const EquipmentManagement = () => {
                 <Input
                 type="text"
                 value={String(formData.serial_number ?? '')}
-                onChange={(e) => setFormData({ ...formData, serial_number: e.target.value })}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFormData({ ...formData, serial_number: e.target.value })}
                 placeholder={t('admin2.em_serial_ph')} />
 
               </div>
@@ -449,7 +449,7 @@ const EquipmentManagement = () => {
                 <Input
                 type="date"
                 value={String(formData.purchase_date ?? '')}
-                onChange={(e) => setFormData({ ...formData, purchase_date: e.target.value })} />
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFormData({ ...formData, purchase_date: e.target.value })} />
 
               </div>
               <div>
@@ -459,7 +459,7 @@ const EquipmentManagement = () => {
                 <Input
                 type="date"
                 value={String(formData.warranty_expiry ?? '')}
-                onChange={(e) => setFormData({ ...formData, warranty_expiry: e.target.value })} />
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFormData({ ...formData, warranty_expiry: e.target.value })} />
 
               </div>
               <div>
@@ -469,7 +469,7 @@ const EquipmentManagement = () => {
                 <Input
                 type="date"
                 value={String(formData.maintenance_date ?? '')}
-                onChange={(e) => setFormData({ ...formData, maintenance_date: e.target.value })} />
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFormData({ ...formData, maintenance_date: e.target.value })} />
 
               </div>
               <div>
@@ -479,7 +479,7 @@ const EquipmentManagement = () => {
                 <Input
                 type="number"
                 value={String(formData.cost ?? '')}
-                onChange={(e) => setFormData({ ...formData, cost: parseFloat(e.target.value) })}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFormData({ ...formData, cost: parseFloat(e.target.value) })}
                 placeholder={t('admin2.em_cost_ph')} />
 
               </div>
@@ -491,7 +491,7 @@ const EquipmentManagement = () => {
               </label>
               <Textarea
               value={String(formData.description ?? '')}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFormData({ ...formData, description: e.target.value })}
               placeholder={t('admin2.em_description_ph')}
               rows={3} />
 

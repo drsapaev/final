@@ -371,7 +371,7 @@ const DoctorServiceSelector = ({
                 type="number"
                 aria-label={t('misc.dss_tsena_uslugi_service_name', { name: service.name })}
                 value={service.price}
-                onChange={(e) => handlePriceChange(service.id, parseFloat(e.target.value) || 0)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handlePriceChange(service.id, parseFloat(e.target.value) || 0)}
                 style={{
                   width: '96px',
                   paddingLeft: '8px',
@@ -385,11 +385,11 @@ const DoctorServiceSelector = ({
                   color: 'var(--mac-text-primary)',
                   transition: 'all var(--mac-duration-fast) var(--mac-ease)'
                 }}
-                onFocus={(e) => {
+                onFocus={(e: React.FocusEvent<HTMLElement>) => {
                   e.currentTarget.style.borderColor = 'var(--mac-accent)';
                   e.currentTarget.style.boxShadow = 'var(--mac-focus-ring)';
                 }}
-                onBlur={(e) => {
+                onBlur={(e: React.FocusEvent<HTMLElement>) => {
                   e.currentTarget.style.borderColor = 'var(--mac-border)';
                   e.currentTarget.style.boxShadow = 'none';
                 }}
@@ -466,15 +466,15 @@ const DoctorServiceSelector = ({
                         transition: 'all var(--mac-duration-normal) var(--mac-ease)'
                       }}
                       onClick={() => handleServiceToggle(service)}
-                      onKeyDown={(event) => handleActivationKeyDown(event, () => handleServiceToggle(service))}
-                      onMouseEnter={(e) => {
+                      onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => handleActivationKeyDown(event, () => handleServiceToggle(service))}
+                      onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
                         if (!isSelected) {
                           e.currentTarget.style.backgroundColor = 'var(--mac-bg-hover)';
                           e.currentTarget.style.transform = 'translateX(4px)';
                           e.currentTarget.style.boxShadow = 'var(--mac-shadow-sm)';
                         }
                       }}
-                      onMouseLeave={(e) => {
+                      onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
                         if (!isSelected) {
                           e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)';
                           e.currentTarget.style.transform = 'translateX(0)';

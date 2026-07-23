@@ -266,7 +266,7 @@ const PaymentManager = ({
                         value="click"
                         aria-label={t('payment.pay_mgr_provider_click_aria')}
                         checked={selectedProvider === 'click'}
-                        onChange={(e) => setSelectedProvider(e.target.value)}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSelectedProvider(e.target.value)}
                       />
                       <span>Click</span>
                     </label>
@@ -278,7 +278,7 @@ const PaymentManager = ({
                         value="payme"
                         aria-label={t('payment.pay_mgr_provider_payme_aria')}
                         checked={selectedProvider === 'payme'}
-                        onChange={(e) => setSelectedProvider(e.target.value)}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSelectedProvider(e.target.value)}
                       />
                       <span>PayMe</span>
                     </label>

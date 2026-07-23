@@ -250,7 +250,7 @@ const PrescriptionSystem = ({
                   type="text"
                   aria-label={`Medication ${index + 1} name`}
                   value={medication.name}
-                  onChange={(e) => handleMedicationChange(medication.id, 'name', e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleMedicationChange(medication.id, 'name', e.target.value)}
                   placeholder={t('misc.ps_med_name_ph')}
                   className="w-full p-2 border border-gray-300 rounded"
                   disabled={!canEdit} />
@@ -263,7 +263,7 @@ const PrescriptionSystem = ({
                   type="text"
                   aria-label={`Medication ${index + 1} dosage`}
                   value={medication.dosage}
-                  onChange={(e) => handleMedicationChange(medication.id, 'dosage', e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleMedicationChange(medication.id, 'dosage', e.target.value)}
                   placeholder={t('misc.ps_med_dosage_ph')}
                   className="w-full p-2 border border-gray-300 rounded"
                   disabled={!canEdit} />
@@ -276,7 +276,7 @@ const PrescriptionSystem = ({
                   type="text"
                   aria-label={`Medication ${index + 1} frequency`}
                   value={medication.frequency}
-                  onChange={(e) => handleMedicationChange(medication.id, 'frequency', e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleMedicationChange(medication.id, 'frequency', e.target.value)}
                   placeholder={t('misc.ps_med_frequency_ph')}
                   className="w-full p-2 border border-gray-300 rounded"
                   disabled={!canEdit} />
@@ -289,7 +289,7 @@ const PrescriptionSystem = ({
                   type="text"
                   aria-label={`Medication ${index + 1} duration`}
                   value={medication.duration}
-                  onChange={(e) => handleMedicationChange(medication.id, 'duration', e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleMedicationChange(medication.id, 'duration', e.target.value)}
                   placeholder={t('misc.ps_med_duration_ph')}
                   className="w-full p-2 border border-gray-300 rounded"
                   disabled={!canEdit} />
@@ -302,7 +302,7 @@ const PrescriptionSystem = ({
                   type="number"
                   aria-label={`Medication ${index + 1} quantity`}
                   value={medication.quantity}
-                  onChange={(e) => handleMedicationChange(medication.id, 'quantity', parseInt(e.target.value) || 1)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleMedicationChange(medication.id, 'quantity', parseInt(e.target.value) || 1)}
                   className="w-full p-2 border border-gray-300 rounded"
                   disabled={!canEdit} />
                 
@@ -314,7 +314,7 @@ const PrescriptionSystem = ({
                   type="text"
                   aria-label={`Medication ${index + 1} special instructions`}
                   value={medication.instructions}
-                  onChange={(e) => handleMedicationChange(medication.id, 'instructions', e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleMedicationChange(medication.id, 'instructions', e.target.value)}
                   placeholder={t('misc.ps_med_special_ph')}
                   className="w-full p-2 border border-gray-300 rounded"
                   disabled={!canEdit} />
@@ -333,7 +333,7 @@ const PrescriptionSystem = ({
         <textarea
           aria-label="Prescription general instructions"
           value={prescription.instructions}
-          onChange={(e) => handleFieldChange('instructions', e.target.value)}
+          onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleFieldChange('instructions', e.target.value)}
           placeholder={t('misc.ps_general_instructions_ph')}
           className="w-full h-24 p-3 border border-gray-300 rounded-lg resize-none"
           disabled={!canEdit} />
@@ -346,7 +346,7 @@ const PrescriptionSystem = ({
         <textarea
           aria-label="Prescription doctor notes"
           value={prescription.doctorNotes}
-          onChange={(e) => handleFieldChange('doctorNotes', e.target.value)}
+          onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleFieldChange('doctorNotes', e.target.value)}
           placeholder={t('misc.ps_doctor_notes_ph')}
           className="w-full h-20 p-3 border border-gray-300 rounded-lg resize-none"
           disabled={!canEdit} />

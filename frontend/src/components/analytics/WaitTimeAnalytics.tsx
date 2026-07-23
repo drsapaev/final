@@ -718,7 +718,7 @@ const WaitTimeAnalytics = () => {
             <Input
               type="date"
               value={dateRange.startDate}
-              onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })} />
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setDateRange({ ...dateRange, startDate: e.target.value })} />
             
           </div>
           <div>
@@ -728,7 +728,7 @@ const WaitTimeAnalytics = () => {
             <Input
               type="date"
               value={dateRange.endDate}
-              onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })} />
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setDateRange({ ...dateRange, endDate: e.target.value })} />
             
           </div>
           <div>
@@ -738,7 +738,7 @@ const WaitTimeAnalytics = () => {
             <Input
               placeholder={t('misc.wta_filter_department')}
               value={filters.department}
-              onChange={(e) => setFilters({ ...filters, department: e.target.value })} />
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFilters({ ...filters, department: e.target.value })} />
             
           </div>
           <div className="wta-action-btn-end">

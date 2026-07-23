@@ -345,7 +345,7 @@ export default function HeaderNew() {
       {/* 1) Язык — PR-50: replaced cycling button with <select> (H-1, H-2 fix) */}
       <select
         value={lang}
-        onChange={(e) => changeLang(e.target.value)}
+        onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => changeLang(e.target.value)}
         aria-label={t('legacy.hn_select_language')}
         title={t('legacy.hn_select_language')}
         style={{
@@ -502,7 +502,7 @@ export default function HeaderNew() {
             <button
               type="button"
               key={scheme.id}
-              onClick={(e) => {
+              onClick={(e: React.MouseEvent<HTMLElement>) => {
                 e.preventDefault();
                 e.stopPropagation();
                 handleThemeClick(scheme.id);
@@ -519,8 +519,8 @@ export default function HeaderNew() {
                 background: 'transparent',
                 cursor: 'pointer'
               }}
-              onMouseEnter={(e) => {e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)';}}
-              onMouseLeave={(e) => {e.currentTarget.style.backgroundColor = 'transparent';}}>
+              onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)';}}
+              onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {e.currentTarget.style.backgroundColor = 'transparent';}}>
 
                     <span style={{ display: 'inline-flex', alignItems: 'center', color: 'var(--mac-accent-blue)' }}>
                       {renderSchemeIcon(scheme.id)}
@@ -565,7 +565,7 @@ export default function HeaderNew() {
               {/* click-outside overlay — PR-50: added role + keyboard handler */}
               <div
                 onClick={() => setShowProfileMenu(false)}
-                onKeyDown={(e) => { if (e.key === 'Escape') setShowProfileMenu(false); }}
+                onKeyDown={(e: React.KeyboardEvent<HTMLElement>) => { if (e.key === 'Escape') setShowProfileMenu(false); }}
                 role="button"
                 tabIndex={-1}
                 aria-label={t('legacy.hn_close_profile_menu')}
@@ -688,10 +688,10 @@ export default function HeaderNew() {
             userSelect: 'none',
             transition: 'background 0.15s ease',
           }}
-          onMouseEnter={(e) => {
+          onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
             e.currentTarget.style.background = 'var(--mac-surface-hover, #e5e7eb)';
           }}
-          onMouseLeave={(e) => {
+          onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
             e.currentTarget.style.background = 'var(--mac-surface-secondary, #f3f4f6)';
           }}
         >

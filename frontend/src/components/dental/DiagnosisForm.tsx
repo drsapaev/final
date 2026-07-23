@@ -193,7 +193,7 @@ const DiagnosisForm = ({
               </div>
               <select
             value={formData.toothDiagnoses[toothId] || ''}
-            onChange={(e) => handleToothDiagnosisChange(toothId, e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleToothDiagnosisChange(toothId, e.target.value)}
             disabled={!isEditing}
             className="w-full text-xs px-2 py-1 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100">
             
@@ -219,7 +219,7 @@ const DiagnosisForm = ({
               </div>
               <select
             value={formData.toothDiagnoses[toothId] || ''}
-            onChange={(e) => handleToothDiagnosisChange(toothId, e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleToothDiagnosisChange(toothId, e.target.value)}
             disabled={!isEditing}
             className="w-full text-xs px-2 py-1 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100">
             
@@ -252,7 +252,7 @@ const DiagnosisForm = ({
           type="text"
           aria-label={t('dental.dental_df_aria_general_diagnosis', { index: index + 1 })}
           value={diagnosis}
-          onChange={(e) => {
+          onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
             const newDiagnoses = [...formData.generalDiagnoses];
             newDiagnoses[index] = e.target.value;
             handleInputChange('generalDiagnoses', newDiagnoses);
@@ -309,7 +309,7 @@ const DiagnosisForm = ({
             type="text"
             aria-label={t('dental.dental_df_aria_immediate_item', { index: index + 1 })}
             value={item}
-            onChange={(e) => {
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
               const newItems = [...formData.treatmentPlan.immediate];
               newItems[index] = e.target.value;
               handleInputChange('treatmentPlan.immediate', newItems);
@@ -354,7 +354,7 @@ const DiagnosisForm = ({
             type="text"
             aria-label={t('dental.dental_df_aria_short_term_item', { index: index + 1 })}
             value={item}
-            onChange={(e) => {
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
               const newItems = [...formData.treatmentPlan.shortTerm];
               newItems[index] = e.target.value;
               handleInputChange('treatmentPlan.shortTerm', newItems);
@@ -399,7 +399,7 @@ const DiagnosisForm = ({
             type="text"
             aria-label={t('dental.dental_df_aria_long_term_item', { index: index + 1 })}
             value={item}
-            onChange={(e) => {
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
               const newItems = [...formData.treatmentPlan.longTerm];
               newItems[index] = e.target.value;
               handleInputChange('treatmentPlan.longTerm', newItems);
@@ -455,7 +455,7 @@ const DiagnosisForm = ({
               type="text"
               aria-label={t('dental.dental_df_aria_medication', { index: index + 1 })}
               value={prescription.medication || ''}
-              onChange={(e) => {
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
                 const newPrescriptions = [...formData.prescriptions];
                 newPrescriptions[index] = { ...prescription, medication: e.target.value };
                 handleInputChange('prescriptions', newPrescriptions);
@@ -474,7 +474,7 @@ const DiagnosisForm = ({
               type="text"
               aria-label={t('dental.dental_df_aria_dosage', { index: index + 1 })}
               value={prescription.dosage || ''}
-              onChange={(e) => {
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
                 const newPrescriptions = [...formData.prescriptions];
                 newPrescriptions[index] = { ...prescription, dosage: e.target.value };
                 handleInputChange('prescriptions', newPrescriptions);
@@ -493,7 +493,7 @@ const DiagnosisForm = ({
               type="text"
               aria-label={t('dental.dental_df_aria_administration', { index: index + 1 })}
               value={prescription.administration || ''}
-              onChange={(e) => {
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
                 const newPrescriptions = [...formData.prescriptions];
                 newPrescriptions[index] = { ...prescription, administration: e.target.value };
                 handleInputChange('prescriptions', newPrescriptions);
@@ -512,7 +512,7 @@ const DiagnosisForm = ({
               type="text"
               aria-label={t('dental.dental_df_aria_duration', { index: index + 1 })}
               value={prescription.duration || ''}
-              onChange={(e) => {
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
                 const newPrescriptions = [...formData.prescriptions];
                 newPrescriptions[index] = { ...prescription, duration: e.target.value };
                 handleInputChange('prescriptions', newPrescriptions);
@@ -528,7 +528,7 @@ const DiagnosisForm = ({
               <textarea
             aria-label={t('dental.dental_df_aria_prescription_notes', { index: index + 1 })}
             value={prescription.notes || ''}
-            onChange={(e) => {
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
               const newPrescriptions = [...formData.prescriptions];
               newPrescriptions[index] = { ...prescription, notes: e.target.value };
               handleInputChange('prescriptions', newPrescriptions);
@@ -590,7 +590,7 @@ const DiagnosisForm = ({
                 </label>
                 <select
               value={referral.specialist || ''}
-              onChange={(e) => {
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
                 const newReferrals = [...formData.referrals];
                 newReferrals[index] = { ...referral, specialist: e.target.value };
                 handleInputChange('referrals', newReferrals);
@@ -618,7 +618,7 @@ const DiagnosisForm = ({
                 </label>
                 <select
               value={referral.priority || ''}
-              onChange={(e) => {
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
                 const newReferrals = [...formData.referrals];
                 newReferrals[index] = { ...referral, priority: e.target.value };
                 handleInputChange('referrals', newReferrals);
@@ -642,7 +642,7 @@ const DiagnosisForm = ({
               <textarea
             aria-label={t('dental.dental_df_aria_referral_reason', { index: index + 1 })}
             value={referral.reason || ''}
-            onChange={(e) => {
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
               const newReferrals = [...formData.referrals];
               newReferrals[index] = { ...referral, reason: e.target.value };
               handleInputChange('referrals', newReferrals);
@@ -659,7 +659,7 @@ const DiagnosisForm = ({
             type="text"
             aria-label={t('dental.dental_df_aria_referral_notes', { index: index + 1 })}
             value={referral.notes || ''}
-            onChange={(e) => {
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
               const newReferrals = [...formData.referrals];
               newReferrals[index] = { ...referral, notes: e.target.value };
               handleInputChange('referrals', newReferrals);

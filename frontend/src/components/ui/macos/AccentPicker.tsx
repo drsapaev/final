@@ -55,7 +55,7 @@ export default function AccentPicker({ size = 22, className = '', style = {} }: 
               alignItems: 'center',
               justifyContent: 'center'
             }}
-            onKeyDown={(e) => {
+            onKeyDown={(e: React.KeyboardEvent<HTMLElement>) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
                 setAccent(key as AccentName);

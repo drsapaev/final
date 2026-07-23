@@ -173,7 +173,7 @@ export const InteractiveListItem = ({
         onClick={onClick}
         role="button"
         tabIndex={0}
-        onKeyDown={(event) => {
+        onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => {
           if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault();
             onClick(event);

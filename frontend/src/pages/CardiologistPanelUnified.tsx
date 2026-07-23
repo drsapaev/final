@@ -1765,7 +1765,7 @@ const MacOSCardiologistPanelUnified = () => {
                 showFormOpen
                 onNewTest={() => {}}
                 onCancelForm={() => setShowForm({ open: false })}
-                onSubmit={(e) => {
+                onSubmit={(e: React.FormEvent<HTMLFormElement>) => {
                   e?.preventDefault?.();
                   // C-4 fix: Persist ECG metadata to /cardio/ecg as a manual entry
                   // (file_id is null — the doctor is typing parameters from
@@ -1963,7 +1963,7 @@ const MacOSCardiologistPanelUnified = () => {
                 type="number"
                 aria-label={tI18n('cardio.cardio_panel_settings_ldl_threshold_aria')}
                 value={settings.ldlThreshold}
-                onChange={(e) => setSettings({ ...settings, ldlThreshold: Number(e.target.value) })}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSettings({ ...settings, ldlThreshold: Number(e.target.value) })}
                 className="cardio-settings-input" />
 
               </div>

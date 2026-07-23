@@ -340,7 +340,7 @@ const IntegratedServiceSelector = ({
               <div className="space-y-3">
                 <select
                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
-                onChange={(e) => {
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
                   const serviceId = parseInt(e.target.value);
                   if (serviceId) {
                     const service = groupServices.find((s) => s.id === serviceId);

@@ -59,10 +59,10 @@ const ChatButton = () => {
                     transition: 'all var(--mac-duration-fast)',
                     padding: 0
                 }}
-                onMouseEnter={(e) => {
+                onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
                     e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)';
                 }}
-                onMouseLeave={(e) => {
+                onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
                     e.currentTarget.style.backgroundColor = 'transparent';
                 }}
             >

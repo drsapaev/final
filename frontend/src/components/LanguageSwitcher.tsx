@@ -90,12 +90,12 @@ const LanguageSwitcher = ({ compact = false }) => {
                                 fontSize: 'var(--mac-font-size-base)',
                                 transition: 'background 0.15s',
                             }}
-                            onMouseEnter={(e) => {
+                            onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
                                 if (language !== lang.code) {
                                     e.currentTarget.style.background = 'var(--mac-bg-tertiary)';
                                 }
                             }}
-                            onMouseLeave={(e) => {
+                            onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
                                 if (language !== lang.code) {
                                     e.currentTarget.style.background = 'transparent';
                                 }

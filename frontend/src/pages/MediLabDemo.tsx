@@ -380,11 +380,11 @@ const MediLabDemo = () => {
                    boxShadow: getActionShadow(action.color),
                    color: 'var(--mac-text-on-accent)'
                  }}
-                 onMouseEnter={(e) => {
+                 onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
                    e.currentTarget.style.backgroundColor = getActionHoverColor(action.color);
                    e.currentTarget.style.boxShadow = getActionHoverShadow(action.color);
                  }}
-                 onMouseLeave={(e) => {
+                 onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
                    e.currentTarget.style.backgroundColor = action.color;
                    e.currentTarget.style.boxShadow = getActionShadow(action.color);
                  }}
@@ -508,7 +508,7 @@ const MediLabDemo = () => {
               type="text"
               placeholder="Search patients..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
               style={panelInputStyle}
             />
@@ -716,10 +716,10 @@ const MediLabDemo = () => {
                             style={{
                               backgroundColor: 'transparent'
                             }}
-                            onMouseEnter={(e) => {
+                            onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
                               e.currentTarget.style.backgroundColor = 'var(--mac-card-hover-bg)';
                             }}
-                            onMouseLeave={(e) => {
+                            onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
                               e.currentTarget.style.backgroundColor = 'transparent';
                             }}
                           >
@@ -731,10 +731,10 @@ const MediLabDemo = () => {
                             style={{
                               backgroundColor: 'transparent'
                             }}
-                            onMouseEnter={(e) => {
+                            onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
                               e.currentTarget.style.backgroundColor = 'var(--mac-card-hover-bg)';
                             }}
-                            onMouseLeave={(e) => {
+                            onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
                               e.currentTarget.style.backgroundColor = 'transparent';
                             }}
                           >

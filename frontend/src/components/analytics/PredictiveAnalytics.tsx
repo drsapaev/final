@@ -291,7 +291,7 @@ const PredictiveAnalytics = ({
               <span className="text-sm font-medium">{t('misc.pa_metrika')}</span>
               <select
                 value={selectedMetric}
-                onChange={(e) => setSelectedMetric(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSelectedMetric(e.target.value)}
                 className="px-3 py-1 border border-gray-300 rounded-md text-sm">
                 
                 {metricOptions.map((option) =>
@@ -306,7 +306,7 @@ const PredictiveAnalytics = ({
               <span className="text-sm font-medium">{t('misc.pa_period')}</span>
               <select
                 value={forecastPeriod}
-                onChange={(e) => setForecastPeriod(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setForecastPeriod(e.target.value)}
                 className="px-3 py-1 border border-gray-300 rounded-md text-sm">
                 
                 {periodOptions.map((option) =>

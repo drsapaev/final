@@ -261,11 +261,11 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
             minWidth: '28px',
             minHeight: '28px'
           }}
-          onMouseEnter={(e) => {
+          onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
             e.currentTarget.style.color = isDark ? 'var(--mac-warning)' : 'var(--mac-accent-blue-active)';
             e.currentTarget.style.filter = 'brightness(1.2)';
           }}
-          onMouseLeave={(e) => {
+          onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
             e.currentTarget.style.color = isDark ? 'var(--mac-text-tertiary)' : 'var(--mac-text-secondary)';
             e.currentTarget.style.filter = 'brightness(1)';
           }}
@@ -393,11 +393,11 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
             minHeight: isCollapsed ? '32px' : 'auto',
             width: isCollapsed ? '32px' : 'auto'
           }}
-          onMouseEnter={(e) => {
+          onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
             e.currentTarget.style.color = isDark ? 'var(--mac-warning)' : 'var(--mac-accent-blue-active)';
             e.currentTarget.style.filter = 'brightness(1.2)';
           }}
-          onMouseLeave={(e) => {
+          onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
             e.currentTarget.style.color = isDark ? '#f8fafb' : 'var(--mac-text-primary)';
             e.currentTarget.style.filter = 'brightness(1)';
           }}
@@ -424,11 +424,11 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
             minHeight: isCollapsed ? '32px' : 'auto',
             width: isCollapsed ? '32px' : 'auto'
           }}
-          onMouseEnter={(e) => {
+          onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
             e.currentTarget.style.color = isDark ? 'var(--mac-success)' : 'var(--mac-success)';
             e.currentTarget.style.filter = 'brightness(1.2)';
           }}
-          onMouseLeave={(e) => {
+          onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
             e.currentTarget.style.color = isDark ? '#f8fafb' : 'var(--mac-text-primary)';
             e.currentTarget.style.filter = 'brightness(1)';
           }}
@@ -462,11 +462,11 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
             minHeight: isCollapsed ? '40px' : 'auto',
             justifyContent: 'center'
           }}
-          onMouseEnter={(e) => {
+          onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
             e.currentTarget.style.color = 'var(--mac-error)';
             e.currentTarget.style.filter = 'brightness(1.2)';
           }}
-          onMouseLeave={(e) => {
+          onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
             e.currentTarget.style.color = isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-text-primary)';
             e.currentTarget.style.filter = 'brightness(1)';
           }}

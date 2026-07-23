@@ -2722,7 +2722,7 @@ interface PatientRecord {
         <Input
         placeholder={t('misc.aw_search_service_placeholder')}
         value={serviceSearchQuery}
-        onChange={(e) => setServiceSearchQuery(e.target.value)}
+        onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setServiceSearchQuery(e.target.value)}
         icon={Search}
         clearable
         onClear={() => setServiceSearchQuery('')}

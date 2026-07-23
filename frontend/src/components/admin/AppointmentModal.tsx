@@ -213,7 +213,7 @@ const AppointmentModal = ({
                   </label>
                   <Select
                 value={formData.patientId}
-                onChange={(value) => handleChange('patientId', value)}
+                onChange={(value: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('patientId', value)}
                 options={[
                 { value: '', label: t('admin2.am_placeholder_patient') },
                 ...patients.map((patient) => ({
@@ -239,7 +239,7 @@ const AppointmentModal = ({
                   </label>
                   <Select
                 value={formData.doctorId}
-                onChange={(value) => handleChange('doctorId', value)}
+                onChange={(value: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('doctorId', value)}
                 options={[
                 { value: '', label: t('admin2.am_placeholder_doctor') },
                 ...doctors.map((doctor) => ({
@@ -268,7 +268,7 @@ const AppointmentModal = ({
                   <Input
                 type="date"
                 value={formData.appointmentDate}
-                onChange={(e) => handleChange('appointmentDate', e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('appointmentDate', e.target.value)}
                 error={errors.appointmentDate}
                 icon={Calendar} />
               
@@ -288,7 +288,7 @@ const AppointmentModal = ({
                   <Input
                 type="time"
                 value={formData.appointmentTime}
-                onChange={(e) => handleChange('appointmentTime', e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('appointmentTime', e.target.value)}
                 error={errors.appointmentTime}
                 icon={Clock} />
               
@@ -308,7 +308,7 @@ const AppointmentModal = ({
                   <Input
                 type="number"
                 value={formData.duration}
-                onChange={(e) => handleChange('duration', e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('duration', e.target.value)}
                 error={errors.duration}
                 min="15"
                 max="120"
@@ -330,7 +330,7 @@ const AppointmentModal = ({
                 </label>
                 <Select
               value={(formData as Record<string, any>).status}
-              onChange={(value) => handleChange('status', value)}
+              onChange={(value: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('status', value)}
               options={[
               { value: '', label: t('admin2.am_status_default') },
               { value: 'pending', label: t('admin2.am_status_pending') },
@@ -357,7 +357,7 @@ const AppointmentModal = ({
                 </label>
                 <Textarea
               value={formData.reason}
-              onChange={(e) => handleChange('reason', e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('reason', e.target.value)}
               error={errors.reason}
               rows={3}
               placeholder={t('admin2.am_placeholder_reason')} />
@@ -376,7 +376,7 @@ const AppointmentModal = ({
                 </label>
                 <Textarea
               value={formData.notes}
-              onChange={(e) => handleChange('notes', e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('notes', e.target.value)}
               rows={2}
               placeholder={t('admin2.am_placeholder_notes')} />
             
@@ -396,7 +396,7 @@ const AppointmentModal = ({
                   <Input
                 type="tel"
                 value={formData.phone}
-                onChange={(e) => handleChange('phone', e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('phone', e.target.value)}
                 placeholder="+998 90 123 45 67"
                 icon={Phone} />
               
@@ -408,7 +408,7 @@ const AppointmentModal = ({
                   <Input
                 type="email"
                 value={formData.email}
-                onChange={(e) => handleChange('email', e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('email', e.target.value)}
                 placeholder="patient@example.com"
                 icon={Mail} />
               

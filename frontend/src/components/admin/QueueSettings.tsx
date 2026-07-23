@@ -414,7 +414,7 @@ const QueueSettings = () => {
                 <Input
                   type="time"
                   value={settings.auto_close_time}
-                  onChange={(e) => handleSettingChange('auto_close_time', e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleSettingChange('auto_close_time', e.target.value)}
                   className="w-full" />
                 
                 <p className="admin-p-xs-tertiary-mt-4">
@@ -428,7 +428,7 @@ const QueueSettings = () => {
                 </label>
                 <Select
                   value={settings.timezone}
-                  onChange={(value) => handleSettingChange('timezone', value)}
+                  onChange={(value: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleSettingChange('timezone', value)}
                   options={TIMEZONE_OPTIONS.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
                   className="w-full"></Select>
                 
@@ -521,7 +521,7 @@ const QueueSettings = () => {
                   min="1"
                   max="100"
                   value={getNumberSetting(settings.start_numbers, specialty.key, 1)}
-                  onChange={(e) => handleSettingChange(`start_numbers.${specialty.key}`, parseInt(e.target.value))}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleSettingChange(`start_numbers.${specialty.key}`, parseInt(e.target.value))}
                   className="w-full" />
                 
                   <p className="admin-p-xs-tertiary-mt-4">
@@ -539,7 +539,7 @@ const QueueSettings = () => {
                   min="1"
                   max="100"
                   value={getNumberSetting(settings.max_per_day, specialty.key, 1)}
-                  onChange={(e) => handleSettingChange(`max_per_day.${specialty.key}`, parseInt(e.target.value))}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleSettingChange(`max_per_day.${specialty.key}`, parseInt(e.target.value))}
                   className="w-full" />
                 
                   <p className="admin-p-xs-tertiary-mt-4">

@@ -76,7 +76,7 @@ export default function WebAuthnRegistration({ patientId }) {
             <Input
               label={t('patient.pat_web_device_name')}
               value={credentialName}
-              onChange={(e) => setCredentialName(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setCredentialName(e.target.value)}
               placeholder={t('patient.pat_web_device_name_placeholder')}
               disabled={isRegistering}
             />

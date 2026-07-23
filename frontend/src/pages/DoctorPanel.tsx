@@ -612,8 +612,8 @@ const DoctorPanel = () => {
             aria-label={t("doctor.aria_open_tab", { name: t("doctor.tab_dashboard") })}
             style={activeTab === 'dashboard' ? activeTabStyle : tabStyle}
             onClick={() => setDoctorTab('dashboard')}
-            onMouseEnter={(e) => handleInactiveTabHover(e, activeTab === 'dashboard', true)}
-            onMouseLeave={(e) => handleInactiveTabHover(e, activeTab === 'dashboard', false)}>
+            onMouseEnter={(e: React.MouseEvent<HTMLElement>) => handleInactiveTabHover(e, activeTab === 'dashboard', true)}
+            onMouseLeave={(e: React.MouseEvent<HTMLElement>) => handleInactiveTabHover(e, activeTab === 'dashboard', false)}>
 
             <Activity size={isMobile ? 16 : 20} />
             {!isMobile && <span>{t("doctor.tab_dashboard")}</span>}
@@ -623,8 +623,8 @@ const DoctorPanel = () => {
             aria-label={t("doctor.aria_open_tab", { name: t("doctor.tab_patients") })}
             style={activeTab === 'patients' ? activeTabStyle : tabStyle}
             onClick={() => setDoctorTab('patients')}
-            onMouseEnter={(e) => handleInactiveTabHover(e, activeTab === 'patients', true)}
-            onMouseLeave={(e) => handleInactiveTabHover(e, activeTab === 'patients', false)}>
+            onMouseEnter={(e: React.MouseEvent<HTMLElement>) => handleInactiveTabHover(e, activeTab === 'patients', true)}
+            onMouseLeave={(e: React.MouseEvent<HTMLElement>) => handleInactiveTabHover(e, activeTab === 'patients', false)}>
 
             <User size={isMobile ? 16 : 20} />
             {!isMobile && <span>{t("doctor.tab_patients")}</span>}
@@ -634,8 +634,8 @@ const DoctorPanel = () => {
             aria-label={t("doctor.aria_open_tab", { name: t("doctor.tab_appointments") })}
             style={activeTab === 'appointments' ? activeTabStyle : tabStyle}
             onClick={() => setDoctorTab('appointments')}
-            onMouseEnter={(e) => handleInactiveTabHover(e, activeTab === 'appointments', true)}
-            onMouseLeave={(e) => handleInactiveTabHover(e, activeTab === 'appointments', false)}>
+            onMouseEnter={(e: React.MouseEvent<HTMLElement>) => handleInactiveTabHover(e, activeTab === 'appointments', true)}
+            onMouseLeave={(e: React.MouseEvent<HTMLElement>) => handleInactiveTabHover(e, activeTab === 'appointments', false)}>
 
             <Calendar size={isMobile ? 16 : 20} />
             {!isMobile && <span>{t("doctor.tab_appointments")}</span>}
@@ -646,8 +646,8 @@ const DoctorPanel = () => {
             aria-label={t("doctor.aria_open_tab", { name: t("doctor.tab_queue") })}
             style={activeTab === 'queue' ? activeTabStyle : tabStyle}
             onClick={() => setDoctorTab('queue')}
-            onMouseEnter={(e) => handleInactiveTabHover(e, activeTab === 'queue', true)}
-            onMouseLeave={(e) => handleInactiveTabHover(e, activeTab === 'queue', false)}>
+            onMouseEnter={(e: React.MouseEvent<HTMLElement>) => handleInactiveTabHover(e, activeTab === 'queue', true)}
+            onMouseLeave={(e: React.MouseEvent<HTMLElement>) => handleInactiveTabHover(e, activeTab === 'queue', false)}>
 
             <Users size={isMobile ? 16 : 20} />
             {!isMobile && <span>{t("doctor.tab_queue")}</span>}
@@ -662,8 +662,8 @@ const DoctorPanel = () => {
             aria-label={t("doctor.aria_open_tab", { name: t("doctor.tab_ai") })}
             style={activeTab === 'ai' ? activeTabStyle : tabStyle}
             onClick={() => setDoctorTab('ai')}
-            onMouseEnter={(e) => handleInactiveTabHover(e, activeTab === 'ai', true)}
-            onMouseLeave={(e) => handleInactiveTabHover(e, activeTab === 'ai', false)}>
+            onMouseEnter={(e: React.MouseEvent<HTMLElement>) => handleInactiveTabHover(e, activeTab === 'ai', true)}
+            onMouseLeave={(e: React.MouseEvent<HTMLElement>) => handleInactiveTabHover(e, activeTab === 'ai', false)}>
 
             <Brain size={isMobile ? 16 : 20} />
             {!isMobile && <span>AI Помощник</span>}
@@ -673,8 +673,8 @@ const DoctorPanel = () => {
             aria-label={t("doctor.aria_open_tab", { name: t("doctor.tab_reports") })}
             style={activeTab === 'reports' ? activeTabStyle : tabStyle}
             onClick={() => setDoctorTab('reports')}
-            onMouseEnter={(e) => handleInactiveTabHover(e, activeTab === 'reports', true)}
-            onMouseLeave={(e) => handleInactiveTabHover(e, activeTab === 'reports', false)}>
+            onMouseEnter={(e: React.MouseEvent<HTMLElement>) => handleInactiveTabHover(e, activeTab === 'reports', true)}
+            onMouseLeave={(e: React.MouseEvent<HTMLElement>) => handleInactiveTabHover(e, activeTab === 'reports', false)}>
 
             <FileText size={isMobile ? 16 : 20} />
             {!isMobile && <span>{t("doctor.tab_reports")}</span>}
@@ -690,10 +690,10 @@ const DoctorPanel = () => {
                 <AnimatedTransition type="scale" delay={200}>
                   <Card
                   style={statCardStyle}
-                  onMouseEnter={(e) => {
+                  onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
                     Object.assign(e.currentTarget.style, statCardHoverStyle);
                   }}
-                  onMouseLeave={(e) => {
+                  onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
                     e.currentTarget.style.transform = 'translateY(0) scale(1)';
                     e.currentTarget.style.boxShadow = getShadow('lg');
                   }}>
@@ -717,10 +717,10 @@ const DoctorPanel = () => {
                 <AnimatedTransition type="scale" delay={300}>
                   <Card
                   style={statCardStyle}
-                  onMouseEnter={(e) => {
+                  onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
                     Object.assign(e.currentTarget.style, statCardHoverStyle);
                   }}
-                  onMouseLeave={(e) => {
+                  onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
                     e.currentTarget.style.transform = 'translateY(0) scale(1)';
                     e.currentTarget.style.boxShadow = getShadow('lg');
                   }}>
@@ -744,10 +744,10 @@ const DoctorPanel = () => {
                 <AnimatedTransition type="scale" delay={400}>
                   <Card
                   style={statCardStyle}
-                  onMouseEnter={(e) => {
+                  onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
                     Object.assign(e.currentTarget.style, statCardHoverStyle);
                   }}
-                  onMouseLeave={(e) => {
+                  onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
                     e.currentTarget.style.transform = 'translateY(0) scale(1)';
                     e.currentTarget.style.boxShadow = getShadow('lg');
                   }}>
@@ -771,10 +771,10 @@ const DoctorPanel = () => {
                 <AnimatedTransition type="scale" delay={500}>
                   <Card
                   style={statCardStyle}
-                  onMouseEnter={(e) => {
+                  onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
                     Object.assign(e.currentTarget.style, statCardHoverStyle);
                   }}
-                  onMouseLeave={(e) => {
+                  onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
                     e.currentTarget.style.transform = 'translateY(0) scale(1)';
                     e.currentTarget.style.boxShadow = getShadow('lg');
                   }}>
@@ -815,13 +815,13 @@ const DoctorPanel = () => {
                       type="text"
                       placeholder={t("doctor.search_patients_placeholder")}
                       value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSearchQuery(e.target.value)}
                       className={`doctor-search-input ${isMobile ? 'doctor-search-w-mobile' : 'doctor-search-w-desktop'}`} />
 
                     </div>
                     <select
                     value={filterStatus}
-                    onChange={(e) => setFilterStatus(e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFilterStatus(e.target.value)}
                     className="doctor-filter-select">
 
                       <option value="all">{t("doctor.filter_all_statuses")}</option>
@@ -907,7 +907,7 @@ const DoctorPanel = () => {
                             <button
                         aria-label={`Edit ${getPatientA11yContext(patient)}`}
                         className="doctor-action-btn doctor-action-btn-primary"
-                        onClick={(e) => {
+                        onClick={(e: React.MouseEvent<HTMLElement>) => {
                           e.stopPropagation();
                           handlePatientClick(patient);
                         }}>
@@ -920,7 +920,7 @@ const DoctorPanel = () => {
                             <button
                         aria-label={`View ${getPatientA11yContext(patient)}`}
                         className="doctor-action-btn doctor-action-btn-success"
-                        onClick={(e) => {
+                        onClick={(e: React.MouseEvent<HTMLElement>) => {
                           e.stopPropagation();
                           handlePatientClick(patient);
                         }}>
@@ -932,7 +932,7 @@ const DoctorPanel = () => {
                         className="doctor-action-btn doctor-action-btn-danger"
                         disabled
                         title={t("doctor.feature_in_development")}
-                        onClick={(e) => e.stopPropagation()}>
+                        onClick={(e: React.MouseEvent<HTMLElement>) => e.stopPropagation()}>
 
                               <Trash2 size={16} />
                             </button>
@@ -964,13 +964,13 @@ const DoctorPanel = () => {
                       type="text"
                       placeholder={t("doctor.search_appointments_placeholder")}
                       value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSearchQuery(e.target.value)}
                       className={`doctor-search-input ${isMobile ? 'doctor-search-w-mobile' : 'doctor-search-w-desktop'}`} />
 
                     </div>
                     <select
                     value={filterStatus}
-                    onChange={(e) => setFilterStatus(e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFilterStatus(e.target.value)}
                     className="doctor-filter-select">
 
                       <option value="all">{t("doctor.filter_all_statuses")}</option>
@@ -1047,7 +1047,7 @@ const DoctorPanel = () => {
                             <button
                         aria-label={`Edit ${getAppointmentA11yContext(appointment)}`}
                         className="doctor-action-btn doctor-action-btn-primary"
-                        onClick={(e) => {
+                        onClick={(e: React.MouseEvent<HTMLElement>) => {
                           e.stopPropagation();
                           logger.log('Edit appointment', appointment.id);
                         }}>
@@ -1061,7 +1061,7 @@ const DoctorPanel = () => {
                         className="doctor-action-btn doctor-action-btn-success"
                         disabled
                         title={t("doctor.feature_in_development")}
-                        onClick={(e) => e.stopPropagation()}>
+                        onClick={(e: React.MouseEvent<HTMLElement>) => e.stopPropagation()}>
 
                               <CheckCircle size={16} />
                             </button>
@@ -1070,7 +1070,7 @@ const DoctorPanel = () => {
                         className="doctor-action-btn doctor-action-btn-danger"
                         disabled
                         title={t("doctor.feature_in_development")}
-                        onClick={(e) => e.stopPropagation()}>
+                        onClick={(e: React.MouseEvent<HTMLElement>) => e.stopPropagation()}>
 
                               <XCircle size={16} />
                             </button>
@@ -1167,8 +1167,8 @@ const DoctorPanel = () => {
         role="dialog"
         aria-modal="true"
         aria-label={t("doctor.aria_patient_info")}
-        onClick={(e) => { if (e.target === e.currentTarget) patientModal.closeModal(); }}
-        onKeyDown={(e) => { if (e.key === 'Escape') patientModal.closeModal(); }}
+        onClick={(e: React.MouseEvent<HTMLElement>) => { if (e.target === e.currentTarget) patientModal.closeModal(); }}
+        onKeyDown={(e: React.KeyboardEvent<HTMLElement>) => { if (e.key === 'Escape') patientModal.closeModal(); }}
         tabIndex={-1}>
           <div className="doctor-modal-card">
             <div className="doctor-modal-header">

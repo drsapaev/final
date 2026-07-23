@@ -173,7 +173,7 @@ const PriceOverrideApproval = () => {
             <Filter size={16 as unknown as "small" | "default" | "large" | "xlarge"} className="text-gray-500" />
             <select
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setStatusFilter(e.target.value)}
               className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
               
               <option value="pending">{t('misc.poa_ozhidayut_odobreniya')}</option>
@@ -360,7 +360,7 @@ const PriceOverrideApproval = () => {
                 id="price-override-rejection-reason"
                 aria-label={t('misc.poa_prichina_otkloneniya_izmenen')}
                 value={rejectionReason}
-                onChange={(e) => setRejectionReason(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setRejectionReason(e.target.value)}
                 rows={3}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                 placeholder={t('misc.poa_ukazhite_prichinu_otkloneniy')} />

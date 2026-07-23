@@ -118,8 +118,8 @@ const MacOSBreadcrumb = ({
           <button
             type="button"
             onClick={() => handleItemClick(item, index)}
-            onMouseEnter={(e) => handleMouseEnter(e, isLast)}
-            onMouseLeave={(e) => handleMouseLeave(e, isLast)}
+            onMouseEnter={(e: React.MouseEvent<HTMLElement>) => handleMouseEnter(e, isLast)}
+            onMouseLeave={(e: React.MouseEvent<HTMLElement>) => handleMouseLeave(e, isLast)}
             style={{
               ...itemStyle(isLast),
               border: 'none',

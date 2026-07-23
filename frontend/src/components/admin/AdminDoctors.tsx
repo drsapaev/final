@@ -190,7 +190,7 @@ const AdminDoctors = () => {
             type="text"
             placeholder={t('admin2.ad_search_placeholder')}
             value={searchTerm}
-            onChange={(event) => setSearchTerm(event.target.value)}
+            onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSearchTerm(event.target.value)}
             icon={Search}
             iconPosition="left"
             aria-label={t('admin2.ad_search_aria')}

@@ -242,7 +242,7 @@ const PriceOverrideManager = ({
                   type="text"
                   aria-label={t('derma.derma_price_new_price_aria')}
                   value={newPrice}
-                  onChange={(e) => setNewPrice(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setNewPrice(e.target.value)}
                   style={{
                     width: '100%',
                     paddingLeft: '40px',
@@ -256,11 +256,11 @@ const PriceOverrideManager = ({
                     fontSize: 'var(--mac-font-size-base)',
                     transition: 'all var(--mac-duration-fast) var(--mac-ease)'
                   }}
-                  onFocus={(e) => {
+                  onFocus={(e: React.FocusEvent<HTMLElement>) => {
                     (e.target as HTMLElement).style.borderColor = 'var(--mac-accent)';
                     (e.target as HTMLElement).style.boxShadow = 'var(--mac-focus-ring)';
                   }}
-                  onBlur={(e) => {
+                  onBlur={(e: React.FocusEvent<HTMLElement>) => {
                     (e.target as HTMLElement).style.borderColor = 'var(--mac-border)';
                     (e.target as HTMLElement).style.boxShadow = 'none';
                   }}
@@ -282,7 +282,7 @@ const PriceOverrideManager = ({
               </label>
               <select
                 value={reason}
-                onChange={(e) => setReason(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setReason(e.target.value)}
                 style={{
                   width: '100%',
                   paddingLeft: '12px',
@@ -297,11 +297,11 @@ const PriceOverrideManager = ({
                   marginBottom: 'var(--mac-spacing-2)',
                   transition: 'all var(--mac-duration-fast) var(--mac-ease)'
                 }}
-                onFocus={(e) => {
+                onFocus={(e: React.FocusEvent<HTMLElement>) => {
                   (e.target as HTMLElement).style.borderColor = 'var(--mac-accent)';
                   (e.target as HTMLElement).style.boxShadow = 'var(--mac-focus-ring)';
                 }}
-                onBlur={(e) => {
+                onBlur={(e: React.FocusEvent<HTMLElement>) => {
                   (e.target as HTMLElement).style.borderColor = 'var(--mac-border)';
                   (e.target as HTMLElement).style.boxShadow = 'none';
                 }}>
@@ -318,7 +318,7 @@ const PriceOverrideManager = ({
                 type="text"
                 aria-label={t('derma.derma_price_other_reason_aria')}
                 value={reason}
-                onChange={(e) => setReason(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setReason(e.target.value)}
                 style={{
                   width: '100%',
                   paddingLeft: '12px',
@@ -332,11 +332,11 @@ const PriceOverrideManager = ({
                   fontSize: 'var(--mac-font-size-base)',
                   transition: 'all var(--mac-duration-fast) var(--mac-ease)'
                 }}
-                onFocus={(e) => {
+                onFocus={(e: React.FocusEvent<HTMLElement>) => {
                   (e.target as HTMLElement).style.borderColor = 'var(--mac-accent)';
                   (e.target as HTMLElement).style.boxShadow = 'var(--mac-focus-ring)';
                 }}
-                onBlur={(e) => {
+                onBlur={(e: React.FocusEvent<HTMLElement>) => {
                   (e.target as HTMLElement).style.borderColor = 'var(--mac-border)';
                   (e.target as HTMLElement).style.boxShadow = 'none';
                 }}
@@ -358,7 +358,7 @@ const PriceOverrideManager = ({
               <textarea
                 aria-label={t('derma.derma_price_details_aria')}
                 value={details}
-                onChange={(e) => setDetails(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setDetails(e.target.value)}
                 rows={3}
                 style={{
                   width: '100%',
@@ -375,11 +375,11 @@ const PriceOverrideManager = ({
                   transition: 'all var(--mac-duration-fast) var(--mac-ease)',
                   fontFamily: 'inherit'
                 }}
-                onFocus={(e) => {
+                onFocus={(e: React.FocusEvent<HTMLElement>) => {
                   (e.target as HTMLElement).style.borderColor = 'var(--mac-accent)';
                   (e.target as HTMLElement).style.boxShadow = 'var(--mac-focus-ring)';
                 }}
-                onBlur={(e) => {
+                onBlur={(e: React.FocusEvent<HTMLElement>) => {
                   (e.target as HTMLElement).style.borderColor = 'var(--mac-border)';
                   (e.target as HTMLElement).style.boxShadow = 'none';
                 }}

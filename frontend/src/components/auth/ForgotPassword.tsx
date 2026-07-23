@@ -411,7 +411,7 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
             type={method === 'phone' ? 'tel' : 'email'}
             aria-label={method === 'phone' ? t('final.fp_phone_label') : t('final.fp_email_label')}
             value={contact}
-            onChange={(e) => {
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
               const value = method === 'phone' ? formatPhone(e.target.value) : e.target.value;
               setContact(value);
               setInlineError('');
@@ -488,7 +488,7 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
             type="text"
             aria-label={t('final.fp_code_label')}
             value={verificationCode}
-            onChange={(e) => {
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
               setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6));
               setInlineError('');
             }}
@@ -611,7 +611,7 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
               type={showNewPassword ? 'text' : 'password'}
               aria-label={t('final.fp_new_password')}
               value={newPassword}
-              onChange={(e) => {
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
                 setNewPassword(e.target.value);
                 setInlineError('');
                 if (confirmPassword) setPasswordsMatch(e.target.value === confirmPassword);
@@ -667,7 +667,7 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
               type={showConfirmPassword ? 'text' : 'password'}
               aria-label={t('final.fp_confirm_password')}
               value={confirmPassword}
-              onChange={(e) => {
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
                 setConfirmPassword(e.target.value);
                 setInlineError('');
               }}

@@ -282,7 +282,7 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
         cursor: 'pointer'
       }}
       onClick={() => toggleSection(section)}
-      onKeyDown={(event) => {
+      onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => {
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault();
           toggleSection(section);
@@ -305,7 +305,7 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
                 <Input
             label={field.label}
             value={getNestedValue(echoData[section], field.key)}
-            onChange={(e) => handleChange(section, field.key, e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange(section, field.key, e.target.value)}
             placeholder={field.placeholder} />
           
               </div>
@@ -423,7 +423,7 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
           </Typography>
           <Textarea
             value={echoData.additional.comments}
-            onChange={(e) => handleChange('additional', 'comments', e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('additional', 'comments', e.target.value)}
             placeholder={t('cardio.cardio_echo_ph_comments')}
             rows={4} />
           
@@ -436,7 +436,7 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
           </Typography>
           <Textarea
             value={echoData.conclusion}
-            onChange={(e) => setEchoData((prev) => ({ ...prev, conclusion: e.target.value }))}
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setEchoData((prev) => ({ ...prev, conclusion: e.target.value }))}
             placeholder={t('cardio.cardio_echo_ph_conclusion')}
             rows={6} />
           

@@ -237,8 +237,8 @@ function ToastItem({ toast, onRemove, theme }: { toast: Record<string, unknown>;
       <button
         style={closeButtonStyle}
         onClick={() => onRemove(toast.id as string | number)}
-        onMouseOver={(e) => e.currentTarget.style.opacity = '1'}
-        onMouseOut={(e) => e.currentTarget.style.opacity = '0.7'}>
+        onMouseOver={(e: React.MouseEvent<HTMLElement>) => e.currentTarget.style.opacity = '1'}
+        onMouseOut={(e: React.MouseEvent<HTMLElement>) => e.currentTarget.style.opacity = '0.7'}>
 
         ×
       </button>

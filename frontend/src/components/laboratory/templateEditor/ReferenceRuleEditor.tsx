@@ -70,7 +70,7 @@ function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }) {
           aria-label={t('misc.rre_raw_json_aria')}
           rows={6}
           value={field.reference_rule_text || ''}
-          onChange={(event) => updateField(sectionIndex, fieldIndex, 'reference_rule_text', event.target.value)}
+          onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateField(sectionIndex, fieldIndex, 'reference_rule_text', event.target.value)}
         />
         <span className="ltw-text-12 ltw-text-secondary">
           {t('misc.rre_struct_unavailable')}
@@ -151,7 +151,7 @@ function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }) {
                   className="macos-input"
                   aria-label={t('misc.rre_source_aria')}
                   value={caseItem.when?.source || 'patient.sex'}
-                  onChange={(e) => updateCaseWhen(caseIndex, 'source', e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateCaseWhen(caseIndex, 'source', e.target.value)}
                 >
                   {RULE_SOURCE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{t(o.labelKey)}</option>)}
                 </select>
@@ -162,7 +162,7 @@ function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }) {
                   className="macos-input"
                   aria-label={t('misc.rre_operator_aria')}
                   value={caseItem.when?.op || 'eq'}
-                  onChange={(e) => updateCaseWhen(caseIndex, 'op', e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateCaseWhen(caseIndex, 'op', e.target.value)}
                 >
                   {RULE_OP_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.labelKey ? t(o.labelKey) : o.label}</option>)}
                 </select>
@@ -176,7 +176,7 @@ function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }) {
                       aria-label={t('misc.rre_min_aria')}
                       type="number"
                       value={caseItem.when?.min ?? ''}
-                      onChange={(e) => updateCaseWhen(caseIndex, 'min', parseFloat(e.target.value) || 0)}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateCaseWhen(caseIndex, 'min', parseFloat(e.target.value) || 0)}
                     />
                   </label>
                   <label className="ltw-label-grid">
@@ -186,7 +186,7 @@ function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }) {
                       aria-label={t('misc.rre_max_aria')}
                       type="number"
                       value={caseItem.when?.max ?? ''}
-                      onChange={(e) => updateCaseWhen(caseIndex, 'max', parseFloat(e.target.value) || 0)}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateCaseWhen(caseIndex, 'max', parseFloat(e.target.value) || 0)}
                     />
                   </label>
                 </div>
@@ -198,7 +198,7 @@ function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }) {
                       className="macos-input"
                       aria-label={t('misc.rre_value_aria')}
                       value={caseItem.when?.value ?? ''}
-                      onChange={(e) => updateCaseWhen(caseIndex, 'value', e.target.value)}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateCaseWhen(caseIndex, 'value', e.target.value)}
                     >
                       <option value="">{t('misc.rre_select')}</option>
                       <option value="M">{t('misc.rre_male_m')}</option>
@@ -209,7 +209,7 @@ function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }) {
                       className="macos-input"
                       aria-label={t('misc.rre_value_aria')}
                       value={caseItem.when?.value ?? ''}
-                      onChange={(e) => updateCaseWhen(caseIndex, 'value', e.target.value)}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateCaseWhen(caseIndex, 'value', e.target.value)}
                     />
                   )}
                 </label>
@@ -223,7 +223,7 @@ function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }) {
                   className="macos-input"
                   aria-label={t('misc.rre_norm_text_aria')}
                   value={caseItem.text || ''}
-                  onChange={(e) => updateCase(caseIndex, 'text', e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateCase(caseIndex, 'text', e.target.value)}
                   placeholder="3.5-5.0"
                 />
               </label>
@@ -234,7 +234,7 @@ function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }) {
                   aria-label={t('misc.rre_lower_bound_aria')}
                   type="number"
                   value={caseItem.low ?? ''}
-                  onChange={(e) => updateCase(caseIndex, 'low', parseFloat(e.target.value) || null)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateCase(caseIndex, 'low', parseFloat(e.target.value) || null)}
                 />
               </label>
               <label className="ltw-label-grid">
@@ -244,7 +244,7 @@ function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }) {
                   aria-label={t('misc.rre_upper_bound_aria')}
                   type="number"
                   value={caseItem.high ?? ''}
-                  onChange={(e) => updateCase(caseIndex, 'high', parseFloat(e.target.value) || null)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateCase(caseIndex, 'high', parseFloat(e.target.value) || null)}
                 />
               </label>
             </div>
@@ -261,7 +261,7 @@ function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }) {
               className="macos-input"
               aria-label={t('misc.rre_norm_text_default_aria')}
               value={defaultRule.text || ''}
-              onChange={(e) => updateDefault('text', e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateDefault('text', e.target.value)}
               placeholder="3.5-5.0"
             />
           </label>
@@ -272,7 +272,7 @@ function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }) {
               aria-label={t('misc.rre_lower_bound_default_aria')}
               type="number"
               value={defaultRule.low ?? ''}
-              onChange={(e) => updateDefault('low', parseFloat(e.target.value) || null)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateDefault('low', parseFloat(e.target.value) || null)}
             />
           </label>
           <label className="ltw-label-grid">
@@ -282,7 +282,7 @@ function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }) {
               aria-label={t('misc.rre_upper_bound_default_aria')}
               type="number"
               value={defaultRule.high ?? ''}
-              onChange={(e) => updateDefault('high', parseFloat(e.target.value) || null)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateDefault('high', parseFloat(e.target.value) || null)}
             />
           </label>
         </div>
@@ -297,7 +297,7 @@ function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }) {
           aria-label={t('misc.rre_raw_json_aria')}
           rows={6}
           value={field.reference_rule_text || ''}
-          onChange={(event) => updateField(sectionIndex, fieldIndex, 'reference_rule_text', event.target.value)}
+          onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateField(sectionIndex, fieldIndex, 'reference_rule_text', event.target.value)}
         />
       </details>
     </div>

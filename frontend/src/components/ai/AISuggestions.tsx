@@ -135,7 +135,7 @@ const AISuggestions = ({
               role="button"
               tabIndex={0}
               onClick={() => onSelect && onSelect(item)}
-              onKeyDown={(event) => handleActivationKeyDown(event, () => onSelect && onSelect(item))}
+              onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => handleActivationKeyDown(event, () => onSelect && onSelect(item))}
               style={{ cursor: 'pointer' }}>
               {typeof item === 'string' ? item : item.label || item.name || JSON.stringify(item)}
             </span>
@@ -168,7 +168,7 @@ const AISuggestions = ({
           role="button"
           tabIndex={0}
           onClick={() => setExpanded(!expanded)}
-          onKeyDown={(event) => handleActivationKeyDown(event, () => setExpanded(!expanded))}>
+          onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => handleActivationKeyDown(event, () => setExpanded(!expanded))}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Brain style={{ color: 'var(--mac-accent-blue)' }} />
             <Typography variant="subtitle1" style={{ fontWeight: 'var(--mac-font-weight-medium)' }}>{title}</Typography>

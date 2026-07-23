@@ -458,7 +458,7 @@ const UserManagement = () => {
         aria-haspopup="menu"
         aria-expanded={actionsMenuUser?.id === user.id}
         title={t('admin2.um_actions_button_title')}
-        onClick={(e) => {
+        onClick={(e: React.MouseEvent<HTMLElement>) => {
           openActionsMenu(e, user);
         }}
         variant="ghost"
@@ -512,7 +512,7 @@ const UserManagement = () => {
               <Input
                 placeholder={t('admin2.um_search_placeholder')}
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSearchTerm(e.target.value)}
                 className="admin-pl-32-w-100pct" />
               
             </div>

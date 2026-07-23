@@ -1689,7 +1689,7 @@ const DermatologistPanelUnified = () => {
                           <Input
                           type="text"
                           value={doctorPrice}
-                          onChange={(e) => setDoctorPrice(e.target.value)}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setDoctorPrice(e.target.value)}
                           placeholder={t('derma.derma_panel_ph_doctor_price')}
                           inputMode="numeric"
                           className="derma-input-pl-40" />

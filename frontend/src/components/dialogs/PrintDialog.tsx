@@ -292,7 +292,7 @@ const PrintDialog = ({
                           setSelectedPrinter(printer.id);
                         }
                       }}
-                      onKeyDown={(event) => {
+                      onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => {
                         if (
                           (event.key === 'Enter' || event.key === ' ') &&
                           printer.status === 'online'

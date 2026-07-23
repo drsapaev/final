@@ -280,7 +280,7 @@ const DisplayBoardSettings = () => {
                 type="text"
                 aria-label="Display board location"
                 value={selectedBoard.location || ''}
-                onChange={(e) => handleBoardSettingChange('location', e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleBoardSettingChange('location', e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                 placeholder={t('admin2.db_field_location_placeholder')} />
               
@@ -293,7 +293,7 @@ const DisplayBoardSettings = () => {
               </label>
               <Select
                 value={selectedBoard.theme}
-                onChange={(value) => handleBoardSettingChange('theme', value)}
+                onChange={(value: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleBoardSettingChange('theme', value)}
                 options={themes.map((theme) => ({
                   value: theme.name,
                   label: theme.display_name
@@ -309,7 +309,7 @@ const DisplayBoardSettings = () => {
               </label>
               <Select
                 value={selectedBoard.show_patient_names}
-                onChange={(value) => handleBoardSettingChange('show_patient_names', value)}
+                onChange={(value: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleBoardSettingChange('show_patient_names', value)}
                 options={privacyOptions.map((option) => ({
                   value: option.value,
                   label: `${option.label} - ${option.description}`
@@ -332,7 +332,7 @@ const DisplayBoardSettings = () => {
                 min="1"
                 max="20"
                 value={selectedBoard.queue_display_count}
-                onChange={(e) => handleBoardSettingChange('queue_display_count', parseInt(e.target.value))}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleBoardSettingChange('queue_display_count', parseInt(e.target.value))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white" />
               
               <p className="text-sm text-gray-500 mt-1">
@@ -390,7 +390,7 @@ const DisplayBoardSettings = () => {
                 min="5"
                 max="300"
                 value={selectedBoard.call_display_duration}
-                onChange={(e) => handleBoardSettingChange('call_display_duration', parseInt(e.target.value))}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleBoardSettingChange('call_display_duration', parseInt(e.target.value))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white" />
               
             </div>
@@ -419,7 +419,7 @@ const DisplayBoardSettings = () => {
                   </label>
                   <Select
                   value={selectedBoard.voice_language}
-                  onChange={(value) => handleBoardSettingChange('voice_language', value)}
+                  onChange={(value: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleBoardSettingChange('voice_language', value)}
                   options={voiceLanguages.map((lang) => ({
                     value: lang.value,
                     label: lang.label
@@ -438,7 +438,7 @@ const DisplayBoardSettings = () => {
                   min="0"
                   max="100"
                   value={selectedBoard.volume_level}
-                  onChange={(e) => handleBoardSettingChange('volume_level', parseInt(e.target.value))}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleBoardSettingChange('volume_level', parseInt(e.target.value))}
                   className="w-full" />
                 
                 </div>

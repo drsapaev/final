@@ -270,7 +270,7 @@ const ReportsManager = () => {
             <Input
             type="date"
             value={reportForm.start_date}
-            onChange={(e) => setReportForm((prev) => ({ ...prev, start_date: e.target.value }))} />
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setReportForm((prev) => ({ ...prev, start_date: e.target.value }))} />
 
           </div>
 
@@ -279,7 +279,7 @@ const ReportsManager = () => {
             <Input
             type="date"
             value={reportForm.end_date}
-            onChange={(e) => setReportForm((prev) => ({ ...prev, end_date: e.target.value }))} />
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setReportForm((prev) => ({ ...prev, end_date: e.target.value }))} />
 
           </div>
         </div>

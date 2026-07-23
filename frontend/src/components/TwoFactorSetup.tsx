@@ -114,7 +114,7 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
         type="email"
         aria-label="Two factor recovery email"
         value={recoveryEmail}
-        onChange={(e) => setRecoveryEmail(e.target.value)}
+        onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setRecoveryEmail(e.target.value)}
         placeholder="your@email.com"
         style={{
           width: '100%',
@@ -142,7 +142,7 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
         type="tel"
         aria-label="Two factor recovery phone"
         value={recoveryPhone}
-        onChange={(e) => setRecoveryPhone(e.target.value)}
+        onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setRecoveryPhone(e.target.value)}
         placeholder="+7 (999) 123-45-67"
         style={{
           width: '100%',
@@ -295,7 +295,7 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
         type="text"
         aria-label="Two factor authentication code"
         value={totpCode}
-        onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+        onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
         placeholder="123456"
         maxLength={6}
         style={{

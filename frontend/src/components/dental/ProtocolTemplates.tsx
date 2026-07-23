@@ -582,7 +582,7 @@ const ProtocolTemplates = ({
                   placeholder={t('dental.dental_pt_search_placeholder')}
                   aria-label={t('dental.dental_pt_aria_search')}
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSearchQuery(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
                 
               </div>
@@ -592,7 +592,7 @@ const ProtocolTemplates = ({
             <div className="flex gap-2">
               <select
                 value={filterCategory}
-                onChange={(e) => setFilterCategory(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFilterCategory(e.target.value)}
                 aria-label={t('dental.dental_pt_aria_filter_category')}
                 className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                 
@@ -605,7 +605,7 @@ const ProtocolTemplates = ({
               
               <select
                 value={filterDifficulty}
-                onChange={(e) => setFilterDifficulty(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFilterDifficulty(e.target.value)}
                 aria-label={t('dental.dental_pt_aria_filter_difficulty')}
                 className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                 
@@ -631,7 +631,7 @@ const ProtocolTemplates = ({
               role="button"
               tabIndex={0}
               onClick={() => setSelectedTemplate(template)}
-              onKeyDown={(event) => {
+              onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => {
                 if (event.key === 'Enter' || event.key === ' ') {
                   event.preventDefault();
                   setSelectedTemplate(template);

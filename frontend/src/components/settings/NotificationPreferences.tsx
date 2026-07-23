@@ -850,7 +850,7 @@ export default function NotificationPreferences() {
               description={t(field.hintKey)}
               disabled={saving}
               label={t(field.labelKey)}
-              onChange={(nextValue) => updateDraft(field.key, nextValue)}
+              onChange={(nextValue: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateDraft(field.key, nextValue)}
             />
           ))}
         </NotificationChannelCard>
@@ -911,7 +911,7 @@ export default function NotificationPreferences() {
                   step={field.step}
                   value={draft[field.key] ?? ''}
                   disabled={saving}
-                  onChange={(event) => {
+                  onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
                     if (field.type === 'number') {
                       const parsedValue = Number.parseInt(event.target.value, 10);
                       updateDraft(field.key, Number.isNaN(parsedValue) ? null : parsedValue);
@@ -934,7 +934,7 @@ export default function NotificationPreferences() {
             description={t('misc.np_weekend_hint')}
             disabled={saving}
             label={t('misc.np_weekend_label')}
-            onChange={(nextValue) => updateDraft('weekend_notifications', nextValue)}
+            onChange={(nextValue: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateDraft('weekend_notifications', nextValue)}
           />
         </CardContent>
       </Card>
@@ -1022,7 +1022,7 @@ export default function NotificationPreferences() {
                   type="datetime-local"
                   value={toDateTimeLocalValue(policyDraft.muted_until)}
                   disabled={saving}
-                  onChange={(event) => {
+                  onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
                     const rawValue = event.target.value;
                     updatePolicyDraft((prev) => ({
                       ...prev,
@@ -1054,7 +1054,7 @@ export default function NotificationPreferences() {
                   type="datetime-local"
                   value={toDateTimeLocalValue(policyDraft.snooze_until)}
                   disabled={saving}
-                  onChange={(event) => {
+                  onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
                     const rawValue = event.target.value;
                     updatePolicyDraft((prev) => ({
                       ...prev,
@@ -1069,7 +1069,7 @@ export default function NotificationPreferences() {
                 description={t('misc.np_realtime_desktop_hint')}
                 disabled={saving}
                 label={t('misc.np_realtime_desktop_label')}
-                onChange={(nextValue) =>
+                onChange={(nextValue: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
                   updatePolicyDraft((prev) => ({
                     ...prev,
                     channel_controls: {
@@ -1085,7 +1085,7 @@ export default function NotificationPreferences() {
                 description={t('misc.np_dnd_hint')}
                 disabled={saving}
                 label="Do Not Disturb"
-                onChange={(nextValue) =>
+                onChange={(nextValue: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
                   updatePolicyDraft((prev) => ({
                     ...prev,
                     dnd: {
@@ -1101,7 +1101,7 @@ export default function NotificationPreferences() {
                 description={t('misc.np_dnd_always_on_hint')}
                 disabled={saving || !policyDraft.dnd?.enabled}
                 label={t('misc.np_dnd_always_on_label')}
-                onChange={(nextValue) =>
+                onChange={(nextValue: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
                   updatePolicyDraft((prev) => ({
                     ...prev,
                     dnd: {
@@ -1135,7 +1135,7 @@ export default function NotificationPreferences() {
                     type="time"
                     value={policyDraft.dnd?.start || '22:00'}
                     disabled={saving || !policyDraft.dnd?.enabled || policyDraft.dnd?.always_on}
-                    onChange={(event) =>
+                    onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
                       updatePolicyDraft((prev) => ({
                         ...prev,
                         dnd: {
@@ -1149,7 +1149,7 @@ export default function NotificationPreferences() {
                     type="time"
                     value={policyDraft.dnd?.end || '07:00'}
                     disabled={saving || !policyDraft.dnd?.enabled || policyDraft.dnd?.always_on}
-                    onChange={(event) =>
+                    onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
                       updatePolicyDraft((prev) => ({
                         ...prev,
                         dnd: {
@@ -1169,7 +1169,7 @@ export default function NotificationPreferences() {
                   description={t(family.hintKey)}
                   disabled={saving}
                   label={`Realtime: ${t(family.labelKey)}`}
-                  onChange={(nextValue) =>
+                  onChange={(nextValue: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
                     updatePolicyDraft((prev) => ({
                       ...prev,
                       family_controls: {
@@ -1191,7 +1191,7 @@ export default function NotificationPreferences() {
                   description={t(eventField.hintKey)}
                   disabled={saving}
                   label={`Realtime: ${t(eventField.labelKey)}`}
-                  onChange={(nextValue) =>
+                  onChange={(nextValue: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
                     updatePolicyDraft((prev) => ({
                       ...prev,
                       event_controls: {

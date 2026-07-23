@@ -285,10 +285,10 @@ const AppointmentContextMenu = ({
                 gap: 'var(--mac-spacing-3)',
                 transition: 'background-color 0.15s ease'
               }}
-              onMouseEnter={(e) => {
+              onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
                 e.currentTarget.style.backgroundColor = colors.hover;
               }}
-              onMouseLeave={(e) => {
+              onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
                 e.currentTarget.style.backgroundColor = 'transparent';
               }}
               title={item.title}>

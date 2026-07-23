@@ -43,7 +43,7 @@ function Row({ k, v, onSave }) {
   return (
     <div className="settings-row">
       <div className="settings-label-semibold">{k}</div>
-      <Input aria-label={`Setting value for ${k}`} value={val} onChange={(e) => setVal(e.target.value)} className="settings-input" />
+      <Input aria-label={`Setting value for ${k}`} value={val} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setVal(e.target.value)} className="settings-input" />
       <button onClick={() => onSave(k, val)} className="settings-btn">{t('misc.save')}</button>
     </div>);
 
@@ -297,7 +297,7 @@ export default function Settings() {void
                   placeholder={t('misc.settings_activation_key_placeholder')}
                   aria-label="Activation key"
                   value={key}
-                  onChange={(e) => setKey(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setKey(e.target.value)}
                   className="settings-input" />
                 
                   <button onClick={doActivate} disabled={busyAct || !key.trim()} className="settings-btn-primary">
@@ -569,7 +569,7 @@ function ProviderModal({ provider, onClose, onSave, title }: { provider?: Record
               type="text"
               aria-label="Provider name"
               value={formData.name as string}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFormData({ ...formData, name: e.target.value })}
               required
               style={{
                 width: '100%',
@@ -588,7 +588,7 @@ function ProviderModal({ provider, onClose, onSave, title }: { provider?: Record
               type="text"
               aria-label="Provider code"
               value={formData.code as string}
-              onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFormData({ ...formData, code: e.target.value })}
               required
               style={{
                 width: '100%',
@@ -606,7 +606,7 @@ function ProviderModal({ provider, onClose, onSave, title }: { provider?: Record
             <textarea
               aria-label="Provider description"
               value={formData.description as string}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFormData({ ...formData, description: e.target.value })}
               rows={3}
               style={{
                 width: '100%',
@@ -626,7 +626,7 @@ function ProviderModal({ provider, onClose, onSave, title }: { provider?: Record
               type="password"
               aria-label="Provider secret key"
               value={formData.secret_key as string}
-              onChange={(e) => setFormData({ ...formData, secret_key: e.target.value })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFormData({ ...formData, secret_key: e.target.value })}
               required
               style={{
                 width: '100%',
@@ -645,7 +645,7 @@ function ProviderModal({ provider, onClose, onSave, title }: { provider?: Record
               type="url"
               aria-label="Provider webhook URL"
               value={formData.webhook_url as string}
-              onChange={(e) => setFormData({ ...formData, webhook_url: e.target.value })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFormData({ ...formData, webhook_url: e.target.value })}
               style={{
                 width: '100%',
                 padding: 8,
@@ -663,7 +663,7 @@ function ProviderModal({ provider, onClose, onSave, title }: { provider?: Record
               type="url"
               aria-label="Provider API URL"
               value={formData.api_url as string}
-              onChange={(e) => setFormData({ ...formData, api_url: e.target.value })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFormData({ ...formData, api_url: e.target.value })}
               style={{
                 width: '100%',
                 padding: 8,
@@ -774,7 +774,7 @@ function KVField({ label, defKey, items, onSave }) {
   return (
     <div className="settings-row">
       <div className="settings-label-semibold">{label}</div>
-      <Input aria-label={`${label} setting value`} value={val} onChange={(e) => setVal(e.target.value)} className="settings-input" />
+      <Input aria-label={`${label} setting value`} value={val} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setVal(e.target.value)} className="settings-input" />
       <button onClick={() => onSave(defKey, val)} className="settings-btn">{t('misc.save')}</button>
     </div>);
 
@@ -794,7 +794,7 @@ function RoleMapItem({ role, items, onSave }) {
       <Input
         aria-label={`Route target for ${role}`}
         value={val}
-        onChange={(e) => setVal(e.target.value)}
+        onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setVal(e.target.value)}
         className="settings-input"
         placeholder={t('misc.settings_role_placeholder')} />
       

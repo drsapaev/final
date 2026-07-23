@@ -1411,10 +1411,10 @@ const RegistrarPanel = () => {
       <a
         href="#main-content"
         className="registrar-hidden-visually"
-        onFocus={(e) => {
+        onFocus={(e: React.FocusEvent<HTMLElement>) => {
           e.currentTarget.style.left = '0';
         }}
-        onBlur={(e) => {
+        onBlur={(e: React.FocusEvent<HTMLElement>) => {
           e.currentTarget.style.left = '-9999px';
         }}>
 
@@ -2149,7 +2149,7 @@ const RegistrarPanel = () => {
               value={customRescheduleDate}
               min={getLocalDateString()}
               aria-label={tI18n('registrarPanel.rp_aria_reschedule_date')}
-              onChange={(e) => setCustomRescheduleDate(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setCustomRescheduleDate(e.target.value)}
               className="registrar-reschedule-input registrar-reschedule-input-themed"
             />
             {/* R-27 fix: optional time picker (HH:MM) */}
@@ -2161,7 +2161,7 @@ const RegistrarPanel = () => {
               type="time"
               value={customRescheduleTime}
               aria-label={tI18n('registrarPanel.rp_aria_reschedule_time')}
-              onChange={(e) => setCustomRescheduleTime(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setCustomRescheduleTime(e.target.value)}
               className="registrar-reschedule-input registrar-reschedule-input-themed"
             />
             <div className="registrar-reschedule-hint registrar-reschedule-hint-text">

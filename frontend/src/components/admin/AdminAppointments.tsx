@@ -291,7 +291,7 @@ const AdminAppointments = () => {
             type="text"
             placeholder={t('admin2.appt_search_ph')}
             value={searchTerm}
-            onChange={(event) => setSearchTerm(event.target.value)}
+            onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSearchTerm(event.target.value)}
             icon={Search}
             iconPosition="left"
             aria-label={t('admin2.appt_search_aria')}
@@ -306,7 +306,7 @@ const AdminAppointments = () => {
           <Input
             type="date"
             value={filterDate}
-            onChange={(event) => setFilterDate(event.target.value)}
+            onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFilterDate(event.target.value)}
             aria-label={t('admin2.appt_filter_date_aria')}
           />
           <Select
