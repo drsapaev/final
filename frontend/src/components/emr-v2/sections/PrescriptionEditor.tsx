@@ -16,6 +16,32 @@ import './PrescriptionEditor.css';
 import { Input } from '../../ui/macos';
 import { useTranslation } from '../../../i18n/useTranslation';
 
+// === Domain types ===
+export interface PrescriptionItem {
+  id?: string | number;
+  name?: string;
+  drug?: string;
+  dose?: string;
+  dosage?: string;
+  frequency?: string;
+  freq?: string;
+  duration?: string;
+  note?: string;
+  [key: string]: unknown;
+}
+
+export interface PrescriptionEditorProps {
+  /** Current list of prescriptions (controlled). */
+  prescriptions?: PrescriptionItem[];
+  /** Called whenever the list changes (add/edit/delete). */
+  onChange?: (prescriptions: PrescriptionItem[]) => void;
+  /** Whether the editor is editable (read-only when false). */
+  isEditable?: boolean;
+  /** Called when the field is first touched. */
+  onFieldTouch?: (fieldName?: string) => void;
+  [key: string]: unknown;
+}
+
 // Mock DB препаратов
 const getMockDrugs = (t) => [
 { name: t('misc.pe_drug_amoxicillin'), defaultDose: t('misc.pe_drug_amoxicillin_dose'), defaultFreq: t('misc.pe_drug_amoxicillin_freq') },
@@ -32,7 +58,7 @@ const PrescriptionEditor = ({
   onChange,
   isEditable = true,
   onFieldTouch
-}: any) => {
+}: PrescriptionEditorProps) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [isAdding, setIsAdding] = useState(false);
   const [newItem, setNewItem] = useState({

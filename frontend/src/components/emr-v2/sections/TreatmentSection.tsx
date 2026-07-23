@@ -226,7 +226,7 @@ export function TreatmentSection({
                     Лекарственные назначения
                 </h4>
                 <PrescriptionEditor
-          prescriptions={medications || []}
+          prescriptions={(medications || []) as import('./PrescriptionEditor').PrescriptionItem[]}
           onChange={onMedicationsChange}
           isEditable={!disabled} />
         
