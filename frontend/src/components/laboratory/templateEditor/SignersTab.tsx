@@ -19,7 +19,7 @@ function SignersTab({ draftVersion, onUpdateSigner }) {
               className="macos-input"
               aria-label={signerFieldLabels[key] || key}
               value={draftVersion.signer_defaults?.[key] || ''}
-              onChange={(event) => onUpdateSigner(key, event.target.value)}
+              onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => onUpdateSigner(key, event.target.value)}
             />
           </label>
         ))}

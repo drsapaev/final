@@ -173,12 +173,12 @@ export const Tab = ({
         outline: 'none',
         flex: 1
       }}
-      onMouseEnter={(e) => {
+      onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
         if (!active && !disabled && !prefersReducedMotion) {
           (e.target as HTMLElement).style.backgroundColor = 'var(--mac-bg-secondary)';
         }
       }}
-      onMouseLeave={(e) => {
+      onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
         if (!active && !disabled && !prefersReducedMotion) {
           (e.target as HTMLElement).style.backgroundColor = 'transparent';
         }
@@ -298,12 +298,12 @@ export const NavigationMenu = ({
             borderBottom: '2px solid var(--mac-accent-blue)'
           } : {})
         }}
-        onMouseEnter={(e) => {
+        onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
           if (activeItem !== item.id && !item.disabled && !prefersReducedMotion) {
             (e.target as HTMLElement).style.backgroundColor = 'var(--mac-bg-secondary)';
           }
         }}
-        onMouseLeave={(e) => {
+        onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
           if (activeItem !== item.id && !item.disabled && !prefersReducedMotion) {
             (e.target as HTMLElement).style.backgroundColor = 'transparent';
           }
@@ -373,10 +373,10 @@ export const Breadcrumbs = ({
             padding: '0',
             fontSize: 'inherit'
           }}
-          onMouseEnter={(e) => {
+          onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
             (e.target as HTMLElement).style.textDecoration = 'underline';
           }}
-          onMouseLeave={(e) => {
+          onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
             (e.target as HTMLElement).style.textDecoration = 'none';
           }}>
           
@@ -469,12 +469,12 @@ export const Pagination = ({
             cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
             transition: prefersReducedMotion ? 'none' : 'all 0.2s ease'
           }}
-          onMouseEnter={(e) => {
+          onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
             if (currentPage !== 1 && !prefersReducedMotion) {
               (e.target as HTMLElement).style.backgroundColor = 'var(--mac-bg-secondary)';
             }
           }}
-          onMouseLeave={(e) => {
+          onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
             if (currentPage !== 1 && !prefersReducedMotion) {
               (e.target as HTMLElement).style.backgroundColor = 'var(--mac-bg-primary)';
             }
@@ -503,12 +503,12 @@ export const Pagination = ({
               minWidth: '40px',
               transition: prefersReducedMotion ? 'none' : 'all 0.2s ease'
             }}
-            onMouseEnter={(e) => {
+            onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
               if (typeof page === 'number' && page !== currentPage && !prefersReducedMotion) {
                 (e.target as HTMLElement).style.backgroundColor = page === currentPage ? 'var(--mac-accent-blue-hover)' : 'var(--mac-bg-secondary)';
               }
             }}
-            onMouseLeave={(e) => {
+            onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
               if (typeof page === 'number' && page !== currentPage && !prefersReducedMotion) {
                 (e.target as HTMLElement).style.backgroundColor = page === currentPage ? 'var(--mac-accent-blue)' : 'var(--mac-bg-primary)';
               }
@@ -534,12 +534,12 @@ export const Pagination = ({
             cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
             transition: prefersReducedMotion ? 'none' : 'all 0.2s ease'
           }}
-          onMouseEnter={(e) => {
+          onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
             if (currentPage !== totalPages && !prefersReducedMotion) {
               (e.target as HTMLElement).style.backgroundColor = 'var(--mac-bg-secondary)';
             }
           }}
-          onMouseLeave={(e) => {
+          onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
             if (currentPage !== totalPages && !prefersReducedMotion) {
               (e.target as HTMLElement).style.backgroundColor = 'var(--mac-bg-primary)';
             }
@@ -555,7 +555,7 @@ export const Pagination = ({
           <span style={{ fontSize: 'var(--mac-font-size-base)', color: 'var(--mac-text-secondary)' }}>Показывать:</span>
           <select
           value={pageSize}
-          onChange={(e) => onPageSizeChange && onPageSizeChange(Number(e.target.value))}
+          onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => onPageSizeChange && onPageSizeChange(Number(e.target.value))}
           style={{
             padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
             fontSize: 'var(--mac-font-size-base)',

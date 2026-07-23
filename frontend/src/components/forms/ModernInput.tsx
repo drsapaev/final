@@ -235,7 +235,7 @@ const ModernInput = ({
           onClick={() => handleSuggestionClick(suggestion)}
           role="button"
           tabIndex={0}
-          onKeyDown={(event) => {
+          onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => {
             if (event.key === 'Enter' || event.key === ' ') {
               event.preventDefault();
               handleSuggestionClick(suggestion);

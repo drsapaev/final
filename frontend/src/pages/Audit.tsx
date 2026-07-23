@@ -112,7 +112,7 @@ export default function Audit() {
                 min={10}
                 max={1000}
                 value={limit}
-                onChange={(e) => setLimit(Number(e.target.value) || 100)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setLimit(Number(e.target.value) || 100)}
                 aria-label={t('misc.a_kolichestvo_zapisey_audita_d')}
               />
             </label>
@@ -123,7 +123,7 @@ export default function Audit() {
               id={searchInputId}
               placeholder={t('misc.a_poisk_po_polzovatelyu_deystv')}
               value={q}
-              onChange={(e) => setQ(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setQ(e.target.value)}
               style={{ minWidth: 260 }}
               aria-label={t('misc.a_poisk_po_zhurnalu_audita')}
             />

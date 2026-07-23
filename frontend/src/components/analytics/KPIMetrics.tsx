@@ -353,7 +353,7 @@ const KPIMetrics = ({
           <span className="text-sm font-medium">{t('misc.km_period')}</span>
           <select
             value={selectedPeriod}
-            onChange={(e) => setSelectedPeriod(e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSelectedPeriod(e.target.value)}
             className="px-3 py-1 border border-gray-300 rounded-md text-sm">
             
             <option value="7d">7 дней</option>

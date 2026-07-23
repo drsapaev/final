@@ -615,13 +615,13 @@ export default function TwoFactorManager() {
                   <Input
                     type="password"
                     value={disablePassword}
-                    onChange={(event) => setDisablePassword(event.target.value)}
+                    onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setDisablePassword(event.target.value)}
                     placeholder={t('misc.tfm_disable_form_password_placeholder')}
                   />
                   <Input
                     type="text"
                     value={disableCode}
-                    onChange={(event) => setDisableCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                    onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setDisableCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
                     placeholder={t('misc.tfm_disable_form_code_placeholder')}
                   />
                   <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -728,7 +728,7 @@ export default function TwoFactorManager() {
                       <Input
                         type="text"
                         value={verificationCode}
-                        onChange={(event) => setVerificationCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                        onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setVerificationCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
                         placeholder={t('misc.tfm_enter_6digit_code')}
                       />
                       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>

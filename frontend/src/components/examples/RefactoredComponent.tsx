@@ -170,7 +170,7 @@ function NewPatientComponent() {
       aria-label="Patient full name"
       placeholder={t18('misc.rc_fio_patsienta')}
       value={formData.full_name}
-      onChange={(e) => setFormData((prev) => ({ ...prev, full_name: e.target.value }))}
+      onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFormData((prev) => ({ ...prev, full_name: e.target.value }))}
       disabled={submitting} />
         
 
@@ -179,7 +179,7 @@ function NewPatientComponent() {
         aria-label="Patient phone"
         placeholder={t18('misc.rc_telefon')}
         value={formData.phone}
-        onChange={(e) => setFormData((prev) => ({ ...prev, phone: e.target.value }))}
+        onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFormData((prev) => ({ ...prev, phone: e.target.value }))}
         disabled={submitting} />
         
 
@@ -188,7 +188,7 @@ function NewPatientComponent() {
         aria-label="Patient email"
         placeholder="Email"
         value={formData.email}
-        onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
+        onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
         disabled={submitting} />
         
 
@@ -196,7 +196,7 @@ function NewPatientComponent() {
         type="date"
         aria-label="Patient birth date"
         value={formData.birth_date}
-        onChange={(e) => setFormData((prev) => ({ ...prev, birth_date: e.target.value }))}
+        onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFormData((prev) => ({ ...prev, birth_date: e.target.value }))}
         disabled={submitting} />
         
 

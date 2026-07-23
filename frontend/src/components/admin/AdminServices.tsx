@@ -57,12 +57,12 @@ const AdminServices = () => {
               aria-label={tab.label}
               onClick={() => selectTab(tab.key)}
               className={isActive ? 'admin-services-tab-btn-active' : 'admin-services-tab-btn'}
-              onMouseEnter={(event) => {
+              onMouseEnter={(event: React.MouseEvent<HTMLElement>) => {
                 if (!isActive) {
                   event.currentTarget.style.color = 'var(--mac-text-primary)';
                 }
               }}
-              onMouseLeave={(event) => {
+              onMouseLeave={(event: React.MouseEvent<HTMLElement>) => {
                 if (!isActive) {
                   event.currentTarget.style.color = 'var(--mac-text-secondary)';
                 }

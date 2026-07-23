@@ -377,7 +377,7 @@ const MacOSDemo = () => {
                     placeholder="Enter detailed patient notes..."
                     hint="Include symptoms, diagnosis, and treatment plan"
                     value={textareaValue}
-                    onChange={(e) => setTextareaValue(e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setTextareaValue(e.target.value)}
                     minRows={3}
                     maxRows={8}
                     autoResize

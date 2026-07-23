@@ -256,7 +256,7 @@ const ForceMajeureModal = ({
           <textarea
             aria-label="Force majeure reason"
             value={reason}
-            onChange={(e) => setReason(e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setReason(e.target.value)}
             placeholder={t('misc.fm_reason_placeholder')}
             className={`fmm-textarea ${error ? 'fmm-textarea--error' : ''}`} />
           {!isReasonValid && reason.length > 0 &&
@@ -279,7 +279,7 @@ const ForceMajeureModal = ({
                 value="deposit"
                 aria-label="Refund to deposit"
                 checked={refundType === 'deposit'}
-                onChange={(e) => setRefundType(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setRefundType(e.target.value)}
                 style={{ display: 'none' }} />
               <div className={`fmm-refund-radio ${refundType === 'deposit' ? 'fmm-refund-radio--selected' : ''}`}>
                 {refundType === 'deposit' && <div className="fmm-refund-radio-dot" />}
@@ -296,7 +296,7 @@ const ForceMajeureModal = ({
                 value="bank_transfer"
                 aria-label="Refund to bank card"
                 checked={refundType === 'bank_transfer'}
-                onChange={(e) => setRefundType(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setRefundType(e.target.value)}
                 style={{ display: 'none' }} />
               <div className={`fmm-refund-radio ${refundType === 'bank_transfer' ? 'fmm-refund-radio--selected' : ''}`}>
                 {refundType === 'bank_transfer' && <div className="fmm-refund-radio-dot" />}
@@ -321,7 +321,7 @@ const ForceMajeureModal = ({
             type="text"
             aria-label="Type confirmation phrase"
             value={confirmText}
-            onChange={(e) => setConfirmText(e.target.value.toUpperCase())}
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setConfirmText(e.target.value.toUpperCase())}
             placeholder="ПОДТВЕРЖДАЮ"
             className={`fmm-confirm-input ${isConfirmValid ? 'fmm-confirm-input--valid' : ''}`} />
         </div>

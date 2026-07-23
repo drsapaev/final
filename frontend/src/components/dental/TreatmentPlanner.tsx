@@ -399,7 +399,7 @@ const TreatmentPlanner = ({ visitId, onUpdate, patientId, teethData }: { visitId
             <Input
               label={t('dental.dental_tp_plan_name_label')}
               value={treatmentPlan.name}
-              onChange={(e) => setTreatmentPlan({ ...treatmentPlan, name: e.target.value })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setTreatmentPlan({ ...treatmentPlan, name: e.target.value })}
               style={{ width: '100%', boxSizing: 'border-box' }}
             />
           </div>
@@ -485,14 +485,14 @@ const TreatmentPlanner = ({ visitId, onUpdate, patientId, teethData }: { visitId
             <Input
               label={t('dental.dental_tp_stage_name_label')}
               value={stageForm.name}
-              onChange={(e) => setStageForm({ ...stageForm, name: e.target.value })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setStageForm({ ...stageForm, name: e.target.value })}
               style={{ width: '100%', boxSizing: 'border-box' }}
             />
 
             <Textarea
               label={t('dental.dental_tp_description_label')}
               value={stageForm.description}
-              onChange={(e) => setStageForm({ ...stageForm, description: e.target.value })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setStageForm({ ...stageForm, description: e.target.value })}
               minRows={2}
               textareaStyle={{ width: '100%', boxSizing: 'border-box' }}
             />
@@ -502,7 +502,7 @@ const TreatmentPlanner = ({ visitId, onUpdate, patientId, teethData }: { visitId
                 type="date"
                 label={t('dental.dental_tp_date_label')}
                 value={stageForm.date}
-                onChange={(e) => setStageForm({ ...stageForm, date: e.target.value })}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setStageForm({ ...stageForm, date: e.target.value })}
                 style={{ width: '100%', boxSizing: 'border-box' }}
               />
 
@@ -520,7 +520,7 @@ const TreatmentPlanner = ({ visitId, onUpdate, patientId, teethData }: { visitId
                 type="number"
                 label={t('dental.dental_tp_duration_label')}
                 value={stageForm.duration}
-                onChange={(e) => setStageForm({ ...stageForm, duration: parseInt(e.target.value) || 1 })}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setStageForm({ ...stageForm, duration: parseInt(e.target.value) || 1 })}
                 style={{ width: '100%', boxSizing: 'border-box' }}
               />
 
@@ -528,7 +528,7 @@ const TreatmentPlanner = ({ visitId, onUpdate, patientId, teethData }: { visitId
                 type="number"
                 label={t('dental.dental_tp_cost_label')}
                 value={stageForm.cost}
-                onChange={(e) => setStageForm({ ...stageForm, cost: parseInt(e.target.value) || 0 })}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setStageForm({ ...stageForm, cost: parseInt(e.target.value) || 0 })}
                 style={{ width: '100%', boxSizing: 'border-box' }}
               />
             </div>

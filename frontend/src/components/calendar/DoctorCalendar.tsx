@@ -327,7 +327,7 @@ const DoctorCalendar = ({
         ...(slot.booked ? styles.slotBooked : styles.slotAvailable)
       } as CSSProperties}
       onClick={() => slot.booked ? onViewAppointment?.(slot) : onSelectSlot?.(slot, date)}
-      onKeyDown={(event) => handleActivationKeyDown(event, () => (slot.booked ? onViewAppointment?.(slot) : onSelectSlot?.(slot, date)))}>
+      onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => handleActivationKeyDown(event, () => (slot.booked ? onViewAppointment?.(slot) : onSelectSlot?.(slot, date)))}>
 
                 <div style={{ fontWeight: 'var(--mac-font-weight-medium)' } as CSSProperties}>{slot.time || slot.start_time}</div>
                 {slot.patient_name &&
@@ -351,7 +351,7 @@ const DoctorCalendar = ({
           ...(today ? styles.dayCellToday : {})
         } as CSSProperties}
         onClick={() => setSelectedDay(date)}
-        onKeyDown={(event) => handleActivationKeyDown(event, () => setSelectedDay(date))}>
+        onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => handleActivationKeyDown(event, () => setSelectedDay(date))}>
 
                 <div
           style={{

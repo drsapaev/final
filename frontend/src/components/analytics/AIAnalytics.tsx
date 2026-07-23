@@ -780,7 +780,7 @@ const AIAnalytics = () => {
             <Input
               type="date"
               value={dateRange.startDate}
-              onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })} />
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setDateRange({ ...dateRange, startDate: e.target.value })} />
 
           </div>
           <div>
@@ -790,7 +790,7 @@ const AIAnalytics = () => {
             <Input
               type="date"
               value={dateRange.endDate}
-              onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })} />
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setDateRange({ ...dateRange, endDate: e.target.value })} />
 
           </div>
           <div>
@@ -799,7 +799,7 @@ const AIAnalytics = () => {
             </label>
             <Select
               value={filters.aiFunction}
-              onChange={(e) => setFilters({ ...filters, aiFunction: e.target.value })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFilters({ ...filters, aiFunction: e.target.value })}
               options={[
               { value: '', label: t('misc.aia_all_functions') },
               { value: 'diagnose_symptoms', label: t('misc.aia_func_diagnose') },

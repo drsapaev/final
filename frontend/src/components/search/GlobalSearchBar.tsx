@@ -379,7 +379,7 @@ export default function GlobalSearchBar({ className = '' }) {
           ref={inputRef}
           type="text"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setQuery(e.target.value)}
           onFocus={() => setIsOpen(true)}
           onKeyDown={handleKeyDown}
           placeholder={t('misc.gsb_poisk_patsientov_vizitov')}
@@ -433,7 +433,7 @@ export default function GlobalSearchBar({ className = '' }) {
                     tabIndex={0}
                     style={{ ...styles.item, ...(isSelected ? styles.itemSelected : {}) } as CSSProperties}
                     onClick={() => handleItemClick('patient', p)}
-                    onKeyDown={(event) => handleResultItemKeyDown(event, () => handleItemClick('patient', p))}
+                    onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => handleResultItemKeyDown(event, () => handleItemClick('patient', p))}
                     onMouseEnter={() => setSelectedIndex(itemIndex)}>
                     
                                                 <span style={styles.itemIcon as CSSProperties}>👤</span>
@@ -468,7 +468,7 @@ export default function GlobalSearchBar({ className = '' }) {
                     tabIndex={0}
                     style={{ ...styles.item, ...(isSelected ? styles.itemSelected : {}) } as CSSProperties}
                     onClick={() => handleItemClick('visit', v)}
-                    onKeyDown={(event) => handleResultItemKeyDown(event, () => handleItemClick('visit', v))}
+                    onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => handleResultItemKeyDown(event, () => handleItemClick('visit', v))}
                     onMouseEnter={() => setSelectedIndex(itemIndex)}>
                     
                                                 <span style={styles.itemIcon as CSSProperties}>📋</span>
@@ -504,7 +504,7 @@ export default function GlobalSearchBar({ className = '' }) {
                     tabIndex={0}
                     style={{ ...styles.item, ...(isSelected ? styles.itemSelected : {}) } as CSSProperties}
                     onClick={() => handleItemClick('lab', l)}
-                    onKeyDown={(event) => handleResultItemKeyDown(event, () => handleItemClick('lab', l))}
+                    onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => handleResultItemKeyDown(event, () => handleItemClick('lab', l))}
                     onMouseEnter={() => setSelectedIndex(itemIndex)}>
                     
                                                 <span style={styles.itemIcon as CSSProperties}>{statusIcon}</span>

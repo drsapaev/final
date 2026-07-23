@@ -29,7 +29,7 @@ function QueueCard({ appointment, isSelected = false, onOpenAppointment }) {
       role="button"
       tabIndex={0}
       onClick={() => onOpenAppointment(appointment)}
-      onKeyDown={(e) => {
+      onKeyDown={(e: React.KeyboardEvent<HTMLElement>) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
           onOpenAppointment(appointment);

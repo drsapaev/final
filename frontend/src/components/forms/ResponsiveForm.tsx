@@ -110,11 +110,11 @@ const FormInput = ({
         outline: 'none',
         ...style
       }}
-      onFocus={(e) => {
+      onFocus={(e: React.FocusEvent<HTMLElement>) => {
         e.target.style.borderColor = 'var(--mac-accent-blue)';
         e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
       }}
-      onBlur={(e) => {
+      onBlur={(e: React.FocusEvent<HTMLElement>) => {
         e.target.style.borderColor = 'var(--mac-border)';
         e.target.style.boxShadow = 'none';
       }} />);
@@ -152,11 +152,11 @@ const FormSelect = ({
         outline: 'none',
         ...style
       }}
-      onFocus={(e) => {
+      onFocus={(e: React.FocusEvent<HTMLElement>) => {
         e.target.style.borderColor = 'var(--mac-accent-blue)';
         e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
       }}
-      onBlur={(e) => {
+      onBlur={(e: React.FocusEvent<HTMLElement>) => {
         e.target.style.borderColor = 'var(--mac-border)';
         e.target.style.boxShadow = 'none';
       }}>
@@ -201,11 +201,11 @@ const FormTextarea = ({
         outline: 'none',
         ...style
       }}
-      onFocus={(e) => {
+      onFocus={(e: React.FocusEvent<HTMLElement>) => {
         e.target.style.borderColor = 'var(--mac-accent-blue)';
         e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
       }}
-      onBlur={(e) => {
+      onBlur={(e: React.FocusEvent<HTMLElement>) => {
         e.target.style.borderColor = 'var(--mac-border)';
         e.target.style.boxShadow = 'none';
       }} />);

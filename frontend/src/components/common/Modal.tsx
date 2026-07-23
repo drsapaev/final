@@ -254,10 +254,10 @@ function ModalItem({ modal, onClose }) {
         <button
           style={closeButtonStyle as unknown as CSSProperties}
           onClick={() => onClose(modal.id)}
-          onMouseOver={(e) => {
+          onMouseOver={(e: React.MouseEvent<HTMLElement>) => {
             e.currentTarget.style.backgroundColor = 'var(--color-background-tertiary)';
           }}
-          onMouseOut={(e) => {
+          onMouseOut={(e: React.MouseEvent<HTMLElement>) => {
             e.currentTarget.style.backgroundColor = 'transparent';
           }}>
 
@@ -420,10 +420,10 @@ export function Modal({
           <button
             style={closeButtonStyle as unknown as CSSProperties}
             onClick={onClose}
-            onMouseOver={(e) => {
+            onMouseOver={(e: React.MouseEvent<HTMLElement>) => {
               e.currentTarget.style.backgroundColor = 'var(--color-background-tertiary)';
             }}
-            onMouseOut={(e) => {
+            onMouseOut={(e: React.MouseEvent<HTMLElement>) => {
               e.currentTarget.style.backgroundColor = 'transparent';
             }}>
 

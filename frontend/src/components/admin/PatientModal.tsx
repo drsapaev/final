@@ -251,7 +251,7 @@ const PatientModal = ({
               <Input
                 type="text"
                 value={String(formData.lastName ?? '')}
-                onChange={(e) => handleChange('lastName', e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('lastName', e.target.value)}
                 placeholder={t('admin2.pm_ph_last_name')}
                 error={errors.lastName}
                 icon={User} />
@@ -272,7 +272,7 @@ const PatientModal = ({
               <Input
                 type="text"
                 value={String(formData.firstName ?? '')}
-                onChange={(e) => handleChange('firstName', e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('firstName', e.target.value)}
                 placeholder={t('admin2.pm_ph_first_name')}
                 error={errors.firstName} />
 
@@ -292,7 +292,7 @@ const PatientModal = ({
               <Input
                 type="text"
                 value={String(formData.middleName ?? '')}
-                onChange={(e) => handleChange('middleName', e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('middleName', e.target.value)}
                 placeholder={t('admin2.pm_ph_middle_name')} />
 
             </div>
@@ -307,7 +307,7 @@ const PatientModal = ({
               <Input
                 type="date"
                 value={String(formData.birthDate ?? '')}
-                onChange={(e) => handleChange('birthDate', e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('birthDate', e.target.value)}
                 error={errors.birthDate}
                 icon={Calendar} />
 
@@ -331,7 +331,7 @@ const PatientModal = ({
               </label>
               <Select
                 value={String(formData.gender ?? '')}
-                onChange={(value) => handleChange('gender', value)}
+                onChange={(value: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('gender', value)}
                 options={[
                 { value: '', label: t('admin2.pm_gender_placeholder') },
                 { value: 'male', label: t('admin2.pm_gender_male') },
@@ -385,7 +385,7 @@ const PatientModal = ({
               <Input
                 type="email"
                 value={String(formData.email ?? '')}
-                onChange={(e) => handleChange('email', e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('email', e.target.value)}
                 placeholder="ivan@example.com"
                 error={errors.email}
                 icon={Mail} />
@@ -407,7 +407,7 @@ const PatientModal = ({
             <Input
               type="text"
               value={String(formData.address ?? '')}
-              onChange={(e) => handleChange('address', e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('address', e.target.value)}
               placeholder={t('admin2.pm_ph_address')}
               icon={MapPin} />
 
@@ -428,7 +428,7 @@ const PatientModal = ({
               <Input
                 type="text"
                 value={String(formData.passport ?? '')}
-                onChange={(e) => handleChange('passport', e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('passport', e.target.value)}
                 placeholder="AA1234567"
                 error={errors.passport}
                 icon={IdCard} />
@@ -454,7 +454,7 @@ const PatientModal = ({
               <Input
                 type="text"
                 value={String(formData.insuranceNumber ?? '')}
-                onChange={(e) => handleChange('insuranceNumber', e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('insuranceNumber', e.target.value)}
                 placeholder="12345678901234" />
 
             </div>
@@ -474,7 +474,7 @@ const PatientModal = ({
               <Input
                 type="text"
                 value={String(formData.emergencyContact ?? '')}
-                onChange={(e) => handleChange('emergencyContact', e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('emergencyContact', e.target.value)}
                 placeholder={t('admin2.pm_ph_emergency_contact')} />
 
             </div>
@@ -485,7 +485,7 @@ const PatientModal = ({
               <Input
                 type="tel"
                 value={String(formData.emergencyPhone ?? '')}
-                onChange={(e) => handleChange('emergencyPhone', e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('emergencyPhone', e.target.value)}
                 placeholder="+998 90 987 65 43"
                 icon={Phone} />
 
@@ -505,7 +505,7 @@ const PatientModal = ({
               </label>
               <Select
                 value={String(formData.bloodType ?? '')}
-                onChange={(value) => handleChange('bloodType', value)}
+                onChange={(value: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('bloodType', value)}
                 options={[
                 { value: '', label: t('admin2.pm_blood_type_not_specified') },
                 { value: 'A+', label: 'A+' },
@@ -527,7 +527,7 @@ const PatientModal = ({
               <Input
                 type="text"
                 value={String(formData.allergies ?? '')}
-                onChange={(e) => handleChange('allergies', e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('allergies', e.target.value)}
                 placeholder={t('admin2.pm_ph_allergies')} />
 
             </div>
@@ -538,7 +538,7 @@ const PatientModal = ({
             </label>
             <Textarea
               value={String(formData.chronicDiseases ?? '')}
-              onChange={(e) => handleChange('chronicDiseases', e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('chronicDiseases', e.target.value)}
               placeholder={t('admin2.pm_ph_chronic')}
               rows={3} />
 
@@ -556,7 +556,7 @@ const PatientModal = ({
             </label>
             <Textarea
               value={String(formData.notes ?? '')}
-              onChange={(e) => handleChange('notes', e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('notes', e.target.value)}
               placeholder={t('admin2.pm_ph_notes')}
               rows={3} />
 

@@ -252,12 +252,12 @@ export const Modal = ({
                   borderRadius: 'var(--mac-radius-sm)',
                   transition: prefersReducedMotion ? 'none' : 'background-color 0.2s ease'
                 }}
-                onMouseEnter={(e) => {
+                onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
                   if (!prefersReducedMotion) {
                     (e.target as HTMLElement).style.backgroundColor = 'var(--mac-bg-secondary)';
                   }
                 }}
-                onMouseLeave={(e) => {
+                onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
                   if (!prefersReducedMotion) {
                     (e.target as HTMLElement).style.backgroundColor = 'transparent';
                   }

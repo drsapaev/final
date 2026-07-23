@@ -17,7 +17,7 @@ function DesignTab({ draftVersion, onUpdateLayout, onUpdateFooter, onUpdateBrand
             className="macos-input"
             aria-label="Макет печати"
             value={draftVersion.layout_preset}
-            onChange={(event) => onUpdateLayout(event.target.value)}
+            onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => onUpdateLayout(event.target.value)}
           >
             {layoutOptions.map((option) => (
               <option key={option.value} value={option.value}>{option.label}</option>
@@ -31,7 +31,7 @@ function DesignTab({ draftVersion, onUpdateLayout, onUpdateFooter, onUpdateBrand
             aria-label="Подвал шаблона"
             rows={3}
             value={draftVersion.footer_notes}
-            onChange={(event) => onUpdateFooter(event.target.value)}
+            onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => onUpdateFooter(event.target.value)}
           />
         </label>
       </div>
@@ -46,7 +46,7 @@ function DesignTab({ draftVersion, onUpdateLayout, onUpdateFooter, onUpdateBrand
                 className="macos-input"
                 aria-label={brandingFieldLabels[key] || key}
                 value={draftVersion.branding_overrides?.[key] || ''}
-                onChange={(event) => onUpdateBranding(key, event.target.value)}
+                onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => onUpdateBranding(key, event.target.value)}
               />
             </label>
           ))}

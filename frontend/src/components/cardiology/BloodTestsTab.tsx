@@ -83,7 +83,7 @@ export function BloodTestsTab({
           type="number"
           aria-label={ariaLabel}
           value={bloodTestForm[fieldName]}
-          onChange={(e) => setBloodTestForm({ ...bloodTestForm, [fieldName]: e.target.value })}
+          onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setBloodTestForm({ ...bloodTestForm, [fieldName]: e.target.value })}
           className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white cardio-input-themed"
           style={{
             border: `1px solid ${isError ? 'var(--mac-error)' : getColor('border')}`,
@@ -219,7 +219,7 @@ export function BloodTestsTab({
                   required
                   aria-label={t('cardio.cardio_blood_date_aria')}
                   value={bloodTestForm.test_date}
-                  onChange={(e) => setBloodTestForm({ ...bloodTestForm, test_date: e.target.value })}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setBloodTestForm({ ...bloodTestForm, test_date: e.target.value })}
                   className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white cardio-input-themed"
                   style={{ border: `1px solid ${getColor('border')}`, backgroundColor: getColor('surface'), color: getColor('text') }}
                 />
@@ -235,7 +235,7 @@ export function BloodTestsTab({
                   type="number"
                   aria-label="LDL cholesterol"
                   value={bloodTestForm.cholesterol_ldl}
-                  onChange={(e) => setBloodTestForm({ ...bloodTestForm, cholesterol_ldl: e.target.value })}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setBloodTestForm({ ...bloodTestForm, cholesterol_ldl: e.target.value })}
                   className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white cardio-input-themed"
                   style={{
                     border: `1px solid ${isLdlCritical(bloodTestForm.cholesterol_ldl) ? 'var(--mac-error)' : getColor('border')}`,
@@ -263,7 +263,7 @@ export function BloodTestsTab({
               <label className="cardio-form-label">{t('cardio.cardio_blood_interpretation_label')}</label>
               <Textarea
                 value={bloodTestForm.interpretation}
-                onChange={(e) => setBloodTestForm({ ...bloodTestForm, interpretation: e.target.value })}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setBloodTestForm({ ...bloodTestForm, interpretation: e.target.value })}
                 placeholder={t('cardio.cardio_blood_ph_interpretation')}
                 rows={4}
               />

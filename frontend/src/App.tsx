@@ -231,8 +231,8 @@ function AppShell({ children }) {
           fontWeight: 600,
           transition: 'top 200ms ease',
         }}
-        onFocus={(e) => { e.currentTarget.style.top = '8px'; }}
-        onBlur={(e) => { e.currentTarget.style.top = '-100px'; }}
+        onFocus={(e: React.FocusEvent<HTMLElement>) => { e.currentTarget.style.top = '8px'; }}
+        onBlur={(e: React.FocusEvent<HTMLElement>) => { e.currentTarget.style.top = '-100px'; }}
       >
         Перейти к содержимому
       </a>
@@ -329,7 +329,7 @@ function AppShell({ children }) {
         {compactSidebar && mobileSidebarExpanded && (
           <div
             onClick={() => setMobileSidebarExpanded(false)}
-            onKeyDown={(e) => { if (e.key === 'Escape' || e.key === 'Enter') setMobileSidebarExpanded(false); }}
+            onKeyDown={(e: React.KeyboardEvent<HTMLElement>) => { if (e.key === 'Escape' || e.key === 'Enter') setMobileSidebarExpanded(false); }}
             aria-label="Закрыть меню"
             role="button"
             tabIndex={-1}

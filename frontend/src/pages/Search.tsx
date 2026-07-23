@@ -238,7 +238,7 @@ export default function Search() {
             id={searchInputId}
             type="text"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setQuery(e.target.value)}
             placeholder={t('misc.srch_input_placeholder')}
             style={styles.searchInput}
             aria-label={t('misc.srch_label_search')}
@@ -350,10 +350,10 @@ export default function Search() {
                   tabIndex={0}
                   aria-label={t('misc.srch_aria_open_patient', { name: patientDisplay })}
                   onClick={() => goToPatient(patient)}
-                  onKeyDown={(event) => handleActivationKeyDown(event, () => goToPatient(patient))}
+                  onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => handleActivationKeyDown(event, () => goToPatient(patient))}
                   style={styles.card}
-                  onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-                  onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+                  onMouseEnter={(e: React.MouseEvent<HTMLElement>) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                  onMouseLeave={(e: React.MouseEvent<HTMLElement>) => e.currentTarget.style.transform = 'translateY(0)'}
                 >
                   <div style={styles.cardHeader}>
                     <span style={styles.patientId}>#{patient.id}</span>
@@ -399,10 +399,10 @@ export default function Search() {
                     tabIndex={0}
                     aria-label={t('misc.srch_aria_open_visit', { visitId: visit.id, patientName: visitPatientName })}
                     onClick={() => goToVisit(visit)}
-                    onKeyDown={(event) => handleActivationKeyDown(event, () => goToVisit(visit))}
+                    onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => handleActivationKeyDown(event, () => goToVisit(visit))}
                     style={styles.card}
-                    onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-                    onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+                    onMouseEnter={(e: React.MouseEvent<HTMLElement>) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                    onMouseLeave={(e: React.MouseEvent<HTMLElement>) => e.currentTarget.style.transform = 'translateY(0)'}
                   >
                     <div style={styles.cardHeader}>
                       <span style={styles.visitId}>{t('misc.srch_visit_id', { visitId: visit.id })}</span>

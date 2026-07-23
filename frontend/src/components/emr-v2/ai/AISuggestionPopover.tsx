@@ -195,7 +195,7 @@ export function AISuggestionPopover({
                             tabIndex={disabled ? -1 : 0}
                             aria-disabled={disabled}
                             onClick={() => !disabled && onApply?.(suggestion)}
-                            onKeyDown={(event) => {
+                            onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => {
                                 if ((event.key === 'Enter' || event.key === ' ') && !disabled) {
                                     event.preventDefault();
                                     onApply?.(suggestion);
@@ -224,7 +224,7 @@ export function AISuggestionPopover({
                                 )}
                                 <button
                                     className="ai-popover__apply"
-                                    onClick={(e) => {
+                                    onClick={(e: React.MouseEvent<HTMLElement>) => {
                                         e.stopPropagation();
                                         if (!disabled && onApply) onApply(suggestion);
                                     }}
@@ -234,7 +234,7 @@ export function AISuggestionPopover({
                                 </button>
                                 <button
                                     className="ai-popover__dismiss"
-                                    onClick={(e) => {
+                                    onClick={(e: React.MouseEvent<HTMLElement>) => {
                                         e.stopPropagation();
                                         onDismiss?.(suggestion.id);
                                     }}

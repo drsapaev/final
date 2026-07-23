@@ -39,7 +39,7 @@ const VitalsWidget = ({ vitals: vitalsRaw = {}, onChange, onFieldTouch, disabled
                         type="number"
                         aria-label="Systolic blood pressure"
                         value={vitals?.systolic || ''}
-                        onChange={(e) => handleChange('systolic', e.target.value)}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('systolic', e.target.value)}
                         placeholder="120"
                         disabled={disabled}
                     />
@@ -51,7 +51,7 @@ const VitalsWidget = ({ vitals: vitalsRaw = {}, onChange, onFieldTouch, disabled
                         type="number"
                         aria-label="Diastolic blood pressure"
                         value={vitals?.diastolic || ''}
-                        onChange={(e) => handleChange('diastolic', e.target.value)}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('diastolic', e.target.value)}
                         placeholder="80"
                         disabled={disabled}
                     />
@@ -62,7 +62,7 @@ const VitalsWidget = ({ vitals: vitalsRaw = {}, onChange, onFieldTouch, disabled
                         type="number"
                         aria-label="Pulse"
                         value={vitals?.pulse || ''}
-                        onChange={(e) => handleChange('pulse', e.target.value)}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('pulse', e.target.value)}
                         placeholder="72"
                         disabled={disabled}
                     />
@@ -73,7 +73,7 @@ const VitalsWidget = ({ vitals: vitalsRaw = {}, onChange, onFieldTouch, disabled
                         type="number"
                         aria-label="Blood oxygen saturation"
                         value={vitals?.spo2 || ''}
-                        onChange={(e) => handleChange('spo2', e.target.value)}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('spo2', e.target.value)}
                         placeholder="98"
                         disabled={disabled}
                     />
@@ -94,7 +94,7 @@ const VitalsWidget = ({ vitals: vitalsRaw = {}, onChange, onFieldTouch, disabled
                         type="number"
                         aria-label="Height in centimeters"
                         value={vitals?.height || ''}
-                        onChange={(e) => handleChange('height', e.target.value)}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('height', e.target.value)}
                         placeholder="170"
                         disabled={disabled}
                     />
@@ -106,7 +106,7 @@ const VitalsWidget = ({ vitals: vitalsRaw = {}, onChange, onFieldTouch, disabled
                         type="number"
                         aria-label="Weight in kilograms"
                         value={vitals?.weight || ''}
-                        onChange={(e) => handleChange('weight', e.target.value)}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('weight', e.target.value)}
                         placeholder="70"
                         disabled={disabled}
                     />

@@ -300,7 +300,7 @@ export default function NotificationInbox({ userRole, onClose }) {
             type="search"
             aria-label={t('misc.ni_poisk_po_uvedomleniyam')}
             value={searchText}
-            onChange={(event) => setSearchText(event.target.value)}
+            onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSearchText(event.target.value)}
             placeholder={t('misc.ni_poisk_po_uvedomleniyam')}
             style={{
               flex: 1,
@@ -478,7 +478,7 @@ export default function NotificationInbox({ userRole, onClose }) {
                   {!item.isRead && !item.isArchived ? (
                     <button
                       type="button"
-                      onClick={(event) => {
+                      onClick={(event: React.MouseEvent<HTMLElement>) => {
                         event.stopPropagation();
                         void handleOpen(item);
                       }}
@@ -498,7 +498,7 @@ export default function NotificationInbox({ userRole, onClose }) {
                   {!item.isArchived ? (
                     <button
                       type="button"
-                      onClick={(event) => void handleArchive(item, event)}
+                      onClick={(event: React.MouseEvent<HTMLElement>) => void handleArchive(item, event)}
                       style={{
                         border: 'none',
                         borderRadius: 999,

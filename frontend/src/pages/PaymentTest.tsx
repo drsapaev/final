@@ -195,7 +195,7 @@ const PaymentTest = () => {
                     type="number"
                     aria-label="Payment test visit id"
                     value={testData.visitId}
-                    onChange={(e) => setTestData({ ...testData, visitId: parseInt(e.target.value, 10) })}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setTestData({ ...testData, visitId: parseInt(e.target.value, 10) })}
                     style={fieldControlStyle}
                   />
                 </label>
@@ -207,7 +207,7 @@ const PaymentTest = () => {
                     type="number"
                     aria-label="Payment test amount"
                     value={testData.amount}
-                    onChange={(e) => setTestData({ ...testData, amount: parseFloat(e.target.value) })}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setTestData({ ...testData, amount: parseFloat(e.target.value) })}
                     style={fieldControlStyle}
                   />
                 </label>
@@ -217,7 +217,7 @@ const PaymentTest = () => {
                   <select
                     id="payment-test-currency"
                     value={testData.currency}
-                    onChange={(e) => setTestData({ ...testData, currency: e.target.value })}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setTestData({ ...testData, currency: e.target.value })}
                     style={fieldControlStyle}
                   >
                     <option value="UZS">UZS (Узбекский сум)</option>
@@ -233,7 +233,7 @@ const PaymentTest = () => {
                     aria-label="Payment test description"
                     rows={2}
                     value={testData.description}
-                    onChange={(e) => setTestData({ ...testData, description: e.target.value })}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setTestData({ ...testData, description: e.target.value })}
                     style={{ ...fieldControlStyle, resize: 'vertical', minHeight: 72 }}
                   />
                 </label>

@@ -122,7 +122,7 @@ export default function LabReportHistoryPanel({
                 ref={(el) => { cardRefsRef.current[index] = el; }}
                 onClick={() => onOpenInstance(item.id)}
                 // L-L-5 fix: ArrowUp/Down/Home/End для навигации между карточками.
-                onKeyDown={(e) => handleCardKeyDown(e, index)}
+                onKeyDown={(e: React.KeyboardEvent<HTMLElement>) => handleCardKeyDown(e, index)}
                 aria-label={`${t('queue.history_report_number')} ${item.template?.name || `#${item.id}`}, ${patientLabel}, ${formatLabStatus(item.status)}`}
                 style={{
                   border: '1px solid var(--mac-border)',

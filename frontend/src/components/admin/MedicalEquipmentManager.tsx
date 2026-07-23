@@ -434,7 +434,7 @@ const MedicalEquipmentManager = () => {
             <Input
             id="location-filter"
             value={filters.location as string}
-            onChange={(e) => setFilters({ ...filters, location: e.target.value })}
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFilters({ ...filters, location: e.target.value })}
             placeholder={t('admin2.equip_filter_location_ph')} />
           
           </div>
@@ -554,7 +554,7 @@ const MedicalEquipmentManager = () => {
               <Input
               id="measurement-patient"
               value={measurementForm.patient_id as string}
-              onChange={(e) => setMeasurementForm({ ...measurementForm, patient_id: e.target.value })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setMeasurementForm({ ...measurementForm, patient_id: e.target.value })}
               placeholder={t('admin2.equip_patient_id_ph')} />
             
             </div>

@@ -187,7 +187,7 @@ const AppActivation = () => {
             className="glass-input"
             style={{ paddingLeft: '44px' }}
             value={activationKey}
-            onChange={(e) => setActivationKey(e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setActivationKey(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder="XXXX-XXXX-XXXX-XXXX"
             disabled={loading}

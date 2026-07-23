@@ -202,7 +202,7 @@ const RegistrarNotificationManager = () => {
           <Input
           placeholder={t('admin2.rnm_department_placeholder')}
           value={notificationForm.department}
-          onChange={(e) => setNotificationForm({ ...notificationForm, department: e.target.value })}
+          onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setNotificationForm({ ...notificationForm, department: e.target.value })}
           className="admin-w-full" />
         
         </div>
@@ -214,7 +214,7 @@ const RegistrarNotificationManager = () => {
           <Textarea
           placeholder={t('admin2.rnm_message_placeholder')}
           value={notificationForm.message}
-          onChange={(e) => setNotificationForm({ ...notificationForm, message: e.target.value })}
+          onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setNotificationForm({ ...notificationForm, message: e.target.value })}
           rows={4}
           className="admin-w-full" />
         
@@ -251,7 +251,7 @@ const RegistrarNotificationManager = () => {
             <Input
             placeholder={t('admin2.rnm_test_message_placeholder')}
             value={testMessage}
-            onChange={(e) => setTestMessage(e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setTestMessage(e.target.value)}
             className="admin-minw-200" />
           
             <Button
@@ -436,12 +436,12 @@ const RegistrarNotificationManager = () => {
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className="admin-p-12px20-bd-none-bg-transparent-cursor-pointer-flex-ai-center-gap-8-sm-tra-ea233b09" style={{ '--admin-color': isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)', '--admin-fontWeight': isActive ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)' } as CSSProperties}
-              onMouseEnter={(e) => {
+              onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
                 if (!isActive) {
                   e.currentTarget.style.color = 'var(--mac-text-primary)';
                 }
               }}
-              onMouseLeave={(e) => {
+              onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
                 if (!isActive) {
                   e.currentTarget.style.color = 'var(--mac-text-secondary)';
                 }

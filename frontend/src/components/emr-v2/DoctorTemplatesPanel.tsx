@@ -181,7 +181,7 @@ export function DoctorTemplatesPanel({
                                     <div className="doctor-templates-item-actions">
                                         <button
                                             type="button"
-                                            onClick={(e) => handlePinToggle(template, e)}
+                                            onClick={(e: React.MouseEvent<HTMLElement>) => handlePinToggle(template, e)}
                                             className={`doctor-templates-action-btn ${template.is_pinned ? 'active' : ''}`}
                                             aria-label={t18('misc.dtp_template_is_pinned_otkrepit_', { is_pinned: template.is_pinned ? 'Открепить' : 'Закрепить' })}
                                             title={template.is_pinned ? t18('misc.dtp_otkrepit') : t18('misc.dtp_zakrepit')}
@@ -190,7 +190,7 @@ export function DoctorTemplatesPanel({
                                         </button>
                                         <button
                                             type="button"
-                                            onClick={(e) => handleEditStart(template, e)}
+                                            onClick={(e: React.MouseEvent<HTMLElement>) => handleEditStart(template, e)}
                                             className="doctor-templates-action-btn"
                                             aria-label={t18('misc.dtp_redaktirovat_shablon_vracha')}
                                             title={t18('misc.dtp_redaktirovat')}
@@ -199,7 +199,7 @@ export function DoctorTemplatesPanel({
                                         </button>
                                         <button
                                             type="button"
-                                            onClick={(e) => handleDelete(template, e)}
+                                            onClick={(e: React.MouseEvent<HTMLElement>) => handleDelete(template, e)}
                                             className="doctor-templates-action-btn doctor-templates-action-btn--danger"
                                             aria-label={t18('misc.dtp_udalit_shablon_vracha')}
                                             title={t18('misc.dtp_udalit')}
@@ -256,7 +256,7 @@ export function DoctorTemplatesPanel({
                                 className="doctor-templates-edit-textarea"
                                 aria-label={t18('misc.dtp_tekst_shablona_vracha')}
                                 value={editText}
-                                onChange={(e) => setEditText(e.target.value)}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setEditText(e.target.value)}
                                 rows={6}
                                 autoFocus
                             />

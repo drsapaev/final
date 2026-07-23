@@ -493,7 +493,7 @@ const AllFreeApproval = () => {
                   id="all-free-rejection-reason"
                   aria-label={t('admin2.af_modal_reason_aria')}
                   value={rejectionReason}
-                  onChange={(e) => setRejectionReason(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setRejectionReason(e.target.value)}
                   rows={3}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                   placeholder={t('admin2.af_modal_reason_placeholder')} />

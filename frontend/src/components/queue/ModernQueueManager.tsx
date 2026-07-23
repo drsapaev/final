@@ -439,7 +439,7 @@ const ModernQueueManager = ({
                 // Max добавлен — без него можно создать очередь на 2030 год.
                 // Раньше: только комментарий, без max.
                 max={getLocalDateString()}
-                onChange={(e) => {
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
                   const newDate = e.target.value;
                   setInternalDate(newDate);
                   if (onDateChange) {

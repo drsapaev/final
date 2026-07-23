@@ -458,7 +458,7 @@ const EmailSMSManager = () => {
             label={t('misc.esm_label_recipient')}
             aria-label="Email recipient"
             value={emailForm.to}
-            onChange={(event) => setEmailForm({ ...emailForm, to: event.target.value })}
+            onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setEmailForm({ ...emailForm, to: event.target.value })}
             placeholder="example@email.com"
           />
           <Input
@@ -466,7 +466,7 @@ const EmailSMSManager = () => {
             label={t('misc.esm_label_subject')}
             aria-label="Email subject"
             value={emailForm.subject}
-            onChange={(event) => setEmailForm({ ...emailForm, subject: event.target.value })}
+            onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setEmailForm({ ...emailForm, subject: event.target.value })}
             placeholder={t('misc.esm_placeholder_subject')}
           />
           <Select
@@ -486,7 +486,7 @@ const EmailSMSManager = () => {
           label={t('misc.esm_label_message')}
           aria-label="Email message"
           value={emailForm.message}
-          onChange={(event) => setEmailForm({ ...emailForm, message: event.target.value })}
+          onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setEmailForm({ ...emailForm, message: event.target.value })}
           minRows={4}
           placeholder={t('misc.esm_placeholder_message')}
         />
@@ -515,7 +515,7 @@ const EmailSMSManager = () => {
             label={t('misc.esm_label_phone')}
             aria-label="SMS phone number"
             value={smsForm.phone}
-            onChange={(event) => setSmsForm({ ...smsForm, phone: event.target.value })}
+            onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSmsForm({ ...smsForm, phone: event.target.value })}
             placeholder="+998901234567"
           />
           <Input
@@ -523,7 +523,7 @@ const EmailSMSManager = () => {
             label={t('misc.esm_label_sender')}
             aria-label="SMS sender"
             value={smsForm.sender}
-            onChange={(event) => setSmsForm({ ...smsForm, sender: event.target.value })}
+            onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSmsForm({ ...smsForm, sender: event.target.value })}
             placeholder="Clinic"
           />
           <Select
@@ -543,7 +543,7 @@ const EmailSMSManager = () => {
           label={t('misc.esm_label_message')}
           aria-label="SMS message"
           value={smsForm.message}
-          onChange={(event) => setSmsForm({ ...smsForm, message: event.target.value })}
+          onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSmsForm({ ...smsForm, message: event.target.value })}
           minRows={3}
           placeholder={t('misc.esm_placeholder_sms_message')}
         />
@@ -578,7 +578,7 @@ const EmailSMSManager = () => {
             label={t('misc.esm_label_batch_size')}
             aria-label="Bulk batch size"
             value={bulkForm.batchSize}
-            onChange={(event) => setBulkForm({ ...bulkForm, batchSize: Number.parseInt(event.target.value, 10) || 1 })}
+            onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setBulkForm({ ...bulkForm, batchSize: Number.parseInt(event.target.value, 10) || 1 })}
             min="1"
             max="1000"
           />
@@ -588,7 +588,7 @@ const EmailSMSManager = () => {
             label={t('misc.esm_label_batch_delay')}
             aria-label="Bulk delay between batches"
             value={bulkForm.delay}
-            onChange={(event) => setBulkForm({ ...bulkForm, delay: Number.parseFloat(event.target.value) || 0 })}
+            onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setBulkForm({ ...bulkForm, delay: Number.parseFloat(event.target.value) || 0 })}
             min="0"
             max="10"
           />
@@ -606,7 +606,7 @@ const EmailSMSManager = () => {
             label={t('misc.esm_label_subject')}
             aria-label="Bulk email subject"
             value={bulkForm.subject}
-            onChange={(event) => setBulkForm({ ...bulkForm, subject: event.target.value })}
+            onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setBulkForm({ ...bulkForm, subject: event.target.value })}
             placeholder={t('misc.esm_placeholder_subject')}
           />
         )}
@@ -615,7 +615,7 @@ const EmailSMSManager = () => {
           label={t('misc.esm_label_recipients', { count: bulkForm.recipients.length })}
           aria-label="Bulk recipients"
           value={bulkForm.recipientsText}
-          onChange={(event) => updateBulkRecipients(event.target.value)}
+          onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateBulkRecipients(event.target.value)}
           minRows={4}
           placeholder={bulkForm.type === 'email' ? 'patient@example.com, team@example.com' : '+998901234567, +998901234568'}
         />
@@ -624,7 +624,7 @@ const EmailSMSManager = () => {
           label={t('misc.esm_label_message')}
           aria-label="Bulk message"
           value={bulkForm.message}
-          onChange={(event) => setBulkForm({ ...bulkForm, message: event.target.value })}
+          onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setBulkForm({ ...bulkForm, message: event.target.value })}
           minRows={4}
           placeholder={t('misc.esm_placeholder_message')}
         />

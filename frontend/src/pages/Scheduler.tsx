@@ -65,9 +65,9 @@ export default function Scheduler() {
           <div className="clinic-ops-toolbar">
             <label htmlFor="scheduler-date">
               Дата:&nbsp;
-              <Input id="scheduler-date" className="clinic-ops-input" type="date" aria-label={t('misc.sche_data_raspisaniya')} value={date} onChange={(e) => setDate(e.target.value)} />
+              <Input id="scheduler-date" className="clinic-ops-input" type="date" aria-label={t('misc.sche_data_raspisaniya')} value={date} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setDate(e.target.value)} />
             </label>
-            <Input className="clinic-ops-input" aria-label={t('misc.sche_poisk_po_vrachu_kabinetu_ili')} placeholder={t('misc.sche_poisk_po_vrachu_kabinetu_sta')} value={q} onChange={(e) => setQ(e.target.value)} style={{ minWidth: 260 }} />
+            <Input className="clinic-ops-input" aria-label={t('misc.sche_poisk_po_vrachu_kabinetu_ili')} placeholder={t('misc.sche_poisk_po_vrachu_kabinetu_sta')} value={q} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setQ(e.target.value)} style={{ minWidth: 260 }} />
             <button className="clinic-ops-button" onClick={load} disabled={busy}>{busy ? t('misc.sche_zagruzka') : t('misc.sche_obnovit')}</button>
           </div>
 

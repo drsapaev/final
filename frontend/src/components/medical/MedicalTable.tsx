@@ -187,10 +187,10 @@ const MedicalTable = ({
                 style={{
                   backgroundColor: isDark ? 'var(--mac-text-primary)' : 'var(--mac-bg-primary)'
                 }}
-                onMouseEnter={(e) => {
+                onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
                   e.currentTarget.style.backgroundColor = isDark ? 'var(--mac-text-secondary)' : 'var(--mac-bg-secondary)';
                 }}
-                onMouseLeave={(e) => {
+                onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
                   e.currentTarget.style.backgroundColor = isDark ? 'var(--mac-text-primary)' : 'var(--mac-bg-primary)';
                 }}
               >

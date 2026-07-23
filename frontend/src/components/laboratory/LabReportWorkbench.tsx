@@ -604,7 +604,7 @@ export default function LabReportWorkbench({
                   <select
                     className="macos-input"
                     value={selectedTemplateId}
-                    onChange={(event) => setSelectedTemplateId(event.target.value)}
+                    onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSelectedTemplateId(event.target.value)}
                     disabled={templateResolutionLoading || (resolutionHasBlockingGap && !escapeHatchActive)}
                   >
                     <option value="">Выберите шаблон</option>
@@ -776,7 +776,7 @@ export default function LabReportWorkbench({
                         className="macos-input"
                         aria-label={signerFieldLabels[key] || key}
                         value={signerSnapshot?.[key] || ''}
-                        onChange={(event) => setSignerSnapshot((prev) => ({ ...prev, [key]: event.target.value }))}
+                        onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSignerSnapshot((prev) => ({ ...prev, [key]: event.target.value }))}
                         // WF-09 fix: signer fields должны блокироваться на FINALIZED/PRINTED,
                         // иначе persistDraft вызовет updateInstance → 409 Conflict (silent failure).
                         disabled={!canEditActiveInstance}

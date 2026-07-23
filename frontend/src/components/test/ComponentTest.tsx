@@ -200,13 +200,13 @@ function ComponentTestInner() {
       {/* Тест форм */}
       <div style={sectionStyle}>
         <h2 style={titleStyle}>{t('misc.ct_section_forms')}</h2>
-        <form onSubmit={(e) => { e.preventDefault(); handleFormSubmit(form?.values); }}>
+        <form onSubmit={(e: React.FormEvent<HTMLFormElement>) => { e.preventDefault(); handleFormSubmit(form?.values); }}>
           <input
             type="text"
             aria-label="Test form name"
             placeholder={t('misc.ct_input_name')}
             value={String(form?.values?.name ?? '')}
-            onChange={(e) => setValue('name', e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setValue('name', e.target.value)}
             style={inputStyle}
           />
           <input
@@ -214,7 +214,7 @@ function ComponentTestInner() {
             aria-label="Test form email"
             placeholder="Email"
             value={String(form?.values?.email ?? '')}
-            onChange={(e) => setValue('email', e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setValue('email', e.target.value)}
             style={inputStyle}
           />
           <button type="button" style={buttonStyle} onClick={handleFormValidation}>

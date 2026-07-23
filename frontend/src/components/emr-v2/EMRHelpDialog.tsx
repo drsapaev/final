@@ -22,7 +22,7 @@ const EMRHelpDialog = ({ isOpen, onClose }) => {
             tabIndex={0}
             aria-label="Закрыть справку EMR"
             onClick={onClose}
-            onKeyDown={(event) => handleActivationKeyDown(event, onClose)}>
+            onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => handleActivationKeyDown(event, onClose)}>
             <div className="emr-v2-modal-content theme-soft-surface" onClickCapture={e => e.stopPropagation()} style={{ maxWidth: '600px', borderRadius: 'var(--mac-radius-lg)' }}>
                 <header className="emr-v2-modal-header" style={{ borderBottom: '1px solid var(--mac-border)', paddingBottom: '16px', marginBottom: 'var(--mac-spacing-4)' }}>
                     <h3 style={{ margin: 0, fontSize: '1.25rem', color: 'var(--mac-accent)' }}>

@@ -254,7 +254,7 @@ const ModernSelect = ({
                 <button
                   type="button"
                   className="tag-remove"
-                  onClick={(e) => handleRemoveOption(e, val)}
+                  onClick={(e: React.MouseEvent<HTMLElement>) => handleRemoveOption(e, val)}
                   tabIndex={0}  // PR-42 / Medium-G: was -1 (removed from tab order)
                   aria-label={t18('misc.ms_udalit')}
                   title={t18('misc.ms_udalit')}>
@@ -407,7 +407,7 @@ const ModernSelect = ({
             aria-label={t18('misc.ms_poisk_accessiblelabel', { accessibleLabel: accessibleLabel })}
             placeholder={t18('common.search')}
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSearchQuery(e.target.value)}
             style={{
               backgroundColor: 'transparent',
               color: getColor('textPrimary')
@@ -455,7 +455,7 @@ const ModernSelect = ({
                     key={typeof option === 'object' ? option.value : option}
                     className={`select-option ${isOptionSelected(option) ? 'selected' : ''} ${highlightedIndex === currentIndex ? 'highlighted' : ''}`}
                     onClick={() => handleOptionClick(option)}
-                    onKeyDown={(event) => {
+                    onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => {
                       if (event.key === 'Enter' || event.key === ' ') {
                         event.preventDefault();
                         handleOptionClick(option);

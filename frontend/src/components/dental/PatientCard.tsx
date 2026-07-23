@@ -201,7 +201,7 @@ const PatientCard = ({
           type="text"
           aria-label={t('dental.dental_pc_aria_surname')}
           value={formData.surname || ''}
-          onChange={(e) => handleInputChange('surname', e.target.value)}
+          onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleInputChange('surname', e.target.value)}
           disabled={!isEditing}
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
           required />
@@ -216,7 +216,7 @@ const PatientCard = ({
           type="text"
           aria-label={t('dental.dental_pc_aria_name')}
           value={formData.name || ''}
-          onChange={(e) => handleInputChange('name', e.target.value)}
+          onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleInputChange('name', e.target.value)}
           disabled={!isEditing}
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
           required />
@@ -231,7 +231,7 @@ const PatientCard = ({
           type="text"
           aria-label={t('dental.dental_pc_aria_patronymic')}
           value={formData.patronymic || ''}
-          onChange={(e) => handleInputChange('patronymic', e.target.value)}
+          onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleInputChange('patronymic', e.target.value)}
           disabled={!isEditing}
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100" />
         
@@ -245,7 +245,7 @@ const PatientCard = ({
           type="date"
           aria-label={t('dental.dental_pc_aria_birth_date')}
           value={formData.birthDate || ''}
-          onChange={(e) => handleInputChange('birthDate', e.target.value)}
+          onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleInputChange('birthDate', e.target.value)}
           disabled={!isEditing}
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
           required />
@@ -258,7 +258,7 @@ const PatientCard = ({
           </label>
           <select
           value={formData.gender || ''}
-          onChange={(e) => handleInputChange('gender', e.target.value)}
+          onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleInputChange('gender', e.target.value)}
           disabled={!isEditing}
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
           required>
@@ -299,7 +299,7 @@ const PatientCard = ({
               type="tel"
               aria-label={t('dental.dental_pc_aria_phone')}
               value={formData.phone || ''}
-              onChange={(e) => handleInputChange('phone', e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleInputChange('phone', e.target.value)}
               disabled={!isEditing}
               className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
               required />
@@ -317,7 +317,7 @@ const PatientCard = ({
               type="email"
               aria-label={t('dental.dental_pc_aria_email')}
               value={formData.email || ''}
-              onChange={(e) => handleInputChange('email', e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleInputChange('email', e.target.value)}
               disabled={!isEditing}
               className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100" />
             
@@ -333,7 +333,7 @@ const PatientCard = ({
               <textarea
               aria-label={t('dental.dental_pc_aria_address')}
               value={formData.address || ''}
-              onChange={(e) => handleInputChange('address', e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleInputChange('address', e.target.value)}
               disabled={!isEditing}
               rows={2}
               className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
@@ -364,7 +364,7 @@ const PatientCard = ({
             type="text"
             aria-label={t('dental.dental_pc_aria_passport_series')}
             value={formData.passport.series || ''}
-            onChange={(e) => handleInputChange('passport.series', e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleInputChange('passport.series', e.target.value)}
             disabled={!isEditing}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
             placeholder="1234" />
@@ -379,7 +379,7 @@ const PatientCard = ({
             type="text"
             aria-label={t('dental.dental_pc_aria_passport_number')}
             value={formData.passport.number || ''}
-            onChange={(e) => handleInputChange('passport.number', e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleInputChange('passport.number', e.target.value)}
             disabled={!isEditing}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
             placeholder="123456" />
@@ -394,7 +394,7 @@ const PatientCard = ({
             type="text"
             aria-label={t('dental.dental_pc_aria_passport_issued_by')}
             value={formData.passport.issuedBy || ''}
-            onChange={(e) => handleInputChange('passport.issuedBy', e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleInputChange('passport.issuedBy', e.target.value)}
             disabled={!isEditing}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
             placeholder={t('dental.dental_pc_ph_passport_issued_by')} />
@@ -409,7 +409,7 @@ const PatientCard = ({
             type="date"
             aria-label={t('dental.dental_pc_aria_passport_issue_date')}
             value={formData.passport.issueDate || ''}
-            onChange={(e) => handleInputChange('passport.issueDate', e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleInputChange('passport.issueDate', e.target.value)}
             disabled={!isEditing}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100" />
           
@@ -432,7 +432,7 @@ const PatientCard = ({
             type="text"
             aria-label={t('dental.dental_pc_aria_policy_number')}
             value={formData.insurance.policyNumber || ''}
-            onChange={(e) => handleInputChange('insurance.policyNumber', e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleInputChange('insurance.policyNumber', e.target.value)}
             disabled={!isEditing}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
             placeholder="1234567890123456" />
@@ -447,7 +447,7 @@ const PatientCard = ({
             type="text"
             aria-label={t('dental.dental_pc_aria_insurance_company')}
             value={formData.insurance.company || ''}
-            onChange={(e) => handleInputChange('insurance.company', e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleInputChange('insurance.company', e.target.value)}
             disabled={!isEditing}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
             placeholder={t('dental.dental_pc_ph_insurance_company')} />
@@ -462,7 +462,7 @@ const PatientCard = ({
             type="date"
             aria-label={t('dental.dental_pc_aria_valid_until')}
             value={formData.insurance.validUntil || ''}
-            onChange={(e) => handleInputChange('insurance.validUntil', e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleInputChange('insurance.validUntil', e.target.value)}
             disabled={!isEditing}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100" />
           
@@ -474,7 +474,7 @@ const PatientCard = ({
             </label>
             <select
             value={formData.insurance.type || ''}
-            onChange={(e) => handleInputChange('insurance.type', e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleInputChange('insurance.type', e.target.value)}
             disabled={!isEditing}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100">
             
@@ -498,7 +498,7 @@ const PatientCard = ({
         <textarea
         aria-label={t('dental.dental_pc_aria_complaints')}
         value={formData.medicalHistory.complaints || ''}
-        onChange={(e) => handleInputChange('medicalHistory.complaints', e.target.value)}
+        onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleInputChange('medicalHistory.complaints', e.target.value)}
         disabled={!isEditing}
         rows={3}
         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
@@ -517,7 +517,7 @@ const PatientCard = ({
               <input
             type="text"
             value={disease}
-            onChange={(e) => {
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
               const newDiseases = [...formData.medicalHistory.somaticDiseases];
               newDiseases[index] = e.target.value;
               handleInputChange('medicalHistory.somaticDiseases', newDiseases);
@@ -563,7 +563,7 @@ const PatientCard = ({
               <input
             type="text"
             value={allergy}
-            onChange={(e) => {
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
               const newAllergies = [...formData.medicalHistory.allergies];
               newAllergies[index] = e.target.value;
               handleInputChange('medicalHistory.allergies', newAllergies);
@@ -609,7 +609,7 @@ const PatientCard = ({
               <input
             type="text"
             value={medication}
-            onChange={(e) => {
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
               const newMedications = [...formData.medicalHistory.currentMedications];
               newMedications[index] = e.target.value;
               handleInputChange('medicalHistory.currentMedications', newMedications);
@@ -652,7 +652,7 @@ const PatientCard = ({
           </label>
           <select
           value={formData.medicalHistory.bloodType || ''}
-          onChange={(e) => handleInputChange('medicalHistory.bloodType', e.target.value)}
+          onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleInputChange('medicalHistory.bloodType', e.target.value)}
           disabled={!isEditing}
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100">
           
@@ -674,7 +674,7 @@ const PatientCard = ({
           </label>
           <select
           value={formData.medicalHistory.rhFactor || ''}
-          onChange={(e) => handleInputChange('medicalHistory.rhFactor', e.target.value)}
+          onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleInputChange('medicalHistory.rhFactor', e.target.value)}
           disabled={!isEditing}
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100">
           
@@ -693,7 +693,7 @@ const PatientCard = ({
         <textarea
         aria-label={t('dental.dental_pc_aria_dental_history')}
         value={formData.medicalHistory.dentalHistory || ''}
-        onChange={(e) => handleInputChange('medicalHistory.dentalHistory', e.target.value)}
+        onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleInputChange('medicalHistory.dentalHistory', e.target.value)}
         disabled={!isEditing}
         rows={3}
         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
@@ -720,7 +720,7 @@ const PatientCard = ({
             type="text"
             aria-label={t('dental.dental_pc_aria_emergency_name')}
             value={formData.emergencyContact.name || ''}
-            onChange={(e) => handleInputChange('emergencyContact.name', e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleInputChange('emergencyContact.name', e.target.value)}
             disabled={!isEditing}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
             placeholder={t('dental.dental_pc_ph_emergency_name')} />
@@ -733,7 +733,7 @@ const PatientCard = ({
             </label>
             <select
             value={formData.emergencyContact.relationship || ''}
-            onChange={(e) => handleInputChange('emergencyContact.relationship', e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleInputChange('emergencyContact.relationship', e.target.value)}
             disabled={!isEditing}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100">
             
@@ -756,7 +756,7 @@ const PatientCard = ({
               type="tel"
               aria-label={t('dental.dental_pc_aria_emergency_phone')}
               value={formData.emergencyContact.phone || ''}
-              onChange={(e) => handleInputChange('emergencyContact.phone', e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleInputChange('emergencyContact.phone', e.target.value)}
               disabled={!isEditing}
               className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
               placeholder="+7 (999) 123-45-67" />
@@ -772,7 +772,7 @@ const PatientCard = ({
             type="text"
             aria-label={t('dental.dental_pc_aria_emergency_address')}
             value={formData.emergencyContact.address || ''}
-            onChange={(e) => handleInputChange('emergencyContact.address', e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleInputChange('emergencyContact.address', e.target.value)}
             disabled={!isEditing}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
             placeholder={t('dental.dental_pc_ph_emergency_address')} />

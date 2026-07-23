@@ -168,7 +168,7 @@ const PrescriptionEditor = ({
                 className="prescription-input"
                 aria-label="Prescription medicine name"
                 value={newItem.name}
-                onChange={(e) => handleInputChange('name', e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleInputChange('name', e.target.value)}
                 placeholder={t('misc.pe_nazvanie')}
                 autoFocus />
               
@@ -181,7 +181,7 @@ const PrescriptionEditor = ({
                   role="button"
                   tabIndex={0}
                   onClick={() => handleSelectDrug(s)}
-                  onKeyDown={(event) => {
+                  onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => {
                     if (event.key === 'Enter' || event.key === ' ') {
                       event.preventDefault();
                       handleSelectDrug(s);
@@ -203,7 +203,7 @@ const PrescriptionEditor = ({
                 className="prescription-input"
                 aria-label="Prescription dose"
                 value={newItem.dose}
-                onChange={(e) => handleInputChange('dose', e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleInputChange('dose', e.target.value)}
                 placeholder={t('misc.pe_500_mg')} />
               
                                 </div>
@@ -213,7 +213,7 @@ const PrescriptionEditor = ({
                 className="prescription-input"
                 aria-label="Prescription frequency"
                 value={newItem.frequency}
-                onChange={(e) => handleInputChange('frequency', e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleInputChange('frequency', e.target.value)}
                 placeholder={t('misc.pe_3_r_d')} />
               
                                 </div>
@@ -223,7 +223,7 @@ const PrescriptionEditor = ({
                 className="prescription-input"
                 aria-label="Prescription duration"
                 value={newItem.duration}
-                onChange={(e) => handleInputChange('duration', e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleInputChange('duration', e.target.value)}
                 placeholder={t('misc.pe_7_dney')} />
               
                                 </div>

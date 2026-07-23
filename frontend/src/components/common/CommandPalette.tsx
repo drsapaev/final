@@ -291,14 +291,14 @@ export function CommandPalette({ profile, navigate }) {
       onClick={() => setIsOpen(false)}
       role="button"
       tabIndex={-1}
-      onKeyDown={(e) => { if (e.key === 'Escape') setIsOpen(false); }}
+      onKeyDown={(e: React.KeyboardEvent<HTMLElement>) => { if (e.key === 'Escape') setIsOpen(false); }}
       aria-label={t('misc.cp_zakryt_panel_komand')}
     >
       <div
         role="dialog"
         aria-label="Command palette"
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => { if (e.key === 'Escape') setIsOpen(false); }}
+        onClick={(e: React.MouseEvent<HTMLElement>) => e.stopPropagation()}
+        onKeyDown={(e: React.KeyboardEvent<HTMLElement>) => { if (e.key === 'Escape') setIsOpen(false); }}
         style={{
           width: '90%',
           maxWidth: '560px',
@@ -325,7 +325,7 @@ export function CommandPalette({ profile, navigate }) {
             ref={inputRef}
             type="text"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={t('misc.cp_poisk_marshruta_ili_deystviy')}
             aria-label="Search commands"
@@ -379,7 +379,7 @@ export function CommandPalette({ profile, navigate }) {
                 aria-selected={isSelected}
                 onClick={() => handleSelect(item)}
                 tabIndex={isSelected ? 0 : -1}
-                onKeyDown={(e) => { if (e.key === 'Enter') handleSelect(item); }}
+                onKeyDown={(e: React.KeyboardEvent<HTMLElement>) => { if (e.key === 'Enter') handleSelect(item); }}
                 style={{
                   display: 'flex',
                   alignItems: 'center',

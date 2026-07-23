@@ -1586,7 +1586,7 @@ const DentistPanelUnified = () => {
           aria-label={tI18n('dental.dental_panel_aria_examination')}
           className="dental-card-btn"
           onClick={() => handleExamination(patient)}
-          onKeyDown={(event) => handleCardKeyDown(event, () => handleExamination(patient))}
+          onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => handleCardKeyDown(event, () => handleExamination(patient))}
           onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
             e.currentTarget.style.background = 'var(--mac-bg-secondary)';
           }}
@@ -1630,7 +1630,7 @@ const DentistPanelUnified = () => {
           aria-label={tI18n('dental.dental_panel_aria_diagnosis')}
           className="dental-card-btn"
           onClick={() => handleDiagnosis(patient)}
-          onKeyDown={(event) => handleCardKeyDown(event, () => handleDiagnosis(patient))}
+          onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => handleCardKeyDown(event, () => handleDiagnosis(patient))}
           onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
             e.currentTarget.style.background = 'var(--mac-bg-secondary)';
           }}
@@ -1691,7 +1691,7 @@ const DentistPanelUnified = () => {
               aria-label={tI18n('dental.dental_panel_aria_visit')}
               className="dental-card-btn"
               onClick={() => handleVisitProtocol(patient)}
-              onKeyDown={(event) => handleCardKeyDown(event, () => handleVisitProtocol(patient))}
+              onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => handleCardKeyDown(event, () => handleVisitProtocol(patient))}
               onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
                 e.currentTarget.style.background = 'var(--mac-bg-secondary)';
               }}
@@ -1736,7 +1736,7 @@ const DentistPanelUnified = () => {
           aria-label={tI18n('dental.dental_panel_aria_photos')}
           className="dental-card-btn"
           onClick={() => handlePhotoArchive(patient)}
-          onKeyDown={(event) => handleCardKeyDown(event, () => handlePhotoArchive(patient))}
+          onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => handleCardKeyDown(event, () => handlePhotoArchive(patient))}
           onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
             e.currentTarget.style.background = 'var(--mac-bg-secondary)';
           }}
@@ -1793,7 +1793,7 @@ const DentistPanelUnified = () => {
           aria-label={tI18n('dental.dental_panel_aria_chart')}
           className="dental-card-btn"
           onClick={() => handleDentalChart(patient)}
-          onKeyDown={(event) => handleCardKeyDown(event, () => handleDentalChart(patient))}
+          onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => handleCardKeyDown(event, () => handleDentalChart(patient))}
           onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
             e.currentTarget.style.background = 'var(--mac-bg-secondary)';
           }}
@@ -2086,7 +2086,7 @@ const DentistPanelUnified = () => {
                     type="date"
                     aria-label={tI18n('dental.dental_panel_exam_aria_date')}
                     value={examinationForm.examination_date}
-                    onChange={(e) => setExaminationForm({ ...examinationForm, examination_date: e.target.value })}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setExaminationForm({ ...examinationForm, examination_date: e.target.value })}
                     required
                     className="w-full px-3 py-2 border var(--mac-border) rounded-md  var(--mac-accent) " />
 
@@ -2095,7 +2095,7 @@ const DentistPanelUnified = () => {
                     <label className="block text-sm font-medium var(--mac-text-primary) mb-2">{tI18n('dental.dental_panel_exam_label_hygiene')}</label>
                     <select
                     value={examinationForm.oral_hygiene}
-                    onChange={(e) => setExaminationForm({ ...examinationForm, oral_hygiene: e.target.value })}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setExaminationForm({ ...examinationForm, oral_hygiene: e.target.value })}
                     className="w-full px-3 py-2 border var(--mac-border) rounded-md  var(--mac-accent) ">
 
                       <option value="">{tI18n('dental.dental_panel_option_select')}</option>
@@ -2112,7 +2112,7 @@ const DentistPanelUnified = () => {
                     <label className="block text-sm font-medium var(--mac-text-primary) mb-2">{tI18n('dental.dental_panel_exam_label_caries')}</label>
                     <select
                     value={examinationForm.caries_status}
-                    onChange={(e) => setExaminationForm({ ...examinationForm, caries_status: e.target.value })}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setExaminationForm({ ...examinationForm, caries_status: e.target.value })}
                     className="w-full px-3 py-2 border var(--mac-border) rounded-md  var(--mac-accent) ">
 
                       <option value="">{tI18n('dental.dental_panel_option_select')}</option>
@@ -2127,7 +2127,7 @@ const DentistPanelUnified = () => {
                     <label className="block text-sm font-medium var(--mac-text-primary) mb-2">{tI18n('dental.dental_panel_exam_label_periodontal')}</label>
                     <select
                     value={examinationForm.periodontal_status}
-                    onChange={(e) => setExaminationForm({ ...examinationForm, periodontal_status: e.target.value })}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setExaminationForm({ ...examinationForm, periodontal_status: e.target.value })}
                     className="w-full px-3 py-2 border var(--mac-border) rounded-md  var(--mac-accent) ">
 
                       <option value="">{tI18n('dental.dental_panel_option_select')}</option>
@@ -2144,7 +2144,7 @@ const DentistPanelUnified = () => {
                     <label className="block text-sm font-medium var(--mac-text-primary) mb-2">{tI18n('dental.dental_panel_exam_label_occlusion')}</label>
                     <select
                     value={examinationForm.occlusion}
-                    onChange={(e) => setExaminationForm({ ...examinationForm, occlusion: e.target.value })}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setExaminationForm({ ...examinationForm, occlusion: e.target.value })}
                     className="w-full px-3 py-2 border var(--mac-border) rounded-md  var(--mac-accent) ">
 
                       <option value="">{tI18n('dental.dental_panel_option_select')}</option>
@@ -2161,7 +2161,7 @@ const DentistPanelUnified = () => {
                     type="text"
                     aria-label={tI18n('dental.dental_panel_exam_aria_missing')}
                     value={examinationForm.missing_teeth}
-                    onChange={(e) => setExaminationForm({ ...examinationForm, missing_teeth: e.target.value })}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setExaminationForm({ ...examinationForm, missing_teeth: e.target.value })}
                     placeholder={tI18n('dental.dental_panel_exam_placeholder_missing')}
                     className="w-full px-3 py-2 border var(--mac-border) rounded-md  var(--mac-accent) " />
 
@@ -2173,7 +2173,7 @@ const DentistPanelUnified = () => {
                     <label className="block text-sm font-medium var(--mac-text-primary) mb-2">{tI18n('dental.dental_panel_exam_label_plaque')}</label>
                     <select
                     value={examinationForm.dental_plaque}
-                    onChange={(e) => setExaminationForm({ ...examinationForm, dental_plaque: e.target.value })}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setExaminationForm({ ...examinationForm, dental_plaque: e.target.value })}
                     className="w-full px-3 py-2 border var(--mac-border) rounded-md  var(--mac-accent) ">
 
                       <option value="">{tI18n('dental.dental_panel_option_select')}</option>
@@ -2187,7 +2187,7 @@ const DentistPanelUnified = () => {
                     <label className="block text-sm font-medium var(--mac-text-primary) mb-2">{tI18n('dental.dental_panel_exam_label_bleeding')}</label>
                     <select
                     value={examinationForm.gingival_bleeding}
-                    onChange={(e) => setExaminationForm({ ...examinationForm, gingival_bleeding: e.target.value })}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setExaminationForm({ ...examinationForm, gingival_bleeding: e.target.value })}
                     className="w-full px-3 py-2 border var(--mac-border) rounded-md  var(--mac-accent) ">
 
                       <option value="">{tI18n('dental.dental_panel_option_select')}</option>
@@ -2204,7 +2204,7 @@ const DentistPanelUnified = () => {
                   <textarea
                   aria-label={tI18n('dental.dental_panel_exam_aria_diagnosis')}
                   value={examinationForm.diagnosis}
-                  onChange={(e) => setExaminationForm({ ...examinationForm, diagnosis: e.target.value })}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setExaminationForm({ ...examinationForm, diagnosis: e.target.value })}
                   placeholder={tI18n('dental.dental_panel_exam_placeholder_diagnosis')}
                   rows={3}
                   className="w-full px-3 py-2 border var(--mac-border) rounded-md  var(--mac-accent) " />
@@ -2216,7 +2216,7 @@ const DentistPanelUnified = () => {
                   <textarea
                   aria-label={tI18n('dental.dental_panel_exam_aria_recommendations')}
                   value={examinationForm.recommendations}
-                  onChange={(e) => setExaminationForm({ ...examinationForm, recommendations: e.target.value })}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setExaminationForm({ ...examinationForm, recommendations: e.target.value })}
                   placeholder={tI18n('dental.dental_panel_exam_placeholder_recommendations')}
                   rows={3}
                   className="w-full px-3 py-2 border var(--mac-border) rounded-md  var(--mac-accent) " />

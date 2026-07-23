@@ -220,7 +220,7 @@ const PatientPanel = () => {
                 aria-controls="pp-tabpanel"
                 tabIndex={isActive ? 0 : -1}
                 onClick={() => switchSection(tab.id)}
-                onKeyDown={(e) => handleTabKeyDown(e, tab.id)}
+                onKeyDown={(e: React.KeyboardEvent<HTMLElement>) => handleTabKeyDown(e, tab.id)}
                 className={`pp-tab ${isActive ? 'pp-tab-active' : ''}`}
               >
                 <Icon name={tab.icon} size={16 as never} />

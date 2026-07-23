@@ -563,7 +563,7 @@ const DoctorQueuePanel = ({
                   setSelectedPatient(entry);
                   if (onPatientSelect) onPatientSelect(entry);
                 }}
-                onKeyDown={(event) => {
+                onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => {
                   if (event.key === 'Enter' || event.key === ' ') {
                     event.preventDefault();
                     setSelectedPatient(entry);
@@ -664,7 +664,7 @@ const DoctorQueuePanel = ({
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-2)' }}>
                         {canCall &&
                       <Button
-                        onClick={(e) => {
+                        onClick={(e: React.MouseEvent<HTMLElement>) => {
                           e.stopPropagation();
                           handleCallPatient(entry.id);
                         }}>
@@ -677,7 +677,7 @@ const DoctorQueuePanel = ({
                         {canStartVisit &&
                       <Button
                         variant="outline"
-                        onClick={(e) => {
+                        onClick={(e: React.MouseEvent<HTMLElement>) => {
                           e.stopPropagation();
                           handleStartVisit(entry.id);
                         }}>
@@ -690,7 +690,7 @@ const DoctorQueuePanel = ({
                         {canComplete &&
                       <Button
                         variant="success"
-                        onClick={(e) => {
+                        onClick={(e: React.MouseEvent<HTMLElement>) => {
                           e.stopPropagation();
                           handleCompleteVisit(entry.id);
                         }}>

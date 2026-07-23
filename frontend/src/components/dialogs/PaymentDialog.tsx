@@ -194,7 +194,7 @@ const PaymentDialog = ({
                 aria-invalid={!!errors.amount}
                 aria-describedby={errors.amount ? 'payment-amount-error' : undefined}
                 value={paymentAmount}
-                onChange={(e) => {
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
                   setPaymentAmount(e.target.value);
                   if (errors.amount) {
                     setErrors((prev) => ({ ...prev, amount: null }));

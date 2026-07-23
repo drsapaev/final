@@ -397,7 +397,7 @@ const TelegramManager = () => {
               type="password"
               aria-label="Telegram bot token"
               value={String(settings.bot_token ?? '')}
-              onChange={(e) => setSettings({ ...settings, bot_token: e.target.value })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSettings({ ...settings, bot_token: e.target.value })}
               placeholder="123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
               className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
             
@@ -423,7 +423,7 @@ const TelegramManager = () => {
             type="url"
             aria-label="Telegram webhook URL"
             value={String(settings.webhook_url ?? '')}
-            onChange={(e) => setSettings({ ...settings, webhook_url: e.target.value })}
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSettings({ ...settings, webhook_url: e.target.value })}
             placeholder="https://yourdomain.com/api/v1/telegram/webhook"
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
           
@@ -439,7 +439,7 @@ const TelegramManager = () => {
               </label>
               <select
               value={settings.notifications_enabled ? 'true' : 'false'}
-              onChange={(e) => setSettings({ ...settings, notifications_enabled: e.target.value === 'true' })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSettings({ ...settings, notifications_enabled: e.target.value === 'true' })}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
               
                 <option value="true">{t('misc.tm_opt_notifications_on')}</option>
@@ -453,7 +453,7 @@ const TelegramManager = () => {
               </label>
               <select
               value={String(settings.default_language ?? 'ru')}
-              onChange={(e) => setSettings({ ...settings, default_language: e.target.value })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSettings({ ...settings, default_language: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
               
                 <option value="ru">{t('misc.tm_opt_lang_ru')}</option>
@@ -685,7 +685,7 @@ const TelegramManager = () => {
                 type="number"
                 aria-label="Telegram test chat ID"
                 value={testChatId}
-                onChange={(e) => setTestChatId(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setTestChatId(e.target.value)}
                 placeholder="123456789"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
               
@@ -698,7 +698,7 @@ const TelegramManager = () => {
                 <textarea
                 aria-label="Telegram test message"
                 value={testMessage}
-                onChange={(e) => setTestMessage(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setTestMessage(e.target.value)}
                 placeholder={t('misc.tm_placeholder_test_message')}
                 rows={4}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />

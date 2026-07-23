@@ -66,7 +66,7 @@ function MaskedPhone({ phone, canReveal = true }) {
   return (
     <button
       type="button"
-      onClick={(e) => {
+      onClick={(e: React.MouseEvent<HTMLElement>) => {
         e.stopPropagation();
         setRevealed((v) => !v);
       }}
@@ -221,7 +221,7 @@ export default function LabQueueWorkbench({
               <Input
                 type="search"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSearchQuery(e.target.value)}
                 placeholder={t18('queue.search_placeholder')}
                 aria-label={t18('queue.search_aria')}
                 className="lqw-search-input"
@@ -264,7 +264,7 @@ export default function LabQueueWorkbench({
             <span className="lqw-sort-label">{t18('queue.sort_label')}</span>
             <select
               value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSortBy(e.target.value)}
               aria-label={t18('queue.sort_aria')}
               className="macos-input lqw-sort-select"
             >

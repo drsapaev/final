@@ -3,7 +3,7 @@
   "description": "Baseline error counts for strict-mode migration (Phase G). This file is used by scripts/strict-baseline-check.mjs to prevent regression — new code must not increase the error count above these baselines.",
   "flags": {
     "noImplicitAny": {
-      "totalErrors": 5417,
+      "totalErrors": 5406,
       "topErrorCodes": {
         "TS7006": 3207,
         "TS7031": 943,

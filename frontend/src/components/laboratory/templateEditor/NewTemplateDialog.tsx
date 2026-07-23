@@ -62,7 +62,7 @@ function NewTemplateDialog({ open, onClose, onCreate, saving, existingTemplates 
               aria-label={t('misc.ntd_kod_shablona')}
               aria-invalid={Boolean(codeConflict)}
               value={form.code}
-              onChange={(e) => setForm((prev) => ({ ...prev, code: e.target.value }))}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setForm((prev) => ({ ...prev, code: e.target.value }))}
               placeholder={t('misc.ntd_napr_hematology_basic')}
               className="ltw-input-full"
               required
@@ -82,7 +82,7 @@ function NewTemplateDialog({ open, onClose, onCreate, saving, existingTemplates 
               id="new-template-name"
               aria-label={t('misc.ntd_nazvanie_shablona')}
               value={form.name}
-              onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setForm((prev) => ({ ...prev, name: e.target.value }))}
               placeholder={t('misc.ntd_napr_obschiy_analiz_krovi')}
               className="ltw-input-full"
               required
@@ -94,7 +94,7 @@ function NewTemplateDialog({ open, onClose, onCreate, saving, existingTemplates 
               id="new-template-family"
               aria-label={t('misc.ntd_semeystvo_shablona')}
               value={form.family}
-              onChange={(e) => setForm((prev) => ({ ...prev, family: e.target.value }))}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setForm((prev) => ({ ...prev, family: e.target.value }))}
               className="macos-input ltw-input-full"
             >
               <option value="hematology">{t('misc.ntd_gematologiya')}</option>
@@ -113,7 +113,7 @@ function NewTemplateDialog({ open, onClose, onCreate, saving, existingTemplates 
               id="new-template-description"
               aria-label={t('misc.ntd_opisanie_shablona')}
               value={form.description}
-              onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setForm((prev) => ({ ...prev, description: e.target.value }))}
               placeholder={t('misc.ntd_kratkoe_opisanie_shablona')}
               minRows={3}
               className="ltw-input-full"

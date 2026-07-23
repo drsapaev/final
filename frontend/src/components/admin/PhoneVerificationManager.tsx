@@ -234,7 +234,7 @@ const PhoneVerificationManager = () => {
             <Input
             type="tel"
             value={adminForm.phone}
-            onChange={(e) => setAdminForm((prev) => ({ ...prev, phone: formatPhone(e.target.value) }))}
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setAdminForm((prev) => ({ ...prev, phone: formatPhone(e.target.value) }))}
             placeholder="+998XXXXXXXXX"
             className="w-full" />
           
@@ -246,7 +246,7 @@ const PhoneVerificationManager = () => {
             </label>
             <Select
             value={adminForm.purpose}
-            onChange={(value) => setAdminForm((prev) => ({ ...prev, purpose: value }))}
+            onChange={(value: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setAdminForm((prev) => ({ ...prev, purpose: value }))}
             options={[
             { value: 'verification', label: t('admin2.pvm_purpose_verification') },
             { value: 'password_reset', label: t('admin2.pvm_purpose_password_reset') },
@@ -264,7 +264,7 @@ const PhoneVerificationManager = () => {
             </label>
             <Select
             value={adminForm.provider}
-            onChange={(value) => setAdminForm((prev) => ({ ...prev, provider: value }))}
+            onChange={(value: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setAdminForm((prev) => ({ ...prev, provider: value }))}
             options={[
             { value: '', label: t('admin2.pvm_provider_default') },
             { value: 'eskiz', label: 'Eskiz' },
@@ -282,7 +282,7 @@ const PhoneVerificationManager = () => {
             </label>
             <Textarea
             value={adminForm.message}
-            onChange={(e) => setAdminForm((prev) => ({ ...prev, message: e.target.value }))}
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setAdminForm((prev) => ({ ...prev, message: e.target.value }))}
             placeholder={t('admin2.pvm_ph_message')}
             className="admin-minh-80-w-100pct" />
           
@@ -429,12 +429,12 @@ const PhoneVerificationManager = () => {
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className="admin-p-12px20-bd-none-bg-transparent-cursor-pointer-flex-ai-center-gap-8-sm-tra-ea233b09" style={{ '--admin-color': isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)', '--admin-fontWeight': isActive ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)' } as CSSProperties}
-              onMouseEnter={(e) => {
+              onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
                 if (!isActive) {
                   e.currentTarget.style.color = 'var(--mac-text-primary)';
                 }
               }}
-              onMouseLeave={(e) => {
+              onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
                 if (!isActive) {
                   e.currentTarget.style.color = 'var(--mac-text-secondary)';
                 }

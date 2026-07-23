@@ -593,7 +593,7 @@ export default function LabPanel() {
                   tabIndex={activeTab === tab.id ? 0 : -1}
                   variant={activeTab === tab.id ? 'primary' : 'outline'}
                   onClick={() => switchTab(tab.id)}
-                  onKeyDown={(event) => handleTabKeyDown(event, tab.id)}
+                  onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => handleTabKeyDown(event, tab.id)}
                 >
                   <Icon name={tab.icon} size={16 as never} />
                   {tab.label}

@@ -247,7 +247,7 @@ export function TreatmentSection({
         role="button"
         tabIndex={0}
         onClick={() => setShowMyExperience(false)}
-        onKeyDown={(event) => {
+        onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => {
           if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault();
             setShowMyExperience(false);
@@ -292,7 +292,7 @@ export function TreatmentSection({
                                         {/* Pin button */}
                                         <button
                 type="button"
-                onClick={(e) => {
+                onClick={(e: React.MouseEvent<HTMLElement>) => {
                   e.stopPropagation();
                   t.is_pinned ?
                   unpinTemplate(t.id) :
@@ -315,7 +315,7 @@ export function TreatmentSection({
                                         {/* Edit button */}
                                         <button
                 type="button"
-                onClick={(e) => {
+                onClick={(e: React.MouseEvent<HTMLElement>) => {
                   e.stopPropagation();
                   setEditingTemplate(t);
                   setEditText(t.treatment_text);
@@ -437,7 +437,7 @@ export function TreatmentSection({
         tabIndex={0}
         aria-label={t('misc.ts_zakryt_okno_redaktirovaniya_')}
         onClick={() => setEditingTemplate(null)}
-        onKeyDown={(event) => {
+        onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => {
           if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault();
             setEditingTemplate(null);
@@ -460,7 +460,7 @@ export function TreatmentSection({
                         <textarea
             aria-label={t('misc.ts_tekst_shablona_lecheniya')}
             value={editText}
-            onChange={(e) => setEditText(e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setEditText(e.target.value)}
             style={{
               width: '100%',
               minHeight: '150px',

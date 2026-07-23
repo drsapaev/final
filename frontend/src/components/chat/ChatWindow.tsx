@@ -700,7 +700,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
         aria-label={t('chatTitle')}
         className={`chat-window ${isDragging ? 'dragging' : ''} ${isResizing ? 'resizing' : ''} ${isCompactViewport ? 'compact' : ''}`}
         onPointerDown={isCompactViewport ? undefined : handleMouseDown}
-        onKeyDown={(e) => { if (e.key === 'Escape' && isOpen) { onClose(); } }}
+        onKeyDown={(e: React.KeyboardEvent<HTMLElement>) => { if (e.key === 'Escape' && isOpen) { onClose(); } }}
         style={chatWindowStyle}>
         
                 {/* Header */}
@@ -792,9 +792,9 @@ const ChatWindow = ({ isOpen, onClose }) => {
                 placeholder={t('common.search')}
                 aria-label={t('misc.cw_search_user_aria')}
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSearchQuery(e.target.value)}
                 autoFocus
-                onMouseDown={(e) => e.stopPropagation()} />
+                onMouseDown={(e: React.MouseEvent<HTMLElement>) => e.stopPropagation()} />
               
                             </div>
 
@@ -810,7 +810,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
                 className="conversation-item"
                 role="button"
                 tabIndex={0}
-                onKeyDown={(event) => handleActivationKeyDown(event, () => startConversation(u.id))}
+                onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => handleActivationKeyDown(event, () => startConversation(u.id))}
                 onClick={() => startConversation(u.id)}>
                 
                                                 <div className="conv-avatar" style={{ position: 'relative' }}>
@@ -859,7 +859,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
                                     <Search size={14} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: 'var(--mac-text-tertiary)' }} />
                                     <Input
                   value={convSearchQuery}
-                  onChange={(e) => setConvSearchQuery(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setConvSearchQuery(e.target.value)}
                   placeholder={t('common.search')}
                   aria-label={t('misc.cw_search_chats_aria')}
                   style={{
@@ -899,7 +899,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
                 data-user-id={conv.user_id}
                 role="button"
                 tabIndex={0}
-                onKeyDown={(event) => handleActivationKeyDown(event, () => loadMessages(conv.user_id))}
+                onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => handleActivationKeyDown(event, () => loadMessages(conv.user_id))}
                 onClick={() => loadMessages(conv.user_id)}>
               
                                         <div className="conv-avatar-wrapper">
@@ -953,7 +953,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
                 data-user-id={u.id}
                 role="button"
                 tabIndex={0}
-                onKeyDown={(event) => handleActivationKeyDown(event, () => startConversation(u.id))}
+                onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => handleActivationKeyDown(event, () => startConversation(u.id))}
                 onClick={() => startConversation(u.id)}>
                 
                                                 <div className="conv-avatar" style={{ background: 'linear-gradient(135deg, #a8c0ff, #3f2b96)', color: 'white' }}>
@@ -995,7 +995,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
               }}>
                                         <Input
                   value={msgSearchQuery}
-                  onChange={(e) => setMsgSearchQuery(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setMsgSearchQuery(e.target.value)}
                   placeholder={t('misc.cw_search_messages_placeholder')}
                   aria-label={t('misc.cw_search_messages_aria')}
                   autoFocus
@@ -1112,7 +1112,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
                                   tabIndex={0}
                                   aria-label={t('misc.cw_open_image_aria')}
                                   onClick={() => window.open(String(item.content ?? ''), '_blank')}
-                                  onKeyDown={(event) => handleActivationKeyDown(event, () => window.open(String(item.content ?? ''), '_blank'))}
+                                  onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => handleActivationKeyDown(event, () => window.open(String(item.content ?? ''), '_blank'))}
                                   style={{ cursor: 'pointer', maxWidth: '100%', borderRadius: 8 }} />
                                 
                                                                                 </div> :
@@ -1168,8 +1168,8 @@ const ChatWindow = ({ isOpen, onClose }) => {
                               className={`reaction-bubble ${userIds.includes(user?.id) ? 'active' : ''}`}
                               role="button"
                               tabIndex={0}
-                              onKeyDown={(event) => handleActivationKeyDown(event, () => toggleReaction(Number(item.id), emoji))}
-                              onClick={(e) => {e.stopPropagation();toggleReaction(Number(item.id), emoji);}}>
+                              onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => handleActivationKeyDown(event, () => toggleReaction(Number(item.id), emoji))}
+                              onClick={(e: React.MouseEvent<HTMLElement>) => {e.stopPropagation();toggleReaction(Number(item.id), emoji);}}>
                               
                                                                                 {emoji} {userIds.length > 1 && userIds.length}
                                                                             </span>
@@ -1180,7 +1180,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
                                                                 <button
                             className="add-reaction-btn"
                             aria-label={t('misc.cw_add_reaction_aria')}
-                            onClick={(e) => {
+                            onClick={(e: React.MouseEvent<HTMLElement>) => {
                               e.stopPropagation();
                               setReactionMenuMessageId(reactionMenuMessageId === item.id ? null : item.id);
                             }}>
@@ -1193,7 +1193,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
                                                                         {['👍', '❤️', '😂', '😮', '😢', '🔥'].map((emoji) =>
                             <button
                               key={emoji}
-                              onClick={(e) => {
+                              onClick={(e: React.MouseEvent<HTMLElement>) => {
                                 e.stopPropagation();
                                 toggleReaction(Number(item.id), emoji);
                                 setReactionMenuMessageId(null);
@@ -1314,7 +1314,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
                     placeholder={t('misc.cw_message_input_placeholder')}
                     rows={1}
                     disabled={isSending}
-                    onMouseDown={(e) => e.stopPropagation()}
+                    onMouseDown={(e: React.MouseEvent<HTMLElement>) => e.stopPropagation()}
                     aria-label={t('misc.cw_enter_message_aria')} />
                   
                                             {inputValue.length > 100 &&

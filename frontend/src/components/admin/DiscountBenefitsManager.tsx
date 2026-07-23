@@ -314,7 +314,7 @@ const DiscountBenefitsManager = () => {
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('admin2.disc_f_name_label')}</label>
           <Input
           value={discountForm.name}
-          onChange={(e) => setDiscountForm({ ...discountForm, name: e.target.value })}
+          onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setDiscountForm({ ...discountForm, name: e.target.value })}
           placeholder={t('admin2.disc_f_name_ph')} />
         
         </div>
@@ -332,7 +332,7 @@ const DiscountBenefitsManager = () => {
           <Input
           type="number"
           value={discountForm.value}
-          onChange={(e) => setDiscountForm({ ...discountForm, value: e.target.value })}
+          onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setDiscountForm({ ...discountForm, value: e.target.value })}
           placeholder={t('admin2.disc_f_value_ph')} />
         
         </div>
@@ -341,7 +341,7 @@ const DiscountBenefitsManager = () => {
           <Input
           type="number"
           value={discountForm.min_amount}
-          onChange={(e) => setDiscountForm({ ...discountForm, min_amount: e.target.value })}
+          onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setDiscountForm({ ...discountForm, min_amount: e.target.value })}
           placeholder="0" />
         
         </div>
@@ -350,7 +350,7 @@ const DiscountBenefitsManager = () => {
           <Input
           type="number"
           value={discountForm.max_discount}
-          onChange={(e) => setDiscountForm({ ...discountForm, max_discount: e.target.value })}
+          onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setDiscountForm({ ...discountForm, max_discount: e.target.value })}
           placeholder={t('admin2.disc_not_limited_ph')} />
         
         </div>
@@ -359,7 +359,7 @@ const DiscountBenefitsManager = () => {
           <Input
           type="number"
           value={discountForm.usage_limit}
-          onChange={(e) => setDiscountForm({ ...discountForm, usage_limit: e.target.value })}
+          onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setDiscountForm({ ...discountForm, usage_limit: e.target.value })}
           placeholder={t('admin2.disc_not_limited_ph')} />
         
         </div>
@@ -368,7 +368,7 @@ const DiscountBenefitsManager = () => {
           <Input
           type="datetime-local"
           value={discountForm.start_date}
-          onChange={(e) => setDiscountForm({ ...discountForm, start_date: e.target.value })} />
+          onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setDiscountForm({ ...discountForm, start_date: e.target.value })} />
         
         </div>
         <div>
@@ -376,7 +376,7 @@ const DiscountBenefitsManager = () => {
           <Input
           type="datetime-local"
           value={discountForm.end_date}
-          onChange={(e) => setDiscountForm({ ...discountForm, end_date: e.target.value })} />
+          onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setDiscountForm({ ...discountForm, end_date: e.target.value })} />
         
         </div>
       </div>
@@ -384,7 +384,7 @@ const DiscountBenefitsManager = () => {
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('common.description')}</label>
         <Textarea
         value={discountForm.description}
-        onChange={(e) => setDiscountForm({ ...discountForm, description: e.target.value })}
+        onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setDiscountForm({ ...discountForm, description: e.target.value })}
         placeholder={t('admin2.disc_f_desc_ph')}
         rows={3} />
       
@@ -428,7 +428,7 @@ const DiscountBenefitsManager = () => {
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('admin2.disc_bf_name_label')}</label>
           <Input
           value={benefitForm.name}
-          onChange={(e) => setBenefitForm({ ...benefitForm, name: e.target.value })}
+          onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setBenefitForm({ ...benefitForm, name: e.target.value })}
           placeholder={t('admin2.disc_bf_name_ph')} />
         
         </div>
@@ -446,7 +446,7 @@ const DiscountBenefitsManager = () => {
           <Input
           type="number"
           value={benefitForm.discount_percentage}
-          onChange={(e) => setBenefitForm({ ...benefitForm, discount_percentage: e.target.value })}
+          onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setBenefitForm({ ...benefitForm, discount_percentage: e.target.value })}
           placeholder={t('admin2.disc_bf_percent_ph')}
           max="100" />
         
@@ -456,7 +456,7 @@ const DiscountBenefitsManager = () => {
           <Input
           type="number"
           value={benefitForm.max_discount_amount}
-          onChange={(e) => setBenefitForm({ ...benefitForm, max_discount_amount: e.target.value })}
+          onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setBenefitForm({ ...benefitForm, max_discount_amount: e.target.value })}
           placeholder={t('admin2.disc_not_limited_ph')} />
         
         </div>
@@ -465,7 +465,7 @@ const DiscountBenefitsManager = () => {
           <Input
           type="number"
           value={benefitForm.age_min}
-          onChange={(e) => setBenefitForm({ ...benefitForm, age_min: e.target.value })}
+          onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setBenefitForm({ ...benefitForm, age_min: e.target.value })}
           placeholder={t('admin2.disc_not_limited_ph')} />
         
         </div>
@@ -474,7 +474,7 @@ const DiscountBenefitsManager = () => {
           <Input
           type="number"
           value={benefitForm.age_max}
-          onChange={(e) => setBenefitForm({ ...benefitForm, age_max: e.target.value })}
+          onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setBenefitForm({ ...benefitForm, age_max: e.target.value })}
           placeholder={t('admin2.disc_not_limited_ph')} />
         
         </div>
@@ -483,7 +483,7 @@ const DiscountBenefitsManager = () => {
           <Input
           type="number"
           value={benefitForm.monthly_limit}
-          onChange={(e) => setBenefitForm({ ...benefitForm, monthly_limit: e.target.value })}
+          onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setBenefitForm({ ...benefitForm, monthly_limit: e.target.value })}
           placeholder={t('admin2.disc_not_limited_ph')} />
         
         </div>
@@ -492,7 +492,7 @@ const DiscountBenefitsManager = () => {
           <Input
           type="number"
           value={benefitForm.yearly_limit}
-          onChange={(e) => setBenefitForm({ ...benefitForm, yearly_limit: e.target.value })}
+          onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setBenefitForm({ ...benefitForm, yearly_limit: e.target.value })}
           placeholder={t('admin2.disc_not_limited_ph')} />
         
         </div>
@@ -501,7 +501,7 @@ const DiscountBenefitsManager = () => {
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('common.description')}</label>
         <Textarea
         value={benefitForm.description}
-        onChange={(e) => setBenefitForm({ ...benefitForm, description: e.target.value })}
+        onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setBenefitForm({ ...benefitForm, description: e.target.value })}
         placeholder={t('admin2.disc_bf_desc_ph')}
         rows={3} />
       
@@ -510,7 +510,7 @@ const DiscountBenefitsManager = () => {
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('admin2.disc_bf_doc_types_label')}</label>
         <Input
         value={benefitForm.document_types}
-        onChange={(e) => setBenefitForm({ ...benefitForm, document_types: e.target.value })}
+        onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setBenefitForm({ ...benefitForm, document_types: e.target.value })}
         placeholder='["passport", "certificate"]' />
       
       </div>
@@ -553,7 +553,7 @@ const DiscountBenefitsManager = () => {
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('admin2.disc_lf_name_label')}</label>
           <Input
           value={loyaltyForm.name}
-          onChange={(e) => setLoyaltyForm({ ...loyaltyForm, name: e.target.value })}
+          onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setLoyaltyForm({ ...loyaltyForm, name: e.target.value })}
           placeholder={t('admin2.disc_lf_name_ph')} />
         
         </div>
@@ -563,7 +563,7 @@ const DiscountBenefitsManager = () => {
           type="number"
           step="0.1"
           value={loyaltyForm.points_per_ruble}
-          onChange={(e) => setLoyaltyForm({ ...loyaltyForm, points_per_ruble: e.target.value })}
+          onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setLoyaltyForm({ ...loyaltyForm, points_per_ruble: e.target.value })}
           placeholder="1.0" />
         
         </div>
@@ -573,7 +573,7 @@ const DiscountBenefitsManager = () => {
           type="number"
           step="0.1"
           value={loyaltyForm.ruble_per_point}
-          onChange={(e) => setLoyaltyForm({ ...loyaltyForm, ruble_per_point: e.target.value })}
+          onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setLoyaltyForm({ ...loyaltyForm, ruble_per_point: e.target.value })}
           placeholder="1.0" />
         
         </div>
@@ -582,7 +582,7 @@ const DiscountBenefitsManager = () => {
           <Input
           type="number"
           value={loyaltyForm.min_points_to_redeem}
-          onChange={(e) => setLoyaltyForm({ ...loyaltyForm, min_points_to_redeem: e.target.value })}
+          onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setLoyaltyForm({ ...loyaltyForm, min_points_to_redeem: e.target.value })}
           placeholder="100" />
         
         </div>
@@ -591,7 +591,7 @@ const DiscountBenefitsManager = () => {
           <Input
           type="number"
           value={loyaltyForm.min_purchase_for_points}
-          onChange={(e) => setLoyaltyForm({ ...loyaltyForm, min_purchase_for_points: e.target.value })}
+          onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setLoyaltyForm({ ...loyaltyForm, min_purchase_for_points: e.target.value })}
           placeholder="0" />
         
         </div>
@@ -600,7 +600,7 @@ const DiscountBenefitsManager = () => {
           <Input
           type="number"
           value={loyaltyForm.max_points_per_purchase}
-          onChange={(e) => setLoyaltyForm({ ...loyaltyForm, max_points_per_purchase: e.target.value })}
+          onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setLoyaltyForm({ ...loyaltyForm, max_points_per_purchase: e.target.value })}
           placeholder={t('admin2.disc_not_limited_ph')} />
         
         </div>
@@ -609,7 +609,7 @@ const DiscountBenefitsManager = () => {
           <Input
           type="datetime-local"
           value={loyaltyForm.start_date}
-          onChange={(e) => setLoyaltyForm({ ...loyaltyForm, start_date: e.target.value })} />
+          onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setLoyaltyForm({ ...loyaltyForm, start_date: e.target.value })} />
         
         </div>
         <div>
@@ -617,7 +617,7 @@ const DiscountBenefitsManager = () => {
           <Input
           type="datetime-local"
           value={loyaltyForm.end_date}
-          onChange={(e) => setLoyaltyForm({ ...loyaltyForm, end_date: e.target.value })} />
+          onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setLoyaltyForm({ ...loyaltyForm, end_date: e.target.value })} />
         
         </div>
       </div>
@@ -625,7 +625,7 @@ const DiscountBenefitsManager = () => {
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('common.description')}</label>
         <Textarea
         value={loyaltyForm.description}
-        onChange={(e) => setLoyaltyForm({ ...loyaltyForm, description: e.target.value })}
+        onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setLoyaltyForm({ ...loyaltyForm, description: e.target.value })}
         placeholder={t('admin2.disc_lf_desc_ph')}
         rows={3} />
       

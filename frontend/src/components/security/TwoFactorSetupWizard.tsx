@@ -259,7 +259,7 @@ const TwoFactorSetupWizard = ({ onComplete, onCancel }: { onComplete?: () => voi
           type={selectedMethod === 'sms' ? 'tel' : 'email'}
           aria-label={selectedMethod === 'sms' ? '2FA setup phone number' : '2FA setup email address'}
           value={selectedMethod === 'sms' ? recoveryPhone : recoveryEmail}
-          onChange={(e) => {
+          onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
             if (selectedMethod === 'sms') {
               setRecoveryPhone(e.target.value);
             } else {
@@ -280,7 +280,7 @@ const TwoFactorSetupWizard = ({ onComplete, onCancel }: { onComplete?: () => voi
           type="email"
           aria-label="Recovery email"
           value={recoveryEmail}
-          onChange={(e) => setRecoveryEmail(e.target.value)}
+          onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setRecoveryEmail(e.target.value)}
           placeholder="recovery@example.com"
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
         
@@ -294,7 +294,7 @@ const TwoFactorSetupWizard = ({ onComplete, onCancel }: { onComplete?: () => voi
           type="tel"
           aria-label="Recovery phone"
           value={recoveryPhone}
-          onChange={(e) => setRecoveryPhone(e.target.value)}
+          onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setRecoveryPhone(e.target.value)}
           placeholder="+7 (999) 123-45-67"
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
         
@@ -385,7 +385,7 @@ const TwoFactorSetupWizard = ({ onComplete, onCancel }: { onComplete?: () => voi
         type="text"
         aria-label="2FA verification code"
         value={verificationCode}
-        onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+        onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
         placeholder="000000"
         className="w-full px-3 py-2 text-center text-2xl font-mono border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
         maxLength={6} />

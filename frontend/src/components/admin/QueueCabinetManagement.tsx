@@ -368,7 +368,7 @@ const QueueCabinetManagement = () => {
                   id="queue-cabinet-day"
                   type="date"
                   value={filters.day}
-                  onChange={(event) =>
+                  onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
                     setFilters((current) => ({ ...current, day: event.target.value }))
                   }
                 />
@@ -385,7 +385,7 @@ const QueueCabinetManagement = () => {
                   type="number"
                   placeholder={t('admin2.qcm_filter_specialist_placeholder')}
                   value={filters.specialistId}
-                  onChange={(event) =>
+                  onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
                     setFilters((current) => ({ ...current, specialistId: event.target.value }))
                   }
                 />
@@ -401,7 +401,7 @@ const QueueCabinetManagement = () => {
                   id="queue-cabinet-number"
                   placeholder="101"
                   value={filters.cabinetNumber}
-                  onChange={(event) =>
+                  onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
                     setFilters((current) => ({ ...current, cabinetNumber: event.target.value }))
                   }
                 />

@@ -127,7 +127,7 @@ const IntegrationDemo = () => {
                 type="text"
                 aria-label="Test symptoms"
                 value={testSymptoms}
-                onChange={(e) => setTestSymptoms(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setTestSymptoms(e.target.value)}
                 className="clinic-input"
                 placeholder={t('misc.id_vvedite_simptomy')}
               />
@@ -139,7 +139,7 @@ const IntegrationDemo = () => {
                 type="text"
                 aria-label="Test diagnosis"
                 value={testDiagnosis}
-                onChange={(e) => setTestDiagnosis(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setTestDiagnosis(e.target.value)}
                 className="clinic-input"
                 placeholder={t('misc.id_vvedite_diagnoz')}
               />

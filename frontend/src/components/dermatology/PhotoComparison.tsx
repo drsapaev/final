@@ -466,7 +466,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata: metadataRaw = {} }
               min="0"
               max="100"
               value={sliderPosition}
-              onChange={(e) => setSliderPosition(Number(e.target.value))}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSliderPosition(Number(e.target.value))}
               style={{
                 width: '100%',
                 height: '4px',

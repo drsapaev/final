@@ -50,7 +50,7 @@ export function DermaExamsTab({
               <div className="grid grid-cols-1 md:grid-cols-2" style={{ gap: 'var(--mac-spacing-4)' }}>
                 <div>
                   <label className="derma-form-label">{t('derma.derma_exams_skin_date')}</label>
-                  <Input type="date" aria-label={t('derma.derma_exams_skin_date')} value={skinExamination.exam_date || ''} onChange={(e) => setSkinExamination({ ...skinExamination, exam_date: e.target.value })} required />
+                  <Input type="date" aria-label={t('derma.derma_exams_skin_date')} value={skinExamination.exam_date || ''} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSkinExamination({ ...skinExamination, exam_date: e.target.value })} required />
                 </div>
                 <div>
                   <label className="derma-form-label">{t('derma.derma_exams_skin_type')}</label>
@@ -65,28 +65,28 @@ export function DermaExamsTab({
                 </div>
                 <div>
                   <label className="derma-form-label">{t('derma.derma_exams_skin_condition')}</label>
-                  <Input aria-label={t('derma.derma_exams_skin_condition')} value={skinExamination.skin_condition || ''} onChange={(e) => setSkinExamination({ ...skinExamination, skin_condition: e.target.value })} placeholder={t('derma.derma_exams_ph_skin_condition')} />
+                  <Input aria-label={t('derma.derma_exams_skin_condition')} value={skinExamination.skin_condition || ''} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSkinExamination({ ...skinExamination, skin_condition: e.target.value })} placeholder={t('derma.derma_exams_ph_skin_condition')} />
                 </div>
                 <div>
                   <label className="derma-form-label">{t('derma.derma_exams_lesions')}</label>
-                  <Input aria-label={t('derma.derma_exams_lesions')} value={skinExamination.lesions || ''} onChange={(e) => setSkinExamination({ ...skinExamination, lesions: e.target.value })} placeholder={t('derma.derma_exams_ph_lesions')} />
+                  <Input aria-label={t('derma.derma_exams_lesions')} value={skinExamination.lesions || ''} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSkinExamination({ ...skinExamination, lesions: e.target.value })} placeholder={t('derma.derma_exams_ph_lesions')} />
                 </div>
                 <div>
                   <label className="derma-form-label">{t('derma.derma_exams_distribution')}</label>
-                  <Input aria-label={t('derma.derma_exams_distribution')} value={skinExamination.distribution || ''} onChange={(e) => setSkinExamination({ ...skinExamination, distribution: e.target.value })} placeholder={t('derma.derma_exams_ph_face_neck')} />
+                  <Input aria-label={t('derma.derma_exams_distribution')} value={skinExamination.distribution || ''} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSkinExamination({ ...skinExamination, distribution: e.target.value })} placeholder={t('derma.derma_exams_ph_face_neck')} />
                 </div>
                 <div>
                   <label className="derma-form-label">{t('derma.derma_exams_symptoms')}</label>
-                  <Input aria-label={t('derma.derma_exams_symptoms')} value={skinExamination.symptoms || ''} onChange={(e) => setSkinExamination({ ...skinExamination, symptoms: e.target.value })} placeholder={t('derma.derma_exams_ph_symptoms')} />
+                  <Input aria-label={t('derma.derma_exams_symptoms')} value={skinExamination.symptoms || ''} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSkinExamination({ ...skinExamination, symptoms: e.target.value })} placeholder={t('derma.derma_exams_ph_symptoms')} />
                 </div>
               </div>
               <div style={{ marginTop: 'var(--mac-spacing-4)' }}>
                 <label className="derma-form-label">{t('derma.derma_exams_diagnosis')}</label>
-                <Textarea aria-label={t('derma.derma_exams_diagnosis')} value={skinExamination.diagnosis || ''} onChange={(e) => setSkinExamination({ ...skinExamination, diagnosis: e.target.value })} rows={2} />
+                <Textarea aria-label={t('derma.derma_exams_diagnosis')} value={skinExamination.diagnosis || ''} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSkinExamination({ ...skinExamination, diagnosis: e.target.value })} rows={2} />
               </div>
               <div style={{ marginTop: 'var(--mac-spacing-4)' }}>
                 <label className="derma-form-label">{t('derma.derma_exams_treatment_plan')}</label>
-                <Textarea aria-label={t('derma.derma_exams_treatment_plan')} value={skinExamination.treatment_plan || ''} onChange={(e) => setSkinExamination({ ...skinExamination, treatment_plan: e.target.value })} rows={3} />
+                <Textarea aria-label={t('derma.derma_exams_treatment_plan')} value={skinExamination.treatment_plan || ''} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSkinExamination({ ...skinExamination, treatment_plan: e.target.value })} rows={3} />
               </div>
               <div style={{ display: 'flex', gap: 'var(--mac-spacing-3)', justifyContent: 'flex-end', marginTop: 'var(--mac-spacing-4)' }}>
                 <Button type="button" variant="outline" onClick={onCancelSkinForm}>{t('common.cancel')}</Button>
@@ -135,28 +135,28 @@ export function DermaExamsTab({
               <div className="grid grid-cols-1 md:grid-cols-2" style={{ gap: 'var(--mac-spacing-4)' }}>
                 <div>
                   <label className="derma-form-label">{t('derma.derma_exams_cosmetic_date')}</label>
-                  <Input type="date" aria-label={t('derma.derma_exams_cosmetic_date')} value={cosmeticProcedure.procedure_date || ''} onChange={(e) => setCosmeticProcedure({ ...cosmeticProcedure, procedure_date: e.target.value })} required />
+                  <Input type="date" aria-label={t('derma.derma_exams_cosmetic_date')} value={cosmeticProcedure.procedure_date || ''} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setCosmeticProcedure({ ...cosmeticProcedure, procedure_date: e.target.value })} required />
                 </div>
                 <div>
                   <label className="derma-form-label">{t('derma.derma_exams_cosmetic_type')}</label>
-                  <Input aria-label={t('derma.derma_exams_cosmetic_type')} value={cosmeticProcedure.procedure_type || ''} onChange={(e) => setCosmeticProcedure({ ...cosmeticProcedure, procedure_type: e.target.value })} placeholder={t('derma.derma_exams_ph_meso')} />
+                  <Input aria-label={t('derma.derma_exams_cosmetic_type')} value={cosmeticProcedure.procedure_type || ''} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setCosmeticProcedure({ ...cosmeticProcedure, procedure_type: e.target.value })} placeholder={t('derma.derma_exams_ph_meso')} />
                 </div>
                 <div>
                   <label className="derma-form-label">{t('derma.derma_exams_cosmetic_area')}</label>
-                  <Input aria-label={t('derma.derma_exams_cosmetic_area_aria')} value={cosmeticProcedure.area_treated || ''} onChange={(e) => setCosmeticProcedure({ ...cosmeticProcedure, area_treated: e.target.value })} placeholder={t('derma.derma_exams_ph_face_neck')} />
+                  <Input aria-label={t('derma.derma_exams_cosmetic_area_aria')} value={cosmeticProcedure.area_treated || ''} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setCosmeticProcedure({ ...cosmeticProcedure, area_treated: e.target.value })} placeholder={t('derma.derma_exams_ph_face_neck')} />
                 </div>
                 <div>
                   <label className="derma-form-label">{t('derma.derma_exams_cosmetic_products')}</label>
-                  <Input aria-label={t('derma.derma_exams_cosmetic_products')} value={cosmeticProcedure.products_used || ''} onChange={(e) => setCosmeticProcedure({ ...cosmeticProcedure, products_used: e.target.value })} placeholder={t('derma.derma_exams_ph_hyaluronic')} />
+                  <Input aria-label={t('derma.derma_exams_cosmetic_products')} value={cosmeticProcedure.products_used || ''} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setCosmeticProcedure({ ...cosmeticProcedure, products_used: e.target.value })} placeholder={t('derma.derma_exams_ph_hyaluronic')} />
                 </div>
                 <div>
                   <label className="derma-form-label">{t('derma.derma_exams_cosmetic_cost')}</label>
-                  <Input type="number" aria-label={t('derma.derma_exams_cosmetic_cost_aria')} value={cosmeticProcedure.total_cost || ''} onChange={(e) => setCosmeticProcedure({ ...cosmeticProcedure, total_cost: e.target.value })} placeholder="0" />
+                  <Input type="number" aria-label={t('derma.derma_exams_cosmetic_cost_aria')} value={cosmeticProcedure.total_cost || ''} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setCosmeticProcedure({ ...cosmeticProcedure, total_cost: e.target.value })} placeholder="0" />
                 </div>
               </div>
               <div style={{ marginTop: 'var(--mac-spacing-4)' }}>
                 <label className="derma-form-label">{t('derma.derma_exams_cosmetic_results')}</label>
-                <Textarea aria-label={t('derma.derma_exams_cosmetic_results')} value={cosmeticProcedure.results || ''} onChange={(e) => setCosmeticProcedure({ ...cosmeticProcedure, results: e.target.value })} rows={2} />
+                <Textarea aria-label={t('derma.derma_exams_cosmetic_results')} value={cosmeticProcedure.results || ''} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setCosmeticProcedure({ ...cosmeticProcedure, results: e.target.value })} rows={2} />
               </div>
               <div style={{ display: 'flex', gap: 'var(--mac-spacing-3)', justifyContent: 'flex-end', marginTop: 'var(--mac-spacing-4)' }}>
                 <Button type="button" variant="outline" onClick={onCancelCosmeticForm}>{t('common.cancel')}</Button>

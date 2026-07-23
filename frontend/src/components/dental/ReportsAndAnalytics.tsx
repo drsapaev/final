@@ -520,7 +520,7 @@ const ReportsAndAnalytics = ({
           <div className="flex items-center gap-2">
             <select
               value={dateRange}
-              onChange={(e) => handleDateRangeChange(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleDateRangeChange(e.target.value)}
               className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
               
               <option value="7d">{t('dental.dental_ra_range_7d')}</option>

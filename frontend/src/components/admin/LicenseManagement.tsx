@@ -281,7 +281,7 @@ const LicenseManagement = () => {
               aria-label={t('admin2.lm_search_aria')}
               placeholder={t('admin2.lm_search_placeholder')}
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSearchTerm(e.target.value)}
               className="admin-pl-40" />
             
             <Search aria-hidden="true" className="admin-pos-absolute-left-12-top-50pct-transform-translateY-50-tertiary-w-16-h-16" />
@@ -350,7 +350,7 @@ const LicenseManagement = () => {
                 type="text"
                 required
                 value={String(formData.name ?? '')}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFormData({ ...formData, name: e.target.value })}
                 placeholder={t('admin2.lm_field_name_placeholder')} />
               
               </div>
@@ -376,7 +376,7 @@ const LicenseManagement = () => {
                 type="text"
                 required
                 value={String(formData.license_key ?? '')}
-                onChange={(e) => setFormData({ ...formData, license_key: e.target.value })}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFormData({ ...formData, license_key: e.target.value })}
                 placeholder={t('admin2.lm_field_license_key_placeholder')} />
               
               </div>
@@ -387,7 +387,7 @@ const LicenseManagement = () => {
                 <Input
                 type="text"
                 value={String(formData.vendor ?? '')}
-                onChange={(e) => setFormData({ ...formData, vendor: e.target.value })}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFormData({ ...formData, vendor: e.target.value })}
                 placeholder={t('admin2.lm_field_vendor_placeholder')} />
               
               </div>
@@ -409,7 +409,7 @@ const LicenseManagement = () => {
                 <Input
                 type="date"
                 value={String(formData.purchase_date ?? '')}
-                onChange={(e) => setFormData({ ...formData, purchase_date: e.target.value })} />
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFormData({ ...formData, purchase_date: e.target.value })} />
               
               </div>
               <div>
@@ -419,7 +419,7 @@ const LicenseManagement = () => {
                 <Input
                 type="date"
                 value={String(formData.expiry_date ?? '')}
-                onChange={(e) => setFormData({ ...formData, expiry_date: e.target.value })} />
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFormData({ ...formData, expiry_date: e.target.value })} />
               
               </div>
               <div>
@@ -429,7 +429,7 @@ const LicenseManagement = () => {
                 <Input
                 type="number"
                 value={String(formData.cost ?? '')}
-                onChange={(e) => setFormData({ ...formData, cost: parseFloat(e.target.value) })}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFormData({ ...formData, cost: parseFloat(e.target.value) })}
                 placeholder={t('admin2.lm_field_cost_placeholder')} />
               
               </div>
@@ -441,7 +441,7 @@ const LicenseManagement = () => {
                 type="number"
                 min="1"
                 value={String(formData.seats ?? '')}
-                onChange={(e) => setFormData({ ...formData, seats: parseInt(e.target.value) })}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFormData({ ...formData, seats: parseInt(e.target.value) })}
                 placeholder={t('admin2.lm_field_seats_placeholder')} />
               
               </div>
@@ -453,7 +453,7 @@ const LicenseManagement = () => {
               </label>
               <Textarea
               value={String(formData.description ?? '')}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFormData({ ...formData, description: e.target.value })}
               placeholder={t('admin2.lm_field_description_placeholder')}
               rows={3} />
             
