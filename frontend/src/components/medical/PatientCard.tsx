@@ -5,6 +5,49 @@ import Icon from '../Icon';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useTranslation } from '../../i18n/useTranslation';
 
+// === Domain types ===
+// PatientCard displays a single patient as a tile. The shape covers both
+// MediLabDemo's structured Patient objects and DentistPanelUnified's
+// selectedPatient (which is a superset with visit_id, examinationData,
+// etc. — those extra fields ride along via the index signature).
+
+export interface PatientCardPatient {
+  id?: string | number;
+  name?: string;
+  avatar?: string | null;
+  patientId?: string | number;
+  age?: string | number;
+  gender?: string;
+  lastVisit?: string;
+  department?: string;
+  status?: string;
+  is_deleted?: boolean;
+  [key: string]: unknown;
+}
+
+export interface PatientCardProps {
+  /** Patient data to render. */
+  patient: PatientCardPatient;
+  /** Open patient details view. */
+  onView?: (patient: PatientCardPatient) => void;
+  /** Open edit form. */
+  onEdit?: (patient: PatientCardPatient) => void;
+  /** Hard-delete (used as fallback when onArchive is not provided). */
+  onDelete?: (patient: PatientCardPatient) => void;
+  /** Soft-delete (archive) handler — preferred over onDelete. */
+  onArchive?: (patient: PatientCardPatient) => void;
+  /** Restore an archived patient. */
+  onRestore?: (patient: PatientCardPatient) => void;
+  /** Save handler (used by DentistPanelUnified modal flow). */
+  onSave?: (updatedPatient: PatientCardPatient) => void;
+  /** Close handler (used by DentistPanelUnified modal flow). */
+  onClose?: () => void;
+  /** Extra CSS class. */
+  className?: string;
+  /** Pass-through props to underlying MedicalCard. */
+  [key: string]: unknown;
+}
+
 /**
  * Карточка пациента в стиле MediLab
  */
@@ -17,7 +60,7 @@ const PatientCard = ({
   onRestore,  // Restore handler
   className = '',
   ...props
-}: any) => {
+}: PatientCardProps) => {
   const { isDark } = useTheme();
 
   const {
@@ -33,7 +76,7 @@ const PatientCard = ({
     is_deleted = false  // Soft-delete flag
   } = patient;
 
-  const getStatusColor = (status) => {
+  const getStatusColor = (status: string | undefined) => {
     if (is_deleted) return 'var(--mac-text-tertiary)';  // Gray for archived
     switch (status) {
       case 'active': return 'var(--mac-success)';
@@ -44,7 +87,7 @@ const PatientCard = ({
     }
   };
 
-  const getGenderIcon = (gender) => {
+  const getGenderIcon = (gender: string | undefined) => {
     return gender === 'M' ? '👨' : gender === 'F' ? '👩' : '👤';
   };
 

@@ -2021,7 +2021,7 @@ const DentistPanelUnified = () => {
             </div>
             <TeethChart
             patientId={selectedPatientId}
-            initialData={dentalChartData}
+            initialData={(dentalChartData ?? {}) as Record<string, { status?: string; updatedAt?: string; [key: string]: unknown }>}
             onToothClick={(toothNumber, toothData) => {
               logger.info('Клик по зубу:', toothNumber, toothData);
               setSelectedTooth({ number: toothNumber, data: toothData });
