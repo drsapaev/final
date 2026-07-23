@@ -198,7 +198,7 @@ export const mcpAPI = {
   /**
    * Интерпретация лабораторных результатов
    */
-  async interpretLabResults(data) {
+  async interpretLabResults(data: Record<string, unknown>) {
     return mcpRequest('post', '/lab/interpret', {
       data: {
         results: data.results,

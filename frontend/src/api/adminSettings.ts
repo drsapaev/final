@@ -5,7 +5,7 @@ export async function fetchWizardSettings() {
   return response.data;
 }
 
-export async function saveWizardSettings(payload) {
+export async function saveWizardSettings(payload: Record<string, unknown>) {
   const response = await api.post('/admin/wizard-settings', payload);
   return response.data;
 }
@@ -15,7 +15,7 @@ export async function fetchBenefitSettings() {
   return response.data;
 }
 
-export async function saveBenefitSettings(payload) {
+export async function saveBenefitSettings(payload: Record<string, unknown>) {
   const response = await api.post('/admin/benefit-settings', payload);
   return response.data;
 }
@@ -27,7 +27,7 @@ export async function fetchClinicSettings(category = 'clinic') {
   return response.data;
 }
 
-export async function saveClinicSettings(payload) {
+export async function saveClinicSettings(payload: Record<string, unknown>) {
   const response = await api.put('/admin/clinic/settings', payload);
   return response.data;
 }
@@ -37,7 +37,7 @@ export async function fetchTicketPrintSettings() {
   return response.data;
 }
 
-export async function saveTicketPrintSettings(payload) {
+export async function saveTicketPrintSettings(payload: Record<string, unknown>) {
   const response = await api.put('/admin/clinic/ticket-print-settings', payload);
   return response.data;
 }
@@ -47,12 +47,12 @@ export async function fetchPaymentProviderSettings() {
   return response.data;
 }
 
-export async function savePaymentProviderSettings(payload) {
+export async function savePaymentProviderSettings(payload: Record<string, unknown>) {
   const response = await api.post('/admin/payment-provider-settings', payload);
   return response.data;
 }
 
-export async function testPaymentProviderConfig(provider, config) {
+export async function testPaymentProviderConfig(provider: string, config: Record<string, unknown>) {
   const response = await api.post('/admin/test-payment-provider', {
     provider,
     config,

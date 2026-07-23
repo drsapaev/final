@@ -60,7 +60,7 @@ export async function fetchSetupStatus() {
   return setupStatusRequestPromise;
 }
 
-export async function initializeSetup(payload) {
+export async function initializeSetup(payload: Record<string, unknown>) {
   // UX Audit Setup bugfix: raw fetch() POST → api.post().
   // Axios автоматически ставит Content-Type: application/json и парсит ответ.
   try {

@@ -24,9 +24,9 @@ export const API_ENDPOINTS = {
   USERS: {
     LIST: '/users',
     CREATE: '/users',
-    GET: (id) => `/users/${id}`,
-    UPDATE: (id) => `/users/${id}`,
-    DELETE: (id) => `/users/${id}`,
+    GET: (id: string | number) => `/users/${id}`,
+    UPDATE: (id: string | number) => `/users/${id}`,
+    DELETE: (id: string | number) => `/users/${id}`,
     ROLES: '/users/roles',
     PERMISSIONS: '/users/permissions'
   },
@@ -35,9 +35,9 @@ export const API_ENDPOINTS = {
   PATIENTS: {
     LIST: '/patients',
     CREATE: '/patients',
-    GET: (id) => `/patients/${id}`,
-    UPDATE: (id) => `/patients/${id}`,
-    DELETE: (id) => `/patients/${id}`,
+    GET: (id: string | number) => `/patients/${id}`,
+    UPDATE: (id: string | number) => `/patients/${id}`,
+    DELETE: (id: string | number) => `/patients/${id}`,
     SEARCH: '/patients/',
     STATS: '/patients/stats'
   },
@@ -46,11 +46,11 @@ export const API_ENDPOINTS = {
   DOCTORS: {
     LIST: '/doctors',
     CREATE: '/doctors',
-    GET: (id) => `/doctors/${id}`,
-    UPDATE: (id) => `/doctors/${id}`,
-    DELETE: (id) => `/doctors/${id}`,
-    SCHEDULE: (id) => `/doctors/${id}/schedule`,
-    AVAILABILITY: (id) => `/doctors/${id}/availability`,
+    GET: (id: string | number) => `/doctors/${id}`,
+    UPDATE: (id: string | number) => `/doctors/${id}`,
+    DELETE: (id: string | number) => `/doctors/${id}`,
+    SCHEDULE: (id: string | number) => `/doctors/${id}/schedule`,
+    AVAILABILITY: (id: string | number) => `/doctors/${id}/availability`,
     SPECIALIZATIONS: '/doctors/specializations',
     DEPARTMENTS: '/doctors/departments'
   },
@@ -59,13 +59,13 @@ export const API_ENDPOINTS = {
   APPOINTMENTS: {
     LIST: '/appointments',
     CREATE: '/appointments',
-    GET: (id) => `/appointments/${id}`,
-    UPDATE: (id) => `/appointments/${id}`,
-    DELETE: (id) => `/appointments/${id}`,
-    BY_PATIENT: (patientId) => `/appointments/patient/${patientId}`,
-    BY_DOCTOR: (doctorId) => `/appointments/doctor/${doctorId}`,
-    CANCEL: (id) => `/appointments/${id}/cancel`,
-    CONFIRM: (id) => `/appointments/${id}/confirm`,
+    GET: (id: string | number) => `/appointments/${id}`,
+    UPDATE: (id: string | number) => `/appointments/${id}`,
+    DELETE: (id: string | number) => `/appointments/${id}`,
+    BY_PATIENT: (patientId: string | number) => `/appointments/patient/${patientId}`,
+    BY_DOCTOR: (doctorId: string | number) => `/appointments/doctor/${doctorId}`,
+    CANCEL: (id: string | number) => `/appointments/${id}/cancel`,
+    CONFIRM: (id: string | number) => `/appointments/${id}/confirm`,
     STATS: '/appointments/stats',
     BY_DATE: '/appointments/by-date'
   },
@@ -74,11 +74,11 @@ export const API_ENDPOINTS = {
   QUEUE: {
     LIST: '/queue',
     CREATE: '/queue',
-    GET: (id) => `/queue/${id}`,
-    UPDATE: (id) => `/queue/${id}`,
-    DELETE: (id) => `/queue/${id}`,
-    SKIP: (id) => `/queue/${id}/skip`,
-    COMPLETE: (id) => `/queue/${id}/complete`,
+    GET: (id: string | number) => `/queue/${id}`,
+    UPDATE: (id: string | number) => `/queue/${id}`,
+    DELETE: (id: string | number) => `/queue/${id}`,
+    SKIP: (id: string | number) => `/queue/${id}/skip`,
+    COMPLETE: (id: string | number) => `/queue/${id}/complete`,
     STATS: '/queue/stats',
     BY_DEPARTMENT: '/queue/by-department',
     CALL_NEXT: '/queue/call-next',
@@ -95,9 +95,9 @@ export const API_ENDPOINTS = {
   SERVICES: {
     LIST: '/services',
     CREATE: '/services',
-    GET: (id) => `/services/${id}`,
-    UPDATE: (id) => `/services/${id}`,
-    DELETE: (id) => `/services/${id}`,
+    GET: (id: string | number) => `/services/${id}`,
+    UPDATE: (id: string | number) => `/services/${id}`,
+    DELETE: (id: string | number) => `/services/${id}`,
     BY_DEPARTMENT: '/services/by-department',
     PRICING: '/services/pricing'
   },
@@ -106,9 +106,9 @@ export const API_ENDPOINTS = {
   REPORTS: {
     LIST: '/reports',
     CREATE: '/reports',
-    GET: (id) => `/reports/${id}`,
-    DELETE: (id) => `/reports/${id}`,
-    EXPORT_BY_ID: (id) => `/reports/${id}/export`,
+    GET: (id: string | number) => `/reports/${id}`,
+    DELETE: (id: string | number) => `/reports/${id}`,
+    EXPORT_BY_ID: (id: string | number) => `/reports/${id}/export`,
     GENERATE: '/reports/generate',
     TYPES: '/reports/types'
   },
@@ -116,8 +116,8 @@ export const API_ENDPOINTS = {
   // Настройки
   SETTINGS: {
     LIST: '/settings',
-    GET: (key) => `/settings/${key}`,
-    UPDATE: (key) => `/settings/${key}`,
+    GET: (key: string) => `/settings/${key}`,
+    UPDATE: (key: string) => `/settings/${key}`,
     BULK_UPDATE: '/settings/bulk-update',
     CATEGORIES: '/settings/categories'
   },
@@ -128,11 +128,11 @@ export const API_ENDPOINTS = {
     HISTORY: '/notifications/history',
     SYNC: '/notifications/sync',
     UNREAD_COUNT: '/notifications/unread-count',
-    SETTINGS: (userId) => `/notifications/settings/${userId}`,
-    SETTINGS_POLICY: (userId) => `/notifications/settings/${userId}/policy`,
-    MARK_SEEN: (id) => `/notifications/${id}/seen`,
-    MARK_READ: (id) => `/notifications/${id}/read`,
-    ARCHIVE: (id) => `/notifications/${id}/archive`,
+    SETTINGS: (userId: string | number) => `/notifications/settings/${userId}`,
+    SETTINGS_POLICY: (userId: string | number) => `/notifications/settings/${userId}/policy`,
+    MARK_SEEN: (id: string | number) => `/notifications/${id}/seen`,
+    MARK_READ: (id: string | number) => `/notifications/${id}/read`,
+    ARCHIVE: (id: string | number) => `/notifications/${id}/archive`,
     MARK_ALL_READ: '/notifications/mark-all-read',
     HISTORY_STATS: '/notifications/history/stats',
     SEND: '/notifications/send'
@@ -142,9 +142,9 @@ export const API_ENDPOINTS = {
   FILES: {
     UPLOAD: '/files/upload',
     LIST: '/files',
-    GET: (id) => `/files/${id}`,
-    DELETE: (id) => `/files/${id}`,
-    DOWNLOAD: (id) => `/files/${id}/download`
+    GET: (id: string | number) => `/files/${id}`,
+    DELETE: (id: string | number) => `/files/${id}`,
+    DOWNLOAD: (id: string | number) => `/files/${id}/download`
   },
 
   // Платежи (новое)
@@ -208,63 +208,63 @@ export const API_ENDPOINTS = {
  */
 export const createEndpoints = {
   // Пользователи
-  getUser: (id) => `/users/${id}`,
-  updateUser: (id) => `/users/${id}`,
-  deleteUser: (id) => `/users/${id}`,
+  getUser: (id: string | number) => `/users/${id}`,
+  updateUser: (id: string | number) => `/users/${id}`,
+  deleteUser: (id: string | number) => `/users/${id}`,
 
   // Пациенты
-  getPatient: (id) => `/patients/${id}`,
-  updatePatient: (id) => `/patients/${id}`,
-  deletePatient: (id) => `/patients/${id}`,
+  getPatient: (id: string | number) => `/patients/${id}`,
+  updatePatient: (id: string | number) => `/patients/${id}`,
+  deletePatient: (id: string | number) => `/patients/${id}`,
 
   // Врачи
-  getDoctor: (id) => `/doctors/${id}`,
-  updateDoctor: (id) => `/doctors/${id}`,
-  deleteDoctor: (id) => `/doctors/${id}`,
-  getDoctorSchedule: (id) => `/doctors/${id}/schedule`,
-  getDoctorAvailability: (id) => `/doctors/${id}/availability`,
+  getDoctor: (id: string | number) => `/doctors/${id}`,
+  updateDoctor: (id: string | number) => `/doctors/${id}`,
+  deleteDoctor: (id: string | number) => `/doctors/${id}`,
+  getDoctorSchedule: (id: string | number) => `/doctors/${id}/schedule`,
+  getDoctorAvailability: (id: string | number) => `/doctors/${id}/availability`,
 
   // Записи на прием
-  getAppointment: (id) => `/appointments/${id}`,
-  updateAppointment: (id) => `/appointments/${id}`,
-  deleteAppointment: (id) => `/appointments/${id}`,
-  getPatientAppointments: (patientId) => `/appointments/patient/${patientId}`,
-  getDoctorAppointments: (doctorId) => `/appointments/doctor/${doctorId}`,
-  cancelAppointment: (id) => `/appointments/${id}/cancel`,
-  confirmAppointment: (id) => `/appointments/${id}/confirm`,
+  getAppointment: (id: string | number) => `/appointments/${id}`,
+  updateAppointment: (id: string | number) => `/appointments/${id}`,
+  deleteAppointment: (id: string | number) => `/appointments/${id}`,
+  getPatientAppointments: (patientId: string | number) => `/appointments/patient/${patientId}`,
+  getDoctorAppointments: (doctorId: string | number) => `/appointments/doctor/${doctorId}`,
+  cancelAppointment: (id: string | number) => `/appointments/${id}/cancel`,
+  confirmAppointment: (id: string | number) => `/appointments/${id}/confirm`,
 
   // Очередь
-  getQueueItem: (id) => `/queue/${id}`,
-  updateQueueItem: (id) => `/queue/${id}`,
-  deleteQueueItem: (id) => `/queue/${id}`,
-  skipQueueItem: (id) => `/queue/${id}/skip`,
-  completeQueueItem: (id) => `/queue/${id}/complete`,
+  getQueueItem: (id: string | number) => `/queue/${id}`,
+  updateQueueItem: (id: string | number) => `/queue/${id}`,
+  deleteQueueItem: (id: string | number) => `/queue/${id}`,
+  skipQueueItem: (id: string | number) => `/queue/${id}/skip`,
+  completeQueueItem: (id: string | number) => `/queue/${id}/complete`,
 
   // Услуги
-  getService: (id) => `/services/${id}`,
-  updateService: (id) => `/services/${id}`,
-  deleteService: (id) => `/services/${id}`,
+  getService: (id: string | number) => `/services/${id}`,
+  updateService: (id: string | number) => `/services/${id}`,
+  deleteService: (id: string | number) => `/services/${id}`,
 
   // Отчеты
-  getReport: (id) => `/reports/${id}`,
-  deleteReport: (id) => `/reports/${id}`,
-  exportReport: (id) => `/reports/${id}/export`,
+  getReport: (id: string | number) => `/reports/${id}`,
+  deleteReport: (id: string | number) => `/reports/${id}`,
+  exportReport: (id: string | number) => `/reports/${id}/export`,
 
   // Настройки
-  getSetting: (key) => `/settings/${key}`,
-  updateSetting: (key) => `/settings/${key}`,
+  getSetting: (key: string) => `/settings/${key}`,
+  updateSetting: (key: string) => `/settings/${key}`,
 
   // Уведомления
   getNotificationInbox: () => '/notifications/inbox',
   getNotificationHistory: () => '/notifications/history',
 
   // Файлы
-  getFile: (id) => `/files/${id}`,
-  deleteFile: (id) => `/files/${id}`,
-  downloadFile: (id) => `/files/${id}/download`,
+  getFile: (id: string | number) => `/files/${id}`,
+  deleteFile: (id: string | number) => `/files/${id}`,
+  downloadFile: (id: string | number) => `/files/${id}/download`,
 
   // Аудит
-  getAuditLog: (id) => `/audit/logs/${id}`
+  getAuditLog: (id: string | number) => `/audit/logs/${id}`
 };
 
 /**
