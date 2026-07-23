@@ -8,6 +8,64 @@ import { formatRegistrarTime } from '../../utils/dateUtils';
 import './QueueTable.css';
 import { useTranslation } from '../../i18n/useTranslation';
 
+// === Domain types ===
+// QueueTable is a pure display component driven by ModernQueueManager.
+// It receives a pre-translated strings object (queueTableT) plus the
+// queue snapshot and the effective doctor selection.
+
+export interface QueueTableEntry {
+  id?: string | number;
+  patient_name?: string;
+  name?: string;
+  patient_phone?: string;
+  phone?: string;
+  queue_number?: number | string;
+  number?: number | string;
+  queue_time?: string;
+  created_at?: string;
+  timestamp?: string;
+  status?: string;
+  source?: string;
+  source_kind?: string;
+  [key: string]: unknown;
+}
+
+export interface QueueTableData {
+  entries?: QueueTableEntry[];
+  is_open?: boolean;
+  [key: string]: unknown;
+}
+
+export interface QueueTableDoctor {
+  id?: string | number;
+  full_name?: string;
+  name?: string;
+  specialty?: string;
+  [key: string]: unknown;
+}
+
+export interface QueueTableT {
+  selectDoctor?: string;
+  patient?: string;
+  phone?: string;
+  time?: string;
+  status?: string;
+  actions?: string;
+  called?: string;
+  queueEmpty?: string;
+  queueNotFound?: string;
+  [key: string]: unknown;
+}
+
+export interface QueueTableProps {
+  queueData?: QueueTableData | null;
+  effectiveDoctor?: QueueTableDoctor | string | null;
+  loading?: boolean;
+  /** Pre-translated strings object (built by ModernQueueManager). */
+  t?: QueueTableT;
+  [key: string]: unknown;
+}
+
 /**
  * QueueTable Component
  * Displays the current queue entries in a table format
@@ -17,7 +75,7 @@ const QueueTable = ({
     effectiveDoctor = null,
     loading = false,
     t = {}
-}: any) => {
+}: QueueTableProps) => {
     // If no queue data or no doctor selected
     if (!effectiveDoctor) {
         return (

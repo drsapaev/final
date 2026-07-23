@@ -26,9 +26,61 @@ import './EMRSmartFieldV2.css';
 import { Input } from '../../ui/macos';
 import { useTranslation } from '../../../i18n/useTranslation';
 
+// === Domain types ===
+export interface EMRSmartFieldV2Suggestion {
+  id?: string | number;
+  content?: string;
+  text?: string;
+  source?: string;
+  confidence?: number;
+  [key: string]: unknown;
+}
+
+export interface EMRSmartFieldV2Props {
+  /** Current text value (controlled). */
+  value?: string;
+  /** Called whenever the user edits the field. Optional second arg for metadata. */
+  onChange?: (value: string, options?: Record<string, unknown>) => void;
+  /** Placeholder text. */
+  placeholder?: string;
+  /** When true, render a textarea instead of a single-line input. */
+  multiline?: boolean;
+  /** Rows for the textarea (ignored when multiline=false). */
+  rows?: number;
+  /** Read-only flag. */
+  disabled?: boolean;
+  /** Field id (used for scroll navigation and aria). */
+  id?: string;
+  /** Field name — passed to AI request handler to disambiguate which field. */
+  fieldName?: string;
+  /** AI suggestions to show in the popover. */
+  suggestions?: EMRSmartFieldV2Suggestion[] | unknown[];
+  /** Loading flag for AI requests. */
+  aiLoading?: boolean;
+  /** Apply a suggestion to the field. */
+  onApplySuggestion?: (suggestion: unknown) => void;
+  /** Dismiss a suggestion. */
+  onDismissSuggestion?: (suggestion: unknown) => void;
+  /** Request AI suggestions for the field. Receives field name or text. */
+  onRequestAI?: (textOrFieldName: string) => void;
+  /** Whether to show the AI assist button. */
+  showAIButton?: boolean;
+  /** Opt-in experimental inline ghost-text mode. */
+  experimentalGhostMode?: boolean;
+  /** Telemetry callback. */
+  onTelemetry?: (payload: Record<string, unknown>) => void;
+  /** Optional label (observed in DiagnosisSection caller). */
+  label?: string;
+  /** Optional required flag (observed in DiagnosisSection caller). */
+  required?: boolean;
+  /** Optional AI-disabled tooltip (observed in ExaminationSection caller). */
+  aiDisabledTooltip?: string;
+  [key: string]: unknown;
+}
+
 /**
  * EMRSmartFieldV2 Component
- * 
+ *
  * @param {Object} props
  * @param {string} props.value - Current value
  * @param {Function} props.onChange - Change handler (value, metadata?)
@@ -64,7 +116,7 @@ export function EMRSmartFieldV2({
     showAIButton = true,
     experimentalGhostMode = false,
     onTelemetry,
-}: any) {
+}: EMRSmartFieldV2Props) {
     const [isFocused, setIsFocused] = useState(false);
     const [showPopover, setShowPopover] = useState(false);
     const [ghostText, setGhostText] = useState('');
@@ -152,8 +204,9 @@ export function EMRSmartFieldV2({
             }
 
             // Ghost Text Logic
-            if (experimentalGhostMode && suggestions[0]?.content && value) {
-                const topSuggestion = suggestions[0].content;
+            const firstSuggestion = suggestions[0] as EMRSmartFieldV2Suggestion | undefined;
+            if (experimentalGhostMode && firstSuggestion?.content && value) {
+                const topSuggestion = String(firstSuggestion.content);
                 if (topSuggestion.startsWith(value) && topSuggestion.length > value.length) {
                     setGhostText(topSuggestion.substring(value.length));
                 } else {

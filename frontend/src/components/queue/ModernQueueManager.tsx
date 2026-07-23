@@ -25,6 +25,45 @@ import QueueTable from './QueueTable';
 import logger from '../../utils/logger';
 import './ModernQueueManager.css';
 
+// === Domain types ===
+// ModernQueueManager is a registrar/queue-management surface.
+// The parent owns the date + doctor selection; ModernQueueManager
+// receives them as controlled props and emits change events.
+// Doctors shape is dynamic (backend-driven), so it rides via index sig.
+
+export interface ModernQueueManagerDoctor {
+  id: string | number;
+  full_name?: string;
+  name?: string;
+  specialty?: string;
+  specialty_display?: string;
+  department?: string;
+  cabinet?: string | number;
+  [key: string]: unknown;
+}
+
+export interface ModernQueueManagerProps {
+  /** Currently selected date (YYYY-MM-DD). */
+  selectedDate?: string;
+  /** Currently selected doctor id. */
+  selectedDoctor?: string | number;
+  /** Called when the queue snapshot needs to be reloaded. */
+  onQueueUpdate?: () => void | Promise<void>;
+  /** Active UI language. */
+  language?: string;
+  /** Doctor lookup array (passed from parent). */
+  doctors?: ModernQueueManagerDoctor[];
+  /** Called when the user changes the doctor selection. */
+  onDoctorChange?: (doctorId: string) => void;
+  /** Called when the user changes the date. */
+  onDateChange?: (date: string) => void;
+  /** Optional UI theme override. */
+  theme?: string;
+  /** Optional search query (observed in QueueView caller). */
+  searchQuery?: string;
+  [key: string]: unknown;
+}
+
 const ModernQueueManager = ({
   selectedDate = getLocalDateString(),
   selectedDoctor = '',
@@ -33,7 +72,7 @@ const ModernQueueManager = ({
   doctors = [],
   onDoctorChange,
   onDateChange
-}: any) => {
+}: ModernQueueManagerProps) => {
   const {
     loading,
     queueData,
@@ -129,7 +168,7 @@ const ModernQueueManager = ({
   // При получении queue_update события — перезагружаем snapshot очереди.
   // Polling выше остаётся как fallback (60s).
   const { isConnected: wsConnected, connectionState: wsState } = useQueueWebSocket({
-    specialistId: effectiveDoctor,
+    specialistId: String(effectiveDoctor ?? ''),
     date: effectiveDate,
     enabled: Boolean(effectiveDoctor && effectiveDate),
     onUpdate: loadQueue,
@@ -611,7 +650,7 @@ const ModernQueueManager = ({
 
           <QueueTable
             queueData={queueData}
-            effectiveDoctor={effectiveDoctor}
+            effectiveDoctor={String(effectiveDoctor ?? '')}
             onGenerateQR={generateQR}
             loading={loading}
             t={queueTableT} />

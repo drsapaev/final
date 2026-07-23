@@ -5,7 +5,76 @@ import { useState, useMemo, useCallback } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Input } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
-import React, { type CSSProperties } from "react";
+import React, { type CSSProperties, type ReactNode } from "react";
+
+// === Domain types ===
+// Table is a generic sortable/filterable/paginated table. Column shape
+// covers all variants observed in 19 callers (key, title/header/label,
+// render, sortable, width, align, filterable). Row shape is dynamic
+// (backend-driven), so it rides along via index signature.
+
+export interface TableColumn {
+  /** Unique column key — used as the row[cell.key] accessor. */
+  key: string;
+  /** Header label (string or ReactNode). */
+  title?: ReactNode;
+  /** Alias for `title` (used by some callers). */
+  header?: string;
+  /** Alias for `title` (used by some callers). */
+  label?: string;
+  /** Custom cell renderer: receives (cellValue, row). */
+  render?: (value: unknown, row: Record<string, unknown>) => ReactNode;
+  /** Whether this column is sortable (defaults to table-level `sortable`). */
+  sortable?: boolean;
+  /** Whether this column is filterable (defaults to table-level `filterable`). */
+  filterable?: boolean;
+  /** Column width (CSS value). */
+  width?: string;
+  /** Cell text alignment. */
+  align?: 'left' | 'right' | 'center' | string;
+  [key: string]: unknown;
+}
+
+export interface TableProps {
+  /** Row data (each row is a dynamic object keyed by column.key). */
+  data?: Record<string, unknown>[];
+  /** Column definitions. */
+  columns?: TableColumn[];
+  /** Whether sorting is enabled (per-column overrides via column.sortable). */
+  sortable?: boolean;
+  /** Whether filtering is enabled (per-column overrides via column.filterable). */
+  filterable?: boolean;
+  /** Whether pagination is enabled. */
+  pagination?: boolean;
+  /** Number of rows per page. */
+  pageSize?: number;
+  /** Sort change handler. */
+  onSort?: (field: string, direction: 'asc' | 'desc') => void;
+  /** Filter change handler. */
+  onFilter?: (field: string, value: string) => void;
+  /** Page change handler. */
+  onPageChange?: (page: number) => void;
+  /** Loading flag — renders skeleton rows when true. */
+  loading?: boolean;
+  /** Empty-state message. */
+  emptyMessage?: string;
+  /** Optional empty-state element (overrides emptyMessage). */
+  emptyState?: ReactNode;
+  /** Optional CSS class. */
+  className?: string;
+  /** Optional variant. */
+  variant?: string;
+  /** Optional size. */
+  size?: string;
+  /** Optional striped rows flag. */
+  striped?: boolean;
+  /** Optional hoverable rows flag. */
+  hoverable?: boolean;
+  /** Optional inline style. */
+  style?: CSSProperties;
+  /** Pass-through props to underlying <table>. */
+  [key: string]: unknown;
+}
 
 /**
  * Компонент таблицы
@@ -23,7 +92,7 @@ export function Table({
   loading = false,
   emptyMessage = 'Нет данных',
   ...props
-}: any) {
+}: TableProps) {
   const theme = useTheme();
   const { getColor, getSpacing, getFontSize } = theme;
   
@@ -79,7 +148,7 @@ export function Table({
       setSortDirection('asc');
     }
     
-    onSort?.(field, sortDirection);
+    onSort?.(field, sortDirection as 'asc' | 'desc');
   }, [sortField, sortDirection, sortable, onSort]);
 
   // Обработка фильтрации
@@ -223,8 +292,8 @@ export function Table({
                   {column.filterable !== false && (
                     <Input
                       type="text"
-                      aria-label={`Filter ${column.title}`}
-                      placeholder={`Фильтр по ${column.title.toLowerCase()}`}
+                      aria-label={`Filter ${String(column.title ?? column.header ?? column.label ?? '')}`}
+                      placeholder={`Фильтр по ${String(column.title ?? column.header ?? column.label ?? '').toLowerCase()}`}
                       value={filters[column.key] || ''}
                       onChange={(e) => handleFilter(column.key, e.target.value)}
                       style={filterInputStyle as CSSProperties}
@@ -246,7 +315,7 @@ export function Table({
           ) : (
             paginatedData.map((row, index) => (
               <tr
-                key={row.id || index}
+                key={String(row.id ?? index)}
                 style={rowStyle as CSSProperties}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.backgroundColor = getColor('background', 'tertiary');
@@ -257,7 +326,7 @@ export function Table({
               >
                 {columns.map((column) => (
                   <td key={column.key} style={cellStyle as CSSProperties}>
-                    {column.render ? column.render(row[column.key], row) : row[column.key]}
+                    {column.render ? column.render(row[column.key], row) : String(row[column.key] ?? '')}
                   </td>
                 ))}
               </tr>

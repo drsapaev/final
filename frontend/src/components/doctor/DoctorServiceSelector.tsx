@@ -26,6 +26,36 @@ import tokenManager from '../../utils/tokenManager';
 import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
+
+// === Domain types ===
+export interface DoctorServiceItem {
+  id?: string | number;
+  service_id?: string | number;
+  service?: string;
+  name?: string;
+  quantity?: number;
+  price?: number;
+  total?: number;
+  duration?: number;
+  duration_minutes?: number;
+  currency?: string;
+  [key: string]: unknown;
+}
+
+export interface DoctorServiceSelectorProps {
+  /** Medical specialty filter (e.g. 'cardiology', 'dermatology'). */
+  specialty?: string;
+  /** Currently selected services (controlled). */
+  selectedServices?: DoctorServiceItem[];
+  /** Called whenever the selection changes. */
+  onServicesChange?: (services: DoctorServiceItem[]) => void;
+  /** Whether the user can edit service prices inline. */
+  canEditPrices?: boolean;
+  /** Extra CSS class. */
+  className?: string;
+  [key: string]: unknown;
+}
+
 /**
  * Селектор услуг для панели врача
  * Использует справочник из админ панели согласно passport.md стр. 1254
@@ -36,7 +66,7 @@ const DoctorServiceSelector = ({
   onServicesChange,
   canEditPrices = true,
   className = ''
-}: any) => {
+}: DoctorServiceSelectorProps) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // Проверяем демо-режим в самом начале
   const isDemoMode = window.location.pathname.includes('/medilab-demo');
@@ -167,11 +197,11 @@ const DoctorServiceSelector = ({
   };
 
   const getTotalCost = () => {
-    return selectedServices.reduce((total, service) => total + (service.total || service.price * service.quantity), 0);
+    return selectedServices.reduce((total, service) => total + (Number(service.total ?? 0) || (Number(service.price ?? 0) * Number(service.quantity ?? 1))), 0);
   };
 
   const getTotalDuration = () => {
-    return selectedServices.reduce((total, service) => total + service.duration_minutes * service.quantity, 0);
+    return selectedServices.reduce((total, service) => total + (Number(service.duration_minutes ?? 0) * Number(service.quantity ?? 1)), 0);
   };
   const handleActivationKeyDown = (event, onActivate) => {
     if (event.key === 'Enter' || event.key === ' ') {
@@ -268,7 +298,7 @@ const DoctorServiceSelector = ({
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-2)' }}>
             {selectedServices.map((service) =>
           <div
-            key={service.id}
+            key={String(service.id ?? service.service_id ?? '')}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -285,12 +315,12 @@ const DoctorServiceSelector = ({
                     <div style={{
                   fontWeight: 'var(--mac-font-weight-medium)',
                   color: 'var(--mac-text-primary)'
-                }}>{service.name}</div>
+                }}>{String(service.name ?? '')}</div>
                     <div style={{
                   fontSize: 'var(--mac-font-size-sm)',
                   color: 'var(--mac-text-tertiary)'
                 }}>
-                      {service.duration_minutes} мин
+                      {String(service.duration_minutes ?? '')} мин
                     </div>
                   </div>
                 </div>
@@ -369,13 +399,13 @@ const DoctorServiceSelector = ({
               <span style={{
                 fontWeight: 'var(--mac-font-weight-medium)',
                 color: 'var(--mac-text-primary)'
-              }}>{service.price.toLocaleString()}</span>
+              }}>{Number(service.price ?? 0).toLocaleString()}</span>
               }
 
                   <span style={{
                 fontSize: 'var(--mac-font-size-sm)',
                 color: 'var(--mac-text-tertiary)'
-              }}>{service.currency}</span>
+              }}>{String(service.currency ?? '')}</span>
 
                   {/* Убрать услугу */}
                   <Button

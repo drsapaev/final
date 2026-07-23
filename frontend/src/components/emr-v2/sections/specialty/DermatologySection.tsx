@@ -262,7 +262,7 @@ export function DermatologySection({
             <div className="dermatology-field-group">
                 <label className="dermatology-label">{i18nT('misc.ds_lokalizatsiya_porazheniy')}</label>
                 <EMRSmartFieldV2
-          value={localization?.description || ''}
+          value={String(localization?.description ?? '')}
           onChange={(value) => onChange?.('localization', {
             ...localization,
             description: value
