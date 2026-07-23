@@ -162,7 +162,7 @@ const useSettings = () => {
   }, [settings]);
 
   // Импорт настроек
-  const importSettings = useCallback(async (file) => {
+  const importSettings = useCallback(async (file: File) => {
     setLoading(true);
     setError(null);
     
@@ -187,7 +187,7 @@ const useSettings = () => {
   }, []);
 
   // Получение настроек по категории
-  const getSettingsByCategory = useCallback((category) => {
+  const getSettingsByCategory = useCallback((category: string) => {
     const categoryMap = {
       general: ['name', 'description', 'address', 'city', 'country', 'postalCode', 'phone', 'email', 'website'],
       workingHours: ['workingHours'],
@@ -203,7 +203,7 @@ const useSettings = () => {
     const fields = categoryMap[category] || [];
     const result = {};
     
-    fields.forEach(field => {
+    fields.forEach((field: string) => {
       if (Object.prototype.hasOwnProperty.call(settings, field)) {
         result[field] = settings[field];
       }

@@ -68,7 +68,7 @@ export function useDoctorPanelState({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resolveTabFromUrl]);
 
-  const handleTabChange = useCallback((tabId) => {
+  const handleTabChange = useCallback((tabId: string) => {
     setActiveTab(tabId);
     const params = new URLSearchParams(location.search);
     params.set('tab', tabId);
