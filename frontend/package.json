@@ -36,7 +36,8 @@
     "generate:api-types": "bash scripts/generate-api-types.sh",
     "generate:api-types:check": "bash scripts/generate-api-types.sh && git diff --exit-code src/types/generated/ || (echo 'API types are out of date! Run: npm run generate:api-types' && exit 1)",
     "type-debt:check": "node ../scripts/type-debt-check.mjs",
-    "strict:baseline": "node ../scripts/strict-baseline-check.mjs"
+    "strict:baseline": "node ../scripts/strict-baseline-check.mjs",
+    "strict:baseline:update": "node ../scripts/strict-baseline-check.mjs --update"
   },
   "dependencies": {
     "@emoji-mart/data": "^1.2.1",
