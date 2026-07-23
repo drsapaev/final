@@ -205,7 +205,7 @@ function ComponentTestInner() {
             type="text"
             aria-label="Test form name"
             placeholder={t('misc.ct_input_name')}
-            value={form?.values?.name || ''}
+            value={String(form?.values?.name ?? '')}
             onChange={(e) => setValue('name', e.target.value)}
             style={inputStyle}
           />
@@ -213,7 +213,7 @@ function ComponentTestInner() {
             type="email"
             aria-label="Test form email"
             placeholder="Email"
-            value={form?.values?.email || ''}
+            value={String(form?.values?.email ?? '')}
             onChange={(e) => setValue('email', e.target.value)}
             style={inputStyle}
           />

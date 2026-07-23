@@ -26,7 +26,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const FRONTEND_DIR = resolve(__dirname, '..', 'frontend', 'src');
 
 const BASELINE = {
-  anyCasts: 8,
+  anyCasts: 4,
   tsIgnore: 0,
   tsNoCheck: 0,
   indexSignatureAny: 0,
