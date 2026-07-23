@@ -654,6 +654,11 @@ jobs:
         cd frontend
         npm run type-debt:check
 
+    - name: 📊 Strict baseline gate (prevents new implicit-any / null-safety debt)
+      run: |
+        cd frontend
+        npm run strict:baseline
+
     - name: Icon-only controls accessibility sweep
       run: |
         cd frontend

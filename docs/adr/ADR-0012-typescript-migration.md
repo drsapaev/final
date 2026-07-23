@@ -480,6 +480,8 @@ Only after G1–G4 are complete:
 
 ### Revised effort estimate
 
+**Assumption:** 1 full-time developer with CI access and regression testing responsibilities.
+
 | Phase | Errors | Estimated days |
 |-------|--------|----------------|
 | G0 Baseline | — | 0.5 |
@@ -488,10 +490,7 @@ Only after G1–G4 are complete:
 | G3 remaining flags | ~500–1,500 | 3–5 |
 | G4 library types | 289 | 1–2 |
 | G5 strict: true + CI | — | 1 |
-| **Total** | **10,098** | **15–23 working days (3–4 calendar weeks)** |
-
-Previous estimate was 2–3 weeks; revised to 3–4 calendar weeks for a single
-developer including testing and regression passes.
+| **Total** | **10,098** | **15–23 working days (~3–4 calendar weeks)** |
 
 ### Current state
 
@@ -512,6 +511,62 @@ To:
 This is the true "strict-ready" state. After that, enabling `strict: true`
 becomes an administrative action rather than a large refactoring effort.
 
+### Maturity model
+
+The project's TypeScript maturity is tracked across three levels:
+
+| Level | Status | Description |
+|-------|--------|-------------|
+| **Level 1 — Achieved** | ✅ Complete (Phases B–F5) | 0 explicit `any`, 0 `@ts-nocheck`, 0 tsc, 0 eslint. CI debt gate enforces baseline=0. |
+| **Level 2 — Planned** | 📋 Phase G1–G2 | `noImplicitAny` + `strictNullChecks`. No implicit `any`, null-safe domain model. Strict baseline gate (`scripts/strict-baseline-check.mjs`) prevents regression during migration. |
+| **Level 3 — Future** | 🔮 Phase G3–G5 | `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`, gradual removal of index signatures, `strict: true` enabled. |
+
+This three-level boundary separates **migration** (complete) from **quality improvement** (ongoing), removing the pressure to "just enable strict and fix everything at once."
+
+### Strict baseline gate
+
+A CI gate (`scripts/strict-baseline-check.mjs`) was added in Phase H to prevent regression during the Phase G migration:
+
+- **`scripts/strict-baseline.json`** — records the current error count for `noImplicitAny` (5,417) and `strictNullChecks` (4,998)
+- **`npm run strict:baseline`** — runs `tsc` with each flag temporarily enabled and verifies the error count does not exceed the baseline
+- **CI step** — `📊 Strict baseline gate` runs after the type-debt gate in `ci-cd-unified.yml`
+
+This allows developers to fix strict-mode errors incrementally without blocking PRs: existing errors are grandfathered, but new errors fail CI. To reduce the baseline: fix errors → `node scripts/strict-baseline-check.mjs --update` → commit.
+
+### G1 semi-automatic approach (revised after autofix experiment)
+
+After the G1 autofix experiment showed that blind `: unknown` causes 429 downstream TS2345 errors, the revised G1 strategy uses a **semi-automatic** approach:
+
+**Automatically fix (safe — no downstream errors):**
+
+| Pattern | Before | After |
+|---------|--------|-------|
+| `onClick={(e) => ...}` | `(e)` | `(e: React.MouseEvent<HTMLButtonElement>)` |
+| `onChange={(e) => ...}` | `(e)` | `(e: React.ChangeEvent<HTMLInputElement>)` |
+| `onSubmit={(e) => ...}` | `(e)` | `(e: React.FormEvent<HTMLFormElement>)` |
+| `onKeyDown={(e) => ...}` | `(e)` | `(e: React.KeyboardEvent<HTMLElement>)` |
+| `onBlur={(e) => ...}` | `(e)` | `(e: React.FocusEvent<HTMLElement>)` |
+
+These React event handler types are well-known and don't cause downstream errors because the handler body accesses standard event properties (`.target.value`, `.preventDefault()`, etc.).
+
+**Estimated impact of semi-auto approach:**
+
+| Error code | Before | After semi-auto | Auto-fixed |
+|------------|--------|-----------------|------------|
+| TS7006 | 3,207 | ~2,200–2,400 | ~800–1,000 |
+| TS7031 | 943 | ~500 | ~400 |
+| TS7053 | 486 | ~350 | ~150 |
+| **Total** | **4,636** | **~3,050–3,250** | **~1,350–1,550** |
+
+**Do NOT auto-fix (requires domain analysis):**
+
+- `(patient) => ...` — needs `Patient` type
+- `(item) => ...` — needs domain-specific item type
+- `(data) => ...` — needs API response type
+- `(row) => ...` — needs table row type
+
+These require manual analysis to determine the correct domain type. Blind `: unknown` doesn't work because the function body accesses properties (`.id`, `.name`, `.status`) that require narrowing on `unknown`.
+
 ---
 
 ## References
@@ -520,5 +575,6 @@ becomes an administrative action rather than a large refactoring effort.
 - **Caller inventory**: `docs/f3-0-caller-inventory.md`
 - **Debt registry**: GitHub Issue #2443
 - **CI gate**: `scripts/type-debt-check.mjs` + `.github/workflows/ci-cd-unified.yml`
+- **Strict baseline gate**: `scripts/strict-baseline-check.mjs` + `scripts/strict-baseline.json`
 - **Baseline**: `scripts/type-debt-baseline.json` (currently 0)
-- **Phase PRs**: #2433, #2444, #2446, #2447, #2449, #2450, #2451, #2452, #2453, #2454
+- **Phase PRs**: #2433, #2444, #2446, #2447, #2449, #2450, #2451, #2452, #2453, #2454, #2455, #2456
