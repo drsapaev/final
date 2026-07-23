@@ -21,8 +21,42 @@ import './ComplaintsField.css';
 import logger from '../../../utils/logger';
 import { useTranslation } from '../../../i18n/useTranslation';
 
+// === Domain types ===
+export interface ComplaintsFieldSuggestion {
+  id?: string | number;
+  content?: string;
+  text?: string;
+  [key: string]: unknown;
+}
+
+export interface ComplaintsFieldProps {
+  /** Current complaints text (controlled). */
+  value?: string;
+  /** Called whenever the user edits the field. */
+  onChange?: (value: string) => void;
+  /** Whether the field is editable (read-only when false). */
+  isEditable?: boolean;
+  /** Whether AI suggestions are enabled. */
+  aiEnabled?: boolean;
+  /** Request AI suggestions for the given draft text; returns 2-3 variants. */
+  onRequestAI?: (text: string) => Promise<ComplaintsFieldSuggestion[]> | ComplaintsFieldSuggestion[] | undefined;
+  /** Inline validation error message. */
+  error?: string;
+  /** Auto-focus the field on mount. */
+  autoFocus?: boolean;
+  /** Called when the field is first touched (focus). Caller may receive field name. */
+  onFieldTouch?: (fieldName?: string) => void;
+  /** Called when the field loses focus. */
+  onBlur?: () => void;
+  /** Optional label override. */
+  label?: string;
+  /** Optional placeholder override. */
+  placeholder?: string;
+  [key: string]: unknown;
+}
+
 // Debounce hook
-const useDebounce = (value, delay) => {
+const useDebounce = (value: string, delay: number) => {
   const { t } = useTranslation();
     const [debouncedValue, setDebouncedValue] = useState(value);
 
@@ -46,7 +80,7 @@ const ComplaintsField = ({
     onBlur,
     label = 'Жалобы',
     placeholder = 'Введите жалобы пациента...'
-}: any) => {
+}: ComplaintsFieldProps) => {
     const complaintsFieldId = useId();
     const textareaRef = useRef(null);
 

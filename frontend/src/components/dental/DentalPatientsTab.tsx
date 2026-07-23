@@ -10,13 +10,40 @@ import { Scissors, FileText, Eye } from 'lucide-react';
 import { Stethoscope as Tooth } from 'lucide-react';
 import { useTranslation } from '../../i18n/useTranslation';
 
+// === Domain types ===
+export interface DentalPatientsTabPatient {
+  id?: string | number;
+  name?: string;
+  patient_name?: string;
+  full_name?: string;
+  patient_id?: string | number;
+  phone?: string;
+  last_visit?: string;
+  status?: string;
+  [key: string]: unknown;
+}
+
+export interface DentalPatientsTabProps {
+  /** Patients to render as cards. */
+  patients?: DentalPatientsTabPatient[];
+  /** Open the patient details view. */
+  onSelectPatient?: (patient: DentalPatientsTabPatient) => void;
+  /** Open the dental chart for a patient. */
+  onDentalChart?: (patient: DentalPatientsTabPatient) => void;
+  /** Open the treatment planner for a patient. */
+  onTreatment?: (patient: DentalPatientsTabPatient) => void;
+  /** Open the prosthetic flow for a patient. */
+  onProsthetic?: (patient: DentalPatientsTabPatient) => void;
+  [key: string]: unknown;
+}
+
 export function DentalPatientsTab({
   patients = [],
   onSelectPatient,
   onDentalChart,
   onTreatment,
   onProsthetic,
-}: any) {
+}: DentalPatientsTabProps) {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   if (patients.length === 0) {
     return (

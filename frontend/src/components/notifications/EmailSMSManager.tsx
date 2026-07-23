@@ -339,7 +339,13 @@ const EmailSMSManager = () => {
     );
   };
 
-  const renderStatCard = ({ title, value, detail, icon: Icon, tone = 'blue' }: any) => {
+  const renderStatCard = ({ title, value, detail, icon: Icon, tone = 'blue' }: {
+    title: string;
+    value: unknown;
+    detail?: string;
+    icon: import('lucide-react').LucideIcon;
+    tone?: 'blue' | 'green' | 'red' | 'orange' | string;
+  }) => {
     const toneColor = {
       blue: 'var(--mac-accent-blue)',
       green: 'var(--mac-success)',
@@ -353,7 +359,7 @@ const EmailSMSManager = () => {
           <div>
             <p style={{ margin: 0, color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-sm)', fontWeight: 'var(--mac-font-weight-semibold)' }}>{title}</p>
             <strong style={{ display: 'block', marginTop: 'var(--mac-spacing-2)', fontSize: '26px', color: 'var(--mac-text-primary)' }}>
-              {value}
+              {String(value ?? '')}
             </strong>
             {detail && (
               <span style={{ display: 'block', marginTop: 'var(--mac-spacing-1)', color: toneColor, fontSize: 'var(--mac-font-size-xs)' }}>

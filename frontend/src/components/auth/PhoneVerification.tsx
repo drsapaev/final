@@ -17,6 +17,34 @@ import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
 import { useSafeInput } from '../../hooks/useSafeInput';  // PR-39 / P0-5: sanitizer wired to form
 import { useTranslation } from '../../i18n/useTranslation';
+
+// === Domain types ===
+export type PhoneVerificationPurpose = 'verification' | 'login' | 'reset' | string;
+
+export interface PhoneVerificationResult {
+  phone: string;
+  verified_at?: string;
+  [key: string]: unknown;
+}
+
+export interface PhoneVerificationProps {
+  /** Initial phone number (E.164 or local format). */
+  phone?: string;
+  /** Why the code is being sent — controls i18n + backend endpoint selection. */
+  purpose?: PhoneVerificationPurpose;
+  /** Called once the phone is successfully verified. */
+  onVerified?: (result: PhoneVerificationResult) => void;
+  /** Cancel handler — closes the verification flow. */
+  onCancel?: () => void;
+  /** Optional custom message shown to the user. */
+  customMessage?: string;
+  /** When true, the user can edit the phone number inline. */
+  showPhoneInput?: boolean;
+  /** Optional override for the card title (defaults to translated string). */
+  title?: string;
+  [key: string]: unknown;
+}
+
 const PhoneVerification = ({
   phone,
   purpose = 'verification',
@@ -25,7 +53,7 @@ const PhoneVerification = ({
   customMessage,
   showPhoneInput = false,
   title  // PR-44 / P0-19: default now comes from useTranslation
-}: any) => {
+}: PhoneVerificationProps) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // PR-44 / P0-19: title defaults to translated string instead of hardcoded RU
   const displayTitle = title || t('verificationTitle');
