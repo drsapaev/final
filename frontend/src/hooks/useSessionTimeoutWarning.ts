@@ -32,7 +32,7 @@ const DEFAULT_POLL_INTERVAL = 30 * 1000; // 30 seconds
  * Returns the expiration time in milliseconds (epoch), or null if the
  * token is not a JWT or has no exp claim.
  */
-function getTokenExpiryMs(token) {
+function getTokenExpiryMs(token: string) {
   if (!token) return null;
   try {
     const parts = token.split('.');

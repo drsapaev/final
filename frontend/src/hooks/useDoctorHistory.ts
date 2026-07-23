@@ -88,7 +88,7 @@ export function useDoctorHistory({
         history.forEach(entry => {
             if (entry.content) {
                 // Split by sentences/newlines
-                entry.content.split(/[.\n]/).forEach(phrase => {
+                entry.content.split(/[.\n]/).forEach((phrase: string) => {
                     const trimmed = phrase.trim();
                     if (trimmed.length > 10 && trimmed.length < 200) {
                         phrases.add(trimmed);
