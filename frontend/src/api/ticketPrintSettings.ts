@@ -80,7 +80,7 @@ export async function fetchTicketPrintSettings() {
   return normalizeTicketPrintSettings(response.data);
 }
 
-export async function saveTicketPrintSettings(payload) {
+export async function saveTicketPrintSettings(payload: Record<string, unknown>) {
   const response = await api.put('/admin/clinic/ticket-print-settings', payload);
   return normalizeTicketPrintSettings(response.data);
 }
