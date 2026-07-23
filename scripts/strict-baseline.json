@@ -1,0 +1,40 @@
+{
+  "generatedAt": "2026-07-23",
+  "description": "Baseline error counts for strict-mode migration (Phase G). This file is used by scripts/strict-baseline-check.mjs to prevent regression — new code must not increase the error count above these baselines.",
+  "flags": {
+    "noImplicitAny": {
+      "totalErrors": 5417,
+      "topErrorCodes": {
+        "TS7006": 3207,
+        "TS7031": 943,
+        "TS7053": 486,
+        "TS7016": 289,
+        "TS7005": 142,
+        "TS7018": 109,
+        "TS7022": 107
+      },
+      "topDirectories": {
+        "pages": 710,
+        "components/admin": 659,
+        "utils": 305,
+        "hooks": 280,
+        "components/dental": 238,
+        "api": 235,
+        "components/laboratory": 187,
+        "components/common": 171,
+        "components": 138,
+        "components/forms": 136
+      }
+    },
+    "strictNullChecks": {
+      "totalErrors": 4998
+    }
+  },
+  "notes": [
+    "This baseline was generated after Phase F5 (zero explicit any casts).",
+    "The counts represent IMPLICIT any and null-safety debt that Phase G will address.",
+    "To reduce the baseline: fix errors → run scripts/strict-baseline-check.mjs --update → commit.",
+    "To increase the baseline: only with justification in a PR (e.g. new file with known debt).",
+    "See docs/adr/ADR-0012-typescript-migration.md Phase G section for the full incremental plan."
+  ]
+}
