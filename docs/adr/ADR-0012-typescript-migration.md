@@ -337,57 +337,180 @@ Further strictness is a **policy decision** for a separate ADR.
 
 ---
 
-## Phase G — Strict Mode Assessment
+## Phase G — Strict Mode Assessment & Incremental Plan
 
-Phase G assessed the feasibility of enabling `strict: true` in `tsconfig.json`.
-The assessment was performed by temporarily enabling strict mode and counting
-the resulting TypeScript compiler errors.
+Phase G assessed the feasibility of enabling `strict: true` in `tsconfig.json`
+and produced a detailed incremental plan with error distribution telemetry.
 
-### Error breakdown (strict: true, all flags)
+### G0 — Baseline & telemetry
 
-| Flag | Error count | Top error codes |
-|------|-------------|-----------------|
-| `strict: true` (all) | **10,098** | TS2339 (3583), TS7006 (3135), TS7031 (849), TS7053 (491) |
-| `noImplicitAny: true` alone | 5,417 | TS7006, TS7031, TS7053 (implicit `any` on untyped params) |
-| `strictNullChecks: true` alone | 4,998 | TS2339, TS2322, TS18047 (null/undefined access) |
+Error distribution collected via `npx tsc --noEmit --pretty false`:
 
-### Interpretation
+**Top error codes (noImplicitAny: true, 5,417 total):**
 
-- **TS7006/TS7031** (3,984 errors) — untyped function parameters and destructured
-  bindings. These are the bulk of the debt: hundreds of functions like
-  `const handleChange = (e) => ...` where `e` is implicitly `any`. Fixing
-  requires adding type annotations to ~2,000 function signatures.
-- **TS2339** (3,583 errors) — property access on `unknown`/`null`/`undefined`.
-  Many are downstream of the index-signature compromise (`[key: string]: unknown`)
-  — accessing `.foo` on `unknown` requires narrowing. Fixing requires either
-  type guards or explicit casts at each access site.
-- **TS7016** (289 errors) — missing declaration files for untyped npm packages.
-  Requires adding `@types/*` packages or writing custom `.d.ts` shims.
+| Code | Count | Description |
+|------|-------|-------------|
+| TS7006 | 3,207 | Parameter implicitly has `any` type |
+| TS7031 | 943 | Binding element implicitly has `any` type |
+| TS7053 | 486 | Element implicitly has `any` type (index access) |
+| TS7016 | 289 | Could not find declaration file (library types) |
+| TS7005 | 142 | Variable implicitly has `any` type |
+| TS7018 | 109 | Object literal property implicitly has `any` type |
+| TS7022 | 107 | Variable implicitly has type `any` in some locations |
 
-### Decision
+**Errors by directory (top 15):**
 
-**Phase G is deferred.** Enabling `strict: true` in one step would surface
-10,098 errors — far too many for a single PR. The recommended approach is
-incremental:
+| Directory | Errors |
+|-----------|--------|
+| `pages/` | 710 |
+| `components/admin/` | 659 |
+| `utils/` | 305 |
+| `hooks/` | 282 |
+| `components/dental/` | 238 |
+| `api/` | 235 |
+| `components/laboratory/` | 187 |
+| `components/common/` | 171 |
+| `components/` (root) | 138 |
+| `components/forms/` | 136 |
+| `components/wizard/` | 124 |
+| `components/ui/macos/` | 110 |
+| `components/cardiology/` | 107 |
+| `components/laboratory/templateEditor/` | 105 |
+| `components/ai/` | 103 |
 
-1. **G1: `noImplicitAny`** (5,417 errors) — batch-add type annotations to
-   untyped function parameters. Estimated 3–5 days.
-2. **G2: `strictNullChecks`** (4,998 errors, overlapping) — add null guards
-   and optional chaining. Estimated 5–7 days.
-3. **G3: Remaining strict flags** (`strictFunctionTypes`, `strictBindCallApply`,
-   `strictPropertyInitialization`, `noImplicitThis`, `alwaysStrict`) —
-   estimated 2–3 days.
-4. **G4: Library type gaps** (289 errors) — add `@types/*` packages or
-   custom `.d.ts` shims for untyped npm dependencies.
+**Cascade priority** (`hooks/` + `contexts/` + `stores/` + `api/`): **577 errors** (11% of total, but highest cascade impact — fixing these first reduces downstream errors in `components/` and `pages/`).
 
-Total estimated effort: **2–3 developer-weeks** for full `strict: true`.
+**Top-20 files by error count:**
+
+| File | Errors |
+|------|--------|
+| `api/endpoints.ts` | 74 |
+| `pages/DentistPanelUnified.tsx` | 73 |
+| `components/laboratory/LabTemplateWorkbench.tsx` | 70 |
+| `pages/TelegramMiniAppPatientShell.tsx` | 66 |
+| `components/wizard/AppointmentWizardV2.tsx` | 65 |
+| `pages/RegistrarPanel.tsx` | 58 |
+| `pages/Landing.tsx` | 58 |
+| `pages/CashierPanel.tsx` | 58 |
+| `pages/Settings.tsx` | 56 |
+| `components/tables/EnhancedAppointmentsTable.tsx` | 56 |
+
+### G1 — `noImplicitAny` (5,417 errors, estimated 4–6 days)
+
+The most mechanical phase. Errors are mostly TS7006 (untyped function parameters)
+and TS7031 (untyped destructured bindings).
+
+**Strategy:**
+
+1. **Day 1: hooks + contexts** (577 errors) — highest cascade effect. Typing
+   hook return values and context shapes will eliminate downstream errors in
+   components that consume them.
+2. **Day 2: api + stores** (235 + 0 errors) — API client functions need typed
+   parameters and return types.
+3. **Day 3: top-20 components** (~700 errors) — largest component files by
+   error count.
+4. **Day 4: remaining TS7006** (~2,000 errors) — batch process.
+5. **Day 5: TS7031 + TS7053 + cleanup** (~1,400 errors) — destructuring and
+   index access patterns.
+6. **Day 6: CI gate** — enable `noImplicitAny: true` in tsconfig + add
+   `npm run typecheck:noImplicitAny` to CI.
+
+**Important lesson from G1 autofix experiment:** Blindly replacing `: any`
+with `: unknown` does NOT work — `unknown` requires narrowing before property
+access, causing TS2339 errors downstream. Each parameter needs a **specific**
+type (e.g., `React.MouseEvent<HTMLButtonElement>`, `Patient`, `string`).
+The autofix script (`scripts/g1-autofix.py`) successfully fixed 395 TS7006
+errors in hooks/contexts/api, but introduced 429 new TS2345 errors because
+`unknown` params were passed to functions expecting `string`. **Manual type
+annotation with specific types is required.**
+
+### G2 — `strictNullChecks` (4,998 errors, estimated 6–9 days)
+
+Not mechanical — requires changing the data model to be null-safe.
+
+**Typical patterns:**
+
+| Pattern | Before | After |
+|---------|--------|-------|
+| useState | `useState<Patient>()` | `useState<Patient \| null>(null)` |
+| Property access | `patient.name` | `patient?.name ?? ''` |
+| Refs | `inputRef.current.focus()` | `inputRef.current?.focus()` |
+| API responses | `data.items.map(...)` | `data?.items?.map(...) ?? []` |
+
+**Danger zones:** EMR forms, queue state, appointment data — nullable states
+often reflect real business logic. Must not blindly use `!` (non-null assertion).
+
+**ESLint rule to add:** `@typescript-eslint/no-non-null-assertion: warn` —
+forces `!` to be accompanied by a comment explaining the invariant.
+
+### G3 — Remaining strict flags (estimated 3–5 days)
+
+Enable **one at a time** in this order:
+
+1. **`exactOptionalPropertyTypes`** — most useful after G2. Distinguishes
+   `{ foo?: string }` from `{ foo: string | undefined }`.
+2. **`noImplicitOverride`** — almost free, requires `override` keyword on
+   class methods.
+3. **`noUncheckedIndexedAccess`** — noisiest, forces narrowing on every
+   `array[i]` and `record[key]` access. Enable last.
+4. **`noPropertyAccessFromIndexSignature`** — only useful after removing
+   `[key: string]: unknown` index signatures (long-term goal).
+
+### G4 — Library types (289 errors, estimated 1–2 days)
+
+1. Install `@types/*` packages: `@types/qrcode`, `@types/file-saver`,
+   `@types/lodash`, `@types/prop-types`, etc.
+2. For libraries without types, create `src/types/vendor.d.ts` with typed
+   module declarations:
+   ```ts
+   declare module 'legacy-medical-sdk' {
+     export function connect(...args: unknown[]): unknown;
+   }
+   ```
+3. Never use bare `declare module 'foo';` without exports — that's hidden `any`.
+
+### G5 — Enable `strict: true` + CI gates
+
+Only after G1–G4 are complete:
+
+1. Set `"strict": true` in `tsconfig.json` (replaces individual flags).
+2. Add `npm run typecheck:strict` to CI as a required check.
+3. Update `scripts/type-debt-check.mjs` to also verify `strict: true` is
+   enabled (prevents accidental rollback).
+
+### Revised effort estimate
+
+| Phase | Errors | Estimated days |
+|-------|--------|----------------|
+| G0 Baseline | — | 0.5 |
+| G1 noImplicitAny | 5,417 | 4–6 |
+| G2 strictNullChecks | 4,998 | 6–9 |
+| G3 remaining flags | ~500–1,500 | 3–5 |
+| G4 library types | 289 | 1–2 |
+| G5 strict: true + CI | — | 1 |
+| **Total** | **10,098** | **15–23 working days (3–4 calendar weeks)** |
+
+Previous estimate was 2–3 weeks; revised to 3–4 calendar weeks for a single
+developer including testing and regression passes.
 
 ### Current state
 
 `tsconfig.json` retains `strict: false` and `noImplicitAny: false`. The
 codebase has zero *explicit* `any` casts (enforced by CI debt gate), but
 *implicit* `any` is still permitted by the compiler. This is the accepted
-endpoint of the Phase B–F5 migration; Phase G is a separate future project.
+endpoint of the Phase B–F5 migration; Phase G is a separate future project
+with a detailed incremental plan documented above.
+
+### Key insight
+
+After G1+G2, the project will transition from:
+- Zero explicit `any` + loose compiler mode
+
+To:
+- Zero explicit `any` + no implicit `any` + null-safe domain model
+
+This is the true "strict-ready" state. After that, enabling `strict: true`
+becomes an administrative action rather than a large refactoring effort.
 
 ---
 
