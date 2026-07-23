@@ -29,6 +29,56 @@ import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
 
+// === Domain types ===
+// EchoForm tracks echocardiography measurements grouped by anatomical
+// section. All measurement fields are strings (user input) until saved.
+
+export interface EchoData {
+  leftVentricle: {
+    edd: string;
+    esd: string;
+    ef: string;
+    fs: string;
+    ivs: string;
+    pw: string;
+  };
+  rightVentricle: {
+    rvdd: string;
+    rvot: string;
+  };
+  atria: {
+    la: string;
+    ra: string;
+  };
+  valves: {
+    mitral: { e: string; a: string; e_a: string; decel_time: string };
+    tricuspid: { e: string; a: string; e_a: string };
+    aortic: { peak_velocity: string; mean_gradient: string; ava: string };
+    pulmonary: { peak_velocity: string; mean_gradient: string };
+  };
+  additional: {
+    pericardium: string;
+    aorta: string;
+    comments: string;
+  };
+  conclusion: string;
+  [key: string]: unknown;
+}
+
+export interface EchoFormProps {
+  /** Visit ID for saving/loading Echo data via API. */
+  visitId?: string | number | null;
+  /** Patient ID (passed through for API calls). */
+  patientId?: string | number | null;
+  /** Called when user saves the form without a visitId (draft mode). */
+  onSave?: (data: EchoData) => void;
+  /** Reload patient data after Echo changes (called after successful save). */
+  onDataUpdate?: () => void;
+  /** Pre-populate the form with existing Echo data. */
+  initialData?: Partial<EchoData> | null;
+  [key: string]: unknown;
+}
+
 const DEFAULT_ECHO_DATA = {
   // Левый желудочек
   leftVentricle: {
@@ -144,9 +194,9 @@ function buildEchoEmrPayload(existingEmr, echoData) {
   };
 }
 
-const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: any) => {
+const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFormProps) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
-  const [echoData, setEchoData] = useState(DEFAULT_ECHO_DATA);
+  const [echoData, setEchoData] = useState<EchoData>(DEFAULT_ECHO_DATA as EchoData);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -165,13 +215,13 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: any) =>
     }
   }, [initialData]);
 
-  const handleChange = (section, field, value) => {
+  const handleChange = (section: string, field: string, value: unknown) => {
     setEchoData((prev) => ({
       ...prev,
       [section]: field.includes('.')
         ? setNestedValue(prev[section] || {}, field, value)
         : {
-          ...(prev[section] || {}),
+          ...(prev[section] as Record<string, unknown> || {}),
           [field]: value
         }
     }));
@@ -206,7 +256,7 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: any) =>
         if (onSave) {
           onSave(response.data?.data?.specialty_data?.echo || echoData);
         }
-        onDataUpdate?.(response.data);
+        onDataUpdate?.();
       }
     } catch (err) {
       setError(t('cardio.cardio_echo_save_error'));

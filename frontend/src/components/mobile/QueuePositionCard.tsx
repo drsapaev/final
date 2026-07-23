@@ -6,7 +6,34 @@ import { Clock, User } from 'lucide-react';
 import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 
-const QueuePositionCard = ({ queueEntry }: any) => {
+// === Domain types ===
+// Patient-facing queue position card. The shape is built by the caller
+// (MobilePatientDashboard) from the active queue entry; the card itself
+// only reads the fields below.
+
+export type QueueEntryStatus = 'waiting' | 'called' | 'in_service' | 'in_cabinet' | string;
+
+export interface QueueEntrySnapshot {
+  id?: string | number;
+  number?: string | number;
+  status?: QueueEntryStatus;
+  peopleBefore?: number;
+  estimatedWaitTime?: number;
+  doctorName?: string;
+  specialty?: string;
+  cabinet?: string | number;
+  [key: string]: unknown;
+}
+
+export interface QueuePositionCardProps {
+  /** Snapshot of the patient's current queue position. */
+  queueEntry?: QueueEntrySnapshot | null;
+  /** Optional refresh handler (caller triggers data reload). */
+  onRefresh?: () => void | Promise<void>;
+  [key: string]: unknown;
+}
+
+const QueuePositionCard = ({ queueEntry }: QueuePositionCardProps) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   if (!queueEntry) return null;
 
@@ -22,7 +49,7 @@ const QueuePositionCard = ({ queueEntry }: any) => {
   } = queueEntry;
 
   // Определение цветов и текстов в зависимости от статуса
-  const getStatusConfig = (status) => {
+  const getStatusConfig = (status: string | undefined) => {
     switch (status) {
       case 'waiting':
         return {

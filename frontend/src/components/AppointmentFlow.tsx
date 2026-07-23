@@ -10,7 +10,42 @@ import {
 
 '../constants/appointmentStatus';
 
-const AppointmentFlow = ({ appointment }: any) => {
+// === Domain types ===
+// AppointmentFlow renders a stepper for an appointment lifecycle:
+// payment → visit → emr → prescription. The component only reads status
+// and a few display fields; the full appointment shape is opaque to it.
+
+interface AppointmentFlowEmr {
+  isDraft?: boolean;
+  [key: string]: unknown;
+}
+
+interface AppointmentFlowPrescription {
+  isDraft?: boolean;
+  [key: string]: unknown;
+}
+
+export interface AppointmentFlowAppointment {
+  id?: string | number;
+  status?: string;
+  patient_name?: string;
+  specialist?: string;
+  emr?: AppointmentFlowEmr | null;
+  prescription?: AppointmentFlowPrescription | null;
+  [key: string]: unknown;
+}
+
+export interface AppointmentFlowProps {
+  /** The appointment being visualized. */
+  appointment?: AppointmentFlowAppointment | null;
+  /** Optional handler — fired when user wants to start the visit. */
+  onStartVisit?: (appointment: AppointmentFlowAppointment) => void;
+  /** Optional handler — fired when user wants to open the payment flow. */
+  onPayment?: (appointment: AppointmentFlowAppointment) => void;
+  [key: string]: unknown;
+}
+
+const AppointmentFlow = ({ appointment }: AppointmentFlowProps) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const getStepIcon = (step: string, status?: string) => {
     switch (step) {
