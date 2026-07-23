@@ -54,9 +54,19 @@ export function useTranslation() {
     }
   };
 
+  // Wrap t() to accept any flat string key — matching the project's
+  // flat-key convention (e.g. t('common.save'), t('cardio.unit_mgdl')).
+  // react-i18next's strict TFunction enforces namespaced key prefixes
+  // (e.g. 'ru:common.save') when resources are typed. We deliberately
+  // keep resources untyped (see src/types/react-i18next-override.d.ts)
+  // and loosen t() here so 700+ call sites continue to work.
+  const t = ((key: string, options?: Record<string, unknown>) =>
+    reactI18n.t(key as never, options as never) as unknown as string) as
+    (key: string, options?: Record<string, unknown>) => string;
+
   return {
     ...reactI18n,
-    t: reactI18n.t,
+    t,
     i18n,
     // Augmented fields
     language,

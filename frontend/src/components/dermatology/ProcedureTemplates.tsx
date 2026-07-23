@@ -168,8 +168,7 @@ const ProcedureTemplates = ({ onSelectProcedure, visitId }: { onSelectProcedure?
   const loadTemplates = useCallback(async () => {
     try {
       // В реальном приложении загружаем с сервера
-      // const response = await api.get('/procedure-templates') as any;
-      // setTemplates(response.data);
+      // (backend endpoint /procedure-templates not yet wired — using defaults)
 
       // Для демо используем предустановленные
       setTemplates(defaultTemplatesRef.current);
