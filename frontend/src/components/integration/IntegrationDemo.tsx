@@ -16,6 +16,10 @@ const IntegrationDemo = () => {
   const [activeDemo, setActiveDemo] = useState('queue');
   
   // Используем созданные хуки
+  // TECH-DEBT(integration-demo-001): demo file uses fields that don't exist on
+  // UseQueueManagerReturn (generateQRCode, error, success). Keeping the loose
+  // Record type below so the demo keeps compiling — it is internal demo code,
+  // not production. Revisit when modernizing the demo surface.
   const queueManager = useQueueManager() as unknown as Record<string, any>;
   const emrAI = useEMRAI();
   const { users, appointments, actions } = useAppData() as unknown as { users: unknown[]; appointments: unknown[]; actions: { setLoading: (key: string, v: boolean) => void; setUsers: (v: unknown[]) => void; [key: string]: unknown }; };

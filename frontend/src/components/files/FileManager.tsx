@@ -111,6 +111,24 @@ const permissionOptions = (t) => [
   { value: 'confidential', label: t('misc.fm_filter_perm_confidential') }
 ];
 
+// === Domain types ===
+// Shape returned by GET /files/statistics — backend response is dynamic,
+// so we expose the canonical fields the UI reads and let extra fields ride
+// along via the index signature.
+interface FileStorageUsage {
+  used_bytes?: number;
+  max_bytes?: number;
+  [key: string]: unknown;
+}
+
+interface FileManagerStats {
+  total_files?: number;
+  total_size?: number;
+  files_by_type?: Record<string, number>;
+  storage_usage?: FileStorageUsage | null;
+  [key: string]: unknown;
+}
+
 const fileTypeLabels = (t) => ({
   image: t('misc.fm_label_image'),
   video: t('misc.fm_label_video'),
@@ -155,7 +173,7 @@ const FileManager = () => {
   const [currentFolder] = useState(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showStatsModal, setShowStatsModal] = useState(false);
-  const [stats, setStats] = useState(null as any);
+  const [stats, setStats] = useState<FileManagerStats | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploading, setUploading] = useState(false);
 
@@ -810,7 +828,7 @@ const FileManager = () => {
                   <CardDescription>{t('misc.fm_stat_total_files_desc')}</CardDescription>
                 </CardHeader>
                 <CardContent style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <strong style={{ fontSize: '26px' }}>{stats.total_files || 0}</strong>
+                  <strong style={{ fontSize: '26px' }}>{stats?.total_files || 0}</strong>
                   <File size={30} style={{ color: 'var(--mac-accent-blue)' }} />
                 </CardContent>
               </Card>
@@ -821,7 +839,7 @@ const FileManager = () => {
                   <CardDescription>{t('misc.fm_stat_total_size_desc')}</CardDescription>
                 </CardHeader>
                 <CardContent style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <strong style={{ fontSize: '26px' }}>{formatFileSize(stats.total_size)}</strong>
+                  <strong style={{ fontSize: '26px' }}>{formatFileSize(stats?.total_size)}</strong>
                   <BarChart3 size={30} style={{ color: 'var(--mac-success)' }} />
                 </CardContent>
               </Card>
@@ -831,10 +849,10 @@ const FileManager = () => {
                   <CardTitle>{t('misc.fm_stat_by_type')}</CardTitle>
                 </CardHeader>
                 <CardContent style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
-                  {Object.entries(stats.files_by_type || {}).length === 0 ? (
+                  {Object.entries(stats?.files_by_type || {}).length === 0 ? (
                     <span style={{ color: 'var(--mac-text-secondary)' }}>{t('misc.no_data')}</span>
                   ) : (
-                    Object.entries(stats.files_by_type || {}).map(([type, count]: [string, any]) => (
+                    Object.entries(stats?.files_by_type || {}).map(([type, count]) => (
                       <div key={type} style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--mac-spacing-3)' }}>
                         <span style={{ color: 'var(--mac-text-secondary)' }}>{fileTypeLabels(t)[type] || type}</span>
                         <strong>{count}</strong>
@@ -851,15 +869,15 @@ const FileManager = () => {
                 <CardContent style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--mac-spacing-3)' }}>
                     <span style={{ color: 'var(--mac-text-secondary)' }}>{t('misc.fm_stat_storage_used')}</span>
-                    <strong>{formatFileSize(stats.storage_usage?.used_bytes || 0)}</strong>
+                    <strong>{formatFileSize(stats?.storage_usage?.used_bytes || 0)}</strong>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--mac-spacing-3)' }}>
                     <span style={{ color: 'var(--mac-text-secondary)' }}>{t('misc.fm_stat_storage_max')}</span>
-                    <strong>{formatFileSize(stats.storage_usage?.max_bytes || 0)}</strong>
+                    <strong>{formatFileSize(stats?.storage_usage?.max_bytes || 0)}</strong>
                   </div>
-                  {stats.storage_usage?.max_bytes && (
+                  {stats?.storage_usage?.max_bytes && (
                     <Progress
-                      value={(stats.storage_usage.used_bytes || 0) / stats.storage_usage.max_bytes * 100}
+                      value={(stats?.storage_usage?.used_bytes || 0) / stats?.storage_usage?.max_bytes * 100}
                       variant="primary"
                     />
                   )}

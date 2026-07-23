@@ -22,6 +22,103 @@ import './CartStepV2.css';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
 
+// === Domain types ===
+// CartStepV2 is step 2 of AppointmentWizardV2. The parent owns all state;
+// the child receives data + callbacks. Service / doctor / cart shapes are
+// dynamic (backend-driven), so they ride along via index signatures.
+
+export interface CartItem {
+  id?: string | number;
+  service_id?: string | number;
+  service?: string;
+  name?: string;
+  quantity?: number;
+  price?: number;
+  service_price?: number;
+  doctor_id?: string | number;
+  doctor_name?: string;
+  doctor?: string;
+  visit_type?: string;
+  [key: string]: unknown;
+}
+
+export interface CartState {
+  items?: CartItem[];
+  [key: string]: unknown;
+}
+
+export interface CartService {
+  id?: string | number;
+  name: string;
+  category_code?: string;
+  service_code?: string;
+  code?: string;
+  price?: number;
+  duration?: number;
+  [key: string]: unknown;
+}
+
+export interface CartDoctor {
+  id?: string | number;
+  name?: string;
+  full_name?: string;
+  specialty?: string;
+  [key: string]: unknown;
+}
+
+export interface CartErrors {
+  [key: string]: unknown;
+}
+
+export interface RepeatEligibility {
+  eligible?: boolean;
+  reason?: string;
+  repeat_discount_percent?: number;
+  [key: string]: unknown;
+}
+
+export interface RepeatEligibilityMap {
+  [itemId: string]: RepeatEligibility | undefined | null | unknown;
+}
+
+export interface RepeatSuggestionSummary {
+  [key: string]: unknown;
+}
+
+export interface CartStepV2Props {
+  /** Cart state (items + visit metadata). */
+  cart: CartState;
+  /** Add a service to the cart. */
+  onAddToCart: (service: CartService) => void;
+  /** Remove an item from the cart by id. */
+  onRemoveFromCart: (itemId: string | number | undefined) => void;
+  /** All available services (filtered + grouped internally). */
+  servicesData: CartService[];
+  /** Doctor lookup (array or map keyed by id). */
+  doctorsData: CartDoctor[] | Record<string, CartDoctor>;
+  /** Inline validation errors keyed by field. */
+  errors?: CartErrors;
+  /** Currently active category tab. */
+  activeCategory: string;
+  /** Service search query string. */
+  searchQuery: string;
+  /** Wizard edit mode (loads every service). */
+  editMode?: boolean;
+  /** SSOT: function to resolve a service display name (accepts cart item or service). */
+  getServiceName: (itemOrService: { service_id?: string | number; name?: string; [key: string]: unknown }) => string;
+  /** Update a single field on a cart item. Caller signature is (itemId, field, value). */
+  onUpdateItem: (itemId: string | number | undefined, field: string, value: unknown) => void;
+  /** Map of cart-item-id → repeat eligibility flag. */
+  repeatEligibilityByItemId?: RepeatEligibilityMap;
+  /** Loading flag for repeat eligibility lookups. */
+  isRepeatEligibilityLoading?: boolean;
+  /** Apply a repeat-eligibility suggestion (caller may pass an item id or none). */
+  onApplyRepeatSuggestion?: (...args: unknown[]) => void;
+  /** Summary of repeat suggestions shown to the user. */
+  repeatSuggestionSummary?: RepeatSuggestionSummary;
+  [key: string]: unknown;
+}
+
 const CartStepV2 = ({
   cart,
   onAddToCart,
@@ -39,7 +136,7 @@ const CartStepV2 = ({
   isRepeatEligibilityLoading,
   onApplyRepeatSuggestion,
   repeatSuggestionSummary
-}: any) => {
+}: CartStepV2Props) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // Local state removed - lifted to AppointmentWizardV2
 
@@ -277,9 +374,10 @@ const CartStepV2 = ({
           }
 
             {consultationRows.map((row) => {
-            const isEligible = Boolean(row.eligibility?.eligible);
-            const reason = row.eligibility?.reason || t('misc.csv_proverka_nedostupna');
-            const discount = Number(row.eligibility?.repeat_discount_percent || 0);
+            const eligibility = row.eligibility as RepeatEligibility | null | undefined;
+            const isEligible = Boolean(eligibility?.eligible);
+            const reason = eligibility?.reason || t('misc.csv_proverka_nedostupna');
+            const discount = Number(eligibility?.repeat_discount_percent || 0);
             return (
               <div key={row.itemId} className="cart-step-v2__consultation-row">
                   <div className="cart-step-v2__consultation-info">
@@ -370,7 +468,7 @@ const CartStepV2 = ({
         }}>
             {cart.items.map((item) => {
             // ✅ SSOT: Используем единую функцию для получения названия услуги
-            const displayName = getServiceName ? getServiceName(item) : item.service_name || t('misc.csv_neizvestnaya_usluga');
+            const displayName = String(getServiceName ? getServiceName(item) : item.service_name || t('misc.csv_neizvestnaya_usluga'));
             const service = servicesData?.find((s) => s.id === item.service_id);
             const requiresDoctor = Boolean(service?.requires_doctor || service?.is_consultation);
 
@@ -502,7 +600,7 @@ const CartStepV2 = ({
           gap: 'var(--mac-spacing-2)'
         }}>
             <AlertCircle size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
-            {errors.cart || errors.doctors || errors.repeat}
+            {String(errors.cart ?? errors.doctors ?? errors.repeat ?? '')}
           </div>
         }
       </div>

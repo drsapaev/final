@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useRef, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useRef, useCallback, type ReactNode, type Dispatch, type SetStateAction } from 'react';
 import { useLocation } from 'react-router-dom';
 import PropTypes from 'prop-types';
 import { getWsBaseUrl } from '../api/runtime';
@@ -19,9 +19,11 @@ import { isPublicRoutePath } from '../routing/routeSelectors';
 // index signature. These intentionally match the shape produced by
 // api/messages.ts (which is still implicit-any — typed in a later batch).
 interface ChatReaction {
-  emoji: string;
-  count: number;
-  user_ids?: number[];
+  reaction: string;
+  id?: number;
+  user_id: number;
+  user_name?: string | null;
+  [key: string]: unknown;
 }
 
 interface ChatMessage {
@@ -38,6 +40,10 @@ interface ChatMessage {
 
 interface Conversation {
   user_id: number;
+  user_name?: string;
+  user_role?: string;
+  role?: string;
+  last_message_time?: string;
   unread_count?: number;
   last_message?: string;
   last_message_at?: string;
@@ -98,7 +104,7 @@ interface ChatContextValue {
   isChatOpen: boolean;
   setIsChatOpen: (open: boolean) => void;
   mutedConversations: Set<number>;
-  setMutedConversations: (next: Set<number>) => void;
+  setMutedConversations: Dispatch<SetStateAction<Set<number>>>;
   onlineUsers: Record<string, unknown>;
   requestOnlineStatus: (userIds: number[]) => void;
   loadConversations: (options?: { syncUnread?: boolean }) => Promise<void>;

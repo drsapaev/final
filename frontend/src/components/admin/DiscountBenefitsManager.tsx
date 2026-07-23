@@ -31,6 +31,40 @@ import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 
+// === Domain types ===
+// Shape produced by loadAnalytics(): three optional analytics sections, each
+// returned by a separate backend endpoint. Fields are optional because the
+// backend may omit them when there is no data yet.
+
+interface DiscountAnalyticsSection {
+  total_applications?: number;
+  total_discount_amount?: number;
+  average_discount_percentage?: number;
+  [key: string]: unknown;
+}
+
+interface BenefitAnalyticsSection {
+  total_applications?: number;
+  total_benefit_amount?: number;
+  average_benefit_percentage?: number;
+  [key: string]: unknown;
+}
+
+interface LoyaltyAnalyticsSection {
+  total_patients?: number;
+  active_patients?: number;
+  total_points_earned?: number;
+  redemption_rate?: number;
+  [key: string]: unknown;
+}
+
+interface DiscountAnalytics {
+  discounts?: DiscountAnalyticsSection | null;
+  benefits?: BenefitAnalyticsSection | null;
+  loyalty?: LoyaltyAnalyticsSection | null;
+  [key: string]: unknown;
+}
+
 const sanitizePayload = (form) =>
   Object.fromEntries(
     Object.entries(form).filter(([, value]) => {
@@ -59,7 +93,7 @@ const DiscountBenefitsManager = () => {
   const [loyaltyPrograms, setLoyaltyPrograms] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [analytics, setAnalytics] = useState(null as any);
+  const [analytics, setAnalytics] = useState<DiscountAnalytics | null>(null);
 
   // Формы для создания/редактирования
   const [discountForm, setDiscountForm] = useState({
@@ -146,10 +180,16 @@ const DiscountBenefitsManager = () => {
       api.get('/discount-benefits/analytics/loyalty')]
       );
 
-      const analytics = {
-        discounts: discountAnalytics.status === 'fulfilled' ? discountAnalytics.value.data?.analytics : null,
-        benefits: benefitAnalytics.status === 'fulfilled' ? benefitAnalytics.value.data?.analytics : null,
-        loyalty: loyaltyAnalytics.status === 'fulfilled' ? loyaltyAnalytics.value.data?.analytics : null
+      const analytics: DiscountAnalytics = {
+        discounts: (discountAnalytics.status === 'fulfilled'
+          ? (discountAnalytics.value.data as { analytics?: DiscountAnalyticsSection })?.analytics
+          : null) ?? null,
+        benefits: (benefitAnalytics.status === 'fulfilled'
+          ? (benefitAnalytics.value.data as { analytics?: BenefitAnalyticsSection })?.analytics
+          : null) ?? null,
+        loyalty: (loyaltyAnalytics.status === 'fulfilled'
+          ? (loyaltyAnalytics.value.data as { analytics?: LoyaltyAnalyticsSection })?.analytics
+          : null) ?? null,
       };
 
       setAnalytics(analytics);

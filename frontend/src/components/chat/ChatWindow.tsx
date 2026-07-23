@@ -27,9 +27,9 @@ import './Chat.css';
 import { Input } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
 
-const groupReactions = (reactions) => {
+const groupReactions = (reactions: { reaction: string; user_id: number }[] | undefined | null): Record<string, number[]> => {
   if (!reactions) return {};
-  const groups = {};
+  const groups: Record<string, number[]> = {};
   reactions.forEach((r) => {
     if (!groups[r.reaction]) groups[r.reaction] = [];
     groups[r.reaction].push(r.user_id);
@@ -118,7 +118,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
     toggleReaction,
     deleteMessage,
     uploadFile
-  } = useChat() as any;
+  } = useChat();
 
   const [inputValue, setInputValue] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -770,7 +770,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
               title={t('chatNewChat')}
               aria-label={t('chatNewChat')}
               style={{ opacity: activeConversation || showNewChat ? 0.5 : 1 }}
-              disabled={activeConversation || showNewChat}>
+              disabled={Boolean(activeConversation || showNewChat)}>
               
                             <Plus size={18} />
                         </button>
@@ -1037,7 +1037,20 @@ const ChatWindow = ({ isOpen, onClose }) => {
                 }}>
                 
                                         {rowVirtualizer.getVirtualItems().map((virtualItem) => {
-                  const item: Record<string, unknown> = groupedMessages[virtualItem.index];
+                  const item = groupedMessages[virtualItem.index] as {
+                    type: string;
+                    id?: string | number;
+                    date?: string | number | Date;
+                    sender_id?: number;
+                    recipient_id?: number;
+                    sender_name?: string;
+                    content?: string;
+                    is_read?: boolean;
+                    created_at?: string;
+                    message_type?: string;
+                    reactions?: { reaction: string; user_id: number; user_name?: string | null }[];
+                    [k: string]: unknown;
+                  };
                   return (
                     <div
                       key={virtualItem.key}
@@ -1147,16 +1160,16 @@ const ChatWindow = ({ isOpen, onClose }) => {
                                                                     </>
                           }
 
-                                                                {item.reactions && (item.reactions as unknown[]).length > 0 &&
+                                                                {item.reactions && item.reactions.length > 0 &&
                           <div className="message-reactions">
-                                                                        {Object.entries(groupReactions(item.reactions)).map(([emoji, userIds]: [string, any]) =>
+                                                                        {Object.entries(groupReactions(item.reactions)).map(([emoji, userIds]) =>
                             <span
                               key={emoji}
                               className={`reaction-bubble ${userIds.includes(user?.id) ? 'active' : ''}`}
                               role="button"
                               tabIndex={0}
-                              onKeyDown={(event) => handleActivationKeyDown(event, () => toggleReaction(item.id, emoji))}
-                              onClick={(e) => {e.stopPropagation();toggleReaction(item.id, emoji);}}>
+                              onKeyDown={(event) => handleActivationKeyDown(event, () => toggleReaction(Number(item.id), emoji))}
+                              onClick={(e) => {e.stopPropagation();toggleReaction(Number(item.id), emoji);}}>
                               
                                                                                 {emoji} {userIds.length > 1 && userIds.length}
                                                                             </span>
@@ -1182,7 +1195,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
                               key={emoji}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                toggleReaction(item.id, emoji);
+                                toggleReaction(Number(item.id), emoji);
                                 setReactionMenuMessageId(null);
                               }}>
                               

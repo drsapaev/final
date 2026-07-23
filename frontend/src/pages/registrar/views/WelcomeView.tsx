@@ -64,6 +64,83 @@ import logger from '../../../utils/logger';
 import notify from '../../../services/notify';
 import tokenManager from '../../../utils/tokenManager';
 
+// === Domain types ===
+// WelcomeView is a registrar-facing dashboard. Most state lives in the
+// parent (RegistrarPanel); WelcomeView receives props and renders.
+// Function signatures mirror the parent's setter / callback types.
+
+interface ContextMenuPosition { x: number; y: number; }
+interface ContextMenuState { open: boolean; row: unknown; position: ContextMenuPosition; }
+interface PaymentDialogState { open: boolean; row: unknown; paid: boolean; source: unknown; }
+interface PrintDialogState { open: boolean; type: string; data: unknown; }
+
+interface WelcomeViewDataSourceIndicatorProps {
+  count?: number;
+  [key: string]: unknown;
+}
+
+interface WelcomeViewDataSourceIndicator {
+  (props: WelcomeViewDataSourceIndicatorProps): React.JSX.Element;
+}
+
+export interface WelcomeViewProps {
+  // i18n + theming
+  t: (key: string, options?: Record<string, unknown>) => string;
+  language: string;
+  theme: string;
+  textColor?: string;
+  // Data — appointment shape is dynamic; component reads arbitrary fields.
+  appointments: Record<string, unknown>[];
+  departmentStats: unknown;
+  dataSource: string;
+  appointmentsLoading: boolean;
+  filteredAppointments: Record<string, unknown>[];
+  services: Record<string, unknown>;
+  // Filters
+  activeTab: string | null;
+  historyDate: string;
+  showCalendar: boolean;
+  tempDateInput: string;
+  // Action: data load — accepts an options object per caller convention.
+  loadAppointments: (options?: unknown) => void | Promise<void>;
+  // Action: wizard
+  setShowWizard: (open: boolean) => void;
+  setWizardEditMode: (edit: boolean) => void;
+  setWizardInitialData: (data: Record<string, unknown> | null) => void;
+  // Action: payment manager
+  setShowPaymentManager: (open: boolean) => void;
+  // Action: filter changes
+  setHistoryDate: (date: string) => void;
+  setShowCalendar: (open: boolean) => void;
+  setTempDateInput: (date: string) => void;
+  // Action: URL search params — react-router's SetURLSearchParams signature
+  // (accepts URLSearchParams, plain object, or updater function).
+  setSearchParams: (
+    next:
+      | URLSearchParams
+      | Record<string, string>
+      | ((prev: URLSearchParams) => URLSearchParams),
+    options?: { replace?: boolean }
+  ) => void;
+  // Action: navigation
+  navigate: (path: string, options?: { replace?: boolean; state?: unknown }) => void;
+  // Action: dialogs
+  setPaymentDialog: React.Dispatch<React.SetStateAction<PaymentDialogState>>;
+  setPrintDialog: React.Dispatch<React.SetStateAction<PrintDialogState>>;
+  setContextMenu: React.Dispatch<React.SetStateAction<ContextMenuState>>;
+  // Action: records
+  openRecordPreview: (row: unknown) => void;
+  openRecordEditor: (row: unknown) => void;
+  updateAppointmentStatus: (id: unknown, status: string, note: string, row?: unknown) => void | Promise<void>;
+  handleStartVisit: (row: unknown) => void | Promise<void>;
+  // Action: CSV — actual signatures come from registrarCsv.ts; loosened here.
+  generateCSV: (...args: unknown[]) => unknown;
+  downloadCSV: (...args: unknown[]) => void;
+  // Memoized data-source badge component
+  DataSourceIndicator: WelcomeViewDataSourceIndicator;
+  [key: string]: unknown;
+}
+
 const WelcomeView = React.memo(({
   t,
   language,
@@ -99,7 +176,7 @@ const WelcomeView = React.memo(({
   generateCSV,
   downloadCSV,
   DataSourceIndicator,
-}: any) => {
+}: WelcomeViewProps) => {
   return (
     <AnimatedTransition type="fade" delay={100}>
       <Card variant="default" className="registrar-card-surface">
