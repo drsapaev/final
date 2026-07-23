@@ -3,9 +3,21 @@ import { useState, useEffect } from 'react';
 import { Card, Button, Badge,
   Input } from '../ui/macos';
 import { useQueueManager } from '../../hooks/useQueueManager';
+import type { UseQueueManagerReturn } from '../../hooks/useQueueManager';
 import { useEMRAI } from '../../hooks/useEMRAI';
 import { useAppData } from '../../contexts/AppDataContext';
 import { useTranslation } from '../../i18n/useTranslation';
+
+// IntegrationDemo reads fields that don't exist on UseQueueManagerReturn
+// (generateQRCode, error, success). This is pre-existing demo breakage —
+// the demo was written against an older hook API. We extend the real
+// return type with the missing fields so the demo compiles without
+// forcing the production hook to add them.
+interface IntegrationDemoQueueManager extends UseQueueManagerReturn {
+  generateQRCode?: (date: string, specialistId: string) => Promise<unknown>;
+  error?: string;
+  success?: string;
+}
 
 /**
  * Демонстрационный компонент для проверки интеграции
@@ -14,13 +26,9 @@ import { useTranslation } from '../../i18n/useTranslation';
 const IntegrationDemo = () => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [activeDemo, setActiveDemo] = useState('queue');
-  
+
   // Используем созданные хуки
-  // TECH-DEBT(integration-demo-001): demo file uses fields that don't exist on
-  // UseQueueManagerReturn (generateQRCode, error, success). Keeping the loose
-  // Record type below so the demo keeps compiling — it is internal demo code,
-  // not production. Revisit when modernizing the demo surface.
-  const queueManager = useQueueManager() as unknown as Record<string, any>;
+  const queueManager = useQueueManager() as unknown as IntegrationDemoQueueManager;
   const emrAI = useEMRAI();
   const { users, appointments, actions } = useAppData() as unknown as { users: unknown[]; appointments: unknown[]; actions: { setLoading: (key: string, v: boolean) => void; setUsers: (v: unknown[]) => void; [key: string]: unknown }; };
 

@@ -20,7 +20,7 @@ import { useNavigate } from 'react-router-dom';
 import { isOnPath } from './navigation';
 
 /**
- * @returns {(path: string, options?: { replace?: boolean, state?: any }) => void}
+ * @returns {(path: string, options?: { replace?: boolean, state?: unknown }) => void}
  */
 export function useNavigateSafely(): (path: string, options?: { replace?: boolean; state?: unknown }) => void {
   const navigate = useNavigate();
