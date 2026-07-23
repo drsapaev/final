@@ -5,10 +5,119 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { Input } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
 
+// === Domain types ===
+// Per-field validation rules. Each rule's value is the error message (or
+// truthy value) shown when the rule fails. `pattern` is a RegExp, `custom`
+// is a predicate function.
+//
+// Note: existing callers sometimes pass `validationRules={{ required: 'msg' }}`
+// where `required` is BOTH the field name AND the rule kind. To stay
+// backward-compatible with that shape, ValidationRule accepts a string
+// index signature so a plain string maps to a "required" error message
+// for the field of the same name.
+
+export interface ValidationRule {
+  /** Required-field error message (or truthy value to flag failure). */
+  required?: string | true;
+  /** Minimum-length error message; numeric threshold is on the rule too. */
+  minLength?: string | number;
+  /** Maximum-length error message; numeric threshold is on the rule too. */
+  maxLength?: string | number;
+  /** Pattern to test against (RegExp). The RegExp itself is the error value. */
+  pattern?: RegExp;
+  /** Email-format error message (truthy value enables the email regex check). */
+  email?: string | true;
+  /** Phone-format error message (truthy value enables the phone regex check). */
+  phone?: string | true;
+  /** Custom predicate; returns true when value is valid. The function is the error value. */
+  custom?: ((value: unknown) => boolean) | string;
+  [key: string]: unknown;
+}
+
+/**
+ * validationRules is a map of fieldName → rule spec. Backward-compat:
+ * existing callers pass `{ required: 'msg' }` where the field name is
+ * `required` and the value is a plain string used as the error message.
+ * To accept both shapes, the value type is `ValidationRule | string`.
+ */
+export type ValidationRules = Record<string, ValidationRule | string>;
+
+/**
+ * Validate a single value against a rule spec. Returns the error value
+ * (string/RegExp/function/etc.) for the first failing rule, or null if
+ * all rules pass. Extracted so FormField / FormTextArea / FormSelect
+ * share the same logic without re-casting.
+ *
+ * Accepts both `ValidationRule` (object with required/minLength/etc.)
+ * and a plain string (treated as the `required` error message).
+ */
+function validateValueAgainstRules(value: unknown, rules: ValidationRule | string): unknown {
+  // Backward-compat: plain string is treated as { required: <string> }.
+  if (typeof rules === 'string') {
+    if (!value || String(value).trim() === '') {
+      return rules;
+    }
+    return null;
+  }
+
+  const strValue = value == null ? '' : String(value);
+
+  if (rules.required && (!value || strValue.trim() === '')) {
+    return rules.required;
+  }
+
+  if (value && rules.minLength && typeof rules.minLength === 'number' && strValue.length < rules.minLength) {
+    return rules.minLength;
+  }
+
+  if (value && rules.maxLength && typeof rules.maxLength === 'number' && strValue.length > rules.maxLength) {
+    return rules.maxLength;
+  }
+
+  if (value && rules.pattern instanceof RegExp && !rules.pattern.test(strValue)) {
+    return rules.pattern;
+  }
+
+  if (value && rules.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(strValue)) {
+    return rules.email;
+  }
+
+  if (value && rules.phone && !/^[+]?[1-9][\d]{0,15}$/.test(strValue.replace(/\s/g, ''))) {
+    return rules.phone;
+  }
+
+  if (value && typeof rules.custom === 'function' && !rules.custom(value)) {
+    return rules.custom;
+  }
+
+  return null;
+}
+
+// Form state shape stored in FormProvider's `forms` map.
+export interface FormState {
+  values: Record<string, unknown>;
+  errors: Record<string, unknown>;
+  touched: Record<string, boolean>;
+  isSubmitting: boolean;
+  [key: string]: unknown;
+}
+
+export interface FormContextValue {
+  /** All registered forms keyed by formId. */
+  forms: Record<string, FormState>;
+  /** Register a new form with initial values. */
+  registerForm: (formId: string, initialValues?: Record<string, unknown>) => void;
+  /** Merge updates into a specific form's state. */
+  updateForm: (formId: string, updates: Partial<FormState>) => void;
+  /** Get a form's current state (or null if not registered). */
+  getForm: (formId: string) => FormState | null;
+  [key: string]: unknown;
+}
+
 /**
  * Контекст для форм
  */
-const FormContext = React.createContext({} as any);
+const FormContext = React.createContext<FormContextValue | null>(null);
 
 /**
  * Провайдер контекста форм
@@ -116,46 +225,14 @@ export function useForm(formId, initialValues = {}) {
     });
   }, [formId, initialValues, updateForm]);
 
-  const validateForm = useCallback((validationRules) => {
+  const validateForm = useCallback((validationRules: ValidationRules) => {
     const errors: Record<string, unknown> = {};
     const values = form?.values || {};
 
-    Object.entries(validationRules).forEach(([name, rules]: [string, any]) => {
-      const value = values[name];
-
-      if (rules.required && (!value || value.toString().trim() === '')) {
-        errors[name] = rules.required;
-        return;
-      }
-
-      if (value && rules.minLength && value.length < rules.minLength) {
-        errors[name] = rules.minLength;
-        return;
-      }
-
-      if (value && rules.maxLength && value.length > rules.maxLength) {
-        errors[name] = rules.maxLength;
-        return;
-      }
-
-      if (value && rules.pattern && !rules.pattern.test(value)) {
-        errors[name] = rules.pattern;
-        return;
-      }
-
-      if (value && rules.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
-        errors[name] = rules.email;
-        return;
-      }
-
-      if (value && rules.phone && !/^[+]?[1-9][\d]{0,15}$/.test(value.replace(/\s/g, ''))) {
-        errors[name] = rules.phone;
-        return;
-      }
-
-      if (value && rules.custom && !rules.custom(value)) {
-        errors[name] = rules.custom;
-        return;
+    Object.entries(validationRules).forEach(([name, rules]) => {
+      const error = validateValueAgainstRules(values[name], rules);
+      if (error != null) {
+        errors[name] = error;
       }
     });
 
@@ -219,7 +296,7 @@ interface FormFieldProps {
   type?: string;
   placeholder?: string;
   required?: boolean;
-  validationRules?: Record<string, unknown>;
+  validationRules?: ValidationRules;
   formId?: string;
   style?: React.CSSProperties;
   [key: string]: unknown;
@@ -239,8 +316,8 @@ export function FormField({
   const theme = useTheme();
   const { getColor, getSpacing, getFontSize } = theme;
 
-  const value = form?.values?.[name] || '';
-  const error = form?.errors?.[name];
+  const value = String(form?.values?.[name] ?? '');
+  const error = form?.errors?.[name] as string | undefined;
   const touched = form?.touched?.[name];
 
   const handleChange = useCallback((e) => {
@@ -258,41 +335,12 @@ export function FormField({
 
     // Валидация при потере фокуса
     if (Object.keys(validationRules).length > 0) {
-      const rules = validationRules as any;
-
-      if (rules.required && (!value || value.toString().trim() === '')) {
-        setError(name, rules.required);
-        return;
-      }
-
-      if (value && rules.minLength && value.length < rules.minLength) {
-        setError(name, rules.minLength);
-        return;
-      }
-
-      if (value && rules.maxLength && value.length > rules.maxLength) {
-        setError(name, rules.maxLength);
-        return;
-      }
-
-      if (value && rules.pattern && !rules.pattern.test(value)) {
-        setError(name, rules.pattern);
-        return;
-      }
-
-      if (value && rules.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
-        setError(name, rules.email);
-        return;
-      }
-
-      if (value && rules.phone && !/^[+]?[1-9][\d]{0,15}$/.test(value.replace(/\s/g, ''))) {
-        setError(name, rules.phone);
-        return;
-      }
-
-      if (value && rules.custom && !rules.custom(value)) {
-        setError(name, rules.custom);
-        return;
+      const rules = validationRules[name];
+      if (rules) {
+        const error = validateValueAgainstRules(value, rules);
+        if (error != null) {
+          setError(name, error);
+        }
       }
     }
   }, [name, value, validationRules, setTouched, setError]);
@@ -378,7 +426,7 @@ interface FormTextAreaProps {
   label?: React.ReactNode;
   placeholder?: string;
   required?: boolean;
-  validationRules?: Record<string, unknown>;
+  validationRules?: ValidationRules;
   formId?: string;
   rows?: number;
   style?: React.CSSProperties;
@@ -399,8 +447,8 @@ export function FormTextArea({
   const theme = useTheme();
   const { getColor, getSpacing, getFontSize } = theme;
 
-  const value = form?.values?.[name] || '';
-  const error = form?.errors?.[name];
+  const value = String(form?.values?.[name] ?? '');
+  const error = form?.errors?.[name] as string | undefined;
   const touched = form?.touched?.[name];
 
   const handleChange = useCallback((e) => {
@@ -416,21 +464,12 @@ export function FormTextArea({
     setTouched(name, true);
 
     if (Object.keys(validationRules).length > 0) {
-      const rules = validationRules as any;
-
-      if (rules.required && (!value || value.toString().trim() === '')) {
-        setError(name, rules.required);
-        return;
-      }
-
-      if (value && rules.minLength && value.length < rules.minLength) {
-        setError(name, rules.minLength);
-        return;
-      }
-
-      if (value && rules.maxLength && value.length > rules.maxLength) {
-        setError(name, rules.maxLength);
-        return;
+      const rules = validationRules[name];
+      if (rules) {
+        const error = validateValueAgainstRules(value, rules);
+        if (error != null) {
+          setError(name, error);
+        }
       }
     }
   }, [name, value, validationRules, setTouched, setError]);
@@ -519,7 +558,7 @@ interface FormSelectProps {
   options?: Array<{ value: string; label: string } | string>;
   placeholder?: string;
   required?: boolean;
-  validationRules?: Record<string, unknown>;
+  validationRules?: ValidationRules;
   formId?: string;
   style?: React.CSSProperties;
   [key: string]: unknown;
@@ -539,8 +578,8 @@ export function FormSelect({
   const theme = useTheme();
   const { getColor, getSpacing, getFontSize } = theme;
 
-  const value = form?.values?.[name] || '';
-  const error = form?.errors?.[name];
+  const value = String(form?.values?.[name] ?? '');
+  const error = form?.errors?.[name] as string | undefined;
   const touched = form?.touched?.[name];
 
   const handleChange = useCallback((e) => {
@@ -556,11 +595,12 @@ export function FormSelect({
     setTouched(name, true);
 
     if (Object.keys(validationRules).length > 0) {
-      const rules = validationRules as any;
-
-      if (rules.required && (!value || value === '')) {
-        setError(name, rules.required);
-        return;
+      const rules = validationRules[name];
+      if (rules) {
+        const error = validateValueAgainstRules(value, rules);
+        if (error != null) {
+          setError(name, error);
+        }
       }
     }
   }, [name, value, validationRules, setTouched, setError]);
