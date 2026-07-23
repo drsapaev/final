@@ -1,10 +1,14 @@
 # ADR-0012: TypeScript Migration — Contract Recovery & Zero Debt
 
 **Status:** Accepted
-**Date:** 2026-07-23 (Phase F5 — zero debt achieved)
+**Date:** 2026-07-23 (Phase F5 — zero debt achieved; Phase G — strict mode)
 **Deciders:** Frontend team, Backend team, Engineering lead
 **Supersedes:** Phase 0–A incremental JS-to-TS migration (PRs #2390–#2433)
-**Related:** PRs #2433, #2444, #2446, #2447, #2449, #2450, #2451, #2452, #2453; Issue #2443 (closed)
+**Related:** PRs #2433, #2444, #2446, #2447, #2449, #2450, #2451, #2452, #2453, #2454; Issue #2443 (closed)
+
+**Scope:** Frontend TypeScript application only (`frontend/src/`). The backend (FastAPI/Python) was not part of this ADR. OpenAPI-generated types (`src/types/generated/api.ts`) are consumed by the frontend but their generation pipeline is out of scope.
+
+**Effort:** ~10 PRs, ~120 commits, ~2 developer-weeks equivalent.
 
 ---
 
@@ -133,7 +137,9 @@ All 4 previously-documented casts were eliminated in Phase F5:
 | `utils/navigationReact.ts` | JSDoc `state?: any` | Changed JSDoc to `state?: unknown` |
 | `components/dermatology/ProcedureTemplates.tsx` | Commented-out `as any` | Removed dead commented code |
 
-**Zero `any` casts remain in the codebase.**
+**Zero explicit `any` casts remain** (`as any`, `: any`).
+
+> **Note on implicit `any`:** `strict` and `noImplicitAny` remain disabled in `tsconfig.json`. This means implicit `any` (untyped function parameters, untyped variables) is NOT yet prohibited at the compiler level. The codebase has zero *explicit* `any` casts, but implicit `any` may still exist in untyped code paths. Enabling `strict: true` is tracked as a separate project (see Phase G below and Future Work).
 
 ---
 
@@ -151,9 +157,10 @@ All 4 previously-documented casts were eliminated in Phase F5:
 | Phase F3-1 | #2449 | 5 zero-conflict component Props | 18 → 12 (within PR #2451) |
 | Phase F3-2 | #2450 | PatientCard + TeethChart conflict resolution | 12 → 8 |
 | Phase F3-3 | #2451 | 10 Generic-domain components | 8 → 4 |
-| Phase F4 | #2452 | Form.tsx FormContextValue + ValidationRules | 4 → 4 (documented) |
+| Phase F4 | #2452 | Form.tsx FormContextValue + ValidationRules | 4 → 4 (refactored and documented, no net reduction) |
 | Phase Final | #2453 | TECH-DEBT gate + ADR-0012 + Issue #2443 closure | 4 → 4 (locked in) |
-| Phase F5 | this PR | Eliminate remaining 4 casts (i18next, IntegrationDemo, JSDoc, commented code) | 4 → 0 |
+| Phase F5 | #2454 | Eliminate remaining 4 casts (i18next, IntegrationDemo, JSDoc, commented code) | 4 → 0 |
+| Phase G | this PR | ADR review corrections + strict-mode assessment (deferred) | 0 → 0 (assessment only) |
 
 **Total: 656 → 0 `any` casts (-100%), 0 `@ts-nocheck`, 0 tsc, 0 eslint.**
 
@@ -262,13 +269,18 @@ Further strictness is a **policy decision** for a separate ADR.
 - **Index signatures accept any string key** — `[key: string]: unknown` means
   typos in field names won't be caught at compile time. Mitigated by typed
   canonical fields above the index signature.
+  > **Recommendation:** New domain interfaces SHOULD avoid index signatures
+  > unless the backend contract is demonstrably extensible. Existing index
+  > signatures are a migration compromise and may be removed incrementally
+  > as backend contracts are verified.
 - **CI unit tests time out** — Frontend unit tests frequently exceed the
   15-minute CI job limit. PRs merge with `mergeable=True, state=unstable`
   when this happens (PR Required Gate fails but is non-blocking). This is
   a pre-existing CI infrastructure issue, not a migration regression.
-- **`strict: false`** — full strict mode is NOT enabled. The migration
-  achieved 0 tsc errors under the current loose config; enabling strict
-  mode would surface new errors and is a separate project.
+- **`strict: false`** — full strict mode was NOT enabled during Phases B–F5.
+  The migration achieved 0 tsc errors under the current loose config; enabling
+  strict mode would surface new errors (implicit `any`, strict null checks,
+  strict function types). Phase G (below) addresses this incrementally.
 
 ### Neutral
 
@@ -277,17 +289,39 @@ Further strictness is a **policy decision** for a separate ADR.
 
 ---
 
+## Risk Register
+
+- **Dual APIs may remain indefinitely** if `onChange` deprecation is not
+  enforced via ESLint rule. Mitigation: tracked in Future Work (long-term).
+- **Index signatures can hide field-name typos** — `[key: string]: unknown`
+  on domain interfaces allows arbitrary string keys without compile-time
+  checking. Mitigation: recommendation added in Consequences section;
+  strict Props interfaces tracked in Future Work.
+- **Strict mode may surface substantial nullable-state debt** — enabling
+  `strict: true` (Phase G) will introduce `strictNullChecks`, which may
+  reveal dozens of unguarded null/undefined access patterns. Mitigation:
+  Phase G enables strict flags incrementally.
+- **Debt checker pattern is narrow** — the current regex matches `as any`
+  and `: any` but NOT `Record<string, any>`, `Promise<any>`, or
+  `Array<any>`. An experimental broader pattern surfaced 101 additional
+  legacy sites. The experiment was reverted to avoid turning the migration
+  PR into a large unrelated cleanup. A follow-up initiative is tracked
+  under Future Work.
+
+---
+
 ## Future Work
 
 ### Short-term (next quarter)
 
-- **Enable `strict: true`** in a dedicated PR with batched fixes for any
-  new errors surfaced. This is the natural next step but requires its own
-  migration plan (estimated 1–2 weeks of focused work).
+- **Phase G: Enable `strict: true`** — see Phase G section below for the
+  incremental approach. This is the natural next step after zero-debt.
 - **Tighten debt checker pattern** — the current `type-debt-check.mjs`
   matches `as any` and `: any` but NOT `Record<string, any>`,
-  `Promise<any>`, or `Array<any>`. A future PR can tighten the pattern
-  (estimated 100+ pre-existing sites to clean up first).
+  `Promise<any>`, or `Array<any>`. An experimental broader pattern
+  surfaced 101 additional legacy sites and was reverted to avoid scope
+  creep. A follow-up PR can tighten the pattern after cleaning up those
+  sites.
 
 ### Long-term (next year)
 
@@ -303,11 +337,65 @@ Further strictness is a **policy decision** for a separate ADR.
 
 ---
 
+## Phase G — Strict Mode Assessment
+
+Phase G assessed the feasibility of enabling `strict: true` in `tsconfig.json`.
+The assessment was performed by temporarily enabling strict mode and counting
+the resulting TypeScript compiler errors.
+
+### Error breakdown (strict: true, all flags)
+
+| Flag | Error count | Top error codes |
+|------|-------------|-----------------|
+| `strict: true` (all) | **10,098** | TS2339 (3583), TS7006 (3135), TS7031 (849), TS7053 (491) |
+| `noImplicitAny: true` alone | 5,417 | TS7006, TS7031, TS7053 (implicit `any` on untyped params) |
+| `strictNullChecks: true` alone | 4,998 | TS2339, TS2322, TS18047 (null/undefined access) |
+
+### Interpretation
+
+- **TS7006/TS7031** (3,984 errors) — untyped function parameters and destructured
+  bindings. These are the bulk of the debt: hundreds of functions like
+  `const handleChange = (e) => ...` where `e` is implicitly `any`. Fixing
+  requires adding type annotations to ~2,000 function signatures.
+- **TS2339** (3,583 errors) — property access on `unknown`/`null`/`undefined`.
+  Many are downstream of the index-signature compromise (`[key: string]: unknown`)
+  — accessing `.foo` on `unknown` requires narrowing. Fixing requires either
+  type guards or explicit casts at each access site.
+- **TS7016** (289 errors) — missing declaration files for untyped npm packages.
+  Requires adding `@types/*` packages or writing custom `.d.ts` shims.
+
+### Decision
+
+**Phase G is deferred.** Enabling `strict: true` in one step would surface
+10,098 errors — far too many for a single PR. The recommended approach is
+incremental:
+
+1. **G1: `noImplicitAny`** (5,417 errors) — batch-add type annotations to
+   untyped function parameters. Estimated 3–5 days.
+2. **G2: `strictNullChecks`** (4,998 errors, overlapping) — add null guards
+   and optional chaining. Estimated 5–7 days.
+3. **G3: Remaining strict flags** (`strictFunctionTypes`, `strictBindCallApply`,
+   `strictPropertyInitialization`, `noImplicitThis`, `alwaysStrict`) —
+   estimated 2–3 days.
+4. **G4: Library type gaps** (289 errors) — add `@types/*` packages or
+   custom `.d.ts` shims for untyped npm dependencies.
+
+Total estimated effort: **2–3 developer-weeks** for full `strict: true`.
+
+### Current state
+
+`tsconfig.json` retains `strict: false` and `noImplicitAny: false`. The
+codebase has zero *explicit* `any` casts (enforced by CI debt gate), but
+*implicit* `any` is still permitted by the compiler. This is the accepted
+endpoint of the Phase B–F5 migration; Phase G is a separate future project.
+
+---
+
 ## References
 
 - **Migration plan**: `docs/Tree_F.md` (Phase F contract recovery tree)
 - **Caller inventory**: `docs/f3-0-caller-inventory.md`
 - **Debt registry**: GitHub Issue #2443
 - **CI gate**: `scripts/type-debt-check.mjs` + `.github/workflows/ci-cd-unified.yml`
-- **Baseline**: `scripts/type-debt-baseline.json` (currently 4)
-- **Phase PRs**: #2433, #2444, #2446, #2447, #2449, #2450, #2451, #2452
+- **Baseline**: `scripts/type-debt-baseline.json` (currently 0)
+- **Phase PRs**: #2433, #2444, #2446, #2447, #2449, #2450, #2451, #2452, #2453, #2454
