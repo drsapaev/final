@@ -41,18 +41,44 @@ import {
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
 
-const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }: any) => {
+// === Domain types ===
+// TeethChart tracks per-tooth state keyed by FDI tooth number.
+// Backend persists this as specialty_data.tooth_status; the chart reads
+// it as a plain object.
+
+export interface ToothData {
+  status?: string;
+  updatedAt?: string;
+  note?: string;
+  [key: string]: unknown;
+}
+
+export type TeethChartMap = Record<string, ToothData>;
+
+export interface TeethChartProps {
+  /** Called whenever a tooth is clicked. Receives the tooth number and its current data. */
+  onToothClick?: (toothNumber: number, toothData: ToothData) => void;
+  /** Initial per-tooth state (typically loaded from EMR specialty_data.tooth_status). */
+  initialData?: TeethChartMap;
+  /** When true, the chart only emits clicks without mutating internal state. */
+  readOnly?: boolean;
+  /** Optional patient ID (passed through for downstream consumers). */
+  patientId?: string | number | null;
+  [key: string]: unknown;
+}
+
+const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }: TeethChartProps) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
-  const [teethData, setTeethData] = useState(initialData);
-  const [selectedTooth, setSelectedTooth] = useState(null);
+  const [teethData, setTeethData] = useState<TeethChartMap>(initialData);
+  const [selectedTooth, setSelectedTooth] = useState<number | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<string>(TOOTH_STATUS.CARIES);
   const [viewMode, setViewMode] = useState('adult'); // adult, child
   const [zoom, setZoom] = useState(1);
 
   // Обработка клика по зубу
-  const handleToothClick = (toothNumber) => {
+  const handleToothClick = (toothNumber: number) => {
     if (readOnly) {
-      onToothClick && onToothClick(toothNumber, teethData[toothNumber]);
+      onToothClick && onToothClick(toothNumber, teethData[toothNumber] || {});
       return;
     }
 
@@ -62,7 +88,7 @@ const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }: any) =
     const newData = {
       ...teethData,
       [toothNumber]: {
-        ...teethData[toothNumber],
+        ...(teethData[toothNumber] || {}),
         status: selectedStatus,
         updatedAt: new Date().toISOString()
       }
@@ -79,8 +105,8 @@ const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }: any) =
   };
 
   // Отрисовка одного зуба
-  const renderTooth = (toothNumber) => {
-    const toothData = teethData[toothNumber] || { status: TOOTH_STATUS.HEALTHY };
+  const renderTooth = (toothNumber: number) => {
+    const toothData: ToothData = teethData[toothNumber] || { status: TOOTH_STATUS.HEALTHY };
     const isSelected = selectedTooth === toothNumber;
     const status = toothData.status || TOOTH_STATUS.HEALTHY;
 
@@ -345,8 +371,8 @@ const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }: any) =
             </Typography>
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
               {Object.entries(
-              Object.values(teethData).reduce((acc, tooth) => {
-                const status = (tooth as Record<string, unknown>).status || TOOTH_STATUS.HEALTHY;
+              Object.values(teethData).reduce<Record<string, number>>((acc, tooth) => {
+                const status = tooth?.status || TOOTH_STATUS.HEALTHY;
                 acc[String(status)] = (acc[String(status)] || 0) + 1;
                 return acc;
               }, {})
