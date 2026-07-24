@@ -178,19 +178,27 @@
       ]
     },
     "Billing": {
-      "percent": 30,
-      "status": "started",
+      "percent": 60,
+      "status": "partial",
       "types": [
         "Transaction",
         "CartItem",
         "CartState",
-        "Service"
-      ],
-      "missing": [
+        "Service",
         "Invoice",
+        "InvoiceItem",
         "Payment",
         "Discount",
-        "DiscountAnalytics"
+        "DiscountApplication",
+        "BillingSummary",
+        "PaymentMethod",
+        "PaymentStatus",
+        "DiscountMode"
+      ],
+      "missing": [
+        "Refund",
+        "PaymentProvider",
+        "PaymentWebhook"
       ]
     },
     "Service": {
