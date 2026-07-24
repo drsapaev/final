@@ -119,17 +119,16 @@
       "missing": []
     },
     "Doctor": {
-      "percent": 75,
-      "status": "partial",
+      "percent": 100,
+      "status": "complete",
       "types": [
         "Doctor",
         "QueueSpecialist",
-        "AppUser"
-      ],
-      "missing": [
-        "DoctorSchedule",
+        "AppUser",
+        "DoctorScheduleSlot",
         "DoctorAvailability"
-      ]
+      ],
+      "missing": []
     },
     "EMR": {
       "percent": 85,
@@ -230,13 +229,14 @@
       ]
     },
     "Department": {
-      "percent": 50,
-      "status": "started",
+      "percent": 80,
+      "status": "partial",
       "types": [
-        "Department"
+        "Department",
+        "DepartmentStats"
       ],
       "missing": [
-        "DepartmentStats"
+        "DepartmentFilters"
       ]
     }
   },

@@ -95,13 +95,39 @@ export interface Patient {
   [key: string]: unknown;
 }
 
+export interface DoctorScheduleSlot {
+  start_time?: string;
+  end_time?: string;
+  day_of_week?: number;
+  is_available?: boolean;
+  [key: string]: unknown;
+}
+
+export interface DoctorAvailability {
+  date?: string;
+  is_available?: boolean;
+  slots?: DoctorScheduleSlot[];
+  reason?: string;
+  [key: string]: unknown;
+}
+
 export interface Doctor {
   id: string | number;
   full_name?: string;
   name?: string;
   specialty?: string;
+  specialty_display?: string;
   department?: string;
+  department_id?: string | number;
   email?: string;
+  phone?: string;
+  cabinet?: string | number;
+  is_active?: boolean;
+  price_default?: number;
+  start_number_online?: number;
+  user_id?: string | number;
+  schedule?: DoctorScheduleSlot[];
+  availability?: DoctorAvailability[];
   [key: string]: unknown;
 }
 
@@ -122,10 +148,22 @@ export interface ReportConfig {
   [key: string]: unknown;
 }
 
+export interface DepartmentStats {
+  total_doctors?: number;
+  total_appointments?: number;
+  total_patients?: number;
+  active_queues?: number;
+  [key: string]: unknown;
+}
+
 export interface Department {
   id?: string | number;
   name?: string;
   code?: string;
+  description?: string;
+  is_active?: boolean;
+  doctor_count?: number;
+  stats?: DepartmentStats;
   [key: string]: unknown;
 }
 
