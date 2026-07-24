@@ -20,9 +20,9 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
   const [clinicalRecommendations, setClinicalRecommendations] = useState(null);
 
   // Получение AI подсказок для МКБ-10 через MCP
-  const getICD10Suggestions = useCallback(async (symptoms, diagnosis, specialty = null) => {
+  const getICD10Suggestions = useCallback(async (symptoms: string, diagnosis: string, specialty: string | null = null) => {
     // Prompt injection check
-    const inputText = (symptoms?.join(' ') || '') + ' ' + (diagnosis || '');
+    const inputText = (symptoms || '') + ' ' + (diagnosis || '');
     if (detectPromptInjection(inputText)) {
       setError('Обнаружена попытка prompt injection.');
       logger.warn('EMR AI: prompt injection detected in ICD10 suggestions');
@@ -72,7 +72,7 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
       } else {
         // Старый метод через прямой API
         const response = await apiClient.post('/ai/icd-suggest', {
-          symptoms: symptoms ? symptoms.split('.').filter(s => s.trim()) : [],
+          symptoms: symptoms ? symptoms.split('.').filter((s: string) => s.trim()) : [],
           diagnosis: diagnosis || '',
           provider: provider
         });
@@ -92,7 +92,7 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
   }, [useMCP, provider]);
 
   // Анализ жалоб пациента через MCP
-  const analyzeComplaints = useCallback(async (complaintsData) => {
+  const analyzeComplaints = useCallback(async (complaintsData: Record<string, unknown>) => {
     // Prompt injection check
     const complaintText = complaintsData?.complaint || complaintsData?.complaints || '';
     if (detectPromptInjection(complaintText)) {
@@ -142,7 +142,7 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
   }, [useMCP, provider]);
 
   // Получение рекомендаций по лечению
-  const getTreatmentRecommendations = useCallback(async (patientData) => {
+  const getTreatmentRecommendations = useCallback(async (patientData: Record<string, unknown>) => {
     setLoading(true);
     setError('');
 
@@ -160,7 +160,7 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
   }, []);
 
   // Интерпретация лабораторных результатов через MCP
-  const interpretLabResults = useCallback(async (results, patientAge, patientGender) => {
+  const interpretLabResults = useCallback(async (results: Record<string, unknown>[], patientAge: number, patientGender: string) => {
     setLoading(true);
     setError('');
 
@@ -205,7 +205,7 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
   }, [useMCP, provider]);
 
   // Предложения по лабораторным исследованиям (оставлено для обратной совместимости)
-  const getLabTestSuggestions = useCallback(async (symptoms, diagnosis) => {
+  const getLabTestSuggestions = useCallback(async (symptoms: string, diagnosis: string) => {
     setLoading(true);
     setError('');
 
@@ -236,13 +236,13 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
   }, []);
 
   // Анализ медицинских изображений через MCP
-  const analyzeImage = useCallback(async (imageFile, imageType, options = {}) => {
+  const analyzeImage = useCallback(async (imageFile: File | Record<string, unknown>, imageType: string, options: Record<string, unknown> = {}) => {
     setLoading(true);
     setError('');
 
     try {
       if (useMCP) {
-        const mcpResult = await mcpAPI.analyzeImage(imageFile, imageType, {
+        const mcpResult = await mcpAPI.analyzeImage(imageFile as File, imageType, {
           ...options,
           provider: provider
         });
@@ -272,7 +272,7 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
   }, [useMCP, provider]);
 
   // Анализ кожных образований через MCP
-  const analyzeSkinLesion = useCallback(async (imageFile, lesionInfo = null, patientHistory = null) => {
+  const analyzeSkinLesion = useCallback(async (imageFile: File | Record<string, unknown>, lesionInfo: Record<string, unknown> | null = null, patientHistory: Record<string, unknown> | null = null) => {
     setLoading(true);
     setError('');
 
