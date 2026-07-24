@@ -257,7 +257,7 @@ export default function LabReportWorkbench({
       ? new Date(activeInstance.updated_at).toISOString()
       : null;
 
-    const payload = [];
+    const payload: Array<Record<string, unknown>> = [];
     activeInstance.sections.forEach((section) => {
       section.fields.forEach((field) => {
         const currentValue = draftValues[field.field_key];

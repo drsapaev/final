@@ -29,6 +29,8 @@
     "src/types/domain/**/*.tsx",
     "src/types/**/*.ts",
     "src/api/client.ts",
+    "src/api/labReporting.ts",
+    "src/api/registrarBatch.ts",
     "src/stores/**/*.ts",
     "src/stores/**/*.tsx"
   ],

@@ -163,19 +163,19 @@ export default function LabTemplateWorkbench({
     }
   }
 
-  async function ensureDraftVersion() {
+  async function ensureDraftVersion(): Promise<string | number> {
     if (!selectedTemplate) {
       throw new Error(t('misc.ltw_snachala_vyberite_shablon'));
     }
     if (hasTemplateVersionAction(activeVersion, 'update')) {
-      return (activeVersion as Record<string, unknown>)?.id;
+      return (activeVersion as Record<string, unknown>)?.id as string | number;
     }
     if (!hasTemplateVersionAction(activeVersion, 'create_draft')) {
       throw new Error(t('misc.ltw_server_ne_razreshil_sozdat_c'));
     }
-    const version = (await labReportingApi.createTemplateVersion((selectedTemplate as { id?: string | number })?.id, (activeVersion as Record<string, unknown>)?.id || null)) as Record<string, unknown>;
+    const version = (await labReportingApi.createTemplateVersion((selectedTemplate as { id?: string | number })?.id as string | number, (activeVersion as Record<string, unknown>)?.id as string | number | null)) as Record<string, unknown>;
     await onTemplatesChanged();
-    return (version as Record<string, unknown>)?.id;
+    return (version as Record<string, unknown>)?.id as string | number;
   }
 
   // PR-57: validate reference ranges (low < high) before save/publish
@@ -293,7 +293,7 @@ export default function LabTemplateWorkbench({
     if (!ok) return;
     setSaving(true);
     try {
-      await labReportingApi.archiveTemplateVersion((activeVersion as Record<string, unknown>)?.id);
+      await labReportingApi.archiveTemplateVersion((activeVersion as Record<string, unknown>)?.id as string | number);
       notify('success', t('success.template_archived'));
       await onTemplatesChanged();
     } catch (error) {

@@ -42,9 +42,11 @@ try {
   console.log('Directories currently under strict gate:');
   console.log('  - src/api/mappers/');
   console.log('  - src/types/domain/');
-  console.log('  - src/types/              (added in G7-A: api-constants.ts typed)');
-  console.log('  - src/api/client.ts       (added in G7-B: 7 strict fixes)');
-  console.log('  - src/stores/             (added in G7-B: unblocked by client.ts)');
+  console.log('  - src/types/              (G7-A: api-constants.ts typed)');
+  console.log('  - src/api/client.ts       (G7-B: 7 strict fixes)');
+  console.log('  - src/stores/             (G7-B: unblocked by client.ts)');
+  console.log('  - src/api/labReporting.ts (G7-C: 20 params typed)');
+  console.log('  - src/api/registrarBatch.ts (G7-C: 21 params + interfaces typed)');
   console.log('');
   console.log('To add a new directory: edit tsconfig.strict.json `include` array,');
   console.log('verify with `npx tsc --noEmit -p tsconfig.strict.json`, then commit.');
