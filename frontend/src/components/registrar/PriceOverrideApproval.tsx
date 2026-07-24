@@ -27,20 +27,21 @@ import {
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 
-const PRICE_OVERRIDE_ACTION_CAN_FIELD = {
+const PRICE_OVERRIDE_ACTION_CAN_FIELD: Record<string, string> = {
   approve: 'can_approve',
   reject: 'can_reject'
 };
 
-const hasBackendPriceOverrideAction = (override, action) => {
+const hasBackendPriceOverrideAction = (override: PriceOverrideEntry | null | undefined, action: string): boolean => {
   const normalizedAction = String(action || '').trim().toLowerCase();
   if (!normalizedAction) {
     return false;
   }
 
-  if (Array.isArray(override?.available_actions)) {
-    return override.available_actions.some(
-      (availableAction) => String(availableAction || '').trim().toLowerCase() === normalizedAction
+  const availableActions = override?.available_actions as string[] | undefined;
+  if (Array.isArray(availableActions)) {
+    return availableActions.some(
+      (availableAction: string) => String(availableAction || '').trim().toLowerCase() === normalizedAction
     );
   }
 
@@ -85,7 +86,7 @@ const PriceOverrideApproval = () => {
     loadPriceOverrides();
   }, [loadPriceOverrides]);
 
-  const handleApproval = async (overrideId, action, rejectionReason = null) => {
+  const handleApproval = async (overrideId: string | number, action: 'approve' | 'reject', rejectionReason: string | null = null) => {
     setIsProcessing(true);
     try {
       // UX Audit Registrar #1: raw fetch() POST → approvePriceOverride() из api/registrar.
@@ -106,14 +107,15 @@ const PriceOverrideApproval = () => {
     } catch (error) {
       logger.error('Error processing approval:', error);
       // Axios errors: detail лежит в error.response.data.detail.
-      const detail = error?.response?.data?.detail || error?.message || t('misc.poa_oshibka_obrabotki_zaprosa');
+      const axiosErr = error as { response?: { data?: { detail?: string } }; message?: string };
+      const detail = axiosErr?.response?.data?.detail || axiosErr?.message || t('misc.poa_oshibka_obrabotki_zaprosa');
       toast.error(detail);
     } finally {
       setIsProcessing(false);
     }
   };
 
-  const formatPrice = (price) => {
+  const formatPrice = (price: unknown) => {
     return Number(price).toLocaleString('ru-RU') + ' UZS';
   };
 
@@ -126,7 +128,7 @@ const PriceOverrideApproval = () => {
     }
   };
 
-  const getStatusIcon = (status) => {
+  const getStatusIcon = (status: string) => {
     switch (status) {
       case 'pending':return <Clock size={16 as unknown as "small" | "default" | "large" | "xlarge"} />;
       case 'approved':return <CheckCircle size={16 as unknown as "small" | "default" | "large" | "xlarge"} />;
@@ -135,7 +137,7 @@ const PriceOverrideApproval = () => {
     }
   };
 
-  const getStatusText = (status) => {
+  const getStatusText = (status: string) => {
     switch (status) {
       case 'pending':return t('misc.poa_ozhidaet_odobreniya');
       case 'approved':return t('misc.poa_odobreno');
@@ -144,7 +146,7 @@ const PriceOverrideApproval = () => {
     }
   };
 
-  const getSpecialtyText = (specialty) => {
+  const getSpecialtyText = (specialty: string) => {
     switch (specialty) {
       case 'dermatology':return t('misc.poa_dermatologiya');
       case 'cosmetology':return t('misc.poa_kosmetologiya');
@@ -251,7 +253,7 @@ const PriceOverrideApproval = () => {
                   </label>
                   <div className="text-sm">
                     <div>{override.doctor_name}</div>
-                    <div className="text-gray-500">{getSpecialtyText(override.doctor_specialty)}</div>
+                    <div className="text-gray-500">{getSpecialtyText(String(override.doctor_specialty ?? ''))}</div>
                   </div>
                 </div>
                 
