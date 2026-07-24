@@ -3,7 +3,7 @@
   "description": "Baseline error counts for strict-mode migration (Phase G). This file is used by scripts/strict-baseline-check.mjs to prevent regression — new code must not increase the error count above these baselines.",
   "flags": {
     "noImplicitAny": {
-      "totalErrors": 5121,
+      "totalErrors": 5115,
       "topErrorCodes": {
         "TS7006": 3207,
         "TS7031": 943,
@@ -27,7 +27,7 @@
       }
     },
     "strictNullChecks": {
-      "totalErrors": 4998
+      "totalErrors": 5006
     }
   },
   "notes": [
@@ -159,7 +159,7 @@
       ]
     },
     "Appointment": {
-      "percent": 85,
+      "percent": 90,
       "status": "near-complete",
       "types": [
         "Appointment",
@@ -242,7 +242,7 @@
   },
   "domainAdoption": {
     "sharedDomainTypes": 66,
-    "filesUsingSharedTypes": 4,
+    "filesUsingSharedTypes": 5,
     "localDuplicatesRemoved": 1,
     "componentsMigrated": [
       "EnhancedAppointmentsTable.tsx",

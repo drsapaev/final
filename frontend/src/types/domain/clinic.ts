@@ -76,6 +76,10 @@ export interface Appointment {
   patient_phone?: string;
   patient_birth_year?: number;
   patient_address?: string;
+  specialist_name?: string;
+  grouped_records?: unknown[];
+  grouped_record_refs?: unknown[];
+  aggregated_ids?: unknown[];
   [key: string]: unknown;
 }
 
