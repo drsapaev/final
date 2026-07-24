@@ -31,7 +31,7 @@ import React from "react";
  * and uses consistent Russian aria-labels (HIGH #8).
  */
 // i18n: payment method labels are translated at call time via getPaymentMethodOptions(t).
-const getPaymentMethodOptions = (t) => [
+const getPaymentMethodOptions = (t: (key: string) => string) => [
   { value: 'cash', label: t('payment.pay_cash_method_cash') },
   { value: 'card', label: t('payment.pay_cash_method_card') },
   { value: 'click', label: t('payment.pay_cash_method_click') },
@@ -42,7 +42,13 @@ const getPaymentMethodOptions = (t) => [
 // Cuts ~10s per cash transaction × 200 tx/shift = ~30 min saved per cashier shift.
 const QUICK_CASH_DENOMINATIONS = [50000, 100000, 200000, 500000];
 
-const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
+interface CashPaymentModalProps {
+  appointment?: Record<string, unknown> | null;
+  onProcessPayment?: (...args: unknown[]) => Promise<void>;
+  onClose?: () => void;
+}
+
+const CashPaymentModal = ({ appointment, onProcessPayment, onClose }: CashPaymentModalProps) => {
     const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
     // Auto-fill amount from appointment data
     const defaultAmount = appointment?.total_amount ||
@@ -80,7 +86,7 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
         return numericReceived < numericAmount;
     }, [paymentData.method, numericReceived, numericAmount]);
 
-    const handleSubmit = (e) => {
+    const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         if (!paymentData.amount || Number(paymentData.amount) <= 0) {
             notify.warning(t('payment.invalid_amount'));
@@ -129,12 +135,12 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
                         {t('payment.pay_cash_patient')}
                     </Typography>
                     <Typography variant="body1" className="cpm-patient-name-text">
-                        {appointment?.patient_name || t('payment.pay_cash_patient_fallback', { id: appointment?.patient_id })}
+                        {String(appointment?.patient_name ?? '') || t('payment.pay_cash_patient_fallback', { id: appointment?.patient_id })}
                     </Typography>
                     <Typography variant="body2" color="textSecondary">
-                        {appointment?.department} • {appointment?.appointment_date} {appointment?.appointment_time}
+                        {String(appointment?.department ?? '')} • {String(appointment?.appointment_date ?? '')} {String(appointment?.appointment_time ?? '')}
                     </Typography>
-                    {defaultAmount > 0 && (
+                    {Number(defaultAmount) > 0 && (
                         <Box
                             mt={1}
                             px={1.5}
@@ -144,7 +150,7 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
                             gap={1}
                             className="cpm-amount-hint-box">
                             <Info size={14} aria-hidden="true" />
-                            {t('payment.pay_cash_amount_due')} {formatUZS(defaultAmount)}
+                            {t('payment.pay_cash_amount_due')} {formatUZS(Number(defaultAmount))}
                         </Box>
                     )}
                 </Box>
@@ -158,7 +164,7 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
                             id="cash-payment-amount"
                             type="number"
                             aria-label={t('payment.pay_cash_amount_aria')}
-                            value={paymentData.amount}
+                            value={String(paymentData.amount ?? '')}
                             onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setPaymentData(prev => ({ ...prev, amount: e.target.value }))}
                             placeholder={t('payment.pay_cash_amount_placeholder')}
                             required

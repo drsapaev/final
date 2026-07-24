@@ -13,6 +13,16 @@ import './PaymentClick.css';
  * MEDIUM #10 fix: removed `void useState(null)` artifact (the file no
  * longer has any useState — rules-of-hooks can no longer break).
  */
+interface PaymentClickProps {
+  isOpen: boolean;
+  onClose: () => void;
+  invoiceId: string | number;
+  totalAmount: number;
+  currency?: string;
+  onSuccess?: (...args: unknown[]) => void;
+  onError?: (...args: unknown[]) => void;
+}
+
 const PaymentClick = ({
   isOpen,
   onClose,
@@ -21,7 +31,7 @@ const PaymentClick = ({
   currency = 'UZS',
   onSuccess,
   onError
-}) => (
+}: PaymentClickProps) => (
   <PaymentProviderDialog
     isOpen={isOpen}
     onClose={onClose}
