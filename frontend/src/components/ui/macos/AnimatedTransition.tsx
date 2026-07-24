@@ -26,24 +26,37 @@
  */
 
 import { useEffect, useState } from 'react';
+import type { ReactNode, CSSProperties } from 'react';
 
-const TYPE_STYLES = {
-  fade: (visible) => ({
+type AnimationType = 'fade' | 'scale' | 'slide' | 'slideUp';
+
+const TYPE_STYLES: Record<AnimationType, (visible: boolean) => CSSProperties> = {
+  fade: (visible: boolean) => ({
     opacity: visible ? 1 : 0,
   }),
-  scale: (visible) => ({
+  scale: (visible: boolean) => ({
     opacity: visible ? 1 : 0,
     transform: visible ? 'scale(1)' : 'scale(0.95)',
   }),
-  slide: (visible) => ({
+  slide: (visible: boolean) => ({
     opacity: visible ? 1 : 0,
     transform: visible ? 'translateX(0)' : 'translateX(-100%)',
   }),
-  slideUp: (visible) => ({
+  slideUp: (visible: boolean) => ({
     opacity: visible ? 1 : 0,
     transform: visible ? 'translateY(0)' : 'translateY(16px)',
   }),
 };
+
+interface AnimatedTransitionProps {
+  children?: ReactNode;
+  show?: boolean;
+  type?: AnimationType | string;
+  duration?: number;
+  delay?: number;
+  className?: string;
+  [key: string]: unknown;
+}
 
 const AnimatedTransition = ({
   children,
@@ -53,7 +66,7 @@ const AnimatedTransition = ({
   delay = 0,
   className = '',
   ...props
-}) => {
+}: AnimatedTransitionProps) => {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -64,7 +77,7 @@ const AnimatedTransition = ({
     setVisible(false);
   }, [show, delay]);
 
-  const typeStyle = TYPE_STYLES[type] || TYPE_STYLES.fade;
+  const typeStyle = TYPE_STYLES[type as AnimationType] || TYPE_STYLES.fade;
   const computedStyle = {
     ...typeStyle(visible),
     transition: `opacity ${duration}ms ease-in-out, transform ${duration}ms ease-in-out`,

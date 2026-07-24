@@ -37,7 +37,9 @@
     "src/routing/**/*.tsx",
     "src/components/medical/**/*.ts",
     "src/components/medical/**/*.tsx",
-    "src/components/Icon.tsx"
+    "src/components/Icon.tsx",
+    "src/components/ui/macos/**/*.ts",
+    "src/components/ui/macos/**/*.tsx"
   ],
   "exclude": ["node_modules", "dist", "e2e", "src/api/__tests__/**", "src/routing/__tests__/**"]
 }

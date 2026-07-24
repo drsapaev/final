@@ -93,8 +93,8 @@ const MacOSTab = ({
     }
   };
 
-  const currentSize = sizeStyles[size];
-  const currentVariant = variantStyles[variant];
+  const currentSize = sizeStyles[size as TabSize];
+  const currentVariant = variantStyles[variant as TabVariant];
 
   const containerStyle: CSSProperties = {
     display: 'flex',

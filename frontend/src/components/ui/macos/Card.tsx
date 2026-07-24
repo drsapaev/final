@@ -117,9 +117,9 @@ const Card = React.forwardRef<HTMLDivElement, CardProps>(({
 
     return {
       ...baseStyles,
-      ...paddingStyles[padding],
-      ...shadowStyles[shadow],
-      ...variantStyles[variant],
+      ...paddingStyles[padding as CardPadding],
+      ...shadowStyles[shadow as CardShadow],
+      ...variantStyles[variant as CardVariant],
       ...(interactive && {
         cursor: 'pointer',
         ':hover': {

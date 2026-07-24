@@ -105,17 +105,17 @@ const MacOSStatCard = ({
     }
   };
 
-  const currentSize = sizeStyles[size];
-  const currentVariant = variantStyles[variant];
-  const currentColor = colorStyles[color] || colorStyles.blue;
-  const currentTrend = trendStyles[trendType];
+  const currentSize = sizeStyles[size as 'sm' | 'md' | 'lg'];
+  const currentVariant = variantStyles[variant as 'default' | 'filled' | 'elevated'];
+  const currentColor = colorStyles[color as 'blue' | 'green' | 'orange' | 'red' | 'purple' | 'gray'] || colorStyles.blue;
+  const currentTrend = trendStyles[trendType as 'positive' | 'negative' | 'neutral'];
 
   const cardStyle: CSSProperties = {
     padding: currentSize.padding,
     background: currentVariant.background,
     border: currentVariant.border,
     borderRadius: currentVariant.borderRadius,
-    boxShadow: (isHovered || isFocused) && onClick ? 'var(--mac-shadow-md)' : (currentVariant.boxShadow || 'none'),
+    boxShadow: (isHovered || isFocused) && onClick ? 'var(--mac-shadow-md)' : (('boxShadow' in currentVariant ? currentVariant.boxShadow : null) || 'none'),
     cursor: onClick ? 'pointer' : 'default',
     transition: 'all var(--mac-duration-normal) var(--mac-ease)',
     position: 'relative',
@@ -175,7 +175,7 @@ const MacOSStatCard = ({
       onClick();
     }
   };
-  const handleKeyDown = (e) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLElement>) => {
     if ((e.key === 'Enter' || e.key === ' ') && onClick) {
       e.preventDefault();
       onClick();

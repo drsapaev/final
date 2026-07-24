@@ -148,8 +148,8 @@ const Table = ({
     }
   };
 
-  const currentSize = sizeStyles[size];
-  const currentVariant = variantStyles[variant];
+  const currentSize = sizeStyles[size as TableSize];
+  const currentVariant = variantStyles[variant as TableVariant];
 
   const tableStyle: CSSProperties = {
     width: '100%',
@@ -296,8 +296,8 @@ const Table = ({
               onKeyDown={(e) => handleHeaderKeyDown(e, column)}
               tabIndex={isSortable ? 0 : undefined}
               aria-sort={isSortable ? (isSorted ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none') : undefined}
-              onMouseEnter={(e) => handleMouseEnter(e, false, isSortable)}
-              onMouseLeave={(e) => handleMouseLeave(e, false, isSortable)}
+              onMouseEnter={(e) => handleMouseEnter(e, false, Boolean(isSortable))}
+              onMouseLeave={(e) => handleMouseLeave(e, false, Boolean(isSortable))}
             >
               {column.title}
               {renderSortIcon(column)}

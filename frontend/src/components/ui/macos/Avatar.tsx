@@ -54,7 +54,7 @@ export const Avatar = ({ src, name, size = 'medium', status, style = {}, classNa
 
   return (
     <div className={`mac-avatar ${className}`} style={{ ...containerStyle, ...style }} title={name ?? undefined}>
-      <img src={src} alt={name || 'User'} style={imgStyle} />
+      <img src={src ?? undefined} alt={name || 'User'} style={imgStyle} />
       {!src && (
         <div style={fallbackStyle} aria-hidden>{getInitials(name)}</div>
       )}
