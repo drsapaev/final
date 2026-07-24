@@ -96,8 +96,8 @@
       ]
     },
     "Queue": {
-      "percent": 80,
-      "status": "partial",
+      "percent": 100,
+      "status": "complete",
       "types": [
         "QueueSpecialist",
         "QueueData",
@@ -108,12 +108,15 @@
         "QueueTableEntry",
         "QueueTableData",
         "AppQueueData",
-        "AppQueueEntry"
-      ],
-      "missing": [
+        "AppQueueEntry",
         "QueueState",
-        "QueueAction"
-      ]
+        "QueueAction",
+        "QueueStats",
+        "QueueFilters",
+        "QueueEntryStatus",
+        "QueueSource"
+      ],
+      "missing": []
     },
     "Doctor": {
       "percent": 75,
@@ -165,16 +168,22 @@
       ]
     },
     "Auth": {
-      "percent": 40,
+      "percent": 75,
       "status": "partial",
       "types": [
-        "AppUser",
-        "AuthState"
+        "AuthUser",
+        "AuthState",
+        "AuthAction",
+        "Permission",
+        "Role",
+        "LoginCredentials",
+        "LoginResponse",
+        "UserRole",
+        "AuthStatus"
       ],
       "missing": [
-        "AuthAction",
-        "Role",
-        "Permission"
+        "SessionInfo",
+        "TokenPayload"
       ]
     },
     "Billing": {
