@@ -22,15 +22,15 @@ import { API_ENDPOINTS, buildQueryString } from './endpoints.js';
 import logger from '../utils/logger';
 
 const NOTIFICATION_QUERY_CACHE_MS = 15_000;
-const notificationQueryResultCache = new Map();
-const notificationQueryPromiseCache = new Map();
+const notificationQueryResultCache = new Map<string, { cachedAt: number; data: unknown }>();
+const notificationQueryPromiseCache = new Map<string, Promise<unknown>>();
 
-function buildNotificationQueryKey(endpoint, params = {}) {
+function buildNotificationQueryKey(endpoint: string, params: Record<string, unknown> = {}): string {
   const queryString = buildQueryString(params);
   return queryString ? `${endpoint}?${queryString}` : endpoint;
 }
 
-function getNotificationQueryCacheEntry(key) {
+function getNotificationQueryCacheEntry(key: string): unknown | null {
   const entry = notificationQueryResultCache.get(key);
   if (!entry) {
     return null;
@@ -45,7 +45,7 @@ function getNotificationQueryCacheEntry(key) {
   return entry.data;
 }
 
-function setNotificationQueryCacheEntry(key, data) {
+function setNotificationQueryCacheEntry(key: string, data: unknown) {
   notificationQueryResultCache.set(key, {
     cachedAt: Date.now(),
     data
@@ -58,7 +58,7 @@ export function clearNotificationQueryCache(): void {
   logger.info('[FIX:NOTIFICATIONS] notification query cache cleared');
 }
 
-async function fetchNotificationQuery(endpoint, params = {}) {
+async function fetchNotificationQuery(endpoint: string, params: Record<string, unknown> = {}): Promise<unknown> {
   const cacheKey = buildNotificationQueryKey(endpoint, params);
 
   const cached = getNotificationQueryCacheEntry(cacheKey);
@@ -105,7 +105,7 @@ export const servicesService = {
   /**
    * Получение истории изменений услуги
    */
-  async getServiceHistory(serviceId, params = {}) {
+  async getServiceHistory(serviceId: string | number, params: Record<string, unknown> = {}) {
     const queryString = buildQueryString(params);
     return apiRequest('GET', `/services/${serviceId}/history?${queryString}`);
   },
@@ -122,7 +122,7 @@ export const servicesService = {
 /**
  * Сервис уведомлений
  */
-function appendQuery(endpoint, params = {}) {
+function appendQuery(endpoint: string, params: Record<string, unknown> = {}): string {
   const queryString = buildQueryString(params);
   return queryString ? `${endpoint}?${queryString}` : endpoint;
 }
@@ -166,14 +166,14 @@ export const notificationsService = {
   /**
    * Notification channel settings for a user
    */
-  async getSettings(userId) {
+  async getSettings(userId: string | number) {
     return apiRequest('GET', API_ENDPOINTS.NOTIFICATIONS.SETTINGS(userId));
   },
 
   /**
    * Update notification channel settings for a user
    */
-  async updateSettings(userId, settingsPayload) {
+  async updateSettings(userId: string | number, settingsPayload: Record<string, unknown>) {
     const response = await apiRequest(
       'PUT',
       API_ENDPOINTS.NOTIFICATIONS.SETTINGS(userId),
@@ -186,14 +186,14 @@ export const notificationsService = {
   /**
    * Runtime anti-noise policy for a user
    */
-  async getPolicy(userId) {
+  async getPolicy(userId: string | number) {
     return apiRequest('GET', API_ENDPOINTS.NOTIFICATIONS.SETTINGS_POLICY(userId));
   },
 
   /**
    * Update runtime anti-noise policy for a user
    */
-  async updatePolicy(userId, policyPayload) {
+  async updatePolicy(userId: string | number, policyPayload: Record<string, unknown>) {
     const response = await apiRequest(
       'PUT',
       API_ENDPOINTS.NOTIFICATIONS.SETTINGS_POLICY(userId),
@@ -206,7 +206,7 @@ export const notificationsService = {
   /**
    * Mark a notification as seen
    */
-  async markSeen(id) {
+  async markSeen(id: string | number) {
   const response = await apiRequest('POST', API_ENDPOINTS.NOTIFICATIONS.MARK_SEEN(id));
   clearNotificationQueryCache();
   return response;
@@ -215,7 +215,7 @@ export const notificationsService = {
   /**
    * Mark a notification as read
    */
-  async markAsRead(id) {
+  async markAsRead(id: string | number) {
   const response = await apiRequest('POST', API_ENDPOINTS.NOTIFICATIONS.MARK_READ(id));
   clearNotificationQueryCache();
   return response;
@@ -224,7 +224,7 @@ export const notificationsService = {
   /**
    * Archive a notification
    */
-  async archiveNotification(id) {
+  async archiveNotification(id: string | number) {
   const response = await apiRequest('POST', API_ENDPOINTS.NOTIFICATIONS.ARCHIVE(id));
   clearNotificationQueryCache();
   return response;
@@ -252,7 +252,7 @@ export const notificationsService = {
   /**
    * Отправка уведомления
    */
-  async sendNotification(notificationData) {
+  async sendNotification(notificationData: Record<string, unknown>) {
   const response = await apiRequest('POST', API_ENDPOINTS.NOTIFICATIONS.SEND, {
       data: notificationData
     });

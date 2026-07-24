@@ -31,6 +31,7 @@
     "src/api/client.ts",
     "src/api/labReporting.ts",
     "src/api/registrarBatch.ts",
+    "src/api/services.ts",
     "src/stores/**/*.ts",
     "src/stores/**/*.tsx"
   ],
