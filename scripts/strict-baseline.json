@@ -3,7 +3,7 @@
   "description": "Baseline error counts for strict-mode migration (Phase G). This file is used by scripts/strict-baseline-check.mjs to prevent regression — new code must not increase the error count above these baselines.",
   "flags": {
     "noImplicitAny": {
-      "totalErrors": 5163,
+      "totalErrors": 5162,
       "topErrorCodes": {
         "TS7006": 3207,
         "TS7031": 943,
@@ -71,5 +71,124 @@
       "Transaction",
       "ReportConfig"
     ]
+  },
+  "domainModelsProgress": {
+    "Patient": {
+      "percent": 100,
+      "status": "complete",
+      "types": [
+        "Patient",
+        "AppPatient",
+        "PatientCardPatient"
+      ]
+    },
+    "Doctor": {
+      "percent": 70,
+      "status": "partial",
+      "types": [
+        "Doctor",
+        "QueueSpecialist",
+        "AppUser"
+      ],
+      "missing": [
+        "DoctorSchedule",
+        "DoctorAvailability"
+      ]
+    },
+    "Appointment": {
+      "percent": 50,
+      "status": "partial",
+      "types": [
+        "Appointment",
+        "AppAppointment",
+        "AppointmentFlowAppointment"
+      ],
+      "missing": [
+        "AppointmentStatus union",
+        "AppointmentType"
+      ]
+    },
+    "Queue": {
+      "percent": 80,
+      "status": "partial",
+      "types": [
+        "QueueSpecialist",
+        "QueueData",
+        "QrData",
+        "QueueEntry",
+        "QueueActionResponse",
+        "QueueEntrySnapshot",
+        "QueueTableEntry",
+        "QueueTableData",
+        "AppQueueData",
+        "AppQueueEntry"
+      ],
+      "missing": [
+        "QueueState",
+        "QueueAction"
+      ]
+    },
+    "EMR": {
+      "percent": 60,
+      "status": "partial",
+      "types": [
+        "EMRTemplateField",
+        "EMRTemplateSection",
+        "EMRTemplateStructure",
+        "EMRTemplate",
+        "EMRTemplateSuggestion",
+        "EMRRecord",
+        "EMRStatus",
+        "EMRApiError",
+        "EchoData",
+        "ToothData"
+      ],
+      "missing": [
+        "EMRDiagnosis",
+        "EMRPrescription",
+        "EMRSection"
+      ]
+    },
+    "Billing": {
+      "percent": 20,
+      "status": "started",
+      "types": [
+        "Transaction",
+        "CartItem",
+        "CartState"
+      ],
+      "missing": [
+        "Invoice",
+        "Payment",
+        "Discount",
+        "DiscountAnalytics"
+      ]
+    },
+    "Auth": {
+      "percent": 40,
+      "status": "partial",
+      "types": [
+        "AppUser",
+        "AuthState"
+      ],
+      "missing": [
+        "AuthAction",
+        "Role",
+        "Permission"
+      ]
+    },
+    "Form": {
+      "percent": 90,
+      "status": "near-complete",
+      "types": [
+        "FormContextValue",
+        "ValidationRule",
+        "ValidationRules",
+        "FormState"
+      ],
+      "missing": [
+        "FormAction"
+      ]
+    }
   }
 }
