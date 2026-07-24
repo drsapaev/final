@@ -1,14 +1,32 @@
-
 import React from 'react';
+import type { ReactNode, CSSProperties } from 'react';
 import Icon from '../Icon';
 import { useTheme } from '../../contexts/ThemeContext';
-import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
+
+interface TableColumn {
+  key: string;
+  label: ReactNode;
+  render?: (value: unknown, row: Record<string, unknown>, index: number) => ReactNode;
+}
+
+interface MedicalTableProps {
+  columns?: TableColumn[];
+  data?: Array<Record<string, unknown>>;
+  onView?: (row: Record<string, unknown>, index: number) => void;
+  onEdit?: (row: Record<string, unknown>, index: number) => void;
+  onDelete?: (row: Record<string, unknown>, index: number) => void;
+  sortable?: boolean;
+  pagination?: boolean;
+  pageSize?: number;
+  className?: string;
+  [key: string]: unknown;
+}
 
 /**
  * Унифицированная медицинская таблица в стиле MediLab
  */
-const MedicalTable = ({ 
+const MedicalTable = ({
   columns = [],
   data = [],
   onView,
@@ -18,21 +36,21 @@ const MedicalTable = ({
   pagination = true,
   pageSize = 10,
   className = '',
-  ...props 
-}) => {
+  ...props
+}: MedicalTableProps) => {
   const { isDark } = useTheme();
   const [sortField, setSortField] = React.useState('');
-  const [sortDirection, setSortDirection] = React.useState('asc');
+  const [sortDirection, setSortDirection] = React.useState<'asc' | 'desc'>('asc');
   const [currentPage, setCurrentPage] = React.useState(1);
 
   // Сортировка данных
   const sortedData = React.useMemo(() => {
     if (!sortField) return data;
-    
+
     return [...data].sort((a, b) => {
-      const aValue = a[sortField];
-      const bValue = b[sortField];
-      
+      const aValue = a[sortField] as string | number;
+      const bValue = b[sortField] as string | number;
+
       if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
       if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
       return 0;
@@ -42,7 +60,7 @@ const MedicalTable = ({
   // Пагинация
   const paginatedData = React.useMemo(() => {
     if (!pagination) return sortedData;
-    
+
     const startIndex = (currentPage - 1) * pageSize;
     const endIndex = startIndex + pageSize;
     return sortedData.slice(startIndex, endIndex);
@@ -50,9 +68,9 @@ const MedicalTable = ({
 
   const totalPages = Math.ceil(sortedData.length / pageSize);
 
-  const handleSort = (field) => {
+  const handleSort = (field: string) => {
     if (!sortable) return;
-    
+
     if (sortField === field) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
@@ -61,17 +79,17 @@ const MedicalTable = ({
     }
   };
 
-  const renderSortIcon = (field) => {
+  const renderSortIcon = (field: string) => {
     if (!sortable || sortField !== field) return null;
-    
-    return sortDirection === 'asc' ? 
-      <Icon name="ChevronUp" size={16} /> : 
+
+    return sortDirection === 'asc' ?
+      <Icon name="ChevronUp" size={16} /> :
       <Icon name="ChevronDown" size={16} />;
   };
 
-  const renderActionButtons = (row, index) => {
-    const actions = [];
-    
+  const renderActionButtons = (row: Record<string, unknown>, index: number) => {
+    const actions: ReactNode[] = [];
+
     if (onView) {
       actions.push(
         <button
@@ -85,7 +103,7 @@ const MedicalTable = ({
         </button>
       );
     }
-    
+
     if (onEdit) {
       actions.push(
         <button
@@ -99,7 +117,7 @@ const MedicalTable = ({
         </button>
       );
     }
-    
+
     if (onDelete) {
       actions.push(
         <button
@@ -113,7 +131,7 @@ const MedicalTable = ({
         </button>
       );
     }
-    
+
     return actions.length > 0 ? (
       <div className="flex gap-1">
         {actions}
@@ -122,7 +140,7 @@ const MedicalTable = ({
   };
 
   return (
-    <div 
+    <div
       className={`medical-table ${className}`}
       style={{
         backgroundColor: isDark ? 'var(--mac-text-primary)' : 'var(--mac-bg-primary)',
@@ -136,7 +154,7 @@ const MedicalTable = ({
       <div className="overflow-x-auto">
         <div className="admin-table-wrapper">
 <table className="w-full">
-          <thead 
+          <thead
             style={{
               backgroundColor: isDark ? 'var(--mac-text-primary)' : 'var(--mac-bg-secondary)'
             }}
@@ -161,7 +179,7 @@ const MedicalTable = ({
                 </th>
               ))}
               {(onView || onEdit || onDelete) && (
-                <th 
+                <th
                   className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider"
                   style={{
                     color: isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-text-primary)',
@@ -173,7 +191,7 @@ const MedicalTable = ({
               )}
             </tr>
           </thead>
-          <tbody 
+          <tbody
             className="divide-y"
             style={{
               backgroundColor: isDark ? 'var(--mac-text-primary)' : 'var(--mac-bg-primary)',
@@ -181,7 +199,7 @@ const MedicalTable = ({
             }}
           >
             {paginatedData.map((row, index) => (
-              <tr 
+              <tr
                 key={index}
                 className="hover:bg-gray-50 transition-colors interactive-element hover-lift ripple-effect magnetic-hover focus-ring"
                 style={{
@@ -200,7 +218,7 @@ const MedicalTable = ({
                     className="px-6 py-4 whitespace-nowrap text-sm"
                     style={{ color: isDark ? 'var(--mac-bg-secondary)' : 'var(--mac-text-primary)' }}
                   >
-                    {column.render ? column.render(row[column.key], row, index) : row[column.key]}
+                    {column.render ? column.render(row[column.key], row, index) : String(row[column.key] ?? '')}
                   </td>
                 ))}
                 {(onView || onEdit || onDelete) && (
@@ -217,20 +235,20 @@ const MedicalTable = ({
 
       {/* Пагинация */}
       {pagination && totalPages > 1 && (
-        <div 
+        <div
           className="px-6 py-3 border-t flex items-center justify-between"
           style={{
             backgroundColor: isDark ? 'var(--mac-text-primary)' : 'var(--mac-bg-primary)',
             borderColor: isDark ? 'var(--mac-text-primary)' : 'var(--mac-border)'
           }}
         >
-          <div 
+          <div
             className="text-sm"
             style={{ color: isDark ? 'var(--mac-text-tertiary)' : 'var(--mac-text-secondary)' }}
           >
             Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, sortedData.length)} of {sortedData.length} results
           </div>
-          
+
           <div className="flex gap-2">
             <button
               onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
@@ -244,7 +262,7 @@ const MedicalTable = ({
             >
               Previous
             </button>
-            
+
             {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
               <button
                 key={page}
@@ -261,7 +279,7 @@ const MedicalTable = ({
                 {page}
               </button>
             ))}
-            
+
             <button
               onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
               disabled={currentPage === totalPages}
@@ -281,19 +299,4 @@ const MedicalTable = ({
   );
 };
 
-
-MedicalTable.propTypes = {
-  ...(MedicalTable.propTypes || {}),
-  className: PropTypes.any,
-  columns: PropTypes.any,
-  data: PropTypes.any,
-  onDelete: PropTypes.any,
-  onEdit: PropTypes.any,
-  onView: PropTypes.any,
-  pageSize: PropTypes.any,
-  pagination: PropTypes.any,
-  sortable: PropTypes.any,
-};
-
 export default MedicalTable;
-

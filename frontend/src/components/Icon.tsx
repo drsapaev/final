@@ -1,32 +1,42 @@
+import type { CSSProperties, ReactNode } from 'react';
 import iconsMap from '../assets/iconsMap';
 
 import logger from '../utils/logger';
-import PropTypes from 'prop-types';
+
+interface IconProps {
+  name: string;
+  size?: number;
+  color?: string;
+  className?: string;
+  style?: CSSProperties;
+  [key: string]: unknown;
+}
+
 /**
  * Универсальный компонент иконок
  * Использует глобальный набор иконок из iconsMap.js
  */
-const Icon = ({ 
-  name, 
-  size = 24, 
-  color = 'currentColor', 
-  className = '', 
+const Icon = ({
+  name,
+  size = 24,
+  color = 'currentColor',
+  className = '',
   style = {},
-  ...props 
-}) => {
+  ...props
+}: IconProps) => {
   // Получаем компонент иконки из iconsMap
-  const IconComponent = iconsMap[name];
-  
+  const IconComponent = (iconsMap as Record<string, React.ComponentType<{ size?: number; color?: string; className?: string; style?: CSSProperties }>>)[name];
+
   // Если иконка не найдена, возвращаем fallback
   if (!IconComponent) {
     logger.warn(`Иконка "${name}" не найдена в iconsMap`);
     return (
-      <span 
+      <span
         className={className}
-        style={{ 
-          fontSize: `${size}px`, 
+        style={{
+          fontSize: `${size}px`,
           color,
-          ...style 
+          ...style
         }}
         {...props}
       >
@@ -34,7 +44,7 @@ const Icon = ({
       </span>
     );
   }
-  
+
   // Рендерим найденную иконку
   return (
     <IconComponent
@@ -47,15 +57,4 @@ const Icon = ({
   );
 };
 
-
-Icon.propTypes = {
-  ...(Icon.propTypes || {}),
-  className: PropTypes.any,
-  color: PropTypes.any,
-  name: PropTypes.any,
-  size: PropTypes.any,
-  style: PropTypes.any,
-};
-
 export default Icon;
-

@@ -1,15 +1,27 @@
-
 import { TrendingUp, TrendingDown } from 'lucide-react';
+import type { ReactNode } from 'react';
 import MedicalCard from './MedicalCard';
 import Icon from '../Icon';
 import { useTheme } from '../../contexts/ThemeContext';
-import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
+
+type MetricColor = 'blue' | 'green' | 'purple' | 'orange' | 'red';
+
+interface MetricCardProps {
+  title: ReactNode;
+  value: ReactNode;
+  change?: number;
+  iconName?: string;
+  color?: MetricColor;
+  className?: string;
+  compact?: boolean;
+  [key: string]: unknown;
+}
 
 /**
  * Карточка метрики для дашборда в стиле MediLab
  */
-const MetricCard = ({ 
+const MetricCard = ({
   title,
   value,
   change,
@@ -17,8 +29,8 @@ const MetricCard = ({
   color = 'blue',
   className = '',
   compact = false,
-  ...props 
-}) => {
+  ...props
+}: MetricCardProps) => {
   const { isDark } = useTheme();
 
   // PR-63: replaced hardcoded hex colors with CSS custom properties
@@ -99,7 +111,7 @@ const MetricCard = ({
               color: colors.icon
             }}
           >
-            <Icon name={iconName} size={compact ? 16 : 24} />
+            <Icon name={iconName ?? 'Activity'} size={compact ? 16 : 24} />
           </div>
         )}
       </div>
@@ -107,17 +119,6 @@ const MetricCard = ({
   );
 };
 
-
-MetricCard.propTypes = {
-  ...(MetricCard.propTypes || {}),
-  change: PropTypes.any,
-  className: PropTypes.any,
-  color: PropTypes.any,
-  compact: PropTypes.any,
-  iconName: PropTypes.any,
-  title: PropTypes.any,
-  value: PropTypes.any,
-};
 
 export default MetricCard;
 
