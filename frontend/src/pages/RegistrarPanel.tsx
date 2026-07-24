@@ -875,7 +875,7 @@ const RegistrarPanel = () => {
   // Groups entries by patient for visual display (1 patient = 1 row)
   // ✅ ALLOWED by SSOT: This is view-model grouping, NOT business logic
   // ⚠️ Do NOT use for: filtering, routing, department decisions
-  const aggregatePatientsForAllDepartments = useCallback((appointments) => aggregateRegistrarPatients(appointments), []);
+  const aggregatePatientsForAllDepartments = useCallback((appointments: Appointment[]) => aggregateRegistrarPatients(appointments), []);
 
   // Мемоизированная фильтрация записей по выбранной вкладке (повторный клик снимает фильтр → activeTab === null)
   // Фильтрация по вкладке + по дате (?date=YYYY-MM-DD) + по поиску (?q=...)
@@ -1225,7 +1225,7 @@ const RegistrarPanel = () => {
     // Для вкладки "Все отделения" (activeTab === null или undefined) - агрегируем пациентов
     if (!activeTab) {
       // Сначала фильтруем по статусу, если задан
-      const filtered = sortRegistrarRowsForPresentation(appointments.filter((appointment) => {
+      const filtered = sortRegistrarRowsForPresentation(appointments.filter((appointment: Appointment) => {
         // Фильтр по статусу (если задан)
         if (statusFilter && appointment.status !== statusFilter) return false;
         return true;
@@ -1293,11 +1293,11 @@ const RegistrarPanel = () => {
 
 
   // Обработчик действий контекстного меню
-  const openRecordPreview = useCallback((row) => {
+  const openRecordPreview = useCallback((row: Appointment) => {
     setRecordPreviewDialog({ open: true, row });
   }, []);
 
-  const openRecordEditor = useCallback((row) => {
+  const openRecordEditor = useCallback((row: Appointment) => {
     if (isMultiRecordAggregateRow(row)) {
       logger.info('[RegistrarPanel] Opening edit wizard for aggregate all-departments row', {
         patient: row?.patient_fio || row?.patient_name,
@@ -1314,7 +1314,7 @@ const RegistrarPanel = () => {
     setShowWizard(true);
   }, []);
 
-  const handleContextMenuAction = useCallback(async (action, row) => {
+  const handleContextMenuAction = useCallback(async (action: string, row: Appointment) => {
     switch (action) {
       case 'view':
         openRecordPreview(row);
@@ -1652,7 +1652,7 @@ const RegistrarPanel = () => {
               showCheckboxes={false} // UX Audit R-4.7: bulk-action UI удалён (QW-01 fix),
                                     // поэтому чекбоксы отключены — они были dead UI
                                     // (видны, но ничего не делают). Nielsen #2 + #4.
-              onRowClick={(row) => {
+              onRowClick={(row: Appointment) => {
                 logger.info('Открыть детали записи:', row);
                 // Здесь можно открыть модальное окно с деталями записи
               }}
@@ -1868,7 +1868,7 @@ const RegistrarPanel = () => {
             }
           }
         }}
-        onPrintTicket={(appointment) => {
+        onPrintTicket={(appointment: Appointment) => {
           const printSource = {
             ...(paymentDialog.row || {}),
             ...(appointment || {})
