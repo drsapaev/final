@@ -292,8 +292,8 @@ export const PaginatedResponseDTO = {
 /**
  * Валидация DTO
  */
-export function validateDTO(data, dto) {
-  const errors = [];
+export function validateDTO(data: Record<string, unknown>, dto: Record<string, string>): string[] {
+  const errors: string[] = [];
 
   for (const [key, expectedType] of Object.entries(dto)) {
     if (!(key in data)) {
@@ -315,8 +315,8 @@ export function validateDTO(data, dto) {
 /**
  * Создание типизированного объекта
  */
-export function createDTO(data, dto) {
-  const validated = {};
+export function createDTO(data: Record<string, unknown>, dto: Record<string, unknown>): Record<string, unknown> {
+  const validated: Record<string, unknown> = {};
 
   for (const [key] of Object.entries(dto)) {
     if (key in data) {

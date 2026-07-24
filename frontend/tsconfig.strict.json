@@ -1,0 +1,36 @@
+{
+  // Wave G7: per-directory strict mode.
+  //
+  // This tsconfig enables `strict: true` for directories that are ready
+  // (0 errors under strict). The main tsconfig.json stays non-strict
+  // until ALL directories are ready, then G8 flips the main config.
+  //
+  // Currently strict-ready (verified by scripts/per-directory-strict.mjs):
+  //   - src/api/mappers/   (Wave G4 code, fully typed)
+  //   - src/types/domain/  (Wave G1-G3 domain types, pure type defs)
+  //
+  // Usage:
+  //   npx tsc --noEmit -p tsconfig.strict.json
+  //
+  // CI gate (planned): run this in CI to prevent strict-ready directories
+  // from regressing. When a new directory becomes ready, add it to `include`
+  // and commit. When ALL directories are ready, delete this file and flip
+  // strict: true in tsconfig.json (G8).
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true
+  },
+  "include": [
+    "src/api/mappers/**/*.ts",
+    "src/api/mappers/**/*.tsx",
+    "src/types/domain/**/*.ts",
+    "src/types/domain/**/*.tsx",
+    "src/types/**/*.ts",
+    "src/api/client.ts",
+    "src/stores/**/*.ts",
+    "src/stores/**/*.tsx"
+  ],
+  "exclude": ["node_modules", "dist", "e2e"]
+}
