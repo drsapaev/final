@@ -151,5 +151,27 @@ declare module 'prop-types' {
   export function oneOf(types: any[]): any;
   export function instanceOf(cls: new (...args: any[]) => any): any;
   export function exact(shape: Record<string, any>): any;
+  // Default export (for `import PropTypes from 'prop-types'` style)
+  const PropTypes: {
+    any: any;
+    string: any;
+    number: any;
+    bool: any;
+    array: any;
+    object: any;
+    func: any;
+    node: any;
+    element: any;
+    elementType: any;
+    symbol: any;
+    arrayOf(type: any): any;
+    objectOf(type: any): any;
+    shape(shape: Record<string, any>): any;
+    oneOfType(types: any[]): any;
+    oneOf(types: any[]): any;
+    instanceOf(cls: new (...args: any[]) => any): any;
+    exact(shape: Record<string, any>): any;
+  };
+  export default PropTypes;
   /* eslint-enable @typescript-eslint/no-explicit-any */
 }
