@@ -93,7 +93,7 @@ export const useLocalStorage = <T,>(key: string, initialValue: T) => {
     }
   });
 
-  const setValue = useCallback((value) => {
+  const setValue = useCallback((value: unknown) => {
     try {
       const valueToStore = value instanceof Function ? value(storedValue) : value;
       setStoredValue(valueToStore);
@@ -118,7 +118,7 @@ export const useSessionStorage = <T,>(key: string, initialValue: T) => {
     }
   });
 
-  const setValue = useCallback((value) => {
+  const setValue = useCallback((value: unknown) => {
     try {
       const valueToStore = value instanceof Function ? value(storedValue) : value;
       setStoredValue(valueToStore);
@@ -531,7 +531,7 @@ export const useDateUtils = () => {
     return 'только что';
   }, []);
 
-  const isToday = useCallback((date) => {
+  const isToday = useCallback((date: string) => {
     if (!date) return false;
     
     const today = new Date();
@@ -540,7 +540,7 @@ export const useDateUtils = () => {
     return today.toDateString() === target.toDateString();
   }, []);
 
-  const isYesterday = useCallback((date) => {
+  const isYesterday = useCallback((date: string) => {
     if (!date) return false;
     
     const yesterday = new Date();

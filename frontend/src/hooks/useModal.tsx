@@ -61,7 +61,7 @@ export const useModal = (initialOpen = false) => {
     }
   }, [isOpen, openModal, closeModal]);
 
-  const setModalLoading = useCallback((isLoading) => {
+  const setModalLoading = useCallback((isLoading: boolean) => {
     setLoading(isLoading);
   }, []);
 
@@ -81,14 +81,14 @@ export const useModal = (initialOpen = false) => {
 export const useModals = () => {
   const [modals, setModals] = useState({});
 
-  const openModal = useCallback((id) => {
+  const openModal = useCallback((id: string | number) => {
     setModals(prev => ({
       ...prev,
       [id]: { isOpen: true, isAnimating: true }
     }));
   }, []);
 
-  const closeModal = useCallback((id) => {
+  const closeModal = useCallback((id: string | number) => {
     setModals(prev => ({
       ...prev,
       [id]: { isOpen: prev[id]?.isOpen || false, isAnimating: false }
@@ -102,7 +102,7 @@ export const useModals = () => {
     }, 300);
   }, []);
 
-  const toggleModal = useCallback((id) => {
+  const toggleModal = useCallback((id: string | number) => {
     const modal = modals[id];
     if (modal?.isOpen) {
       closeModal(id);
@@ -111,11 +111,11 @@ export const useModals = () => {
     }
   }, [modals, openModal, closeModal]);
 
-  const isModalOpen = useCallback((id) => {
+  const isModalOpen = useCallback((id: string | number) => {
     return modals[id]?.isOpen || false;
   }, [modals]);
 
-  const isModalAnimating = useCallback((id) => {
+  const isModalAnimating = useCallback((id: string | number) => {
     return modals[id]?.isAnimating || false;
   }, [modals]);
 
