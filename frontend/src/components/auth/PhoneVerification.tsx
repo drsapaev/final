@@ -14,7 +14,6 @@ import { api } from '../../api/client';
 import { toast } from 'react-toastify';
 
 import logger from '../../utils/logger';
-import PropTypes from 'prop-types';
 import { useSafeInput } from '../../hooks/useSafeInput';  // PR-39 / P0-5: sanitizer wired to form
 import { useTranslation } from '../../i18n/useTranslation';
 
@@ -396,16 +395,6 @@ const PhoneVerification = ({
 };
 
 
-PhoneVerification.propTypes = {
-  ...(PhoneVerification.propTypes || {}),
-  customMessage: PropTypes.any,
-  onCancel: PropTypes.any,
-  onVerified: PropTypes.any,
-  phone: PropTypes.any,
-  purpose: PropTypes.any,
-  showPhoneInput: PropTypes.any,
-  title: PropTypes.any,
-};
 
 export default PhoneVerification;
 

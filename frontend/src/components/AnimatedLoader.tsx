@@ -1,8 +1,7 @@
-import PropTypes from 'prop-types';
+import type { CSSProperties, ReactNode } from 'react';
+import React from 'react';
 
-// SW-01 fix: removed dependency on design-system/getColor.
-// Replaced with CSS variables that work with macOS theme system.
-const COLORS = {
+const COLORS: Record<string, string> = {
   primary: 'var(--mac-accent-blue, #007aff)',
   secondary: 'var(--mac-text-secondary, #6b7280)',
   success: 'var(--mac-success, #34c759)',
@@ -13,14 +12,21 @@ const COLORS = {
 
 const SKELETON_BG = 'var(--mac-bg-secondary, rgba(0,0,0,0.05))';
 
+interface AnimatedLoaderProps {
+  size?: 'sm' | 'md' | 'lg' | string;
+  color?: string;
+  className?: string;
+  style?: CSSProperties;
+}
+
 const AnimatedLoader = ({
   size = 'md',
   color = 'primary',
   className = '',
   style = {}
-}) => {
-  const getSizeStyles = () => {
-    const sizes = {
+}: AnimatedLoaderProps) => {
+  const getSizeStyles = (): Record<string, string> => {
+    const sizes: Record<string, Record<string, string>> = {
       sm: { width: '16px', height: '16px', borderWidth: '2px' },
       md: { width: '24px', height: '24px', borderWidth: '3px' },
       lg: { width: '32px', height: '32px', borderWidth: '4px' }
@@ -51,20 +57,20 @@ const AnimatedLoader = ({
 };
 
 
-AnimatedLoader.propTypes = {
-  ...(AnimatedLoader.propTypes || {}),
-  className: PropTypes.any,
-  color: PropTypes.any,
-  size: PropTypes.any,
-  style: PropTypes.any,
-};
+
+interface AnimatedTableSkeletonProps {
+  rows?: number;
+  columns?: number;
+  className?: string;
+  style?: CSSProperties;
+}
 
 const AnimatedTableSkeleton = ({
   rows = 5,
   columns = 4,
   className = '',
   style = {}
-}) => {
+}: AnimatedTableSkeletonProps) => {
   const tableStyles = {
     background: 'var(--mac-bg-primary, white)',
     borderRadius: 'var(--mac-radius-lg)',
@@ -118,18 +124,16 @@ const AnimatedTableSkeleton = ({
 };
 
 
-AnimatedTableSkeleton.propTypes = {
-  ...(AnimatedTableSkeleton.propTypes || {}),
-  className: PropTypes.any,
-  columns: PropTypes.any,
-  rows: PropTypes.any,
-  style: PropTypes.any,
-};
+
+interface AnimatedCardSkeletonProps {
+  className?: string;
+  style?: CSSProperties;
+}
 
 const AnimatedCardSkeleton = ({
   className = '',
   style = {}
-}) => {
+}: AnimatedCardSkeletonProps) => {
   const cardStyles = {
     background: 'var(--mac-bg-primary, white)',
     borderRadius: 'var(--mac-radius-lg)',
@@ -194,11 +198,6 @@ const AnimatedCardSkeleton = ({
 };
 
 
-AnimatedCardSkeleton.propTypes = {
-  ...(AnimatedCardSkeleton.propTypes || {}),
-  className: PropTypes.any,
-  style: PropTypes.any,
-};
 
 AnimatedLoader.TableSkeleton = AnimatedTableSkeleton;
 AnimatedLoader.CardSkeleton = AnimatedCardSkeleton;

@@ -19,7 +19,6 @@ import { useTranslation } from '../../i18n/useTranslation';
 
 import { useState, useEffect, useCallback } from 'react';
 import type { CSSProperties } from 'react';
-import PropTypes from 'prop-types';
 import {
   Mail, Phone, ArrowLeft, Send, CheckCircle, RefreshCw, Shield, Key,
   Eye, EyeOff, AlertCircle,
@@ -781,10 +780,5 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
   );
 };
 
-ForgotPassword.propTypes = {
-  language: PropTypes.oneOf(['RU', 'UZ', 'EN']),
-  onBack: PropTypes.func,
-  onSuccess: PropTypes.func,
-};
 
 export default ForgotPassword;
