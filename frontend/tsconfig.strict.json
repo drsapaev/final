@@ -45,6 +45,10 @@
     "src/components/common/Loading.tsx",
     "src/components/common/RoleGuard.tsx",
     "src/components/auth/RequireAuth.tsx",
+    "src/components/auth/ForgotPassword.tsx",
+    "src/components/auth/LoginFormStyled.tsx",
+    "src/components/auth/PhoneVerification.tsx",
+    "src/components/auth/loginErrorUtils.ts",
     "src/components/AnimatedLoader.tsx"
   ],
   "exclude": ["node_modules", "dist", "e2e", "src/api/__tests__/**", "src/routing/__tests__/**"]
