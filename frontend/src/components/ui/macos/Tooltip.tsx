@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect, useLayoutEffect, type ReactNode, type CSSProperties, type PointerEvent, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { useTheme } from '../../../contexts/ThemeContext';
-import PropTypes from 'prop-types';
 import { useTranslation } from '../../../i18n/useTranslation';
 
 type TooltipPosition =
@@ -355,20 +354,6 @@ const Tooltip = ({
     </>);
 
 };
-
-
-Tooltip.propTypes = {
-  ...(Tooltip.propTypes || {}),
-  children: PropTypes.any,
-  className: PropTypes.any,
-  content: PropTypes.any,
-  delay: PropTypes.any,
-  disabled: PropTypes.any,
-  followCursor: PropTypes.any,
-  position: PropTypes.any,
-  style: PropTypes.any,
-};
-
 Tooltip.displayName = 'macOS Tooltip';
 
 export default Tooltip;

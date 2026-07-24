@@ -1,7 +1,5 @@
 import React, { type ReactNode, type CSSProperties, type KeyboardEvent } from 'react';
 import { Check } from 'lucide-react';
-import PropTypes from 'prop-types';
-
 type CheckboxSize = 'sm' | 'md' | 'lg';
 type CheckboxVariant = 'default' | 'filled' | 'error';
 
@@ -164,22 +162,6 @@ const Checkbox = React.forwardRef<HTMLDivElement, CheckboxProps>(({
     </div>);
 
 });
-
-
-Checkbox.propTypes = {
-  ...(Checkbox.propTypes || {}),
-  checked: PropTypes.any,
-  className: PropTypes.any,
-  description: PropTypes.any,
-  disabled: PropTypes.any,
-  error: PropTypes.any,
-  label: PropTypes.any,
-  onChange: PropTypes.any,
-  size: PropTypes.any,
-  style: PropTypes.any,
-  variant: PropTypes.any,
-};
-
 Checkbox.displayName = 'Checkbox';
 
 export default Checkbox;

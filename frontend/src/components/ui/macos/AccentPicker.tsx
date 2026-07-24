@@ -1,5 +1,4 @@
 import { ACCENT_OPTIONS, useMacOSTheme, type AccentName } from '../../../theme/macosTheme.jsx';
-import PropTypes from 'prop-types';
 import type { CSSProperties } from 'react';
 
 type AccentKey = typeof ACCENT_OPTIONS[number];
@@ -67,14 +66,5 @@ export default function AccentPicker({ size = 22, className = '', style = {} }: 
     </div>
   );
 }
-
-
-AccentPicker.propTypes = {
-  ...(AccentPicker.propTypes || {}),
-  className: PropTypes.any,
-  size: PropTypes.any,
-  style: PropTypes.any,
-};
-
 // Silence unused-import warning in environments that strip type-only imports.
 export type { AccentKey };

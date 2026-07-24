@@ -1,14 +1,16 @@
 import React, { type CSSProperties, type ReactNode } from 'react';
-import PropTypes from 'prop-types';
+
+type TypographyVariant = 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' | 'body1' | 'body2' | 'subtitle1' | 'subtitle2' | 'caption' | string;
+type TypographyColor = 'primary' | 'secondary' | 'textSecondary' | 'success' | 'warning' | 'danger' | string;
 
 interface TypographyProps {
   children?: ReactNode;
-  variant?: string;
-  color?: string;
+  variant?: TypographyVariant;
+  color?: TypographyColor;
   gutterBottom?: boolean;
   style?: CSSProperties;
   paragraph?: boolean;
-  component?: string | React.ComponentType<any>;
+  component?: string | React.ComponentType<Record<string, unknown>>;
   className?: string;
   id?: string;
   fontWeight?: number | string;
@@ -17,7 +19,7 @@ interface TypographyProps {
   sx?: Record<string, unknown>;
 }
 // Minimal macOS-style Typography supporting common MUI variants
-const variantMap = {
+const variantMap: Record<string, { fontSize: string; fontWeight: number }> = {
   h1: { fontSize: '28px', fontWeight: 700 },
   h2: { fontSize: '22px', fontWeight: 700 },
   h3: { fontSize: '17px', fontWeight: 600 },
@@ -31,7 +33,7 @@ const variantMap = {
   caption: { fontSize: '11px', fontWeight: 400 }
 };
 
-const colorMap = {
+const colorMap: Record<string, string> = {
   primary: 'var(--mac-text-primary)',
   secondary: 'var(--mac-text-secondary)',
   textSecondary: 'var(--mac-text-secondary)',
@@ -62,19 +64,6 @@ const Typography = ({
   const Tag = component || (variant.startsWith('h') ? 'h' + variant.replace('h', '') : 'p');
   return <Tag style={styles} {...props}>{children}</Tag>;
 };
-
-
-Typography.propTypes = {
-  ...(Typography.propTypes || {}),
-  children: PropTypes.any,
-  color: PropTypes.any,
-  component: PropTypes.elementType,
-  gutterBottom: PropTypes.any,
-  paragraph: PropTypes.any,
-  style: PropTypes.any,
-  variant: PropTypes.any,
-};
-
 export default Typography;
 
 

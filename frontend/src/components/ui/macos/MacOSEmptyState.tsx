@@ -144,16 +144,5 @@ const MacOSEmptyState = ({
 };
 
 
-MacOSEmptyState.propTypes = {
-  ...(MacOSEmptyState.propTypes || {}),
-  action: PropTypes.any,
-  className: PropTypes.any,
-  description: PropTypes.any,
-  icon: PropTypes.any,
-  size: PropTypes.any,
-  style: PropTypes.any,
-  title: PropTypes.any,
-  variant: PropTypes.any,
-};
 
 export default MacOSEmptyState;

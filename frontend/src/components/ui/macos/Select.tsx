@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect, type CSSProperties, type ReactNode, type KeyboardEvent } from 'react';
-import PropTypes from 'prop-types';
 import { createPortal } from 'react-dom';
 import { useTranslation } from '../../../i18n/useTranslation';
 import { toFormValue } from '../../../utils/formValue';
@@ -302,29 +301,4 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(({
 });
 
 Select.displayName = 'Select';
-
-Select.propTypes = {
-  options: PropTypes.arrayOf(
-    PropTypes.oneOfType([
-      PropTypes.string,
-      PropTypes.number,
-      PropTypes.shape({
-        value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-        label: PropTypes.node
-      })
-    ])
-  ),
-  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-  defaultValue: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-  onChange: PropTypes.func,
-  placeholder: PropTypes.node,
-  disabled: PropTypes.bool,
-  size: PropTypes.oneOf(['small', 'default', 'large']),
-  label: PropTypes.node,
-  error: PropTypes.oneOfType([PropTypes.bool, PropTypes.node]),
-  className: PropTypes.string,
-  style: PropTypes.object,
-  id: PropTypes.string
-};
-
 export default Select;

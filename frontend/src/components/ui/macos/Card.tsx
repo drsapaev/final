@@ -1,5 +1,4 @@
 import React, { type ReactNode, type CSSProperties, type MouseEvent, type KeyboardEvent } from 'react';
-import PropTypes from 'prop-types';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { useTranslation } from '../../../i18n/useTranslation';
 
@@ -385,46 +384,4 @@ export const CardFooter = React.forwardRef<HTMLDivElement, CardPartProps>(({
 });
 
 CardFooter.displayName = 'macOS Card Footer';
-
-Card.propTypes = {
-  children: PropTypes.node,
-  variant: PropTypes.string,
-  padding: PropTypes.string,
-  shadow: PropTypes.string,
-  interactive: PropTypes.bool,
-  onClick: PropTypes.func,
-  className: PropTypes.string,
-  style: PropTypes.object
-};
-
-CardHeader.propTypes = {
-  children: PropTypes.node,
-  className: PropTypes.string,
-  style: PropTypes.object
-};
-
-CardTitle.propTypes = {
-  children: PropTypes.node,
-  className: PropTypes.string,
-  style: PropTypes.object
-};
-
-CardDescription.propTypes = {
-  children: PropTypes.node,
-  className: PropTypes.string,
-  style: PropTypes.object
-};
-
-CardContent.propTypes = {
-  children: PropTypes.node,
-  className: PropTypes.string,
-  style: PropTypes.object
-};
-
-CardFooter.propTypes = {
-  children: PropTypes.node,
-  className: PropTypes.string,
-  style: PropTypes.object
-};
-
 export default Card;

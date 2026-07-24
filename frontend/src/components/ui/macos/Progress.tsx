@@ -1,5 +1,4 @@
 import React, { type CSSProperties } from 'react';
-import PropTypes from 'prop-types';
 import { useTheme } from '../../../contexts/ThemeContext';
 
 type ProgressVariant = 'default' | 'primary' | 'success' | 'warning' | 'danger' | 'determinate' | string;
@@ -115,7 +114,6 @@ const Progress = React.forwardRef<HTMLDivElement, ProgressProps>(({
     width: '100%',
     backgroundColor: variantStyles[variant]?.backgroundColor || variantStyles.default.backgroundColor,
     border: variantStyles[variant]?.border || variantStyles.default.border,
-    borderRadius: sizeStyles.borderRadius,
     overflow: 'hidden',
     position: 'relative',
     ...sizeStyles,
@@ -170,19 +168,6 @@ const Progress = React.forwardRef<HTMLDivElement, ProgressProps>(({
 });
 
 Progress.displayName = 'macOS Progress';
-
-Progress.propTypes = {
-  value: PropTypes.number,
-  max: PropTypes.number,
-  variant: PropTypes.oneOf(['default', 'primary', 'success', 'warning', 'danger']),
-  size: PropTypes.oneOf(['small', 'default', 'large']),
-  animated: PropTypes.bool,
-  showValue: PropTypes.bool,
-  formatValue: PropTypes.func,
-  className: PropTypes.string,
-  style: PropTypes.object
-};
-
 /**
  * Circular Progress Component
  */
@@ -319,18 +304,4 @@ export const CircularProgress = React.forwardRef<HTMLDivElement, CircularProgres
 });
 
 CircularProgress.displayName = 'macOS Circular Progress';
-
-CircularProgress.propTypes = {
-  value: PropTypes.number,
-  max: PropTypes.number,
-  size: PropTypes.oneOf(['small', 'default', 'large', 'xlarge']),
-  thickness: PropTypes.oneOf(['thin', 'medium', 'thick']),
-  variant: PropTypes.oneOf(['default', 'primary', 'success', 'warning', 'danger']),
-  animated: PropTypes.bool,
-  showValue: PropTypes.bool,
-  formatValue: PropTypes.func,
-  className: PropTypes.string,
-  style: PropTypes.object
-};
-
 export default Progress;
