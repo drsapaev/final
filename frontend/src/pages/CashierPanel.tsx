@@ -29,6 +29,8 @@ import { formatRegistrarDate, formatRegistrarTime, parseRegistrarTimestamp } fro
 import notify from '../services/notify';
 // STRAT#31: useTranslation adapter for confirm/notify i18n.
 import { useTranslation } from '../i18n/useTranslation';
+import type { Appointment } from '../types/domain/clinic';
+import type { Transaction } from '../types/domain/clinic';
 import { formatUZS } from '../utils/formatCurrency';
 import {
   Dialog,
@@ -104,7 +106,7 @@ const resolvePaymentId = (paymentRowOrId) => {
   );
 };
 
-const resolvePaymentMethodCode = (method) => {
+const resolvePaymentMethodCode = (method: string) => {
   const normalizedMethod = String(method || '').trim().toLowerCase();
 
   if (!normalizedMethod) return 'cash';
@@ -1205,7 +1207,7 @@ const CashierPanel = () => {
                   <SegmentedControl
                     options={datePresets.map((p) => ({ label: p.label, value: p.id }))}
                     value="__none__"
-                    onChange={(id) => {
+                    onChange={(id: string | number) => {
                       const preset = datePresets.find((p) => p.id === id);
                       if (!preset) return;
                       setSelectedDate(preset.getRange().to);
@@ -1232,7 +1234,7 @@ const CashierPanel = () => {
                   <SegmentedControl
                     options={datePresets.map((p) => ({ label: p.label, value: p.id }))}
                     value="__none__"
-                    onChange={(id) => {
+                    onChange={(id: string | number) => {
                       const preset = datePresets.find((p) => p.id === id);
                       if (!preset) return;
                       const { from, to } = preset.getRange();
