@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 
 import { api } from '../api/client';
 import logger from '../utils/logger';
+import type { Transaction } from '../types/domain/clinic';
 
 const FINANCE_CACHE_KEY = 'admin_finance_transactions_cache';
 
@@ -190,7 +191,7 @@ const useFinance = () => {
     }
   }, [persistTransactions]);
 
-  const createTransaction = useCallback(async (transactionData) => {
+  const createTransaction = useCallback(async (transactionData: Partial<Transaction>) => {
     setLoading(true);
     setError(null);
 
@@ -220,7 +221,7 @@ const useFinance = () => {
     }
   }, [loadTransactions, persistTransactions]);
 
-  const updateTransaction = useCallback(async (id, transactionData) => {
+  const updateTransaction = useCallback(async (id: string | number, transactionData) => {
     setLoading(true);
     setError(null);
 

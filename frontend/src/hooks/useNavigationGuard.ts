@@ -117,7 +117,7 @@ export function useNavigationGuard({
      *
      * P-013 note: kept as window.confirm() — same reason as confirmNavigation.
      */
-    const safeNavigate = useCallback((to, options) => {
+    const safeNavigate = useCallback((to: string, options) => {
         if (!isBlocking || window.confirm(message)) {
             isNavigatingRef.current = true;
             navigate(to, options);
@@ -129,7 +129,7 @@ export function useNavigationGuard({
     /**
      * Force navigate - bypass guard (use after save)
      */
-    const forceNavigate = useCallback((to, options) => {
+    const forceNavigate = useCallback((to: string, options) => {
         isNavigatingRef.current = true;
         navigate(to, options);
     }, [navigate]);

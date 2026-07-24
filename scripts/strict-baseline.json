@@ -3,7 +3,7 @@
   "description": "Baseline error counts for strict-mode migration (Phase G). This file is used by scripts/strict-baseline-check.mjs to prevent regression — new code must not increase the error count above these baselines.",
   "flags": {
     "noImplicitAny": {
-      "totalErrors": 5217,
+      "totalErrors": 5203,
       "topErrorCodes": {
         "TS7006": 3207,
         "TS7031": 943,
@@ -27,7 +27,7 @@
       }
     },
     "strictNullChecks": {
-      "totalErrors": 5001
+      "totalErrors": 4991
     }
   },
   "notes": [
@@ -38,10 +38,11 @@
     "See docs/adr/ADR-0012-typescript-migration.md Phase G section for the full incremental plan."
   ],
   "domainInterfacesRecovered": {
-    "count": 2,
+    "count": 27,
     "files": [
       "types/domain/appData.ts",
-      "types/domain/emr.ts"
+      "types/domain/emr.ts",
+      "types/domain/clinic.ts"
     ],
     "types": [
       "AppUser",
@@ -63,7 +64,12 @@
       "EMRTemplateSuggestion",
       "EMRRecord",
       "EMRStatus",
-      "EMRApiError"
+      "EMRApiError",
+      "Appointment",
+      "Patient",
+      "Doctor",
+      "Transaction",
+      "ReportConfig"
     ]
   }
 }
