@@ -22,6 +22,7 @@ import { toast } from 'react-toastify';
 import {
   fetchPriceOverrides,
   approvePriceOverride,
+  type PriceOverrideEntry,
 } from '../../api/registrar';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
@@ -57,7 +58,7 @@ const hasBackendPriceOverrideAction = (override, action) => {
 const PriceOverrideApproval = () => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   useTheme();
-  const [priceOverrides, setPriceOverrides] = useState([]);
+  const [priceOverrides, setPriceOverrides] = useState<PriceOverrideEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('pending');
   const [selectedOverride, setSelectedOverride] = useState(null);

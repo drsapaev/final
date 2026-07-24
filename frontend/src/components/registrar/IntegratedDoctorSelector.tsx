@@ -1,5 +1,6 @@
 
 import { useState, useEffect } from 'react';
+import type { Doctor } from '../../types/domain/clinic';
 import {
   Heart,
   Stethoscope,
@@ -37,7 +38,7 @@ const IntegratedDoctorSelector = ({
 }) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [loading, setLoading] = useState(true);
-  const [doctors, setDoctors] = useState([]);
+  const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [queueSettings, setQueueSettings] = useState<Record<string, any>>({});
   const [error, setError] = useState('');
 

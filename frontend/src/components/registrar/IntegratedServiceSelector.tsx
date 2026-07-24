@@ -36,7 +36,7 @@ const IntegratedServiceSelector = ({
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [loading, setLoading] = useState(true);
   const [services, setServices] = useState<Record<string, any>>({});
-  const [, setCategories] = useState([]);
+  const [, setCategories] = useState<unknown[]>([]);
   const [error, setError] = useState('');
   const [retryCount, setRetryCount] = useState(0);
 

@@ -1722,7 +1722,7 @@ interface PatientRecord {
 
 
       const originalServiceIds = new Set();
-      const originalQueueIds = new Set(); // ✅ Moved here for availability in handleComplete
+      const originalQueueIds = new Set<string | number>(); // ✅ Moved here for availability in handleComplete
       // PR-14: collect updated_at per queue entry for optimistic locking.
       // Map<entryId, isoString> — passed to applyRegistrarEditDelta as
       // expectedEntryUpdatedAt so backend can detect concurrent edits.
@@ -1770,7 +1770,7 @@ interface PatientRecord {
             const cartServices = wizardData.cart.items.map((item) => ({
               service_id: (item as { service_id?: string | number }).service_id,
               quantity: item.quantity || 1
-            })).filter((s) => s.service_id);
+            })).filter((s): s is { service_id: string | number; quantity: unknown } => s.service_id != null);
 
             // Определяем visit_type и discount_mode
             const visitType = wizardData.cart.discount_mode === 'repeat' ? 'repeat' :

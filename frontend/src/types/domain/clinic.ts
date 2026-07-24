@@ -126,6 +126,7 @@ export interface Doctor {
   price_default?: number;
   start_number_online?: number;
   user_id?: string | number;
+  user?: { full_name?: string; [k: string]: unknown };
   schedule?: DoctorScheduleSlot[];
   availability?: DoctorAvailability[];
   [key: string]: unknown;
