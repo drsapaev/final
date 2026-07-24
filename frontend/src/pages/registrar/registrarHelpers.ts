@@ -67,7 +67,7 @@ export const REGISTRAR_RECORD_KINDS = new Set(['visit', 'online_queue', 'appoint
 // Contract normalization helpers
 // ───────────────────────────────────────────────────────────
 
-export const normalizeRegistrarContractValue = (value) => {
+export const normalizeRegistrarContractValue = (value: unknown) => {
   if (value === null || value === undefined) return '';
   return String(value).trim().toLowerCase();
 };
@@ -224,9 +224,9 @@ export const hasBackendPatientGenderContract = (record) => {
 // Preview formatting
 // ───────────────────────────────────────────────────────────
 
-export const formatPreviewList = (value) => {
+export const formatPreviewList = (value: unknown) => {
   if (Array.isArray(value)) {
-    return value.map((item) => {
+    return value.map((item: Record<string, unknown>) => {
       if (typeof item === 'string') return item;
       return item?.name || item?.service_name || item?.code || item?.queue_name || item?.queue_tag || '';
     }).filter(Boolean).join(', ');
@@ -238,7 +238,7 @@ export const formatPreviewList = (value) => {
 // Wizard queue assignment normalization
 // ───────────────────────────────────────────────────────────
 
-const hasQueueIdentityValue = (value) => value !== null && value !== undefined && value !== '';
+const hasQueueIdentityValue = (value: unknown) => value !== null && value !== undefined && value !== '';
 
 export const resolveWizardQueueEntryId = (assignment) => {
   if (!assignment || typeof assignment !== 'object') return null;
@@ -362,9 +362,9 @@ export const buildPostWizardPaymentRow = (wizardResult) => {
 // Multi-record aggregate row helpers
 // ───────────────────────────────────────────────────────────
 
-const hasMultipleRecordRefs = (value) => Array.isArray(value) && value.filter(Boolean).length > 1;
+const hasMultipleRecordRefs = (value: unknown) => Array.isArray(value) && value.filter(Boolean).length > 1;
 
-export const isMultiRecordAggregateRow = (row) => (
+export const isMultiRecordAggregateRow = (row: Record<string, unknown>) => (
   hasMultipleRecordRefs(row?.grouped_record_refs) ||
   hasMultipleRecordRefs(row?.grouped_records) ||
   hasMultipleRecordRefs(row?.aggregated_ids)
