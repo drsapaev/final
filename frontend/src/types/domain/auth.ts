@@ -28,8 +28,12 @@ export type AuthStatus = 'authenticated' | 'unauthenticated' | 'loading' | 'erro
 export interface UserProfile {
   id?: number | null;
   name?: string;
+  full_name?: string;
+  username?: string;
   email?: string;
   role?: string;
+  role_name?: string;
+  specialty?: string;
   [key: string]: unknown;
 }
 

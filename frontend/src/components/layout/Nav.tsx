@@ -4,16 +4,7 @@ import auth, { setProfile } from '../../stores/auth';
 import type { AuthState } from '../../stores/auth';
 import { getVisibleRoutesForShell, isInternalDemoEnabled } from '../../routing/routeSelectors';
 import { useTranslation } from '../../i18n/useTranslation';
-
-interface UserProfile {
-  id?: number | null;
-  full_name?: string;
-  username?: string;
-  role?: string;
-  role_name?: string;
-  specialty?: string;
-  [key: string]: unknown;
-}
+import type { UserProfile } from '../../types/domain/auth';
 
 interface RouteNavMeta {
   label?: string;
