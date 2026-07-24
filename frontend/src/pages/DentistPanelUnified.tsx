@@ -45,6 +45,8 @@ import { printPanelTicket } from '../services/panelPrint';
 import notify from '../services/notify';
 // STRAT#34: useTranslation adapter for confirm/notify i18n.
 import { useTranslation } from '../i18n/useTranslation';
+import type { Appointment } from '../types/domain/clinic';
+import type { Patient } from '../types/domain/clinic';
 import { useConfirm } from '../components/common/ConfirmDialog';
 import { useSessionTimeoutWarning } from '../hooks/useSessionTimeoutWarning';
 import { useDentalHotkeys } from '../hooks/useDentalHotkeys';
@@ -1255,7 +1257,7 @@ const DentistPanelUnified = () => {
       return null;
     }
 
-    const mapPhotoList = (type) => (
+    const mapPhotoList = (type: string) => (
       Array.isArray(template.photos)
         ? template.photos.filter((photo) => photo?.type === type).map((photo, index) => ({
           id: `${type}-${index}-${Date.now()}`,
