@@ -21,8 +21,19 @@ export type AppointmentType =
   | 'benefit'
   | string;
 
+
+export interface QueueNumberInfo {
+  number?: string | number;
+  queue_name?: string;
+  queue_tag?: string;
+  status?: string;
+  service_name?: string;
+  specialty?: string;
+  [key: string]: unknown;
+}
+
 export interface Appointment {
-  id: string | number;
+  id?: string | number;
   patient_id?: string | number;
   patient_name?: string;
   patient_fio?: string;
@@ -44,6 +55,27 @@ export interface Appointment {
   amount?: number;
   created_at?: string;
   updated_at?: string;
+  // Fields accessed in EnhancedAppointmentsTable and RegistrarPanel
+  available_actions?: unknown[];
+  services?: Array<{ name?: string; code?: string; [k: string]: unknown }>;
+  service_codes?: string[];
+  service?: string;
+  number?: string | number;
+  appointment_date?: string;
+  appointment_time?: string;
+  queue_number_status?: string;
+  queue_numbers?: QueueNumberInfo[];
+  payment_type?: string;
+  payment_amount?: number;
+  discount_mode?: string;
+  approval_status?: string;
+  cost?: number;
+  session_id?: string;
+  template_name?: string;
+  flagged_findings_count?: number;
+  patient_phone?: string;
+  patient_birth_year?: number;
+  patient_address?: string;
   [key: string]: unknown;
 }
 
