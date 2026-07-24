@@ -20,7 +20,6 @@ import { Card } from '../ui/macos';
 // Теперь auth/CSRF/refresh обрабатываются axios-interceptor'ом в api/client.js.
 import { fetchRegistrarServices } from '../../api/registrar';
 import logger from '../../utils/logger';
-import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 /**
  * Интегрированный селектор услуг для регистратуры
@@ -423,13 +422,5 @@ const IntegratedServiceSelector = ({
 };
 
 
-IntegratedServiceSelector.propTypes = {
-  ...(IntegratedServiceSelector.propTypes || {}),
-  className: PropTypes.any,
-  onNext: PropTypes.any,
-  onServicesChange: PropTypes.any,
-  selectedServices: PropTypes.any,
-  simple: PropTypes.any,
-};
 
 export default IntegratedServiceSelector;

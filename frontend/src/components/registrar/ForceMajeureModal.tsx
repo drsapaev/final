@@ -22,7 +22,6 @@ import {
 
 import logger from '../../utils/logger';
 import ModernDialog from '../dialogs/ModernDialog';
-import PropTypes from 'prop-types';
 import { Input } from '../ui/macos';
 // UX Audit: inline-стили перенесены в ForceMajeureModal.css.
 // useTheme + tokenManager удалены (auth через axios-interceptor, theme через CSS).
@@ -343,13 +342,5 @@ const ForceMajeureModal = ({
 };
 
 
-ForceMajeureModal.propTypes = {
-  ...(ForceMajeureModal.propTypes || {}),
-  isOpen: PropTypes.any,
-  onClose: PropTypes.any,
-  onSuccess: PropTypes.any,
-  specialistId: PropTypes.any,
-  specialistName: PropTypes.any,
-};
 
 export default ForceMajeureModal;

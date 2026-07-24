@@ -23,7 +23,6 @@ import {
   fetchRegistrarQueueSettings,
 } from '../../api/registrar';
 import logger from '../../utils/logger';
-import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 /**
  * Интегрированный селектор врачей для регистратуры
@@ -263,14 +262,6 @@ const IntegratedDoctorSelector = ({
 };
 
 
-IntegratedDoctorSelector.propTypes = {
-  ...(IntegratedDoctorSelector.propTypes || {}),
-  className: PropTypes.any,
-  onDoctorChange: PropTypes.any,
-  selectedDoctorId: PropTypes.any,
-  showSchedule: PropTypes.any,
-  specialty: PropTypes.any,
-};
 
 export default IntegratedDoctorSelector;
 
