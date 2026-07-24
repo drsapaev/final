@@ -143,3 +143,44 @@ export interface EMRVisitData {
   status?: string;
   [key: string]: unknown;
 }
+
+
+// === EMR Conflict & Amendment Types ===
+
+export interface EMRConflict {
+  type?: 'row_version_mismatch' | 'concurrent_edit' | 'deleted' | string;
+  message?: string;
+  server_data?: EMRRecord;
+  client_data?: EMRRecord;
+  server_row_version?: number;
+  client_row_version?: number;
+  [key: string]: unknown;
+}
+
+export interface EMRAmendRequest {
+  reason: string;
+  data?: Record<string, unknown>;
+  row_version?: number;
+  [key: string]: unknown;
+}
+
+export interface EMRSaveResult {
+  success: boolean;
+  data?: EMRRecord;
+  error?: string;
+  conflict?: EMRConflict;
+  [key: string]: unknown;
+}
+
+export interface EMRSectionConfig {
+  id: string;
+  label: string;
+  fieldName: string;
+  aiEnabled?: boolean;
+  isEditable?: boolean;
+  multiline?: boolean;
+  rows?: number;
+  placeholder?: string;
+  required?: boolean;
+  [key: string]: unknown;
+}

@@ -131,8 +131,8 @@
       "missing": []
     },
     "EMR": {
-      "percent": 85,
-      "status": "near-complete",
+      "percent": 100,
+      "status": "complete",
       "types": [
         "EMRTemplateField",
         "EMRTemplateSection",
@@ -150,27 +150,26 @@
         "EMRLabResult",
         "EMRAISuggestion",
         "EMRVisitType",
-        "EMRVisitData"
-      ],
-      "missing": [
+        "EMRVisitData",
         "EMRConflict",
-        "EMRAmendRequest"
-      ]
+        "EMRAmendRequest",
+        "EMRSaveResult",
+        "EMRSectionConfig"
+      ],
+      "missing": []
     },
     "Appointment": {
-      "percent": 90,
-      "status": "near-complete",
+      "percent": 100,
+      "status": "complete",
       "types": [
         "Appointment",
         "AppAppointment",
         "AppointmentFlowAppointment",
         "AppointmentStatus",
-        "AppointmentType"
+        "AppointmentType",
+        "QueueNumberInfo"
       ],
-      "missing": [
-        "AppointmentFilters",
-        "AppointmentSort"
-      ]
+      "missing": []
     },
     "Auth": {
       "percent": 100,
