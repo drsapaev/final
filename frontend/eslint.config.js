@@ -6,6 +6,9 @@ import globals from 'globals';
 import tsParser from '@typescript-eslint/parser';
 import tseslint from '@typescript-eslint/eslint-plugin';
 import noHardcodedColors from './scripts/no-hardcoded-colors.js';
+import noDomainTypeDuplication from './scripts/no-domain-type-duplication.js';
+import noDtoImportInComponents from './scripts/no-dto-import-in-components.js';
+import noApiLooseReturn from './scripts/no-api-loose-return.js';
 
 export default [
   js.configs.recommended,
@@ -18,6 +21,9 @@ export default [
       custom: {
         rules: {
           'no-hardcoded-colors': noHardcodedColors,
+          'no-domain-type-duplication': noDomainTypeDuplication,
+          'no-dto-import-in-components': noDtoImportInComponents,
+          'no-api-loose-return': noApiLooseReturn,
         },
       },
     },
@@ -43,6 +49,12 @@ export default [
     rules: {
       // Custom: ban hardcoded colors (prevent regressions)
       'custom/no-hardcoded-colors': 'warn',
+
+      // Wave 5 — Domain Adoption 100% regression guards
+      // Error-level: these are architectural invariants, not style.
+      'custom/no-domain-type-duplication': 'error',
+      'custom/no-dto-import-in-components': 'error',
+      'custom/no-api-loose-return': 'error',
 
       // React правила
       ...react.configs.recommended.rules,
