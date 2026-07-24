@@ -28,12 +28,9 @@
     "src/types/domain/**/*.ts",
     "src/types/domain/**/*.tsx",
     "src/types/**/*.ts",
-    "src/api/client.ts",
-    "src/api/labReporting.ts",
-    "src/api/registrarBatch.ts",
-    "src/api/services.ts",
+    "src/api/**/*.ts",
     "src/stores/**/*.ts",
     "src/stores/**/*.tsx"
   ],
-  "exclude": ["node_modules", "dist", "e2e"]
+  "exclude": ["node_modules", "dist", "e2e", "src/api/__tests__/**"]
 }

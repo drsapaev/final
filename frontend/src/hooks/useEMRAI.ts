@@ -278,7 +278,7 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
 
     try {
       if (useMCP) {
-        const mcpResult = await mcpAPI.analyzeSkinLesion(imageFile, lesionInfo, patientHistory, provider);
+        const mcpResult = await mcpAPI.analyzeSkinLesion(imageFile as File | Blob, lesionInfo, patientHistory, provider);
 
         if ((mcpResult as Record<string, unknown>).status === 'success') {
           // Validate AI response

@@ -66,9 +66,9 @@ export const TICKET_PRINT_SETTINGS_DEFINITIONS = [
   },
 ];
 
-export function normalizeTicketPrintSettings(settings = {}) {
-  return Object.keys(TICKET_PRINT_SETTINGS_DEFAULTS).reduce((acc, key) => {
-    const fallback = TICKET_PRINT_SETTINGS_DEFAULTS[key];
+export function normalizeTicketPrintSettings(settings: Record<string, unknown> = {}): Record<string, boolean> {
+  return Object.keys(TICKET_PRINT_SETTINGS_DEFAULTS).reduce((acc: Record<string, boolean>, key: string) => {
+    const fallback = TICKET_PRINT_SETTINGS_DEFAULTS[key as keyof typeof TICKET_PRINT_SETTINGS_DEFAULTS];
     const value = settings?.[key];
     acc[key] = typeof value === 'boolean' ? value : fallback;
     return acc;

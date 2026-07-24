@@ -33,7 +33,7 @@ export function getCurrentPathname() {
  * @param {string} path
  * @returns {boolean}
  */
-export function isOnPath(path) {
+export function isOnPath(path: string): boolean {
   return getCurrentPathname() === path;
 }
 
@@ -71,7 +71,7 @@ export function hardRedirectToLogin(options: Record<string, unknown> = {}) {
  * @param {object} [options]
  * @param {string} [options.reason]
  */
-export function hardRedirectTo(path, options: Record<string, unknown> = {}) {
+export function hardRedirectTo(path: string, options: Record<string, unknown> = {}): void {
   const { reason = 'init' } = options;
   if (typeof window === 'undefined') return;
   if (isOnPath(path)) return;
@@ -85,7 +85,7 @@ export function hardRedirectTo(path, options: Record<string, unknown> = {}) {
  * @param {string} url
  * @returns {boolean}
  */
-export function isExternalUrl(url) {
+export function isExternalUrl(url: string): boolean {
   if (!url || typeof url !== 'string') return false;
   if (url.startsWith('/') || url.startsWith('#')) return false;
   try {

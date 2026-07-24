@@ -223,9 +223,9 @@ const AIAssistant = ({
         case 'skin':
           if (useMCP && data.image) {
             mcpResult = await mcpAPI.analyzeSkinLesion(
-              data.image,
-              data.lesionInfo,
-              data.patientHistory,
+              data.image as File | Blob,
+              data.lesionInfo as Record<string, unknown> | null,
+              data.patientHistory as Record<string, unknown> | null,
               provider
             );
             if (mcpResult.status === 'success') {

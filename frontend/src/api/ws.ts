@@ -14,7 +14,7 @@ function wsEnabled() {
  */
 export function openQueueWS(department: string, dateStr: string, onMessage: (data: unknown) => void): () => void {
   if (!wsEnabled()) return () => {};
-  let ws = null;
+  let ws: WebSocket | null = null;
 
   try {
     const query = `department=${encodeURIComponent(department)}&date_str=${encodeURIComponent(dateStr)}`;
@@ -50,8 +50,8 @@ export function openQueueWS(department: string, dateStr: string, onMessage: (dat
  */
 export function openDisplayBoardWS(boardId: string, onMessage: (data: unknown) => void, onConnect: () => void, onDisconnect: () => void): () => void {
   if (!wsEnabled()) return () => {};
-  let ws = null;
-  let reconnectTimeout = null;
+  let ws: WebSocket | null = null;
+  let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
   let reconnectAttempts = 0;
   const maxReconnectAttempts = 5;
   const reconnectDelay = 3000;
