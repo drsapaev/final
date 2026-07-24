@@ -253,7 +253,7 @@ const getPaymentStatusLabel = (status, t) => {
 // were removed — they leaked patient names (PHI) into aria-labels, and after
 // localization all action buttons now use static Russian aria-labels instead.
 
-const resolveCashierVisitIds = (appointment) => {
+const resolveCashierVisitIds = (appointment: Appointment) => {
   const paymentVisitIds = Array.isArray(appointment?.payment_visit_ids)
     ? appointment.payment_visit_ids.filter((visitId) => visitId !== null && visitId !== undefined)
     : [];
@@ -279,20 +279,20 @@ const resolveCashierVisitIds = (appointment) => {
     : [];
 };
 
-const resolveSingleCashierVisitId = (appointment) => {
+const resolveSingleCashierVisitId = (appointment: Appointment) => {
   const visitIds = resolveCashierVisitIds(appointment);
   return visitIds.length === 1 ? visitIds[0] : null;
 };
 
-const isBackendGroupedCashierPayment = (appointment) =>
+const isBackendGroupedCashierPayment = (appointment: Appointment) =>
   appointment?.payment_contract === 'grouped_visits' ||
   appointment?.can_create_grouped_payment === true;
 
-const canCreateDirectCashierPayment = (appointment) => {
+const canCreateDirectCashierPayment = (appointment: Appointment) => {
   return appointment?.can_create_direct_payment === true;
 };
 
-const canCreateCashierPayment = (appointment) =>
+const canCreateCashierPayment = (appointment: Appointment) =>
   canCreateDirectCashierPayment(appointment) || appointment?.can_create_grouped_payment === true;
 
 const createGroupedCashierPayment = async (appointment, paymentData) => {
@@ -703,7 +703,7 @@ const CashierPanel = () => {
     paymentWidget.closeModal();
   };
 
-  const openPaymentWidget = (appointment) => {
+  const openPaymentWidget = (appointment: Appointment) => {
     if (!canCreateDirectCashierPayment(appointment) || isBackendGroupedCashierPayment(appointment)) {
       const message = tI18n('cashier.online_payment_group_unavailable');
       setPaymentError(message);
