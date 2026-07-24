@@ -1,12 +1,25 @@
 import { createContext, useContext, useReducer, useCallback } from 'react';
+import type { ReactNode } from 'react';
 import PropTypes from 'prop-types';
+import type {
+  AppDataState,
+  AppDataAction,
+  AppDataContextValue,
+  AppUser,
+  AppPatient,
+  AppAppointment,
+  AppQueueData,
+  AppQueueEntry,
+  AppEMRData,
+  AppLabResult,
+} from '../types/domain/appData';
 /**
  * Контекст для управления глобальным состоянием приложения
  * Оптимизирует передачу данных между компонентами
  */
 
 // Начальное состояние
-const initialState = {
+const initialState: AppDataState = {
   // Пользователи и роли
   users: [],
   currentUser: null,
@@ -75,10 +88,10 @@ const ActionTypes = {
   SET_LOADING: 'SET_LOADING',
   SET_ERROR: 'SET_ERROR',
   CLEAR_ERROR: 'CLEAR_ERROR'
-};
+} as const;
 
 // Reducer для управления состоянием
-function appDataReducer(state, action) {
+function appDataReducer(state: AppDataState, action: AppDataAction): AppDataState {
   switch (action.type) {
     // Пользователи
     case ActionTypes.SET_USERS:
@@ -257,102 +270,102 @@ function appDataReducer(state, action) {
 }
 
 // Создаем контекст
-const AppDataContext = createContext<unknown>(null);
+const AppDataContext = createContext<AppDataContextValue | null>(null);
 
 // Провайдер контекста
-export const AppDataProvider = ({ children }) => {
+export const AppDataProvider = ({ children }: { children: ReactNode }) => {
   const [state, dispatch] = useReducer(appDataReducer, initialState);
 
   // Action creators
   const actions = {
     // Пользователи
-    setUsers: useCallback((users) => {
+    setUsers: useCallback((users: AppUser[]) => {
       dispatch({ type: ActionTypes.SET_USERS, payload: users });
     }, []),
     
-    setCurrentUser: useCallback((user) => {
+    setCurrentUser: useCallback((user: AppUser) => {
       dispatch({ type: ActionTypes.SET_CURRENT_USER, payload: user });
     }, []),
     
-    addUser: useCallback((user) => {
+    addUser: useCallback((user: AppUser) => {
       dispatch({ type: ActionTypes.ADD_USER, payload: user });
     }, []),
     
-    updateUser: useCallback((user) => {
+    updateUser: useCallback((user: AppUser) => {
       dispatch({ type: ActionTypes.UPDATE_USER, payload: user });
     }, []),
     
-    deleteUser: useCallback((userId) => {
+    deleteUser: useCallback((userId: string | number) => {
       dispatch({ type: ActionTypes.DELETE_USER, payload: userId });
     }, []),
 
     // Пациенты
-    setPatients: useCallback((patients) => {
+    setPatients: useCallback((patients: AppPatient[]) => {
       dispatch({ type: ActionTypes.SET_PATIENTS, payload: patients });
     }, []),
     
-    setSelectedPatient: useCallback((patient) => {
+    setSelectedPatient: useCallback((patient: AppPatient) => {
       dispatch({ type: ActionTypes.SET_SELECTED_PATIENT, payload: patient });
     }, []),
     
-    addPatient: useCallback((patient) => {
+    addPatient: useCallback((patient: AppPatient) => {
       dispatch({ type: ActionTypes.ADD_PATIENT, payload: patient });
     }, []),
     
-    updatePatient: useCallback((patient) => {
+    updatePatient: useCallback((patient: AppPatient) => {
       dispatch({ type: ActionTypes.UPDATE_PATIENT, payload: patient });
     }, []),
 
     // Записи
-    setAppointments: useCallback((appointments) => {
+    setAppointments: useCallback((appointments: AppAppointment[]) => {
       dispatch({ type: ActionTypes.SET_APPOINTMENTS, payload: appointments });
     }, []),
     
-    addAppointment: useCallback((appointment) => {
+    addAppointment: useCallback((appointment: AppAppointment) => {
       dispatch({ type: ActionTypes.ADD_APPOINTMENT, payload: appointment });
     }, []),
     
-    updateAppointment: useCallback((appointment) => {
+    updateAppointment: useCallback((appointment: AppAppointment) => {
       dispatch({ type: ActionTypes.UPDATE_APPOINTMENT, payload: appointment });
     }, []),
 
     // Очередь
-    setQueueData: useCallback((queueData) => {
+    setQueueData: useCallback((queueData: AppQueueData | null) => {
       dispatch({ type: ActionTypes.SET_QUEUE_DATA, payload: queueData });
     }, []),
     
-    updateQueueEntry: useCallback((entry) => {
+    updateQueueEntry: useCallback((entry: AppQueueEntry) => {
       dispatch({ type: ActionTypes.UPDATE_QUEUE_ENTRY, payload: entry });
     }, []),
 
     // EMR
-    setEMRData: useCallback((emrData) => {
+    setEMRData: useCallback((emrData: AppEMRData | null) => {
       dispatch({ type: ActionTypes.SET_EMR_DATA, payload: emrData });
     }, []),
     
-    updateEMRField: useCallback((field, value) => {
+    updateEMRField: useCallback((field: string, value: unknown) => {
       dispatch({ type: ActionTypes.UPDATE_EMR_FIELD, payload: { field, value } });
     }, []),
 
     // Лабораторные результаты
-    setLabResults: useCallback((results) => {
+    setLabResults: useCallback((results: AppLabResult[]) => {
       dispatch({ type: ActionTypes.SET_LAB_RESULTS, payload: results });
     }, []),
     
-    addLabResult: useCallback((result) => {
+    addLabResult: useCallback((result: AppLabResult) => {
       dispatch({ type: ActionTypes.ADD_LAB_RESULT, payload: result });
     }, []),
 
     // Утилиты
-    setLoading: useCallback((key, value) => {
+    setLoading: useCallback((key: string, value: boolean) => {
       dispatch({ type: ActionTypes.SET_LOADING, payload: { key, value } });
     }, []),
     
-    setError: useCallback((key, error) => {
+    setError: useCallback((key: string, error: string | null) => {
       dispatch({ type: ActionTypes.SET_ERROR, payload: { key, error } });
     }, []),
     
-    clearError: useCallback((key) => {
+    clearError: useCallback((key: string) => {
       dispatch({ type: ActionTypes.CLEAR_ERROR, payload: key });
     }, [])
   };
@@ -376,7 +389,7 @@ AppDataProvider.propTypes = {
 };
 
 // Хук для использования контекста
-export const useAppData = () => {
+export const useAppData = (): AppDataContextValue => {
   const context = useContext(AppDataContext);
   if (!context) {
     throw new Error('useAppData must be used within an AppDataProvider');
@@ -385,7 +398,7 @@ export const useAppData = () => {
 };
 
 // Селекторы для оптимизации производительности
-export const useAppDataSelector = (selector) => {
+export const useAppDataSelector = <T,>(selector: (context: AppDataContextValue) => T): T => {
   const context = useAppData();
   return selector(context);
 };
