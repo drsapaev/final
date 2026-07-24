@@ -10,14 +10,20 @@ export type DiscountMode = 'none' | 'repeat' | 'benefit' | 'all_free' | string;
 
 export interface Invoice {
   id: string | number;
+  invoice_number?: string;
   appointment_id?: string | number;
   patient_id?: string | number;
   patient_name?: string;
+  invoice_type?: string;
   amount?: number;
+  total_amount?: number;
   paid_amount?: number;
+  balance?: number;
   discount_amount?: number;
-  status?: PaymentStatus;
+  status?: PaymentStatus | string;
   method?: PaymentMethod;
+  issue_date?: string;
+  due_date?: string;
   created_at?: string;
   paid_at?: string;
   items?: InvoiceItem[];
@@ -38,11 +44,16 @@ export interface InvoiceItem {
 
 export interface Payment {
   id: string | number;
+  payment_number?: string;
+  is_confirmed?: boolean;
   invoice_id?: string | number;
+  patient_id?: string | number;
   amount?: number;
   method?: PaymentMethod;
+  payment_method?: string;
   status?: PaymentStatus;
   transaction_id?: string;
+  payment_date?: string;
   created_at?: string;
   [key: string]: unknown;
 }

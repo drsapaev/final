@@ -34,6 +34,7 @@ import {
 import { toast } from 'react-toastify';
 
 import { api } from '../../api/client';
+import type { Invoice, Payment } from '../../types/domain/billing';
 import logger from '../../utils/logger';
 import { sanitizePrintableHtml } from '../../utils/printWindow';  // PR-35 / P0-7
 import { useTranslation } from '../../i18n/useTranslation';
@@ -85,29 +86,6 @@ const buildPaymentPayload = (form) => ({
 
 const BillingManager = () => {
   const [activeTab, setActiveTab] = useState('invoices');
-  interface Invoice {
-    id: string | number;
-    invoice_number?: string;
-    status?: string;
-    invoice_type?: string;
-    patient_id?: string | number;
-    issue_date?: string;
-    due_date?: string;
-    total_amount?: number;
-    balance?: number;
-    [k: string]: unknown;
-  }
-  interface Payment {
-    id: string | number;
-    payment_number?: string;
-    is_confirmed?: boolean;
-    invoice_id?: string | number;
-    patient_id?: string | number;
-    amount?: number;
-    payment_method?: string;
-    payment_date?: string;
-    [k: string]: unknown;
-  }
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [analytics, setAnalytics] = useState<{ summary?: { total_invoices?: number; total_amount?: number; paid_amount?: number; overdue_amount?: number; recent_invoices?: unknown[]; [k: string]: unknown }; status_breakdown?: Array<{ status?: string; count?: number; [k: string]: unknown }>; [k: string]: unknown } | null>(null);

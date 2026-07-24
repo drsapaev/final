@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 
 import { api } from '../api/client';
-import type { Appointment } from '../types/domain/clinic';
+import type { Appointment, Doctor } from '../types/domain/clinic';
 
 const normalizeAppointment = (appointment: Appointment) => ({
   ...appointment,
@@ -29,15 +29,15 @@ const normalizeAppointment = (appointment: Appointment) => ({
     appointment.hasIntegrityWarnings ?? appointment.has_integrity_warnings ?? false,
 });
 
-const buildAppointmentPayload = (appointmentData: Record<string, unknown>, doctors: unknown[] = []) => {
+const buildAppointmentPayload = (appointmentData: Record<string, unknown>, doctors: Doctor[] = []) => {
   const selectedDoctor = doctors.find(
-    (doctor) => (doctor as Record<string, unknown>).id === Number((appointmentData as Record<string, unknown>).doctorId)
+    (doctor) => doctor.id === Number(appointmentData.doctorId)
   );
 
   const payload = {
-    patient_id: Number((appointmentData as Record<string, unknown>).patientId),
-    doctor_id: Number((appointmentData as Record<string, unknown>).doctorId),
-    department: (selectedDoctor as Record<string, unknown> | null)?.specialty || null,
+    patient_id: Number(appointmentData.patientId),
+    doctor_id: Number(appointmentData.doctorId),
+    department: selectedDoctor?.specialty || null,
     appointment_date: appointmentData.appointmentDate,
     appointment_time: appointmentData.appointmentTime,
     notes: String(appointmentData.reason ?? "").trim() || String(appointmentData.notes ?? "").trim() || '',
@@ -51,7 +51,7 @@ const buildAppointmentPayload = (appointmentData: Record<string, unknown>, docto
   return payload;
 };
 
-const useAppointments = (doctors: unknown[] = []) => {
+const useAppointments = (doctors: Doctor[] = []) => {
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
