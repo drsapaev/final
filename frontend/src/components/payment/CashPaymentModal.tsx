@@ -1,7 +1,6 @@
 
 import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect, useMemo } from 'react';
-import PropTypes from 'prop-types';
 import { CheckCircle, XCircle, Info } from 'lucide-react';
 import {
   Button,
@@ -263,19 +262,5 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }) => {
     );
 };
 
-CashPaymentModal.propTypes = {
-    appointment: PropTypes.shape({
-        total_amount: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-        remaining_amount: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-        payment_amount: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-        patient_name: PropTypes.string,
-        patient_id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-        department: PropTypes.string,
-        appointment_date: PropTypes.string,
-        appointment_time: PropTypes.string
-    }),
-    onProcessPayment: PropTypes.func,
-    onClose: PropTypes.func
-};
 
 export default CashPaymentModal;

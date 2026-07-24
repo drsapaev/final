@@ -1,4 +1,3 @@
-import PropTypes from 'prop-types';
 import PaymentProviderDialog from './PaymentProviderDialog';
 import './PaymentClick.css';
 
@@ -36,15 +35,5 @@ const PaymentClick = ({
     onError={onError} />
 );
 
-PaymentClick.propTypes = {
-  ...(PaymentClick.propTypes || {}),
-  currency: PropTypes.any,
-  invoiceId: PropTypes.any,
-  isOpen: PropTypes.any,
-  onClose: PropTypes.any,
-  onError: PropTypes.any,
-  onSuccess: PropTypes.any,
-  totalAmount: PropTypes.any,
-};
 
 export default PaymentClick;

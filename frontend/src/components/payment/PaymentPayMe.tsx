@@ -1,4 +1,3 @@
-import PropTypes from 'prop-types';
 import PaymentProviderDialog from './PaymentProviderDialog';
 import './PaymentPayMe.css';
 
@@ -36,15 +35,5 @@ const PaymentPayMe = ({
     onError={onError} />
 );
 
-PaymentPayMe.propTypes = {
-  ...(PaymentPayMe.propTypes || {}),
-  currency: PropTypes.any,
-  invoiceId: PropTypes.any,
-  isOpen: PropTypes.any,
-  onClose: PropTypes.any,
-  onError: PropTypes.any,
-  onSuccess: PropTypes.any,
-  totalAmount: PropTypes.any,
-};
 
 export default PaymentPayMe;
