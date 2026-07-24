@@ -125,3 +125,31 @@ interface Window {
   };
 }
 
+
+// prop-types — minimal declaration for the legacy TranslationProvider.propTypes
+// and routeGuards.tsx propTypes usage. The library ships its own .js without
+// bundled types. PropTypes validators are typed as `any` because they're
+// runtime validators, not TypeScript types — consumers use them as values
+// (e.g. `PropTypes.string.isRequired`), not as type annotations.
+declare module 'prop-types' {
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  export const any: any;
+  export const string: any;
+  export const number: any;
+  export const bool: any;
+  export const array: any;
+  export const object: any;
+  export const func: any;
+  export const node: any;
+  export const element: any;
+  export const elementType: any;
+  export const symbol: any;
+  export function arrayOf(type: any): any;
+  export function objectOf(type: any): any;
+  export function shape(shape: Record<string, any>): any;
+  export function oneOfType(types: any[]): any;
+  export function oneOf(types: any[]): any;
+  export function instanceOf(cls: new (...args: any[]) => any): any;
+  export function exact(shape: Record<string, any>): any;
+  /* eslint-enable @typescript-eslint/no-explicit-any */
+}

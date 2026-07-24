@@ -23,6 +23,7 @@
     "strictNullChecks": true
   },
   "include": [
+    "src/types/declarations.d.ts",
     "src/api/mappers/**/*.ts",
     "src/api/mappers/**/*.tsx",
     "src/types/domain/**/*.ts",
@@ -30,7 +31,10 @@
     "src/types/**/*.ts",
     "src/api/**/*.ts",
     "src/stores/**/*.ts",
-    "src/stores/**/*.tsx"
+    "src/stores/**/*.tsx",
+    "src/i18n/useTranslation.ts",
+    "src/routing/**/*.ts",
+    "src/routing/**/*.tsx"
   ],
-  "exclude": ["node_modules", "dist", "e2e", "src/api/__tests__/**"]
+  "exclude": ["node_modules", "dist", "e2e", "src/api/__tests__/**", "src/routing/__tests__/**"]
 }
