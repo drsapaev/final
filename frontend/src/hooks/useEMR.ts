@@ -13,6 +13,7 @@ import { emrReducer, initialState, emrActions } from '../reducers/emrReducer';
 import { apiClient } from '../api/client';
 import logger from '../utils/logger';
 import { buildInitialEMRData, normalizeEMRData } from '../utils/emrSpecialty';
+import type { EMRApiError, EMRStatus } from '../types/domain/emr';
 
 let fallbackSessionCounter = 0;
 
@@ -38,9 +39,9 @@ const generateSessionId = () => {
 };
 
 const emrCache = new Map();
-const isAccessDeniedStatus = (status) => status === 401 || status === 403;
+const isAccessDeniedStatus = (status: EMRStatus) => status === 401 || status === 403;
 
-const getAccessDeniedMessage = (error) => (
+const getAccessDeniedMessage = (error: EMRApiError): string => (
     error?.response?.data?.detail ||
     error?.response?.data?.message ||
     error?.message ||
@@ -77,7 +78,7 @@ export function useEMR(visitId, { autoLoad = true, specialty = 'general' } = {})
 
     const cacheKey = `${visitId || ''}:${specialty}`;
 
-    const handleAccessDenied = useCallback((operation, error) => {
+    const handleAccessDenied = useCallback((operation: string, error: EMRApiError) => {
         const status = error?.response?.status;
         const message = getAccessDeniedMessage(error);
         logger.warn(`[FIX:EMR${status}] ${operation} blocked by access control`, {
@@ -291,7 +292,7 @@ export function useEMR(visitId, { autoLoad = true, specialty = 'general' } = {})
     // =========================================================================
     // AMEND EMR
     // =========================================================================
-    const amendEMR = useCallback(async (reason) => {
+    const amendEMR = useCallback(async (reason: string) => {
         if (!reason || reason.trim().length < 10) {
             const error = 'Причина поправки должна быть не менее 10 символов';
             dispatch(emrActions.saveError(error));
@@ -350,11 +351,11 @@ export function useEMR(visitId, { autoLoad = true, specialty = 'general' } = {})
     // =========================================================================
     // FIELD SETTERS
     // =========================================================================
-    const setField = useCallback((field, value) => {
+    const setField = useCallback((field: string, value: unknown) => {
         dispatch(emrActions.setField(field, value));
     }, []);
 
-    const setNestedField = useCallback((path, value) => {
+    const setNestedField = useCallback((path: string, value: unknown) => {
         dispatch(emrActions.setNestedField(path, value));
     }, []);
 

@@ -1,5 +1,11 @@
 import { apiRequest } from '../api/client';
 import logger from '../utils/logger';
+import type {
+  EMRTemplate,
+  EMRTemplateSection,
+  EMRTemplateField,
+  EMRTemplateSuggestion,
+} from '../types/domain/emr';
 
 const EMR_TEMPLATE_FIELD_HINTS = {
   complaints: ['complaint', 'symptom', 'pain', 'жалоб'],
@@ -30,17 +36,17 @@ export async function loadBackendEmrTemplates() {
   return backendEmrTemplatesPromise;
 }
 
-export function buildBackendTemplateSnippet(template) {
+export function buildBackendTemplateSnippet(template: EMRTemplate): string {
   const sections = Array.isArray(template?.template_structure?.sections)
     ? template.template_structure.sections
     : [];
   const sectionTitles = sections
-    .map((section) => section.section_title || section.section_name)
+    .map((section: EMRTemplateSection) => section.section_title || section.section_name)
     .filter(Boolean)
     .slice(0, 2);
   const fieldLabels = sections
-    .flatMap((section) => (Array.isArray(section.fields) ? section.fields : []))
-    .map((field) => field.label)
+    .flatMap((section: EMRTemplateSection) => (Array.isArray(section.fields) ? section.fields : []))
+    .map((field: EMRTemplateField) => field.label)
     .filter(Boolean)
     .slice(0, 3);
 
@@ -54,7 +60,7 @@ export function buildBackendTemplateSnippet(template) {
     .join(' · ');
 }
 
-export function backendTemplateMatches(fieldName, text, template) {
+export function backendTemplateMatches(fieldName: string, text: string, template: EMRTemplate): boolean {
   const hints = EMR_TEMPLATE_FIELD_HINTS[fieldName] || [];
   const haystack = [
     template?.name,
@@ -62,11 +68,11 @@ export function backendTemplateMatches(fieldName, text, template) {
     template?.specialty,
     template?.template_structure?.template_name,
     ...(Array.isArray(template?.template_structure?.sections)
-      ? template.template_structure.sections.flatMap((section) => [
+      ? template.template_structure.sections.flatMap((section: EMRTemplateSection) => [
           section.section_name,
           section.section_title,
           ...(Array.isArray(section.fields)
-            ? section.fields.map((field) => field.label)
+            ? section.fields.map((field: EMRTemplateField) => field.label)
             : []),
         ])
       : []),
@@ -86,7 +92,7 @@ export function backendTemplateMatches(fieldName, text, template) {
   );
 }
 
-export function mergeTemplateSuggestions(primary, secondary) {
+export function mergeTemplateSuggestions(primary: EMRTemplateSuggestion[], secondary: EMRTemplateSuggestion[]): EMRTemplateSuggestion[] {
   const seen = new Set();
   const merged = [];
 
