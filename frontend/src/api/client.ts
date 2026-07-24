@@ -13,7 +13,7 @@ import axios, { type AxiosError, type AxiosInstance, type AxiosRequestConfig, ty
 import { buildApiUrl, buildWsUrl, getApiBaseUrl, getApiOrigin } from './runtime';
 import { tokenManager } from '../utils/tokenManager';
 import logger from '../utils/logger';
-import type { LoginResponse, LoginResult } from '../types/auth';
+import type { LoginResult } from '../types/domain/auth';
 import { parseLoginResponse, AuthInvariantViolationError } from '../types/auth-mapper';
 import type { LoginResponseRaw, UserDto } from '../types/api';
 

@@ -136,13 +136,12 @@ function isDomainFile(filename) {
 
 function isTypesBarrelOrReExport(filename) {
   const normalized = filename.replace(/\\/g, '/');
-  // src/types/index.ts, src/types/auth-store.ts, src/stores/auth.ts — these
-  // are the legacy re-export shims we keep for backwards compat.
+  // Wave G6: types/auth.ts and types/auth-store.ts were deleted.
+  // stores/auth.ts no longer re-exports domain types — consumers import
+  // directly from types/domain/auth.
+  // Remaining shims: hooks that still re-export for backwards compat.
   return (
     normalized.endsWith('/types/index.ts') ||
-    normalized.endsWith('/types/auth-store.ts') ||
-    normalized.endsWith('/types/auth.ts') ||
-    normalized.endsWith('/stores/auth.ts') ||
     normalized.endsWith('/hooks/useRoles.ts') ||
     normalized.endsWith('/hooks/useQueueManager.ts') ||
     normalized.endsWith('/utils/mcp.ts')

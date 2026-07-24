@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import auth, { setProfile } from '../../stores/auth';
-import type { AuthState } from '../../stores/auth';
+import type { AuthState } from '../../types/domain/auth';
 import { getVisibleRoutesForShell, isInternalDemoEnabled } from '../../routing/routeSelectors';
 import { useTranslation } from '../../i18n/useTranslation';
 import type { UserProfile } from '../../types/domain/auth';

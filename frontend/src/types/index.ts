@@ -109,10 +109,14 @@ export type { components, paths, operations } from './generated/api';
 // ============================================================================
 // Manual — backend SSOT mirrors
 // ============================================================================
+// Wave G6: removed `export * from './auth'` and `export * from './auth-store'`.
+// These were legacy shims. Login-flow types now live in types/domain/auth.ts
+// (re-exported via `export * from './domain/auth'` below). AuthStore
+// interface lives in types/auth-store.ts but is no longer barrel-exported —
+// import directly from '@/types/auth-store' if needed.
 export * from './roles';
-export * from './auth';
+export * from './domain/auth';
 export * from './auth-mapper';
-export * from './auth-store';
 export * from './route';
 
 // ============================================================================
