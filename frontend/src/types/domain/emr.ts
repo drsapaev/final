@@ -68,3 +68,78 @@ export interface EMRApiError {
   message?: string;
   [key: string]: unknown;
 }
+
+// === EMR Clinical Content Types ===
+// Used by EMR sections (complaints, anamnesis, examination, diagnosis,
+// prescriptions) and AI suggestion validation.
+
+export interface EMRDiagnosis {
+  id?: string | number;
+  code?: string;
+  description?: string;
+  icd10?: string;
+  confidence?: number;
+  source?: string;
+  [key: string]: unknown;
+}
+
+export interface EMRPrescription {
+  id?: string | number;
+  name?: string;
+  drug?: string;
+  dose?: string;
+  dosage?: string;
+  frequency?: string;
+  freq?: string;
+  duration?: string;
+  note?: string;
+  [key: string]: unknown;
+}
+
+export interface EMRSection {
+  id?: string;
+  title?: string;
+  name?: string;
+  label?: string;
+  value?: string;
+  isEditable?: boolean;
+  isDraft?: boolean;
+  error?: string;
+  [key: string]: unknown;
+}
+
+export interface EMRLabResult {
+  id?: string | number;
+  test_name?: string;
+  value?: string | number;
+  unit?: string;
+  reference_range?: string;
+  status?: string;
+  date?: string;
+  abnormal?: boolean;
+  [key: string]: unknown;
+}
+
+export interface EMRAISuggestion {
+  id?: string | number;
+  content?: string;
+  text?: string;
+  source?: string;
+  confidence?: number;
+  [key: string]: unknown;
+}
+
+export type EMRVisitType = 'paid' | 'repeat' | 'benefit' | string;
+
+export interface EMRVisitData {
+  visit_id?: string | number;
+  patient_id?: string | number;
+  patient_name?: string;
+  doctor_id?: string | number;
+  doctor_name?: string;
+  specialty?: string;
+  visit_type?: EMRVisitType;
+  date?: string;
+  status?: string;
+  [key: string]: unknown;
+}
