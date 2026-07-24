@@ -4,7 +4,6 @@ import type { CSSProperties } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import ModernDialog from '../dialogs/ModernDialog';
 import { toast } from 'react-toastify';
-import PropTypes from 'prop-types';
 // UX Audit Registrar #2: useConfirm hook для замены window.confirm().
 import { useConfirm } from '../common/ConfirmDialog';
 // UX Audit Stage 3 (Queue issue 7.3):
@@ -154,7 +153,7 @@ const ModernQueueManager = ({
   // WebSocket (useQueueWebSocket ниже) даёт мгновенные обновления.
   // Если WS упал, polling 60s всё ещё обновляет очередь.
   useEffect(() => {
-    let interval;
+    let interval: ReturnType<typeof setInterval> | undefined;
     if (autoRefresh && effectiveDoctor && effectiveDate) {
       interval = setInterval(() => {
         loadQueue();
@@ -176,10 +175,11 @@ const ModernQueueManager = ({
 
   // Слушатель событий от QueueJoin для мгновенного обновления
   useEffect(() => {
-    const handleQueueUpdate = (event) => {
-      logger.log('[ModernQueueManager] Получено событие queueUpdated:', event.detail);
+    const handleQueueUpdate = (event: Event) => {
+      const detail = (event as CustomEvent).detail as { action?: string } | undefined;
+      logger.log('[ModernQueueManager] Получено событие queueUpdated:', detail);
       // Обновляем очередь при любом событии добавления
-      if (event.detail?.action === 'refreshAll' || event.detail?.action === 'entryAdded') {
+      if (detail?.action === 'refreshAll' || detail?.action === 'entryAdded') {
         loadQueue();
       }
     };
@@ -209,7 +209,7 @@ const ModernQueueManager = ({
       setShowQrDialog(true);
       toast.success(t('misc.mqm_qr_generated'));
     } catch (error) {
-      toast.error(error.message || t('misc.mqm_qr_gen_error'));
+      toast.error((error as Error)?.message || t('misc.mqm_qr_gen_error'));
     }
   };
 
@@ -225,7 +225,7 @@ const ModernQueueManager = ({
       setShowQrDialog(true);
       toast.success(t('misc.mqm_clinic_qr_generated'));
     } catch (error) {
-      toast.error(error.message || t('misc.mqm_clinic_qr_gen_error'));
+      toast.error((error as Error)?.message || t('misc.mqm_clinic_qr_gen_error'));
     }
   };
 
@@ -272,7 +272,7 @@ const ModernQueueManager = ({
         onQueueUpdate();
       }
     } catch (error) {
-      toast.error(error.message || t('misc.mqm_reception_open_error'));
+      toast.error((error as Error)?.message || t('misc.mqm_reception_open_error'));
     }
   };
 
@@ -314,7 +314,7 @@ const ModernQueueManager = ({
         onQueueUpdate();
       }
     } catch (error) {
-      toast.error(error.message || t('misc.mqm_reception_close_error'));
+      toast.error((error as Error)?.message || t('misc.mqm_reception_close_error'));
     }
   };
 
@@ -341,7 +341,7 @@ const ModernQueueManager = ({
 
       await loadQueue();
     } catch (error) {
-      toast.error(error.message || t('misc.mqm_call_patient_error'));
+      toast.error((error as Error)?.message || t('misc.mqm_call_patient_error'));
     }
   };
 
@@ -353,7 +353,7 @@ const ModernQueueManager = ({
 
     if (qrData.qr_code_base64) {
       const link = document.createElement('a');
-      link.download = `qr-queue-${qrData.day}-${qrData.specialist_name.replace(/\s+/g, '_')}.png`;
+      link.download = `qr-queue-${qrData.day}-${(qrData.specialist_name || 'doctor').replace(/\s+/g, '_')}.png`;
       link.href = qrData.qr_code_base64;
       link.click();
       toast.success(t('misc.mqm_qr_downloaded'));
@@ -778,15 +778,5 @@ const ModernQueueManager = ({
 
 };
 
-ModernQueueManager.propTypes = {
-  selectedDate: PropTypes.string,
-  selectedDoctor: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-  onQueueUpdate: PropTypes.func,
-  language: PropTypes.string,
-  doctors: PropTypes.array,
-  onDoctorChange: PropTypes.func,
-  onDateChange: PropTypes.func,
-  searchQuery: PropTypes.string
-};
 
 export default ModernQueueManager;
