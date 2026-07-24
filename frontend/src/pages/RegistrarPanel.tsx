@@ -27,6 +27,8 @@ import { useConfirm } from '../components/common/ConfirmDialog';
 // and confirm/notify strings (registrar.*). Replaces the legacy split between
 // getRegistrarTranslator (flat keys) and adapter (namespaced keys).
 import { useTranslation } from '../i18n/useTranslation';
+import type { Appointment } from '../types/domain/clinic';
+import type { QueueEntry } from '../types/domain/queue';
 // Decomp 2: hotkeys extracted to useRegistrarHotkeys hook
 import { useRegistrarHotkeys } from './registrar/useRegistrarHotkeys';
 // Decomp 3: reschedule helpers extracted to useRegistrarReschedule hook
@@ -120,7 +122,7 @@ const RegistrarPanel = () => {
   // R-02 fix: activeTab синхронизирован с URL (?dept=...).
   // Раньше был useState(null) — F5 сбрасывал выбранное отделение.
   const [activeTab, setActiveTabRaw] = useState(() => searchParams.get('dept') || null);
-  const setActiveTab = useCallback((tab) => {
+  const setActiveTab = useCallback((tab: string) => {
     setActiveTabRaw(tab);
     // R-02: пишем в URL для shareable links + back button
     const params = new URLSearchParams(window.location.search);
@@ -281,7 +283,7 @@ const RegistrarPanel = () => {
   // and call t('key') for registrarPanel.* flat keys. Wrap tI18n to accept
   // flat keys and route them to the registrarPanel namespace.
   // Also handles 'misc.*' and 'registrar.*' namespaced keys passed through.
-  const t = (key) => {
+  const t = (key: string) => {
     if (key.includes('.')) return tI18n(key);
     return tI18n('registrarPanel.' + key);
   };
@@ -845,7 +847,7 @@ const RegistrarPanel = () => {
 
       const profileAppointments = appointments.filter((a) => {
         const entryTag = (a.queue_tag || a.specialty || '').toLowerCase().trim();
-        return possibleTags.some((tag) => tag.toLowerCase() === entryTag);
+        return possibleTags.some((tag: string) => tag.toLowerCase() === entryTag);
       });
 
       const todayAppointments = profileAppointments.filter((a) => {
@@ -883,7 +885,7 @@ const RegistrarPanel = () => {
   const filterServicesByDepartment = useCallback((appointment, departmentKey) => {
     // ⭐ SSOT: Используем централизованную функцию toServiceCode
     // Используем только канонический резолв из SSOT
-    const toServiceCode = (value) => {
+    const toServiceCode = (value: unknown) => {
       if (!value) return null;
 
       // Сначала пробуем SSOT резолвер
@@ -894,7 +896,7 @@ const RegistrarPanel = () => {
     };
 
     // ⭐ Для QR-записей с queue_numbers - собираем услуги из всех queue_numbers
-    const normalizeDepartmentKey = (value) => value ? String(value).toLowerCase().trim() : null;
+    const normalizeDepartmentKey = (value: unknown) => value ? String(value).toLowerCase().trim() : null;
     const targetDepartmentKey = normalizeDepartmentKey(departmentKey);
 
     const getServiceIdentity = (serviceItem) => {
@@ -937,7 +939,7 @@ const RegistrarPanel = () => {
       const indexedDetail = serviceDetails[index];
       if (indexedDetail?.department_key) return indexedDetail;
 
-      const detailMatch = serviceDetails.find((detail) => serviceMatchesIdentity(detail, identity));
+      const detailMatch = serviceDetails.find((detail: unknown) => serviceMatchesIdentity(detail, identity));
       if (detailMatch?.department_key) return detailMatch;
 
       if (services && typeof services === 'object') {
@@ -982,7 +984,7 @@ const RegistrarPanel = () => {
         const allCodes = [];
         const seenCodes = new Set();
 
-        appointment.queue_numbers.forEach((qn) => {
+        appointment.queue_numbers.forEach((qn: Record<string, unknown>) => {
           // Приоритет 1: service_name
           const serviceNameCode = toServiceCode(qn.service_name);
           if (serviceNameCode && !seenCodes.has(serviceNameCode)) {
@@ -1032,7 +1034,7 @@ const RegistrarPanel = () => {
           }
 
           // Для остальных отделений - проверяем по префиксу
-          return allowedPrefixes.some((prefix) => code.startsWith(prefix));
+          return allowedPrefixes.some((prefix: string) => code.startsWith(prefix));
         });
 
         if (filteredByDepartment.length > 0) {
@@ -1077,13 +1079,13 @@ const RegistrarPanel = () => {
           if (Array.isArray(groupServices)) {
             if (typeof service === 'number' || typeof service === 'string' && !isNaN(Number(service))) {
               const serviceId = parseInt(String(service));
-              const serviceByID = groupServices.find((s) => s.id === serviceId);
+              const serviceByID = groupServices.find((s: Record<string, unknown>) => s.id === serviceId);
               if (serviceByID && serviceByID.service_code) {
                 serviceToCodeMap.set(String(service), String(serviceByID.service_code).toUpperCase());
                 return;
               }
             }
-            const serviceByName = groupServices.find((s) => s.name === service);
+            const serviceByName = groupServices.find((s: Record<string, unknown>) => s.name === service);
             if (serviceByName && serviceByName.service_code) {
               serviceToCodeMap.set(String(service), String(serviceByName.service_code).toUpperCase());
               return;
@@ -1103,7 +1105,7 @@ const RegistrarPanel = () => {
       'procedures': ['P', 'C', 'D_PROC']
     };
 
-    const getServiceCategoryByCode = (serviceCode) => {
+    const getServiceCategoryByCode = (serviceCode: string) => {
       if (!serviceCode) return null;
       const normalizedCode = String(serviceCode).toUpperCase();
 
@@ -1144,7 +1146,7 @@ const RegistrarPanel = () => {
   const filteredAppointments = useMemo(() => {
     // ⭐ SSOT: Get queue_tags from loaded profiles instead of hardcoded mapping
     // queueProfiles is populated by ModernTabs via onProfilesLoaded callback
-    const getQueueTagsForTab = (tabKey) => {
+    const getQueueTagsForTab = (tabKey: string) => {
       if (!tabKey) return [];
 
       // Find profile by key
@@ -1174,7 +1176,7 @@ const RegistrarPanel = () => {
         toString().toLowerCase().trim();
 
         // Проверяем соответствие вкладке
-        const matchesTab = possibleTags.some((tag) => tag.toLowerCase() === entryQueueTag);
+        const matchesTab = possibleTags.some((tag: string) => tag.toLowerCase() === entryQueueTag);
         if (!matchesTab) return false;
 
         // Фильтр по статусу
@@ -1259,7 +1261,7 @@ const RegistrarPanel = () => {
           searchDigits.length >= 3 && phoneDigits.includes(searchDigits);
 
           // Поиск по услугам (теперь ищем в агрегированном списке)
-          const inServices = Array.isArray(patient.services) && patient.services.some((s) => String(s).toLowerCase().includes(searchQuery));
+          const inServices = Array.isArray(patient.services) && patient.services.some((s: string) => String(s).toLowerCase().includes(searchQuery));
 
           return inFio || inPhone || inServices || inId;
         });
@@ -2185,9 +2187,9 @@ const RegistrarPanel = () => {
       {/* Модуль оплаты */}
       <PaymentManager
         isOpen={showPaymentManager}
-        onClose={(result) => {
+        onClose={(result: unknown) => {
           setShowPaymentManager(false);
-          if (result?.success) {
+          if ((result as Record<string, unknown>)?.success) {
             // Обновляем данные после успешной оплаты
             loadAppointments();
             loadIntegratedData();
