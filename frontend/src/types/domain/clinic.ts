@@ -87,11 +87,18 @@ export interface Patient {
   id: string | number;
   full_name?: string;
   name?: string;
+  first_name?: string;
+  last_name?: string;
+  middle_name?: string;
   phone?: string;
   email?: string;
   birth_date?: string;
+  sex?: string;
   gender?: string;
+  doc_type?: string;
+  doc_number?: string;
   address?: string;
+  created_at?: string;
   [key: string]: unknown;
 }
 

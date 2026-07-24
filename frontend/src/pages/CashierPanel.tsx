@@ -21,6 +21,8 @@ import { useHotkeys } from '../hooks/useHotkeys';
 import { useSessionTimeoutWarning } from '../hooks/useSessionTimeoutWarning';
 import { getApiOrigin } from '../api/runtime';
 import { api } from '../api/client';  // PR-53: replace raw fetch with axios
+import { getPatient as fetchPatientById } from '../api/patients';
+import type { Patient } from '../types/domain/clinic';
 import { printPanelReceiptInBrowser } from '../services/panelPrint';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
@@ -390,11 +392,11 @@ const CashierPanel = () => {
       const loadPatientForSearch = async () => {
         try {
           // PR-53: migrated from raw fetch() to axios client
+          // Wave G5: use api/patients.ts which returns domain Patient via mapper
           const token = tokenManager.getAccessToken();
           if (!token) return;
 
-          const response = (await api.get(`/patients/${patientIdFromUrl}`)) as import('axios').AxiosResponse<Record<string, unknown>>;
-          const patientData = response.data;
+          const patientData: Patient = await fetchPatientById(patientIdFromUrl);
           const patientName = `${patientData.last_name || ''} ${patientData.first_name || ''}`.trim();
           setQuery(patientName);
           logger.info('[Cashier] Patient loaded from URL', { patientId: patientData?.id });

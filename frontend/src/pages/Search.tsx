@@ -3,6 +3,8 @@ import type { CSSProperties } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { getVisit } from '../api/visits';
+import { searchPatients as searchPatientsApi, getPatient as getPatientById } from '../api/patients';
+import type { Patient } from '../types/domain/clinic';
 import logger from '../utils/logger';  // PR-38 / Medium-23: log instead of silent catch
 import {
   AppEmpty, AppError, Button,
@@ -18,7 +20,7 @@ export default function Search() {
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
-  const [patients, setPatients] = useState([]);
+  const [patients, setPatients] = useState<Patient[]>([]);
   const [visits, setVisits] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -39,9 +41,8 @@ export default function Search() {
     setSearchPerformed(true);
 
     try {
-      // Search patients
-      const patientsRes = await api.get(`/patients/?q=${encodeURIComponent(searchQuery)}&limit=30`);
-      const patientsData = Array.isArray(patientsRes.data) ? patientsRes.data : [];
+      // Search patients — Wave G5: use api/patients.ts which returns domain Patient[]
+      const patientsData = await searchPatientsApi(searchQuery);
       setPatients(patientsData);
 
       // Search visits - try multiple strategies
@@ -180,7 +181,7 @@ export default function Search() {
       if (idsToFetch.length === 0) return;
 
       const results = await Promise.allSettled(
-        idsToFetch.map(pid => api.get(`/patients/${pid}`).then(res => ({ pid, data: res.data })))
+        idsToFetch.map(pid => getPatientById(pid).then(data => ({ pid, data })))
       );
       let hasUpdates = false;
       for (const result of results) {
