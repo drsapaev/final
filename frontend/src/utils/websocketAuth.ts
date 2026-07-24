@@ -62,12 +62,12 @@ export function createAuthenticatedWebSocket(baseUrl: string, params: Record<str
 
   const ws = new WebSocket(wsUrl, subprotocols);
 
-  ws.onopen = (event) => {
+  ws.onopen = (event: Event) => {
     logger.log('✅ Аутентифицированное WebSocket подключено');
     if (onConnect) onConnect(event);
   };
 
-  ws.onclose = (event) => {
+  ws.onclose = (event: CloseEvent) => {
     logger.log('❌ Аутентифицированное WebSocket отключено', event.code, event.reason);
 
     // Обрабатываем ошибки аутентификации
@@ -81,7 +81,7 @@ export function createAuthenticatedWebSocket(baseUrl: string, params: Record<str
     if (onDisconnect) onDisconnect(event);
   };
 
-  ws.onmessage = (event) => {
+  ws.onmessage = (event: MessageEvent) => {
     try {
       const data = JSON.parse(event.data);
       logger.log('📨 Получено сообщение WebSocket:', data);
@@ -99,7 +99,7 @@ export function createAuthenticatedWebSocket(baseUrl: string, params: Record<str
     }
   };
 
-  ws.onerror = (error) => {
+  ws.onerror = (error: unknown) => {
     logger.error('❌ Ошибка WebSocket:', error);
     if (onError) onError(error);
   };
@@ -200,7 +200,7 @@ export function createReconnectingAuthWebSocket(baseUrl: string, params: Record<
     try {
       ws = createAuthenticatedWebSocket(baseUrl, params, {
         ...wsOptions,
-        onConnect: (event) => {
+        onConnect: (event: Event) => {
           logger.log('✅ Переподключающийся WebSocket подключен');
           reconnectAttempts = 0;
           lastPongTime = Date.now();
@@ -210,7 +210,7 @@ export function createReconnectingAuthWebSocket(baseUrl: string, params: Record<
 
           if (wsOptions.onConnect) wsOptions.onConnect(event);
         },
-        onDisconnect: (event) => {
+        onDisconnect: (event: CloseEvent) => {
           logger.log('❌ Переподключающийся WebSocket отключен');
           stopHeartbeat();
 
@@ -229,13 +229,13 @@ export function createReconnectingAuthWebSocket(baseUrl: string, params: Record<
             }
           }
         },
-        onAuthError: (error) => {
+        onAuthError: (error: unknown) => {
           logger.error('❌ Ошибка аутентификации, переподключение остановлено:', error);
           isManuallyDisconnected = true; // Останавливаем переподключение при ошибках аутентификации
           stopHeartbeat();
           if (wsOptions.onAuthError) wsOptions.onAuthError(error);
         },
-        onMessage: (event) => {
+        onMessage: (event: MessageEvent) => {
           // ✅ SECURITY: Handle heartbeat pong messages
           try {
             const data = JSON.parse(event.data);
@@ -311,7 +311,7 @@ export function createReconnectingAuthWebSocket(baseUrl: string, params: Record<
     }
   };
 
-  const send = (message) => {
+  const send = (message: Record<string, unknown>) => {
     if (ws) {
       sendAuthenticatedMessage(ws, message);
     }
