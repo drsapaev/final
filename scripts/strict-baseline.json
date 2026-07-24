@@ -82,30 +82,17 @@
         "PatientCardPatient"
       ]
     },
-    "Doctor": {
-      "percent": 70,
-      "status": "partial",
+    "Form": {
+      "percent": 90,
+      "status": "near-complete",
       "types": [
-        "Doctor",
-        "QueueSpecialist",
-        "AppUser"
+        "FormContextValue",
+        "ValidationRule",
+        "ValidationRules",
+        "FormState"
       ],
       "missing": [
-        "DoctorSchedule",
-        "DoctorAvailability"
-      ]
-    },
-    "Appointment": {
-      "percent": 50,
-      "status": "partial",
-      "types": [
-        "Appointment",
-        "AppAppointment",
-        "AppointmentFlowAppointment"
-      ],
-      "missing": [
-        "AppointmentStatus union",
-        "AppointmentType"
+        "FormAction"
       ]
     },
     "Queue": {
@@ -126,6 +113,19 @@
       "missing": [
         "QueueState",
         "QueueAction"
+      ]
+    },
+    "Doctor": {
+      "percent": 75,
+      "status": "partial",
+      "types": [
+        "Doctor",
+        "QueueSpecialist",
+        "AppUser"
+      ],
+      "missing": [
+        "DoctorSchedule",
+        "DoctorAvailability"
       ]
     },
     "EMR": {
@@ -149,19 +149,19 @@
         "EMRSection"
       ]
     },
-    "Billing": {
-      "percent": 20,
-      "status": "started",
+    "Appointment": {
+      "percent": 70,
+      "status": "partial",
       "types": [
-        "Transaction",
-        "CartItem",
-        "CartState"
+        "Appointment",
+        "AppAppointment",
+        "AppointmentFlowAppointment",
+        "AppointmentStatus",
+        "AppointmentType"
       ],
       "missing": [
-        "Invoice",
-        "Payment",
-        "Discount",
-        "DiscountAnalytics"
+        "AppointmentFilters",
+        "AppointmentSort"
       ]
     },
     "Auth": {
@@ -177,17 +177,43 @@
         "Permission"
       ]
     },
-    "Form": {
-      "percent": 90,
-      "status": "near-complete",
+    "Billing": {
+      "percent": 30,
+      "status": "started",
       "types": [
-        "FormContextValue",
-        "ValidationRule",
-        "ValidationRules",
-        "FormState"
+        "Transaction",
+        "CartItem",
+        "CartState",
+        "Service"
       ],
       "missing": [
-        "FormAction"
+        "Invoice",
+        "Payment",
+        "Discount",
+        "DiscountAnalytics"
+      ]
+    },
+    "Service": {
+      "percent": 80,
+      "status": "partial",
+      "types": [
+        "Service",
+        "CartService",
+        "CartDoctor"
+      ],
+      "missing": [
+        "ServiceCategory",
+        "ServiceFilter"
+      ]
+    },
+    "Department": {
+      "percent": 50,
+      "status": "started",
+      "types": [
+        "Department"
+      ],
+      "missing": [
+        "DepartmentStats"
       ]
     }
   }
