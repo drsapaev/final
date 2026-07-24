@@ -184,12 +184,12 @@ export const useUserPreferences = (userId: unknown = null, autoLoad: boolean = t
     }, [preferences]);
 
     // Обновить режим smart field
-    const setSmartFieldMode = useCallback((mode) => {
+    const setSmartFieldMode = useCallback((mode: string) => {
         updatePreference('emr_smart_field_mode', mode);
     }, [updatePreference]);
 
     // Добавить недавний ICD-10 код
-    const addRecentICD10 = useCallback((code) => {
+    const addRecentICD10 = useCallback((code: string) => {
         const current = preferences?.emr_recent_icd10 || [];
         if (current.includes(code)) {
             // Перемещаем в начало
@@ -202,7 +202,7 @@ export const useUserPreferences = (userId: unknown = null, autoLoad: boolean = t
     }, [preferences?.emr_recent_icd10, updatePreference]);
 
     // Добавить недавний шаблон
-    const addRecentTemplate = useCallback((templateId) => {
+    const addRecentTemplate = useCallback((templateId: string | number) => {
         const current = preferences?.emr_recent_templates || [];
         if (!current.includes(templateId)) {
             const updated = [templateId, ...current].slice(0, 10);
@@ -211,7 +211,7 @@ export const useUserPreferences = (userId: unknown = null, autoLoad: boolean = t
     }, [preferences?.emr_recent_templates, updatePreference]);
 
     // Добавить в избранное
-    const addFavoriteTemplate = useCallback((specialty, templateId) => {
+    const addFavoriteTemplate = useCallback((specialty: string, templateId: string | number) => {
         const current = preferences?.emr_favorite_templates || {};
         const specialtyFavorites = current[specialty] || [];
 
@@ -225,7 +225,7 @@ export const useUserPreferences = (userId: unknown = null, autoLoad: boolean = t
     }, [preferences?.emr_favorite_templates, updatePreference]);
 
     // Удалить из избранного
-    const removeFavoriteTemplate = useCallback((specialty, templateId) => {
+    const removeFavoriteTemplate = useCallback((specialty: string, templateId: string | number) => {
         const current = preferences?.emr_favorite_templates || {};
         const specialtyFavorites = current[specialty] || [];
 
