@@ -15,7 +15,7 @@ import { tokenManager } from '../utils/tokenManager';
 import logger from '../utils/logger';
 import type { LoginResponse, LoginResult } from '../types/auth';
 import { parseLoginResponse, AuthInvariantViolationError } from '../types/auth-mapper';
-import type { LoginResponseRaw, User } from '../types/api';
+import type { LoginResponseRaw, UserDto } from '../types/api';
 
 const API_BASE = getApiBaseUrl();
 // PR-39 / Medium-11: CSRF bootstrap defaults to ON. Set VITE_CSRF_BOOTSTRAP=0
@@ -361,9 +361,9 @@ async function apiRequest<T = unknown>(
 /**
  * Convenience API helpers used by frontend code
  */
-async function me(): Promise<User> {
+async function me(): Promise<UserDto> {
   // GET /auth/me
-  const resp = await api.get<User>('/auth/me');
+  const resp = await api.get<UserDto>('/auth/me');
   return resp.data;
 }
 

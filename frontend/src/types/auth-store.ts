@@ -7,15 +7,18 @@
 //
 // Если при типизации выяснится, что API-поверхность store нужно менять —
 // остановитесь и обсудите с командой. НЕ переписывайте store в этой фазе.
+//
+// Wave 3 consolidation: AuthState and UserProfile are now imported from
+// '@/types/domain/auth' as the single source of truth. This file only
+// re-exports them for backwards compatibility with callers that still
+// import from '@/types/auth-store'. New code should import from the domain
+// layer directly.
 
-/**
- * Snapshot of auth state — what subscribers receive.
- * Matches `getState()` return in stores/auth.js.
- */
-export interface AuthState {
-  token: string | null;
-  profile: Record<string, unknown> | null;
-}
+import type { AuthState, UserProfile } from './domain/auth';
+
+// Re-export so existing `import type { AuthState } from '@/types/auth-store'`
+// keeps working without churn.
+export type { AuthState, UserProfile } from './domain/auth';
 
 /**
  * Public API of the auth store.
@@ -32,8 +35,8 @@ export interface AuthStore {
   clearToken: () => void;
 
   // Profile management
-  getProfile: (force?: boolean) => Promise<Record<string, unknown> | null>;
-  setProfile: (profile: Record<string, unknown> | null) => void;
+  getProfile: (force?: boolean) => Promise<UserProfile | null>;
+  setProfile: (profile: UserProfile | null) => void;
 
   // Session validation (cached, debounced against backend /me)
   validateSession: (force?: boolean) => Promise<AuthState>;
@@ -43,6 +46,6 @@ export interface AuthStore {
   setAuthToken: (token: string | null) => void;
   getAuthToken: () => string | null;
   clearAuthToken: () => void;
-  setAuthProfile: (profile: Record<string, unknown> | null) => void;
+  setAuthProfile: (profile: UserProfile | null) => void;
   subscribeAuth: (fn: (state: AuthState) => void) => () => void;
 }

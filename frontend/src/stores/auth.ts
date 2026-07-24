@@ -20,19 +20,11 @@
 import { me, setToken as setClientToken } from '../api/client.js';
 import { tokenManager } from '../utils/tokenManager';
 import logger from '../utils/logger';
+import type { AuthState, UserProfile } from '../types/domain/auth';
 
-interface UserProfile {
-  id?: number | null;
-  name?: string;
-  email?: string;
-  role?: string;
-  [key: string]: unknown;
-}
-
-export interface AuthState {
-  token: string | null;
-  profile: UserProfile | null;
-}
+// Re-export the canonical AuthState so existing consumers that import
+// `AuthState` from '@/stores/auth' keep working.
+export type { AuthState, UserProfile } from '../types/domain/auth';
 
 type AuthSubscriber = (state: AuthState) => void;
 
