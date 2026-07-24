@@ -6,73 +6,73 @@ export { default as ModernForm, FormGroup, FormRow, FormColumn } from './ModernF
 
 // Валидаторы
 export const validators = {
-  required: (message = 'Поле обязательно для заполнения') => (value) => {
+  required: (message: string = 'Поле обязательно для заполнения') => (value: string) => {
     if (!value || (typeof value === 'string' && !value.trim())) {
       return message;
     }
     return true;
   },
 
-  email: (message = 'Введите корректный email') => (value) => {
+  email: (message: string = 'Введите корректный email') => (value: string) => {
     if (!value) return true;
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(value) ? true : message;
   },
 
-  phone: (message = 'Введите корректный номер телефона') => (value) => {
+  phone: (message: string = 'Введите корректный номер телефона') => (value: string) => {
     if (!value) return true;
     const phoneRegex = /^\+?[\d\s-()]{10,}$/;
     return phoneRegex.test(value) ? true : message;
   },
 
-  minLength: (min, message) => (value) => {
+  minLength: (min: number, message?: string) => (value: string) => {
     if (!value) return true;
     const actualMessage = message || `Минимум ${min} символов`;
     return value.length >= min ? true : actualMessage;
   },
 
-  maxLength: (max, message) => (value) => {
+  maxLength: (max: number, message?: string) => (value: string) => {
     if (!value) return true;
     const actualMessage = message || `Максимум ${max} символов`;
     return value.length <= max ? true : actualMessage;
   },
 
-  pattern: (regex, message = 'Неверный формат') => (value) => {
+  pattern: (regex: RegExp, message: string = 'Неверный формат') => (value: string) => {
     if (!value) return true;
     return regex.test(value) ? true : message;
   },
 
-  numeric: (message = 'Только цифры') => (value) => {
+  numeric: (message: string = 'Только цифры') => (value: string) => {
     if (!value) return true;
     return /^\d+$/.test(value) ? true : message;
   },
 
-  alphanumeric: (message = 'Только буквы и цифры') => (value) => {
+  alphanumeric: (message: string = 'Только буквы и цифры') => (value: string) => {
     if (!value) return true;
     return /^[a-zA-Zа-яА-Я0-9]+$/.test(value) ? true : message;
   },
 
-  min: (min, message) => (value) => {
+  min: (min: number, message?: string) => (value: string) => {
     if (!value) return true;
     const num = parseFloat(value);
     const actualMessage = message || `Минимальное значение: ${min}`;
     return num >= min ? true : actualMessage;
   },
 
-  max: (max, message) => (value) => {
+  max: (max: number, message?: string) => (value: string) => {
     if (!value) return true;
     const num = parseFloat(value);
     const actualMessage = message || `Максимальное значение: ${max}`;
     return num <= max ? true : actualMessage;
   },
 
-  match: (fieldName, message) => (value, allValues) => {
+  match: (fieldName: string, message?: string) => (value: unknown, allValues: Record<string, unknown>) => {
     if (!value) return true;
     const actualMessage = message || 'Поля не совпадают';
     return value === allValues[fieldName] ? true : actualMessage;
   },
 
-  custom: (validator, message = 'Неверное значение') => (value, allValues) => {
+  custom: (validator: (value: unknown, allValues: Record<string, unknown>) => boolean | string, message: string = 'Неверное значение') => (value: unknown, allValues: Record<string, unknown>) => {
     const result = validator(value, allValues);
     return result === true ? true : (typeof result === 'string' ? result : message);
   }
@@ -81,7 +81,7 @@ export const validators = {
 // Утилиты для работы с формами
 export const formUtils = {
   // Создание начальных значений из схемы
-  createInitialValues: (schema, defaultValues = {}) => {
+  createInitialValues: (schema: Record<string, unknown>, defaultValues: Record<string, unknown> = {}) => {
     const initialValues = { ...defaultValues };
     
     Object.keys(schema).forEach(fieldName => {
@@ -94,7 +94,7 @@ export const formUtils = {
   },
 
   // Очистка значений формы
-  clearForm: (schema) => {
+  clearForm: (schema: Record<string, unknown>) => {
     const clearedValues = {};
     
     Object.keys(schema).forEach(fieldName => {
@@ -105,12 +105,12 @@ export const formUtils = {
   },
 
   // Проверка изменений в форме
-  hasChanges: (currentValues, initialValues) => {
+  hasChanges: (currentValues: Record<string, unknown>, initialValues: Record<string, unknown>) => {
     return JSON.stringify(currentValues) !== JSON.stringify(initialValues);
   },
 
   // Получение только измененных полей
-  getChangedFields: (currentValues, initialValues) => {
+  getChangedFields: (currentValues: Record<string, unknown>, initialValues: Record<string, unknown>) => {
     const changes = {};
     
     Object.keys(currentValues).forEach(key => {
@@ -123,7 +123,7 @@ export const formUtils = {
   },
 
   // Форматирование данных для отправки
-  formatForSubmission: (values, formatters = {}) => {
+  formatForSubmission: (values: Record<string, unknown>, formatters: Record<string, (value: unknown) => unknown> = {}) => {
     const formatted = { ...values };
     
     Object.keys(formatters).forEach(fieldName => {
