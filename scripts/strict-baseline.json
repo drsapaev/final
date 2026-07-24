@@ -132,8 +132,8 @@
       ]
     },
     "EMR": {
-      "percent": 60,
-      "status": "partial",
+      "percent": 85,
+      "status": "near-complete",
       "types": [
         "EMRTemplateField",
         "EMRTemplateSection",
@@ -144,12 +144,18 @@
         "EMRStatus",
         "EMRApiError",
         "EchoData",
-        "ToothData"
-      ],
-      "missing": [
+        "ToothData",
         "EMRDiagnosis",
         "EMRPrescription",
-        "EMRSection"
+        "EMRSection",
+        "EMRLabResult",
+        "EMRAISuggestion",
+        "EMRVisitType",
+        "EMRVisitData"
+      ],
+      "missing": [
+        "EMRConflict",
+        "EMRAmendRequest"
       ]
     },
     "Appointment": {
@@ -168,7 +174,7 @@
       ]
     },
     "Auth": {
-      "percent": 75,
+      "percent": 80,
       "status": "partial",
       "types": [
         "AuthUser",
