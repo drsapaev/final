@@ -102,12 +102,12 @@ const LoginFormStyled = () => {
   const [twoFactorMethod, setTwoFactorMethod] = useState('totp');
 
   // Функция для проверки защищенных панелей
-  const isProtectedPanelPath = (pathname) => {
+  const isProtectedPanelPath = (pathname: string) => {
     const route = getEffectiveRouteByPath(pathname);
     return Boolean(route && (route.group === 'clinical' || route.group === 'admin'));
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
     setError('');
@@ -135,7 +135,7 @@ const LoginFormStyled = () => {
       // Заменён raw fetch() на api.post() из api/client.
       // axios-клиент сам добавит Authorization-хедер на следующие запросы,
       // обрабатывает CSRF, refresh-token и rate-limit — всё в одном месте.
-      let data;
+      let data: Record<string, unknown>;
       try {
         const response = (await api.post('/authentication/login', credentials)) as import('axios').AxiosResponse<Record<string, unknown>>;
         data = response.data;
@@ -157,8 +157,8 @@ const LoginFormStyled = () => {
       // Проверяем, требуется ли 2FA (в простом сервере 2FA отключено)
       if (data.requires_2fa && data.pending_2fa_token) {
         setRequires2FA(true);
-        setPending2FAToken(data.pending_2fa_token);
-        setTwoFactorMethod(data.two_factor_method || 'totp');
+        setPending2FAToken(String(data.pending_2fa_token ?? ""));
+        setTwoFactorMethod(String(data.two_factor_method || 'totp'));
         setLoading(false);
         return;
       }
@@ -169,9 +169,9 @@ const LoginFormStyled = () => {
         // Проверяем, требуется ли смена пароля
         if (data.must_change_password) {
           // UX Audit Stage 1: setToken() уже пишет в localStorage через tokenManager
-          setToken(accessToken);
+          setToken(String(accessToken));
           if (data.refresh_token) {
-            setRefreshToken(data.refresh_token);
+            setRefreshToken(String(data.refresh_token));
           }
           navigate(changePasswordRequiredRoute, {
             state: { currentPassword: formData.password },
@@ -182,20 +182,20 @@ const LoginFormStyled = () => {
 
         // Сохраняем токен единообразно для всех клиентов
         // UX Audit Stage 1 (issue 3.1.3): удалён дублирующий localStorage.setItem
-        setToken(accessToken);
+        setToken(String(accessToken));
         // SECURITY/AUTH-REAUDIT-28: persist refresh_token — раньше не сохранялся,
         // из-за чего proactive-refresh в api/client.js был мёртвым кодом, и пользователь
         // молча разлогинивался каждые 30 минут.
         if (data.refresh_token) {
-          setRefreshToken(data.refresh_token);
+          setRefreshToken(String(data.refresh_token));
         }
 
         try {
           // UX Audit Stage 1 (Login issue 3.7):
           // Удалён 100-мс setTimeout + auth.getState() race-condition workaround.
           // Теперь используем data.user напрямую из ответа сервера.
-          setProfile(data.user);
-          const profile = data.user || null;
+          setProfile(data.user as Record<string, unknown> | null);
+          const profile = (data.user as Record<string, unknown> | null) || null;
           const computedRoute = getRouteForProfile(profile);
           const fromClean = from || landingRoute;
 
@@ -229,12 +229,13 @@ const LoginFormStyled = () => {
       }
     } catch (err) {
       // Улучшенная обработка ошибок с нормализацией
-      const rawMessage = typeof err?.message === 'string' ? err.message : '';
+      const errObj = err as { message?: string; response?: { status?: number; data?: { detail?: string; message?: string } }; normalizedMessage?: string };
+      const rawMessage = typeof errObj?.message === 'string' ? errObj.message : '';
       const errorMessage = formatLoginErrorMessage({
-        responseStatus: err?.response?.status,
-        responseDetail: err?.response?.data?.detail,
-        responseMessage: err?.response?.data?.message,
-        rawMessage: err?.normalizedMessage || rawMessage,
+        responseStatus: errObj?.response?.status,
+        responseDetail: errObj?.response?.data?.detail,
+        responseMessage: errObj?.response?.data?.message,
+        rawMessage: errObj?.normalizedMessage || rawMessage,
         fallbackMessage: t('misc.lfs_oshibka_vhoda'),
       });
 
@@ -263,14 +264,14 @@ const LoginFormStyled = () => {
     }
   };
 
-  const handle2FASuccess = async (response) => {
+  const handle2FASuccess = async (response: { data?: Record<string, unknown> }) => {
     try {
       if (response.data?.access_token) {
         const accessToken = typeof response.data.access_token === 'string' ? response.data.access_token.trim() : response.data.access_token;
-        setToken(accessToken);
+        setToken(String(accessToken));
         // AUTH-REAUDIT-28: persist rotated refresh token after 2FA completion.
         if (response.data?.refresh_token) {
-          setRefreshToken(response.data.refresh_token);
+          setRefreshToken(String(response.data.refresh_token));
         }
 
         const profileResponse = (await api.get('/auth/me')) as import('axios').AxiosResponse<Record<string, unknown>>;
@@ -296,7 +297,7 @@ const LoginFormStyled = () => {
     setError('');
   };
 
-  const handleInputChange = (e) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
@@ -307,13 +308,13 @@ const LoginFormStyled = () => {
   // UX Audit Stage 2 (Login issue 3.2): обработчики Caps Lock detection.
   // getModifierState('CapsLock') работает в keydown/keyup/keypress.
   // На keyup сбрасываем, на keydown — обновляем.
-  const handleKeyDown = (e) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (typeof e.getModifierState === 'function') {
       setCapsLockOn(e.getModifierState('CapsLock'));
     }
   };
 
-  const handleKeyUp = (e) => {
+  const handleKeyUp = (e: React.KeyboardEvent) => {
     if (typeof e.getModifierState === 'function') {
       setCapsLockOn(e.getModifierState('CapsLock'));
     }
@@ -329,7 +330,7 @@ const LoginFormStyled = () => {
   ];
   const twoFactorTabPanelId = 'twofactor-tabpanel';
 
-  const handle2FATabKeyDown = (e, index) => {
+  const handle2FATabKeyDown = (e: React.KeyboardEvent, index: number) => {
     if (e.key === 'ArrowRight') {
       e.preventDefault();
       const next = twoFactorTabs[(index + 1) % twoFactorTabs.length];
