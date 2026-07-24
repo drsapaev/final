@@ -1,12 +1,20 @@
-import React, { type CSSProperties } from 'react';
+import React, { type CSSProperties, type ReactNode, type ComponentType } from 'react';
 
 // Компонент для ролевых ограничений доступа
-import PropTypes from 'prop-types';
 import { useTheme } from '../../contexts/ThemeContext';
 import { getProfileRoles, hasRouteAccess as hasRouteAccessByRole, normalizeRole } from '../../routing/routeSelectors';
 import { useTranslation } from '../../i18n/useTranslation';
 import i18n from '../../i18n';
 const t18 = i18n.t as unknown as (key: string, options?: Record<string, unknown>) => string;
+
+interface RoleGuardProps {
+  children: ReactNode;
+  allowedRoles?: string[];
+  requiredPermissions?: string[];
+  fallback?: ReactNode;
+  profile?: Record<string, unknown> | null;
+  route?: string | null;
+}
 
 /**
  * Компонент для проверки ролевого доступа
@@ -18,7 +26,7 @@ export function RoleGuard({
   fallback = null,
   profile = null,
   route = null
-}) {
+}: RoleGuardProps) {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const theme = useTheme();
   theme;
@@ -66,8 +74,10 @@ export function RoleGuard({
 /**
  * HOC для ролевых ограничений
  */
-export function withRoleGuard(WrappedComponent, guardProps = {}) {
-  return function WithRoleGuardComponent(props) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function withRoleGuard(WrappedComponent: ComponentType<any>, guardProps: Record<string, unknown> = {}) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return function WithRoleGuardComponent(props: any) {
     return (
       <RoleGuard {...guardProps}>
         <WrappedComponent {...props} />
@@ -79,23 +89,23 @@ export function withRoleGuard(WrappedComponent, guardProps = {}) {
 /**
  * Хук для проверки ролевого доступа
  */
-export function useRoleAccess(profile = null) {
+export function useRoleAccess(profile: Record<string, unknown> | null = null) {
   const userProfile = profile || (typeof window !== 'undefined' ?
   JSON.parse(sessionStorage.getItem('auth_profile') || 'null') : null);
 
-  const hasRole = (roles) => {
+  const hasRole = (roles: string[]) => {
   if (!userProfile || !Array.isArray(roles)) return false;
     const userRoles = getUserRoles(userProfile);
     return roles.some((role) => userRoles.includes(normalizeRole(role)));
   };
 
-  const hasPermission = (permissions) => {
+  const hasPermission = (permissions: string[]) => {
     if (!userProfile || !Array.isArray(permissions)) return false;
     const userPermissions = getUserPermissions(userProfile);
     return permissions.every((permission) => userPermissions.includes(permission));
   };
 
-  const hasRouteAccess = (route) => {
+  const hasRouteAccess = (route: string) => {
     if (!userProfile || !route) return false;
     return hasRouteAccessByRole(userProfile, route);
   };
@@ -136,24 +146,38 @@ export function useRoleAccess(profile = null) {
 /**
  * Компонент для условного рендеринга
  */
+interface ConditionalRenderProps {
+  condition: boolean;
+  children: ReactNode;
+  fallback?: ReactNode;
+}
+
 export function ConditionalRender({
   condition,
   children,
   fallback = null
-}) {
-  return condition ? children : fallback;
+}: ConditionalRenderProps) {
+  return condition ? <>{children}</> : <>{fallback}</>;
 }
 
 /**
  * Компонент для ролевого условного рендеринга
  */
+interface RoleConditionalRenderProps {
+  roles?: string[];
+  permissions?: string[];
+  children: ReactNode;
+  fallback?: ReactNode;
+  profile?: Record<string, unknown> | null;
+}
+
 export function RoleConditionalRender({
   roles = [],
   permissions = [],
   children,
   fallback = null,
   profile = null
-}) {
+}: RoleConditionalRenderProps) {
   const { hasRole, hasPermission } = useRoleAccess(profile);
 
   const hasAccess = (roles.length === 0 || hasRole(roles)) && (
@@ -165,7 +189,7 @@ export function RoleConditionalRender({
 /**
  * Компонент для отображения ошибки доступа
  */
-function AccessDenied({ message, theme }) {
+function AccessDenied({ message, theme }: { message: string; theme: ReturnType<typeof useTheme> }) {
   const { getColor, getSpacing, getFontSize } = theme;
 
   const containerStyle = {
@@ -209,11 +233,11 @@ function AccessDenied({ message, theme }) {
 /**
  * Утилиты для работы с ролями
  */
-function getUserRoles(profile) {
+function getUserRoles(profile: Record<string, unknown>): string[] {
   return getProfileRoles(profile);
 }
 
-function getUserPermissions(profile) {
+function getUserPermissions(profile: Record<string, unknown>): string[] {
   const permissions = [];
 
   if (Array.isArray(profile.permissions)) {
@@ -249,7 +273,7 @@ function getUserPermissions(profile) {
 /**
  * Компонент для отображения информации о пользователе
  */
-export function UserInfo({ profile = null, showRoles = true, showPermissions = false }) {
+export function UserInfo({ profile = null, showRoles = true, showPermissions = false }: { profile?: Record<string, unknown> | null; showRoles?: boolean; showPermissions?: boolean } = {}) {
   const { profile: userProfile } = useRoleAccess(profile);
   const theme = useTheme();
   const { getColor, getSpacing, getFontSize } = theme;
@@ -300,54 +324,7 @@ export function UserInfo({ profile = null, showRoles = true, showPermissions = f
 
 }
 
-const profileShape = PropTypes.shape({
-  username: PropTypes.string,
-  email: PropTypes.string,
-  role: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-  role_name: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-  roles: PropTypes.arrayOf(PropTypes.oneOfType([PropTypes.string, PropTypes.number])),
-  permissions: PropTypes.arrayOf(PropTypes.string),
-  is_superuser: PropTypes.bool,
-  is_admin: PropTypes.bool,
-  admin: PropTypes.bool
-});
 
-const themeShape = PropTypes.shape({
-  getColor: PropTypes.func,
-  getSpacing: PropTypes.func,
-  getFontSize: PropTypes.func
-});
 
-RoleGuard.propTypes = {
-  children: PropTypes.node,
-  allowedRoles: PropTypes.arrayOf(PropTypes.string),
-  requiredPermissions: PropTypes.arrayOf(PropTypes.string),
-  fallback: PropTypes.node,
-  profile: profileShape,
-  route: PropTypes.string
-};
 
-ConditionalRender.propTypes = {
-  condition: PropTypes.bool,
-  children: PropTypes.node,
-  fallback: PropTypes.node
-};
 
-RoleConditionalRender.propTypes = {
-  roles: PropTypes.arrayOf(PropTypes.string),
-  permissions: PropTypes.arrayOf(PropTypes.string),
-  children: PropTypes.node,
-  fallback: PropTypes.node,
-  profile: profileShape
-};
-
-AccessDenied.propTypes = {
-  message: PropTypes.string,
-  theme: themeShape
-};
-
-UserInfo.propTypes = {
-  profile: profileShape,
-  showRoles: PropTypes.bool,
-  showPermissions: PropTypes.bool
-};
