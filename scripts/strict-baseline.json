@@ -173,8 +173,8 @@
       ]
     },
     "Auth": {
-      "percent": 80,
-      "status": "partial",
+      "percent": 100,
+      "status": "complete",
       "types": [
         "AuthUser",
         "AuthState",
@@ -184,16 +184,15 @@
         "LoginCredentials",
         "LoginResponse",
         "UserRole",
-        "AuthStatus"
+        "AuthStatus",
+        "TokenPayload",
+        "SessionInfo"
       ],
-      "missing": [
-        "SessionInfo",
-        "TokenPayload"
-      ]
+      "missing": []
     },
     "Billing": {
-      "percent": 60,
-      "status": "partial",
+      "percent": 100,
+      "status": "complete",
       "types": [
         "Transaction",
         "CartItem",
@@ -207,37 +206,36 @@
         "BillingSummary",
         "PaymentMethod",
         "PaymentStatus",
-        "DiscountMode"
-      ],
-      "missing": [
+        "DiscountMode",
+        "RefundStatus",
         "Refund",
         "PaymentProvider",
-        "PaymentWebhook"
-      ]
+        "PaymentWebhook",
+        "CartItemBilling",
+        "PaymentResult"
+      ],
+      "missing": []
     },
     "Service": {
-      "percent": 80,
-      "status": "partial",
+      "percent": 100,
+      "status": "complete",
       "types": [
         "Service",
         "CartService",
-        "CartDoctor"
-      ],
-      "missing": [
+        "CartDoctor",
         "ServiceCategory",
         "ServiceFilter"
-      ]
+      ],
+      "missing": []
     },
     "Department": {
-      "percent": 80,
-      "status": "partial",
+      "percent": 100,
+      "status": "complete",
       "types": [
         "Department",
         "DepartmentStats"
       ],
-      "missing": [
-        "DepartmentFilters"
-      ]
+      "missing": []
     }
   },
   "domainAdoption": {

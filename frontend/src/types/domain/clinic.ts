@@ -167,6 +167,21 @@ export interface Department {
   [key: string]: unknown;
 }
 
+export interface ServiceCategory {
+  id?: string | number;
+  name?: string;
+  code?: string;
+  [key: string]: unknown;
+}
+
+export interface ServiceFilter {
+  category?: string;
+  specialty?: string;
+  department?: string;
+  search?: string;
+  [key: string]: unknown;
+}
+
 export interface Service {
   id: string | number;
   name?: string;
@@ -177,5 +192,9 @@ export interface Service {
   duration?: number;
   specialty?: string;
   department?: string;
+  is_active?: boolean;
+  is_consultation?: boolean;
+  requires_doctor?: boolean;
+  description?: string;
   [key: string]: unknown;
 }

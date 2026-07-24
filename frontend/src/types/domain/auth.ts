@@ -69,3 +69,23 @@ export interface LoginResponse {
   expires_in?: number;
   [key: string]: unknown;
 }
+
+export interface TokenPayload {
+  sub?: string | number;
+  exp?: number;
+  iat?: number;
+  role?: string;
+  roles?: string[];
+  [key: string]: unknown;
+}
+
+export interface SessionInfo {
+  session_id?: string;
+  user_id?: string | number;
+  ip_address?: string;
+  user_agent?: string;
+  created_at?: string;
+  expires_at?: string;
+  is_active?: boolean;
+  [key: string]: unknown;
+}
