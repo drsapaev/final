@@ -2,11 +2,12 @@ import { useState, useEffect, useCallback } from 'react';
 
 import { api } from '../api/client';
 import logger from '../utils/logger';
+import type { Doctor } from '../types/domain/clinic';
 
-const normalizeDoctorPayload = (doctorData) => ({
+const normalizeDoctorPayload = (doctorData: Record<string, unknown>) => ({
   user_id: doctorData.userId ? Number(doctorData.userId) : null,
-  specialty: doctorData.specialty?.trim() || 'general',
-  cabinet: doctorData.cabinet?.trim() || null,
+  specialty: String(doctorData.specialty ?? '').trim() || 'general',
+  cabinet: String(doctorData.cabinet ?? '').trim() || null,
   price_default:
     doctorData.priceDefault === '' || doctorData.priceDefault === null || doctorData.priceDefault === undefined
       ? null
@@ -63,7 +64,7 @@ const useDoctors = () => {
   }, []);
 
   const createDoctor = useCallback(
-    async (doctorData) => {
+    async (doctorData: Partial<Doctor>) => {
       setLoading(true);
       setError(null);
 

@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 
 import { api } from '../api/client';
+import type { Appointment } from '../types/domain/clinic';
 
-const normalizeAppointment = (appointment) => ({
+const normalizeAppointment = (appointment: Appointment) => ({
   ...appointment,
   patientId: appointment.patientId ?? appointment.patient_id ?? null,
   doctorId: appointment.doctorId ?? appointment.doctor_id ?? null,
@@ -138,7 +139,7 @@ const useAppointments = (doctors: unknown[] = []) => {
 
   const filteredAppointments = useMemo(
     () =>
-      appointments.filter((appointment) => {
+      appointments.filter((appointment: Appointment) => {
         const haystack = [
           appointment.patientName,
           appointment.doctorName,
@@ -175,7 +176,7 @@ const useAppointments = (doctors: unknown[] = []) => {
       no_show: 0,
     };
 
-    appointments.forEach((appointment) => {
+    appointments.forEach((appointment: Appointment) => {
       stats[appointment.status] = (stats[appointment.status] || 0) + 1;
     });
 
@@ -184,7 +185,7 @@ const useAppointments = (doctors: unknown[] = []) => {
 
   const getTodayAppointments = useCallback(() => {
     const today = new Date().toISOString().split('T')[0];
-    return appointments.filter((appointment) => appointment.appointmentDate === today);
+    return appointments.filter((appointment: Appointment) => appointment.appointmentDate === today);
   }, [appointments]);
 
   const getTomorrowAppointments = useCallback(() => {
@@ -192,7 +193,7 @@ const useAppointments = (doctors: unknown[] = []) => {
     tomorrow.setDate(tomorrow.getDate() + 1);
     const tomorrowStr = tomorrow.toISOString().split('T')[0];
     return appointments.filter(
-      (appointment) => appointment.appointmentDate === tomorrowStr
+      (appointment: Appointment) => appointment.appointmentDate === tomorrowStr
     );
   }, [appointments]);
 

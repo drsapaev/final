@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { api } from '../api/client';  // PR-38 / High-21: centralized axios client
 import { buildPatientDocumentFields } from '../utils/patientDocument';
 import logger from '../utils/logger';
+import type { Patient } from '../types/domain/clinic';
 
 interface CatchError {
   status?: number;
@@ -34,7 +35,7 @@ const usePatients = () => {
   const [filterBloodType, setFilterBloodType] = useState('');
 
   // Transform API snake_case → component camelCase
-  const transformPatient = (p) => ({
+  const transformPatient = (p: Patient) => ({
     id: p.id,
     firstName: (p as Record<string, unknown>).first_name,
     lastName: (p as Record<string, unknown>).last_name,
@@ -78,7 +79,7 @@ const usePatients = () => {
   }, []);
 
   // Создание пациента
-  const createPatient = useCallback(async (patientData) => {
+  const createPatient = useCallback(async (patientData: Partial<Patient>) => {
     setLoading(true);
     setError(null);
 
@@ -118,7 +119,7 @@ const usePatients = () => {
   }, []);
 
   // Обновление пациента
-  const updatePatient = useCallback(async (id, patientData) => {
+  const updatePatient = useCallback(async (id: string | number, patientData) => {
     setLoading(true);
     setError(null);
 

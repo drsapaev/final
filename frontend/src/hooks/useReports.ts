@@ -1,3 +1,4 @@
+import type { ReportConfig } from '../types/domain/clinic';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 
 const useReports = () => {
@@ -115,7 +116,7 @@ const useReports = () => {
   }, [mockReports]);
 
   // Генерация отчета
-  const generateReport = useCallback(async (reportConfig) => {
+  const generateReport = useCallback(async (reportConfig: ReportConfig) => {
     setLoading(true);
     setError(null);
     
@@ -164,7 +165,7 @@ const useReports = () => {
   }, []);
 
   // Скачивание отчета
-  const downloadReport = useCallback(async (reportId) => {
+  const downloadReport = useCallback(async (reportId: string | number) => {
     try {
       // Имитация скачивания
       const report = reports.find(r => r.id === reportId);
@@ -191,7 +192,7 @@ const useReports = () => {
   }, [reports]);
 
   // Удаление отчета
-  const deleteReport = useCallback(async (reportId) => {
+  const deleteReport = useCallback(async (reportId: string | number) => {
     setLoading(true);
     setError(null);
     
@@ -209,7 +210,7 @@ const useReports = () => {
   }, []);
 
   // Повторная генерация отчета
-  const regenerateReport = useCallback(async (reportId) => {
+  const regenerateReport = useCallback(async (reportId: string | number) => {
     setLoading(true);
     setError(null);
     
