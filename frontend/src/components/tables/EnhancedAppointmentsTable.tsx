@@ -51,6 +51,7 @@ import AppointmentPagination from './AppointmentPagination';  // PR-75
 // UX Audit R-3.1: единая CSV-функция с PHI masking.
 import { generateCSV, downloadCSV } from '../../pages/registrar/registrarCsv';
 import { useTranslation } from '../../i18n/useTranslation';
+import type { Appointment } from '../../types/domain/clinic';
 
 const SESSION_COLORS = [
   'var(--mac-accent-blue)', // blue
@@ -83,7 +84,7 @@ const getBackendActionAvailability = (row, action, flagName) => {
 
   const actions = new Set(row.available_actions.map((item) => String(item).trim().toLowerCase()));
   const aliases = ACTION_ALIASES[action] || [action];
-  return aliases.some((alias) => actions.has(alias));
+  return aliases.some((alias: string) => actions.has(alias));
 };
 
 const getEnhancedAppointmentRowKey = (row, index) => {
@@ -209,7 +210,7 @@ const EnhancedAppointmentsTable = ({
   }, []);
 
   // Вспомогательная функция для добавления прозрачности к CSS переменной
-  const withOpacity = useCallback((cssVar, opacity) => {
+  const withOpacity = useCallback((cssVar: string, opacity: number) => {
     // Используем color-mix если доступен, иначе fallback
     return `color-mix(in srgb, ${cssVar} ${opacity * 100}%, transparent)`;
   }, []);
@@ -217,11 +218,11 @@ const EnhancedAppointmentsTable = ({
   // ✅ FIX 17: Helper для безопасного парсинга даты
   // Контракт: backend должен отдавать ISO 8601 с корректным timezone.
   // Для исторических naive строк считаем, что это время клиники Asia/Tashkent.
-  const safeParseDate = useCallback((dateStr) => {
+  const safeParseDate = useCallback((dateStr: string) => {
     return parseRegistrarTimestamp(dateStr);
   }, []);
 
-  const getSessionColor = useCallback((sessionId) => {
+  const getSessionColor = useCallback((sessionId: string) => {
     if (!sessionId) return null;
     // Simple hash to get consistent color for same session_id
     let hash = 0;
@@ -322,7 +323,7 @@ const EnhancedAppointmentsTable = ({
   }, []);
 
   // Обработчик сортировки
-  const handleSort = useCallback((key) => {
+  const handleSort = useCallback((key: string) => {
     setSortConfig((prev) => ({
       key,
       direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
@@ -330,7 +331,7 @@ const EnhancedAppointmentsTable = ({
   }, []);
 
   // Обработчик выбора строк
-  const handleRowSelect = useCallback((id, checked) => {
+  const handleRowSelect = useCallback((id: string | number, checked: boolean) => {
     if (onRowSelect) {
       // Используем внешний обработчик
       onRowSelect(id, checked);
@@ -349,7 +350,7 @@ const EnhancedAppointmentsTable = ({
   }, [onRowSelect]);
 
   // Обработчик выбора всех строк
-  const handleSelectAll = useCallback((checked) => {
+  const handleSelectAll = useCallback((checked: boolean) => {
     if (onRowSelect) {
       // Используем внешний обработчик для каждой строки
       paginatedData.forEach((row) => {
@@ -366,7 +367,7 @@ const EnhancedAppointmentsTable = ({
   }, [paginatedData, onRowSelect]);
 
   // ✅ Улучшенный рендер статуса (полный контекстный)
-  const renderStatus = useCallback((status) => {
+  const renderStatus = useCallback((status: string) => {
     const statusConfig = {
       // Статусы записи
       scheduled: {
@@ -595,7 +596,7 @@ const EnhancedAppointmentsTable = ({
     }
 
     // ✅ Функция проверки, является ли строка кодом (а не названием)
-    const isServiceCode = (str) => {
+    const isServiceCode = (str: string) => {
       if (!str || typeof str !== 'string') return false;
       // Коды обычно короткие (до 20 символов), без пробелов, могут содержать подчеркивания, дефисы, буквы и цифры
       // Названия обычно длинные (более 20 символов), содержат пробелы и русские буквы
@@ -752,7 +753,7 @@ const EnhancedAppointmentsTable = ({
   }, [withOpacity, createServiceMapping, services, t]);
 
   // Рендер типа обращения
-  const renderVisitType = useCallback((visitType) => {
+  const renderVisitType = useCallback((visitType: string) => {
     const typeColors = {
       paid: 'var(--mac-accent-blue)',
       repeat: 'var(--mac-success)',
@@ -794,7 +795,7 @@ const EnhancedAppointmentsTable = ({
   }, [withOpacity, t]);
 
   // Рендер вида оплаты (i18next migration)
-  const renderPaymentType = useCallback((paymentType, paymentStatus) => {
+  const renderPaymentType = useCallback((paymentType: string, paymentStatus: string) => {
     const paymentIcons = {
       cash: '💵',
       card: '💳',
@@ -865,7 +866,7 @@ const EnhancedAppointmentsTable = ({
   }, [withOpacity, t]);
 
   // Функция для форматирования номера телефона (i18next migration)
-  const formatPhoneNumber = useCallback((phone) => {
+  const formatPhoneNumber = useCallback((phone: string) => {
     if (!phone) return '—';
 
     // Убираем все нецифровые символы
@@ -924,7 +925,7 @@ const EnhancedAppointmentsTable = ({
         let queueStatus = row.queue_number_status;
         if (!queueStatus && row.queue_numbers && Array.isArray(row.queue_numbers)) {
           // Ищем queue_number в queue_numbers и берём его статус
-          const matchingQueue = row.queue_numbers.find((q) => q.number === row.queue_number);
+          const matchingQueue = row.queue_numbers.find((q: Record<string, unknown>) => q.number === row.queue_number);
           if (matchingQueue) {
             queueStatus = matchingQueue.status;
           } else if (row.queue_numbers.length > 0) {
@@ -1003,7 +1004,7 @@ const EnhancedAppointmentsTable = ({
                 fontSize: 'var(--mac-font-size-xs)',
                 fontWeight: 'var(--mac-font-weight-semibold)',
               }}
-              title={row.queue_numbers.map((q) => t('misc.eat_queue_label', { queueName: q.queue_name || t('misc.eat_queue_default'), number: q.number })).join('\n')}
+              title={row.queue_numbers.map((q: Record<string, unknown>) => t('misc.eat_queue_label', { queueName: q.queue_name || t('misc.eat_queue_default'), number: q.number })).join('\n')}
             >
               +{row.queue_numbers.length - 1}
             </span>
@@ -1083,7 +1084,7 @@ const EnhancedAppointmentsTable = ({
                 fontSize: 'var(--mac-font-size-xs)',
                 fontWeight: 'var(--mac-font-weight-semibold)',
               }}
-              title={row.queue_numbers.map((q) => t('misc.eat_queue_label', { queueName: q.queue_name || t('misc.eat_queue_default'), number: q.number })).join('\n')}
+              title={row.queue_numbers.map((q: Record<string, unknown>) => t('misc.eat_queue_label', { queueName: q.queue_name || t('misc.eat_queue_default'), number: q.number })).join('\n')}
             >
               +{row.queue_numbers.length - 1}
             </span>
@@ -1737,7 +1738,7 @@ const EnhancedAppointmentsTable = ({
                     minWidth: '100px'
                   }}>
                       {renderPaymentType(
-                      (() => {
+                      String((() => {
                         if (row.payment_type === 'mixed_payment') {
                           return 'mixed_payment';
                         }
@@ -1761,8 +1762,8 @@ const EnhancedAppointmentsTable = ({
                           return 'free';
                         }
                         return row.payment_type || (paymentStatus === 'paid' ? 'unknown_payment' : 'pending_payment');
-                      })(),
-                      row.payment_status
+                      })()),
+                      String(row.payment_status ?? "")
                     )}
                     </td>
 
