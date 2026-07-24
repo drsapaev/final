@@ -39,7 +39,9 @@
     "src/components/medical/**/*.tsx",
     "src/components/Icon.tsx",
     "src/components/ui/macos/**/*.ts",
-    "src/components/ui/macos/**/*.tsx"
+    "src/components/ui/macos/**/*.tsx",
+    "src/components/registrar/**/*.ts",
+    "src/components/registrar/**/*.tsx"
   ],
   "exclude": ["node_modules", "dist", "e2e", "src/api/__tests__/**", "src/routing/__tests__/**"]
 }

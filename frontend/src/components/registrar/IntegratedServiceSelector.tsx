@@ -25,13 +25,21 @@ import { useTranslation } from '../../i18n/useTranslation';
  * Интегрированный селектор услуг для регистратуры
  * Использует справочник из админ панели согласно detail.md стр. 112
  */
+interface IntegratedServiceSelectorProps {
+  selectedServices?: Array<Record<string, unknown>>;
+  onServicesChange?: (services: Array<Record<string, unknown>>) => void;
+  className?: string;
+  simple?: boolean;
+  onNext?: () => void;
+}
+
 const IntegratedServiceSelector = ({
   selectedServices = [],
   onServicesChange,
   className = '',
   simple = false,
   onNext
-}) => {
+}: IntegratedServiceSelectorProps) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [loading, setLoading] = useState(true);
   const [services, setServices] = useState<Record<string, any>>({});
@@ -101,7 +109,7 @@ const IntegratedServiceSelector = ({
 
 
   // Названия групп услуг из detail.md
-  const groupNames = {
+  const groupNames: Record<string, string> = {
     cardiology: t('misc.iss_cat_cardio'),
     dermatology: t('misc.iss_cat_derm'),
     cosmetology: t('misc.iss_cat_cosmeto'),
@@ -160,7 +168,8 @@ const IntegratedServiceSelector = ({
       } catch (apiError) {
         // 401/403 — пользователь не авторизован, axios-interceptor сам решит,
         // что делать (показать login или refresh-token). Здесь просто лог.
-        const status = apiError?.response?.status;
+        const axiosApiError = apiError as { response?: { status?: number } };
+        const status = axiosApiError?.response?.status;
         if (status === 401 || status === 403) {
           logger.warn('IntegratedServiceSelector: not authenticated, keeping fallback data');
         } else {
@@ -171,7 +180,7 @@ const IntegratedServiceSelector = ({
       logger.error('IntegratedServiceSelector: Critical error:', err);
       // Fallback данные уже установлены выше, просто показываем ошибку
       if (retryCount > 0) {
-        setError(t('misc.iss_err_load', { message: err.message }));
+        setError(t('misc.iss_err_load', { message: (err as Error)?.message || 'unknown' }));
       }
     }
   }, [retryCount, DEMO_SERVICES, DEMO_CATEGORIES, t]);
@@ -187,7 +196,7 @@ const IntegratedServiceSelector = ({
     loadServices();
   };
 
-  const handleServiceToggle = (serviceId, serviceData) => {
+  const handleServiceToggle = (serviceId: string | number, serviceData: Record<string, unknown>) => {
     const isSelected = selectedServices.some((s) => s.id === serviceId);
 
     if (isSelected) {
@@ -209,12 +218,12 @@ const IntegratedServiceSelector = ({
   };
 
   const getTotalPrice = () => {
-    return selectedServices.reduce((sum, service) => sum + (service.price || 0), 0);
+    return selectedServices.reduce((sum, service) => sum + (Number(service.price) || 0), 0);
   };
 
   const getServicesByGroup = () => {
     // Если services пустой, используем DEMO_SERVICES
-    const sourceServices = Object.keys(services).length > 0 ? services : DEMO_SERVICES;
+    const sourceServices: Record<string, unknown[]> = Object.keys(services).length > 0 ? services : DEMO_SERVICES;
     const filteredServices: Record<string, any[]> = {};
 
     Object.keys(sourceServices).forEach((group) => {
@@ -359,15 +368,15 @@ const IntegratedServiceSelector = ({
                 </select>
 
                 {/* Выбранные услуги из этой группы */}
-                {selectedServices.filter((s) => s.group === group).map((service) =>
-              <div key={service.id} className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                {selectedServices.filter((s) => s.group === group).map((service: Record<string, unknown>) =>
+              <div key={String(service.id ?? '')} className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg">
                     <div className="flex items-center space-x-2">
                       <CheckCircle className="w-5 h-5 text-blue-600" />
-                      <span className="font-medium text-gray-900">{service.name}</span>
-                      <span className="text-sm text-gray-600">({service.price?.toLocaleString('ru-RU')} сум)</span>
+                      <span className="font-medium text-gray-900">{String(service.name ?? '')}</span>
+                      <span className="text-sm text-gray-600">({Number(service.price || 0).toLocaleString('ru-RU')} сум)</span>
                     </div>
                     <button
-                  onClick={() => handleServiceToggle(service.id, service)}
+                  onClick={() => handleServiceToggle(service.id as string | number, service)}
                   className="text-red-600 hover:text-red-800 p-1"
                   title={t('misc.iss_remove_service')}>
                   

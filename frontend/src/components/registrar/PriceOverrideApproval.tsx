@@ -47,7 +47,7 @@ const hasBackendPriceOverrideAction = (override: PriceOverrideEntry | null | und
 
   const canField = PRICE_OVERRIDE_ACTION_CAN_FIELD[normalizedAction];
   if (canField && Object.prototype.hasOwnProperty.call(override || {}, canField)) {
-    return Boolean(override[canField]);
+    return Boolean(override?.[canField]);
   }
 
   return false;
@@ -62,7 +62,7 @@ const PriceOverrideApproval = () => {
   const [priceOverrides, setPriceOverrides] = useState<PriceOverrideEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('pending');
-  const [selectedOverride, setSelectedOverride] = useState(null);
+  const [selectedOverride, setSelectedOverride] = useState<PriceOverrideEntry | null>(null);
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -119,7 +119,7 @@ const PriceOverrideApproval = () => {
     return Number(price).toLocaleString('ru-RU') + ' UZS';
   };
 
-  const getStatusColor = (status) => {
+  const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending':return 'text-yellow-600 bg-yellow-100';
       case 'approved':return 'text-green-600 bg-green-100';
@@ -219,9 +219,9 @@ const PriceOverrideApproval = () => {
               {/* Header карточки */}
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(override.status)}`}>
-                    {getStatusIcon(override.status)}
-                    <span className="ml-2">{getStatusText(override.status)}</span>
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(String(override.status ?? ''))}`}>
+                    {getStatusIcon(String(override.status ?? ''))}
+                    <span className="ml-2">{getStatusText(String(override.status ?? ''))}</span>
                   </span>
                   
                   <span className="text-sm text-gray-500 dark:text-gray-400">
@@ -231,7 +231,7 @@ const PriceOverrideApproval = () => {
                 
                 <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
                   <Calendar size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
-                  {new Date(override.created_at).toLocaleDateString('ru-RU')}
+                  {new Date(override.created_at ?? '').toLocaleDateString('ru-RU')}
                 </div>
               </div>
 
@@ -285,8 +285,8 @@ const PriceOverrideApproval = () => {
                     <DollarSign size={16 as unknown as "small" | "default" | "large" | "xlarge"} className="text-blue-600" />
                     <span className="text-lg font-medium text-blue-600">{formatPrice(override.new_price)}</span>
                     <span className="text-sm text-gray-500">
-                      ({override.new_price > override.original_price ? '+' : ''}
-                      {formatPrice(override.new_price - override.original_price)})
+                      ({Number(override.new_price ?? 0) > Number(override.original_price ?? 0) ? '+' : ''}
+                      {formatPrice(Number(override.new_price ?? 0) - Number(override.original_price ?? 0))})
                     </span>
                   </div>
                 </div>
@@ -338,7 +338,7 @@ const PriceOverrideApproval = () => {
       }
 
       {/* Модальное окно для отклонения */}
-      {showApprovalModal && selectedOverride &&
+      {showApprovalModal && selectedOverride != null && (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full">
             <div className="p-6">
@@ -348,7 +348,7 @@ const PriceOverrideApproval = () => {
               
               <div className="mb-4">
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                  Услуга: {selectedOverride.service_name}
+                  Услуга: {selectedOverride.service_name ?? ''}
                 </p>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
                   Цена: {formatPrice(selectedOverride.original_price)} → {formatPrice(selectedOverride.new_price)}
@@ -399,7 +399,7 @@ const PriceOverrideApproval = () => {
             </div>
           </div>
         </div>
-      }
+      )}
     </div>);
 
 };

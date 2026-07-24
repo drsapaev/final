@@ -28,22 +28,36 @@ import { Input } from '../ui/macos';
 import './ForceMajeureModal.css';
 import { useTranslation } from '../../i18n/useTranslation';
 
+interface ForceMajeureModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  specialistId: string | number | null;
+  specialistName?: string;
+  onSuccess?: (...args: unknown[]) => void;
+}
+
+interface DryRunResult {
+  count: number;
+  entries: unknown[];
+  totalAmount: number;
+}
+
 const ForceMajeureModal = ({
   isOpen,
   onClose,
   specialistId,
   specialistName,
   onSuccess
-}) => {
+}: ForceMajeureModalProps) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [activeTab, setActiveTab] = useState('transfer'); // 'transfer' | 'cancel'
   const [reason, setReason] = useState('');
   const [refundType, setRefundType] = useState('deposit'); // 'deposit' | 'bank_transfer'
   const [confirmText, setConfirmText] = useState('');
   const [loading, setLoading] = useState(false);
-  const [dryRunResult, setDryRunResult] = useState(null);
-  const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(null);
+  const [dryRunResult, setDryRunResult] = useState<DryRunResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   // UX Audit: getAuthToken + tokenManager удалены — auth через axios-interceptor.
 
@@ -57,7 +71,7 @@ const ForceMajeureModal = ({
       setDryRunResult({
         count: data.length,
         entries: data,
-        totalAmount: data.reduce((sum, e) => sum + (e.total_amount || 0), 0)
+        totalAmount: data.reduce((sum: number, e: Record<string, unknown>) => sum + (Number(e.total_amount) || 0), 0)
       });
     } catch (err) {
       logger.error('[ForceMajeureModal] Error loading pending entries:', err);
@@ -104,7 +118,7 @@ const ForceMajeureModal = ({
       if (onSuccess) onSuccess('transfer', result);
     } catch (err) {
       logger.error('[ForceMajeureModal] Transfer error:', err);
-      setError(err.message || t('misc.fm_network_error'));
+      setError((err as Error)?.message || t('misc.fm_network_error'));
     } finally {
       setLoading(false);
     }
@@ -139,7 +153,7 @@ const ForceMajeureModal = ({
       if (onSuccess) onSuccess('cancel', result);
     } catch (err) {
       logger.error('[ForceMajeureModal] Cancel error:', err);
-      setError(err.message || t('misc.fm_network_error'));
+      setError((err as Error)?.message || t('misc.fm_network_error'));
     } finally {
       setLoading(false);
     }
