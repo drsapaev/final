@@ -1,27 +1,31 @@
-
 import { useState, useEffect } from 'react';
-import PropTypes from 'prop-types';
+import type { ReactNode } from 'react';
 import { Check, Printer } from 'lucide-react';
 import ModernDialog from './ModernDialog';
 import React from 'react';
 import { toast } from 'react-toastify';
-// UX Audit R-4.3 (Phase 2): usePaymentMethods hook (future: backend-driven).
 import { usePaymentMethods } from '../../hooks/usePaymentMethods';
-// UX Audit Registrar #5: все inline-стили перенесены в PaymentDialog.css.
-// useTheme удалён — больше не нужен (всё через macos tokens + [data-theme="dark"]).
-// Также: emoji в заголовке (✅/💳) заменены на text-only (иконки и так есть в actions).
 import './PaymentDialog.css';
 
 import logger from '../../utils/logger';
 import { Input } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
+
+interface PaymentDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+  appointment: Record<string, unknown> | null;
+  onPaymentSuccess?: (paymentData?: unknown) => Promise<void> | void;
+  onPrintTicket?: (appointment?: unknown) => void;
+}
+
 const PaymentDialog = ({
   isOpen,
   onClose,
   appointment,
   onPaymentSuccess,
   onPrintTicket,
-}) => {
+}: PaymentDialogProps) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState(t('misc.pd_karta'));
@@ -32,8 +36,8 @@ const PaymentDialog = ({
   // Инициализация данных при открытии
   useEffect(() => {
     if (isOpen && appointment) {
-      setPaymentAmount(appointment.cost || appointment.payment_amount || '');
-      setPaymentMethod(appointment.payment_type || t('misc.pd_karta'));
+      setPaymentAmount(String(appointment.cost ?? appointment.payment_amount ?? ''));
+      setPaymentMethod(String(appointment.payment_type ?? t('misc.pd_karta')));
       setIsPaid(false);
       setErrors({});
       setIsProcessing(false);
@@ -76,7 +80,8 @@ const PaymentDialog = ({
       toast.success(t('misc.pd_oplata_otmechena_kak_poluche'));
     } catch (error) {
       logger.error('Payment error:', error);
-      toast.error(error?.message || t('misc.pd_oshibka_pri_obrabotke_platez'));
+      const err = error as { message?: string };
+      toast.error(err?.message || t('misc.pd_oshibka_pri_obrabotke_platez'));
     } finally {
       setIsProcessing(false);
     }
@@ -168,14 +173,14 @@ const PaymentDialog = ({
               Пациент
             </h4>
             <p className="payment-patient-name">
-              {appointment.patient_fio}
+              {String(appointment.patient_fio ?? '')}
             </p>
             {appointment.services && (
               <p className="payment-patient-services">
                 Услуги:{' '}
                 {Array.isArray(appointment.services)
-                  ? appointment.services.join(', ')
-                  : appointment.services}
+                  ? (appointment.services as string[]).join(', ')
+                  : String(appointment.services ?? '')}
               </p>
             )}
           </div>
@@ -197,7 +202,7 @@ const PaymentDialog = ({
                 onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
                   setPaymentAmount(e.target.value);
                   if (errors.amount) {
-                    setErrors((prev) => ({ ...prev, amount: null }));
+                    setErrors((prev) => ({ ...prev, amount: "" }));
                   }
                 }}
                 placeholder={t('misc.pd_vvedite_summu')}
@@ -227,7 +232,7 @@ const PaymentDialog = ({
                     onClick={() => {
                       setPaymentMethod(method.value);
                       if (errors.method) {
-                        setErrors((prev) => ({ ...prev, method: null }));
+                        setErrors((prev) => ({ ...prev, method: "" }));
                       }
                     }}
                     className={`payment-method-btn ${paymentMethod === method.value ? 'payment-method-btn--selected' : ''}`}
@@ -251,22 +256,5 @@ const PaymentDialog = ({
   );
 };
 
-PaymentDialog.propTypes = {
-  isOpen: PropTypes.bool,
-  onClose: PropTypes.func,
-  appointment: PropTypes.shape({
-    id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-    patient_fio: PropTypes.string,
-    cost: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-    payment_amount: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-    payment_type: PropTypes.string,
-    services: PropTypes.oneOfType([
-      PropTypes.arrayOf(PropTypes.string),
-      PropTypes.string,
-    ]),
-  }),
-  onPaymentSuccess: PropTypes.func,
-  onPrintTicket: PropTypes.func,
-};
 
 export default PaymentDialog;

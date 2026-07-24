@@ -1,6 +1,5 @@
 
 import { useState, useEffect } from 'react';
-import PropTypes from 'prop-types';
 import { Printer, AlertCircle, Wifi, WifiOff, Printer as PrinterIcon } from 'lucide-react';
 import ModernDialog from './ModernDialog';
 import { printService } from '../../services/print';
@@ -366,24 +365,5 @@ const PrintDialog = ({
   );
 };
 
-PrintDialog.propTypes = {
-  isOpen: PropTypes.bool,
-  onClose: PropTypes.func,
-  documentType: PropTypes.oneOf(['ticket', 'receipt', 'report']),
-  documentData: PropTypes.shape({
-    patient_fio: PropTypes.string,
-    services: PropTypes.oneOfType([
-      PropTypes.arrayOf(
-        PropTypes.oneOfType([PropTypes.string, PropTypes.object]),
-      ),
-      PropTypes.string,
-    ]),
-    cost: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-    // UX Audit Registrar #5: добавлены пропсы для multi-service ticket count.
-    print_tickets: PropTypes.array,
-    queue_numbers: PropTypes.array,
-  }),
-  onPrint: PropTypes.func,
-};
 
 export default PrintDialog;
