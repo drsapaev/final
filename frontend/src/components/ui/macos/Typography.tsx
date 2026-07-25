@@ -8,7 +8,7 @@ interface TypographyProps {
   gutterBottom?: boolean;
   style?: CSSProperties;
   paragraph?: boolean;
-  component?: string | React.ComponentType<any>;
+  component?: string | React.ElementType;
   className?: string;
   id?: string;
   fontWeight?: number | string;

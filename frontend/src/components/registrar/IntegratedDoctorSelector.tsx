@@ -38,7 +38,7 @@ const IntegratedDoctorSelector = ({
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [loading, setLoading] = useState(true);
   const [doctors, setDoctors] = useState([]);
-  const [queueSettings, setQueueSettings] = useState<Record<string, any>>({});
+  const [queueSettings, setQueueSettings] = useState<Record<string, unknown>>({});
   const [error, setError] = useState('');
 
   // Иконки специальностей
