@@ -25,12 +25,26 @@ const MEDICAL_PII_KEYS = [
   // Patient identifiers
   'iin', 'passport_number', 'passport_series', 'ssn', 'national_id',
   // Contact info
-  'phone', 'phone_number', 'email',
+  'phone', 'phone_number', 'email', 'address', 'street', 'city', 'postal_code',
+  // Names (audit/phase-2, BS-57: previously missing — only `patient_name`
+  // substring was matched, so standalone `full_name`, `first_name`,
+  // `last_name`, `middle_name`, `fio`, `patient_fio` leaked through).
+  'full_name', 'firstname', 'first_name', 'lastname', 'last_name',
+  'middle_name', 'surname', 'patronymic', 'fio', 'name',
+  // Dates of birth (previously missing)
+  'birth_date', 'date_of_birth', 'dob', 'patient_birth_date', 'patient_birth_year',
+  // Insurance / identity (previously missing)
+  'insurance_number', 'card_number', 'cvv', 'payment_method',
   // Medical
-  'diagnosis', 'diagnoses', 'icd10', 'icd10_codes', 'complaints',
+  'diagnosis', 'diagnoses', 'icd10', 'icd10_codes', 'complaints', 'complaint',
   'examination', 'prescription', 'medications', 'allergies',
+  'medical_history', 'symptoms', 'treatment', 'lab_results', 'blood_type',
   // Visit
   'visit_reason', 'patient_name', 'patient_id', 'doctor_notes',
+  // Auth tokens (defence-in-depth: Sentry SDK auto-scrubs these, but the
+  // custom scrubber runs first and we want redaction even if SDK behaviour
+  // changes in a future release)
+  'token', 'access_token', 'refresh_token', 'secret', 'api_key', 'password',
 ];
 
 function scrubPIIFromObject(obj) {
@@ -83,7 +97,10 @@ export function initSentry() {
       }),
     ],
     beforeSend(event) {
-      // Scrub PII from request bodies, breadcrumbs, extra context.
+      // Scrub PII from request bodies, breadcrumbs, extra context, and contexts.
+      // audit/phase-2, BS-57: previously `event.contexts` was not scrubbed,
+      // so PII attached by Sentry SDK integrations (e.g., device context,
+      // custom contexts set via Sentry.setContext()) leaked through.
       if (event.request) {
         event.request = scrubPIIFromObject(event.request);
       }
@@ -95,6 +112,9 @@ export function initSentry() {
       }
       if (event.extra) {
         event.extra = scrubPIIFromObject(event.extra);
+      }
+      if (event.contexts) {
+        event.contexts = scrubPIIFromObject(event.contexts);
       }
       return event;
     },

@@ -23,6 +23,12 @@ import FileUploader from './FileUploader';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useToast } from '../../components/common/Toast';
 import logger from '../../utils/logger';
+// audit/phase-2, BS-53: import sanitizeURL to filter `javascript:` and other
+// dangerous protocols from chat message `content` before using it as
+// `<img src>`, `<a href>`, or `window.open()` argument. ReactMarkdown already
+// has its own URL filter (urlTransform) — this import covers the image/file
+// branches which were previously unprotected.
+import { sanitizeURL } from '../../utils/sanitizer';
 import './Chat.css';
 import { Input } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
@@ -35,6 +41,17 @@ const groupReactions = (reactions: { reaction: string; user_id: number }[] | und
     groups[r.reaction].push(r.user_id);
   });
   return groups;
+};
+
+// audit/phase-2, BS-53: helper that sanitizes chat message `content` for use
+// as a URL. Returns the safe URL string, or null if the URL is dangerous
+// (e.g., `javascript:alert(...)`, `data:text/html,...`, `vbscript:...`).
+// Callers should render a fallback (e.g., "blocked" placeholder) when null.
+// We intentionally do NOT log the rejected URL — it could itself contain
+// sensitive data the user typed into a chat message.
+const safeMessageURL = (raw: unknown): string | null => {
+  if (raw === null || raw === undefined) return null;
+  return sanitizeURL(String(raw));
 };
 
 const COMPACT_CHAT_BREAKPOINT = 768;
@@ -1104,25 +1121,60 @@ const ChatWindow = ({ isOpen, onClose }) => {
                           <>
                                                                         <div className="message-content">
                                                                             {item.message_type === 'image' ?
-                              <div className="message-image">
-                                                                                    <img
-                                  src={String(item.content ?? '')}
-                                  alt="Attached"
-                                  role="button"
-                                  tabIndex={0}
-                                  aria-label={t('misc.cw_open_image_aria')}
-                                  onClick={() => window.open(String(item.content ?? ''), '_blank')}
-                                  onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => handleActivationKeyDown(event, () => window.open(String(item.content ?? ''), '_blank'))}
-                                  style={{ cursor: 'pointer', maxWidth: '100%', borderRadius: 8 }} />
-                                
-                                                                                </div> :
+                              // audit/phase-2, BS-53: sanitize `content` before
+                              // using it as <img src> or window.open() argument.
+                              // A malicious backend (or a buggy one) could store
+                              // `javascript:alert(document.cookie)` as message
+                              // content; ReactMarkdown branch below already
+                              // filters protocols, but image/file branches did not.
+                              // We compute the safe URL once and skip rendering
+                              // the click target if it's null.
+                              (() => {
+                                const safeImgUrl = safeMessageURL(item.content);
+                                if (!safeImgUrl) {
+                                  return (
+                                    <div className="message-image" aria-label={t('misc.cw_file_default')}>
+                                      <span style={{ color: 'var(--text-secondary, #888)', fontStyle: 'italic' }}>
+                                        {t('misc.cw_file_default')}
+                                      </span>
+                                    </div>
+                                  );
+                                }
+                                return (
+                                  <div className="message-image">
+                                    <img
+                                      src={safeImgUrl}
+                                      alt="Attached"
+                                      role="button"
+                                      tabIndex={0}
+                                      aria-label={t('misc.cw_open_image_aria')}
+                                      onClick={() => window.open(safeImgUrl, '_blank')}
+                                      onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => handleActivationKeyDown(event, () => window.open(safeImgUrl, '_blank'))}
+                                      style={{ cursor: 'pointer', maxWidth: '100%', borderRadius: 8 }} />
+                                  </div>
+                                );
+                              })() :
                               (item.message_type === 'file' || (item.file_id && item.file_url && item.message_type !== 'voice')) ?
-                              <div className="message-file">
-                                                                                    <a href={String(item.content ?? '')} target="_blank" rel="noopener noreferrer" className="file-link">
-                                                                                        <Paperclip size={16} />
-                                                                                        <span>{String(item.content).split('name=')[1] || t('misc.cw_file_default')}</span>
-                                                                                    </a>
-                                                                                </div> :
+                              // Same BS-53 sanitization for the file <a href> branch.
+                              (() => {
+                                const safeFileUrl = safeMessageURL(item.content);
+                                if (!safeFileUrl) {
+                                  return (
+                                    <div className="message-file">
+                                      <Paperclip size={16} />
+                                      <span>{t('misc.cw_file_default')}</span>
+                                    </div>
+                                  );
+                                }
+                                return (
+                                  <div className="message-file">
+                                    <a href={safeFileUrl} target="_blank" rel="noopener noreferrer" className="file-link">
+                                      <Paperclip size={16} />
+                                      <span>{String(item.content).split('name=')[1] || t('misc.cw_file_default')}</span>
+                                    </a>
+                                  </div>
+                                );
+                              })() :
 
                               <ReactMarkdown
                                 urlTransform={(url) => {

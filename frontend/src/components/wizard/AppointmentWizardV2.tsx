@@ -1610,9 +1610,17 @@ interface PatientRecord {
           throw new Error(t('misc.aw_fio_required'));
         }
 
-        const token = tokenManager.getAccessToken();
-        logger.log('🔑 Токен для создания пациента:', token ? `${token.substring(0, 20)}...` : 'НЕТ ТОКЕНА');
-        logger.log('📊 Длина токена:', token ? token.length : 0);
+        // audit/phase-2, BS-52: removed two `logger.log` lines that printed
+        // the first 20 chars of the JWT to the browser console. The logger's
+        // PHI sanitizer only scrubs object arguments — primitive strings pass
+        // through unchanged, so the JWT substring was visible in devtools.
+        // PR-39/Medium-12 already removed the same pattern from api/client.ts;
+        // this is the same regression in the wizard. The presence of a token
+        // is implicit in the request succeeding; if we need explicit "no token"
+        // signalling for debugging, it should be a boolean flag, never a
+        // substring of the secret.
+        const _token = tokenManager.getAccessToken();
+        void _token;
 
         // Подготовка данных пациента - отправляем полное ФИО, backend нормализует
         const patientData: Record<string, unknown> = {

@@ -587,13 +587,15 @@ export const ChatProvider = ({ children }: ChatProviderProps) => {
         // F-001: 4001 = auth rejected (invalid/expired token) — don't reconnect with same token
         if (e.code === 4001) {
           logger.warn('[FIX:WS] Chat WebSocket auth rejected (4001), invalidating token');
-          // tokenManager may expose invalidateAccessToken() in some builds.
-          // Probe via structural cast to avoid coupling this file to the
-          // concrete tokenManager implementation.
-          const tm = tokenManager as typeof tokenManager & { invalidateAccessToken?: () => void };
-          if (tm && typeof tm.invalidateAccessToken === 'function') {
-            tm.invalidateAccessToken();
-          }
+          // audit/phase-2, BS-29: previously this branch probed for a
+          // non-existent `tokenManager.invalidateAccessToken()` method via
+          // a structural cast — the cast satisfied TypeScript but the method
+          // was never defined, so the body was a no-op and the rejected
+          // access token survived. Replace with the real SSOT method:
+          // `tokenManager.clearAll()` wipes access_token + refresh_token +
+          // user data, so the next reconnect attempt will be forced through
+          // the full auth flow instead of retrying with the same bad token.
+          tokenManager.clearAll();
           return;
         }
         // Если не нормальное закрытие (1000) - пробуем переподключиться

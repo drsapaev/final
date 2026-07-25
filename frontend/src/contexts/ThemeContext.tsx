@@ -26,6 +26,7 @@ import {
 import apiClient from '../api/client.js';
 import { mixColors, toRgbaString } from '../theme/colorUtils.js';
 import logger from '../utils/logger';
+import tokenManager from '../utils/tokenManager.js';
 import { isPublicRoutePath } from '../routing/routeSelectors.js';
 
 type ThemeMode = 'light' | 'dark';
@@ -87,17 +88,24 @@ interface AuthStateChangedEvent extends Event {
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 const THEME_PREFERENCE_SAVE_DEBOUNCE_MS = 400;
 const THEME_PREFERENCE_CACHE_MS = 30_000;
-const AUTH_TOKEN_STORAGE_KEY = 'auth_token';
 const themePreferenceCache = new Map<string, { cachedAt: number; theme: ColorScheme }>();
 const themePreferenceRequestPromiseByToken = new Map<string, Promise<ColorScheme | null>>();
 
+// audit/phase-2, BS-32: previously this read `localStorage.getItem('auth_token')`
+// directly, but PR-39 / P0-2 migrated tokens to sessionStorage (and the new
+// access point is `tokenManager.getAccessToken()`). The localStorage read was
+// ALWAYS null in production, so the `if (!authToken) return` guard short-
+// circuited every call and theme preferences were never loaded from the
+// backend. Delegating to tokenManager ensures we read from the same SSOT the
+// rest of the app uses, regardless of which storage backend tokenManager
+// internally chooses.
 function getAuthTokenSnapshot(): string | null {
   if (typeof window === 'undefined') {
     return null;
   }
 
   try {
-    return localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+    return tokenManager.getAccessToken();
   } catch {
     return null;
   }
@@ -269,7 +277,14 @@ export const ThemeProvider = ({ children }: ThemeProviderProps) => {
     };
 
     const handleStorage = (event: StorageEvent) => {
-      if (!event.key || event.key === AUTH_TOKEN_STORAGE_KEY) {
+      // audit/phase-2, BS-32: AUTH_TOKEN_STORAGE_KEY was removed when we
+      // switched to tokenManager. sessionStorage 'storage' events only fire
+      // cross-tab for localStorage, but tokenManager uses sessionStorage —
+      // so this branch will never fire for token changes. Keep the listener
+      // for the `null` key (clear-all) case which signals a logout sweep.
+      // The actual cross-component auth sync is handled by the
+      // 'authStateChanged' CustomEvent below.
+      if (!event.key) {
         syncAuthToken(event.newValue || null);
       }
     };

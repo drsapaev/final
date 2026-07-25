@@ -65,6 +65,16 @@ export function useEMRAutosave({
     const lastSaveTimeRef = useRef(null);
     const pendingSaveRef = useRef(false);
 
+    // audit/phase-1, BS-17: keep latest `doAutosave` in a ref so the
+    // maxWait / debounce timers always invoke the CURRENT closure.
+    // Previously both timers captured the `doAutosave` from the render when
+    // the timer was first scheduled — so after 30s of continuous typing,
+    // the maxWait timer fired with the ORIGINAL `doAutosave` (which closed
+    // over the ORIGINAL `saveEMR` → ORIGINAL `state.data`), silently
+    // saving a stale snapshot and losing everything typed since.
+    // The ref is updated on every render so timer callbacks see the latest.
+    const doAutosaveRef = useRef(null);
+
     /**
      * Check if save is allowed
      */
@@ -177,6 +187,12 @@ export function useEMRAutosave({
         }
     }, [canSave, saveEMR, onAutosaveStart, onAutosaveSuccess, onAutosaveError, getBackoffDelay]);
 
+    // Keep the ref in sync with the latest `doAutosave` closure on every render.
+    // This is what allows the long-lived maxWait timer (set once, fires after 30s)
+    // to invoke the latest `doAutosave` instead of the stale one captured at
+    // the time the timer was scheduled.
+    doAutosaveRef.current = doAutosave;
+
     /**
      * Clear all timers
      */
@@ -200,21 +216,25 @@ export function useEMRAutosave({
             clearTimeout(debounceTimerRef.current);
         }
 
-        // Set debounce timer
+        // Set debounce timer — call through the ref so we always invoke the
+        // latest `doAutosave` (and therefore the latest `saveEMR` / `state.data`).
         debounceTimerRef.current = setTimeout(() => {
-            doAutosave();
+            doAutosaveRef.current?.();
             clearTimers();
         }, debounceMs);
 
-        // Start maxWait timer if not already running
+        // Start maxWait timer if not already running.
+        // The maxWait timer fires only once per "dirty session" (guarded by
+        // pendingSaveRef), so it MUST call through the ref — otherwise it
+        // captures the first-render `doAutosave` and saves stale data.
         if (!maxWaitTimerRef.current && !pendingSaveRef.current) {
             pendingSaveRef.current = true;
             maxWaitTimerRef.current = setTimeout(() => {
-                doAutosave();
+                doAutosaveRef.current?.();
                 clearTimers();
             }, maxWaitMs);
         }
-    }, [debounceMs, maxWaitMs, doAutosave, clearTimers]);
+    }, [debounceMs, maxWaitMs, clearTimers]);
 
     /**
      * Effect: Watch isDirty and schedule autosave
