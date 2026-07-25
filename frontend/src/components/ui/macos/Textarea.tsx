@@ -145,6 +145,7 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(({
       onBlur={handleBlur}
       onInput={(e: FormEvent<HTMLTextAreaElement>) => adjustHeight()}
       rows={minRows}
+      aria-invalid={!!error}
       {...props}
     />
   );

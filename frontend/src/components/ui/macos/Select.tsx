@@ -256,6 +256,7 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(({
           aria-haspopup="listbox"
           aria-expanded={isOpen}
           disabled={disabled}
+          aria-invalid={!!error}
           {...props}
         >
           <span>{selected ? (selected.label ?? String(selected.value)) : <span style={{ color: 'var(--mac-text-secondary)' }}>{placeholder}</span>}</span>
