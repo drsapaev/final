@@ -1,6 +1,4 @@
 import React, { useState, useEffect, type ReactNode, type CSSProperties, type ChangeEvent } from 'react';
-import PropTypes from 'prop-types';
-
 type RadioSize = 'small' | 'default' | 'large';
 
 interface RadioProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'children' | 'style' | 'onChange' | 'size' | 'checked' | 'defaultChecked'> {
@@ -128,20 +126,4 @@ const Radio = React.forwardRef<HTMLInputElement, RadioProps>(({
 });
 
 Radio.displayName = 'Radio';
-
-Radio.propTypes = {
-  checked: PropTypes.bool,
-  defaultChecked: PropTypes.bool,
-  onChange: PropTypes.func,
-  name: PropTypes.string,
-  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-  disabled: PropTypes.bool,
-  label: PropTypes.node,
-  description: PropTypes.node,
-  size: PropTypes.oneOf(['small', 'default', 'large']),
-  className: PropTypes.string,
-  style: PropTypes.object,
-  id: PropTypes.string
-};
-
 export default Radio;

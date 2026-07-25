@@ -55,7 +55,7 @@ export function getErrorType(error: unknown): string {
     return ERROR_TYPES.NETWORK;
   }
 
-  const status = (error as ErrorWithResponse).response.status;
+  const status = (error as ErrorWithResponse).response?.status;
   
   switch (status) {
     case HTTP_STATUS.UNAUTHORIZED:
@@ -87,7 +87,7 @@ export function getErrorMessage(error: unknown, fallbackMessage: string = DEFAUL
     return fallbackMessage;
   }
 
-  const { status, data } = (error as ErrorWithResponse).response;
+  const { status, data } = (error as ErrorWithResponse).response ?? {};
 
   // Сообщение от сервера
   if (data?.detail) {
@@ -289,14 +289,14 @@ export async function retryRequest<T>(
  * Валидаторы форм
  */
 export const validators = {
-  required: (value, fieldName = 'Поле') => {
+  required: (value: unknown, fieldName: string = 'Поле') => {
     if (!value || (typeof value === 'string' && !value.trim())) {
       return `${fieldName} обязательно для заполнения`;
     }
     return null;
   },
 
-  email: (value) => {
+  email: (value: string) => {
     if (!value) return null;
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(value)) {
@@ -305,7 +305,7 @@ export const validators = {
     return null;
   },
 
-  phone: (value) => {
+  phone: (value: string) => {
     if (!value) return null;
     const phoneRegex = /^\+?[\d\s-()]{10,}$/;
     if (!phoneRegex.test(value)) {
@@ -314,7 +314,7 @@ export const validators = {
     return null;
   },
 
-  minLength: (min) => (value, fieldName = 'Поле') => {
+  minLength: (min: number) => (value: string, fieldName: string = 'Поле') => {
     if (!value) return null;
     if (value.length < min) {
       return `${fieldName} должно содержать минимум ${min} символов`;
@@ -322,7 +322,7 @@ export const validators = {
     return null;
   },
 
-  maxLength: (max) => (value, fieldName = 'Поле') => {
+  maxLength: (max: number) => (value: string, fieldName: string = 'Поле') => {
     if (!value) return null;
     if (value.length > max) {
       return `${fieldName} должно содержать максимум ${max} символов`;
@@ -330,7 +330,7 @@ export const validators = {
     return null;
   },
 
-  number: (value, fieldName = 'Поле') => {
+  number: (value: unknown, fieldName: string = 'Поле') => {
     if (!value) return null;
     if (isNaN(Number(value))) {
       return `${fieldName} должно быть числом`;
@@ -338,7 +338,7 @@ export const validators = {
     return null;
   },
 
-  positive: (value, fieldName = 'Поле') => {
+  positive: (value: unknown, fieldName: string = 'Поле') => {
     if (!value) return null;
     if (Number(value) <= 0) {
       return `${fieldName} должно быть положительным числом`;

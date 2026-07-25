@@ -2,12 +2,18 @@
 import { useState } from 'react';
 import { api } from '../api/client';
 import { Shield, Smartphone, Key, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
-import PropTypes from 'prop-types';
 import { Input,
   Checkbox } from './ui/macos';
 import { useTranslation } from '../i18n/useTranslation';
 
-const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken }) => {
+interface TwoFactorVerifyProps {
+  onSuccess?: (response: { data?: Record<string, unknown> }) => void;
+  onCancel?: () => void;
+  method?: string;
+  pendingToken?: string;
+}
+
+const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken }: TwoFactorVerifyProps) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -56,13 +62,14 @@ const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken })
         setError(response.data?.message || response.data?.message || t('misc.tfv_nevernyy_kod'));
       }
     } catch (err) {
-      setError(err.response?.data?.detail || t('misc.tfv_oshibka_verifikatsii'));
+      const errObj = err as { response?: { data?: { detail?: string } } };
+      setError(errObj?.response?.data?.detail || t('misc.tfv_oshibka_verifikatsii'));
     } finally {
       setLoading(false);
     }
   };
 
-  const handleKeyPress = (e) => {
+  const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       handleVerify();
     }
@@ -321,12 +328,5 @@ const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken })
 };
 
 
-TwoFactorVerify.propTypes = {
-  ...(TwoFactorVerify.propTypes || {}),
-  method: PropTypes.any,
-  onCancel: PropTypes.any,
-  onSuccess: PropTypes.any,
-  pendingToken: PropTypes.any,
-};
 
 export default TwoFactorVerify;

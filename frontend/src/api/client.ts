@@ -13,9 +13,9 @@ import axios, { type AxiosError, type AxiosInstance, type AxiosRequestConfig, ty
 import { buildApiUrl, buildWsUrl, getApiBaseUrl, getApiOrigin } from './runtime';
 import { tokenManager } from '../utils/tokenManager';
 import logger from '../utils/logger';
-import type { LoginResponse, LoginResult } from '../types/auth';
+import type { LoginResult } from '../types/domain/auth';
 import { parseLoginResponse, AuthInvariantViolationError } from '../types/auth-mapper';
-import type { LoginResponseRaw, User } from '../types/api';
+import type { LoginResponseRaw, UserDto } from '../types/api';
 
 const API_BASE = getApiBaseUrl();
 // PR-39 / Medium-11: CSRF bootstrap defaults to ON. Set VITE_CSRF_BOOTSTRAP=0
@@ -144,7 +144,7 @@ async function refreshTokenIfNeeded(): Promise<string | null> {
 function getCookie(name: string): string | null {
   const value = `; ${document.cookie}`;
   const parts = value.split(`; ${name}=`);
-  if (parts.length === 2) return parts.pop().split(';').shift();
+  if (parts.length === 2) return parts.pop()?.split(';').shift() ?? null;
   return null;
 }
 
@@ -175,7 +175,8 @@ async function ensureCSRFToken(): Promise<string | null> {
       });
       return response.data?.csrf_token || getCookie('csrf_token');
     } catch (err) {
-      if (err?.response?.status === 404) {
+      const axiosErr = err as { response?: { status?: number } };
+      if (axiosErr?.response?.status === 404) {
         csrfEndpointUnavailable = true;
         logger.info('[FIX:CSRF] Backend does not expose /auth/csrf-token; skipping CSRF header bootstrap');
         return null;
@@ -226,7 +227,7 @@ api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
   }
 
   // ✅ CSRF: Add X-CSRF-Token for state-changing requests
-  const method = config.method?.toLowerCase();
+  const method = config.method?.toLowerCase() ?? '';
   if (['post', 'put', 'patch', 'delete'].includes(method)) {
     const csrfToken = await ensureCSRFToken();
     if (csrfToken) {
@@ -372,8 +373,9 @@ async function apiRequest<T = unknown>(
     return resp.data as T;
   } catch (err) {
     // Normalize error payloads so callers can handle them uniformly.
-    if (err && err.response && err.response.data) {
-      const d = err.response.data;
+    const axiosErr = err as { response?: { data?: { detail?: unknown } } };
+    if (axiosErr?.response?.data) {
+      const d = axiosErr.response.data;
       // common FastAPI shapes: { "detail": "msg" } or { "detail": [ ... ] }
       if (d && d.detail) {
         throw d.detail;
@@ -389,9 +391,9 @@ async function apiRequest<T = unknown>(
 /**
  * Convenience API helpers used by frontend code
  */
-async function me(): Promise<User> {
+async function me(): Promise<UserDto> {
   // GET /auth/me
-  const resp = await api.get<User>('/auth/me');
+  const resp = await api.get<UserDto>('/auth/me');
   return resp.data;
 }
 

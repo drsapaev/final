@@ -1,102 +1,51 @@
-// Safe MCP fallback API used by useAI.tsx
+// Safe MCP fallback API used by useAI.tsx.
 // Provides stubbed methods to avoid runtime failures when MCP backend is absent.
+//
+// All transport types live in src/types/domain/mcp.ts (SSOT). This file
+// re-exports them for backwards compatibility with any callers that still
+// import from '@/utils/mcp'. New code should import from the domain layer
+// directly.
 
-// Result types — discriminated unions so consumers can narrow without `any`.
-export interface McpSuccess<T> {
-  status: 'success';
-  data: T;
-}
+import type {
+  McpResult,
+  McpChatPayload,
+  McpChatData,
+  McpSuggestionPayload,
+  McpSuggestionData,
+  McpTranslatePayload,
+  McpTranslateData,
+  McpAnalyzeImageOptions,
+  McpAnalyzeImageData,
+} from '../types/domain/mcp';
 
-export interface McpFailure {
-  status: 'error';
-  error: string;
-}
-
-export type McpResult<T> = McpSuccess<T> | McpFailure;
-
-// Payloads accepted by mcpAPI.* methods. Extra keys are allowed (callers
-// forward `...options` from the calling hooks) — but the named fields here
-// are the only ones the stub actually reads.
-export interface ChatMessageLike {
-  id?: number;
-  role?: 'user' | 'assistant' | 'system';
-  content?: string;
-  timestamp?: Date;
-  type?: string;
-  metadata?: unknown;
-}
-
-export interface ChatPayload {
-  messages?: ChatMessageLike[];
-  provider?: string;
-  model?: string;
-  temperature?: number;
-  maxTokens?: number;
-  systemPrompt?: string;
-  context?: string;
-  [key: string]: unknown;
-}
-
-export interface ChatData {
-  message: string;
-  metadata: { provider: string; model: string; stub: boolean };
-}
-
-export interface SuggestionPayload {
-  context?: string;
-  type?: string;
-  maxSuggestions?: number;
-  provider?: string;
-  model?: string;
-  [key: string]: unknown;
-}
-
-export interface SuggestionItem {
-  text: string;
-  confidence: number;
-  category: string;
-}
-
-export interface SuggestionData {
-  suggestions: SuggestionItem[];
-  metadata: { type: string; stub: boolean };
-}
-
-export interface TranslatePayload {
-  text?: string;
-  from?: string;
-  to?: string;
-  provider?: string;
-  context?: string;
-  [key: string]: unknown;
-}
-
-export interface TranslateData {
-  translation: string;
-  metadata: { stub: boolean };
-}
-
-export interface AnalyzeImageOptions {
-  provider?: string;
-  [key: string]: unknown;
-}
-
-export interface AnalyzeImageData {
-  summary: string;
-  findings: unknown[];
-  metadata: { stub: boolean };
-}
+// Re-export for backwards compatibility (do NOT add new re-exports — callers
+// should migrate to importing from '@/types/domain/mcp').
+export type {
+  McpSuccess,
+  McpFailure,
+  McpResult,
+  McpChatMessage,
+  McpChatPayload,
+  McpChatData,
+  McpSuggestionPayload,
+  McpSuggestionItem,
+  McpSuggestionData,
+  McpTranslatePayload,
+  McpTranslateData,
+  McpAnalyzeImageOptions,
+  McpAnalyzeImageData,
+} from '../types/domain/mcp';
 
 const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
-const success = <T,>(data: T): McpSuccess<T> => ({ status: 'success', data });
-const failure = (error: unknown): McpFailure => ({
+const success = <T,>(data: T): { status: 'success'; data: T } => ({ status: 'success', data });
+const failure = (error: unknown): { status: 'error'; error: string } => ({
   status: 'error',
   error: String(error || 'Unavailable')
 });
 
 export const mcpAPI = {
-  async chat(payload: ChatPayload = {}): Promise<McpResult<ChatData>> {
+  async chat(payload: McpChatPayload = {}): Promise<McpResult<McpChatData>> {
     try {
       await delay(50);
       const messages = payload.messages ?? [];
@@ -112,7 +61,7 @@ export const mcpAPI = {
     }
   },
 
-  async generateSuggestions(payload: SuggestionPayload = {}): Promise<McpResult<SuggestionData>> {
+  async generateSuggestions(payload: McpSuggestionPayload = {}): Promise<McpResult<McpSuggestionData>> {
     try {
       await delay(50);
       const context = payload.context ?? '';
@@ -129,7 +78,7 @@ export const mcpAPI = {
     }
   },
 
-  async translate(payload: TranslatePayload = {}): Promise<McpResult<TranslateData>> {
+  async translate(payload: McpTranslatePayload = {}): Promise<McpResult<McpTranslateData>> {
     try {
       await delay(50);
       const text = payload.text ?? '';
@@ -145,8 +94,8 @@ export const mcpAPI = {
   async analyzeImage(
     _file: File | Blob | unknown,
     imageType = 'general',
-    options: AnalyzeImageOptions = {}
-  ): Promise<McpResult<AnalyzeImageData>> {
+    options: McpAnalyzeImageOptions = {}
+  ): Promise<McpResult<McpAnalyzeImageData>> {
     try {
       void _file;
       void options;

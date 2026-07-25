@@ -1,7 +1,5 @@
 import React, { type ReactNode, type CSSProperties } from 'react';
 import { useTheme } from '../../../contexts/ThemeContext';
-import PropTypes from 'prop-types';
-
 type PaperVariant = 'elevation' | 'outlined' | 'filled';
 type PaperElevation = 0 | 1 | 2 | 3 | 4 | 5;
 
@@ -83,18 +81,6 @@ const Paper = React.forwardRef<HTMLDivElement, PaperProps>(({
     </div>);
 
 });
-
-
-Paper.propTypes = {
-  ...(Paper.propTypes || {}),
-  children: PropTypes.any,
-  className: PropTypes.any,
-  elevation: PropTypes.any,
-  square: PropTypes.any,
-  style: PropTypes.any,
-  variant: PropTypes.any,
-};
-
 Paper.displayName = 'Paper';
 
 export default Paper;

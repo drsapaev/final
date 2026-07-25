@@ -28,6 +28,7 @@ import { api } from '../../api/client';
 // UX Audit Registrar #1: getPatient() — централизованный доступ к /patients/{id}.
 // Раньше здесь был raw fetch() с ручным Authorization-хедером.
 import { getPatient } from '../../api/patients';
+import type { Doctor } from '../../types/domain/clinic';
 import logger from '../../utils/logger';
 // tokenManager всё ещё используется в loadIntegratedData для diagnostic-лога.
 import tokenManager from '../../utils/tokenManager';
@@ -43,6 +44,10 @@ export const useRegistrarData = ({
   setDoctors,
   setServices,
   setDynamicDepartments,
+}: {
+  setDoctors: (doctors: Doctor[]) => void;
+  setServices: (services: Record<string, unknown>) => void;
+  setDynamicDepartments: (departments: unknown[]) => void;
 }) => {
   // ───────────────────────────────────────────────────────────
   // loadIntegratedData: parallel fetch of doctors + services + departments
@@ -104,8 +109,8 @@ export const useRegistrarData = ({
 
         if (doctorsRes && doctorsRes.data) {
           try {
-            const doctorsData = doctorsRes.data as unknown as Record<string, unknown>;
-            const apiDoctors = (doctorsData.doctors as unknown[]) || [];
+            const doctorsData = doctorsRes.data as { doctors?: unknown[] };
+            const apiDoctors = (doctorsData.doctors as Doctor[]) || [];
             logger.info('✅ Данные врачей получены:', apiDoctors.length, 'врачей');
             if (apiDoctors.length > 0) {
               setDoctors(apiDoctors);

@@ -13,73 +13,20 @@ import {
   isSupportedMessagingContractVersion,
 } from '../constants/messagingContract';
 import { isPublicRoutePath } from '../routing/routeSelectors';
+import type {
+  ChatMessage,
+  ChatConversation,
+  ChatAvailableUser,
+  ChatReaction,
+  ChatConversationsResponse,
+  ChatConversationResponse,
+  ChatUnreadCountResponse,
+  ChatAvailableUsersResponse,
+} from '../types/domain/chat';
+import type { AuthState } from '../types/domain/auth';
 
-// Domain value objects. The backend chat protocol is dynamic, so we model
-// the canonical surface here and let extra fields ride along via the
-// index signature. These intentionally match the shape produced by
-// api/messages.ts (which is still implicit-any — typed in a later batch).
-interface ChatReaction {
-  reaction: string;
-  id?: number;
-  user_id: number;
-  user_name?: string | null;
-  [key: string]: unknown;
-}
-
-interface ChatMessage {
-  id: number;
-  sender_id: number;
-  recipient_id: number;
-  sender_name?: string;
-  content?: string;
-  is_read?: boolean;
-  reactions?: ChatReaction[];
-  created_at?: string;
-  [key: string]: unknown;
-}
-
-interface Conversation {
-  user_id: number;
-  user_name?: string;
-  user_role?: string;
-  role?: string;
-  last_message_time?: string;
-  unread_count?: number;
-  last_message?: string;
-  last_message_at?: string;
-  [key: string]: unknown;
-}
-
-interface AvailableUser {
-  id: number;
-  name?: string;
-  [key: string]: unknown;
-}
-
-interface ConversationsResponse {
-  conversations?: Conversation[];
-  total_unread?: number;
-}
-
-interface ConversationResponse {
-  messages?: ChatMessage[];
-  has_more?: boolean;
-}
-
-interface UnreadCountResponse {
-  count?: number;
-}
-
-interface AvailableUsersResponse {
-  users?: AvailableUser[];
-}
-
-interface AuthState {
-  token?: string | null;
-  profile?: { id?: number | null; [key: string]: unknown } | null;
-  [key: string]: unknown;
-}
-
+// WS protocol envelope. Transport concern — stays local until the WS layer
+// gets its own domain file (planned for Wave 4 alongside API mapper).
 interface WsIncomingMessage {
   type?: string;
   contract_version?: string;
@@ -93,8 +40,9 @@ interface WsIncomingMessage {
   [key: string]: unknown;
 }
 
+// React-specific context shape. Feature-local, not domain.
 interface ChatContextValue {
-  conversations: Conversation[];
+  conversations: ChatConversation[];
   messages: ChatMessage[];
   activeConversation: number | null;
   unreadCount: number;
@@ -112,7 +60,7 @@ interface ChatContextValue {
   sendMessage: (recipientId: number, content: string) => Promise<ChatMessage>;
   closeConversation: () => void;
   setActiveConversation: (userId: number | null) => void;
-  searchUsers: (query: string) => Promise<AvailableUser[]>;
+  searchUsers: (query: string) => Promise<ChatAvailableUser[]>;
   sendTyping: (recipientId: number, isTyping: boolean) => void;
   refreshUnreadCount: () => Promise<void>;
   hasMore: boolean;
@@ -141,7 +89,7 @@ export const ChatProvider = ({ children }: ChatProviderProps) => {
   const isBoardRoute = location.pathname.startsWith('/queue-board') || location.pathname.startsWith('/display-board');
   const isPublicRoute = isPublicRoutePath(location.pathname);
 
-  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [conversations, setConversations] = useState<ChatConversation[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [activeConversation, setActiveConversation] = useState<number | null>(null);
   const [unreadCount, setUnreadCount] = useState<number>(0);
@@ -227,7 +175,7 @@ export const ChatProvider = ({ children }: ChatProviderProps) => {
   const loadConversations = useCallback(async ({ syncUnread = true } = {}): Promise<void> => {
     if (!user || isBoardRoute || isPublicRoute) return;
     try {
-      const data = (await messagesApi.getConversations()) as ConversationsResponse;
+      const data = (await messagesApi.getConversations()) as ChatConversationsResponse;
       setConversations(data.conversations || []);
       if (syncUnread) {
         setUnreadCount(data.total_unread || 0);
@@ -267,7 +215,7 @@ export const ChatProvider = ({ children }: ChatProviderProps) => {
   const refreshUnreadCount = useCallback(async (): Promise<void> => {
     if (isBoardRoute || isPublicRoute) return;
     try {
-      const count = (await messagesApi.getUnreadCount()) as number | UnreadCountResponse;
+      const count = (await messagesApi.getUnreadCount()) as number | ChatUnreadCountResponse;
       setUnreadCount(typeof count === 'number' ? count : (count?.count ?? 0));
     } catch (error) {
       const err = error as { response?: { status?: number } };
@@ -643,7 +591,7 @@ export const ChatProvider = ({ children }: ChatProviderProps) => {
     if (!user) return;
     setIsLoading(true);
     try {
-      const data = (await messagesApi.getConversation(userId)) as ConversationResponse;
+      const data = (await messagesApi.getConversation(userId)) as ChatConversationResponse;
       setMessages(data.messages || []);
       setHasMore(Boolean(data.has_more));
 
@@ -670,7 +618,7 @@ export const ChatProvider = ({ children }: ChatProviderProps) => {
     // setIsLoading(true); // Не блокируем весь UI, можно отдельный стейт loadingMore
     try {
       const currentLength = messages.length;
-      const data = (await messagesApi.getConversation(userId, currentLength)) as ConversationResponse;
+      const data = (await messagesApi.getConversation(userId, currentLength)) as ChatConversationResponse;
 
       setMessages((prev) => [...prev, ...(data.messages || [])]);
       setHasMore(Boolean(data.has_more));
@@ -702,9 +650,9 @@ export const ChatProvider = ({ children }: ChatProviderProps) => {
   }, []);
 
   // Поиск пользователей
-  const searchUsers = useCallback(async (query: string): Promise<AvailableUser[]> => {
+  const searchUsers = useCallback(async (query: string): Promise<ChatAvailableUser[]> => {
     try {
-      const result = (await messagesApi.getAvailableUsers(query)) as AvailableUser[] | AvailableUsersResponse;
+      const result = (await messagesApi.getAvailableUsers(query)) as ChatAvailableUser[] | ChatAvailableUsersResponse;
       if (Array.isArray(result)) {
         return result;
       }

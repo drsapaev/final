@@ -31,8 +31,9 @@ export function useSetupStatus() {
           error: null as string | null
         });
       } catch (error) {
+        const errObj = error as { message?: string };
         logger.warn('[setup] failed to load setup status', {
-          error: error?.message || 'unknown error'
+          error: errObj?.message || 'unknown error'
         });
 
         if (!isActive) {
@@ -42,7 +43,7 @@ export function useSetupStatus() {
         setStatus({
           initialized: true,
           isLoading: false,
-          error
+          error: errObj?.message || 'Setup status failed'
         });
       }
     };

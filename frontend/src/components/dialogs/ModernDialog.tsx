@@ -53,16 +53,16 @@ const ModernDialog = ({
 }: ModernDialogProps) => {
   // UX Audit Registrar #5: useTheme() удалён — getColor/theme больше не нужны
   // (все стили перенесены в CSS с macos tokens + [data-theme="dark"] selectors).
-  const dialogRef = useRef(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   // Фокус-ловушка и управление клавишами
   useEffect(() => {
     if (!isOpen) return;
 
-    const handleKeyDown = (e) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && closeOnEscape) {
         e.preventDefault();
-        onClose();
+        onClose?.();
       }
 
       if (e.key === 'Tab') {
@@ -71,8 +71,8 @@ const ModernDialog = ({
         );
 
         if (focusableElements && focusableElements.length > 0) {
-          const firstElement = focusableElements[0];
-          const lastElement = focusableElements[focusableElements.length - 1];
+          const firstElement = focusableElements[0] as HTMLElement;
+          const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement;
 
           if (e.shiftKey && document.activeElement === firstElement) {
             e.preventDefault();
@@ -93,7 +93,7 @@ const ModernDialog = ({
         'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
       );
       if (firstFocusable) {
-        firstFocusable.focus();
+        (firstFocusable as HTMLElement).focus();
       }
     }, 100);
 

@@ -1,23 +1,45 @@
 /**
  * API для работы с сообщениями между пользователями
+ *
+ * Wave 4: all functions return domain Chat* types from types/domain/chat.ts.
+ * The raw backend JSON is mapped at the boundary by mappers/chat.ts so
+ * ChatContext and other consumers never see `Record<string, unknown>`.
  */
 
 import { api } from './client';
+import type {
+  ChatMessage,
+  ChatConversation,
+  ChatAvailableUser,
+  ChatConversationsResponse,
+  ChatConversationResponse,
+  ChatUnreadCountResponse,
+  ChatAvailableUsersResponse,
+} from '../types/domain/chat';
+import {
+  mapChatMessageDto,
+  mapChatConversationDto,
+  mapConversationsResponseDto,
+  mapConversationResponseDto,
+  mapUnreadCountResponseDto,
+  mapAvailableUsersResponseDto,
+  mapChatAvailableUserDtos,
+} from './mappers';
 
 const MESSAGE_QUERY_CACHE_MS = 15_000;
-const conversationCache = new Map();
-const unreadCountCache = new Map();
-const conversationPromiseCache = new Map();
-const unreadCountPromiseCache = new Map();
+const conversationCache = new Map<string, { cachedAt: number; data: ChatConversationsResponse }>();
+const unreadCountCache = new Map<string, { cachedAt: number; data: number }>();
+const conversationPromiseCache = new Map<string, Promise<ChatConversationsResponse>>();
+const unreadCountPromiseCache = new Map<string, Promise<number>>();
 
-function isFreshCacheEntry(entry, ttlMs = MESSAGE_QUERY_CACHE_MS) {
-  return Boolean(entry) && Date.now() - entry.cachedAt < ttlMs;
+function isFreshCacheEntry(entry: { cachedAt: number } | undefined, ttlMs = MESSAGE_QUERY_CACHE_MS): boolean {
+  return Boolean(entry) && Date.now() - entry!.cachedAt < ttlMs;
 }
 
-function getCachedConversationResult(key) {
+function getCachedConversationResult(key: string): ChatConversationsResponse | null {
   const entry = conversationCache.get(key);
   if (isFreshCacheEntry(entry)) {
-    return entry.data;
+    return entry!.data;
   }
 
   if (entry) {
@@ -27,10 +49,10 @@ function getCachedConversationResult(key) {
   return null;
 }
 
-function getCachedUnreadCountResult(key) {
+function getCachedUnreadCountResult(key: string): number | null {
   const entry = unreadCountCache.get(key);
   if (isFreshCacheEntry(entry)) {
-    return entry.data;
+    return entry!.data;
   }
 
   if (entry) {
@@ -49,24 +71,22 @@ export function clearMessageQueryCache(): void {
 
 /**
  * Отправить сообщение пользователю
- * @param {number} recipientId - ID получателя
- * @param {string} content - Текст сообщения
- * @returns {Promise<Object>} Созданное сообщение
+ * @returns {Promise<ChatMessage>} Созданное сообщение (домен)
  */
-export const sendMessage = async (recipientId, content) => {
+export const sendMessage = async (recipientId: number, content: string): Promise<ChatMessage> => {
     const response = await api.post('/messages/send', {
         recipient_id: recipientId,
         content: content
     });
     clearMessageQueryCache();
-    return response.data;
+    return mapChatMessageDto(response.data as Record<string, unknown>);
 };
 
 /**
  * Получить список всех бесед
- * @returns {Promise<Object>} Список бесед и общее количество непрочитанных
+ * @returns {Promise<ChatConversationsResponse>} Список бесед и общее количество непрочитанных
  */
-export const getConversations = async () => {
+export const getConversations = async (): Promise<ChatConversationsResponse> => {
     const cacheKey = '/messages/conversations';
     const cached = getCachedConversationResult(cacheKey);
     if (cached) {
@@ -79,11 +99,12 @@ export const getConversations = async () => {
     }
 
     const requestPromise = api.get(cacheKey).then((response) => {
+        const mapped = mapConversationsResponseDto(response.data as Record<string, unknown>);
         conversationCache.set(cacheKey, {
             cachedAt: Date.now(),
-            data: response.data
+            data: mapped
         });
-        return response.data;
+        return mapped;
     }).finally(() => {
         conversationPromiseCache.delete(cacheKey);
     });
@@ -94,23 +115,23 @@ export const getConversations = async () => {
 
 /**
  * Получить переписку с конкретным пользователем
- * @param {number} userId - ID собеседника
- * @param {number} skip - Пропустить N сообщений (пагинация)
- * @param {number} limit - Лимит сообщений
- * @returns {Promise<Object>} Список сообщений
+ * @param userId - ID собеседника
+ * @param skip - Пропустить N сообщений (пагинация)
+ * @param limit - Лимит сообщений
+ * @returns {Promise<ChatConversationResponse>} Список сообщений (домен)
  */
-export const getConversation = async (userId, skip = 0, limit = 50) => {
+export const getConversation = async (userId: number, skip = 0, limit = 50): Promise<ChatConversationResponse> => {
     const response = await api.get(`/messages/conversation/${userId}`, {
         params: { skip, limit }
     });
-    return response.data;
+    return mapConversationResponseDto(response.data as Record<string, unknown>);
 };
 
 /**
  * Получить количество непрочитанных сообщений
  * @returns {Promise<number>} Количество непрочитанных
  */
-export const getUnreadCount = async () => {
+export const getUnreadCount = async (): Promise<number> => {
     const cacheKey = '/messages/unread';
     const cached = getCachedUnreadCountResult(cacheKey);
     if (cached !== null) {
@@ -123,7 +144,7 @@ export const getUnreadCount = async () => {
     }
 
     const requestPromise = api.get(cacheKey).then((response) => {
-        const unreadCount = response.data.unread_count;
+        const unreadCount = Number((response.data as { unread_count?: unknown }).unread_count) || 0;
         unreadCountCache.set(cacheKey, {
             cachedAt: Date.now(),
             data: unreadCount
@@ -139,61 +160,63 @@ export const getUnreadCount = async () => {
 
 /**
  * Пометить сообщение как прочитанное
- * @param {number} messageId - ID сообщения
- * @returns {Promise<Object>} Обновленное сообщение
+ * @returns {Promise<ChatMessage>} Обновленное сообщение (домен)
  */
-export const markAsRead = async (messageId) => {
+export const markAsRead = async (messageId: number): Promise<ChatMessage> => {
     const response = await api.patch(`/messages/${messageId}/read`);
     clearMessageQueryCache();
-    return response.data;
+    return mapChatMessageDto(response.data as Record<string, unknown>);
 };
 
 /**
  * Удалить сообщение (мягкое удаление)
- * @param {number} messageId - ID сообщения
- * @returns {Promise<Object>} Результат
+ *
+ * @api-transport backend returns a free-form status dict ({ success, deleted_at });
+ *               no dedicated domain type yet.
+ *
+ * @returns {Promise<Record<string, unknown>>} Результат
  */
-export const deleteMessage = async (messageId) => {
+export const deleteMessage = async (messageId: number): Promise<Record<string, unknown>> => {
     const response = await api.delete(`/messages/${messageId}`);
     clearMessageQueryCache();
-    return response.data;
+    return response.data as Record<string, unknown>;
 };
 
 /**
  * Получить список доступных пользователей для переписки
- * @param {string} search - Поисковый запрос
- * @returns {Promise<Array>} Список пользователей
+ * @returns {Promise<ChatAvailableUser[]>} Список пользователей (домен)
  */
-export const getAvailableUsers = async (search = '') => {
+export const getAvailableUsers = async (search = ''): Promise<ChatAvailableUser[] | ChatAvailableUsersResponse> => {
     const response = await api.get('/messages/users/available', {
         params: { search }
     });
-    return response.data;
+    // Backend may return either an array directly or { users: [...] }
+    const data = response.data;
+    if (Array.isArray(data)) {
+        return mapChatAvailableUserDtos(data);
+    }
+    return mapAvailableUsersResponseDto(data as Record<string, unknown>);
 };
 
 /**
  * Добавить/удалить реакцию на сообщение
- * @param {number} messageId - ID сообщения
- * @param {string} reaction - Emoji реакции
- * @returns {Promise<Object>} Обновленное сообщение
+ * @returns {Promise<ChatMessage>} Обновленное сообщение (домен)
  */
-export const toggleReaction = async (messageId, reaction) => {
+export const toggleReaction = async (messageId: number, reaction: string): Promise<ChatMessage> => {
     const response = await api.post(`/messages/${messageId}/reactions`, {
         reaction
     });
     clearMessageQueryCache();
-    return response.data;
+    return mapChatMessageDto(response.data as Record<string, unknown>);
 };
 
 /**
  * Загрузить файл для сообщения
- * @param {number} recipientId - ID получателя
- * @param {File} file - Файл
- * @returns {Promise<Object>} Созданное сообщение
+ * @returns {Promise<ChatMessage>} Созданное сообщение (домен)
  */
-export const uploadFile = async (recipientId, file) => {
+export const uploadFile = async (recipientId: number, file: File): Promise<ChatMessage> => {
     const formData = new FormData();
-    formData.append('recipient_id', recipientId);
+    formData.append('recipient_id', String(recipientId));
     formData.append('file', file);
 
     const response = await api.post('/messages/upload', formData, {
@@ -202,10 +225,23 @@ export const uploadFile = async (recipientId, file) => {
         }
     });
     clearMessageQueryCache();
-    return response.data;
+    return mapChatMessageDto(response.data as Record<string, unknown>);
 };
 
-export default {
+// Re-export domain types for backwards compatibility with callers that
+// imported them from '@/api/messages' in earlier phases.
+export type {
+  ChatMessage,
+  ChatConversation,
+  ChatAvailableUser,
+  ChatConversationsResponse,
+  ChatConversationResponse,
+  ChatUnreadCountResponse,
+  ChatAvailableUsersResponse,
+};
+
+// Legacy default export keeps the same shape: an object with all functions.
+const messagesApi = {
     sendMessage,
     getConversations,
     getConversation,
@@ -216,3 +252,5 @@ export default {
     toggleReaction,
     uploadFile
 };
+
+export default messagesApi;

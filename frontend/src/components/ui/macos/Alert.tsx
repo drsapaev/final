@@ -1,13 +1,12 @@
 import React from 'react';
 import { AlertCircle, CheckCircle, Info, AlertTriangle, X } from 'lucide-react';
-import PropTypes from 'prop-types';
 import { useTranslation } from '../../../i18n/useTranslation';
 
 // SW-01 fix: merged MacOSAlert API into Alert.
 // Supports both old Alert API (children + severity) and MacOSAlert API
 // (type + title + description + action + dismissible).
 
-const variantStyle = (severity) => {
+const variantStyle = (severity: string): { borderColor: string; background: string; color: string } => {
   switch (severity) {
     case 'success':
       return { borderColor: 'rgba(52,199,89,0.35)', background: 'rgba(52,199,89,0.08)', color: 'var(--mac-text-primary)' };
@@ -21,7 +20,7 @@ const variantStyle = (severity) => {
   }
 };
 
-const typeIcons = {
+const typeIcons: Record<string, typeof Info> = {
   info: Info,
   success: CheckCircle,
   warning: AlertTriangle,
@@ -131,19 +130,4 @@ const Alert = ({
     </div>
   );
 };
-
-
-Alert.propTypes = {
-  ...(Alert.propTypes || {}),
-  children: PropTypes.any,
-  severity: PropTypes.any,
-  type: PropTypes.string,
-  title: PropTypes.node,
-  description: PropTypes.node,
-  action: PropTypes.node,
-  dismissible: PropTypes.bool,
-  onDismiss: PropTypes.func,
-  style: PropTypes.object,
-};
-
 export default Alert;

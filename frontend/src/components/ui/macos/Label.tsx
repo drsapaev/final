@@ -1,6 +1,4 @@
 import React, { type ReactNode, type CSSProperties } from 'react';
-import PropTypes from 'prop-types';
-
 type LabelVariant = 'default' | 'muted' | 'error';
 type LabelSize = 'sm' | 'md' | 'lg';
 
@@ -69,18 +67,6 @@ const Label = React.forwardRef<HTMLLabelElement, LabelProps>(({
     </label>
   );
 });
-
-
-Label.propTypes = {
-  ...(Label.propTypes || {}),
-  children: PropTypes.any,
-  className: PropTypes.any,
-  required: PropTypes.any,
-  size: PropTypes.any,
-  style: PropTypes.any,
-  variant: PropTypes.any,
-};
-
 Label.displayName = 'Label';
 
 export default Label;

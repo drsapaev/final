@@ -1,5 +1,4 @@
 import React, { useEffect, useId, useRef, type ReactNode, type CSSProperties, type MouseEvent, type KeyboardEvent, type RefObject } from 'react';
-import PropTypes from 'prop-types';
 import { useTheme } from '../../../contexts/ThemeContext';
 import Button from './Button';
 import { useTranslation } from '../../../i18n/useTranslation';
@@ -503,43 +502,4 @@ export const ModalFooter = React.forwardRef<HTMLDivElement, ModalPartProps>(({
 });
 
 ModalFooter.displayName = 'macOS Modal Footer';
-
-Modal.propTypes = {
-  isOpen: PropTypes.bool,
-  onClose: PropTypes.func,
-  title: PropTypes.node,
-  children: PropTypes.node,
-  actions: PropTypes.node,
-  size: PropTypes.string,
-  variant: PropTypes.string,
-  closeOnBackdrop: PropTypes.bool,
-  closeOnEscape: PropTypes.bool,
-  className: PropTypes.string,
-  style: PropTypes.object
-};
-
-ModalHeader.propTypes = {
-  children: PropTypes.node,
-  className: PropTypes.string,
-  style: PropTypes.object
-};
-
-ModalTitle.propTypes = {
-  children: PropTypes.node,
-  className: PropTypes.string,
-  style: PropTypes.object
-};
-
-ModalContent.propTypes = {
-  children: PropTypes.node,
-  className: PropTypes.string,
-  style: PropTypes.object
-};
-
-ModalFooter.propTypes = {
-  children: PropTypes.node,
-  className: PropTypes.string,
-  style: PropTypes.object
-};
-
 export default Modal;

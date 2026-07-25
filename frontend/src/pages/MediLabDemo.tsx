@@ -319,7 +319,7 @@ const MediLabDemo = () => {
             value={metric.value}
             change={metric.change}
             iconName={metric.iconName}
-            color={metric.color}
+            color={metric.color as 'blue' | 'green' | 'purple' | 'orange' | 'red'}
             compact={true}
             className={`h-16 animate-fade-in-up animate-delay-${(index + 1) * 100} metric-card-responsive`}
           />
@@ -598,7 +598,7 @@ const MediLabDemo = () => {
                       'bg-yellow-100 text-yellow-800'
                     }`}
                   >
-                    {value}
+                    {String(value)}
                   </span>
                 )
               }

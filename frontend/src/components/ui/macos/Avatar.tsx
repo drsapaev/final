@@ -1,4 +1,3 @@
-import PropTypes from 'prop-types';
 import type { CSSProperties } from 'react';
 
 type AvatarSize = 'small' | 'medium' | 'large';
@@ -51,11 +50,11 @@ export const Avatar = ({ src, name, size = 'medium', status, style = {}, classNa
     color: 'var(--mac-text-secondary)'
   };
 
-  const statusColor: string | null = status === 'online' ? 'var(--mac-success)' : status === 'busy' ? 'var(--mac-error)' : status === 'away' ? 'var(--mac-warning)' : null;
+  const statusColor: string | undefined = status === 'online' ? 'var(--mac-success)' : status === 'busy' ? 'var(--mac-error)' : status === 'away' ? 'var(--mac-warning)' : undefined;
 
   return (
     <div className={`mac-avatar ${className}`} style={{ ...containerStyle, ...style }} title={name ?? undefined}>
-      <img src={src} alt={name || 'User'} style={imgStyle} />
+      <img src={src ?? undefined} alt={name || 'User'} style={imgStyle} />
       {!src && (
         <div style={fallbackStyle} aria-hidden>{getInitials(name)}</div>
       )}
@@ -77,16 +76,4 @@ export const Avatar = ({ src, name, size = 'medium', status, style = {}, classNa
     </div>
   );
 };
-
-
-Avatar.propTypes = {
-  ...(Avatar.propTypes || {}),
-  className: PropTypes.any,
-  name: PropTypes.any,
-  size: PropTypes.any,
-  src: PropTypes.any,
-  status: PropTypes.any,
-  style: PropTypes.any,
-};
-
 export default Avatar;

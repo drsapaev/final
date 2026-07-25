@@ -8,7 +8,6 @@
  * но если не передан — используются CSS-классы с macos design tokens.
  */
 import { useState } from 'react';
-import PropTypes from 'prop-types';
 import {
 
   XCircle,
@@ -26,9 +25,9 @@ import { useTranslation } from '../../i18n/useTranslation';
 import i18n from '../../i18n';
 const t18 = i18n.t as unknown as (key: string, options?: Record<string, unknown>) => string;
 
-const normalizeQueueAction = (action) => String(action || '').trim().toLowerCase().replace(/-/g, '_');
+const normalizeQueueAction = (action: unknown) => String(action || '').trim().toLowerCase().replace(/-/g, '_');
 
-const QUEUE_ACTION_ALIASES = {
+const QUEUE_ACTION_ALIASES: Record<string, string[]> = {
   no_show: ['no_show'],
   restore_next: ['restore_next'],
   send_to_diagnostics: ['send_to_diagnostics', 'diagnostics'],
@@ -41,7 +40,7 @@ const QUEUE_COMPLETED_STATUSES = new Set(['served', 'completed', 'done']);
 const QUEUE_INCOMPLETE_STATUSES = new Set(['incomplete']);
 const QUEUE_CANCELLED_STATUSES = new Set(['cancelled']);
 
-const hasBackendQueueAction = (entry, action, flagName) => {
+const hasBackendQueueAction = (entry: Record<string, unknown> | null | undefined, action: string, flagName: string): boolean => {
   if (entry?.[flagName] === true) {
     return true;
   }
@@ -93,17 +92,6 @@ const ActionButton = ({ color, icon: Icon, iconSize, onClick, disabled, ariaLabe
   );
 };
 
-ActionButton.propTypes = {
-  color: PropTypes.oneOf(['danger', 'info', 'success', 'warning']).isRequired,
-  icon: PropTypes.elementType.isRequired,
-  iconSize: PropTypes.number.isRequired,
-  onClick: PropTypes.func.isRequired,
-  disabled: PropTypes.bool,
-  ariaLabel: PropTypes.string,
-  title: PropTypes.string,
-  actionButtonStyle: PropTypes.object,
-  getColor: PropTypes.func,
-};
 
 /**
  * Кнопки действий для одной записи в очереди
@@ -116,6 +104,11 @@ export const QueueActionButtons = ({
   onStatusChange,
   styles: stylesRaw = {},
   compact = false
+}: {
+  entry: Record<string, unknown> | null | undefined;
+  onStatusChange?: (action: string, entryId?: string | number, ...rest: unknown[]) => void;
+  styles?: Record<string, unknown>;
+  compact?: boolean;
 }) => {
   const styles = stylesRaw as Record<string, any>;
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
@@ -127,7 +120,7 @@ export const QueueActionButtons = ({
   } = styles;
 
   const entryId = entry?.queue_entry_id ?? null;
-  const status = entry.queue_status || entry.status || null;
+  const status = entry?.queue_status || entry?.status || null;
 
   if (!entryId) {
     logger.warn('[QueueActionButtons] Missing queue_entry_id, skipping queue action controls', {
@@ -137,7 +130,7 @@ export const QueueActionButtons = ({
     return null;
   }
 
-  const handleAction = async (action, payload = {}) => {
+  const handleAction = async (action: string, payload: Record<string, unknown> = {}) => {
     if (loading) return;
     setLoading(true);
 
@@ -170,7 +163,7 @@ export const QueueActionButtons = ({
       logger.info(`[QueueActionButtons] ${action} success for entry ${entryId}`, response?.data);
 
       if (onStatusChange) {
-        onStatusChange(action, entry, response?.data);
+        onStatusChange(action, entryId as string | number);
       }
     } catch (err) {
       logger.error(`[QueueActionButtons] ${action} failed for entry ${entryId}:`, err);
@@ -272,9 +265,9 @@ export const QueueActionButtons = ({
     }
 
     if (
-      !QUEUE_COMPLETED_STATUSES.has(status) &&
-      !QUEUE_INCOMPLETE_STATUSES.has(status) &&
-      !QUEUE_CANCELLED_STATUSES.has(status)
+      !QUEUE_COMPLETED_STATUSES.has(String(status)) &&
+      !QUEUE_INCOMPLETE_STATUSES.has(String(status)) &&
+      !QUEUE_CANCELLED_STATUSES.has(String(status))
     ) {
       return null;
     }
@@ -452,8 +445,8 @@ export const QueueStatsBar = ({ stats, getColor }: Record<string, any>) => {
 /**
  * Хелпер для маппинга статусов очереди
  */
-export const getQueueStatusInfo = (status) => {
-  const statusMap = {
+export const getQueueStatusInfo = (status: string) => {
+  const statusMap: Record<string, { label: string; variant: string; color: string }> = {
     waiting: { label: t18('misc.qmc_status_waiting'), variant: 'warning', color: 'var(--mac-warning)' },
     called: { label: t18('misc.qmc_status_called'), variant: 'primary', color: 'var(--mac-accent-blue)' },
     calling: { label: t18('misc.qmc_status_calling'), variant: 'primary', color: 'var(--mac-accent-blue)' },
@@ -471,36 +464,6 @@ export const getQueueStatusInfo = (status) => {
   return statusMap[status] || { label: status, variant: 'default', color: 'var(--mac-text-secondary)' };
 };
 
-const queueEntryShape = PropTypes.shape({
-  queue_entry_id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-  id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-  status: PropTypes.string,
-  queue_status: PropTypes.string
-});
 
-const styleConfigShape = PropTypes.shape({
-  actionButtonStyle: PropTypes.object,
-  dangerColor: PropTypes.string,
-  successColor: PropTypes.string,
-  warningColor: PropTypes.string,
-  infoColor: PropTypes.string,
-  getColor: PropTypes.func
-});
-
-QueueActionButtons.propTypes = {
-  entry: queueEntryShape,
-  onStatusChange: PropTypes.func,
-  styles: styleConfigShape,
-  compact: PropTypes.bool
-};
-
-QueueStatsBar.propTypes = {
-  stats: PropTypes.shape({
-    waiting: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-    called: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-    served: PropTypes.oneOfType([PropTypes.string, PropTypes.number])
-  }),
-  getColor: PropTypes.func
-};
 
 export default QueueActionButtons;

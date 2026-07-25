@@ -37,7 +37,7 @@ import type {
   TwoFactorVerifyFailure,
   TwoFactorVerifyResult,
   TwoFactorVerifySuccess,
-} from './auth';
+} from './domain/auth';
 
 // ============================================================================
 // Errors

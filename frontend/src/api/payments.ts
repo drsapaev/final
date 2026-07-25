@@ -27,6 +27,8 @@ function createWrappedError(message: string, extras: { status?: number; detail?:
 
 import { api } from './client';
 import logger from '../utils/logger';
+import type { Invoice } from '../types/domain/billing';
+import { mapInvoiceDtos, mapInvoiceDto } from './mappers';
 
 // =====================================================================
 // INVOICES API
@@ -34,12 +36,12 @@ import logger from '../utils/logger';
 
 /**
  * Получить список неоплаченных счетов.
- * @returns {Promise<Array<object>>} Массив счетов (может быть пустым)
+ * @returns {Promise<Invoice[]>} Массив счетов (домен)
  */
-export async function getPendingInvoices(): Promise<Record<string, unknown>[]> {
+export async function getPendingInvoices(): Promise<Invoice[]> {
   try {
     const response = await api.get('/payments/invoices/pending');
-    return response.data;
+    return mapInvoiceDtos(response.data);
   } catch (error) {
     logger.error('[payments API] getPendingInvoices failed', {
       status: (error as WrappedApiError)?.response?.status,
@@ -51,13 +53,13 @@ export async function getPendingInvoices(): Promise<Record<string, unknown>[]> {
 
 /**
  * Создать новый счёт для оплаты.
- * @param {object} invoiceData - { amount, currency, provider, description, patient_info }
- * @returns {Promise<object>} Created invoice with invoice_id
+ * @param invoiceData - { amount, currency, provider, description, patient_info }
+ * @returns {Promise<Invoice>} Created invoice (домен)
  */
-export async function createPaymentInvoice(invoiceData: Record<string, unknown>): Promise<Record<string, unknown>> {
+export async function createPaymentInvoice(invoiceData: Record<string, unknown>): Promise<Invoice> {
   try {
     const response = await api.post('/payments/invoice/create', invoiceData);
-    return response.data;
+    return mapInvoiceDto(response.data as Record<string, unknown>);
   } catch (error) {
     logger.error('[payments API] createPaymentInvoice failed', {
       status: (error as WrappedApiError)?.response?.status,

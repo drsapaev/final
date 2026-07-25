@@ -128,51 +128,51 @@ export const labReportingApi = {
     return request(`/lab/catalog/reference-ranges${suffix}`);
   },
 
-  getTemplate(templateId) {
+  getTemplate(templateId: string | number) {
     return request(`/lab/templates/${templateId}`);
   },
 
-  resolveTemplateOptions(payload) {
+  resolveTemplateOptions(payload: Record<string, unknown>) {
     return request('/lab/template-resolutions/resolve', {
       method: 'POST',
       body: JSON.stringify(payload)
     });
   },
 
-  createTemplate(payload) {
+  createTemplate(payload: Record<string, unknown>) {
     return request('/lab/templates', {
       method: 'POST',
       body: JSON.stringify(payload)
     });
   },
 
-  createTemplateVersion(templateId, sourceVersionId = null) {
+  createTemplateVersion(templateId: string | number, sourceVersionId: string | number | null = null) {
     return request(`/lab/templates/${templateId}/versions`, {
       method: 'POST',
       body: JSON.stringify({ source_version_id: sourceVersionId })
     });
   },
 
-  updateTemplateVersion(versionId, payload) {
+  updateTemplateVersion(versionId: string | number, payload: Record<string, unknown>) {
     return request(`/lab/template-versions/${versionId}`, {
       method: 'PUT',
       body: JSON.stringify(payload)
     });
   },
 
-  publishTemplateVersion(versionId) {
+  publishTemplateVersion(versionId: string | number) {
     return request(`/lab/template-versions/${versionId}/publish`, {
       method: 'POST'
     });
   },
 
-  archiveTemplateVersion(versionId) {
+  archiveTemplateVersion(versionId: string | number) {
     return request(`/lab/template-versions/${versionId}/archive`, {
       method: 'POST'
     });
   },
 
-  cloneTemplate(templateId) {
+  cloneTemplate(templateId: string | number) {
     return request(`/lab/templates/${templateId}/clone`, {
       method: 'POST'
     });
@@ -196,11 +196,11 @@ export const labReportingApi = {
     return request(`/lab/report-instances?${search.toString()}`);
   },
 
-  getInstance(instanceId) {
+  getInstance(instanceId: string | number) {
     return request(`/lab/report-instances/${instanceId}`);
   },
 
-  createInstance(payload) {
+  createInstance(payload: Record<string, unknown>) {
     return request('/lab/report-instances', {
       method: 'POST',
       body: JSON.stringify(payload)
@@ -209,7 +209,7 @@ export const labReportingApi = {
 
   // P1 fix: doctor-initiated lab order — creates a LabReportInstance in DRAFT
   // status linked to the visit, so the lab technician sees it in their queue.
-  createOrder(payload) {
+  createOrder(payload: Record<string, unknown>) {
     return request('/lab/orders', {
       method: 'POST',
       body: JSON.stringify(payload)
@@ -219,7 +219,7 @@ export const labReportingApi = {
   // WF-06 fix: expectedUpdatedAt — optimistic locking via updated_at.
   // Если backend обнаружит, что бланк был изменён после этого timestamp,
   // вернёт 409 Conflict. Frontend показывает dialog "обновите страницу".
-  updateInstance(instanceId, payload, expectedUpdatedAt = null) {
+  updateInstance(instanceId: string | number, payload: Record<string, unknown>, expectedUpdatedAt: string | null = null) {
     const search = expectedUpdatedAt
       ? `?expected_updated_at=${encodeURIComponent(expectedUpdatedAt)}`
       : '';
@@ -229,7 +229,7 @@ export const labReportingApi = {
     });
   },
 
-  bulkSaveValues(instanceId, payload, expectedUpdatedAt = null) {
+  bulkSaveValues(instanceId: string | number, payload: Array<Record<string, unknown>>, expectedUpdatedAt: string | null = null) {
     const search = expectedUpdatedAt
       ? `?expected_updated_at=${encodeURIComponent(expectedUpdatedAt)}`
       : '';
@@ -244,25 +244,25 @@ export const labReportingApi = {
   // backend разрешал одинаковые действия для DRAFT/IN_PROGRESS/READY).
   // Если backend endpoint потребуется снова — добавлять вместе с UI-кнопкой.
 
-  finalize(instanceId) {
+  finalize(instanceId: string | number) {
     return request(`/lab/report-instances/${instanceId}/finalize`, {
       method: 'POST'
     });
   },
 
-  revise(instanceId) {
+  revise(instanceId: string | number) {
     return request(`/lab/report-instances/${instanceId}/revise`, {
       method: 'POST'
     });
   },
 
-  markPrinted(instanceId) {
+  markPrinted(instanceId: string | number) {
     return request(`/lab/report-instances/${instanceId}/mark-printed`, {
       method: 'POST'
     });
   },
 
-  async downloadPdf(instanceId) {
+  async downloadPdf(instanceId: string | number) {
     const token = tokenManager.getAccessToken();
     const response = await fetch(`${API_V1_BASE}/lab/report-instances/${instanceId}/pdf`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {}

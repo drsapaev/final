@@ -1,26 +1,26 @@
 import { getEffectiveRouteByPath, getProfileRoles, getRoleHomeRoute, hasRouteAccess as hasRegistryRouteAccess, normalizeRole, routeToRoles as routeRolesFromRegistry } from '../routing/routeSelectors.js';
 
-export function roleToRoute(role) {
+export function roleToRoute(role: string): string {
   return getRoleHomeRoute(role);
 }
 
-export function routeToRoles(route) {
+export function routeToRoles(route: string): string[] {
   return routeRolesFromRegistry(route);
 }
 
-export function hasRouteAccess(profile, route) {
+export function hasRouteAccess(profile: Record<string, unknown>, route: string): boolean {
   return hasRegistryRouteAccess(profile, route, { internalDemoEnabled: false });
 }
 
-export function getRouteForProfile(profile) {
+export function getRouteForProfile(profile: Record<string, unknown> | null): string {
   return getRoleHomeRoute(profile);
 }
 
-export function getRouteMetadata(route) {
+export function getRouteMetadata(route: string) {
   return getEffectiveRouteByPath(route);
 }
 
-export function getUserRoles(profile) {
+export function getUserRoles(profile: Record<string, unknown>): string[] {
   return getProfileRoles(profile);
 }
 

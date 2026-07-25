@@ -5,32 +5,28 @@
 import { useCallback, useEffect, useState } from 'react';
 import api from '../services/api';
 import logger from '../utils/logger';
+import type {
+  QueueEntry,
+  QueueStats,
+} from '../types/domain/queue';
 
-interface QueueStats {
-  waiting: number;
-  called: number;
-  served: number;
-  total: number;
+// Doctor-queue-specific payload envelope. The backend returns this shape from
+// /queue/{id} with queue entries + stats + can_call_next metadata. The
+// generic QueuePayload in domain/queue.ts has `queues: QueueData[]`, but
+// the doctor-panel endpoint returns a single queue object with entries
+// inline — different shape, so we keep a local interface.
+interface DoctorQueuePayload {
+  entries?: QueueEntry[];
+  stats?: QueueStats;
+  can_call_next?: boolean;
+  next_call_entry_id?: string | number | null;
+  queue_ids?: Array<string | number>;
+  [key: string]: unknown;
 }
 
 interface QueueControls {
   canCallNext: boolean;
   nextCallEntryId: string | number | null;
-}
-
-interface QueueEntry {
-  id: string | number;
-  status: string;
-  available_actions?: string[];
-  [key: string]: unknown;
-}
-
-interface QueuePayload {
-  entries?: QueueEntry[];
-  stats?: Partial<QueueStats>;
-  can_call_next?: boolean;
-  next_call_entry_id?: string | number | null;
-  queue_ids?: Array<string | number>;
 }
 
 interface CatchError {
@@ -51,8 +47,9 @@ const hasBackendQueueAction = (
   flagName: string,
 ): boolean => {
   if (!entry) return false;
-  if (Array.isArray(entry.available_actions)) {
-    return entry.available_actions.includes(action);
+  const availableActions = entry.available_actions as string[] | undefined;
+  if (Array.isArray(availableActions)) {
+    return availableActions.includes(action);
   }
   if (flagName && Object.prototype.hasOwnProperty.call(entry, flagName)) {
     return Boolean(entry[flagName]);
@@ -61,7 +58,7 @@ const hasBackendQueueAction = (
 };
 
 const selectNextCallEntryId = (
-  queuePayload: QueuePayload | null | undefined,
+  queuePayload: DoctorQueuePayload | null | undefined,
 ): string | number | null => {
   const backendEntryId = queuePayload?.next_call_entry_id;
   if (backendEntryId !== undefined && backendEntryId !== null) {
@@ -106,9 +103,9 @@ const useDoctorQueue = (specialty: string = 'general'): UseDoctorQueueReturn => 
 
     try {
       const response = await api.get(`/doctor/${encodeURIComponent(normalizedSpecialty)}/queue/today`);
-      const data = response.data as QueuePayload;
+      const data = response.data as DoctorQueuePayload;
       const entries = Array.isArray(data?.entries) ? data.entries : [];
-      const apiStats = data?.stats || {};
+      const apiStats: QueueStats = (data?.stats as QueueStats) || {};
       const nextCallEntryId = selectNextCallEntryId(data);
 
       setQueue(entries);
@@ -143,7 +140,7 @@ const useDoctorQueue = (specialty: string = 'general'): UseDoctorQueueReturn => 
   const callNext = useCallback(async (): Promise<unknown> => {
     try {
       const currentQueue = await api.get(`/doctor/${encodeURIComponent(normalizedSpecialty)}/queue/today`);
-      const nextCallEntryId = selectNextCallEntryId(currentQueue.data as QueuePayload);
+      const nextCallEntryId = selectNextCallEntryId(currentQueue.data as DoctorQueuePayload);
       if (!nextCallEntryId) {
         return { success: false, message: 'Нет ожидающих пациентов' };
       }

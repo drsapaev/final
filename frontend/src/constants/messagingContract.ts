@@ -55,6 +55,6 @@ export const EPHEMERAL_MESSAGE_EVENTS = new Set([
 
 export const MESSAGING_CONTRACT_VERSION = '2026-03';
 
-export const isSupportedMessagingContractVersion = (contractVersion) => (
+export const isSupportedMessagingContractVersion = (contractVersion: string | undefined | null): boolean => (
   contractVersion === MESSAGING_CONTRACT_VERSION
 );

@@ -72,8 +72,8 @@ const MacOSEmptyState = ({
     }
   };
 
-  const currentSize = sizeStyles[size];
-  const currentVariant = variantStyles[variant];
+  const currentSize = sizeStyles[size as 'sm' | 'md' | 'lg'];
+  const currentVariant = variantStyles[variant as 'default' | 'filled' | 'minimal'];
 
   const containerStyle: CSSProperties = {
     display: 'flex',
@@ -144,16 +144,5 @@ const MacOSEmptyState = ({
 };
 
 
-MacOSEmptyState.propTypes = {
-  ...(MacOSEmptyState.propTypes || {}),
-  action: PropTypes.any,
-  className: PropTypes.any,
-  description: PropTypes.any,
-  icon: PropTypes.any,
-  size: PropTypes.any,
-  style: PropTypes.any,
-  title: PropTypes.any,
-  variant: PropTypes.any,
-};
 
 export default MacOSEmptyState;

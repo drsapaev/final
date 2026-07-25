@@ -1,6 +1,4 @@
 import React, { type ReactNode, type CSSProperties } from 'react';
-import PropTypes from 'prop-types';
-
 type SpacingValue = number | string;
 
 interface BoxProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'children' | 'style'> {
@@ -91,27 +89,5 @@ const Box = React.forwardRef<HTMLDivElement, BoxProps>(({
 
 
 Box.displayName = 'macOS Box';
-
-const spacingPropType = PropTypes.oneOfType([PropTypes.number, PropTypes.string]);
-
-Box.propTypes = {
-  children: PropTypes.node,
-  style: PropTypes.object,
-  sx: PropTypes.object,
-  display: PropTypes.string,
-  alignItems: PropTypes.string,
-  justifyContent: PropTypes.string,
-  gap: spacingPropType,
-  mt: spacingPropType,
-  mb: spacingPropType,
-  mx: spacingPropType,
-  my: spacingPropType,
-  px: spacingPropType,
-  py: spacingPropType,
-  p: spacingPropType,
-  m: spacingPropType,
-  maxWidth: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
-  textAlign: PropTypes.string
-};
 
 export default Box;

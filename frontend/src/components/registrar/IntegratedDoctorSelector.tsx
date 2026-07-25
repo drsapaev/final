@@ -1,5 +1,6 @@
 
 import { useState, useEffect } from 'react';
+import type { Doctor } from '../../types/domain/clinic';
 import {
   Heart,
   Stethoscope,
@@ -22,39 +23,46 @@ import {
   fetchRegistrarQueueSettings,
 } from '../../api/registrar';
 import logger from '../../utils/logger';
-import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 /**
  * Интегрированный селектор врачей для регистратуры
  * Использует данные врачей и расписаний из админ панели
  */
+interface IntegratedDoctorSelectorProps {
+  selectedDoctorId?: string | number | null;
+  onDoctorChange?: (doctorId: string | number | null) => void;
+  specialty?: string | null;
+  showSchedule?: boolean;
+  className?: string;
+}
+
 const IntegratedDoctorSelector = ({
   selectedDoctorId = null,
   onDoctorChange,
   specialty = null,
   showSchedule = true,
   className = ''
-}) => {
+}: IntegratedDoctorSelectorProps) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [loading, setLoading] = useState(true);
-  const [doctors, setDoctors] = useState([]);
+  const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [queueSettings, setQueueSettings] = useState<Record<string, any>>({});
   const [error, setError] = useState('');
 
   // Иконки специальностей
-  const specialtyIcons = {
+  const specialtyIcons: Record<string, typeof Heart> = {
     cardiology: Heart,
     dermatology: Stethoscope,
     stomatology: Scissors
   };
 
-  const specialtyColors = {
+  const specialtyColors: Record<string, string> = {
     cardiology: 'text-red-600',
     dermatology: 'text-orange-600',
     stomatology: 'text-blue-600'
   };
 
-  const specialtyNames = {
+  const specialtyNames: Record<string, string> = {
     cardiology: t('misc.ids_kardiologiya'),
     dermatology: t('misc.ids_dermatologiya'),
     stomatology: t('misc.ids_stomatologiya')
@@ -93,22 +101,22 @@ const IntegratedDoctorSelector = ({
     }
   };
 
-  const handleDoctorSelect = (doctor) => {
-    onDoctorChange(doctor);
+  const handleDoctorSelect = (doctor: Doctor) => {
+    onDoctorChange?.(doctor.id);
   };
 
-  const getWorkingDays = (schedules) => {
+  const getWorkingDays = (schedules: Array<Record<string, unknown>>) => {
     return schedules
-      .filter(s => s.active && s.start_time && s.end_time)
-      .map(s => ({
+      .filter((s: Record<string, unknown>) => s.active && s.start_time && s.end_time)
+      .map((s: Record<string, unknown>) => ({
         weekday: s.weekday,
         time: `${s.start_time}-${s.end_time}`,
         breaks: s.breaks
       }));
   };
 
-  const getQueueInfo = (doctor) => {
-    const specialty = doctor.specialty;
+  const getQueueInfo = (doctor: Doctor) => {
+    const specialty = doctor.specialty ?? '';
     const specialtySettings = queueSettings.specialties?.[specialty];
 
     if (!specialtySettings) return null;
@@ -158,12 +166,12 @@ const IntegratedDoctorSelector = ({
 
   return (
     <div className={`space-y-4 ${className}`}>
-      {doctors.map(doctor => {
+      {doctors.map((doctor: Doctor) => {
         const isSelected = selectedDoctorId === doctor.id;
-        const SpecialtyIcon = specialtyIcons[doctor.specialty] || User;
-        const iconColor = specialtyColors[doctor.specialty] || 'text-gray-600';
+        const SpecialtyIcon = specialtyIcons[doctor.specialty ?? ''] || User;
+        const iconColor = specialtyColors[doctor.specialty ?? ''] || 'text-gray-600';
         const queueInfo = getQueueInfo(doctor);
-        const workingDays = getWorkingDays(doctor.schedules || []);
+        const workingDays = getWorkingDays((doctor.schedules || []) as Array<Record<string, unknown>>);
 
         return (
           <Card
@@ -193,7 +201,7 @@ const IntegratedDoctorSelector = ({
                   <div className="space-y-1">
                     <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
                       <Badge variant="outline" className="mr-2">
-                        {specialtyNames[doctor.specialty] || doctor.specialty}
+                        {specialtyNames[doctor.specialty ?? ''] || doctor.specialty || ''}
                       </Badge>
                       {doctor.cabinet && (
                         <>
@@ -203,9 +211,9 @@ const IntegratedDoctorSelector = ({
                       )}
                     </div>
 
-                    {doctor.price_default > 0 && (
+                    {doctor.price_default != null && Number(doctor.price_default) > 0 && (
                       <div className="text-sm text-gray-600 dark:text-gray-400">
-                        Базовая цена: {doctor.price_default.toLocaleString()} UZS
+                        Базовая цена: {Number(doctor.price_default).toLocaleString()} UZS
                       </div>
                     )}
 
@@ -262,14 +270,6 @@ const IntegratedDoctorSelector = ({
 };
 
 
-IntegratedDoctorSelector.propTypes = {
-  ...(IntegratedDoctorSelector.propTypes || {}),
-  className: PropTypes.any,
-  onDoctorChange: PropTypes.any,
-  selectedDoctorId: PropTypes.any,
-  showSchedule: PropTypes.any,
-  specialty: PropTypes.any,
-};
 
 export default IntegratedDoctorSelector;
 

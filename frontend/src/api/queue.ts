@@ -1,43 +1,60 @@
 import { api } from './client';
+import type {
+  QueueSpecialist,
+  QueueData,
+  QueuePayload,
+  QrData,
+  QueueActionResponse,
+  QueueJoinSessionData,
+  QrTokenInfo,
+  QueueProfilesResponse,
+} from '../types/domain/queue';
+import {
+  mapQueueSpecialistDtos,
+  mapQueueDataDto,
+  mapQueuePayloadDto,
+  mapQrDataDto,
+  mapQueueActionResponseDto,
+} from './mappers';
 
-const withParams = (params) =>
+const withParams = (params: Record<string, unknown>): Record<string, unknown> =>
   Object.fromEntries(
     Object.entries(params || {}).filter(
       ([, value]) => value !== undefined && value !== null && value !== ''
     )
   );
 
-export async function fetchAvailableSpecialists() {
+export async function fetchAvailableSpecialists(): Promise<QueueSpecialist[]> {
   const response = await api.get('/queue/available-specialists');
   const payload = response.data?.specialists ?? response.data ?? [];
-  return Array.isArray(payload) ? payload : [];
+  return mapQueueSpecialistDtos(payload);
 }
 
-export async function fetchPublicQueueProfiles() {
+export async function fetchPublicQueueProfiles(): Promise<QueueProfilesResponse> {
   const response = await api.get('/queues/profiles/public');
-  return response.data;
+  return (response.data as QueueProfilesResponse) ?? { profiles: [] };
 }
 
-export async function fetchQrTokenInfo(token) {
+export async function fetchQrTokenInfo(token: string): Promise<QrTokenInfo> {
   const response = await api.get(`/queue/qr-tokens/${token}/info`);
-  return response.data;
+  return response.data as QrTokenInfo;
 }
 
-export async function startQueueJoinSession(token) {
+export async function startQueueJoinSession(token: string): Promise<QueueJoinSessionData> {
   const response = await api.post('/queue/join/start', { token });
-  return response.data;
+  return response.data as QueueJoinSessionData;
 }
 
-export async function completeQueueJoinSession(payload) {
+export async function completeQueueJoinSession(payload: Record<string, unknown>): Promise<QueueActionResponse> {
   const response = await api.post('/queue/join/complete', payload);
-  return response.data;
+  return mapQueueActionResponseDto(response.data as Record<string, unknown>);
 }
 
-export async function fetchQueuesToday(targetDate) {
+export async function fetchQueuesToday(targetDate: string): Promise<QueuePayload> {
   const response = await api.get('/registrar/queues/today', {
     params: withParams({ target_date: targetDate }),
   });
-  return response.data;
+  return mapQueuePayloadDto(response.data as Record<string, unknown>);
 }
 
 export async function generateDoctorQrToken({
@@ -45,7 +62,12 @@ export async function generateDoctorQrToken({
   department,
   targetDate,
   expiresHours = 24,
-}) {
+}: {
+  specialistId: string | number;
+  department?: string;
+  targetDate: string;
+  expiresHours?: number;
+}): Promise<QrData> {
   const payload = {
     specialist_id: Number(specialistId),
     department: department || 'general',
@@ -53,13 +75,16 @@ export async function generateDoctorQrToken({
     expires_hours: expiresHours,
   };
   const response = await api.post('/queue/admin/qr-tokens/generate', payload);
-  return response.data;
+  return mapQrDataDto(response.data as Record<string, unknown>);
 }
 
 export async function generateClinicQrToken({
   targetDate,
   expiresHours = 24,
-}) {
+}: {
+  targetDate: string;
+  expiresHours?: number;
+}): Promise<QrData> {
   const payload = {
     target_date: targetDate,
     expires_hours: expiresHours,
@@ -68,34 +93,52 @@ export async function generateClinicQrToken({
     '/queue/admin/qr-tokens/generate-clinic',
     payload
   );
-  return response.data;
+  return mapQrDataDto(response.data as Record<string, unknown>);
 }
 
-export async function openReceptionSlot({ day, specialistId }) {
+export async function openReceptionSlot({
+  day,
+  specialistId,
+}: {
+  day: string;
+  specialistId: string | number;
+}): Promise<QueueActionResponse> {
   const response = await api.post('/registrar/open-reception', null, {
     params: {
       day,
       specialist_id: specialistId,
     },
   });
-  return response.data;
+  return mapQueueActionResponseDto(response.data as Record<string, unknown>);
 }
 
 // UX Audit Registrar #7: closeReceptionSlot — закрытие приёма.
 // P2 ARCHITECTURE AUDIT: backend mounts this at /queue/legacy/close
 // (queue.py is mounted with prefix="/queue/legacy" in api.py:389).
 // The previous /queue/close path was a frontend orphan — no backend match.
-export async function closeReceptionSlot({ day, specialistId }) {
+export async function closeReceptionSlot({
+  day,
+  specialistId,
+}: {
+  day: string;
+  specialistId: string | number;
+}): Promise<QueueActionResponse> {
   const response = await api.post('/queue/legacy/close', null, {
     params: {
       day,
       specialist_id: specialistId,
     },
   });
-  return response.data;
+  return mapQueueActionResponseDto(response.data as Record<string, unknown>);
 }
 
-export async function callNextQueuePatient({ specialistId, targetDate }) {
+export async function callNextQueuePatient({
+  specialistId,
+  targetDate,
+}: {
+  specialistId: string | number;
+  targetDate: string;
+}): Promise<QueueActionResponse> {
   const response = await api.post(
     `/queue/${Number(specialistId)}/call-next`,
     null,
@@ -103,18 +146,22 @@ export async function callNextQueuePatient({ specialistId, targetDate }) {
       params: withParams({ target_date: targetDate }),
     }
   );
-  return response.data;
+  return mapQueueActionResponseDto(response.data as Record<string, unknown>);
 }
 
 /**
  * Массовое создание записей в очереди (при добавлении новых услуг)
- * @param {Object} params - Параметры для создания очередей
- * @param {number} params.patientId - ID пациента
- * @param {string} params.source - Источник регистрации: 'online', 'desk', 'morning_assignment'
- * @param {Array<{specialist_id: number, service_id: number, quantity: number}>} params.services - Список услуг, где specialist_id = Doctor.id
- * @returns {Promise<{success: boolean, entries: Array, message: string}>}
+ * @returns {Promise<QueueActionResponse>}
  */
-export async function createQueueEntriesBatch({ patientId, source, services }) {
+export async function createQueueEntriesBatch({
+  patientId,
+  source,
+  services,
+}: {
+  patientId: string | number;
+  source: string;
+  services: Array<{ specialist_id: string | number; service_id: string | number; quantity?: number }>;
+}): Promise<QueueActionResponse> {
   const payload = {
     patient_id: Number(patientId),
     source,
@@ -128,7 +175,7 @@ export async function createQueueEntriesBatch({ patientId, source, services }) {
     '/registrar-integration/queue/entries/batch',
     payload
   );
-  return response.data;
+  return mapQueueActionResponseDto(response.data as Record<string, unknown>);
 }
 
 export async function applyRegistrarEditDelta({
@@ -141,11 +188,19 @@ export async function applyRegistrarEditDelta({
   allFree = false,
   existingQueueEntryIds = [],
   // R-08 fix: optimistic locking — map of entry_id → ISO updated_at string.
-  // Если передан, backend проверит что ни одна entry не была изменена
-  // другим пользователем с момента последнего чтения.
   expectedEntryUpdatedAt = null,
-}) {
-  const payload = {
+}: {
+  patientId: string | number;
+  targetDate: string;
+  patientData?: Record<string, unknown> | null;
+  services: Array<{ service_id: string | number; quantity?: unknown; specialist_id?: string | number | null }>;
+  paymentMethod?: string;
+  discountMode?: string;
+  allFree?: boolean;
+  existingQueueEntryIds?: Array<string | number>;
+  expectedEntryUpdatedAt?: Record<string, string> | null;
+}): Promise<QueueActionResponse> {
+  const payload: Record<string, unknown> = {
     patient_id: Number(patientId),
     target_date: targetDate,
     patient_data: patientData || null,
@@ -165,25 +220,17 @@ export async function applyRegistrarEditDelta({
   };
   // R-08 fix: add optimistic locking map if provided
   if (expectedEntryUpdatedAt && typeof expectedEntryUpdatedAt === 'object') {
-    (payload as Record<string, unknown>).expected_entry_updated_at = expectedEntryUpdatedAt;
+    payload.expected_entry_updated_at = expectedEntryUpdatedAt;
   }
   const response = await api.post('/registrar/cart/edit-delta', payload);
-  return response.data;
+  return mapQueueActionResponseDto(response.data as Record<string, unknown>);
 }
 
 /**
  * Обновление существующей QR-записи (вместо создания новой)
  * ⭐ SSOT: Этот endpoint обновляет существующую запись в очереди,
  * предотвращая создание дубликатов при редактировании QR-записей в мастере
- * 
- * @param {Object} params - Параметры для обновления
- * @param {number} params.entryId - ID записи в очереди (queue_entry.id)
- * @param {Object} params.patientData - Данные пациента {patient_name, phone, birth_year, address}
- * @param {string} params.visitType - Тип визита: 'paid', 'repeat', 'benefit'
- * @param {string} params.discountMode - Режим скидки: 'none', 'repeat', 'benefit', 'all_free'
- * @param {Array<{service_id: number, quantity: number}>} params.services - Список услуг
- * @param {boolean} params.allFree - Все услуги бесплатны
- * @returns {Promise<{success: boolean, entry: Object, total_amount: number}>}
+ * @returns {Promise<QueueActionResponse>}
  */
 export async function updateOnlineQueueEntry({
   entryId,
@@ -192,8 +239,16 @@ export async function updateOnlineQueueEntry({
   discountMode,
   services,
   allFree = false,
-  aggregatedIds = null,  // ⭐ FIX: IDs of all merged entries for dedup check
-}) {
+  aggregatedIds = null,
+}: {
+  entryId: string | number;
+  patientData: Record<string, unknown> | null;
+  visitType: string;
+  discountMode: string;
+  services: Array<{ service_id: string | number; quantity?: unknown }>;
+  allFree?: boolean;
+  aggregatedIds?: Array<string | number> | null;
+}): Promise<QueueActionResponse> {
   const payload = {
     patient_data: patientData,
     visit_type: visitType,
@@ -203,11 +258,27 @@ export async function updateOnlineQueueEntry({
       quantity: Number(service.quantity || 1),
     })),
     all_free: allFree,
-    aggregated_ids: aggregatedIds,  // ⭐ FIX: Pass to backend for dedup
+    aggregated_ids: aggregatedIds,
   };
   const response = await api.put(
     `/queue/online-entry/${Number(entryId)}/full-update`,
     payload
   );
-  return response.data;
+  return mapQueueActionResponseDto(response.data as Record<string, unknown>);
+}
+
+/** Helper for callers that need QueueData (not QueuePayload) directly. */
+export async function fetchQueueDataForDoctor(
+  targetDate: string,
+  specialistId: string | number,
+): Promise<QueueData | null> {
+  const payload = await fetchQueuesToday(targetDate);
+  if (!payload?.queues) return null;
+  const id = Number(specialistId);
+  return (
+    payload.queues.find((q) => {
+      const sid = q.specialist_id;
+      return sid !== undefined && sid !== null && Number(sid) === id;
+    }) ?? null
+  );
 }

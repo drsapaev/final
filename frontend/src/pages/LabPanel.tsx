@@ -702,10 +702,12 @@ export default function LabPanel() {
         <LabTemplateWorkbench
           templates={templates}
           selectedTemplate={selectedTemplate}
-          onSelectTemplate={async (templateId) => {
+          onSelectTemplate={async (template) => {
             try {
-              const template = (await labReportingApi.getTemplate(templateId)) as Record<string, unknown>;
-              setSelectedTemplate(template);
+              const templateId = (template as { id?: string | number })?.id;
+              if (templateId == null) return;
+              const loaded = (await labReportingApi.getTemplate(templateId)) as Record<string, unknown>;
+              setSelectedTemplate(loaded);
             } catch (error) {
               notify('error', getErrorMessage(error, t('misc.lp_ne_udalos_zagruzit_shablon_p')));
             }

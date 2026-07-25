@@ -1,7 +1,5 @@
 import React, { type CSSProperties, type FocusEvent, type MouseEvent, type ComponentType } from 'react';
 import { XCircle } from 'lucide-react';
-import PropTypes from 'prop-types';
-
 type InputSize = 'sm' | 'md' | 'lg';
 type InputVariant = 'default' | 'filled' | 'error';
 type IconPosition = 'left' | 'right';
@@ -84,8 +82,8 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(({
   };
 
   const currentVariant = error ? 'error' : variant;
-  const currentSize = sizeStyles[size];
-  const currentVariantStyle = variantStyles[currentVariant];
+  const currentSize = sizeStyles[size as InputSize];
+  const currentVariantStyle = variantStyles[currentVariant as InputVariant];
   const hasRightIcon = Boolean(Icon) && iconPosition === 'right';
   const hasValue = props.value !== undefined && props.value !== null && String(props.value).length > 0;
   const showClearButton = clearable && typeof onClear === 'function' && hasValue && !disabled;
@@ -213,25 +211,6 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(({
     </div>
   );
 });
-
-
-Input.propTypes = {
-  ...(Input.propTypes || {}),
-  className: PropTypes.any,
-  clearable: PropTypes.any,
-  disabled: PropTypes.any,
-  error: PropTypes.any,
-  icon: PropTypes.any,
-  iconPosition: PropTypes.any,
-  onBlur: PropTypes.any,
-  onClear: PropTypes.any,
-  onFocus: PropTypes.any,
-  size: PropTypes.any,
-  style: PropTypes.any,
-  value: PropTypes.any,
-  variant: PropTypes.any,
-};
-
 Input.displayName = 'Input';
 
 export default Input;

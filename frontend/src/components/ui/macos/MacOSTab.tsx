@@ -1,4 +1,3 @@
-import PropTypes from 'prop-types';
 import { useTranslation } from '../../../i18n/useTranslation';
 import type { CSSProperties, ReactNode, ComponentType, KeyboardEvent, MouseEvent as ReactMouseEvent, FocusEvent } from 'react';
 
@@ -94,8 +93,8 @@ const MacOSTab = ({
     }
   };
 
-  const currentSize = sizeStyles[size];
-  const currentVariant = variantStyles[variant];
+  const currentSize = sizeStyles[size as TabSize];
+  const currentVariant = variantStyles[variant as TabVariant];
 
   const containerStyle: CSSProperties = {
     display: 'flex',
@@ -233,19 +232,4 @@ const MacOSTab = ({
     </div>);
 
 };
-
-
-MacOSTab.propTypes = {
-  ...(MacOSTab.propTypes || {}),
-  activeTab: PropTypes.any,
-  className: PropTypes.any,
-  map: PropTypes.any,
-  onTabChange: PropTypes.any,
-  orientation: PropTypes.any,
-  size: PropTypes.any,
-  style: PropTypes.any,
-  tabs: PropTypes.any,
-  variant: PropTypes.any,
-};
-
 export default MacOSTab;

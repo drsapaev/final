@@ -1,5 +1,4 @@
 import React, { type ReactNode, type CSSProperties } from 'react';
-import PropTypes from 'prop-types';
 import { useTheme } from '../../../contexts/ThemeContext';
 
 type GridSize = number | boolean | string;
@@ -203,46 +202,5 @@ const GridItem = React.forwardRef<HTMLDivElement, GridItemProps>(({
 Grid.displayName = 'Grid';
 GridContainer.displayName = 'GridContainer';
 GridItem.displayName = 'GridItem';
-
-Grid.propTypes = {
-  children: PropTypes.node,
-  className: PropTypes.string,
-  style: PropTypes.object,
-  container: PropTypes.bool,
-  item: PropTypes.bool,
-  xs: PropTypes.oneOfType([PropTypes.number, PropTypes.bool, PropTypes.string]),
-  sm: PropTypes.oneOfType([PropTypes.number, PropTypes.bool, PropTypes.string]),
-  md: PropTypes.oneOfType([PropTypes.number, PropTypes.bool, PropTypes.string]),
-  lg: PropTypes.oneOfType([PropTypes.number, PropTypes.bool, PropTypes.string]),
-  xl: PropTypes.oneOfType([PropTypes.number, PropTypes.bool, PropTypes.string]),
-  spacing: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
-  direction: PropTypes.string,
-  justify: PropTypes.string,
-  alignItems: PropTypes.string,
-  wrap: PropTypes.string
-};
-
-GridContainer.propTypes = {
-  children: PropTypes.node,
-  className: PropTypes.string,
-  style: PropTypes.object,
-  spacing: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
-  direction: PropTypes.string,
-  justify: PropTypes.string,
-  alignItems: PropTypes.string,
-  wrap: PropTypes.string
-};
-
-GridItem.propTypes = {
-  children: PropTypes.node,
-  className: PropTypes.string,
-  style: PropTypes.object,
-  xs: PropTypes.oneOfType([PropTypes.number, PropTypes.bool, PropTypes.string]),
-  sm: PropTypes.oneOfType([PropTypes.number, PropTypes.bool, PropTypes.string]),
-  md: PropTypes.oneOfType([PropTypes.number, PropTypes.bool, PropTypes.string]),
-  lg: PropTypes.oneOfType([PropTypes.number, PropTypes.bool, PropTypes.string]),
-  xl: PropTypes.oneOfType([PropTypes.number, PropTypes.bool, PropTypes.string])
-};
-
 export default Grid;
 export { GridContainer, GridItem };

@@ -149,11 +149,11 @@ export const SIDEBAR_PRESETS = {
 const stable = 'stable';
 const internal = 'internal';
 
-function nav(meta) {
+function nav(meta: Record<string, unknown> | undefined): Record<string, unknown> | false {
   return meta || false;
 }
 
-function layout(meta = {}) {
+function layout(meta: Record<string, unknown> = {}): Record<string, unknown> {
   return meta;
 }
 

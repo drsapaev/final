@@ -32,51 +32,59 @@ import type { components } from './generated/api';
 type Schemas = components['schemas'];
 
 // ============================================================================
-// Domain entities (from OpenAPI)
+// Transport DTOs (from OpenAPI)
 // ============================================================================
+// NOTE (Wave 3): Domain entity names (Patient, Doctor, Appointment, etc.) are
+// suffixed with `Dto` here to avoid collision with the canonical domain
+// types in src/types/domain/*.ts. Components MUST consume the domain types,
+// not these DTOs — mapping happens at the API boundary (Wave 4 will
+// formalize this with src/types/api-mapper.ts).
+//
+// The `*Dto` suffix is a deliberate signal: "this is the raw transport shape,
+// a mapper must convert it to the domain type before the UI sees it".
 
-export type User = Schemas['UserResponse'];
-export type Patient = Schemas['Patient'];
-export type PatientCreate = Schemas['PatientCreate'];
-export type PatientUpdate = Schemas['PatientUpdate'];
-export type PatientProfileOut = Schemas['PatientProfileOut'];
-export type PatientSearchResult = Schemas['PatientSearchResult'];
+export type UserDto = Schemas['UserResponse'];
+export type PatientDto = Schemas['Patient'];
+export type PatientCreateDto = Schemas['PatientCreate'];
+export type PatientUpdateDto = Schemas['PatientUpdate'];
+export type PatientProfileOutDto = Schemas['PatientProfileOut'];
+export type PatientSearchResultDto = Schemas['PatientSearchResult'];
 
-export type Appointment = Schemas['Appointment'];
-export type AppointmentCreate = Schemas['AppointmentCreate'];
-export type AppointmentUpdate = Schemas['AppointmentUpdate'];
-export type AppointmentUpcomingOut = Schemas['AppointmentUpcomingOut'];
-export type AppointmentDoctorInfoResponse = Schemas['AppointmentDoctorInfoResponse'];
+export type AppointmentDto = Schemas['Appointment'];
+export type AppointmentCreateDto = Schemas['AppointmentCreate'];
+export type AppointmentUpdateDto = Schemas['AppointmentUpdate'];
+export type AppointmentUpcomingOutDto = Schemas['AppointmentUpcomingOut'];
+export type AppointmentDoctorInfoResponseDto = Schemas['AppointmentDoctorInfoResponse'];
 
-export type Service = Schemas['ServiceOut'];
-export type ServiceCreate = Schemas['ServiceCreate'];
-export type ServiceUpdate = Schemas['ServiceUpdate'];
+export type ServiceDto = Schemas['ServiceOut'];
+export type ServiceCreateDto = Schemas['ServiceCreate'];
+export type ServiceUpdateDto = Schemas['ServiceUpdate'];
 
-export type Department = Schemas['DepartmentInfoResponse'];
-export type DepartmentListResponse = Schemas['DepartmentListResponse'];
-export type DepartmentUpdate = Schemas['DepartmentUpdate'];
+export type DepartmentDto = Schemas['DepartmentInfoResponse'];
+export type DepartmentListResponseDto = Schemas['DepartmentListResponse'];
+export type DepartmentUpdateDto = Schemas['DepartmentUpdate'];
 
-export type Doctor = Schemas['app__schemas__clinic__DoctorOut'];
-export type DoctorInfoResponse = Schemas['DoctorInfoResponse'];
-export type DoctorListResponse = Schemas['DoctorListResponse'];
+export type DoctorDto = Schemas['app__schemas__clinic__DoctorOut'];
+export type DoctorInfoResponseDto = Schemas['DoctorInfoResponse'];
+export type DoctorListResponseDto = Schemas['DoctorListResponse'];
 
-export type Visit = Schemas['VisitOut'];
-export type VisitCreate = Schemas['VisitCreate'];
-export type VisitWithServices = Schemas['VisitWithServices'];
+export type VisitDto = Schemas['VisitOut'];
+export type VisitCreateDto = Schemas['VisitCreate'];
+export type VisitWithServicesDto = Schemas['VisitWithServices'];
 
-export type EMR = Schemas['EMR'];
-export type EMRCreate = Schemas['EMRCreate'];
-export type EMRSaveRequest = Schemas['EMRSaveRequest'];
-export type EMRRecordOut = Schemas['EMRRecordOut'];
-export type EMRHistoryOut = Schemas['EMRHistoryOut'];
-export type EMRVersionOut = Schemas['EMRVersionOut'];
+export type EMRDto = Schemas['EMR'];
+export type EMRCreateDto = Schemas['EMRCreate'];
+export type EMRSaveRequestDto = Schemas['EMRSaveRequest'];
+export type EMRRecordOutDto = Schemas['EMRRecordOut'];
+export type EMRHistoryOutDto = Schemas['EMRHistoryOut'];
+export type EMRVersionOutDto = Schemas['EMRVersionOut'];
 
-export type LabReport = Schemas['LabReportInstanceOut'];
-export type LabReportCreate = Schemas['LabReportInstanceCreate'];
-export type LabReportUpdate = Schemas['LabReportInstanceUpdate'];
-export type LabOrder = Schemas['LabOrderOut'];
-export type LabOrderCreate = Schemas['LabOrderCreate'];
-export type LabResult = Schemas['LabResultOut'];
+export type LabReportDto = Schemas['LabReportInstanceOut'];
+export type LabReportCreateDto = Schemas['LabReportInstanceCreate'];
+export type LabReportUpdateDto = Schemas['LabReportInstanceUpdate'];
+export type LabOrderDto = Schemas['LabOrderOut'];
+export type LabOrderCreateDto = Schemas['LabOrderCreate'];
+export type LabResultDto = Schemas['LabResultOut'];
 
 // ============================================================================
 // Auth (raw shapes from OpenAPI — see auth.ts for 2FA-discriminated wrappers)
@@ -124,7 +132,7 @@ export type PaymentHistoryItem = Schemas['PaymentHistoryItem'];
 export type PaymentInitRequest = Schemas['PaymentInitRequest'];
 export type PaymentInitResponse = Schemas['PaymentInitResponse'];
 export type PaymentStatusResponse = Schemas['PaymentStatusResponse'];
-export type PaymentMethod = Schemas['PaymentMethod'];
+export type PaymentMethodDto = Schemas['PaymentMethod'];
 export type PayMeConfig = Schemas['PayMeConfig'];
 export type ClickConfig = Schemas['ClickConfig'];
 export type PaymentProviderOut = Schemas['PaymentProviderOut'];

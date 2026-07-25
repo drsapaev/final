@@ -1,4 +1,3 @@
-import PropTypes from 'prop-types';
 import PaymentProviderDialog from './PaymentProviderDialog';
 import './PaymentPayMe.css';
 
@@ -14,6 +13,16 @@ import './PaymentPayMe.css';
  * MEDIUM #10 fix: removed `void useState(null)` artifact (the file no
  * longer has any useState — rules-of-hooks can no longer break).
  */
+interface PaymentPayMeProps {
+  isOpen: boolean;
+  onClose: () => void;
+  invoiceId: string | number;
+  totalAmount: number;
+  currency?: string;
+  onSuccess?: (...args: unknown[]) => void;
+  onError?: (...args: unknown[]) => void;
+}
+
 const PaymentPayMe = ({
   isOpen,
   onClose,
@@ -22,7 +31,7 @@ const PaymentPayMe = ({
   currency = 'UZS',
   onSuccess,
   onError
-}) => (
+}: PaymentPayMeProps) => (
   <PaymentProviderDialog
     isOpen={isOpen}
     onClose={onClose}
@@ -36,15 +45,5 @@ const PaymentPayMe = ({
     onError={onError} />
 );
 
-PaymentPayMe.propTypes = {
-  ...(PaymentPayMe.propTypes || {}),
-  currency: PropTypes.any,
-  invoiceId: PropTypes.any,
-  isOpen: PropTypes.any,
-  onClose: PropTypes.any,
-  onError: PropTypes.any,
-  onSuccess: PropTypes.any,
-  totalAmount: PropTypes.any,
-};
 
 export default PaymentPayMe;

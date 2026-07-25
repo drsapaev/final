@@ -14,7 +14,7 @@ function wsEnabled() {
  */
 export function openQueueWS(department: string, dateStr: string, onMessage: (data: unknown) => void): () => void {
   if (!wsEnabled()) return () => {};
-  let ws = null;
+  let ws: WebSocket | null = null;
 
   try {
     const query = `department=${encodeURIComponent(department)}&date_str=${encodeURIComponent(dateStr)}`;
@@ -50,8 +50,8 @@ export function openQueueWS(department: string, dateStr: string, onMessage: (dat
  */
 export function openDisplayBoardWS(boardId: string, onMessage: (data: unknown) => void, onConnect: () => void, onDisconnect: () => void): () => void {
   if (!wsEnabled()) return () => {};
-  let ws = null;
-  let reconnectTimeout = null;
+  let ws: WebSocket | null = null;
+  let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
   // audit/phase-4, BS-14: hoist `pingIntervalRef` to outer scope so `close()`
   // and `ws.onclose` can clear it. Previously `pingInterval` was declared
   // inside `ws.onopen` (local closure), so:
@@ -63,7 +63,7 @@ export function openDisplayBoardWS(boardId: string, onMessage: (data: unknown) =
   //     readyState !== OPEN, which is exactly when the socket is already
   //     closing — too late to prevent the leak.
   // The ref-based approach guarantees a single live interval at any time.
-  let pingIntervalRef = null;
+  let pingIntervalRef: ReturnType<typeof setInterval> | null = null;
   let reconnectAttempts = 0;
   const maxReconnectAttempts = 5;
   const reconnectDelay = 3000;

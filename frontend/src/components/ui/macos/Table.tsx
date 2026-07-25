@@ -1,5 +1,4 @@
 import React, { useState, type ReactNode, type CSSProperties, type MouseEvent, type KeyboardEvent } from 'react';
-import PropTypes from 'prop-types';
 import { ChevronUp, ChevronDown } from 'lucide-react';
 import { useTranslation } from '../../../i18n/useTranslation';
 
@@ -149,8 +148,8 @@ const Table = ({
     }
   };
 
-  const currentSize = sizeStyles[size];
-  const currentVariant = variantStyles[variant];
+  const currentSize = sizeStyles[size as TableSize];
+  const currentVariant = variantStyles[variant as TableVariant];
 
   const tableStyle: CSSProperties = {
     width: '100%',
@@ -297,8 +296,8 @@ const Table = ({
               onKeyDown={(e) => handleHeaderKeyDown(e, column)}
               tabIndex={isSortable ? 0 : undefined}
               aria-sort={isSortable ? (isSorted ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none') : undefined}
-              onMouseEnter={(e) => handleMouseEnter(e, false, isSortable)}
-              onMouseLeave={(e) => handleMouseLeave(e, false, isSortable)}
+              onMouseEnter={(e) => handleMouseEnter(e, false, Boolean(isSortable))}
+              onMouseLeave={(e) => handleMouseLeave(e, false, Boolean(isSortable))}
             >
               {column.title}
               {renderSortIcon(column)}
@@ -379,33 +378,6 @@ const Table = ({
     </div>
   );
 };
-
-Table.propTypes = {
-  columns: PropTypes.arrayOf(
-    PropTypes.shape({
-      key: PropTypes.string,
-      title: PropTypes.node,
-      sortable: PropTypes.bool,
-      render: PropTypes.func
-    })
-  ),
-  data: PropTypes.arrayOf(PropTypes.object),
-  loading: PropTypes.bool,
-  emptyState: PropTypes.node,
-  sortable: PropTypes.bool,
-  selectable: PropTypes.bool,
-  selectedRows: PropTypes.arrayOf(PropTypes.number),
-  onRowSelect: PropTypes.func,
-  onSort: PropTypes.func,
-  size: PropTypes.oneOf(['sm', 'md', 'lg']),
-  variant: PropTypes.oneOf(['default', 'filled', 'minimal']),
-  striped: PropTypes.bool,
-  hoverable: PropTypes.bool,
-  className: PropTypes.string,
-  style: PropTypes.object,
-  children: PropTypes.node
-};
-
 const TableHead = React.forwardRef<HTMLTableSectionElement, TablePartProps>(({
   children,
   className = '',
@@ -590,53 +562,6 @@ TableBody.displayName = 'TableBody';
 TableRow.displayName = 'TableRow';
 TableCell.displayName = 'TableCell';
 TableHeaderCell.displayName = 'TableHeaderCell';
-
-Table.propTypes = {
-  children: PropTypes.node,
-  className: PropTypes.string,
-  style: PropTypes.object,
-  variant: PropTypes.string
-};
-
-TableHead.propTypes = {
-  children: PropTypes.node,
-  className: PropTypes.string,
-  style: PropTypes.object
-};
-
-TableBody.propTypes = {
-  children: PropTypes.node,
-  className: PropTypes.string,
-  style: PropTypes.object
-};
-
-TableRow.propTypes = {
-  children: PropTypes.node,
-  className: PropTypes.string,
-  style: PropTypes.object,
-  hover: PropTypes.bool,
-  selected: PropTypes.bool,
-  onClick: PropTypes.func
-};
-
-TableCell.propTypes = {
-  children: PropTypes.node,
-  className: PropTypes.string,
-  style: PropTypes.object,
-  align: PropTypes.string,
-  padding: PropTypes.string
-};
-
-TableHeaderCell.propTypes = {
-  children: PropTypes.node,
-  className: PropTypes.string,
-  style: PropTypes.object,
-  align: PropTypes.string,
-  padding: PropTypes.string,
-  sortable: PropTypes.bool,
-  sortDirection: PropTypes.string,
-  onSort: PropTypes.func
-};
 
 export default Table;
 export { TableHead, TableBody, TableRow, TableCell, TableHeaderCell };

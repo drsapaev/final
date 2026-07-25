@@ -1,6 +1,4 @@
 import React, { useState, useEffect, type CSSProperties, type ReactNode } from 'react';
-import PropTypes from 'prop-types';
-
 type SegmentedSize = 'small' | 'default' | 'large' | 'sm' | 'md' | 'lg' | string;
 type SegmentedVariant = 'default' | 'filled' | 'outline' | string;
 type SegmentedValue = string | number;
@@ -200,21 +198,6 @@ const SegmentedControl = React.forwardRef<HTMLDivElement, SegmentedControlProps>
     </div>
   );
 });
-
-
-SegmentedControl.propTypes = {
-  ...(SegmentedControl.propTypes || {}),
-  className: PropTypes.any,
-  defaultValue: PropTypes.any,
-  disabled: PropTypes.any,
-  onChange: PropTypes.any,
-  options: PropTypes.any,
-  size: PropTypes.any,
-  style: PropTypes.any,
-  value: PropTypes.any,
-  variant: PropTypes.any,
-};
-
 SegmentedControl.displayName = 'SegmentedControl';
 
 export default SegmentedControl;

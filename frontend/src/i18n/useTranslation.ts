@@ -48,7 +48,7 @@ export function useTranslation() {
   const language = i18n.language || DEFAULT_LANGUAGE;
 
   // setLanguage wraps i18n.changeLanguage (async) — synchronous from caller's POV.
-  const setLanguage = (code) => {
+  const setLanguage = (code: string) => {
     if (SUPPORTED_LANGUAGES.includes(code)) {
       i18n.changeLanguage(code);
     }
@@ -116,14 +116,14 @@ export { ru as TRANSLATIONS };
  * It simply renders its children — no state, no context.
  */
 import React from 'react';
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 import PropTypes from 'prop-types';
 
-export function TranslationProvider({ children }) {
+export function TranslationProvider({ children }: { children: React.ReactNode }) {
   return children;
 }
 
 TranslationProvider.propTypes = {
-  ...(TranslationProvider.propTypes || {}),
   children: PropTypes.any,
 };
 

@@ -1083,7 +1083,7 @@ const DermatologistPanelUnified = () => {
         setPrescription(savedPrescription);
         notify.success(t('derma.prescription_saved'));
       } else {
-        const error = response.data;
+        const error = response.data as { detail?: string };
         notify.error(error.detail || t('derma.derma_panel_prescription_save_failed_short'));
       }
     } catch (error: unknown) {

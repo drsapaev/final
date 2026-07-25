@@ -17,8 +17,6 @@ import ModernDialog from '../dialogs/ModernDialog';
 import logger from '../../utils/logger';
 import { printPanelTicketInBrowser } from '../../services/panelPrint';
 import notify from '../../services/notify';
-import PropTypes from 'prop-types';
-
 /**
  * PaymentProviderDialog — unified hosted-payment provider dialog.
  *
@@ -564,19 +562,5 @@ const PaymentProviderDialog = ({
 };
 
 
-PaymentProviderDialog.propTypes = {
-  ...(PaymentProviderDialog.propTypes || {}),
-  currency: PropTypes.any,
-  invoiceId: PropTypes.any,
-  isOpen: PropTypes.any,
-  onClose: PropTypes.any,
-  onError: PropTypes.any,
-  onSuccess: PropTypes.any,
-  toLocaleString: PropTypes.any,
-  totalAmount: PropTypes.any,
-  provider: PropTypes.oneOf(['click', 'payme']).isRequired,
-  providerLabel: PropTypes.string.isRequired,
-  cssClassName: PropTypes.string.isRequired,
-};
 
 export default PaymentProviderDialog;

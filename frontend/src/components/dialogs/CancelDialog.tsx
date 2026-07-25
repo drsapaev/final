@@ -1,17 +1,22 @@
-
 import { useState, useEffect } from 'react';
-import PropTypes from 'prop-types';
+import type { KeyboardEvent } from 'react';
 import { AlertTriangle, X } from 'lucide-react';
 import ModernDialog from './ModernDialog';
 import React from 'react';
 import { toast } from 'react-toastify';
-// UX Audit Registrar #5: все inline-стили перенесены в CancelDialog.css.
-// useTheme удалён — больше не нужен (всё через macos tokens + [data-theme="dark"]).
 import './CancelDialog.css';
 
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
-const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
+
+interface CancelDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+  appointment: Record<string, unknown> | null;
+  onCancel: (appointmentId: unknown, reason: string) => Promise<void>;
+}
+
+const CancelDialog = ({ isOpen, onClose, appointment, onCancel }: CancelDialogProps) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [reason, setReason] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -26,7 +31,7 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
     }
   }, [isOpen]);
 
-  const validateReason = (value) => {
+  const validateReason = (value: string) => {
     if (!value || value.trim().length < 3) {
       return t('misc.cd_prichina_otmeny_dolzhna_sode');
     }
@@ -36,7 +41,7 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
     return '';
   };
 
-  const handleReasonChange = (e) => {
+  const handleReasonChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
     setReason(value);
 
@@ -55,7 +60,7 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
     setIsProcessing(true);
 
     try {
-      if (onCancel) {
+      if (onCancel && appointment) {
         await onCancel(appointment.id, reason.trim());
       }
 
@@ -63,7 +68,7 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
       onClose();
     } catch (error) {
       logger.error('Cancel error:', error);
-      toast.error(t('misc.cd_oshibka_pri_otmene_zapisi') + error.message);
+      toast.error(t('misc.cd_oshibka_pri_otmene_zapisi') + (error as Error)?.message);
     } finally {
       setIsProcessing(false);
     }
@@ -123,30 +128,30 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
                 Пациент:
               </span>
               <span className="cancel-info-value">
-                {appointment.patient_fio}
+                {String(appointment?.patient_fio ?? '')}
               </span>
             </div>
 
-            {appointment.services && (
+            {Boolean(appointment?.services) && (
               <div className="cancel-info-row">
                 <span className="cancel-info-label">
                   Услуги:
                 </span>
                 <span className="cancel-info-value--right">
                   {Array.isArray(appointment.services)
-                    ? appointment.services.join(', ')
-                    : appointment.services}
+                    ? (appointment.services as string[]).join(', ')
+                    : String(appointment.services)}
                 </span>
               </div>
             )}
 
-            {appointment.cost && (
+            {Boolean(appointment?.cost) && (
               <div className="cancel-info-row">
                 <span className="cancel-info-label">
                   Стоимость:
                 </span>
                 <span className="cancel-info-value">
-                  {new Intl.NumberFormat('ru-RU').format(appointment.cost)} сум
+                  {new Intl.NumberFormat('ru-RU').format(Number(appointment.cost))} сум
                 </span>
               </div>
             )}
@@ -196,19 +201,5 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
   );
 };
 
-CancelDialog.propTypes = {
-  isOpen: PropTypes.bool,
-  onClose: PropTypes.func,
-  appointment: PropTypes.shape({
-    id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-    patient_fio: PropTypes.string,
-    services: PropTypes.oneOfType([
-      PropTypes.arrayOf(PropTypes.string),
-      PropTypes.string,
-    ]),
-    cost: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-  }),
-  onCancel: PropTypes.func,
-};
 
 export default CancelDialog;
