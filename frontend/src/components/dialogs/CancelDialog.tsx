@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import type { ReactNode } from 'react';
 import { AlertTriangle, X } from 'lucide-react';
 import ModernDialog from './ModernDialog';
 import React from 'react';
@@ -8,22 +7,12 @@ import './CancelDialog.css';
 
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
-
-interface CancelDialogAppointment {
-  id?: string | number;
-  patient_fio?: string;
-  patient_name?: string;
-  services?: string[] | string;
-  cost?: number | string;
-  appointment_date?: string;
-  appointment_time?: string;
-  [key: string]: unknown;
-}
+import type { Appointment } from '../../types/domain/clinic';
 
 interface CancelDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  appointment: CancelDialogAppointment | null;
+  appointment: Appointment | null;
   onCancel: (appointmentId: unknown, reason: string) => Promise<void>;
 }
 

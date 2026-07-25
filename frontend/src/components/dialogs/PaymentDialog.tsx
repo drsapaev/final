@@ -9,22 +9,12 @@ import './PaymentDialog.css';
 import logger from '../../utils/logger';
 import { Input } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
-
-interface PaymentDialogAppointment {
-  id?: string | number;
-  patient_fio?: string;
-  patient_name?: string;
-  services?: string[] | string;
-  cost?: number | string;
-  payment_amount?: number | string;
-  payment_type?: string;
-  [key: string]: unknown;
-}
+import type { Appointment } from '../../types/domain/clinic';
 
 interface PaymentDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  appointment: PaymentDialogAppointment | null;
+  appointment: Appointment | null;
   onPaymentSuccess?: (paymentData?: unknown) => Promise<void> | void;
   onPrintTicket?: (appointment?: unknown) => void;
 }
