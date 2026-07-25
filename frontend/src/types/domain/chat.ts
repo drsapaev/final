@@ -16,7 +16,7 @@
  *     is a known duplicate — flagged for removal in Wave 3)
  */
 
-export type ChatMessageType = 'text' | 'system' | 'file' | string;
+export type ChatMessageType = 'text' | 'system' | 'file';
 
 export interface ChatReaction {
   reaction: string;

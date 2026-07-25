@@ -53,7 +53,16 @@ export interface EMRRecord {
   [key: string]: unknown;
 }
 
-export type EMRStatus = number | string;
+// audit/phase-5a, BS-9: renamed from `EMRStatus` to `EMRHttpStatus` to avoid
+// case-only confusion with `EmrStatus` in `types/features/emr.ts` (which
+// models UI state machine: 'idle' | 'loading' | 'saving' | 'error' | 'conflict').
+// This type models HTTP status codes returned by the EMR API (401, 403, etc).
+// The two types have completely different semantics; the case-only naming
+// difference was a review hazard.
+export type EMRHttpStatus = number | string;
+// Backward-compat alias — old code may still import `EMRStatus`.
+/** @deprecated Use `EMRHttpStatus` instead. */
+export type EMRStatus = EMRHttpStatus;
 
 export interface EMRApiError {
   response?: {
@@ -129,7 +138,7 @@ export interface EMRAISuggestion {
   [key: string]: unknown;
 }
 
-export type EMRVisitType = 'paid' | 'repeat' | 'benefit' | string;
+export type EMRVisitType = 'paid' | 'repeat' | 'benefit';
 
 export interface EMRVisitData {
   visit_id?: string | number;

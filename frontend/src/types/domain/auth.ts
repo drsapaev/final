@@ -18,8 +18,8 @@
  * and may be adopted in Wave 4 when the auth UI is refactored.
  */
 
-export type UserRole = 'admin' | 'doctor' | 'nurse' | 'registrar' | 'cashier' | 'lab' | 'patient' | string;
-export type AuthStatus = 'authenticated' | 'unauthenticated' | 'loading' | 'error' | string;
+export type UserRole = 'admin' | 'doctor' | 'nurse' | 'registrar' | 'cashier' | 'lab' | 'patient';
+export type AuthStatus = 'authenticated' | 'unauthenticated' | 'loading' | 'error';
 
 // === Store-level auth snapshot (CANONICAL) ==================================
 // This is the actual shape returned by stores/auth.ts getState().

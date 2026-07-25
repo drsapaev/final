@@ -9,5 +9,5 @@
 //   - backend OpenAPI schemas: AppointmentCreate, ServiceOut, etc.
 
 // TODO Phase 5.15: WizardStep, WizardState, WizardFormValues
-export type WizardStep = 'services' | 'patient' | 'schedule' | 'review' | 'confirmation' | string;
+export type WizardStep = 'services' | 'patient' | 'schedule' | 'review' | 'confirmation';
 export type WizardState = Record<string, unknown>;
