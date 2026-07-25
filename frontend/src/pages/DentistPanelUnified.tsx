@@ -88,6 +88,25 @@ const dentistVisitProtocolsCache = new Map();
 const dentistVisitProtocolsLoadPromises = new Map();
 const dentistFallbackLoggedKeys = new Set();
 
+// audit/phase-1, BS-42: invalidation helper for the 7 module-level caches.
+// Previously these caches were never invalidated on patient switch, so on
+// rapid visit-to-visit navigation the panel showed the previous patient's
+// appointments / services (PHI leak between patients on a shared workstation).
+// `useVisitLifecycle` already aborts in-flight requests and clears the
+// cacheService layer; this helper additionally clears the panel-local
+// module-level singletons so the next render refetches from the backend.
+function invalidateDentistPanelCaches() {
+  dentistAppointmentsCache = null;
+  dentistAppointmentsLoadPromise = null;
+  dentistServicesCache = null;
+  dentistServicesLoadPromise = null;
+  dentistVisitProtocolsCache.clear();
+  dentistVisitProtocolsLoadPromises.clear();
+  // Note: dentistFallbackLoggedKeys intentionally retained — it only guards
+  // against duplicate log noise, holds no PHI, and clearing it would resurface
+  // log spam on the next visit to the same patient.
+}
+
 // countAppointmentsByStatuses and normalizeNumericId are imported from
 // utils/doctorPanelShared (unified across Cardiology / Dermatology / Dentistry).
 
@@ -238,6 +257,12 @@ const DentistPanelUnified = () => {
       // existing useEffect when selectedPatient changes.
       setShowVisitProtocol(false);
       setProtocolTemplateDraft(null);
+      // audit/phase-1, BS-42: also clear the 7 module-level mutable caches
+      // so the next patient's appointments / services / visit-protocols are
+      // refetched from the backend instead of being served stale from the
+      // previous patient's session. Without this, on a shared workstation
+      // the previous patient's PHI could be displayed to the next clinician.
+      invalidateDentistPanelCaches();
     },
   });
   // Состояние для DentalPriceManager

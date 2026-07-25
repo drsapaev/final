@@ -205,6 +205,20 @@ export function emrReducer(state: EmrState, action: EmrAction): EmrState {
         // =========================================================================
         // CONFLICT_RESOLVED - User resolved conflict
         // =========================================================================
+        // audit/phase-1, BS-35: previously this case only set `status: 'idle'`,
+        // cleared `conflict`, and optionally updated `data` + `rowVersion`. It
+        // did NOT reset `history`, `future`, `isDirty`, or `error`. As a result:
+        //   1. `history` still pointed at pre-conflict snapshots → UNDO after
+        //      conflict resolution rewound into the very data the user just
+        //      discarded → next save re-triggered 409 → infinite conflict loop.
+        //   2. `isDirty` retained its pre-conflict value (typically true from
+        //      SET_FIELD), so autosave fired immediately after resolution
+        //      with the new (potentially user-discarded) data.
+        //   3. `error` retained whatever message was set when the conflict
+        //      was raised, surfacing stale UI.
+        // The fix resets history/future (the conflict boundary is a clean
+        // cut), marks `isDirty: true` (the new `data` differs from server's
+        // pre-conflict version), and clears `error`.
         case EMR_ACTIONS.CONFLICT_RESOLVED: {
             const payload = action.payload;
             return {
@@ -213,6 +227,10 @@ export function emrReducer(state: EmrState, action: EmrAction): EmrState {
                 conflict: null,
                 ...(payload?.data ? { data: payload.data } : {}),
                 ...(payload?.rowVersion ? { rowVersion: payload.rowVersion } : {}),
+                history: [],
+                future: [],
+                isDirty: true,
+                error: null,
             };
         }
 
