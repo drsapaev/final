@@ -1,6 +1,4 @@
 import React, { useEffect, useRef, useCallback, type CSSProperties, type FocusEvent, type FormEvent } from 'react';
-import PropTypes from 'prop-types';
-
 type TextareaSize = 'sm' | 'md' | 'lg';
 type TextareaVariant = 'default' | 'filled' | 'error';
 
@@ -153,21 +151,6 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(({
 });
 
 
-Textarea.propTypes = {
-  ...(Textarea.propTypes || {}),
-  autoResize: PropTypes.any,
-  className: PropTypes.any,
-  defaultValue: PropTypes.any,
-  disabled: PropTypes.any,
-  error: PropTypes.any,
-  maxRows: PropTypes.any,
-  minRows: PropTypes.any,
-  size: PropTypes.any,
-  style: PropTypes.any,
-  textareaStyle: PropTypes.object,
-  value: PropTypes.any,
-  variant: PropTypes.any,
-};
 
 Textarea.displayName = 'Textarea';
 

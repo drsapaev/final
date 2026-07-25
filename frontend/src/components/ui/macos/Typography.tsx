@@ -1,6 +1,4 @@
 import React, { type CSSProperties, type ReactNode } from 'react';
-import PropTypes from 'prop-types';
-
 interface TypographyProps {
   children?: ReactNode;
   variant?: string;
@@ -64,16 +62,6 @@ const Typography = ({
 };
 
 
-Typography.propTypes = {
-  ...(Typography.propTypes || {}),
-  children: PropTypes.any,
-  color: PropTypes.any,
-  component: PropTypes.elementType,
-  gutterBottom: PropTypes.any,
-  paragraph: PropTypes.any,
-  style: PropTypes.any,
-  variant: PropTypes.any,
-};
 
 export default Typography;
 

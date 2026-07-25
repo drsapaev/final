@@ -1,6 +1,4 @@
 import React, { useState, useEffect, type ReactNode, type CSSProperties, type ChangeEvent } from 'react';
-import PropTypes from 'prop-types';
-
 type SwitchSize = 'small' | 'default' | 'large';
 
 interface SwitchProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'children' | 'style' | 'onChange' | 'size' | 'checked' | 'defaultChecked'> {
@@ -125,18 +123,6 @@ const Switch = React.forwardRef<HTMLInputElement, SwitchProps>(({
 });
 
 
-Switch.propTypes = {
-  ...(Switch.propTypes || {}),
-  checked: PropTypes.any,
-  className: PropTypes.any,
-  defaultChecked: PropTypes.any,
-  disabled: PropTypes.any,
-  id: PropTypes.any,
-  label: PropTypes.any,
-  onChange: PropTypes.any,
-  size: PropTypes.any,
-  style: PropTypes.any,
-};
 
 Switch.displayName = 'Switch';
 

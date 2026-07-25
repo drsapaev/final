@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Minus, ArrowUpRight, ArrowDownRight } from 'lucide-react';
-import PropTypes from 'prop-types';
 import { useTranslation } from '../../../i18n/useTranslation';
 
 const MacOSMetricCard = ({
@@ -280,20 +279,5 @@ const MacOSMetricCard = ({
 
 };
 
-MacOSMetricCard.propTypes = {
-  title: PropTypes.node,
-  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number, PropTypes.node]),
-  previousValue: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-  unit: PropTypes.node,
-  icon: PropTypes.elementType,
-  trendPeriod: PropTypes.node,
-  color: PropTypes.oneOf(['blue', 'green', 'orange', 'red', 'purple', 'gray']),
-  size: PropTypes.oneOf(['sm', 'md', 'lg']),
-  variant: PropTypes.oneOf(['default', 'filled', 'elevated']),
-  loading: PropTypes.bool,
-  onClick: PropTypes.func,
-  className: PropTypes.string,
-  style: PropTypes.object
-};
 
 export default MacOSMetricCard;

@@ -1,5 +1,4 @@
 import { MoreHorizontal } from 'lucide-react';
-import PropTypes from 'prop-types';
 import { useTranslation } from '../../../i18n/useTranslation';
 
 const MacOSPagination = ({
@@ -212,18 +211,5 @@ const MacOSPagination = ({
 };
 
 
-MacOSPagination.propTypes = {
-  ...(MacOSPagination.propTypes || {}),
-  className: PropTypes.any,
-  currentPage: PropTypes.any,
-  maxVisiblePages: PropTypes.any,
-  onPageChange: PropTypes.any,
-  showFirstLast: PropTypes.any,
-  showPrevNext: PropTypes.any,
-  size: PropTypes.any,
-  style: PropTypes.any,
-  totalPages: PropTypes.any,
-  variant: PropTypes.any,
-};
 
 export default MacOSPagination;

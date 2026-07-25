@@ -1,5 +1,4 @@
 import React, { useId, type ReactNode, type CSSProperties } from 'react';
-import PropTypes from 'prop-types';
 import { useTranslation } from '../../../i18n/useTranslation';
 
 interface MacOSEmptyStateProps {
@@ -144,16 +143,5 @@ const MacOSEmptyState = ({
 };
 
 
-MacOSEmptyState.propTypes = {
-  ...(MacOSEmptyState.propTypes || {}),
-  action: PropTypes.any,
-  className: PropTypes.any,
-  description: PropTypes.any,
-  icon: PropTypes.any,
-  size: PropTypes.any,
-  style: PropTypes.any,
-  title: PropTypes.any,
-  variant: PropTypes.any,
-};
 
 export default MacOSEmptyState;

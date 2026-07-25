@@ -1,6 +1,5 @@
 import React, { type CSSProperties, type ReactElement } from 'react';
 import { useTheme } from '../../../contexts/ThemeContext';
-import PropTypes from 'prop-types';
 import { useTranslation } from '../../../i18n/useTranslation';
 
 type IconSize = 'small' | 'default' | 'large' | 'xlarge';
@@ -541,15 +540,6 @@ const Icon = React.forwardRef<SVGSVGElement, IconProps>(({
 });
 
 
-Icon.propTypes = {
-  ...(Icon.propTypes || {}),
-  className: PropTypes.any,
-  color: PropTypes.any,
-  name: PropTypes.any,
-  size: PropTypes.any,
-  style: PropTypes.any,
-  variant: PropTypes.any,
-};
 
 Icon.displayName = 'macOS Icon';
 

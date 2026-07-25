@@ -1,6 +1,4 @@
 import React, { type ReactNode, type CSSProperties } from 'react';
-import PropTypes from 'prop-types';
-
 type BadgeVariant = 'default' | 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'destructive' | 'error' | 'info' | 'outline' | string;
 type BadgeSize = 'small' | 'default' | 'large' | string;
 
@@ -122,14 +120,6 @@ const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>(({
 });
 
 
-Badge.propTypes = {
-  ...(Badge.propTypes || {}),
-  children: PropTypes.any,
-  className: PropTypes.any,
-  size: PropTypes.any,
-  style: PropTypes.any,
-  variant: PropTypes.any,
-};
 
 Badge.displayName = 'macOS Badge';
 

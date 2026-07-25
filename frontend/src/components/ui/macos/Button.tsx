@@ -1,5 +1,4 @@
 import React, { type ReactNode, type CSSProperties, type MouseEvent } from 'react';
-import PropTypes from 'prop-types';
 import { useTranslation } from '../../../i18n/useTranslation';
 
 type ButtonVariant = 'default' | 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'destructive' | 'error' | 'ghost' | 'outline' | 'link' | string;
@@ -252,18 +251,6 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({
 });
 
 
-Button.propTypes = {
-  ...(Button.propTypes || {}),
-  children: PropTypes.any,
-  className: PropTypes.any,
-  disabled: PropTypes.any,
-  fullWidth: PropTypes.any,
-  loading: PropTypes.any,
-  onClick: PropTypes.any,
-  size: PropTypes.any,
-  style: PropTypes.any,
-  variant: PropTypes.any,
-};
 
 Button.displayName = 'macOS Button';
 

@@ -1,6 +1,5 @@
 import React from 'react';
 import { AlertCircle, CheckCircle, Info, AlertTriangle, X } from 'lucide-react';
-import PropTypes from 'prop-types';
 import { useTranslation } from '../../../i18n/useTranslation';
 
 // SW-01 fix: merged MacOSAlert API into Alert.
@@ -133,17 +132,5 @@ const Alert = ({
 };
 
 
-Alert.propTypes = {
-  ...(Alert.propTypes || {}),
-  children: PropTypes.any,
-  severity: PropTypes.any,
-  type: PropTypes.string,
-  title: PropTypes.node,
-  description: PropTypes.node,
-  action: PropTypes.node,
-  dismissible: PropTypes.bool,
-  onDismiss: PropTypes.func,
-  style: PropTypes.object,
-};
 
 export default Alert;

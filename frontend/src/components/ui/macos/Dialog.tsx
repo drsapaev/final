@@ -1,6 +1,5 @@
 // Minimal macOS-style Dialog components to replace MUI Dialog API used in CashierPanel
 // Props compatibility: open, onClose, maxWidth, fullWidth, children
-import PropTypes from 'prop-types';
 import { useTranslation } from '../../../i18n/useTranslation';
 import type { ReactNode, CSSProperties, MouseEvent } from 'react';
 
@@ -109,30 +108,8 @@ export const DialogActions = ({ children, style = {}, align = 'right', ...props 
   </div>
 );
 
-Dialog.propTypes = {
-  open: PropTypes.bool,
-  onClose: PropTypes.func,
-  maxWidth: PropTypes.oneOfType([PropTypes.oneOf(['xs', 'sm', 'md', 'lg', 'xl']), PropTypes.number, PropTypes.string]),
-  fullWidth: PropTypes.bool,
-  children: PropTypes.node,
-  style: PropTypes.object,
-  overlayStyle: PropTypes.object
-};
 
-DialogTitle.propTypes = {
-  children: PropTypes.node,
-  style: PropTypes.object
-};
 
-DialogContent.propTypes = {
-  children: PropTypes.node,
-  style: PropTypes.object
-};
 
-DialogActions.propTypes = {
-  children: PropTypes.node,
-  style: PropTypes.object,
-  align: PropTypes.oneOf(['left', 'center', 'right'])
-};
 
 export default Dialog;

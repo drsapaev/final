@@ -1,5 +1,4 @@
 import React, { useState, useEffect, type ReactNode, type CSSProperties, type MouseEvent, type KeyboardEvent } from 'react';
-import PropTypes from 'prop-types';
 import { useTheme } from '../../../contexts/ThemeContext';
 import Button from './Button';
 import Icon from './Icon';
@@ -644,38 +643,7 @@ export const SidebarSection = React.forwardRef<HTMLDivElement, SidebarSectionPro
 
 SidebarSection.displayName = 'macOS Sidebar Section';
 
-Sidebar.propTypes = {
-  items: PropTypes.array,
-  activeItem: PropTypes.any,
-  onItemClick: PropTypes.func,
-  collapsible: PropTypes.bool,
-  collapsed: PropTypes.bool,
-  defaultCollapsed: PropTypes.bool,
-  header: PropTypes.node,
-  footer: PropTypes.node,
-  onCollapsedChange: PropTypes.func,
-  variant: PropTypes.string,
-  className: PropTypes.string,
-  style: PropTypes.object
-};
 
-SidebarItem.propTypes = {
-  icon: PropTypes.string,
-  label: PropTypes.node,
-  badge: PropTypes.node,
-  active: PropTypes.bool,
-  onClick: PropTypes.func,
-  className: PropTypes.string,
-  style: PropTypes.object
-};
 
-SidebarSection.propTypes = {
-  title: PropTypes.node,
-  children: PropTypes.node,
-  collapsible: PropTypes.bool,
-  defaultCollapsed: PropTypes.bool,
-  className: PropTypes.string,
-  style: PropTypes.object
-};
 
 export default Sidebar;

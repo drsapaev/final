@@ -1,6 +1,4 @@
 import React, { type ReactNode, type CSSProperties, type ComponentType, type ReactElement } from 'react';
-import PropTypes from 'prop-types';
-
 import Alert from './Alert';
 import MacOSEmptyState from './MacOSEmptyState';
 import { useTranslation } from '../../../i18n/useTranslation';
@@ -240,29 +238,3 @@ export const AppError = React.forwardRef<HTMLElement, AppErrorProps>(({
 
 AppError.displayName = 'AppError';
 
-AppLoading.propTypes = {
-  ariaLabel: PropTypes.string,
-  className: PropTypes.string,
-  description: PropTypes.node,
-  size: PropTypes.oneOf(['sm', 'small', 'md', 'medium', 'lg', 'large']),
-  style: PropTypes.object,
-  title: PropTypes.node
-};
-
-AppEmpty.propTypes = {
-  action: PropTypes.node,
-  className: PropTypes.string,
-  description: PropTypes.node,
-  icon: PropTypes.oneOfType([PropTypes.elementType, PropTypes.node]),
-  style: PropTypes.object,
-  title: PropTypes.string
-};
-
-AppError.propTypes = {
-  action: PropTypes.node,
-  className: PropTypes.string,
-  description: PropTypes.node,
-  severity: PropTypes.oneOf(['info', 'success', 'warning', 'error']),
-  style: PropTypes.object,
-  title: PropTypes.node
-};

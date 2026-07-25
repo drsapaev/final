@@ -25,7 +25,6 @@
  *  - className — additional class names
  */
 
-import PropTypes from 'prop-types';
 import { useEffect, useState } from 'react';
 
 const TYPE_STYLES = {
@@ -83,13 +82,5 @@ const AnimatedTransition = ({
   );
 };
 
-AnimatedTransition.propTypes = {
-  children: PropTypes.node,
-  show: PropTypes.bool,
-  type: PropTypes.oneOf(['fade', 'scale', 'slide', 'slideUp']),
-  duration: PropTypes.number,
-  delay: PropTypes.number,
-  className: PropTypes.string,
-};
 
 export default AnimatedTransition;

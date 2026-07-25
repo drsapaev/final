@@ -1,5 +1,4 @@
 import React, { type ReactNode, type CSSProperties, type MouseEvent, type KeyboardEvent } from 'react';
-import PropTypes from 'prop-types';
 import { useTheme } from '../../../contexts/ThemeContext';
 
 type ListVariant = 'default' | 'compact' | 'inset';
@@ -314,50 +313,11 @@ ListItemIcon.displayName = 'ListItemIcon';
 ListItemSecondaryAction.displayName = 'ListItemSecondaryAction';
 Divider.displayName = 'Divider';
 
-List.propTypes = {
-  children: PropTypes.node,
-  className: PropTypes.string,
-  style: PropTypes.object,
-  variant: PropTypes.string,
-  dense: PropTypes.bool
-};
 
-ListItem.propTypes = {
-  children: PropTypes.node,
-  className: PropTypes.string,
-  style: PropTypes.object,
-  button: PropTypes.bool,
-  selected: PropTypes.bool,
-  disabled: PropTypes.bool,
-  onClick: PropTypes.func
-};
 
-ListItemText.propTypes = {
-  primary: PropTypes.node,
-  secondary: PropTypes.node,
-  children: PropTypes.node,
-  className: PropTypes.string,
-  style: PropTypes.object
-};
 
-ListItemIcon.propTypes = {
-  children: PropTypes.node,
-  className: PropTypes.string,
-  style: PropTypes.object
-};
 
-ListItemSecondaryAction.propTypes = {
-  children: PropTypes.node,
-  className: PropTypes.string,
-  style: PropTypes.object
-};
 
-Divider.propTypes = {
-  className: PropTypes.string,
-  style: PropTypes.object,
-  variant: PropTypes.string,
-  orientation: PropTypes.string
-};
 
 export default List;
 export { ListItem, ListItemText, ListItemIcon, ListItemSecondaryAction, Divider };

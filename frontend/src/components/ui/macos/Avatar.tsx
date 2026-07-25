@@ -1,4 +1,3 @@
-import PropTypes from 'prop-types';
 import type { CSSProperties } from 'react';
 
 type AvatarSize = 'small' | 'medium' | 'large';
@@ -79,14 +78,5 @@ export const Avatar = ({ src, name, size = 'medium', status, style = {}, classNa
 };
 
 
-Avatar.propTypes = {
-  ...(Avatar.propTypes || {}),
-  className: PropTypes.any,
-  name: PropTypes.any,
-  size: PropTypes.any,
-  src: PropTypes.any,
-  status: PropTypes.any,
-  style: PropTypes.any,
-};
 
 export default Avatar;

@@ -1,6 +1,4 @@
 import React, { type ReactNode, type CSSProperties } from 'react';
-import PropTypes from 'prop-types';
-
 interface OptionProps extends Omit<React.OptionHTMLAttributes<HTMLOptionElement>, 'children'> {
   children?: ReactNode;
   disabled?: boolean;
@@ -64,14 +62,6 @@ const Option = React.forwardRef<HTMLOptionElement, OptionProps>(({
 });
 
 
-Option.propTypes = {
-  ...(Option.propTypes || {}),
-  children: PropTypes.any,
-  className: PropTypes.any,
-  disabled: PropTypes.any,
-  style: PropTypes.any,
-  value: PropTypes.any,
-};
 
 Option.displayName = 'Option';
 
