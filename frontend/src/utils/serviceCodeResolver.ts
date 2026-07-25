@@ -192,8 +192,8 @@ export function toServiceCode(value) {
         return normalized.toUpperCase();
     }
 
-    // Ищем в маппинге
-    return SPECIALTY_TO_CODE[normalized] || null;
+    // Ищем в маппинге (audit/phase-8, BS-40: use merged view, not the mutated const)
+    return getMergedSpecialtyToCode()[normalized] || null;
 }
 
 /**
@@ -221,9 +221,10 @@ export function getServiceDisplayName(code, servicesData = []) {
         if (service?.name) return service.name;
     }
 
-    // Приоритет 2: SSOT маппинг
-    if (CODE_TO_NAME[normalizedCode]) {
-        return CODE_TO_NAME[normalizedCode];
+    // Приоритет 2: SSOT маппинг (audit/phase-8, BS-40: use merged view, not the mutated const)
+    const mergedCodeToName = getMergedCodeToName();
+    if (mergedCodeToName[normalizedCode]) {
+        return mergedCodeToName[normalizedCode];
     }
 
     // Приоритет 3: Legacy маппинг
@@ -600,6 +601,12 @@ export function normalizeServicesFromInitialData(initialData, servicesData = [])
 let cachedMappings = null;
 let lastLoadTime = 0;
 const CACHE_TTL = 5 * 60 * 1000; // 5 минут
+// audit/phase-8, BS-40: backend overrides stored separately from the
+// exported static consts. `invalidateMappingsCache()` clears these,
+// restoring the original static-only behavior. Lookup functions merge
+// static + overrides at read time instead of mutating the static maps.
+let backendSpecialtyOverrides: Record<string, unknown> = {};
+let backendCodeNameOverrides: Record<string, unknown> = {};
 
 /**
  * Загружает маппинги с backend API
@@ -624,10 +631,20 @@ export async function loadMappingsFromBackend() {
             cachedMappings = response as Record<string, unknown>;
             lastLoadTime = now;
 
-            // Обновляем локальные маппинги
+            // audit/phase-8, BS-40: previously this called
+            // `Object.assign(SPECIALTY_TO_CODE, resp.specialty_to_code || {})`
+            // which MUTATED the exported const. All consumers holding a
+            // reference to SPECIALTY_TO_CODE saw values change underneath
+            // them between renders, and `invalidateMappingsCache()` did not
+            // restore the original static values — stale backend overrides
+            // accumulated permanently.
+            //
+            // Fix: maintain a separate `backendOverrides` map that is read
+            // by the lookup functions via a merged view. The exported
+            // SPECIALTY_TO_CODE / CODE_TO_NAME constants are never mutated.
             const resp = response as { specialty_to_code?: Record<string, unknown>; code_to_name?: Record<string, unknown> };
-            Object.assign(SPECIALTY_TO_CODE, resp.specialty_to_code || {});
-            Object.assign(CODE_TO_NAME, resp.code_to_name || {});
+            backendSpecialtyOverrides = { ...(resp.specialty_to_code || {}) };
+            backendCodeNameOverrides = { ...(resp.code_to_name || {}) };
 
             return response;
         }
@@ -651,6 +668,24 @@ export async function loadMappingsFromBackend() {
 export function invalidateMappingsCache() {
     cachedMappings = null;
     lastLoadTime = 0;
+    // audit/phase-8, BS-40: clear backend overrides so the next loadMappingsFromBackend()
+    // starts fresh. Previously the mutated SPECIALTY_TO_CODE / CODE_TO_NAME
+    // were never restored, so stale backend values persisted permanently.
+    backendSpecialtyOverrides = {};
+    backendCodeNameOverrides = {};
+}
+
+/**
+ * audit/phase-8, BS-40: helper that returns the merged view of static
+ * specialty_to_code + backend overrides. Used by lookup functions so
+ * the exported SPECIALTY_TO_CODE const is never mutated.
+ */
+function getMergedSpecialtyToCode(): Record<string, unknown> {
+    return { ...SPECIALTY_TO_CODE, ...backendSpecialtyOverrides };
+}
+
+function getMergedCodeToName(): Record<string, unknown> {
+    return { ...CODE_TO_NAME, ...backendCodeNameOverrides };
 }
 
 export default {

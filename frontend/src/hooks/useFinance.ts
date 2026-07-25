@@ -5,6 +5,12 @@ import logger from '../utils/logger';
 import type { Transaction } from '../types/domain/clinic';
 
 const FINANCE_CACHE_KEY = 'admin_finance_transactions_cache';
+// audit/phase-8, BS-36: TTL for deletedIds. Previously deletedIds grew
+// monotonically and never expired — after a DB restore or ID recycling,
+// deleted IDs would filter out valid new transactions forever. 7-day TTL
+// is long enough to cover the "delete then refresh" use case but short
+// enough to self-heal after ID recycling.
+const DELETED_IDS_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 const normalizeTransaction = (transaction: Record<string, unknown> = {}) => ({
   id: (transaction as Record<string, unknown>).id,
@@ -42,6 +48,40 @@ const normalizeDeletedIds = (deletedIds: unknown[] = []): number[] => {
   return [...new Set(deletedIds.map((id) => Number(id)).filter((id) => Number.isFinite(id)))];
 };
 
+// audit/phase-8, BS-36: deletedIds with TTL. Each entry stores { id, deletedAt }.
+// Entries older than DELETED_IDS_TTL_MS are pruned on read + write.
+// This prevents the unbounded growth + ID-recycling false-filter bug.
+interface DeletedIdEntry {
+  id: number;
+  deletedAt: number;
+}
+
+const normalizeDeletedIdEntries = (raw: unknown[]): DeletedIdEntry[] => {
+  const now = Date.now();
+  const seen = new Set<number>();
+  const entries: DeletedIdEntry[] = [];
+  for (const item of raw) {
+    let id: number;
+    let deletedAt: number;
+    if (item && typeof item === 'object' && 'id' in item) {
+      id = Number((item as DeletedIdEntry).id);
+      deletedAt = Number((item as DeletedIdEntry).deletedAt) || now;
+    } else {
+      // Legacy format: bare numeric id (treat as deleted "now")
+      id = Number(item);
+      deletedAt = now;
+    }
+    if (!Number.isFinite(id) || seen.has(id)) continue;
+    // Prune expired entries during normalization
+    if (now - deletedAt > DELETED_IDS_TTL_MS) continue;
+    seen.add(id);
+    entries.push({ id, deletedAt });
+  }
+  return entries;
+};
+
+const entriesToIds = (entries: DeletedIdEntry[]): number[] => entries.map(e => e.id);
+
 const readFinanceCache = () => {
   try {
     const raw = localStorage.getItem(FINANCE_CACHE_KEY);
@@ -55,11 +95,14 @@ const readFinanceCache = () => {
       : Array.isArray(parsed?.transactions)
         ? parsed.transactions
         : [];
-    const deletedIds = new Set<number>(Array.isArray(parsed?.deletedIds) ? (parsed.deletedIds as number[]) : []);
+    // audit/phase-8, BS-36: read deletedIds with TTL pruning.
+    // Supports legacy format (bare number[]) and new format ({id, deletedAt}[]).
+    const rawDeletedIds = Array.isArray(parsed?.deletedIds) ? parsed.deletedIds : [];
+    const entries = normalizeDeletedIdEntries(rawDeletedIds as unknown[]);
 
     return {
       transactions: sortTransactions(cachedTransactions.map(normalizeTransaction)),
-      deletedIds: normalizeDeletedIds(Array.from(deletedIds as Set<number> | unknown[]))
+      deletedIds: entriesToIds(entries)
     };
   } catch (error) {
     logger.warn('[FIX:FINANCE] Не удалось прочитать локальный кэш финансов:', error);
@@ -69,12 +112,24 @@ const readFinanceCache = () => {
 
 const writeFinanceCache = (transactions, deletedIds: unknown[] = []) => {
   try {
+    // audit/phase-8, BS-36: write deletedIds with timestamps for TTL.
+    // Accept both legacy number[] and new DeletedIdEntry[] formats.
+    const now = Date.now();
+    const entries: DeletedIdEntry[] = normalizeDeletedIdEntries(deletedIds as unknown[]);
+    // For legacy bare-number entries, normalizeDeletedIdEntries already
+    // assigned deletedAt = now. For new entries, preserve their deletedAt.
+    // Re-stamp any entry that lost its timestamp.
+    const stampedEntries = entries.map(e => ({
+      id: e.id,
+      deletedAt: e.deletedAt || now,
+    }));
+
     localStorage.setItem(
       FINANCE_CACHE_KEY,
       JSON.stringify({
         updatedAt: new Date().toISOString(),
         transactions: sortTransactions(transactions.map(normalizeTransaction)),
-        deletedIds: normalizeDeletedIds(Array.from(deletedIds as Set<number> | unknown[]))
+        deletedIds: stampedEntries
       })
     );
   } catch (error) {
@@ -83,6 +138,8 @@ const writeFinanceCache = (transactions, deletedIds: unknown[] = []) => {
 };
 
 const mergeTransactions = (serverTransactions: unknown[] = [], cacheState = { transactions: [], deletedIds: [] }) => {
+  // audit/phase-8, BS-36: deletedIds are pruned by TTL on read, so this
+  // Set only contains IDs still within their TTL window.
   const deletedIds = new Set<number>(normalizeDeletedIds(cacheState.deletedIds as unknown[]));
   const merged = new Map();
 
