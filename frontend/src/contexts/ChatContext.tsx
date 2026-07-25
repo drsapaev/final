@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useRef, useCallback, type ReactNode, type Dispatch, type SetStateAction } from 'react';
+import { createContext, useContext, useEffect, useState, useRef, useCallback, useMemo, type ReactNode, type Dispatch, type SetStateAction } from 'react';
 import { useLocation } from 'react-router-dom';
 import PropTypes from 'prop-types';
 import { getWsBaseUrl } from '../api/runtime';
@@ -535,13 +535,15 @@ export const ChatProvider = ({ children }: ChatProviderProps) => {
         // F-001: 4001 = auth rejected (invalid/expired token) — don't reconnect with same token
         if (e.code === 4001) {
           logger.warn('[FIX:WS] Chat WebSocket auth rejected (4001), invalidating token');
-          // tokenManager may expose invalidateAccessToken() in some builds.
-          // Probe via structural cast to avoid coupling this file to the
-          // concrete tokenManager implementation.
-          const tm = tokenManager as typeof tokenManager & { invalidateAccessToken?: () => void };
-          if (tm && typeof tm.invalidateAccessToken === 'function') {
-            tm.invalidateAccessToken();
-          }
+          // audit/phase-2, BS-29: previously this branch probed for a
+          // non-existent `tokenManager.invalidateAccessToken()` method via
+          // a structural cast — the cast satisfied TypeScript but the method
+          // was never defined, so the body was a no-op and the rejected
+          // access token survived. Replace with the real SSOT method:
+          // `tokenManager.clearAll()` wipes access_token + refresh_token +
+          // user data, so the next reconnect attempt will be forced through
+          // the full auth flow instead of retrying with the same bad token.
+          tokenManager.clearAll();
           return;
         }
         // Если не нормальное закрытие (1000) - пробуем переподключиться
@@ -713,7 +715,17 @@ export const ChatProvider = ({ children }: ChatProviderProps) => {
     }
   }, []);
 
-  const value: ChatContextValue = {
+  // audit/phase-4, BS-16: wrap value in useMemo so consumers of useChat()
+  // only re-render when one of the listed deps actually changes. Previously
+  // `value` was a fresh object literal every render, so every parent re-render
+  // (even unrelated state changes) cascaded to ALL chat consumers app-wide.
+  // The most expensive case was `typingUsers` (updated on every peer keystroke)
+  // and `unreadCount` (updated on every incoming message) — both caused every
+  // consumer to re-render even if it only read `isChatOpen`.
+  // The deps array lists every piece of state plus every useCallback-stable
+  // action. If a new field is added to ChatContextValue, it MUST be added
+  // here too — otherwise consumers won't re-render when it changes.
+  const value: ChatContextValue = useMemo(() => ({
     conversations,
     messages,
     activeConversation,
@@ -741,7 +753,19 @@ export const ChatProvider = ({ children }: ChatProviderProps) => {
     toggleReaction,
     deleteMessage,
     uploadFile
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [
+    conversations, messages, activeConversation, unreadCount,
+    isConnected, isLoading, typingUsers, isChatOpen,
+    mutedConversations, onlineUsers, hasMore,
+    // Action identities (all useCallback-stable; listed so useMemo refreshes
+    // when any of them change, which would only happen if their own deps
+    // changed — rare, but correct to include).
+    setIsChatOpen, setMutedConversations, requestOnlineStatus,
+    loadConversations, loadMessages, sendMessage, closeConversation,
+    setActiveConversation, searchUsers, sendTyping, refreshUnreadCount,
+    loadMoreMessages, toggleReaction, deleteMessage, uploadFile,
+  ]);
 
   return (
     <ChatContext.Provider value={value}>

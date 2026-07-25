@@ -65,18 +65,26 @@ export function useDebouncedCallback<A extends unknown[]>(
 
   const debouncedCallback = useCallback(
     (...args: A): void => {
-      void deps;
-      // Отменяем предыдущий таймаут
+      // audit/phase-4, BS-12: previously this useCallback had `[resolvedDelay,
+      // deps]` as its dependency array — `deps` is a fresh array reference on
+      // every caller render, so memoization was completely defeated and the
+      // returned function identity churned every render. That propagated to
+      // every consumer (e.g., `useEffect(..., [debouncedFn])` re-subscribing
+      // every render). Spread `deps` instead so the array's *contents* become
+      // individual dependencies — which is what the caller intended when they
+      // passed `[query, filter]` etc.
+      // The `void deps;` placeholder was a no-op marker for the unused-var
+      // linter; it is no longer needed once we spread the array.
       if (timeoutRef.current !== null) {
         clearTimeout(timeoutRef.current);
       }
 
-      // Устанавливаем новый
       timeoutRef.current = setTimeout(() => {
         callbackRef.current(...args);
       }, resolvedDelay);
     },
-    [resolvedDelay, deps],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [resolvedDelay, ...deps],
   );
 
   // Метод для немедленного вызова (flush)

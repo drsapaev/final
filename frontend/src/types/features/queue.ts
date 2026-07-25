@@ -13,8 +13,9 @@
 // DO NOT write types here speculatively — read the source files first when
 // the corresponding phase starts, then derive types from observed runtime shape.
 
-// TODO Phase 2/5: QueueState, QueueFilters, QueueWebSocketEvent
-export type QueueState = Record<string, unknown>;
+// TODO Phase 2/5: QueueFilters
+// NOTE: `QueueState` placeholder removed — use the real interface in `src/types/domain/queue.ts`.
+//       (Audit 2026-07-25: zero consumers of the placeholder; the domain version is the SSOT.)
 
 export type QueueWebSocketEvent =
   | { type: 'PATIENT_CALLED'; payload: Record<string, unknown> }

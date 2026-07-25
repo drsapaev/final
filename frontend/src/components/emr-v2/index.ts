@@ -52,7 +52,6 @@ export { useEMRAutosave } from '../../hooks/useEMRAutosave';
 export { useNavigationGuard, useBeforeUnload } from '../../hooks/useNavigationGuard';
 export { useEMRKeyboard } from '../../hooks/useEMRKeyboard';
 export { useDoctorHistory } from '../../hooks/useDoctorHistory';
-export { useEMRTelemetry } from '../../hooks/useEMRTelemetry';
 
 // ============================================
 // REDUCER

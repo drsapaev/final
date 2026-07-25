@@ -171,7 +171,47 @@ export function clearToken(): void {
     logger.warn('client.setToken(null) call failed:', e);
   }
 
-  logger.info('[FIX:AUTH] Cleared auth token and profile from local storage');
+  // audit/phase-2, BS-37 + BS-38: clear PHI/financial + patient-side keys
+  // that previously survived staff logout. Without this block, on a shared
+  // kiosk the next user could read previous user's data:
+  //   - admin_finance_transactions_cache: holds { patient_id, amount,
+  //     payment_method, patient_name, ... } — PHI + financial. Stored in
+  //     localStorage which persists across tab/browser restarts.
+  //   - cache_*: generic useCachedData writes arbitrary API responses
+  //     (potentially patient lists) to localStorage.
+  //   - patient_jwt_token / patient_refresh_token / patient_token_expires_at:
+  //     written by useTelegramAuth/useWebAuthn directly to sessionStorage,
+  //     bypassing tokenManager. Staff logout didn't touch them, so patient
+  //     Mini-App identity lingered after a staff session.
+  // Removing these keys is idempotent and safe — none are needed for the
+  // logout flow itself.
+  try {
+    localStorage.removeItem('admin_finance_transactions_cache');
+    // Sweep any cache_* keys written by useCachedData (useApi.ts).
+    // We do not enumerate ALL localStorage keys here because that would
+    // also clear unrelated app state (e.g., saved UI preferences); the
+    // cache_* prefix is specific to useCachedData.
+    const cacheKeys: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('cache_')) {
+        cacheKeys.push(key);
+      }
+    }
+    cacheKeys.forEach((k) => localStorage.removeItem(k));
+  } catch (e) {
+    logger.warn('clearToken localStorage PHI/financial sweep failed:', e);
+  }
+
+  try {
+    sessionStorage.removeItem('patient_jwt_token');
+    sessionStorage.removeItem('patient_refresh_token');
+    sessionStorage.removeItem('patient_token_expires_at');
+  } catch (e) {
+    logger.warn('clearToken sessionStorage patient-token sweep failed:', e);
+  }
+
+  logger.info('[FIX:AUTH] Cleared auth token, profile, PHI/financial cache, and patient tokens');
   notify();
 }
 

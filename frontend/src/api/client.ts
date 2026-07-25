@@ -21,6 +21,13 @@ const API_BASE = getApiBaseUrl();
 // PR-39 / Medium-11: CSRF bootstrap defaults to ON. Set VITE_CSRF_BOOTSTRAP=0
 // to explicitly disable (e.g., for local dev without backend CSRF support).
 const CSRF_BOOTSTRAP_ENABLED = import.meta.env.VITE_CSRF_BOOTSTRAP !== '0';
+// audit/phase-3, BS-56: opt-in fail-closed mode for CSRF.
+// When `VITE_CSRF_STRICT === '1'`, state-changing requests WITHOUT a CSRF
+// token are REJECTED locally instead of being sent to the backend.
+// Default is fail-open (current behaviour) to avoid breaking deployments
+// that don't expose `/auth/csrf-token`. Enable in production once the
+// backend is confirmed to serve the endpoint reliably.
+const CSRF_STRICT_MODE = import.meta.env.VITE_CSRF_STRICT === '1';
 const GLOBAL_RATE_LIMIT_COOLDOWN_MS = 60_000;
 let globalRateLimitUntil = 0;
 let globalRateLimitLogAt = 0;
@@ -225,6 +232,27 @@ api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
     const csrfToken = await ensureCSRFToken();
     if (csrfToken) {
       config.headers.set('X-CSRF-Token', csrfToken);
+    } else if (CSRF_STRICT_MODE) {
+      // audit/phase-3, BS-56: fail-closed path. Without this branch, a
+      // misconfigured backend (no `/auth/csrf-token`, cookie miss, transient
+      // network error) silently allowed every state-changing request to
+      // proceed without CSRF protection for the entire session — the
+      // `csrfEndpointUnavailable` flag is sticky. In strict mode we reject
+      // the request locally so the operator sees a clear failure instead of
+      // a silent security gap. The auth endpoints (login/refresh) are
+      // exempt because they bootstrap the CSRF token itself.
+      const url = config.url || '';
+      const isAuthEndpoint = url.endsWith('/auth/login')
+        || url.endsWith('/auth/refresh')
+        || url.endsWith('/authentication/refresh')
+        || url.endsWith('/auth/csrf-token')
+        || url.endsWith('/auth/logout');
+      if (!isAuthEndpoint) {
+        return Promise.reject(new Error(
+          `[FIX:CSRF] Strict mode: refusing ${method.toUpperCase()} ${url} without CSRF token. `
+          + `Set VITE_CSRF_STRICT=0 to revert to fail-open behaviour.`
+        ));
+      }
     }
   }
 
@@ -410,13 +438,10 @@ async function login(username: string, password: string): Promise<LoginResult> {
   }
 }
 
-// Backwards-compatible aliases expected by older frontend code
-const setAuthToken = setToken; // alias
-const setAxiosAuthToken = setToken; // alias
-const setBearerToken = setToken; // alias
-const getProfile = me; // alias
-const get = api.get; // alias for direct axios usage
-const apiClient = api; // alias for PaymentWidget and other components
+// Backwards-compatible alias expected by live consumers (10+ files import `apiClient`).
+// Other legacy aliases (setAuthToken, setAxiosAuthToken, setBearerToken, getProfile, get)
+// were removed 2026-07-25 — zero importers across the codebase.
+const apiClient = api;
 
 // Инициализируем токен при загрузке модуля
 const existingToken = tokenManager.getAccessToken();
@@ -434,17 +459,12 @@ export {
   buildWsUrl,
   apiRequest,
   setToken,
-  setAuthToken,
-  setAxiosAuthToken,
-  setBearerToken,
   getToken,
   setRefreshToken,
   getRefreshToken,
   clearToken,
   me,
-  getProfile,
   login,
-  get,
 };
 
 export default apiClient;

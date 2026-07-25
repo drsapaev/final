@@ -2,7 +2,7 @@
 import { useTheme } from '../contexts/ThemeContext';
 import type { CSSProperties } from 'react';
 
-type FileStatus = 'correct' | 'needs_move' | 'needs_fix';
+type FileStatus = 'correct' | 'needs_move' | 'needs_fix' | 'removed';
 
 interface FileEntry {
   purpose: string;
@@ -229,10 +229,10 @@ export const FRONTEND_FILE_MAP: Record<string, FileEntry> = {
   },
   
   'src/hooks/useOptimizedData.js': {
-    purpose: 'Хук для оптимизированных данных',
-    currentLocation: 'src/hooks/',
-    recommendedLocation: 'src/hooks/',
-    status: 'correct'
+    purpose: 'Removed 2026-07-25 (audit/phase-0: dead code, zero consumers)',
+    currentLocation: '(deleted)',
+    recommendedLocation: '(deleted)',
+    status: 'removed'
   },
   
   'src/hooks/usePatients.js': {
