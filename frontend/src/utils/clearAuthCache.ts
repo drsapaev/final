@@ -17,9 +17,10 @@ export function clearAuthCache() {
     tokenManager.clearAll();
 
     // Legacy-ключи (auth_profile) — не входят в tokenManager.
+    // `auth_token` повторно удаляется для надёжности (tokenManager.clearAll()
+    // уже его чистит, но явный вызов безопасен — removeItem идемпотентен).
     sessionStorage.removeItem('auth_profile');
     sessionStorage.removeItem('auth_token');
-    sessionStorage.removeItem('auth_profile');
 
     logger.log('Auth cache cleared successfully');
     return true;

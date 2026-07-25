@@ -87,7 +87,7 @@ const getBackendActionAvailability = (row, action, flagName) => {
   return aliases.some((alias: string) => actions.has(alias));
 };
 
-const getEnhancedAppointmentRowKey = (row, index) => {
+const getEnhancedAppointmentRowKey = (row: Appointment, index: number) => {
   const parts = [
     row?.record_type || row?.source_type || row?.source || row?.entity_type || 'appointment',
     row?.appointment_id ?? row?.visit_id ?? row?.queue_entry_id ?? row?.queue_id ?? row?.payment_id ?? row?.id ?? 'no-id',
@@ -235,10 +235,10 @@ const EnhancedAppointmentsTable = ({
 
   // ⭐ SSOT: Display helper for services with queue numbers
   // Format: "K01 (1), D01 (2), L10 (3)"
-  void useCallback((rows) => {
+  void useCallback((rows: Appointment[]) => {
     if (!rows || rows.length === 0) return '—';
 
-    return rows.map((row) => {
+    return rows.map((row: Appointment) => {
       let serviceDisplay = '—';
       if (Array.isArray(row.services) && row.services.length > 0) {
         const svc = row.services[0];
@@ -254,7 +254,7 @@ const EnhancedAppointmentsTable = ({
 
   // ⭐ SSOT: Display helper for queue numbers
   // Format: "1, 2, 3"
-  void useCallback((rows) => {
+  void useCallback((rows: Appointment[]) => {
     if (!rows || rows.length === 0) return '—';
     return rows.map((r) => r.queue_number ?? r.number ?? '?').join(', ');
   }, []);
@@ -293,7 +293,7 @@ const EnhancedAppointmentsTable = ({
 
   // Фильтрация данных
   const filteredData = useMemo(() => {
-    return sortedData.filter((row) => {
+    return sortedData.filter((row: Appointment) => {
       const searchMatch = !filterConfig.search ||
       Object.values(row).some((val) =>
       String(val).toLowerCase().includes(filterConfig.search.toLowerCase())
@@ -315,7 +315,7 @@ const EnhancedAppointmentsTable = ({
 
   const totalPages = Math.ceil(filteredData.length / pageSize);
 
-  const getDisplayAmount = useCallback((row) => {
+  const getDisplayAmount = useCallback((row: Appointment) => {
     if (row?.has_shared_invoice) {
       return Number(row?.cost || 0);
     }
@@ -353,13 +353,13 @@ const EnhancedAppointmentsTable = ({
   const handleSelectAll = useCallback((checked: boolean) => {
     if (onRowSelect) {
       // Используем внешний обработчик для каждой строки
-      paginatedData.forEach((row) => {
+      paginatedData.forEach((row: Appointment) => {
         onRowSelect(row.id, checked);
       });
     } else {
       // Используем внутреннее состояние
       if (checked) {
-        setInternalSelectedRows(new Set(paginatedData.map((row) => row.id)));
+        setInternalSelectedRows(new Set(paginatedData.map((row: Appointment) => row.id)));
       } else {
         setInternalSelectedRows(new Set());
       }
@@ -905,7 +905,7 @@ const EnhancedAppointmentsTable = ({
   // Преждевременный возврат перенесён ниже, чтобы не нарушать порядок хуков
 
   // Функция для отображения номеров очередей
-  const renderQueueNumbers = useCallback((row) => {
+  const renderQueueNumbers = useCallback((row: Appointment) => {
     // Получаем текущую дату
     const today = getLocalDateString();
 
@@ -1098,7 +1098,7 @@ const EnhancedAppointmentsTable = ({
       const todayAppointments = data.filter((item) =>
       item.date === today || item.appointment_date === today
       );
-      const todayIndex = todayAppointments.findIndex((item) => item.id === row.id) + 1;
+      const todayIndex = todayAppointments.findIndex((item: Appointment) => item.id === row.id) + 1;
 
       return (
         <span style={{
@@ -1477,7 +1477,7 @@ const EnhancedAppointmentsTable = ({
                 </td>
               </tr> :
 
-            paginatedData.map((row, index) => {
+            paginatedData.map((row: Appointment, index: number) => {
               // ⭐ SSOT: Get session color for visual grouping (presentation only)
               const sessionColor = getSessionColor(row.session_id);
               const backendCanPay = getBackendActionAvailability(row, 'payment', 'can_mark_paid');

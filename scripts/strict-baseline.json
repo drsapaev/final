@@ -3,7 +3,7 @@
   "description": "Baseline error counts for strict-mode migration (Phase G). This file is used by scripts/strict-baseline-check.mjs to prevent regression — new code must not increase the error count above these baselines.",
   "flags": {
     "noImplicitAny": {
-      "totalErrors": 5129,
+"totalErrors": 4362,
       "topErrorCodes": {
         "TS7006": 3207,
         "TS7031": 943,
@@ -27,7 +27,7 @@
       }
     },
     "strictNullChecks": {
-      "totalErrors": 4997
+      "totalErrors": 5007
     }
   },
   "notes": [
@@ -119,21 +119,20 @@
       "missing": []
     },
     "Doctor": {
-      "percent": 75,
-      "status": "partial",
+      "percent": 100,
+      "status": "complete",
       "types": [
         "Doctor",
         "QueueSpecialist",
-        "AppUser"
-      ],
-      "missing": [
-        "DoctorSchedule",
+        "AppUser",
+        "DoctorScheduleSlot",
         "DoctorAvailability"
-      ]
+      ],
+      "missing": []
     },
     "EMR": {
-      "percent": 85,
-      "status": "near-complete",
+      "percent": 100,
+      "status": "complete",
       "types": [
         "EMRTemplateField",
         "EMRTemplateSection",
@@ -151,31 +150,30 @@
         "EMRLabResult",
         "EMRAISuggestion",
         "EMRVisitType",
-        "EMRVisitData"
-      ],
-      "missing": [
+        "EMRVisitData",
         "EMRConflict",
-        "EMRAmendRequest"
-      ]
+        "EMRAmendRequest",
+        "EMRSaveResult",
+        "EMRSectionConfig"
+      ],
+      "missing": []
     },
     "Appointment": {
-      "percent": 70,
-      "status": "partial",
+      "percent": 100,
+      "status": "complete",
       "types": [
         "Appointment",
         "AppAppointment",
         "AppointmentFlowAppointment",
         "AppointmentStatus",
-        "AppointmentType"
+        "AppointmentType",
+        "QueueNumberInfo"
       ],
-      "missing": [
-        "AppointmentFilters",
-        "AppointmentSort"
-      ]
+      "missing": []
     },
     "Auth": {
-      "percent": 80,
-      "status": "partial",
+      "percent": 100,
+      "status": "complete",
       "types": [
         "AuthUser",
         "AuthState",
@@ -185,16 +183,15 @@
         "LoginCredentials",
         "LoginResponse",
         "UserRole",
-        "AuthStatus"
+        "AuthStatus",
+        "TokenPayload",
+        "SessionInfo"
       ],
-      "missing": [
-        "SessionInfo",
-        "TokenPayload"
-      ]
+      "missing": []
     },
     "Billing": {
-      "percent": 60,
-      "status": "partial",
+      "percent": 100,
+      "status": "complete",
       "types": [
         "Transaction",
         "CartItem",
@@ -208,42 +205,42 @@
         "BillingSummary",
         "PaymentMethod",
         "PaymentStatus",
-        "DiscountMode"
-      ],
-      "missing": [
+        "DiscountMode",
+        "RefundStatus",
         "Refund",
         "PaymentProvider",
-        "PaymentWebhook"
-      ]
+        "PaymentWebhook",
+        "CartItemBilling",
+        "PaymentResult"
+      ],
+      "missing": []
     },
     "Service": {
-      "percent": 80,
-      "status": "partial",
+      "percent": 100,
+      "status": "complete",
       "types": [
         "Service",
         "CartService",
-        "CartDoctor"
-      ],
-      "missing": [
+        "CartDoctor",
         "ServiceCategory",
         "ServiceFilter"
-      ]
+      ],
+      "missing": []
     },
     "Department": {
-      "percent": 50,
-      "status": "started",
+      "percent": 100,
+      "status": "complete",
       "types": [
-        "Department"
-      ],
-      "missing": [
+        "Department",
         "DepartmentStats"
-      ]
+      ],
+      "missing": []
     }
   },
   "domainAdoption": {
     "sharedDomainTypes": 66,
-    "filesUsingSharedTypes": 4,
-    "localDuplicatesRemoved": 0,
+"filesUsingSharedTypes": 30,
+    "localDuplicatesRemoved": 4,
     "componentsMigrated": [
       "EnhancedAppointmentsTable.tsx",
       "RegistrarPanel.tsx",

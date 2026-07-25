@@ -103,7 +103,7 @@ function resolveDoctorQueueEntryId(row) {
 function buildPatientsFromAppointments(appointments, t) {
   const patientsById = new Map();
 
-  appointments.forEach((appointment) => {
+  appointments.forEach((appointment: Appointment) => {
     const patientId = appointment.patient_id || appointment.id;
     if (!patientId || patientsById.has(patientId)) {
       return;
@@ -891,12 +891,12 @@ const DentistPanelUnified = () => {
       }
 
       try {
-        const findMatchingAppointment = (appointments) => {
+        const findMatchingAppointment = (appointments: Appointment[]) => {
           if (!Array.isArray(appointments)) {
             return null;
           }
 
-          return appointments.find((appointment) => {
+          return appointments.find((appointment: Appointment) => {
             if (visitIdFromUrl && normalizeNumericId(appointment.visit_id) === visitIdFromUrl) {
               return true;
             }
@@ -1850,7 +1850,7 @@ const DentistPanelUnified = () => {
             specialistId={String(user?.doctor_id || user?.specialist_id || '')}
             specialty="dentistry"
             onPatientSelect={handlePatientSelect}
-            onStartVisit={(appointment) => {
+            onStartVisit={(appointment: Appointment) => {
               setSelectedPatient(appointment);
               handleTabChange('visit');
             }} />);
