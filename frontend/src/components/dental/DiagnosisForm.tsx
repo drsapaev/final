@@ -247,7 +247,7 @@ const DiagnosisForm = ({
       
       <div className="space-y-4">
         {formData.generalDiagnoses.map((diagnosis, index) =>
-      <div key={index} className="flex items-center gap-3 p-3 border rounded-lg">
+      <div key={`dx-${index}-${diagnosis.text || ''}`} className="flex items-center gap-3 p-3 border rounded-lg">
             <input
           type="text"
           aria-label={t('dental.dental_df_aria_general_diagnosis', { index: index + 1 })}
@@ -304,7 +304,7 @@ const DiagnosisForm = ({
         </h4>
         <div className="space-y-2">
           {formData.treatmentPlan.immediate.map((item, index) =>
-        <div key={index} className="flex items-center gap-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+        <div key={`imm-${index}-${item.text || ''}`} className="flex items-center gap-3 p-3 bg-red-50 border border-red-200 rounded-lg">
               <input
             type="text"
             aria-label={t('dental.dental_df_aria_immediate_item', { index: index + 1 })}
@@ -349,7 +349,7 @@ const DiagnosisForm = ({
         </h4>
         <div className="space-y-2">
           {formData.treatmentPlan.shortTerm.map((item, index) =>
-        <div key={index} className="flex items-center gap-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+        <div key={`short-${index}-${item.text || ''}`} className="flex items-center gap-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
               <input
             type="text"
             aria-label={t('dental.dental_df_aria_short_term_item', { index: index + 1 })}
@@ -394,7 +394,7 @@ const DiagnosisForm = ({
         </h4>
         <div className="space-y-2">
           {formData.treatmentPlan.longTerm.map((item, index) =>
-        <div key={index} className="flex items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+        <div key={`long-${index}-${item.text || ''}`} className="flex items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
               <input
             type="text"
             aria-label={t('dental.dental_df_aria_long_term_item', { index: index + 1 })}
@@ -445,7 +445,7 @@ const DiagnosisForm = ({
       
       <div className="space-y-4">
         {formData.prescriptions.map((prescription, index) =>
-      <div key={index} className="border rounded-lg p-4">
+      <div key={`rx-${index}-${prescription.medication || ''}`} className="border rounded-lg p-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -582,7 +582,7 @@ const DiagnosisForm = ({
       
       <div className="space-y-4">
         {formData.referrals.map((referral, index) =>
-      <div key={index} className="border rounded-lg p-4">
+      <div key={`ref-${index}-${referral.specialty || ''}`} className="border rounded-lg p-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">

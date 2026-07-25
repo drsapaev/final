@@ -56,7 +56,13 @@ function pushHistory(
   history: Record<string, unknown>[],
   data: Record<string, unknown>,
 ): Record<string, unknown>[] {
-    const newHistory = [...history, JSON.parse(JSON.stringify(data)) as Record<string, unknown>];
+    // audit/phase-6, BS-62: use structuredClone when available — preserves
+    // Date objects (JSON roundtrip converts them to ISO strings, breaking
+    // EMR history entries that contain timestamps), and is faster.
+    const snapshot: Record<string, unknown> = typeof structuredClone === 'function'
+        ? structuredClone(data)
+        : JSON.parse(JSON.stringify(data)) as Record<string, unknown>;
+    const newHistory = [...history, snapshot];
     if (newHistory.length > MAX_HISTORY_SIZE) {
         return newHistory.slice(-MAX_HISTORY_SIZE);
     }

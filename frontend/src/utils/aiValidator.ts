@@ -113,8 +113,15 @@ export function validateAIResponse(response: unknown, options: AIValidationOptio
     }
   }
 
-  // Deep clone to avoid mutating original
-  let validated = JSON.parse(JSON.stringify(response));
+  // Deep clone to avoid mutating original.
+  // audit/phase-6, BS-62: use structuredClone when available (modern browsers,
+  // Node 17+) — JSON.parse(JSON.stringify()) loses Date objects (converts to
+  // ISO string), throws on undefined/functions/cycles, and is 2-10x slower.
+  // structuredClone preserves Dates, Maps, Sets, cycles, and is the API the
+  // platform provides for this exact use case.
+  let validated: unknown = typeof structuredClone === 'function'
+    ? structuredClone(response)
+    : JSON.parse(JSON.stringify(response));
 
   // Sanitize based on type
   if (sanitize) {

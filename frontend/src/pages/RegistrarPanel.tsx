@@ -1246,13 +1246,14 @@ const RegistrarPanel = () => {
       // Применяем поиск к агрегированным данным
       if (searchQuery) {
         const searched = aggregatedPatients.filter((patient) => {
-          const inFio = (patient.patient_fio || '').toLowerCase().includes(searchQuery);
+          const p = patient as Record<string, unknown>;
+          const inFio = String(p.patient_fio || '').toLowerCase().includes(searchQuery);
 
           // Поиск по ID записи
-          const inId = String(patient.id).includes(searchQuery);
+          const inId = String(p.id).includes(searchQuery);
 
           // Улучшенный поиск по телефону
-          const originalPhone = (patient.patient_phone || '').toLowerCase();
+          const originalPhone = String(p.patient_phone || '').toLowerCase();
           const phoneDigits = originalPhone.replace(/\D/g, '');
           const searchDigits = searchQuery.replace(/\D/g, '');
 

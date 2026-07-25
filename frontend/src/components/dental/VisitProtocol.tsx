@@ -202,7 +202,7 @@ const VisitProtocol = ({
       
       <div className="space-y-4">
         {formData.procedures.map((procedure, index) =>
-      <div key={index} className="border rounded-lg p-4">
+      <div key={`proc-${index}-${procedure.name || ''}`} className="border rounded-lg p-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -353,7 +353,7 @@ const VisitProtocol = ({
       
       <div className="space-y-4">
         {formData.materials.map((material, index) =>
-      <div key={index} className="border rounded-lg p-4">
+      <div key={`mat-${index}-${material.name || ''}`} className="border rounded-lg p-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -454,7 +454,7 @@ const VisitProtocol = ({
       
       <div className="space-y-4">
         {formData.anesthesia.map((anesthesia, index) =>
-      <div key={index} className="border rounded-lg p-4">
+      <div key={`anes-${index}-${anesthesia.type || ''}`} className="border rounded-lg p-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -650,7 +650,7 @@ const VisitProtocol = ({
       
       <div className="space-y-4">
         {formData.radiographs.map((radiograph, index) =>
-      <div key={index} className="border rounded-lg p-4">
+      <div key={`rad-${index}-${radiograph.type || ''}`} className="border rounded-lg p-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -739,7 +739,7 @@ const VisitProtocol = ({
       
       <div className="space-y-4">
         {formData.prescriptions.map((prescription, index) =>
-      <div key={index} className="border rounded-lg p-4">
+      <div key={`rx-${index}-${prescription.medication || ''}`} className="border rounded-lg p-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
