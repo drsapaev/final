@@ -1,4 +1,4 @@
-import { getEffectiveRouteByPath, getProfileRoles, getRoleHomeRoute, hasRouteAccess as hasRegistryRouteAccess, normalizeRole, routeToRoles as routeRolesFromRegistry } from '../routing/routeSelectors.js';
+import { getEffectiveRouteByPath, getProfileRoles, getRoleHomeRoute, hasRouteAccess as hasRegistryRouteAccess, normalizeRole, routeToRoles as routeRolesFromRegistry } from '../routing/routeSelectors';
 
 export function roleToRoute(role: string): string {
   return getRoleHomeRoute(role);

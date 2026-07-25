@@ -17,7 +17,7 @@
 //
 // Keep changes minimal and additive — don't remove existing exported names.
 
-import { me, setToken as setClientToken } from '../api/client.js';
+import { me, setToken as setClientToken } from '../api/client';
 import { tokenManager } from '../utils/tokenManager';
 import logger from '../utils/logger';
 import type { AuthState, UserProfile } from '../types/domain/auth';

@@ -4,14 +4,14 @@ import { BrowserRouter } from 'react-router-dom';
 // Unified i18n: initializes react-i18next with ru/uz-Latn/uz-Cyrl/en/kk locales.
 // See frontend/src/i18n/index.js for supported languages and configuration.
 import './i18n';
-import App from './App.jsx';
+import App from './App';
 import './styles/theme.css';
 import './styles/dark-theme-visibility-fix.css';
 import './styles/global-fixes.css';
 import './theme/macos-tokens.css';
 import './styles/macos.css';
 import './components/admin/admin.css';
-import { bootstrapStoredColorScheme } from './theme/colorScheme.js';
+import { bootstrapStoredColorScheme } from './theme/colorScheme';
 
 // Инициализация API interceptors
 import { setupInterceptors, initializeAuth } from './api/interceptors';

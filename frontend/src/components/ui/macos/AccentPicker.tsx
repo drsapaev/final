@@ -1,4 +1,4 @@
-import { ACCENT_OPTIONS, useMacOSTheme, type AccentName } from '../../../theme/macosTheme.jsx';
+import { ACCENT_OPTIONS, useMacOSTheme, type AccentName } from '../../../theme/macosTheme';
 import type { CSSProperties } from 'react';
 
 type AccentKey = typeof ACCENT_OPTIONS[number];

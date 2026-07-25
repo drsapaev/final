@@ -617,7 +617,7 @@ export async function loadMappingsFromBackend() {
 
     try {
         // Динамический импорт чтобы избежать циклических зависимостей
-        const { servicesService } = await import('../api/services.js');
+        const { servicesService } = await import('../api/services');
         const response = await servicesService.getCodeMappings();
 
         if (response && (response as { specialty_to_code?: unknown }).specialty_to_code) {
