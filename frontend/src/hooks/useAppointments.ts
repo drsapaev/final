@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 
 import { api } from '../api/client';
 import type { Appointment, Doctor } from '../types/domain/clinic';
@@ -60,18 +60,30 @@ const useAppointments = (doctors: Doctor[] = []) => {
   const [filterDate, setFilterDate] = useState('');
   const [filterDoctor, setFilterDoctor] = useState('');
 
+  // audit/phase-8, BS-22: request-ID guard against overlapping loads.
+  // Each create/update/delete calls `await loadAppointments()`; if the user
+  // triggers two mutations quickly, two loads are in flight and the later-
+  // started one might resolve first, then the earlier overwrites with stale
+  // data. The ref tracks the latest request; stale responses are discarded.
+  const loadAppointmentsRequestIdRef = useRef(0);
+
   const loadAppointments = useCallback(async () => {
+    const requestId = ++loadAppointmentsRequestIdRef.current;
     setLoading(true);
     setError(null);
 
     try {
       const response = await api.get('/admin/appointments');
+      if (requestId !== loadAppointmentsRequestIdRef.current) return;
       const items = Array.isArray(response.data) ? response.data : [];
       setAppointments(items.map(normalizeAppointment));
     } catch (err) {
+      if (requestId !== loadAppointmentsRequestIdRef.current) return;
       setError(String(err));
     } finally {
-      setLoading(false);
+      if (requestId === loadAppointmentsRequestIdRef.current) {
+        setLoading(false);
+      }
     }
   }, []);
 

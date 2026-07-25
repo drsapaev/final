@@ -2,7 +2,7 @@
  * Hook for Doctor Queue Management.
  * Provides queue data and actions for the doctor panel.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import api from '../services/api';
 import logger from '../utils/logger';
 import type {
@@ -97,12 +97,23 @@ const useDoctorQueue = (specialty: string = 'general'): UseDoctorQueueReturn => 
   });
   const normalizedSpecialty = specialty || 'general';
 
+  // audit/phase-8, BS-22: request-ID guard against overlapping loads.
+  // Previously, the 30s polling interval could overlap with mutation-induced
+  // loadQueue() calls — the later-started request could resolve first, then
+  // the earlier request overwrote with stale data. The ref tracks the latest
+  // request; stale responses are silently discarded.
+  const loadQueueRequestIdRef = useRef(0);
+
   const loadQueue = useCallback(async (): Promise<void> => {
+    const requestId = ++loadQueueRequestIdRef.current;
     setLoading(true);
     setError(null);
 
     try {
       const response = await api.get(`/doctor/${encodeURIComponent(normalizedSpecialty)}/queue/today`);
+      // Discard stale responses — a newer loadQueue() has been triggered since.
+      if (requestId !== loadQueueRequestIdRef.current) return;
+
       const data = response.data as DoctorQueuePayload;
       const entries = Array.isArray(data?.entries) ? data.entries : [];
       const apiStats: QueueStats = (data?.stats as QueueStats) || {};
@@ -126,6 +137,7 @@ const useDoctorQueue = (specialty: string = 'general'): UseDoctorQueueReturn => 
         queueIds: data?.queue_ids || [],
       });
     } catch (err) {
+      if (requestId !== loadQueueRequestIdRef.current) return;
       const e = err as CatchError;
       logger.error('[useDoctorQueue] Error loading queue:', err);
       setQueue([]);
@@ -133,7 +145,9 @@ const useDoctorQueue = (specialty: string = 'general'): UseDoctorQueueReturn => 
       setQueueControls({ canCallNext: false, nextCallEntryId: null });
       setError(e?.response?.data?.detail || e?.message || 'Ошибка загрузки очереди');
     } finally {
-      setLoading(false);
+      if (requestId === loadQueueRequestIdRef.current) {
+        setLoading(false);
+      }
     }
   }, [normalizedSpecialty]);
 
