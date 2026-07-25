@@ -92,9 +92,16 @@ export async function subscribeToPushNotifications() {
 
   try {
     const registration = await navigator.serviceWorker.ready;
+    // audit/phase-7, BS-47: prefer VITE_VAPID_PUBLIC_KEY (Vite convention,
+    // exposed via import.meta.env). Fall back to legacy REACT_APP_ define
+    // polyfill for builds that haven't migrated env vars yet. vite.config.ts
+    // aliases both to the same value during the migration window.
+    const vapidPublicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY
+      || process.env.REACT_APP_VAPID_PUBLIC_KEY
+      || '';
     const subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: process.env.REACT_APP_VAPID_PUBLIC_KEY
+      applicationServerKey: vapidPublicKey
     });
 
     logger.log('Подписка на push уведомления создана:', subscription);
