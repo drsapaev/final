@@ -52,9 +52,28 @@ export function openDisplayBoardWS(boardId: string, onMessage: (data: unknown) =
   if (!wsEnabled()) return () => {};
   let ws = null;
   let reconnectTimeout = null;
+  // audit/phase-4, BS-14: hoist `pingIntervalRef` to outer scope so `close()`
+  // and `ws.onclose` can clear it. Previously `pingInterval` was declared
+  // inside `ws.onopen` (local closure), so:
+  //   - `close()` had no reference to it → could not clear → interval kept
+  //     firing every 30s forever after close (and after every reconnect a
+  //     NEW interval stacked on top of the old one — up to 5 leaks per
+  //     board mount on flaky networks).
+  //   - The `else { clearInterval(pingInterval); }` branch only fired when
+  //     readyState !== OPEN, which is exactly when the socket is already
+  //     closing — too late to prevent the leak.
+  // The ref-based approach guarantees a single live interval at any time.
+  let pingIntervalRef = null;
   let reconnectAttempts = 0;
   const maxReconnectAttempts = 5;
   const reconnectDelay = 3000;
+
+  function clearPingInterval() {
+    if (pingIntervalRef !== null) {
+      clearInterval(pingIntervalRef);
+      pingIntervalRef = null;
+    }
+  }
 
   function connect() {
     try {
@@ -68,22 +87,25 @@ export function openDisplayBoardWS(boardId: string, onMessage: (data: unknown) =
       logger.log('🔌 Подключаемся к WebSocket (token via subprotocol)');
 
       ws = new WebSocket(url, subprotocols);
-      
+
       ws.onopen = () => {
         logger.log(`✅ WebSocket подключен к табло ${boardId}`);
         reconnectAttempts = 0;
         onConnect && onConnect();
-        
-        // Отправляем ping для поддержания соединения
-        const pingInterval = setInterval(() => {
+
+        // Отправляем ping для поддержания соединения.
+        // Stored in the outer-scope ref so close()/onclose can clear it.
+        clearPingInterval();
+        pingIntervalRef = setInterval(() => {
           if (ws && ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ type: 'ping' }));
           } else {
-            clearInterval(pingInterval);
+            // Socket is closing/closed — clear the interval to stop the leak.
+            clearPingInterval();
           }
         }, 30000);
       };
-      
+
       ws.onmessage = (ev) => {
         try {
           const obj = JSON.parse(ev.data);
@@ -93,26 +115,30 @@ export function openDisplayBoardWS(boardId: string, onMessage: (data: unknown) =
           logger.warn('Ошибка парсинга WebSocket сообщения:', e);
         }
       };
-      
+
       ws.onerror = (error) => {
         logger.error(`❌ Ошибка WebSocket для табло ${boardId}:`, error);
       };
-      
+
       ws.onclose = (event) => {
         logger.log(`🔌 WebSocket закрыт для табло ${boardId}. Код: ${event.code}`);
+        // Clear the ping interval immediately — the socket is gone, pings
+        // would either throw or silently no-op, but the interval itself
+        // would keep firing forever without this.
+        clearPingInterval();
         onDisconnect && onDisconnect();
-        
+
         // Автоматическое переподключение
         if (reconnectAttempts < maxReconnectAttempts && event.code !== 1000) {
           reconnectAttempts++;
           logger.log(`🔄 Попытка переподключения ${reconnectAttempts}/${maxReconnectAttempts} через ${reconnectDelay}ms`);
-          
+
           reconnectTimeout = setTimeout(() => {
             connect();
           }, reconnectDelay);
         }
       };
-      
+
     } catch (error) {
       logger.error('Ошибка создания WebSocket:', error);
     }
@@ -127,8 +153,18 @@ export function openDisplayBoardWS(boardId: string, onMessage: (data: unknown) =
         clearTimeout(reconnectTimeout);
         reconnectTimeout = null;
       }
-      
+      // audit/phase-4, BS-14: clear the ping interval BEFORE closing the
+      // socket — otherwise the onclose handler runs AFTER our cleanup and
+      // could schedule a reconnect that we won't be able to cancel.
+      clearPingInterval();
+
       if (ws) {
+        // Null the handlers before close so the synthetic onclose fired by
+        // the browser doesn't trigger reconnect logic on a manual close.
+        ws.onclose = null;
+        ws.onerror = null;
+        ws.onopen = null;
+        ws.onmessage = null;
         ws.close(1000, 'Закрытие по запросу');
         ws = null;
       }

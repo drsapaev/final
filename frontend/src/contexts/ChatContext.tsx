@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useRef, useCallback, type ReactNode, type Dispatch, type SetStateAction } from 'react';
+import { createContext, useContext, useEffect, useState, useRef, useCallback, useMemo, type ReactNode, type Dispatch, type SetStateAction } from 'react';
 import { useLocation } from 'react-router-dom';
 import PropTypes from 'prop-types';
 import { getWsBaseUrl } from '../api/runtime';
@@ -767,7 +767,17 @@ export const ChatProvider = ({ children }: ChatProviderProps) => {
     }
   }, []);
 
-  const value: ChatContextValue = {
+  // audit/phase-4, BS-16: wrap value in useMemo so consumers of useChat()
+  // only re-render when one of the listed deps actually changes. Previously
+  // `value` was a fresh object literal every render, so every parent re-render
+  // (even unrelated state changes) cascaded to ALL chat consumers app-wide.
+  // The most expensive case was `typingUsers` (updated on every peer keystroke)
+  // and `unreadCount` (updated on every incoming message) — both caused every
+  // consumer to re-render even if it only read `isChatOpen`.
+  // The deps array lists every piece of state plus every useCallback-stable
+  // action. If a new field is added to ChatContextValue, it MUST be added
+  // here too — otherwise consumers won't re-render when it changes.
+  const value: ChatContextValue = useMemo(() => ({
     conversations,
     messages,
     activeConversation,
@@ -795,7 +805,19 @@ export const ChatProvider = ({ children }: ChatProviderProps) => {
     toggleReaction,
     deleteMessage,
     uploadFile
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [
+    conversations, messages, activeConversation, unreadCount,
+    isConnected, isLoading, typingUsers, isChatOpen,
+    mutedConversations, onlineUsers, hasMore,
+    // Action identities (all useCallback-stable; listed so useMemo refreshes
+    // when any of them change, which would only happen if their own deps
+    // changed — rare, but correct to include).
+    setIsChatOpen, setMutedConversations, requestOnlineStatus,
+    loadConversations, loadMessages, sendMessage, closeConversation,
+    setActiveConversation, searchUsers, sendTyping, refreshUnreadCount,
+    loadMoreMessages, toggleReaction, deleteMessage, uploadFile,
+  ]);
 
   return (
     <ChatContext.Provider value={value}>
