@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useRef, type ReactNode, type MutableRefObject } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, useMemo, type ReactNode, type MutableRefObject } from 'react';
 import PropTypes from 'prop-types';
 import { useLocation } from 'react-router-dom';
 import { buildWsUrl } from '../api/runtime';
@@ -114,7 +114,20 @@ interface NotificationWebSocketProviderProps {
 }
 
 export function NotificationWebSocketProvider({ children }: NotificationWebSocketProviderProps) {
+  // audit/phase-4, BS-20: keep `ws` in BOTH a ref (for synchronous access
+  // inside callbacks) AND state (so consumers re-render when the socket
+  // changes after a reconnect). Previously only a ref was used, which meant:
+  //   - Provider value `{ ws: ws.current }` was a NEW object every render,
+  //     forcing all consumers to re-render on every Provider render even
+  //     when `ws.current` hadn't changed.
+  //   - And conversely, when `ws.current` DID change (reconnect), consumers
+  //     reading `ws` from context saw the stale socket because ref mutation
+  //     doesn't trigger re-renders.
+  // The state/setWs pair fixes both: setWs is called on connect/disconnect,
+  // triggering re-render with the new socket; useMemo on value stabilizes
+  // identity between socket changes.
   const ws = useRef<WebSocket | null>(null);
+  const [wsState, setWsState] = useState<WebSocket | null>(null);
   const handleMessageRef = useRef<(data: WsPayload) => void>(() => {});
   const connectRef = useRef<(() => (() => void) | undefined) | null>(null);
   const connectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -288,6 +301,9 @@ export function NotificationWebSocketProvider({ children }: NotificationWebSocke
     const wsUrl = `${buildWsUrl('/api/v1/ws/notifications/connect')}`;
     const socket = new WebSocket(wsUrl, [`bearer.${token}`]);  // P1-6: token via subprotocol;
     ws.current = socket;
+    // audit/phase-4, BS-20: sync state so consumers re-render with the new
+    // socket reference and useMemo below can produce a stable value.
+    setWsState(socket);
 
     socket.onopen = () => {
       if (closeOnOpenRef.current === socket) {
@@ -317,6 +333,8 @@ export function NotificationWebSocketProvider({ children }: NotificationWebSocke
     socket.onclose = (event: CloseEvent) => {
       if (ws.current === socket) {
         ws.current = null;
+        // audit/phase-4, BS-20: clear state so consumers see the disconnect.
+        setWsState(null);
       }
       if (closeOnOpenRef.current === socket) {
         closeOnOpenRef.current = null;
@@ -390,8 +408,14 @@ export function NotificationWebSocketProvider({ children }: NotificationWebSocke
     };
   }, [closeSocketSafely, connect, location.pathname]);
 
+  // audit/phase-4, BS-20: memoize the value so its identity is stable
+  // between socket changes. Consumers re-render only when wsState actually
+  // changes (connect / disconnect / reconnect), not on every Provider
+  // render triggered by unrelated state in parent components.
+  const value = useMemo<{ ws: WebSocket | null }>(() => ({ ws: wsState }), [wsState]);
+
   return (
-    <NotificationWebSocketContext.Provider value={{ ws: ws.current }}>
+    <NotificationWebSocketContext.Provider value={value}>
       {children}
     </NotificationWebSocketContext.Provider>
   );

@@ -1,4 +1,4 @@
-import { createContext, useContext, useReducer, useCallback } from 'react';
+import { createContext, useContext, useReducer, useCallback, useMemo } from 'react';
 import type { ReactNode } from 'react';
 import PropTypes from 'prop-types';
 import type {
@@ -370,10 +370,25 @@ export const AppDataProvider = ({ children }: { children: ReactNode }) => {
     }, [])
   };
 
-  const value = {
+  // audit/phase-4, BS-19: wrap value in useMemo so consumers of useAppData
+  // only re-render when state actually changes. Previously `value` was a
+  // fresh object literal every render, so EVERY provider render (even ones
+  // triggered by parent re-renders that didn't touch state) cascaded to all
+  // consumers. The `actions` object is built from useCallback-stable
+  // functions, so memoizing the wrapper preserves identity across renders
+  // where state hasn't changed.
+  // Note on `useAppDataSelector` below: it still re-renders on every value
+  // change because `useContext` is not selector-aware. Real selector support
+  // would require use-context-selector or useSyncExternalStore. For now we
+  // keep the API surface but document the limitation in the JSDoc.
+  const value = useMemo(() => ({
     ...state,
     actions
-  };
+    // `actions` is a stable object literal whose members are all useCallback-
+    // memoized; only its wrapper identity changes per render, which useMemo
+    // smooths out. `state` is the real dep.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [state]);
 
   return (
     <AppDataContext.Provider value={value}>
