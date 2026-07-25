@@ -183,7 +183,17 @@ export default [
   },
   {
     // Специальные правила для тестовых файлов
-    files: ['**/*.test.{js,jsx}', '**/__tests__/**/*.{js,jsx}', '**/test/**/*.{js,jsx}'],
+    // audit/phase-7, BS-48: extended patterns to include .ts/.tsx test files.
+    // Previously matched only .test.{js,jsx} (0 such files in the project)
+    // and __tests__/**/*.{js,jsx} — but the project has 149 .test.ts/.test.tsx
+    // files that weren't receiving the test globals block. The block was
+    // effectively dead code. Now covers .ts/.tsx variants for both patterns.
+    files: [
+      '**/*.test.{js,jsx,ts,tsx}',
+      '**/*.spec.{js,jsx,ts,tsx}',
+      '**/__tests__/**/*.{js,jsx,ts,tsx}',
+      '**/test/**/*.{js,jsx,ts,tsx}',
+    ],
     languageOptions: {
       globals: {
         ...globals.jest,
