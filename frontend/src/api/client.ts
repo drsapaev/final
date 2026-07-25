@@ -408,13 +408,10 @@ async function login(username: string, password: string): Promise<LoginResult> {
   }
 }
 
-// Backwards-compatible aliases expected by older frontend code
-const setAuthToken = setToken; // alias
-const setAxiosAuthToken = setToken; // alias
-const setBearerToken = setToken; // alias
-const getProfile = me; // alias
-const get = api.get; // alias for direct axios usage
-const apiClient = api; // alias for PaymentWidget and other components
+// Backwards-compatible alias expected by live consumers (10+ files import `apiClient`).
+// Other legacy aliases (setAuthToken, setAxiosAuthToken, setBearerToken, getProfile, get)
+// were removed 2026-07-25 — zero importers across the codebase.
+const apiClient = api;
 
 // Инициализируем токен при загрузке модуля
 const existingToken = tokenManager.getAccessToken();
@@ -432,17 +429,12 @@ export {
   buildWsUrl,
   apiRequest,
   setToken,
-  setAuthToken,
-  setAxiosAuthToken,
-  setBearerToken,
   getToken,
   setRefreshToken,
   getRefreshToken,
   clearToken,
   me,
-  getProfile,
   login,
-  get,
 };
 
 export default apiClient;
