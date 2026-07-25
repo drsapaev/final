@@ -17,8 +17,8 @@
 // /services/by-department route) and getPricing (no backend /services/pricing
 // route).
 
-import { apiRequest } from './client.js';
-import { API_ENDPOINTS, buildQueryString } from './endpoints.js';
+import { apiRequest } from './client';
+import { API_ENDPOINTS, buildQueryString } from './endpoints';
 import logger from '../utils/logger';
 
 const NOTIFICATION_QUERY_CACHE_MS = 15_000;

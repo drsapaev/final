@@ -107,8 +107,10 @@ export default [
       // =================================================================
 
       // 10.1: Запрет raw fetch() — использовать api/client.
-      // Разрешённые файлы: api/client.js, api/runtime.js, api/setup.js
+      // Разрешённые файлы: api/client.ts, api/runtime.ts, api/setup.ts
       // (последний — legacy, мигрируется отдельно).
+      // audit/phase-7b, BS-49: added `fetch()` selector — previously the
+      // comment claimed "Запрет raw fetch()" but no selector existed.
       'no-restricted-syntax': [
         'warn',
         {
@@ -122,6 +124,35 @@ export default [
         {
           selector: "CallExpression[callee.type='MemberExpression'][callee.object.name='window'][callee.property.name='prompt']",
           message: 'Используйте useConfirm() или модальный диалог вместо window.prompt() (UX Audit 10.10).',
+        },
+        {
+          selector: "CallExpression[callee.name='fetch']",
+          message: 'Используйте api.get/api.post из api/client вместо raw fetch() (UX Audit 10.1). Разрешено только в api/client.ts, api/runtime.ts, api/setup.ts.',
+        },
+      ],
+
+      // audit/phase-7b, BS-49: ban direct imports from generated OpenAPI types.
+      // Consumers should import from types/api.ts (which re-exports with
+      // friendly names) or types/domain/*.ts (hand-written domain types).
+      // Direct imports from types/generated/api.ts couple consumer code to
+      // the raw OpenAPI schema shape and break on schema regeneration.
+      'no-restricted-imports': [
+        'warn',
+        {
+          paths: [
+            {
+              name: '@/types/generated/api',
+              message: 'Import from types/api.ts or types/domain/*.ts instead. Direct imports from generated OpenAPI types couple consumer code to the raw schema shape.',
+            },
+            {
+              name: '../types/generated/api',
+              message: 'Import from types/api.ts or types/domain/*.ts instead. Direct imports from generated OpenAPI types couple consumer code to the raw schema shape.',
+            },
+            {
+              name: '../../types/generated/api',
+              message: 'Import from types/api.ts or types/domain/*.ts instead. Direct imports from generated OpenAPI types couple consumer code to the raw schema shape.',
+            },
+          ],
         },
       ],
 

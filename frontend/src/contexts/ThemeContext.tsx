@@ -22,12 +22,12 @@ import {
   normalizeColorScheme,
   persistColorSchemeLocally,
   resolveThemeMode,
-} from '../theme/colorScheme.js';
-import apiClient from '../api/client.js';
-import { mixColors, toRgbaString } from '../theme/colorUtils.js';
+} from '../theme/colorScheme';
+import apiClient from '../api/client';
+import { mixColors, toRgbaString } from '../theme/colorUtils';
 import logger from '../utils/logger';
-import tokenManager from '../utils/tokenManager.js';
-import { isPublicRoutePath } from '../routing/routeSelectors.js';
+import tokenManager from '../utils/tokenManager';
+import { isPublicRoutePath } from '../routing/routeSelectors';
 
 type ThemeMode = 'light' | 'dark';
 type ColorScheme = string;
