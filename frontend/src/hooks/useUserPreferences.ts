@@ -93,8 +93,15 @@ export const useUserPreferences = (userId: unknown = null, autoLoad: boolean = t
             logger.warn('Failed to load preferences:', err);
 
             // Если 401, значит токен протух - чистим его
+            // audit/phase-2, BS-33: previously this called
+            // `sessionStorage.removeItem('auth_token')` directly, which (a)
+            // bypassed tokenManager.clearAll() so refresh_token + user data
+            // survived, and (b) bypassed the central 401 handler in
+            // interceptors.ts (no auth-state notification fired). Use the
+            // SSOT method instead — it clears the full auth tuple and any
+            // future storage additions are picked up automatically.
             if (err.response && err.response.status === 401) {
-                sessionStorage.removeItem('auth_token');  // PR-39 / P0-2: token now in sessionStorage;
+                tokenManager.clearAll();
             }
 
             // ВАЖНО: Устанавливаем loadedRef = true чтобы прекратить повторные попытки
