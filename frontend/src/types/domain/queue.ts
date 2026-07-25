@@ -10,8 +10,13 @@
  * as the SSOT and removed from the hook.
  */
 
-export type QueueEntryStatus = 'waiting' | 'called' | 'in_service' | 'in_cabinet' | 'completed' | 'skipped' | 'cancelled' | string;
-export type QueueSource = 'online' | 'desk' | 'qr' | 'morning_assignment' | string;
+// audit/phase-5a, BS-3: added 'served' — backend (backend/app/crud/queue.py +
+// backend/app/api/v1/endpoints/doctor_integration/_queue_ops.py) uses this
+// status when a patient has been fully served. Was missing from the TS union,
+// which caused `e.status === 'served'` comparisons to be flagged as
+// unintentional after `| string` widening was removed.
+export type QueueEntryStatus = 'waiting' | 'called' | 'in_service' | 'in_cabinet' | 'completed' | 'served' | 'skipped' | 'cancelled';
+export type QueueSource = 'online' | 'desk' | 'qr' | 'morning_assignment';
 
 export interface QueueEntry {
   id?: string | number;

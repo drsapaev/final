@@ -14,8 +14,8 @@
  * objects* that flow across module boundaries live here.
  */
 
-export type AIProvider = 'mcp' | 'openai' | 'anthropic' | string;
-export type AIContext = 'medical' | 'translation' | 'image_analysis' | string;
+export type AIProvider = 'mcp' | 'openai' | 'anthropic';
+export type AIContext = 'medical' | 'translation' | 'image_analysis';
 export type AIChatRole = 'user' | 'assistant' | 'system';
 export type AIChatMessageType = 'text' | 'error';
 

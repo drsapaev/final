@@ -4,9 +4,9 @@
  * PaymentWidget, and billing-related components.
  */
 
-export type PaymentMethod = 'cash' | 'card' | 'transfer' | 'click' | 'payme' | string;
-export type PaymentStatus = 'pending' | 'paid' | 'refunded' | 'failed' | 'partial' | string;
-export type DiscountMode = 'none' | 'repeat' | 'benefit' | 'all_free' | string;
+export type PaymentMethod = 'cash' | 'card' | 'transfer' | 'click' | 'payme';
+export type PaymentStatus = 'pending' | 'paid' | 'refunded' | 'failed' | 'partial';
+export type DiscountMode = 'none' | 'repeat' | 'benefit' | 'all_free';
 
 export interface Invoice {
   id: string | number;
@@ -87,7 +87,7 @@ export interface BillingSummary {
   [key: string]: unknown;
 }
 
-export type RefundStatus = 'requested' | 'approved' | 'rejected' | 'processed' | string;
+export type RefundStatus = 'requested' | 'approved' | 'rejected' | 'processed';
 
 export interface Refund {
   id: string | number;

@@ -127,7 +127,12 @@ export * from './ui';
 // ============================================================================
 // Manual — i18next type augmentation
 // ============================================================================
-export type { TranslateFunction } from './i18n';
+// audit/phase-5a, BS-10: removed `export type { TranslateFunction } from './i18n'`.
+// The `types/i18n.ts` file was dead code (zero importers) — its `declare module`
+// augmentations were never loaded as a side-effect, and `TranslateFunction` had
+// zero external consumers. The live i18n type augmentation lives in
+// `src/types/react-i18next-override.d.ts` (ambient). See that file for the
+// current override policy.
 
 // ============================================================================
 // Manual — feature-based domain types
