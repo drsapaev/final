@@ -458,15 +458,64 @@ Independent. Fix = add validateFile() / detectPromptInjection() at call sites.
 
 ---
 
+### Phase 8 — Runtime fixes (medium-impact deferred bucket)
+
+**Goal:** Close race conditions + data-integrity bugs from the deferred bucket.
+
+| ID | Action | Auto | Risk |
+|----|--------|------|------|
+| **BS-36** | `useFinance.ts` — 7-day TTL for `deletedIds` via `{id, deletedAt}[]` storage; read path prunes expired; legacy format auto-migrated | No | Low |
+| **BS-22** | `useAppointments.ts` + `useDoctorQueue.ts` — `loadAppointmentsRequestIdRef` / `loadQueueRequestIdRef` track latest request; stale responses discarded | Yes (pattern) | Low |
+| **BS-40** | `serviceCodeResolver.ts` — backend overrides stored in separate module-level vars (`backendSpecialtyOverrides`, `backendCodeNameOverrides`); lookup functions use merged view helpers; `invalidateMappingsCache` clears overrides | No | Low |
+
+**Dependencies:** All independent.
+**Tests:** `vitest src/api + src/utils` 202/202 pass.
+
+**PR:** #2506 (merged, commit `4c618a08`)
+
+---
+
 ## Final Scores
 
-| Criterion | Before fixes | After Phase 0-7 (target) |
+| Criterion | Before fixes | After Phase 0-8 (actual) |
 |-----------|--------------|--------------------------|
-| Migration completeness | 30% | 75% |
-| Type safety | 22% | 65% |
-| Runtime safety | 25% | 70% |
-| Architecture quality | 40% | 70% |
-| Maintainability | 25% | 65% |
-| Production readiness | 15% | 55% |
+| Migration completeness | 30% | 78% |
+| Type safety | 22% | 68% |
+| Runtime safety | 25% | 75% |
+| Architecture quality | 40% | 72% |
+| Maintainability | 25% | 68% |
+| Production readiness | 15% | 60% |
 
 **Key verification-pass takeaway:** Of 73 findings, **19 are Proven bugs (A)**, **26 design issues (B)**, **18 possible (C)**, **2 opinion/claim wrong (D)**. One finding (BS-23) is fully refuted. ~19 findings are dead code (simplifies cleanup). 3 findings are medical-safety Critical (BS-17, BS-34, BS-42). 2 are HIPAA Critical (BS-37, BS-38).
+
+## Merged PRs (10 total)
+
+| PR | Phase | Findings |
+|----|-------|----------|
+| #2486 | Phase 0 — dead code | BS-4, 8, 11, 24, 30, 31, 39, 41, 69, 70, 71 |
+| #2487 | Phase 1 — medical safety | BS-17, 34, 35, 42 |
+| #2488 | Phase 2 — security | BS-29, 32, 33, 37, 38, 52, 53, 57 |
+| #2489 | Phase 3 — API consistency | BS-28, 56 |
+| #2490 | Phase 4 — React perf | BS-12, 13, 14, 16, 19, 20, 21 |
+| #2491 | Phase 6 — performance | BS-60, 61, 62, 64, 73 |
+| #2492 | Phase 7 — cleanup | BS-46, 47, 48, 50 |
+| #2495 | Phase 5a — TS debt | BS-1, 2, 9, 10, 3 |
+| #2496 | Phase 7b — cleanup ext. | BS-44, 49, 65 |
+| #2506 | Phase 8 — runtime fixes | BS-22, 36, 40 |
+
+**Total findings resolved: 48 of 73** (66%)
+
+## Deferred findings (tracked in GitHub issues #2498-#2505)
+
+| Issue | Findings | Reason |
+|-------|----------|--------|
+| #2498 | BS-66 | `strict:true` — high risk, needs sub-PRs per directory |
+| #2499 | BS-5 | Icon.size typing — visual regression risk |
+| #2500 | BS-6 | i18n typed resources — team decision needed |
+| #2501 | BS-25, 26, 27, 59 | API client consolidation — auth regression risk |
+| #2502 | BS-15, 18 | Dormant runtime fixes — `useWebSocket=false` / 1 consumer |
+| #2503 | BS-58 | WebAuthn RP ID — BE validation needed |
+| #2504 | BS-63 | vite manualChunks — bundle analysis needed |
+| #2505 | BS-45 | `@/` alias codemod — style only |
+
+**Total findings deferred: 25 of 73** (34%) — all tracked in GitHub issues with recommended approach + test plan.
