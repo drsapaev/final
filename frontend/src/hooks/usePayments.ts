@@ -29,7 +29,13 @@ interface PaymentListResult {
   error?: string;
 }
 
-interface PaymentResult {
+// audit/phase-merge: renamed from `PaymentResult` to avoid shadowing the
+// canonical domain type in `types/domain/billing.ts` (which has
+// `transaction_id` + `redirect_url` fields and is the SSOT for payment
+// results). This local interface is a hook-internal operation outcome
+// wrapper with a different shape (`data` field) — keeping it under a
+// distinct name satisfies the `no-domain-type-duplication` lint rule.
+interface PaymentOperationResult {
   success: boolean;
   data?: unknown;
   error?: string;
@@ -54,16 +60,16 @@ export interface UsePaymentsReturn {
   error: string | null;
   getPendingPayments: (params?: PaymentListParams) => Promise<PaymentListResult>;
   getPayments: (params?: PaymentListParams) => Promise<PaymentListResult>;
-  createPayment: (paymentData: Record<string, unknown>) => Promise<PaymentResult>;
-  markVisitAsPaid: (visitId: string | number) => Promise<PaymentResult>;
-  getPaymentById: (paymentId: string | number) => Promise<PaymentResult>;
-  cancelPayment: (paymentId: string | number, reason: string) => Promise<PaymentResult>;
-  confirmPayment: (paymentId: string | number) => Promise<PaymentResult>;
-  getStats: (params?: DateRangeParams) => Promise<PaymentResult>;
+  createPayment: (paymentData: Record<string, unknown>) => Promise<PaymentOperationResult>;
+  markVisitAsPaid: (visitId: string | number) => Promise<PaymentOperationResult>;
+  getPaymentById: (paymentId: string | number) => Promise<PaymentOperationResult>;
+  cancelPayment: (paymentId: string | number, reason: string) => Promise<PaymentOperationResult>;
+  confirmPayment: (paymentId: string | number) => Promise<PaymentOperationResult>;
+  getStats: (params?: DateRangeParams) => Promise<PaymentOperationResult>;
   exportPayments: (params?: DateRangeParams) => Promise<{ success: boolean; error?: string }>;
-  refundPayment: (paymentId: string | number, params: RefundParams) => Promise<PaymentResult>;
+  refundPayment: (paymentId: string | number, params: RefundParams) => Promise<PaymentOperationResult>;
   getReceipt: (paymentId: string | number) => Promise<{ success: boolean; error?: string }>;
-  getHourlyStats: (params?: HourlyStatsParams) => Promise<PaymentResult>;
+  getHourlyStats: (params?: HourlyStatsParams) => Promise<PaymentOperationResult>;
 }
 
 export const usePayments = (): UsePaymentsReturn => {
@@ -183,7 +189,7 @@ export const usePayments = (): UsePaymentsReturn => {
   );
 
   const createPayment = useCallback(
-    async (paymentData: Record<string, unknown>): Promise<PaymentResult> => {
+    async (paymentData: Record<string, unknown>): Promise<PaymentOperationResult> => {
       setLoading(true);
       setError(null);
 
@@ -208,7 +214,7 @@ export const usePayments = (): UsePaymentsReturn => {
   );
 
   const markVisitAsPaid = useCallback(
-    async (visitId: string | number): Promise<PaymentResult> => {
+    async (visitId: string | number): Promise<PaymentOperationResult> => {
       setLoading(true);
       setError(null);
 
@@ -233,7 +239,7 @@ export const usePayments = (): UsePaymentsReturn => {
   );
 
   const getPaymentById = useCallback(
-    async (paymentId: string | number): Promise<PaymentResult> => {
+    async (paymentId: string | number): Promise<PaymentOperationResult> => {
       setLoading(true);
       setError(null);
 
@@ -258,7 +264,7 @@ export const usePayments = (): UsePaymentsReturn => {
   );
 
   const cancelPayment = useCallback(
-    async (paymentId: string | number, reason: string): Promise<PaymentResult> => {
+    async (paymentId: string | number, reason: string): Promise<PaymentOperationResult> => {
       setLoading(true);
       setError(null);
 
@@ -283,7 +289,7 @@ export const usePayments = (): UsePaymentsReturn => {
   );
 
   const confirmPayment = useCallback(
-    async (paymentId: string | number): Promise<PaymentResult> => {
+    async (paymentId: string | number): Promise<PaymentOperationResult> => {
       setLoading(true);
       setError(null);
 
@@ -307,7 +313,7 @@ export const usePayments = (): UsePaymentsReturn => {
   );
 
   const getStats = useCallback(
-    async ({ date_from, date_to }: DateRangeParams = {}): Promise<PaymentResult> => {
+    async ({ date_from, date_to }: DateRangeParams = {}): Promise<PaymentOperationResult> => {
       try {
         const params: Record<string, unknown> = {
           ...(date_from && { date_from }),
@@ -371,7 +377,7 @@ export const usePayments = (): UsePaymentsReturn => {
   );
 
   const refundPayment = useCallback(
-    async (paymentId: string | number, { amount, reason }: RefundParams): Promise<PaymentResult> => {
+    async (paymentId: string | number, { amount, reason }: RefundParams): Promise<PaymentOperationResult> => {
       setLoading(true);
       setError(null);
 
@@ -434,7 +440,7 @@ export const usePayments = (): UsePaymentsReturn => {
   );
 
   const getHourlyStats = useCallback(
-    async ({ target_date }: HourlyStatsParams = {}): Promise<PaymentResult> => {
+    async ({ target_date }: HourlyStatsParams = {}): Promise<PaymentOperationResult> => {
       try {
         const params: Record<string, unknown> = {
           ...(target_date && { target_date }),
