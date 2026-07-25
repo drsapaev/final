@@ -60,7 +60,17 @@ const hasBackendQueueAction = (entry: Record<string, unknown> | null | undefined
  * Если передан styles.actionButtonStyle — используется он (backward compat),
  * иначе — CSS-класс .qm-action-btn.qm-action-btn--{color}.
  */
-const ActionButton = ({ color, icon: Icon, iconSize, onClick, disabled, ariaLabel, title, actionButtonStyle, getColor }: Record<string, any>) => {
+const ActionButton = ({ color, icon: Icon, iconSize, onClick, disabled, ariaLabel, title, actionButtonStyle, getColor }: {
+  color: string;
+  icon: React.ComponentType<{ size?: number }>;  
+  iconSize: number;
+  onClick: () => void;
+  disabled?: boolean;
+  ariaLabel?: string;
+  title?: string;
+  actionButtonStyle?: Record<string, unknown>;
+  getColor?: (category: string, variant: string | number) => string;
+}) => {
   // Backward compat: если передан custom actionButtonStyle — используем inline-стиль.
   if (actionButtonStyle) {
     return (
@@ -114,9 +124,9 @@ export const QueueActionButtons = ({
   const [loading, setLoading] = useState(false);
 
   const {
-    actionButtonStyle = null, // UX Audit Registrar #3: по умолчанию null — используем CSS-классы
+    actionButtonStyle = null,
     getColor = null,
-  } = styles;
+  } = styles as { actionButtonStyle?: Record<string, unknown>; getColor?: (category: string, variant: string) => string };
 
   const entryId = entry?.queue_entry_id ?? null;
   const status = (entry?.queue_status || entry?.status || null) as string | null;
@@ -389,8 +399,8 @@ export const QueueActionButtons = ({
 /**
  * Карточка статистики очереди (для хедера)
  */
-export const QueueStatsBar = ({ stats, getColor }: Record<string, any>) => {
-  const styles = {} as Record<string, any> as Record<string, any>;
+export const QueueStatsBar = ({ stats, getColor }: { stats: Record<string, unknown>; getColor?: (category: string, variant: string | number) => string }) => {
+  const styles: Record<string, unknown> = {};
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // UX Audit Registrar #3: если getColor не передан — используем CSS-классы.
   // Backward compat: если getColor передан — используем inline-стили.

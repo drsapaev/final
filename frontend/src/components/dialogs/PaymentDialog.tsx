@@ -1,27 +1,41 @@
-
 import { useState, useEffect } from 'react';
-import PropTypes from 'prop-types';
 import { Check, Printer } from 'lucide-react';
 import ModernDialog from './ModernDialog';
 import React from 'react';
 import { toast } from 'react-toastify';
-// UX Audit R-4.3 (Phase 2): usePaymentMethods hook (future: backend-driven).
 import { usePaymentMethods } from '../../hooks/usePaymentMethods';
-// UX Audit Registrar #5: все inline-стили перенесены в PaymentDialog.css.
-// useTheme удалён — больше не нужен (всё через macos tokens + [data-theme="dark"]).
-// Также: emoji в заголовке (✅/💳) заменены на text-only (иконки и так есть в actions).
 import './PaymentDialog.css';
 
 import logger from '../../utils/logger';
 import { Input } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
+
+interface PaymentDialogAppointment {
+  id?: string | number;
+  patient_fio?: string;
+  patient_name?: string;
+  services?: string[] | string;
+  cost?: number | string;
+  payment_amount?: number | string;
+  payment_type?: string;
+  [key: string]: unknown;
+}
+
+interface PaymentDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+  appointment: PaymentDialogAppointment | null;
+  onPaymentSuccess?: (paymentData?: unknown) => Promise<void> | void;
+  onPrintTicket?: (appointment?: unknown) => void;
+}
+
 const PaymentDialog = ({
   isOpen,
   onClose,
   appointment,
   onPaymentSuccess,
   onPrintTicket,
-}) => {
+}: PaymentDialogProps) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState(t('misc.pd_karta'));
@@ -32,7 +46,7 @@ const PaymentDialog = ({
   // Инициализация данных при открытии
   useEffect(() => {
     if (isOpen && appointment) {
-      setPaymentAmount(appointment.cost || appointment.payment_amount || '');
+      setPaymentAmount(String(appointment.cost ?? appointment.payment_amount ?? ''));
       setPaymentMethod(appointment.payment_type || t('misc.pd_karta'));
       setIsPaid(false);
       setErrors({});
@@ -251,22 +265,5 @@ const PaymentDialog = ({
   );
 };
 
-PaymentDialog.propTypes = {
-  isOpen: PropTypes.bool,
-  onClose: PropTypes.func,
-  appointment: PropTypes.shape({
-    id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-    patient_fio: PropTypes.string,
-    cost: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-    payment_amount: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-    payment_type: PropTypes.string,
-    services: PropTypes.oneOfType([
-      PropTypes.arrayOf(PropTypes.string),
-      PropTypes.string,
-    ]),
-  }),
-  onPaymentSuccess: PropTypes.func,
-  onPrintTicket: PropTypes.func,
-};
 
 export default PaymentDialog;

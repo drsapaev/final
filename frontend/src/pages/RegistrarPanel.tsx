@@ -1869,9 +1869,9 @@ const RegistrarPanel = () => {
           }
         }}
         onPrintTicket={(appointment) => {
-          const printSource = {
-            ...(paymentDialog.row || {}),
-            ...(appointment || {})
+          const printSource: Record<string, unknown> = {
+            ...((paymentDialog.row as Record<string, unknown>) || {}),
+            ...((appointment as Record<string, unknown>) || {})
           };
           // UX Audit: закрываем PaymentDialog при открытии PrintDialog.
           setPaymentDialog({ open: false, row: null, paid: false, source: null });

@@ -6,7 +6,7 @@ interface MacOSStatCardProps {
   title?: ReactNode;
   value?: ReactNode;
   subtitle?: ReactNode;
-  icon?: React.ComponentType<any> | ReactNode;
+  icon?: React.ComponentType<Record<string, unknown>> | ReactNode;
   trend?: ReactNode;
   trendType?: 'positive' | 'negative' | 'neutral' | string;
   trendLabel?: ReactNode;
@@ -90,7 +90,7 @@ const MacOSStatCard = ({
     gray: 'var(--mac-text-secondary)'
   };
 
-  const trendStyles: Record<string, { color: string; icon: React.ComponentType<any> }> = {
+  const trendStyles: Record<string, { color: string; icon: React.ComponentType<Record<string, unknown>> }> = {
     positive: {
       color: 'var(--mac-success)',
       icon: TrendingUp

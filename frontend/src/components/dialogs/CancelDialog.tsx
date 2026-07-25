@@ -1,17 +1,33 @@
-
 import { useState, useEffect } from 'react';
-import PropTypes from 'prop-types';
+import type { ReactNode } from 'react';
 import { AlertTriangle, X } from 'lucide-react';
 import ModernDialog from './ModernDialog';
 import React from 'react';
 import { toast } from 'react-toastify';
-// UX Audit Registrar #5: все inline-стили перенесены в CancelDialog.css.
-// useTheme удалён — больше не нужен (всё через macos tokens + [data-theme="dark"]).
 import './CancelDialog.css';
 
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
-const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
+
+interface CancelDialogAppointment {
+  id?: string | number;
+  patient_fio?: string;
+  patient_name?: string;
+  services?: string[] | string;
+  cost?: number | string;
+  appointment_date?: string;
+  appointment_time?: string;
+  [key: string]: unknown;
+}
+
+interface CancelDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+  appointment: CancelDialogAppointment | null;
+  onCancel: (appointmentId: unknown, reason: string) => Promise<void>;
+}
+
+const CancelDialog = ({ isOpen, onClose, appointment, onCancel }: CancelDialogProps) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [reason, setReason] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -146,7 +162,7 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
                   Стоимость:
                 </span>
                 <span className="cancel-info-value">
-                  {new Intl.NumberFormat('ru-RU').format(appointment.cost)} сум
+                  {new Intl.NumberFormat('ru-RU').format(Number(appointment.cost ?? 0))} сум
                 </span>
               </div>
             )}
@@ -196,19 +212,5 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }) => {
   );
 };
 
-CancelDialog.propTypes = {
-  isOpen: PropTypes.bool,
-  onClose: PropTypes.func,
-  appointment: PropTypes.shape({
-    id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-    patient_fio: PropTypes.string,
-    services: PropTypes.oneOfType([
-      PropTypes.arrayOf(PropTypes.string),
-      PropTypes.string,
-    ]),
-    cost: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-  }),
-  onCancel: PropTypes.func,
-};
 
 export default CancelDialog;

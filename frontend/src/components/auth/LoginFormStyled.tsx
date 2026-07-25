@@ -284,7 +284,8 @@ const LoginFormStyled = () => {
 
         navigate(target, { replace: true });
       }
-    } catch {
+    } catch (post2FAError) {
+      logger.warn('[AUTH] Post-2FA navigation error (non-fatal — token already obtained):', post2FAError);
       setError(t('misc.lfs_oshibka_posle_2fa_verifikats'));
       setRequires2FA(false);
     }
@@ -358,7 +359,7 @@ const LoginFormStyled = () => {
     return (
       <div style={{
         minHeight: '100vh',
-        background: `linear-gradient(135deg, ${colors.primary as string[500]} 0%, ${colors.primary as string[700]} 100%)`,
+        background: `linear-gradient(135deg, ${(colors.primary as Record<number, string>)[500]} 0%, ${(colors.primary as Record<number, string>)[700]} 100%)`,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -380,7 +381,7 @@ const LoginFormStyled = () => {
             <div style={{
               width: '60px',
               height: '60px',
-              background: `linear-gradient(135deg, ${colors.primary as string[500]} 0%, ${colors.primary as string[700]} 100%)`,
+              background: `linear-gradient(135deg, ${(colors.primary as Record<number, string>)[500]} 0%, ${(colors.primary as Record<number, string>)[700]} 100%)`,
               borderRadius: '50%',
               display: 'flex',
               alignItems: 'center',
@@ -442,14 +443,14 @@ const LoginFormStyled = () => {
                     style={{
                       flex: 1,
                       padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
-                      background: isActive ? colors.primary as string[500] : 'transparent',
+                      background: isActive ? (colors.primary as Record<number, string>)[500] : 'transparent',
                       color: isActive ? 'white' : (colors.semantic as { text?: { secondary?: string } })?.text?.secondary,
                       border: '1px solid var(--mac-border)',
                       borderRadius: 'var(--mac-radius-sm)',
                       fontSize: 'var(--mac-font-size-xs)',
                       cursor: 'pointer',
                       font: 'inherit',
-                      outline: isActive ? `2px solid ${colors.primary as string[500]}` : 'none',
+                      outline: isActive ? `2px solid ${(colors.primary as Record<number, string>)[500]}` : 'none',
                       outlineOffset: '2px',
                     }}
                   >
