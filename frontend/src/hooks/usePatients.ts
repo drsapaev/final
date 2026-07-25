@@ -34,29 +34,40 @@ const usePatients = () => {
   const [filterAgeRange, setFilterAgeRange] = useState('');
   const [filterBloodType, setFilterBloodType] = useState('');
 
-  // Transform API snake_case → component camelCase
-  const transformPatient = (p: Patient) => ({
-    id: p.id,
-    firstName: (p as Record<string, unknown>).first_name,
-    lastName: (p as Record<string, unknown>).last_name,
-    middleName: (p as Record<string, unknown>).middle_name,
-    email: (p as Record<string, unknown>).email || '',
-    phone: (p as Record<string, unknown>).phone || '',
-    birthDate: (p as Record<string, unknown>).birth_date || '',
-    gender: (p as Record<string, unknown>).sex === 'M' ? 'male' : (p as Record<string, unknown>).sex === 'F' ? 'female' : '',
-    address: (p as Record<string, unknown>).address || '',
-    passport: p.doc_number || '',
-    insuranceNumber: '',
-    emergencyContact: '',
-    emergencyPhone: '',
-    bloodType: '',
-    allergies: '',
-    chronicDiseases: '',
-    notes: '',
-    createdAt: p.created_at || new Date().toISOString().split('T')[0],
-    lastVisit: null,
-    visitsCount: 0
-  });
+  // Transform API snake_case → component camelCase.
+  // IMPORTANT (audit/phase-1, BS-34): medical fields (allergies, chronic_diseases,
+  // blood_type, insurance_number, emergency_contact, emergency_phone, notes)
+  // are read from the backend payload, NOT hardcoded to ''. The previous
+  // implementation silently wiped these fields on every load/create/update,
+  // which caused clinicians to see empty allergy warnings and made filter-by-
+  // blood-type impossible. This was a medical-safety defect.
+  const transformPatient = (p: Patient) => {
+    const raw = p as Record<string, unknown>;
+    return {
+      id: p.id,
+      firstName: raw.first_name,
+      lastName: raw.last_name,
+      middleName: raw.middle_name,
+      email: raw.email || '',
+      phone: raw.phone || '',
+      birthDate: raw.birth_date || '',
+      gender: raw.sex === 'M' ? 'male' : raw.sex === 'F' ? 'female' : '',
+      address: raw.address || '',
+      passport: p.doc_number || '',
+      // Medical / identity fields — read with `?? ''` so a missing key
+      // collapses to empty string without losing real backend data.
+      insuranceNumber: (raw.insurance_number ?? raw.insuranceNumber ?? '') as string,
+      emergencyContact: (raw.emergency_contact ?? raw.emergencyContact ?? '') as string,
+      emergencyPhone: (raw.emergency_phone ?? raw.emergencyPhone ?? '') as string,
+      bloodType: (raw.blood_type ?? raw.bloodType ?? '') as string,
+      allergies: (raw.allergies ?? '') as string,
+      chronicDiseases: (raw.chronic_diseases ?? raw.chronicDiseases ?? '') as string,
+      notes: (raw.notes ?? '') as string,
+      createdAt: p.created_at || new Date().toISOString().split('T')[0],
+      lastVisit: null,
+      visitsCount: 0
+    };
+  };
 
   // Загрузка пациентов
   const loadPatients = useCallback(async () => {
