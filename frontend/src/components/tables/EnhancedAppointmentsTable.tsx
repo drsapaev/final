@@ -529,9 +529,14 @@ const EnhancedAppointmentsTable = ({
   }, [withOpacity, t]);
 
   // ✅ УНИВЕРСАЛЬНЫЙ МАППИНГ УСЛУГ (работает с любыми данными из админ панели)
+  // audit/phase-6, BS-61: extended to also build nameToService + codeToService
+  // maps so the per-row renderServices() can do O(1) lookups instead of
+  // nested Object.values(services).find() — was O(rows × groups × group_size).
   const createServiceMapping = useCallback(() => {
     const mapping = {};
     const categoryMapping = {};
+    const nameToService: Record<string, Record<string, unknown>> = {};
+    const codeToService: Record<string, Record<string, unknown>> = {};
 
     // Преобразуем структуру services в плоские маппинги
     Object.entries(services).forEach(([category, group]) => {
@@ -547,12 +552,23 @@ const EnhancedAppointmentsTable = ({
               mapping[String(service.service_id)] = service.name;
               categoryMapping[String(service.service_id)] = category;
             }
+
+            // audit/phase-6, BS-61: index by name (lowercase for case-insensitive lookup)
+            nameToService[String(service.name).toLowerCase()] = service;
+
+            // index by service_code + code (uppercase for case-insensitive lookup)
+            if (service.service_code) {
+              codeToService[String(service.service_code).toUpperCase()] = service;
+            }
+            if (service.code) {
+              codeToService[String(service.code).toUpperCase()] = service;
+            }
           }
         });
       }
     });
 
-    return { mapping, categoryMapping };
+    return { mapping, categoryMapping, nameToService, codeToService };
   }, [services]);
 
   // Рендер услуг с динамическим маппингом
@@ -561,7 +577,7 @@ const EnhancedAppointmentsTable = ({
       return '—';
     }
 
-    const { mapping: serviceMapping } = createServiceMapping();
+    const { mapping: serviceMapping, nameToService, codeToService } = createServiceMapping();
 
     // Поддерживаем как массив строк, так и массив объектов
     let servicesList = [];
@@ -607,26 +623,24 @@ const EnhancedAppointmentsTable = ({
     };
 
     // ✅ ИСПОЛЬЗУЕМ НОВЫЕ КОДЫ ИЗ БАЗЫ ДАННЫХ
+    // audit/phase-6, BS-61: use nameToService map (O(1)) instead of nested
+    // Object.values(services).find() (O(groups × group_size) per service).
     const compactCodes = servicesList.map((serviceName) => {
       // Если это уже код (K01, D02, D_PROC03, etc), возвращаем в верхнем регистре
       if (isServiceCode(serviceName)) {
         return String(serviceName).toUpperCase();
       }
 
-      // Если это название, ищем услугу и получаем её код
-      for (const group of Object.values(services)) {
-        if (Array.isArray(group)) {
-          const foundService = group.find((s) => s.name === serviceName);
-          if (foundService) {
-            // Используем service_code если есть, иначе генерируем из category_code
-            if (foundService.service_code) {
-              return String(foundService.service_code).toUpperCase();
-            }
-            // Если есть category_code но нет service_code, генерируем временный код
-            if (foundService.category_code) {
-              return `${String(foundService.category_code).toUpperCase()}${String(foundService.id).padStart(2, '0')}`;
-            }
-          }
+      // Если это название, ищем услугу через O(1) map lookup
+      const foundService = nameToService[String(serviceName).toLowerCase()];
+      if (foundService) {
+        // Используем service_code если есть, иначе генерируем из category_code
+        if (foundService.service_code) {
+          return String(foundService.service_code).toUpperCase();
+        }
+        // Если есть category_code но нет service_code, генерируем временный код
+        if (foundService.category_code) {
+          return `${String(foundService.category_code).toUpperCase()}${String(foundService.id).padStart(2, '0')}`;
         }
       }
 
@@ -636,6 +650,7 @@ const EnhancedAppointmentsTable = ({
 
     // ✅ Преобразуем коды обратно в названия для tooltip
     // ⭐ SSOT: Используем централизованную функцию getServiceDisplayName
+    // audit/phase-6, BS-61: use codeToService map (O(1)) instead of nested find().
     const serviceNamesForTooltip = compactCodes.map((code) => {
       // Если это код, ищем полное название через SSOT
       if (isServiceCode(code)) {
@@ -645,17 +660,10 @@ const EnhancedAppointmentsTable = ({
           return ssotName;
         }
 
-        // Fallback: Ищем в services prop по service_code (точное совпадение)
-        for (const group of Object.values(services)) {
-          if (Array.isArray(group)) {
-            const foundService = group.find((s) =>
-            (s.service_code || '').toUpperCase() === code ||
-            (s.code || '').toUpperCase() === code
-            );
-            if (foundService) {
-              return foundService.name;
-            }
-          }
+        // Fallback: O(1) lookup in codeToService map (keyed by uppercase code)
+        const foundService = codeToService[code.toUpperCase()];
+        if (foundService) {
+          return foundService.name;
         }
 
         // Если не нашли название для кода, возвращаем код как есть
@@ -671,32 +679,19 @@ const EnhancedAppointmentsTable = ({
 
     if (allPatientServices && allPatientServices.length > 0) {
       // ✅ Преобразуем коды всех услуг в названия
+      // audit/phase-6, BS-61: use codeToService map (O(1)) instead of two
+      // nested find() loops per service.
       const allPatientServiceNames = allPatientServices.map((service) => {
         // Если это уже название (длинное, с пробелами), возвращаем как есть
         if (typeof service === 'string' && service.length > 20 && /\s/.test(service)) {
           return service;
         }
 
-        // Если это код, ищем название
+        // Если это код, ищем название через O(1) map lookup
         if (isServiceCode(service)) {
-          // Ищем по service_code
-          for (const group of Object.values(services)) {
-            if (Array.isArray(group)) {
-              const foundService = group.find((s) => s.service_code === service);
-              if (foundService) {
-                return foundService.name;
-              }
-            }
-          }
-
-          // Ищем по старому полю code
-          for (const group of Object.values(services)) {
-            if (Array.isArray(group)) {
-              const foundService = group.find((s) => s.code === service);
-              if (foundService) {
-                return foundService.name;
-              }
-            }
+          const foundService = codeToService[String(service).toUpperCase()];
+          if (foundService) {
+            return foundService.name;
           }
 
           // Если не нашли, возвращаем код

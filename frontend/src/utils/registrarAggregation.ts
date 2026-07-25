@@ -226,9 +226,19 @@ export const aggregatePatientsForAllDepartments = (appointments = []) => {
         visit_id: initialVisitId,
         appointment_id: initialAppointmentId,
         queue_entry_id: initialQueueEntryId,
+        // audit/phase-6, BS-60: use Sets for deduplication throughout the loop,
+        // materialize to arrays only at the finalization step (line 440+).
+        // Previously each push was followed by [...new Set(array)] which is
+        // O(k) per appointment -> O(k^2) per patient for k appointments.
+        // External consumers expect arrays, so we keep the array fields as
+        // the canonical source and maintain Sets as a fast dedup index.
         visit_ids: initialVisitId !== null && initialVisitId !== undefined ? [initialVisitId] : [],
         appointment_ids: initialAppointmentId !== null && initialAppointmentId !== undefined ? [initialAppointmentId] : [],
         queue_entry_ids: initialQueueEntryId !== null && initialQueueEntryId !== undefined ? [initialQueueEntryId] : [],
+        visit_ids_set: new Set(initialVisitId !== null && initialVisitId !== undefined ? [initialVisitId] : []),
+        appointment_ids_set: new Set(initialAppointmentId !== null && initialAppointmentId !== undefined ? [initialAppointmentId] : []),
+        queue_entry_ids_set: new Set(initialQueueEntryId !== null && initialQueueEntryId !== undefined ? [initialQueueEntryId] : []),
+        aggregated_ids_set: new Set(appointment.aggregated_ids ? [...appointment.aggregated_ids] : [appointment.id]),
         patient_id: appointment.patient_id,
         patient_fio: appointment.patient_fio,
         patient_birth_year: appointment.patient_birth_year,
@@ -269,36 +279,49 @@ export const aggregatePatientsForAllDepartments = (appointments = []) => {
         grouped_payment_types: [],
         grouped_records: [],
         grouped_record_refs: [],
+        // audit/phase-6, BS-60: arrays kept in sync with Sets for backward
+        // compat (some consumers read array.length / array[0]); Sets are the
+        // dedup source of truth.
         aggregated_ids: appointment.aggregated_ids ? [...appointment.aggregated_ids] : [appointment.id],
+        // (old field retained for shape compat; the Set above is the SSOT)
       };
     } else {
+      // audit/phase-6, BS-60: dedup via Set.add (O(1) per id) instead of
+      // [...new Set(array)] (O(k) per appointment). The array field is
+      // rebuilt from the Set at the finalization step (line 440+).
       const newIds = appointment.aggregated_ids || [appointment.id];
-      patientGroups[patientKey].aggregated_ids.push(...newIds);
-      patientGroups[patientKey].aggregated_ids = [...new Set(patientGroups[patientKey].aggregated_ids)];
+      const aggregatedSet = patientGroups[patientKey].aggregated_ids_set as Set<unknown>;
+      for (const id of newIds) {
+        aggregatedSet.add(id);
+      }
+      patientGroups[patientKey].aggregated_ids = [...aggregatedSet];
 
       const nextVisitId = pickCanonicalVisitId(appointment);
       const nextAppointmentId = pickCanonicalAppointmentId(appointment);
       const nextQueueEntryId = pickCanonicalQueueEntryId(appointment);
 
       if (nextVisitId !== null && nextVisitId !== undefined) {
-        patientGroups[patientKey].visit_ids.push(nextVisitId);
-        patientGroups[patientKey].visit_ids = [...new Set(patientGroups[patientKey].visit_ids)];
+        const visitSet = patientGroups[patientKey].visit_ids_set as Set<unknown>;
+        visitSet.add(nextVisitId);
+        patientGroups[patientKey].visit_ids = [...visitSet];
         if (!patientGroups[patientKey].visit_id) {
           patientGroups[patientKey].visit_id = nextVisitId;
         }
       }
 
       if (nextAppointmentId !== null && nextAppointmentId !== undefined) {
-        patientGroups[patientKey].appointment_ids.push(nextAppointmentId);
-        patientGroups[patientKey].appointment_ids = [...new Set(patientGroups[patientKey].appointment_ids)];
+        const apptSet = patientGroups[patientKey].appointment_ids_set as Set<unknown>;
+        apptSet.add(nextAppointmentId);
+        patientGroups[patientKey].appointment_ids = [...apptSet];
         if (!patientGroups[patientKey].appointment_id) {
           patientGroups[patientKey].appointment_id = nextAppointmentId;
         }
       }
 
       if (nextQueueEntryId !== null && nextQueueEntryId !== undefined) {
-        patientGroups[patientKey].queue_entry_ids.push(nextQueueEntryId);
-        patientGroups[patientKey].queue_entry_ids = [...new Set(patientGroups[patientKey].queue_entry_ids)];
+        const queueSet = patientGroups[patientKey].queue_entry_ids_set as Set<unknown>;
+        queueSet.add(nextQueueEntryId);
+        patientGroups[patientKey].queue_entry_ids = [...queueSet];
         if (!patientGroups[patientKey].queue_entry_id) {
           patientGroups[patientKey].queue_entry_id = nextQueueEntryId;
         }
@@ -437,7 +460,19 @@ export const aggregatePatientsForAllDepartments = (appointments = []) => {
     }
   });
 
-  return Object.values(patientGroups).map((group) => {
+  return Object.values(patientGroups).map((group): Record<string, unknown> => {
+    // audit/phase-6, BS-60: strip the Set index fields before returning —
+    // external consumers expect the array shape, not the Sets.
+    const groupRecord = group as Record<string, unknown>;
+    const {
+      visit_ids_set: _visitIdsSet,
+      appointment_ids_set: _apptIdsSet,
+      queue_entry_ids_set: _queueIdsSet,
+      aggregated_ids_set: _aggIdsSet,
+      ...groupPublic
+    } = groupRecord;
+    void _visitIdsSet; void _apptIdsSet; void _queueIdsSet; void _aggIdsSet;
+
     const records: unknown[] = Array.isArray(group.grouped_records) ? group.grouped_records as unknown[] : [];
     const groupedDiscountModes: unknown[] = Array.isArray(group.grouped_discount_modes) ? group.grouped_discount_modes as unknown[] : [];
     const uniqueRegistrationModes = [...new Set(groupedDiscountModes.filter(Boolean))];
@@ -485,7 +520,7 @@ export const aggregatePatientsForAllDepartments = (appointments = []) => {
     }
 
     return {
-      ...group,
+      ...groupPublic,
       visit_type: uniqueRegistrationModes.length === 1 ? group.visit_type : 'mixed',
       discount_mode: uniqueRegistrationModes.length === 1 ? uniqueRegistrationModes[0] : 'mixed',
       payment_type: aggregatePaymentType,
