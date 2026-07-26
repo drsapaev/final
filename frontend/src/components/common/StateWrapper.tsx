@@ -119,7 +119,7 @@ export function StateWrapper({
         icon={emptyIcon}
         title={emptyTitle}
         message={emptyMessage}
-        action={emptyAction}
+        action={emptyAction ? String(emptyAction) : undefined}
       />
     );
   }
