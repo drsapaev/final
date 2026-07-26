@@ -1,5 +1,19 @@
 import { MoreHorizontal } from 'lucide-react';
+import type { CSSProperties, MouseEvent, KeyboardEvent, FocusEvent } from 'react';
 import { useTranslation } from '../../../i18n/useTranslation';
+
+interface MacOSPaginationProps {
+  currentPage?: number;
+  totalPages?: number;
+  onPageChange?: (page: number) => void;
+  showFirstLast?: boolean;
+  showPrevNext?: boolean;
+  maxVisiblePages?: number;
+  size?: 'sm' | 'md' | 'lg' | string;
+  variant?: 'default' | 'filled' | 'minimal' | string;
+  className?: string;
+  style?: CSSProperties;
+}
 
 const MacOSPagination = ({
   currentPage = 1,
@@ -12,7 +26,7 @@ const MacOSPagination = ({
   variant = 'default',
   className,
   style
-}) => {
+}: MacOSPaginationProps) => {
   void showPrevNext;
   const sizeStyles = {
     sm: {
@@ -53,8 +67,8 @@ const MacOSPagination = ({
     }
   };
 
-  const currentSize = sizeStyles[size];
-  const currentVariant = variantStyles[variant];
+  const currentSize = sizeStyles[size as 'sm' | 'md' | 'lg'];
+  const currentVariant = variantStyles[variant as 'default' | 'filled' | 'minimal'];
 
   const containerStyle = {
     display: 'flex',
@@ -82,39 +96,39 @@ const MacOSPagination = ({
     opacity: isDisabled ? 0.6 : 1
   });
 
-  const handlePageClick = (page) => {
+  const handlePageClick = (page: number) => {
     if (page >= 1 && page <= totalPages && page !== currentPage) {
-      onPageChange(page);
+      onPageChange?.(page);
     }
   };
 
-  const handleKeyDown = (e, page) => {
+  const handleKeyDown = (e: KeyboardEvent<HTMLElement>, page: number) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       handlePageClick(page);
     }
   };
 
-  const handleMouseEnter = (e, isActive, isDisabled) => {
+  const handleMouseEnter = (e: MouseEvent<HTMLElement>, isActive: boolean, isDisabled: boolean) => {
     if (!isActive && !isDisabled) {
-      e.target.style.background = 'var(--mac-bg-secondary)';
-      e.target.style.borderColor = 'var(--mac-border-hover)';
+      (e.target as HTMLElement).style.background = 'var(--mac-bg-secondary)';
+      (e.target as HTMLElement).style.borderColor = 'var(--mac-border-hover)';
     }
   };
 
-  const handleMouseLeave = (e, isActive) => {
+  const handleMouseLeave = (e: MouseEvent<HTMLElement>, isActive: boolean) => {
     if (!isActive) {
-      e.target.style.background = currentVariant.background;
-      e.target.style.borderColor = currentVariant.border.split(' ')[2];
+      (e.target as HTMLElement).style.background = currentVariant.background;
+      (e.target as HTMLElement).style.borderColor = currentVariant.border.split(' ')[2];
     }
   };
 
-  const handleFocus = (e) => {
+  const handleFocus = (e: FocusEvent<HTMLElement>) => {
     e.target.style.outline = '2px solid var(--mac-accent-blue)';
     e.target.style.outlineOffset = '2px';
   };
 
-  const handleBlur = (e) => {
+  const handleBlur = (e: FocusEvent<HTMLElement>) => {
     e.target.style.outline = 'none';
   };
 

@@ -1,37 +1,44 @@
 import { toast } from 'react-toastify';
 
-const DEFAULT_OPTIONS = {
+type ToastOptions = Record<string, unknown>;
+
+const DEFAULT_OPTIONS: ToastOptions = {
   autoClose: 4000,
   closeOnClick: true,
   pauseOnHover: true,
   draggable: true
 };
 
-const buildOptions = (options = {}) => ({
+const buildOptions = (options: ToastOptions = {}): ToastOptions => ({
   ...DEFAULT_OPTIONS,
   ...options
 });
 
 export const notify = {
-  success(message, options = {}) {
-    return toast.success(message, buildOptions(options));
+  success(message: string, options: ToastOptions = {}): ReturnType<typeof toast.success> {
+    return toast.success(message, buildOptions(options) as never);
   },
 
-  error(message, options = {}) {
-    return toast.error(message, buildOptions(options));
+  error(message: string, options: ToastOptions = {}): ReturnType<typeof toast.error> {
+    return toast.error(message, buildOptions(options) as never);
   },
 
-  info(message, options = {}) {
-    return toast.info(message, buildOptions(options));
+  info(message: string, options: ToastOptions = {}): ReturnType<typeof toast.info> {
+    return toast.info(message, buildOptions(options) as never);
   },
 
-  warning(message, options = {}) {
-    return toast.warning(message, buildOptions(options));
+  warning(message: string, options: ToastOptions = {}): ReturnType<typeof toast.warning> {
+    return toast.warning(message, buildOptions(options) as never);
   },
 
-  fromError(error, fallbackMessage = 'Произошла ошибка', options = {}) {
-    const message = error?.response?.data?.detail || error?.message || fallbackMessage;
-    return toast.error(message, buildOptions(options));
+  fromError(
+    error: { response?: { data?: { detail?: string } }; message?: string } | unknown,
+    fallbackMessage: string = 'Произошла ошибка',
+    options: ToastOptions = {}
+  ): ReturnType<typeof toast.error> {
+    const err = error as { response?: { data?: { detail?: string } }; message?: string };
+    const message = err?.response?.data?.detail || err?.message || fallbackMessage;
+    return toast.error(message, buildOptions(options) as never);
   }
 };
 

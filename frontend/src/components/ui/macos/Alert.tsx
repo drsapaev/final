@@ -6,7 +6,7 @@ import { useTranslation } from '../../../i18n/useTranslation';
 // Supports both old Alert API (children + severity) and MacOSAlert API
 // (type + title + description + action + dismissible).
 
-const variantStyle = (severity) => {
+const variantStyle = (severity: string): { borderColor: string; background: string; color: string } => {
   switch (severity) {
     case 'success':
       return { borderColor: 'rgba(52,199,89,0.35)', background: 'rgba(52,199,89,0.08)', color: 'var(--mac-text-primary)' };
@@ -20,7 +20,7 @@ const variantStyle = (severity) => {
   }
 };
 
-const typeIcons = {
+const typeIcons: Record<string, typeof Info> = {
   info: Info,
   success: CheckCircle,
   warning: AlertTriangle,

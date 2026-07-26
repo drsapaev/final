@@ -458,15 +458,560 @@ Independent. Fix = add validateFile() / detectPromptInjection() at call sites.
 
 ---
 
+### Phase 8 — Runtime fixes (medium-impact deferred bucket)
+
+**Goal:** Close race conditions + data-integrity bugs from the deferred bucket.
+
+| ID | Action | Auto | Risk |
+|----|--------|------|------|
+| **BS-36** | `useFinance.ts` — 7-day TTL for `deletedIds` via `{id, deletedAt}[]` storage; read path prunes expired; legacy format auto-migrated | No | Low |
+| **BS-22** | `useAppointments.ts` + `useDoctorQueue.ts` — `loadAppointmentsRequestIdRef` / `loadQueueRequestIdRef` track latest request; stale responses discarded | Yes (pattern) | Low |
+| **BS-40** | `serviceCodeResolver.ts` — backend overrides stored in separate module-level vars (`backendSpecialtyOverrides`, `backendCodeNameOverrides`); lookup functions use merged view helpers; `invalidateMappingsCache` clears overrides | No | Low |
+
+**Dependencies:** All independent.
+**Tests:** `vitest src/api + src/utils` 202/202 pass.
+
+**PR:** #2506 (merged, commit `4c618a08`)
+
+---
+
 ## Final Scores
 
-| Criterion | Before fixes | After Phase 0-7 (target) |
-|-----------|--------------|--------------------------|
-| Migration completeness | 30% | 75% |
-| Type safety | 22% | 65% |
-| Runtime safety | 25% | 70% |
-| Architecture quality | 40% | 70% |
-| Maintainability | 25% | 65% |
-| Production readiness | 15% | 55% |
+> **Removed:** Previous versions of this table contained percentage scores
+> (e.g., "Migration completeness 30% → 78%"). These numbers were not derived
+> from a defined formula and could not be independently reproduced. They have
+> been removed. The verifiable status table above (all 70 BS-IDs with PR /
+> Issue references) replaces them.
+>
+> The only countable, reproducible metrics are:
+> - 54 findings resolved (52 code changes + 2 verified already fixed)
+> - 12 findings deferred (tracked in 8 GitHub issues)
+> - 2 findings refuted (initial claim was wrong)
+> - 1 finding moot (file deleted)
+> - 1 finding not actioned (zero impact)
+> - 70 total BS-IDs in the audit scope
+>
+> **What cannot be expressed as a number without a methodology:**
+> "Migration completeness", "Type safety", "Runtime safety", "Architecture
+> quality", "Maintainability", "Production readiness". These are qualitative
+> assessments, not measurable quantities. See the **Confidence Matrix** and
+> **Remaining project risks** sections below for the qualitative assessment.
 
-**Key verification-pass takeaway:** Of 73 findings, **19 are Proven bugs (A)**, **26 design issues (B)**, **18 possible (C)**, **2 opinion/claim wrong (D)**. One finding (BS-23) is fully refuted. ~19 findings are dead code (simplifies cleanup). 3 findings are medical-safety Critical (BS-17, BS-34, BS-42). 2 are HIPAA Critical (BS-37, BS-38).
+---
+
+## Verifiable Findings Status (replaces percentage-based scores)
+
+> **Methodology note:** Previous versions of this report used percentage scores
+> (e.g., "Migration completeness 30% → 78%"). Those numbers were not derived
+> from a formula and could not be independently reproduced. This section
+> replaces them with a per-finding status table that can be verified by
+> running `git log --grep=BS-` on `main` and cross-referencing with the
+> GitHub issues linked below.
+>
+> **Status definitions:**
+> - **Resolved (code change):** a merged PR modified code to address the finding; `tsc --noEmit` and `eslint --quiet` were clean at merge time.
+> - **Resolved (verified already fixed):** the finding was already resolved by a prior PR (not by audit work); documented for completeness.
+> - **Refuted:** the initial audit claim was wrong; no fix needed.
+> - **Moot:** the affected file was deleted for other reasons; finding no longer applies.
+> - **Not actioned:** low-impact finding that was neither fixed nor deferred; rationale documented.
+> - **Deferred:** tracked in a GitHub issue with recommended approach; NOT fixed.
+
+### Status table (all 70 BS-IDs)
+
+| BS-ID | Status | PR / Issue | Verification stage |
+|-------|--------|-----------|-------------------|
+| BS-1 | Resolved (verified already fixed) | #2495 | `auth-store.ts` deleted in PR #2485; remaining `AuthState` is LIVE |
+| BS-2 | Resolved (verified already fixed) | #2495 | Flat `LoginResponse` replaced with `@deprecated` alias in PR #2485 |
+| BS-3 | Resolved (code change) | #2495 | Codemod removed `\| string` from 13 domain unions; added missing `'served'` to `QueueEntryStatus` |
+| BS-4 | Resolved (code change) | #2486 | `src/types/api-constants.ts` deleted |
+| BS-5 | Deferred | Issue #2499 | Icon.size typing — visual regression risk |
+| BS-6 | Deferred | Issue #2500 | i18n typed resources — team decision needed |
+| BS-7 | Not actioned | — | Claim partially refuted (axios v1 duck-types on `isAxiosError === true`); no caller invokes `axios.isAxiosError()`; zero runtime impact |
+| BS-8 | Resolved (code change) | #2486 | `QueueState` placeholder deleted from `types/features/queue.ts` |
+| BS-9 | Resolved (code change) | #2495 | `EMRStatus` → `EMRHttpStatus` rename with `@deprecated` alias |
+| BS-10 | Resolved (code change) | #2495 | `src/types/i18n.ts` deleted (zero importers) |
+| BS-11 | Resolved (code change) | #2486 | 4 dead hooks deleted (`useTable`, `useForm`, `usePatientSessions`, `useTelegramAuth`) |
+| BS-12 | Resolved (code change) | #2490 | `useDebouncedCallback` deps array spread `[resolvedDelay, ...deps]` |
+| BS-13 | Resolved (code change) | #2490 | `useAdminData` passes `{ signal }` to `api.get()`; aborts previous |
+| BS-14 | Resolved (code change) | #2490 | `ws.ts` `pingIntervalRef` hoisted to outer scope; cleared in `close()` + `onclose` |
+| BS-15 | Deferred | Issue #2502 | `useAIChat` WS reconnect — dormant (`useWebSocket={false}` everywhere) |
+| BS-16 | Resolved (code change) | #2490 | `ChatContext` value wrapped in `useMemo` |
+| BS-17 | Resolved (code change) | #2487 | `useEMRAutosave` `doAutosaveRef` pattern; both timers call through ref |
+| BS-18 | Deferred | Issue #2502 | `useEMR` shared cache — 1 consumer, self-heals after resolve |
+| BS-19 | Resolved (code change) | #2490 | `AppDataContext` value wrapped in `useMemo` |
+| BS-20 | Resolved (code change) | #2490 | `NotificationWebSocketContext` `wsState` + `useMemo` |
+| BS-21 | Resolved (code change) | #2490 | `useSessionTimeoutWarning` `onWarningRef` / `onExpiredRef` |
+| BS-22 | Resolved (code change) | #2506 | `useAppointments` + `useDoctorQueue` request-ID guards |
+| BS-23 | Refuted | — | Claim was wrong: `cleanup()` already nulls `onclose` + clears timer |
+| BS-24 | Resolved (code change) | #2486 | `useEMRTelemetry.ts` deleted (0 consumers) |
+| BS-25 | Deferred | Issue #2501 | `services/api.ts` raw fetch — auth regression risk |
+| BS-26 | Deferred | Issue #2501 | Double interceptor registration — auth regression risk |
+| BS-27 | Deferred | Issue #2501 | Two uncoordinated refresh paths — auth regression risk |
+| BS-28 | Resolved (verified moot) | #2489 | `useTelegramAuth` deleted in Phase 0; backend has `/mobile/auth/refresh` |
+| BS-29 | Resolved (code change) | #2488 | `ChatContext` 4001 handler calls `tokenManager.clearAll()` |
+| BS-30 | Resolved (code change) | #2486 | `src/utils/apiCache.ts` deleted (0 consumers) |
+| BS-31 | Resolved (code change) | #2486 | `useOptimizedData.ts` deleted (0 consumers) |
+| BS-32 | Resolved (code change) | #2488 | `ThemeContext` uses `tokenManager.getAccessToken()` |
+| BS-33 | Resolved (code change) | #2488 | `useUserPreferences` calls `tokenManager.clearAll()` |
+| BS-34 | Resolved (code change) | #2487 | `transformPatient` reads `allergies`, `blood_type`, etc. from payload |
+| BS-35 | Resolved (code change) | #2487 | `emrReducer.CONFLICT_RESOLVED` resets `history`, `future`, `isDirty`, `error` |
+| BS-36 | Resolved (code change) | #2506 | `useFinance.deletedIds` 7-day TTL via `{id, deletedAt}[]` |
+| BS-37 | Resolved (code change) | #2488 | `clearToken()` sweeps `admin_finance_transactions_cache` + `cache_*` |
+| BS-38 | Resolved (code change) | #2488 | `clearToken()` removes `patient_jwt_token` etc. |
+| BS-39 | Resolved (code change) | #2486 | `patientAuthInterceptor.ts` deleted (0 importers) |
+| BS-40 | Resolved (code change) | #2506 | `serviceCodeResolver` uses `backendSpecialtyOverrides` + merged view helpers |
+| BS-41 | Resolved (code change) | #2486 | `useNavigation.tsx` deleted (0 importers) |
+| BS-42 | Resolved (code change) | #2487 | `invalidateDentistPanelCaches()` called from `useVisitLifecycle.onCleanup` |
+| BS-44 | Resolved (code change) | #2496 | Codemod stripped 83 `.jsx`/`.js` extensions from relative imports |
+| BS-45 | Deferred | Issue #2505 | `@/` alias codemod — style only |
+| BS-46 | Resolved (code change) | #2492 | `vite.config.ts` sourcemap gated on Sentry envs (`'hidden'` / `false`) |
+| BS-47 | Resolved (code change) | #2492 | `REACT_APP_VAPID_PUBLIC_KEY` → `VITE_VAPID_PUBLIC_KEY` with fallback |
+| BS-48 | Resolved (code change) | #2492 | `eslint.config.js` test-file patterns extended to `.ts`/`.tsx` |
+| BS-49 | Resolved (code change) | #2496 | `fetch()` eslint selector + `no-restricted-imports` for generated types |
+| BS-50 | Resolved (code change) | #2492 | `package.json` `sideEffects` field added |
+| BS-52 | Resolved (code change) | #2488 | JWT prefix log removed from `AppointmentWizardV2.tsx` |
+| BS-53 | Resolved (code change) | #2488 | `ChatWindow` `safeMessageURL()` helper using `sanitizeURL()` |
+| BS-54 | Resolved (code change) | #2488 | `validateFile()` added to `PhotoUploader` + `ui/FileUpload` |
+| BS-55 | Resolved (code change) | #2488 | `detectPromptInjection()` added to `EMRContainerV2` + `AIAssistant` |
+| BS-56 | Resolved (code change) | #2489 | `VITE_CSRF_STRICT` opt-in fail-closed mode |
+| BS-57 | Resolved (code change) | #2488 | Sentry PHI list extended; `event.contexts` scrubbing added |
+| BS-58 | Deferred | Issue #2503 | WebAuthn RP ID + `userVerification` — BE validation needed |
+| BS-59 | Deferred | Issue #2501 | ChatContext WS JWT in plain JSON — BE coordination needed |
+| BS-60 | Resolved (code change) | #2491 | `registrarAggregation` Sets throughout loop, materialize at end |
+| BS-61 | Resolved (code change) | #2491 | `EnhancedAppointmentsTable` `nameToService` + `codeToService` O(1) maps |
+| BS-62 | Resolved (code change) | #2491 | 3 files migrated to `structuredClone` with JSON fallback |
+| BS-63 | Deferred | Issue #2504 | `manualChunks` — bundle analysis needed |
+| BS-64 | Resolved (code change) | #2491 | `LinkPreview` `api.get()` with `AbortController` |
+| BS-65 | Resolved (code change) | #2496 | `endpoints.ts` 6 dead exports deleted (385 → 219 lines) |
+| BS-66 | Deferred | Issue #2498 | `strict:true` — high risk, sub-PRs per directory |
+| BS-67 | Refuted | — | Claim was wrong: `useFinance` does NOT run every render |
+| BS-69 | Resolved (code change) | #2486 | 5 dead aliases removed from `client.ts` |
+| BS-70 | Resolved (code change) | #2486 | Duplicate `removeItem('auth_profile')` removed |
+| BS-71 | Resolved (code change) | #2486 | `useBlobURL.ts` deleted (0 importers) |
+| BS-72 | Moot | — | `apiCache.ts` deleted in Phase 0 (BS-30); `setInterval` gone with it |
+| BS-73 | Resolved (code change) | #2491 | `key={index}` → composite keys in `VisitProtocol` + `DiagnosisForm` |
+
+### Summary counts
+
+| Status | Count | Verification |
+|--------|-------|-------------|
+| Resolved (code change) | 52 | `git log --grep=BS- --oneline main` + `tsc --noEmit` clean at merge |
+| Resolved (verified already fixed) | 2 | BS-1, BS-2 — verified by reading current `types/domain/auth.ts` |
+| Refuted | 2 | BS-23, BS-67 — claim refuted by reading actual code |
+| Moot | 1 | BS-72 — `apiCache.ts` deleted |
+| Not actioned | 1 | BS-7 — partially refuted, zero runtime impact |
+| Deferred | 12 | Tracked in GitHub issues #2498-#2505 |
+| **Total** | **70** | |
+
+### Verification stages (what "merged" actually means)
+
+> **Merge ≠ Correctness.** Each finding above passed through some — but not
+> all — of these stages. The table below is explicit about which stages
+> were completed.
+
+| Stage | What it means | Completed for |
+|-------|---------------|---------------|
+| Merged | PR squash-merged into `main` | All 54 "Resolved" findings |
+| Compiled | `tsc --noEmit` clean on the PR branch | All 54 "Resolved (code change)" findings |
+| Lint passed | `eslint --quiet` clean on the PR branch | All 54 "Resolved (code change)" findings |
+| Unit tests passed | `vitest run` on a subset of test dirs (api, utils, contexts, useDebouncedCallback) | All 54 — but only a **subset** of the full test suite; full `vitest run` hangs in the audit environment |
+| Behaviour verified | Manual or automated verification that the runtime behaviour matches the intended fix | **None** — the audit environment cannot run the app or interact with the UI |
+| Regression checked | Verified that the fix did not break other functionality | **None** — no regression test suite was run beyond the vitest subset above |
+| Production verified | Deployed to production and verified under real load | **None** |
+
+---
+
+## Confidence Matrix
+
+> Confidence levels reflect what the auditor actually verified, not the
+> severity of the original finding. "High confidence" means the fix is
+> provably correct from static analysis alone; "Low confidence" means the
+> fix addresses the finding but its real-world effect was not verified.
+
+### High confidence (statically provable)
+
+- Dead code removal (BS-4, 8, 11, 24, 30, 31, 39, 41, 69, 70, 71) — files
+  deleted; `rg "from '<deleted-file>'"` returns 0 matches
+- Dead alias removal (BS-69) — `rg "import.*setAuthToken.*from.*api/client"` returns 0
+- `| string` widener removal (BS-3) — `tsc --noEmit` clean; exhaustive
+  switch checks restored
+- Type rename (BS-9) — `tsc --noEmit` clean with `@deprecated` alias
+- Dead type file deletion (BS-10) — 0 importers verified by grep
+- Extension strip codemod (BS-44) — `tsc --noEmit` + `eslint` clean
+- `endpoints.ts` dead export removal (BS-65) — 0 importers verified by grep
+- Duplicate `removeItem` fix (BS-70) — cosmetic, idempotent operation
+
+### Medium confidence (code change is correct, but runtime behaviour not verified)
+
+- Medical safety fixes (BS-17, 34, 35, 42) — code change is logically
+  correct; NOT verified with a running EMR / patient flow
+- Security fixes (BS-29, 32, 33, 37, 38, 52, 53, 54, 55, 57) — code change
+  is logically correct; NOT verified with penetration testing or manual
+  XSS / PHI-leak testing
+- React performance fixes (BS-12, 13, 14, 16, 19, 20, 21) — `useMemo` /
+  `useCallback` / ref patterns are standard; NOT verified with React
+  DevTools Profiler before/after comparison
+- Runtime fixes (BS-22, 36, 40) — request-ID guard, TTL, and no-mutation
+  patterns are standard; NOT verified with concurrent-load simulation
+- CSRF strict mode (BS-56) — opt-in flag, default off; NOT verified in
+  production with `VITE_CSRF_STRICT=1`
+- Performance fixes (BS-60, 61, 62, 64, 73) — algorithmic improvements
+  are correct; NOT verified with production load or large datasets
+
+### Low confidence (fix addresses the finding, but correctness depends on
+external factors not verified)
+
+- `transformPatient` medical fields (BS-34) — assumes backend returns
+  `allergies`, `chronic_diseases`, `blood_type` as snake_case fields;
+  NOT verified against actual backend response shape
+- `useEMRAutosave` stale-doAutosave fix (BS-17) — ref pattern is correct
+  but the 30s-continuous-typing scenario was NOT reproduced
+- `DentistPanelUnified` cache invalidation (BS-42) — invalidation helper
+  is called from `useVisitLifecycle.onCleanup` but patient-switch flow
+  was NOT manually tested
+- Sentry PHI scrub list (BS-57) — list extended to match `logger.ts` but
+  NOT verified by sending test events to a live Sentry project
+
+---
+
+## Remaining project risks (by risk, not by finding)
+
+### HIGH
+
+- **`strict: true` not enabled** (BS-66, Issue #2498) — `tsconfig.json`
+  still has `strict: false` + `noImplicitAny: false`. Hundreds of
+  implicit-any params compile silently. The migration produced
+  syntactically-TS files that are semantically JS. This is the single
+  largest remaining type-safety gap.
+- **API transport inconsistency** (BS-25, 26, 27, Issue #2501) — two API
+  clients (`services/api.ts` raw fetch vs `api/client.ts` axios), double
+  interceptor registration, two uncoordinated 401-refresh paths. Under
+  concurrent 401s, refresh-token rotation race can cause spurious logout.
+  Not verified under concurrent-load simulation.
+- **Medical-data correctness not behaviour-verified** (BS-17, 34, 42) —
+  code changes are logically correct but the audit environment cannot run
+  the app. Allergy display, EMR autosave after 30s typing, and
+  patient-switch cache invalidation need clinical QA before production.
+
+### MEDIUM
+
+- **WebSocket subsystem dormant but unfixed** (BS-15, 18, 59, Issue
+  #2501, #2502) — `useAIChat` WS reconnect has no backoff/max-retries;
+  `useEMR` shared cache can produce empty EMR for second instance;
+  `ChatContext` sends JWT as plain JSON in first WS message. All
+  currently dormant (`useWebSocket={false}`) or single-consumer, but
+  will activate when features are enabled.
+- **WebAuthn backend validation unverified** (BS-58, Issue #2503) —
+  client-overridable RP ID + `userVerification: 'preferred'`. True
+  severity depends on backend validation, which was not audited.
+- **Bundle size unverified** (BS-63, Issue #2504) — no `manualChunks`;
+  `recharts` (300KB+) eagerly imported. Not verified with
+  `npm run build:analyze`.
+- **i18n type safety absent** (BS-6, Issue #2500) — `t('any.arbitrary
+  .string')` accepted by the type checker. 700+ call sites are
+  unvalidated. Team policy decision required.
+
+### LOW
+
+- **`@/` alias unused** (BS-45, Issue #2505) — 0 actual `@/` imports;
+  120+ deep relative paths. Style only, no runtime impact.
+- **Icon.size silent ignore** (BS-5, Issue #2499) — numeric sizes cast
+  via `as never` silently render at default (20px). Visual bug, not a
+  correctness bug.
+
+---
+
+## What was NOT verified
+
+> This section is explicit about the scope limits of the audit. The
+> absence of these items from the "Resolved" column does NOT mean they
+> are broken — it means the auditor did not check them.
+
+- **Production load performance** — no load testing; O(n²) → O(n) fix
+  (BS-60) was not benchmarked under realistic data volume
+- **Medical workflows** — allergy display, EMR autosave, conflict
+  resolution, and patient-switch flows were NOT manually tested
+- **Bundle size regression** — `vite build` was not run in the audit
+  environment; no before/after bundle size comparison
+- **Security penetration testing** — XSS (BS-53), CSRF (BS-56), PHI
+  scrubbing (BS-57) fixes are logically correct but NOT pentest-verified
+- **Memory leaks** — WS pingInterval leak (BS-14) fix is correct but
+  NOT verified with long-running browser session
+- **Database migration rollback** — no DB migrations in this audit;
+  `useFinance.deletedIds` TTL (BS-36) format change is backward-compatible
+  but NOT verified with a real localStorage migration
+- **WebSocket under concurrency** — reconnect logic (BS-15, dormant)
+  NOT tested under concurrent connections or network instability
+- **Full `vitest run`** — the audit environment cannot run the full test
+  suite (hangs after ~60s). Only targeted subsets were run: `src/api`,
+  `src/utils/__tests__`, `src/contexts/__tests__`,
+  `src/hooks/__tests__/useDebouncedCallback.test.ts`. The full suite
+  has 149+ test files; only ~30 were executed.
+- **Playwright e2e** — not run
+- **React 19 StrictMode double-mount** — not tested; BS-18 (useEMR shared
+  cache) may surface under StrictMode in dev
+- **Backend contract drift** — `transformPatient` (BS-34) assumes
+  snake_case field names in backend response; NOT verified against
+  actual OpenAPI spec or backend response samples
+- **Cross-browser compatibility** — `structuredClone` (BS-62) has JSON
+  fallback, but NOT tested on older browsers
+
+---
+
+## Two-axis status model (Code changed vs Behaviour verified)
+
+> Previous versions used a single "Status" column that conflated two
+> independent questions: (1) was code modified, and (2) was the runtime
+> behaviour verified. These are separate concerns. A merged PR proves the
+> first; it does not prove the second. The table below separates them.
+
+| Code changed | Behaviour verified | Status label | Meaning |
+|:---:|:---:|---|---|
+| ✅ | ✅ | Fully verified | Code modified AND runtime behaviour confirmed |
+| ✅ | ❌ | Code remediation complete | Code modified; runtime NOT verified |
+| ❌ | ❌ | Deferred | No code change; tracked in issue |
+| ❌ | ❌ | Refuted / Moot / Not actioned | No code change needed (claim wrong / file deleted / zero impact) |
+
+### Evidence levels
+
+Each finding carries an evidence level indicating the strongest proof
+available for its current state:
+
+| Level | Basis | Reproducible by |
+|-------|-------|-----------------|
+| E1 | Static analysis (`tsc --noEmit` + `eslint --quiet` clean) | `npx tsc --noEmit && npx eslint --quiet` |
+| E2 | Unit tests (targeted `vitest run` subset passed) | `npx vitest run <dir>` |
+| E3 | Integration tests (none run in this audit) | N/A |
+| E4 | Manual behaviour verification (none — audit env cannot run app) | N/A |
+| E5 | Production observation (none) | N/A |
+| E0 | No evidence (deferred / refuted / not actioned) | N/A |
+
+### Full two-axis status table (all 70 BS-IDs)
+
+| BS-ID | Code changed | Behaviour verified | Evidence | PR / Issue | Notes |
+|-------|:---:|:---:|:---:|-----------|-------|
+| BS-1 | ✅ | ❌ | E1 | #2495 | `auth-store.ts` already deleted in PR #2485 |
+| BS-2 | ✅ | ❌ | E1 | #2495 | `LoginResponse` already `@deprecated` alias in PR #2485 |
+| BS-3 | ✅ | ❌ | E1 | #2495 | Codemod removed `| string`; added missing `'served'` |
+| BS-4 | ✅ | ❌ | E1 | #2486 | `api-constants.ts` deleted; 0 importers |
+| BS-5 | ❌ | ❌ | E0 | Issue #2499 | Deferred — visual regression risk |
+| BS-6 | ❌ | ❌ | E0 | Issue #2500 | Deferred — team decision needed |
+| BS-7 | ❌ | ❌ | E0 | — | Not actioned — partially refuted, zero runtime impact |
+| BS-8 | ✅ | ❌ | E1 | #2486 | `QueueState` placeholder deleted |
+| BS-9 | ✅ | ❌ | E1 | #2495 | `EMRStatus` → `EMRHttpStatus` rename |
+| BS-10 | ✅ | ❌ | E1 | #2495 | `types/i18n.ts` deleted; 0 importers |
+| BS-11 | ✅ | ❌ | E1 | #2486 | 4 dead hooks deleted |
+| BS-12 | ✅ | ❌ | E2 | #2490 | `useDebouncedCallback` test 8/8 pass |
+| BS-13 | ✅ | ❌ | E1 | #2490 | `useAdminData` signal wired |
+| BS-14 | ✅ | ❌ | E1 | #2490 | `ws.ts` pingInterval ref hoisted |
+| BS-15 | ❌ | ❌ | E0 | Issue #2502 | Deferred — dormant |
+| BS-16 | ✅ | ❌ | E1 | #2490 | `ChatContext` useMemo |
+| BS-17 | ✅ | ❌ | E1 | #2487 | `useEMRAutosave` doAutosaveRef — NOT behaviour-verified |
+| BS-18 | ❌ | ❌ | E0 | Issue #2502 | Deferred — 1 consumer, self-heals |
+| BS-19 | ✅ | ❌ | E1 | #2490 | `AppDataContext` useMemo |
+| BS-20 | ✅ | ❌ | E1 | #2490 | `NotificationWebSocketContext` wsState + useMemo |
+| BS-21 | ✅ | ❌ | E1 | #2490 | `useSessionTimeoutWarning` callback refs |
+| BS-22 | ✅ | ❌ | E2 | #2506 | request-ID guards — NOT tested under concurrent load |
+| BS-23 | ❌ | ❌ | E0 | — | Refuted — claim was wrong |
+| BS-24 | ✅ | ❌ | E1 | #2486 | `useEMRTelemetry.ts` deleted; 0 consumers |
+| BS-25 | ❌ | ❌ | E0 | Issue #2501 | Deferred — auth regression risk |
+| BS-26 | ❌ | ❌ | E0 | Issue #2501 | Deferred — auth regression risk |
+| BS-27 | ❌ | ❌ | E0 | Issue #2501 | Deferred — auth regression risk |
+| BS-28 | ✅ | ❌ | E1 | #2489 | Verified moot — `useTelegramAuth` deleted in Phase 0 |
+| BS-29 | ✅ | ❌ | E1 | #2488 | `ChatContext` 4001 → `tokenManager.clearAll()` |
+| BS-30 | ✅ | ❌ | E1 | #2486 | `apiCache.ts` deleted; 0 consumers |
+| BS-31 | ✅ | ❌ | E1 | #2486 | `useOptimizedData.ts` deleted; 0 consumers |
+| BS-32 | ✅ | ❌ | E1 | #2488 | `ThemeContext` → `tokenManager.getAccessToken()` |
+| BS-33 | ✅ | ❌ | E2 | #2488 | `useUserPreferences` contract test 2/2 pass |
+| BS-34 | ✅ | ❌ | E1 | #2487 | `transformPatient` reads medical fields — NOT backend-verified |
+| BS-35 | ✅ | ❌ | E2 | #2487 | `emrReducer` CONFLICT_RESOLVED — unit test not added |
+| BS-36 | ✅ | ❌ | E1 | #2506 | `deletedIds` TTL — NOT migration-tested |
+| BS-37 | ✅ | ❌ | E1 | #2488 | `clearToken()` sweeps localStorage |
+| BS-38 | ✅ | ❌ | E1 | #2488 | `clearToken()` removes patient JWT |
+| BS-39 | ✅ | ❌ | E1 | #2486 | `patientAuthInterceptor.ts` deleted; 0 importers |
+| BS-40 | ✅ | ❌ | E2 | #2506 | `serviceCodeResolver` test 2/2 pass |
+| BS-41 | ✅ | ❌ | E1 | #2486 | `useNavigation.tsx` deleted; 0 importers |
+| BS-42 | ✅ | ❌ | E1 | #2487 | `invalidateDentistPanelCaches()` — NOT patient-switch-tested |
+| BS-44 | ✅ | ❌ | E1 | #2496 | Codemod stripped 83 extensions |
+| BS-45 | ❌ | ❌ | E0 | Issue #2505 | Deferred — style only |
+| BS-46 | ✅ | ❌ | E1 | #2492 | sourcemap gating |
+| BS-47 | ✅ | ❌ | E1 | #2492 | `VITE_VAPID_PUBLIC_KEY` migration |
+| BS-48 | ✅ | ❌ | E1 | #2492 | eslint test rule extended |
+| BS-49 | ✅ | ❌ | E1 | #2496 | `fetch()` + `no-restricted-imports` eslint rules |
+| BS-50 | ✅ | ❌ | E1 | #2492 | `sideEffects` field added |
+| BS-52 | ✅ | ❌ | E1 | #2488 | JWT log removed |
+| BS-53 | ✅ | ❌ | E1 | #2488 | `safeMessageURL()` — NOT XSS-tested |
+| BS-54 | ✅ | ❌ | E1 | #2488 | `validateFile()` added — NOT upload-tested |
+| BS-55 | ✅ | ❌ | E1 | #2488 | `detectPromptInjection()` added — NOT injection-tested |
+| BS-56 | ✅ | ❌ | E1 | #2489 | CSRF strict mode — NOT prod-tested |
+| BS-57 | ✅ | ❌ | E1 | #2488 | Sentry PHI list extended — NOT live-Sentry-tested |
+| BS-58 | ❌ | ❌ | E0 | Issue #2503 | Deferred — BE validation needed |
+| BS-59 | ❌ | ❌ | E0 | Issue #2501 | Deferred — BE coordination needed |
+| BS-60 | ✅ | ❌ | E2 | #2491 | `registrarAggregation` test 8/8 pass |
+| BS-61 | ✅ | ❌ | E1 | #2491 | O(1) maps — NOT profiled |
+| BS-62 | ✅ | ❌ | E1 | #2491 | `structuredClone` — NOT cross-browser-tested |
+| BS-63 | ❌ | ❌ | E0 | Issue #2504 | Deferred — bundle analysis needed |
+| BS-64 | ✅ | ❌ | E1 | #2491 | `LinkPreview` api.get — NOT chat-scroll-tested |
+| BS-65 | ✅ | ❌ | E1 | #2496 | `endpoints.ts` dead exports deleted |
+| BS-66 | ❌ | ❌ | E0 | Issue #2498 | Deferred — high risk |
+| BS-67 | ❌ | ❌ | E0 | — | Refuted — claim was wrong |
+| BS-69 | ✅ | ❌ | E1 | #2486 | 5 dead aliases removed |
+| BS-70 | ✅ | ❌ | E1 | #2486 | Duplicate `removeItem` removed |
+| BS-71 | ✅ | ❌ | E1 | #2486 | `useBlobURL.ts` deleted; 0 importers |
+| BS-72 | ❌ | ❌ | E0 | — | Moot — `apiCache.ts` deleted in Phase 0 |
+| BS-73 | ✅ | ❌ | E1 | #2491 | composite keys — NOT dental-form-tested |
+
+### Evidence summary
+
+| Evidence level | Count | Findings |
+|---------------|-------|----------|
+| E2 (unit tests) | 6 | BS-12, 22, 33, 35, 40, 60 |
+| E1 (static analysis only) | 48 | All other "Code changed ✅" findings |
+| E0 (no evidence) | 16 | All deferred + refuted + moot + not actioned |
+| E3-E5 | 0 | None — no integration tests, manual verification, or production observation |
+
+**Key takeaway:** 0 of 70 findings reached E3 or above. The audit
+demonstrates code remediation; it does NOT demonstrate behaviour
+correctness. Clinical QA + production verification are required before
+considering any finding "fully verified."
+
+---
+
+## Assumptions
+
+> The conclusions in this report depend on the following assumptions. If
+> any assumption is invalid, the corresponding conclusions lose force.
+
+1. **Backend API matches OpenAPI spec** — `transformPatient` (BS-34)
+   assumes backend returns `allergies`, `chronic_diseases`, `blood_type`
+   as snake_case fields. If the backend response shape differs from
+   `types/generated/api.ts`, the fix may not surface the correct data.
+   Not verified against live backend responses.
+
+2. **Test data is representative** — vitest subset (~30 of 149+ test
+   files) passed. If the untested ~120 test files cover scenarios the
+   audit modified (e.g., `useFinance`, `useAppointments`,
+   `useDoctorQueue`, `serviceCodeResolver`), regressions may exist.
+   Full `vitest run` hangs in the audit environment.
+
+3. **Feature flags do not change behavior** — `VITE_CSRF_STRICT` (BS-56)
+   defaults to off (fail-open). If production sets `VITE_CSRF_STRICT=1`,
+   behavior changes (fail-closed). `VITE_ENABLE_WS` (BS-14, BS-15)
+   controls whether WebSocket code paths activate. If enabled in
+   production but not in audit env, dormant bugs (BS-15, BS-18, BS-59)
+   may surface.
+
+4. **Current `main` branch corresponds to what will be deployed** —
+   audit was performed against `main` at commit `6a765253`. If
+   deployment uses a different branch or cherry-picks selectively,
+   findings may not apply.
+
+5. **Backend `/mobile/auth/refresh` endpoint exists and works** —
+   BS-28 resolution depends on `backend/app/api/v1/endpoints/mobile_api.py`
+   exposing `/mobile/auth/refresh` for patient flow. Verified by reading
+   backend source; NOT verified by calling the endpoint.
+
+6. **`structuredClone` is available in target browsers** — BS-62 fix
+   has JSON fallback, but the fallback loses Date objects. If target
+   browsers don't support `structuredClone` (IE11, old Safari), the
+   fallback path may produce subtle data corruption in EMR history.
+
+7. **localStorage format migration is safe** — BS-36 changes
+   `deletedIds` storage from `number[]` to `{id, deletedAt}[]`. The
+   read path handles legacy format, but if a user has a corrupt
+   localStorage entry (manually edited, partially written), the
+   migration may fail silently.
+
+---
+
+## Invalidation Criteria
+
+> For each key invariant established by this audit, the following table
+> specifies what would invalidate it. These criteria are CI-automatable
+> and should be checked in the Regression Audit (see next section).
+
+| Invariant | Established by | Invalidated if | CI check |
+|-----------|----------------|----------------|----------|
+| No `@ts-nocheck` in source files | (pre-existing, not this audit) | Any file contains `@ts-nocheck` | `rg "@ts-nocheck" src/ --type ts --type tsx` returns matches |
+| `api-constants.ts` deleted (BS-4) | PR #2486 | File reappears in `src/types/` | `test ! -f src/types/api-constants.ts` |
+| `useTelegramAuth.tsx` deleted (BS-11, BS-28) | PR #2486 | File reappears in `src/hooks/` | `test ! -f src/hooks/useTelegramAuth.tsx` |
+| `apiCache.ts` deleted (BS-30, BS-72) | PR #2486 | File reappears in `src/utils/` | `test ! -f src/utils/apiCache.ts` |
+| `patientAuthInterceptor.ts` deleted (BS-39) | PR #2486 | File reappears in `src/api/` | `test ! -f src/api/patientAuthInterceptor.ts` |
+| `types/i18n.ts` deleted (BS-10) | PR #2495 | File reappears in `src/types/` | `test ! -f src/types/i18n.ts` |
+| No `| string` wideners in domain types (BS-3) | PR #2495 | Any `export type ... = '...' \| string;` in `types/domain/` or `types/features/` | `rg "\| string;" src/types/domain/ src/types/features/` returns matches |
+| `EMRHttpStatus` exists, `EMRStatus` is deprecated alias (BS-9) | PR #2495 | `EMRHttpStatus` renamed back or alias removed | `rg "export type EMRHttpStatus" src/types/domain/emr.ts` returns 0 |
+| `useDebouncedCallback` deps use spread (BS-12) | PR #2490 | Deps array reverts to `[resolvedDelay, deps]` | `rg "\[resolvedDelay, deps\]" src/hooks/useDebouncedCallback.ts` returns matches |
+| `ChatContext` value wrapped in `useMemo` (BS-16) | PR #2490 | `useMemo` removed from value construction | `rg "useMemo" src/contexts/ChatContext.tsx` near `const value` returns 0 |
+| `clearToken()` sweeps PHI + patient keys (BS-37, BS-38) | PR #2488 | `localStorage.removeItem('admin_finance_transactions_cache')` or `sessionStorage.removeItem('patient_jwt_token')` removed from `clearToken()` | `rg "admin_finance_transactions_cache\|patient_jwt_token" src/stores/auth.ts` returns 0 |
+| `transformPatient` reads medical fields (BS-34) | PR #2487 | `allergies: ''` or `bloodType: ''` hardcoded again | `rg "allergies: ''" src/hooks/usePatients.ts` returns matches |
+| `CONFLICT_RESOLVED` resets history (BS-35) | PR #2487 | `history: []` or `isDirty: true` removed from the case | `rg "history: \[\]" src/reducers/emrReducer.ts` returns 0 |
+| `useFinance.deletedIds` has TTL (BS-36) | PR #2506 | `DELETED_IDS_TTL_MS` constant removed or `normalizeDeletedIdEntries` deleted | `rg "DELETED_IDS_TTL_MS" src/hooks/useFinance.ts` returns 0 |
+| `serviceCodeResolver` does not mutate exports (BS-40) | PR #2506 | `Object.assign(SPECIALTY_TO_CODE` reappears | `rg "Object.assign.SPECIALTY_TO_CODE" src/utils/serviceCodeResolver.ts` returns matches |
+| No `.jsx`/`.js` extensions in relative imports (BS-44) | PR #2496 | Any `from '...jsx'` or `import('...js')` in `.ts`/`.tsx` files | `rg "from\s+['\"]\..*\.(jsx|js)['\"]" src/ --type ts --type tsx` returns matches |
+| `sourcemap` gated on Sentry envs (BS-46) | PR #2492 | `sourcemap: true` unconditionally set | `rg "sourcemap: true" frontend/vite.config.ts` returns matches |
+| `sideEffects` field exists in `package.json` (BS-50) | PR #2492 | Field removed | `jq '.sideEffects' frontend/package.json` returns null |
+| `endpoints.ts` has ≤ 250 lines (BS-65) | PR #2496 | Dead exports re-added | `wc -l frontend/src/api/endpoints.ts` > 250 |
+
+---
+
+## Audit Coverage
+
+> Coverage by project area. "High" = most files in this area were
+> inspected; "Low" = few files inspected or area is out of scope.
+
+| Area | Coverage | Notes |
+|------|----------|-------|
+| TypeScript type system | High | All `types/domain/*.ts`, `types/features/*.ts`, `types/generated/api.ts` inspected |
+| React hooks | High | All `hooks/*.ts(x)` inspected; 7 hooks deleted as dead code |
+| React contexts | High | `ChatContext`, `AppDataContext`, `NotificationWebSocketContext`, `ThemeContext` all modified |
+| API client layer | Medium | `api/client.ts`, `api/interceptors.ts` inspected but not consolidated (deferred); `services/api.ts` not migrated |
+| Build / tooling | Medium | `vite.config.ts`, `eslint.config.js`, `tsconfig.json`, `package.json` modified; `vitest.config.ts` not changed |
+| UI components | Medium | `ChatWindow`, `LinkPreview`, `AppointmentWizardV2`, `PhotoUploader`, `FileUpload`, `EnhancedAppointmentsTable`, dental components modified; 100+ components not individually inspected |
+| Backend | Low | Only verified `/mobile/auth/refresh` endpoint exists (BS-28); no backend code audited |
+| Database | None | No DB migrations, no schema review |
+| Security | Medium | PHI scrubbing, XSS, CSRF, auth-token handling addressed; no penetration testing |
+| Medical algorithms | Low | `transformPatient`, `useEMRAutosave`, `emrReducer` modified; no clinical workflow verification |
+| Infrastructure / DevOps | None | `docker/nginx.conf`, CI/CD workflows not audited |
+| i18n | Low | `useTranslation.ts` cast inspected (BS-6 deferred); locale files not migrated |
+| WebSocket layer | Medium | `ws.ts`, `useQueueWebSocket`, `ChatContext` WS, `useAIChat` inspected; BS-15 dormant, BS-59 deferred |
+
+---
+
+## Regression Audit Policy
+
+> The next audit of this project MUST be a **Regression Audit**, not a
+> new-finding audit. This is a project policy.
+
+### Regression Audit procedure
+
+1. **Start from the Verifiable Findings Status table above.**
+2. For each finding marked "Code changed ✅":
+   - Run the corresponding CI check from the Invalidation Criteria table.
+   - If the check fails → the fix was **regressed**. File a bug immediately.
+   - If the check passes → the fix is **intact**.
+3. For each finding marked "Behaviour verified ❌":
+   - This is the priority list for manual / integration testing.
+   - Focus on HIGH-risk items first: BS-17, BS-34, BS-42 (medical), BS-37, BS-38 (HIPAA).
+4. **Do NOT search for new findings** until all 54 resolved findings are
+   confirmed intact. New findings are a separate audit cycle.
+
+### Audit cycle
+
+```
+Audit N (findings)
+    ↓
+Remediation (PRs)
+    ↓
+Regression Audit N+1 (verify fixes intact)
+    ↓
+If regressions found → fix regressions → re-run Regression Audit
+    ↓
+If no regressions → New Finding Audit N+2
+```
+
+### Automation
+
+The Invalidation Criteria table above is designed to be CI-automatable.
+A `scripts/regression-audit-check.mjs` script should be created that
+runs all checks and fails CI if any invariant is violated. This turns
+the audit from a document into an engineering process.

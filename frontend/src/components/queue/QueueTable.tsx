@@ -2,7 +2,6 @@
 import {
   Badge, Icon,
 } from '../ui/macos';
-import PropTypes from 'prop-types';
 import { formatRegistrarTime } from '../../utils/dateUtils';
 // UX Audit Registrar #3: все inline-стили перенесены в QueueTable.css.
 import './QueueTable.css';
@@ -126,8 +125,8 @@ const QueueTable = ({
     }
 
     // Status badge variants
-    const getStatusBadge = (status) => {
-        const statusMap = {
+    const getStatusBadge = (status: string) => {
+        const statusMap: Record<string, { variant: string; label: string; icon: string }> = {
             'waiting': { variant: 'warning', label: 'Ожидает', icon: 'clock' },
             'called': { variant: 'info', label: 'Вызван', icon: 'bell' },
             'in_progress': { variant: 'primary', label: 'На приеме', icon: 'person.fill' },
@@ -151,7 +150,7 @@ const QueueTable = ({
     };
 
     // Format time
-    const formatTime = (timestamp) => {
+    const formatTime = (timestamp: string | number | null | undefined) => {
         if (!timestamp) return '—';
         try {
             return formatRegistrarTime(timestamp) || 'вЂ”';
@@ -217,7 +216,7 @@ const QueueTable = ({
                                     {formatTime(entry.queue_time || entry.created_at || entry.timestamp)}
                                 </td>
                                 <td className="qt-table-cell-status">
-                                    {getStatusBadge(entry.status)}
+                                    {getStatusBadge(String(entry.status ?? ''))}
                                 </td>
                                 <td className="qt-table-cell-actions">
                                     {entry.status === 'called' && (
@@ -236,16 +235,5 @@ const QueueTable = ({
     );
 };
 
-QueueTable.propTypes = {
-    queueData: PropTypes.shape({
-        entries: PropTypes.array,
-        is_open: PropTypes.bool,
-        online_start_time: PropTypes.string
-    }),
-    effectiveDoctor: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-    onGenerateQR: PropTypes.func,
-    loading: PropTypes.bool,
-    t: PropTypes.object
-};
 
 export default QueueTable;

@@ -1,7 +1,19 @@
-
+import type { ReactNode, CSSProperties } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
-import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
+
+type PaddingSize = 'small' | 'medium' | 'large';
+type ShadowSize = 'none' | 'small' | 'medium' | 'large';
+
+interface MedicalCardProps {
+  children?: ReactNode;
+  className?: string;
+  hover?: boolean;
+  padding?: PaddingSize;
+  shadow?: ShadowSize;
+  style?: CSSProperties;
+  [key: string]: unknown;
+}
 
 /**
  * Базовая медицинская карточка в стиле MediLab
@@ -13,16 +25,16 @@ const MedicalCard = ({
   padding = 'medium',
   shadow = 'medium',
   ...props
-}) => {
+}: MedicalCardProps) => {
   const { isDark } = useTheme();
 
-  const paddingClasses = {
+  const paddingClasses: Record<PaddingSize, string> = {
     small: 'p-3',
     medium: 'p-6',
     large: 'p-8'
   };
 
-  const shadowClasses = {
+  const shadowClasses: Record<ShadowSize, string> = {
     none: '',
     small: 'shadow-sm',
     medium: 'shadow-md',
@@ -49,24 +61,13 @@ const MedicalCard = ({
         boxShadow: isDark ?
         '0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2)' :
         'var(--mac-shadow-md)',
-        ...props.style
+        ...(props.style as CSSProperties)
       }}
       {...props}>
-      
+
       {children}
     </div>);
 
-};
-
-
-MedicalCard.propTypes = {
-  ...(MedicalCard.propTypes || {}),
-  children: PropTypes.any,
-  className: PropTypes.any,
-  hover: PropTypes.any,
-  padding: PropTypes.any,
-  shadow: PropTypes.any,
-  style: PropTypes.any,
 };
 
 export default MedicalCard;

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import type { KeyboardEvent } from 'react';
 import { AlertTriangle, X } from 'lucide-react';
 import ModernDialog from './ModernDialog';
 import React from 'react';
@@ -12,7 +13,7 @@ import type { Appointment } from '../../types/domain/clinic';
 interface CancelDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  appointment: Appointment | null;
+  appointment: Record<string, unknown> | null;
   onCancel: (appointmentId: unknown, reason: string) => Promise<void>;
 }
 
@@ -31,7 +32,7 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }: CancelDialogPr
     }
   }, [isOpen]);
 
-  const validateReason = (value) => {
+  const validateReason = (value: string) => {
     if (!value || value.trim().length < 3) {
       return t('misc.cd_prichina_otmeny_dolzhna_sode');
     }
@@ -41,7 +42,7 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }: CancelDialogPr
     return '';
   };
 
-  const handleReasonChange = (e) => {
+  const handleReasonChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
     setReason(value);
 
@@ -60,7 +61,7 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }: CancelDialogPr
     setIsProcessing(true);
 
     try {
-      if (onCancel) {
+      if (onCancel && appointment) {
         await onCancel(appointment.id, reason.trim());
       }
 
@@ -68,7 +69,7 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }: CancelDialogPr
       onClose();
     } catch (error) {
       logger.error('Cancel error:', error);
-      toast.error(t('misc.cd_oshibka_pri_otmene_zapisi') + error.message);
+      toast.error(t('misc.cd_oshibka_pri_otmene_zapisi') + (error as Error)?.message);
     } finally {
       setIsProcessing(false);
     }
@@ -128,30 +129,30 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }: CancelDialogPr
                 Пациент:
               </span>
               <span className="cancel-info-value">
-                {appointment.patient_fio}
+                {String(appointment?.patient_fio ?? '')}
               </span>
             </div>
 
-            {appointment.services && (
+            {Boolean(appointment?.services) && (
               <div className="cancel-info-row">
                 <span className="cancel-info-label">
                   Услуги:
                 </span>
                 <span className="cancel-info-value--right">
                   {Array.isArray(appointment.services)
-                    ? appointment.services.join(', ')
-                    : appointment.services}
+                    ? (appointment.services as string[]).join(', ')
+                    : String(appointment.services)}
                 </span>
               </div>
             )}
 
-            {appointment.cost && (
+            {Boolean(appointment?.cost) && (
               <div className="cancel-info-row">
                 <span className="cancel-info-label">
                   Стоимость:
                 </span>
                 <span className="cancel-info-value">
-                  {new Intl.NumberFormat('ru-RU').format(Number(appointment.cost ?? 0))} сум
+                  {new Intl.NumberFormat('ru-RU').format(Number(appointment.cost))} сум
                 </span>
               </div>
             )}

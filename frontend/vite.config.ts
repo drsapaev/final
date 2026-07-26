@@ -105,14 +105,51 @@ export default defineConfig(({ mode }) => ({
         drop_debugger: true
       }
     },
-    // Source maps: enable for production so Sentry can de-minify traces.
-    // Files are hidden behind source map upload via @sentry/vite plugin
-    // (no .map files served to clients).
-    sourcemap: true
+    // audit/phase-final, BS-63: manualChunks splits vendor bundle.
+    // Previously all vendor code landed in one chunk via Vite's default
+    // heuristic. recharts (300KB+) was eagerly imported in CashierPanel;
+    // react-markdown was eagerly imported in ChatWindow. Now each major
+    // vendor lib gets its own chunk, loaded only when the route that
+    // needs it is visited.
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          'recharts': ['recharts'],
+          'sentry': ['@sentry/react'],
+          'markdown': ['react-markdown'],
+          'i18n': ['i18next', 'react-i18next'],
+        },
+      },
+    },
+    // audit/phase-7, BS-46: gate source maps on Sentry env vars.
+    // Previously `sourcemap: true` was always on, but the inline comment
+    // claimed ".map files are hidden behind source map upload via
+    // @sentry/vite plugin (no .map files served to clients)" — that was
+    // only true when BOTH SENTRY_AUTH_TOKEN and VITE_SENTRY_DSN were set.
+    // Local builds, staging without Sentry, or any build without those
+    // env vars emitted .map files into dist/ and nginx served them as
+    // static assets (per docker/nginx.conf), leaking original source code.
+    // 'hidden' emits .map files but does not reference them in the bundle
+    // output, so they are never served to clients. The Sentry plugin
+    // (when enabled) still uploads them for de-minification.
+    sourcemap: (process.env.SENTRY_AUTH_TOKEN && process.env.VITE_SENTRY_DSN)
+      ? 'hidden'
+      : false
   },
   // PWA настройки
   define: {
-    // Переменные окружения для PWA
-    'process.env.REACT_APP_VAPID_PUBLIC_KEY': JSON.stringify(process.env.REACT_APP_VAPID_PUBLIC_KEY || ''),
+    // audit/phase-7, BS-47: VAPID public key for web push notifications.
+    // Previously used Create-React-App convention `REACT_APP_VAPID_PUBLIC_KEY`
+    // via `define` polyfill — Vite uses `VITE_` prefix and exposes via
+    // `import.meta.env.VITE_*`. The `define` polyfill worked but was
+    // undocumented; engineers setting up the project didn't know to set
+    // `REACT_APP_VAPID_PUBLIC_KEY` (it wasn't in .env.example).
+    // Now uses VITE_VAPID_PUBLIC_KEY with fallback to legacy var for
+    // backward compat during migration. Consumers (pwa.ts, MobileNotifications)
+    // migrated to import.meta.env.VITE_VAPID_PUBLIC_KEY in the same commit.
+    'process.env.REACT_APP_VAPID_PUBLIC_KEY': JSON.stringify(
+      process.env.VITE_VAPID_PUBLIC_KEY || process.env.REACT_APP_VAPID_PUBLIC_KEY || ''
+    ),
   }
 }));

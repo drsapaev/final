@@ -50,11 +50,11 @@ export const Avatar = ({ src, name, size = 'medium', status, style = {}, classNa
     color: 'var(--mac-text-secondary)'
   };
 
-  const statusColor: string | null = status === 'online' ? 'var(--mac-success)' : status === 'busy' ? 'var(--mac-error)' : status === 'away' ? 'var(--mac-warning)' : null;
+  const statusColor: string | undefined = status === 'online' ? 'var(--mac-success)' : status === 'busy' ? 'var(--mac-error)' : status === 'away' ? 'var(--mac-warning)' : undefined;
 
   return (
     <div className={`mac-avatar ${className}`} style={{ ...containerStyle, ...style }} title={name ?? undefined}>
-      <img src={src} alt={name || 'User'} style={imgStyle} />
+      <img src={src ?? undefined} alt={name || 'User'} style={imgStyle} />
       {!src && (
         <div style={fallbackStyle} aria-hidden>{getInitials(name)}</div>
       )}

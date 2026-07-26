@@ -1944,7 +1944,7 @@ const MacOSCardiologistPanelUnified = () => {
           className="cardio-settings-fab"
           aria-label={tI18n('cardio.cardio_panel_settings_open_aria')}>
 
-          <Icon name="gear" size={18 as never} />
+          <Icon name="gear" size={18} />
         </button>
         {(activeTab === 'visit' || activeTab === 'blood') && settingsOpen &&
         <MacOSCard className="cardio-settings-card">
@@ -1977,7 +1977,7 @@ const MacOSCardiologistPanelUnified = () => {
                 // the values are stored.
                 notify.success(tI18n('cardio.settings_saved'));
                 setSettingsOpen(false);
-              }}><Icon name="square.and.arrow.down" size={16 as never} className="cardio-icon-mr" />{tI18n('cardio.cardio_panel_save')}</Button>
+              }}><Icon name="square.and.arrow.down" size={16} className="cardio-icon-mr" />{tI18n('cardio.cardio_panel_save')}</Button>
             </div>
           </MacOSCard>
         }

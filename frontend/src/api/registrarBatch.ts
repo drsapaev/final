@@ -8,7 +8,7 @@
  * Этот модуль обеспечивает атомарные операции над всеми записями пациента за день.
  */
 
-import { apiRequest } from './client.js';
+import { apiRequest } from './client';
 
 /**
  * Получить все записи пациента на указанную дату
@@ -17,7 +17,7 @@ import { apiRequest } from './client.js';
  * @param {string} date - Дата в формате YYYY-MM-DD
  * @returns {Promise<Object>} - { online_queue_entries, visits, aggregated }
  */
-export async function getPatientEntriesForDate(patientId, date) {
+export async function getPatientEntriesForDate(patientId: string | number, date: string) {
     return apiRequest('GET', `/registrar/batch/patients/${patientId}/entries/${date}`);
 }
 
@@ -44,7 +44,7 @@ export async function getPatientEntriesForDate(patientId, date) {
  *   }
  * });
  */
-export async function batchUpdatePatientEntries(patientId, date, updates) {
+export async function batchUpdatePatientEntries(patientId: string | number, date: string, updates: Record<string, unknown>) {
     return apiRequest('PATCH', `/registrar/batch/patients/${patientId}/entries/${date}`, {
         data: updates
     });
@@ -61,14 +61,14 @@ export async function batchUpdatePatientEntries(patientId, date, updates) {
  * @example
  * const result = await cancelAllPatientEntries(42, '2024-12-17', 'Patient no-show');
  */
-export async function cancelAllPatientEntries(patientId, date, reason = 'bulk_cancel') {
+export async function cancelAllPatientEntries(patientId: string | number, date: string, reason: string = 'bulk_cancel') {
     return apiRequest('DELETE', `/registrar/batch/patients/${patientId}/entries/${date}?reason=${encodeURIComponent(reason)}`);
 }
 
 /**
  * Helper: Форматирует дату в YYYY-MM-DD
  */
-export function formatDateForAPI(date) {
+export function formatDateForAPI(date: string | Date | null | undefined): string | null {
     if (!date) return null;
     if (typeof date === 'string') return date;
 
@@ -86,13 +86,56 @@ export function formatDateForAPI(date) {
  * @param {Object} options.common - Общие обновления
  * @returns {Object} - BatchUpdateRequest
  */
-export function buildBatchRequest({ updates = [], cancels = [], creates = [], common = null }) {
-    const entries = [];
+interface BatchUpdateEntry {
+    id: string | number | null;
+    action: string;
+    service_id?: string | number;
+    service_code?: string;
+    doctor_id?: string | number;
+    status?: string;
+    reason?: string;
+    specialty?: string;
+}
+
+interface BatchUpdateItem {
+    id?: string | number;
+    service_id?: string | number;
+    service_code?: string;
+    doctor_id?: string | number;
+    status?: string;
+    reason?: string;
+    specialty?: string;
+}
+
+interface BatchCancelItem {
+    id?: string | number;
+    reason?: string;
+}
+
+interface BatchCreateItem {
+    specialty?: string;
+    service_id?: string | number;
+    service_code?: string;
+    doctor_id?: string | number;
+}
+
+export function buildBatchRequest({
+    updates = [],
+    cancels = [],
+    creates = [],
+    common = null,
+}: {
+    updates?: BatchUpdateItem[];
+    cancels?: Array<string | number | BatchCancelItem>;
+    creates?: BatchCreateItem[];
+    common?: Record<string, unknown> | null;
+}): { entries: BatchUpdateEntry[]; common_updates?: Record<string, unknown> } {
+    const entries: BatchUpdateEntry[] = [];
 
     // Обновления
-    updates.forEach(update => {
+    updates.forEach((update: BatchUpdateItem) => {
         entries.push({
-            id: update.id,
+            id: update.id!,
             action: 'update',
             service_id: update.service_id,
             service_code: update.service_code,
@@ -102,16 +145,17 @@ export function buildBatchRequest({ updates = [], cancels = [], creates = [], co
     });
 
     // Отмены
-    cancels.forEach(id => {
+    cancels.forEach((id: string | number | BatchCancelItem) => {
+        const cancelItem = typeof id === 'object' && id !== null ? id as BatchCancelItem : { id: id as string | number };
         entries.push({
-            id: typeof id === 'object' ? id.id : id,
+            id: cancelItem.id!,
             action: 'cancel',
-            reason: typeof id === 'object' ? id.reason : 'cancelled',
+            reason: cancelItem.reason || 'cancelled',
         });
     });
 
     // Создания
-    creates.forEach(create => {
+    creates.forEach((create: BatchCreateItem) => {
         entries.push({
             id: null,
             action: 'create',

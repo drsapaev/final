@@ -27,7 +27,7 @@ import { useConfirm } from '../components/common/ConfirmDialog';
 // and confirm/notify strings (registrar.*). Replaces the legacy split between
 // getRegistrarTranslator (flat keys) and adapter (namespaced keys).
 import { useTranslation } from '../i18n/useTranslation';
-import type { Appointment } from '../types/domain/clinic';
+import type { Appointment, Doctor } from '../types/domain/clinic';
 import type { QueueEntry } from '../types/domain/queue';
 // Decomp 2: hotkeys extracted to useRegistrarHotkeys hook
 import { useRegistrarHotkeys } from './registrar/useRegistrarHotkeys';
@@ -268,7 +268,7 @@ const RegistrarPanel = () => {
     resolveRescheduleVisitId,
     removeRescheduledAppointmentFromView,
   } = useRegistrarReschedule({ setAppointments });
-  const [doctors, setDoctors] = useState([]);const [services, setServices] = useState<Record<string, unknown>>({});const [showCalendar, setShowCalendar] = useState(false);const [historyDate, setHistoryDate] = useState(getLocalDateString());const [tempDateInput, setTempDateInput] = useState(getLocalDateString()); // Выбор врача остаётся явным: URL-параметр или ручной выбор в очереди
+  const [doctors, setDoctors] = useState<Doctor[]>([]);const [services, setServices] = useState<Record<string, unknown>>({});const [showCalendar, setShowCalendar] = useState(false);const [historyDate, setHistoryDate] = useState(getLocalDateString());const [tempDateInput, setTempDateInput] = useState(getLocalDateString()); // Выбор врача остаётся явным: URL-параметр или ручной выбор в очереди
   // Unified i18n hook: single source of truth for all translations.
   // - registrarPanel.* — flat UI keys (tabs, statuses, headings, buttons)
   // - registrar.*      — confirm dialog titles/messages + notify messages
@@ -1246,13 +1246,14 @@ const RegistrarPanel = () => {
       // Применяем поиск к агрегированным данным
       if (searchQuery) {
         const searched = aggregatedPatients.filter((patient) => {
-          const inFio = (patient.patient_fio || '').toLowerCase().includes(searchQuery);
+          const p = patient as Record<string, unknown>;
+          const inFio = String(p.patient_fio || '').toLowerCase().includes(searchQuery);
 
           // Поиск по ID записи
-          const inId = String(patient.id).includes(searchQuery);
+          const inId = String(p.id).includes(searchQuery);
 
           // Улучшенный поиск по телефону
-          const originalPhone = (patient.patient_phone || '').toLowerCase();
+          const originalPhone = String(p.patient_phone || '').toLowerCase();
           const phoneDigits = originalPhone.replace(/\D/g, '');
           const searchDigits = searchQuery.replace(/\D/g, '');
 

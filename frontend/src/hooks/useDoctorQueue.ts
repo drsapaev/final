@@ -2,35 +2,31 @@
  * Hook for Doctor Queue Management.
  * Provides queue data and actions for the doctor panel.
  */
-import { useCallback, useEffect, useState } from 'react';
-import api from '../services/api';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { api } from '../api/client';
 import logger from '../utils/logger';
+import type {
+  QueueEntry,
+  QueueStats,
+} from '../types/domain/queue';
 
-interface QueueStats {
-  waiting: number;
-  called: number;
-  served: number;
-  total: number;
+// Doctor-queue-specific payload envelope. The backend returns this shape from
+// /queue/{id} with queue entries + stats + can_call_next metadata. The
+// generic QueuePayload in domain/queue.ts has `queues: QueueData[]`, but
+// the doctor-panel endpoint returns a single queue object with entries
+// inline — different shape, so we keep a local interface.
+interface DoctorQueuePayload {
+  entries?: QueueEntry[];
+  stats?: QueueStats;
+  can_call_next?: boolean;
+  next_call_entry_id?: string | number | null;
+  queue_ids?: Array<string | number>;
+  [key: string]: unknown;
 }
 
 interface QueueControls {
   canCallNext: boolean;
   nextCallEntryId: string | number | null;
-}
-
-interface QueueEntry {
-  id: string | number;
-  status: string;
-  available_actions?: string[];
-  [key: string]: unknown;
-}
-
-interface QueuePayload {
-  entries?: QueueEntry[];
-  stats?: Partial<QueueStats>;
-  can_call_next?: boolean;
-  next_call_entry_id?: string | number | null;
-  queue_ids?: Array<string | number>;
 }
 
 interface CatchError {
@@ -51,8 +47,9 @@ const hasBackendQueueAction = (
   flagName: string,
 ): boolean => {
   if (!entry) return false;
-  if (Array.isArray(entry.available_actions)) {
-    return entry.available_actions.includes(action);
+  const availableActions = entry.available_actions as string[] | undefined;
+  if (Array.isArray(availableActions)) {
+    return availableActions.includes(action);
   }
   if (flagName && Object.prototype.hasOwnProperty.call(entry, flagName)) {
     return Boolean(entry[flagName]);
@@ -61,7 +58,7 @@ const hasBackendQueueAction = (
 };
 
 const selectNextCallEntryId = (
-  queuePayload: QueuePayload | null | undefined,
+  queuePayload: DoctorQueuePayload | null | undefined,
 ): string | number | null => {
   const backendEntryId = queuePayload?.next_call_entry_id;
   if (backendEntryId !== undefined && backendEntryId !== null) {
@@ -100,15 +97,26 @@ const useDoctorQueue = (specialty: string = 'general'): UseDoctorQueueReturn => 
   });
   const normalizedSpecialty = specialty || 'general';
 
+  // audit/phase-8, BS-22: request-ID guard against overlapping loads.
+  // Previously, the 30s polling interval could overlap with mutation-induced
+  // loadQueue() calls — the later-started request could resolve first, then
+  // the earlier request overwrote with stale data. The ref tracks the latest
+  // request; stale responses are silently discarded.
+  const loadQueueRequestIdRef = useRef(0);
+
   const loadQueue = useCallback(async (): Promise<void> => {
+    const requestId = ++loadQueueRequestIdRef.current;
     setLoading(true);
     setError(null);
 
     try {
       const response = await api.get(`/doctor/${encodeURIComponent(normalizedSpecialty)}/queue/today`);
-      const data = response.data as QueuePayload;
+      // Discard stale responses — a newer loadQueue() has been triggered since.
+      if (requestId !== loadQueueRequestIdRef.current) return;
+
+      const data = response.data as DoctorQueuePayload;
       const entries = Array.isArray(data?.entries) ? data.entries : [];
-      const apiStats = data?.stats || {};
+      const apiStats: QueueStats = (data?.stats as QueueStats) || {};
       const nextCallEntryId = selectNextCallEntryId(data);
 
       setQueue(entries);
@@ -129,6 +137,7 @@ const useDoctorQueue = (specialty: string = 'general'): UseDoctorQueueReturn => 
         queueIds: data?.queue_ids || [],
       });
     } catch (err) {
+      if (requestId !== loadQueueRequestIdRef.current) return;
       const e = err as CatchError;
       logger.error('[useDoctorQueue] Error loading queue:', err);
       setQueue([]);
@@ -136,14 +145,16 @@ const useDoctorQueue = (specialty: string = 'general'): UseDoctorQueueReturn => 
       setQueueControls({ canCallNext: false, nextCallEntryId: null });
       setError(e?.response?.data?.detail || e?.message || 'Ошибка загрузки очереди');
     } finally {
-      setLoading(false);
+      if (requestId === loadQueueRequestIdRef.current) {
+        setLoading(false);
+      }
     }
   }, [normalizedSpecialty]);
 
   const callNext = useCallback(async (): Promise<unknown> => {
     try {
       const currentQueue = await api.get(`/doctor/${encodeURIComponent(normalizedSpecialty)}/queue/today`);
-      const nextCallEntryId = selectNextCallEntryId(currentQueue.data as QueuePayload);
+      const nextCallEntryId = selectNextCallEntryId(currentQueue.data as DoctorQueuePayload);
       if (!nextCallEntryId) {
         return { success: false, message: 'Нет ожидающих пациентов' };
       }

@@ -1,13 +1,31 @@
 import React from 'react';
+import type { CSSProperties, MouseEvent, ReactNode } from 'react';
 import { ChevronRight, Home } from 'lucide-react';
-const MacOSBreadcrumb = ({ 
-  items = [], 
+
+interface BreadcrumbItem {
+  label: ReactNode;
+  href?: string;
+  icon?: ReactNode;
+  [key: string]: unknown;
+}
+
+interface MacOSBreadcrumbProps {
+  items?: BreadcrumbItem[];
+  separator?: 'chevron' | 'slash' | 'arrow' | string;
+  size?: 'sm' | 'md' | 'lg' | string;
+  className?: string;
+  style?: CSSProperties;
+  onItemClick?: (item: BreadcrumbItem, index: number) => void;
+}
+
+const MacOSBreadcrumb = ({
+  items = [],
   separator = 'chevron',
   size = 'md',
   className,
   style,
   onItemClick
-}) => {
+}: MacOSBreadcrumbProps) => {
   const sizeStyles = {
     sm: {
       fontSize: 'var(--mac-font-size-xs)',
@@ -26,7 +44,7 @@ const MacOSBreadcrumb = ({
     }
   };
 
-  const currentSize = sizeStyles[size];
+  const currentSize = sizeStyles[size as 'sm' | 'md' | 'lg'];
 
   const containerStyle = {
     display: 'flex',
@@ -37,7 +55,7 @@ const MacOSBreadcrumb = ({
     ...style
   };
 
-  const itemStyle = (isLast) => ({
+  const itemStyle = (isLast: boolean) => ({
     color: isLast ? 'var(--mac-text-primary)' : 'var(--mac-text-secondary)',
     fontWeight: isLast ? 'var(--mac-font-weight-medium)' : 'var(--mac-font-weight-normal)',
     cursor: isLast ? 'default' : 'pointer',
@@ -54,21 +72,21 @@ const MacOSBreadcrumb = ({
     alignItems: 'center'
   };
 
-  const handleItemClick = (item, index) => {
+  const handleItemClick = (item: BreadcrumbItem, index: number) => {
     if (!item.disabled && onItemClick) {
       onItemClick(item, index);
     }
   };
 
-  const handleMouseEnter = (e, isLast) => {
+  const handleMouseEnter = (e: MouseEvent<HTMLElement>, isLast: boolean) => {
     if (!isLast) {
-      e.target.style.color = 'var(--mac-text-primary)';
+      (e.target as HTMLElement).style.color = 'var(--mac-text-primary)';
     }
   };
 
-  const handleMouseLeave = (e, isLast) => {
+  const handleMouseLeave = (e: MouseEvent<HTMLElement>, isLast: boolean) => {
     if (!isLast) {
-      e.target.style.color = 'var(--mac-text-secondary)';
+      (e.target as HTMLElement).style.color = 'var(--mac-text-secondary)';
     }
   };
 
@@ -88,7 +106,7 @@ const MacOSBreadcrumb = ({
     return <span style={separatorStyle}>{separator}</span>;
   };
 
-  const renderItem = (item, index) => {
+  const renderItem = (item: BreadcrumbItem, index: number) => {
     const isLast = index === items.length - 1;
     const isFirst = index === 0;
     const isClickable = !isLast && !item.disabled && Boolean(onItemClick);
@@ -101,10 +119,7 @@ const MacOSBreadcrumb = ({
           />
         )}
         {item.icon && !isFirst && (
-          <item.icon
-            size={size === 'sm' ? 12 : size === 'md' ? 14 : 16}
-            style={{ marginRight: '4px' }}
-          />
+          <span style={{ display: 'inline-flex', marginRight: '4px' }}>{item.icon}</span>
         )}
         {item.label}
       </>
@@ -124,12 +139,12 @@ const MacOSBreadcrumb = ({
               background: 'transparent',
               padding: 0
             }}
-            title={item.title}
+            title={item.title as string | undefined}
           >
             {itemContent}
           </button>
         ) : (
-          <span style={itemStyle(isLast)} title={item.title}>
+          <span style={itemStyle(isLast)} title={item.title as string | undefined}>
             {itemContent}
           </span>
         )}

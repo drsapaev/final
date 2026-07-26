@@ -33,6 +33,9 @@ function createWrappedError(message: string, extras: { status?: number; detail?:
 
 import { api } from './client';
 import logger from '../utils/logger';
+import type { PatientDto } from '../types/api';
+import type { Patient } from '../types/domain/clinic';
+import { mapPatientDto, mapPatientDtos } from './mappers';
 
 // =====================================================================
 // PATIENTS API
@@ -40,25 +43,24 @@ import logger from '../utils/logger';
 
 /**
  * Получить пациента по ID.
- * @param {number|string} patientId
- * @returns {Promise<object>} Patient object
+ * @returns {Promise<Patient>} Domain Patient (canonical)
  * @throws {Error} Если пациент не найден или сеть недоступна
  */
-export async function getPatient(patientId: string | number): Promise<Record<string, unknown>> {
-  const response = await api.get(`/patients/${patientId}`);
-  return response.data;
+export async function getPatient(patientId: string | number): Promise<Patient> {
+  const response = await api.get<PatientDto>(`/patients/${patientId}`);
+  return mapPatientDto(response.data);
 }
 
 /**
  * Создать нового пациента.
- * @param {object} patientData - { full_name, phone, sex, last_name, first_name, ... }
- * @returns {Promise<object>} Created patient with id
+ * @param patientData - { full_name, phone, sex, last_name, first_name, ... }
+ * @returns {Promise<Patient>} Created patient (domain)
  * @throws {Error} Если валидация не прошла (например, телефон уже существует)
  */
-export async function createPatient(patientData: Record<string, unknown>) {
+export async function createPatient(patientData: Record<string, unknown>): Promise<Patient> {
   try {
-    const response = await api.post('/patients/', patientData);
-    return response.data;
+    const response = await api.post<PatientDto>('/patients/', patientData);
+    return mapPatientDto(response.data);
   } catch (error) {
     // 400 — типичная ошибка «пациент уже существует»
     if ((error as WrappedApiError)?.response?.status === 400) {
@@ -73,14 +75,12 @@ export async function createPatient(patientData: Record<string, unknown>) {
 
 /**
  * Обновить пациента (PUT /patients/{id}).
- * @param {number|string} patientId
- * @param {object} updateData - Частичные данные для обновления
- * @returns {Promise<object>} Updated patient
+ * @returns {Promise<Patient>} Updated patient (domain)
  */
-export async function updatePatient(patientId: string | number, updateData: Record<string, unknown>) {
+export async function updatePatient(patientId: string | number, updateData: Record<string, unknown>): Promise<Patient> {
   try {
-    const response = await api.put(`/patients/${patientId}`, updateData);
-    return response.data;
+    const response = await api.put<PatientDto>(`/patients/${patientId}`, updateData);
+    return mapPatientDto(response.data);
   } catch (error) {
     const status = (error as WrappedApiError)?.response?.status;
     const detail = (error as WrappedApiError)?.response?.data?.detail;
@@ -91,28 +91,27 @@ export async function updatePatient(patientId: string | number, updateData: Reco
 
 /**
  * Найти пациентов по телефону.
- * @param {string} phone - Телефон в любом формате (+998XXXXXXXXX, XXXXXXXXX)
- * @returns {Promise<Array<object>>} Массив найденных пациентов (может быть пустым)
+ * @returns {Promise<Patient[]>} Массив найденных пациентов (домен)
  */
-export async function searchPatientsByPhone(phone: string): Promise<Record<string, unknown>[]> {
+export async function searchPatientsByPhone(phone: string): Promise<Patient[]> {
   if (!phone) return [];
-  const response = await api.get('/patients/', {
+  const response = await api.get<unknown>('/patients/', {
     params: { phone },
   });
-  return response.data;
+  return mapPatientDtos(response.data);
 }
 
 /**
  * Найти пациентов по произвольному запросу (ФИО, телефон, ID).
- * @param {string} query - Минимум 2 символа
- * @returns {Promise<Array<object>>} Массив найденных пациентов
+ * @param query - Минимум 2 символа
+ * @returns {Promise<Patient[]>} Массив найденных пациентов (домен)
  */
-export async function searchPatients(query: string): Promise<Record<string, unknown>[]> {
+export async function searchPatients(query: string): Promise<Patient[]> {
   if (!query || query.length < 2) return [];
-  const response = await api.get('/patients/', {
+  const response = await api.get<unknown>('/patients/', {
     params: { q: query },
   });
-  return response.data;
+  return mapPatientDtos(response.data);
 }
 
 /**
@@ -124,7 +123,7 @@ export async function searchPatients(query: string): Promise<Record<string, unkn
  *
  * @returns {Promise<boolean>} true если авторизован
  */
-export async function checkAuthProbe(): Promise<unknown> {
+export async function checkAuthProbe(): Promise<boolean> {
   try {
     await api.get('/patients/', { params: { _limit: 1 } });
     return true;
@@ -146,8 +145,13 @@ export async function checkAuthProbe(): Promise<unknown> {
 /**
  * Создать корзину визитов (POST /registrar/cart).
  *
- * @param {object} cartData - { patient_id, visits, discount_mode, payment_method, all_free, notes }
- * @returns {Promise<object>} Created cart result
+ * @api-transport backend returns a free-form cart result dict that varies
+ *               by visit_type / discount_mode combination; no domain type
+ *               exists yet (planned for Wave 4 follow-up when the wizard
+ *               cart refactor lands).
+ *
+ * @param cartData - { patient_id, visits, discount_mode, payment_method, all_free, notes }
+ * @returns {Promise<Record<string, unknown>>} Created cart result
  */
 export async function createRegistrarCart(cartData: Record<string, unknown>): Promise<Record<string, unknown>> {
   try {
@@ -181,7 +185,7 @@ export async function createRegistrarCart(cartData: Record<string, unknown>): Pr
  * @param {string} phone - Телефон в любом формате
  * @returns {Promise<object|null>} Найденный пациент или null
  */
-export async function findPatientByPhoneVariants(phone: string): Promise<Record<string, unknown> | null> {
+export async function findPatientByPhoneVariants(phone: string): Promise<Patient | null> {
   if (!phone) return null;
 
   // Очищенный телефон (только цифры, без + и пробелов)

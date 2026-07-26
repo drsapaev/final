@@ -8,6 +8,15 @@ import type { CSSProperties } from 'react';
 import { useReducedMotion } from './useEnhancedMediaQuery';
 import { mcpAPI } from '../utils/mcp';
 import { validateAIChatMessage, detectPromptInjection } from '../utils/aiValidator';
+import type {
+  AIProvider,
+  AIContext,
+  AIChatMessage,
+  AISuggestion,
+  AISuggestionHistoryEntry,
+  AITranslationEntry,
+  AIBatchTranslationResult,
+} from '../types/domain/ai';
 
 import logger from '../utils/logger';
 
@@ -15,6 +24,7 @@ import logger from '../utils/logger';
 // minimal structural type so consumers of useAIAssistant can compile
 // without `@ts-nocheck`. This mirrors the W3C SpeechRecognition surface
 // used by Chromium-based browsers (`webkitSpeechRecognition`).
+// NOTE: These are DOM API polyfills, NOT domain types — they stay here.
 interface SpeechRecognitionResult {
   transcript: string;
   confidence: number;
@@ -64,47 +74,9 @@ const AI_CONFIG = {
   retryDelay: 1000
 } as const;
 
-type AIProvider = string;
-type AIContext = string;
-
-interface ChatMessage {
-  id: number;
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  timestamp: Date;
-  type: 'text' | 'error';
-  metadata?: unknown;
-}
-
-interface AISuggestion {
-  id: number;
-  text: string;
-  confidence: number;
-  category: string;
-  timestamp: Date;
-}
-
-interface SuggestionHistoryEntry {
-  context: string;
-  suggestions: AISuggestion[];
-  timestamp: Date;
-}
-
-interface TranslationEntry {
-  id: number;
-  original: string;
-  translated: string;
-  from: string;
-  to: string;
-  timestamp: Date;
-}
-
-interface BatchTranslationResult {
-  original: string;
-  translated: string;
-  error?: string;
-}
-
+// Hook-specific option/return types stay local — they describe the React
+// hook surface, not the domain. Domain value objects (AIChatMessage,
+// AISuggestion, etc.) are imported from types/domain/ai.ts above.
 interface UseAIAssistantOptions {
   provider?: AIProvider;
   model?: string;
@@ -115,11 +87,11 @@ interface UseAIAssistantOptions {
 }
 
 interface UseAIAssistantReturn {
-  messages: ChatMessage[];
+  messages: AIChatMessage[];
   loading: boolean;
   error: string | null;
   isListening: boolean;
-  sendMessage: (message: string, options?: Record<string, unknown>) => Promise<ChatMessage | undefined>;
+  sendMessage: (message: string, options?: Record<string, unknown>) => Promise<AIChatMessage | undefined>;
   clearMessages: () => void;
   startListening: () => void;
 }
@@ -135,7 +107,7 @@ interface UseAISuggestionsReturn {
   suggestions: AISuggestion[];
   loading: boolean;
   error: string | null;
-  history: SuggestionHistoryEntry[];
+  history: AISuggestionHistoryEntry[];
   generateSuggestions: (context: string, options?: Record<string, unknown>) => Promise<AISuggestion[] | undefined>;
   filterByConfidence: (minConfidence?: number) => AISuggestion[];
   groupByCategory: () => Record<string, AISuggestion[]>;
@@ -150,11 +122,11 @@ interface UseAITranslationOptions {
 }
 
 interface UseAITranslationReturn {
-  translations: TranslationEntry[];
+  translations: AITranslationEntry[];
   loading: boolean;
   error: string | null;
   translate: (text: string, fromLang?: string, toLang?: string) => Promise<string>;
-  translateBatch: (texts: string[], fromLang?: string, toLang?: string) => Promise<BatchTranslationResult[]>;
+  translateBatch: (texts: string[], fromLang?: string, toLang?: string) => Promise<AIBatchTranslationResult[]>;
   clearTranslations: () => void;
 }
 
@@ -188,14 +160,14 @@ export const useAIAssistant = (options: UseAIAssistantOptions = {}): UseAIAssist
     context = 'medical'
   } = options;
 
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<AIChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isListening, setIsListening] = useState(false);
   useReducedMotion();
 
   // Отправка сообщения
-  const sendMessage = useCallback(async (message: string, options: Record<string, unknown> = {}): Promise<ChatMessage | undefined> => {
+  const sendMessage = useCallback(async (message: string, options: Record<string, unknown> = {}): Promise<AIChatMessage | undefined> => {
     void options;
     if (!message || message.trim() === '') return;
 
@@ -209,7 +181,7 @@ export const useAIAssistant = (options: UseAIAssistantOptions = {}): UseAIAssist
     setLoading(true);
     setError(null);
 
-    const userMessage: ChatMessage = {
+    const userMessage: AIChatMessage = {
       id: Date.now(),
       role: 'user',
       content: message,
@@ -239,7 +211,7 @@ export const useAIAssistant = (options: UseAIAssistantOptions = {}): UseAIAssist
           timestamp: new Date(),
           type: 'text',
           metadata: response.data.metadata
-        }) as ChatMessage | null;
+        }) as AIChatMessage | null;
 
         if (!validatedMessage) {
           throw new Error('AI response validation failed');
@@ -255,7 +227,7 @@ export const useAIAssistant = (options: UseAIAssistantOptions = {}): UseAIAssist
       const message = err instanceof Error ? err.message : String(err);
       setError(message);
 
-      const errorMessage: ChatMessage = {
+      const errorMessage: AIChatMessage = {
         id: Date.now() + 2,
         role: 'assistant',
         content: 'Извините, произошла ошибка. Попробуйте еще раз.',
@@ -332,7 +304,7 @@ export const useAISuggestions = (options: UseAISuggestionsOptions = {}): UseAISu
   const [suggestions, setSuggestions] = useState<AISuggestion[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [history, setHistory] = useState<SuggestionHistoryEntry[]>([]);
+  const [history, setHistory] = useState<AISuggestionHistoryEntry[]>([]);
 
   // Генерация предложений
   const generateSuggestions = useCallback(async (context: string, options: Record<string, unknown> = {}): Promise<AISuggestion[] | undefined> => {
@@ -422,7 +394,7 @@ export const useAITranslation = (options: UseAITranslationOptions = {}): UseAITr
     targetLanguage = 'en'
   } = options;
 
-  const [translations, setTranslations] = useState<TranslationEntry[]>([]);
+  const [translations, setTranslations] = useState<AITranslationEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -443,7 +415,7 @@ export const useAITranslation = (options: UseAITranslationOptions = {}): UseAITr
       });
 
       if (response.status === 'success') {
-        const translation: TranslationEntry = {
+        const translation: AITranslationEntry = {
           id: Date.now(),
           original: text,
           translated: response.data.translation,
@@ -468,8 +440,8 @@ export const useAITranslation = (options: UseAITranslationOptions = {}): UseAITr
   }, [sourceLanguage, targetLanguage, provider]);
 
   // Пакетный перевод
-  const translateBatch = useCallback(async (texts: string[], fromLang = sourceLanguage, toLang = targetLanguage): Promise<BatchTranslationResult[]> => {
-    const results: BatchTranslationResult[] = [];
+  const translateBatch = useCallback(async (texts: string[], fromLang = sourceLanguage, toLang = targetLanguage): Promise<AIBatchTranslationResult[]> => {
+    const results: AIBatchTranslationResult[] = [];
 
     for (const text of texts) {
       try {

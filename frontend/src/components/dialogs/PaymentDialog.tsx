@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import type { ReactNode } from 'react';
 import { Check, Printer } from 'lucide-react';
 import ModernDialog from './ModernDialog';
 import React from 'react';
@@ -14,7 +15,7 @@ import type { Appointment } from '../../types/domain/clinic';
 interface PaymentDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  appointment: Appointment | null;
+  appointment: Record<string, unknown> | null;
   onPaymentSuccess?: (paymentData?: unknown) => Promise<void> | void;
   onPrintTicket?: (appointment?: unknown) => void;
 }
@@ -37,7 +38,7 @@ const PaymentDialog = ({
   useEffect(() => {
     if (isOpen && appointment) {
       setPaymentAmount(String(appointment.cost ?? appointment.payment_amount ?? ''));
-      setPaymentMethod(appointment.payment_type || t('misc.pd_karta'));
+      setPaymentMethod(String(appointment.payment_type ?? t('misc.pd_karta')));
       setIsPaid(false);
       setErrors({});
       setIsProcessing(false);
@@ -80,7 +81,8 @@ const PaymentDialog = ({
       toast.success(t('misc.pd_oplata_otmechena_kak_poluche'));
     } catch (error) {
       logger.error('Payment error:', error);
-      toast.error(error?.message || t('misc.pd_oshibka_pri_obrabotke_platez'));
+      const err = error as { message?: string };
+      toast.error(err?.message || t('misc.pd_oshibka_pri_obrabotke_platez'));
     } finally {
       setIsProcessing(false);
     }
@@ -172,14 +174,14 @@ const PaymentDialog = ({
               Пациент
             </h4>
             <p className="payment-patient-name">
-              {appointment.patient_fio}
+              {String(appointment.patient_fio ?? '')}
             </p>
             {appointment.services && (
               <p className="payment-patient-services">
                 Услуги:{' '}
                 {Array.isArray(appointment.services)
-                  ? appointment.services.join(', ')
-                  : appointment.services}
+                  ? (appointment.services as string[]).join(', ')
+                  : String(appointment.services ?? '')}
               </p>
             )}
           </div>
@@ -201,7 +203,7 @@ const PaymentDialog = ({
                 onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
                   setPaymentAmount(e.target.value);
                   if (errors.amount) {
-                    setErrors((prev) => ({ ...prev, amount: null }));
+                    setErrors((prev) => ({ ...prev, amount: "" }));
                   }
                 }}
                 placeholder={t('misc.pd_vvedite_summu')}
@@ -231,7 +233,7 @@ const PaymentDialog = ({
                     onClick={() => {
                       setPaymentMethod(method.value);
                       if (errors.method) {
-                        setErrors((prev) => ({ ...prev, method: null }));
+                        setErrors((prev) => ({ ...prev, method: "" }));
                       }
                     }}
                     className={`payment-method-btn ${paymentMethod === method.value ? 'payment-method-btn--selected' : ''}`}

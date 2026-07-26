@@ -17,22 +17,15 @@
 //
 // Keep changes minimal and additive — don't remove existing exported names.
 
-import { me, setToken as setClientToken } from '../api/client.js';
+import { me, setToken as setClientToken } from '../api/client';
 import { tokenManager } from '../utils/tokenManager';
 import logger from '../utils/logger';
+import type { AuthState, UserProfile } from '../types/domain/auth';
 
-interface UserProfile {
-  id?: number | null;
-  name?: string;
-  email?: string;
-  role?: string;
-  [key: string]: unknown;
-}
-
-export interface AuthState {
-  token: string | null;
-  profile: UserProfile | null;
-}
+// Wave G6: removed `export type { AuthState, UserProfile } from '../types/domain/auth'`
+// re-export shim. Consumers should import AuthState directly from
+// '@/types/domain/auth'. The stores/auth.ts module still imports these
+// types for its own internal use (getState return type, subscriber type).
 
 type AuthSubscriber = (state: AuthState) => void;
 

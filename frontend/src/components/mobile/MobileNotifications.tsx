@@ -86,9 +86,15 @@ const MobileNotifications = () => {
   const subscribeToPushNotifications = async () => {
     try {
       const registration = await navigator.serviceWorker.ready;
+      // audit/phase-7, BS-47: prefer VITE_VAPID_PUBLIC_KEY (Vite convention).
+      // Fall back to legacy REACT_APP_ define polyfill for builds that
+      // haven't migrated env vars yet.
+      const vapidPublicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY
+        || process.env.REACT_APP_VAPID_PUBLIC_KEY
+        || '';
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: process.env.REACT_APP_VAPID_PUBLIC_KEY
+        applicationServerKey: vapidPublicKey
       });
 
       // Отправляем подписку на сервер

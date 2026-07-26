@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 
 import { api } from '../api/client';
-import type { Appointment } from '../types/domain/clinic';
+import type { Appointment, Doctor } from '../types/domain/clinic';
 
 const normalizeAppointment = (appointment: Appointment) => ({
   ...appointment,
@@ -29,15 +29,15 @@ const normalizeAppointment = (appointment: Appointment) => ({
     appointment.hasIntegrityWarnings ?? appointment.has_integrity_warnings ?? false,
 });
 
-const buildAppointmentPayload = (appointmentData: Record<string, unknown>, doctors: unknown[] = []) => {
+const buildAppointmentPayload = (appointmentData: Record<string, unknown>, doctors: Doctor[] = []) => {
   const selectedDoctor = doctors.find(
-    (doctor) => (doctor as Record<string, unknown>).id === Number((appointmentData as Record<string, unknown>).doctorId)
+    (doctor) => doctor.id === Number(appointmentData.doctorId)
   );
 
   const payload = {
-    patient_id: Number((appointmentData as Record<string, unknown>).patientId),
-    doctor_id: Number((appointmentData as Record<string, unknown>).doctorId),
-    department: (selectedDoctor as Record<string, unknown> | null)?.specialty || null,
+    patient_id: Number(appointmentData.patientId),
+    doctor_id: Number(appointmentData.doctorId),
+    department: selectedDoctor?.specialty || null,
     appointment_date: appointmentData.appointmentDate,
     appointment_time: appointmentData.appointmentTime,
     notes: String(appointmentData.reason ?? "").trim() || String(appointmentData.notes ?? "").trim() || '',
@@ -51,7 +51,7 @@ const buildAppointmentPayload = (appointmentData: Record<string, unknown>, docto
   return payload;
 };
 
-const useAppointments = (doctors: unknown[] = []) => {
+const useAppointments = (doctors: Doctor[] = []) => {
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -60,18 +60,30 @@ const useAppointments = (doctors: unknown[] = []) => {
   const [filterDate, setFilterDate] = useState('');
   const [filterDoctor, setFilterDoctor] = useState('');
 
+  // audit/phase-8, BS-22: request-ID guard against overlapping loads.
+  // Each create/update/delete calls `await loadAppointments()`; if the user
+  // triggers two mutations quickly, two loads are in flight and the later-
+  // started one might resolve first, then the earlier overwrites with stale
+  // data. The ref tracks the latest request; stale responses are discarded.
+  const loadAppointmentsRequestIdRef = useRef(0);
+
   const loadAppointments = useCallback(async () => {
+    const requestId = ++loadAppointmentsRequestIdRef.current;
     setLoading(true);
     setError(null);
 
     try {
       const response = await api.get('/admin/appointments');
+      if (requestId !== loadAppointmentsRequestIdRef.current) return;
       const items = Array.isArray(response.data) ? response.data : [];
       setAppointments(items.map(normalizeAppointment));
     } catch (err) {
+      if (requestId !== loadAppointmentsRequestIdRef.current) return;
       setError(String(err));
     } finally {
-      setLoading(false);
+      if (requestId === loadAppointmentsRequestIdRef.current) {
+        setLoading(false);
+      }
     }
   }, []);
 

@@ -39,7 +39,7 @@ import {
     CheckSquare,
     Square
 } from 'lucide-react';
-import api from '../../services/api';
+import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import {
   Select,

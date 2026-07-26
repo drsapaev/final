@@ -18,7 +18,7 @@ import {
   Clock,
   Bell } from
 'lucide-react';
-import api from '../../services/api';
+import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import './QueueManagementCard.css';
 import { useTranslation } from '../../i18n/useTranslation';
@@ -129,7 +129,7 @@ export const QueueActionButtons = ({
   } = styles as { actionButtonStyle?: Record<string, unknown>; getColor?: (category: string, variant: string) => string };
 
   const entryId = entry?.queue_entry_id ?? null;
-  const status = (entry?.queue_status || entry?.status || null) as string | null;
+  const status = entry?.queue_status || entry?.status || null;
 
   if (!entryId) {
     logger.warn('[QueueActionButtons] Missing queue_entry_id, skipping queue action controls', {

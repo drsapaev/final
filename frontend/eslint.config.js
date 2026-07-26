@@ -6,6 +6,9 @@ import globals from 'globals';
 import tsParser from '@typescript-eslint/parser';
 import tseslint from '@typescript-eslint/eslint-plugin';
 import noHardcodedColors from './scripts/no-hardcoded-colors.js';
+import noDomainTypeDuplication from './scripts/no-domain-type-duplication.js';
+import noDtoImportInComponents from './scripts/no-dto-import-in-components.js';
+import noApiLooseReturn from './scripts/no-api-loose-return.js';
 
 export default [
   js.configs.recommended,
@@ -18,6 +21,9 @@ export default [
       custom: {
         rules: {
           'no-hardcoded-colors': noHardcodedColors,
+          'no-domain-type-duplication': noDomainTypeDuplication,
+          'no-dto-import-in-components': noDtoImportInComponents,
+          'no-api-loose-return': noApiLooseReturn,
         },
       },
     },
@@ -43,6 +49,12 @@ export default [
     rules: {
       // Custom: ban hardcoded colors (prevent regressions)
       'custom/no-hardcoded-colors': 'warn',
+
+      // Wave 5 — Domain Adoption 100% regression guards
+      // Error-level: these are architectural invariants, not style.
+      'custom/no-domain-type-duplication': 'error',
+      'custom/no-dto-import-in-components': 'error',
+      'custom/no-api-loose-return': 'error',
 
       // React правила
       ...react.configs.recommended.rules,
@@ -95,8 +107,10 @@ export default [
       // =================================================================
 
       // 10.1: Запрет raw fetch() — использовать api/client.
-      // Разрешённые файлы: api/client.js, api/runtime.js, api/setup.js
+      // Разрешённые файлы: api/client.ts, api/runtime.ts, api/setup.ts
       // (последний — legacy, мигрируется отдельно).
+      // audit/phase-7b, BS-49: added `fetch()` selector — previously the
+      // comment claimed "Запрет raw fetch()" but no selector existed.
       'no-restricted-syntax': [
         'warn',
         {
@@ -110,6 +124,35 @@ export default [
         {
           selector: "CallExpression[callee.type='MemberExpression'][callee.object.name='window'][callee.property.name='prompt']",
           message: 'Используйте useConfirm() или модальный диалог вместо window.prompt() (UX Audit 10.10).',
+        },
+        {
+          selector: "CallExpression[callee.name='fetch']",
+          message: 'Используйте api.get/api.post из api/client вместо raw fetch() (UX Audit 10.1). Разрешено только в api/client.ts, api/runtime.ts, api/setup.ts.',
+        },
+      ],
+
+      // audit/phase-7b, BS-49: ban direct imports from generated OpenAPI types.
+      // Consumers should import from types/api.ts (which re-exports with
+      // friendly names) or types/domain/*.ts (hand-written domain types).
+      // Direct imports from types/generated/api.ts couple consumer code to
+      // the raw OpenAPI schema shape and break on schema regeneration.
+      'no-restricted-imports': [
+        'warn',
+        {
+          paths: [
+            {
+              name: '@/types/generated/api',
+              message: 'Import from types/api.ts or types/domain/*.ts instead. Direct imports from generated OpenAPI types couple consumer code to the raw schema shape.',
+            },
+            {
+              name: '../types/generated/api',
+              message: 'Import from types/api.ts or types/domain/*.ts instead. Direct imports from generated OpenAPI types couple consumer code to the raw schema shape.',
+            },
+            {
+              name: '../../types/generated/api',
+              message: 'Import from types/api.ts or types/domain/*.ts instead. Direct imports from generated OpenAPI types couple consumer code to the raw schema shape.',
+            },
+          ],
         },
       ],
 
@@ -171,7 +214,17 @@ export default [
   },
   {
     // Специальные правила для тестовых файлов
-    files: ['**/*.test.{js,jsx}', '**/__tests__/**/*.{js,jsx}', '**/test/**/*.{js,jsx}'],
+    // audit/phase-7, BS-48: extended patterns to include .ts/.tsx test files.
+    // Previously matched only .test.{js,jsx} (0 such files in the project)
+    // and __tests__/**/*.{js,jsx} — but the project has 149 .test.ts/.test.tsx
+    // files that weren't receiving the test globals block. The block was
+    // effectively dead code. Now covers .ts/.tsx variants for both patterns.
+    files: [
+      '**/*.test.{js,jsx,ts,tsx}',
+      '**/*.spec.{js,jsx,ts,tsx}',
+      '**/__tests__/**/*.{js,jsx,ts,tsx}',
+      '**/test/**/*.{js,jsx,ts,tsx}',
+    ],
     languageOptions: {
       globals: {
         ...globals.jest,

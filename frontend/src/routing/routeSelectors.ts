@@ -1,6 +1,6 @@
 import { generatePath, matchPath, type PathMatch } from 'react-router-dom';
-import { buildRouteDocsSnapshot, type RouteDocsSnapshot } from './routeDocsSnapshot.js';
-import { ROLE_ALIASES, ROLE_HOME_PRIORITY, ROUTE_REGISTRY, SIDEBAR_PRESETS } from './routeRegistry.js';
+import { buildRouteDocsSnapshot, type RouteDocsSnapshot } from './routeDocsSnapshot';
+import { ROLE_ALIASES, ROLE_HOME_PRIORITY, ROUTE_REGISTRY, SIDEBAR_PRESETS } from './routeRegistry';
 
 // P-003 fix: added 'Настройки' section to surface the 8 previously orphaned
 // admin-settings routes (benefit-settings, wizard-settings, payment-providers,

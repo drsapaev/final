@@ -7,6 +7,8 @@ import type { CSSProperties } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { labReportingApi } from '../api/labReporting';
+import { getPatient as getPatientById } from '../api/patients';
+import type { Patient } from '../types/domain/clinic';
 import auth from '../stores/auth';
 import logger from '../utils/logger';
 import { openPrintableWindow } from '../utils/printWindow';
@@ -53,7 +55,7 @@ export default function PatientPickupView() {
     return t('misc.ppu_title_default');
   };
 
-  const [patient, setPatient] = useState(null);
+  const [patient, setPatient] = useState<Patient | null>(null);
   const [labResults, setLabResults] = useState([]);
   const [visits, setVisits] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -67,9 +69,9 @@ export default function PatientPickupView() {
     setError(null);
 
     try {
-      // Load patient info
-      const patientRes = (await api.get(`/patients/${patientId}`)) as import('axios').AxiosResponse<Record<string, unknown>>;
-      setPatient(patientRes.data);
+      // Load patient info — Wave G5: use api/patients.ts which returns domain Patient
+      const patientData = await getPatientById(patientId);
+      setPatient(patientData);
 
       // Load lab results
       try {

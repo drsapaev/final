@@ -10,9 +10,9 @@ import { api } from './client';
 
 const SETUP_STATUS_CACHE_MS = 30_000;
 
-let setupStatusCache = null;
+let setupStatusCache: Record<string, unknown> | null = null;
 let setupStatusCacheAt = 0;
-let setupStatusRequestPromise = null;
+let setupStatusRequestPromise: Promise<Record<string, unknown>> | null = null;
 
 export function clearSetupStatusCache() {
   setupStatusCache = null;
@@ -43,14 +43,15 @@ export async function fetchSetupStatus() {
       setupStatusCacheAt = Date.now();
       return payload;
     } catch (error) {
+      const axiosErr = error as { response?: { data?: { detail?: string } }; message?: string };
       if (setupStatusCache) {
         logger.warn('[FIX:SETUP] Setup status request failed, falling back to cached value', {
-          error: error?.message || 'unknown error',
+          error: axiosErr?.message || 'unknown error',
         });
         return setupStatusCache;
       }
       // Нормализуем error message из axios response.
-      const detail = error?.response?.data?.detail || error?.message || 'Setup status request failed';
+      const detail = axiosErr?.response?.data?.detail || axiosErr?.message || 'Setup status request failed';
       throw new Error(detail);
     } finally {
       setupStatusRequestPromise = null;
@@ -69,7 +70,8 @@ export async function initializeSetup(payload: Record<string, unknown>) {
     return response.data;
   } catch (error) {
     // Нормализуем error message из axios response.
-    const detail = error?.response?.data?.detail || error?.message || 'Setup request failed';
+    const axiosErr = error as { response?: { data?: { detail?: string } }; message?: string };
+    const detail = axiosErr?.response?.data?.detail || axiosErr?.message || 'Setup request failed';
     throw new Error(detail);
   }
 }

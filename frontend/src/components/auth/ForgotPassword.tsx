@@ -19,7 +19,6 @@ import { useTranslation } from '../../i18n/useTranslation';
 
 import { useState, useEffect, useCallback } from 'react';
 import type { CSSProperties } from 'react';
-import PropTypes from 'prop-types';
 import {
   Mail, Phone, ArrowLeft, Send, CheckCircle, RefreshCw, Shield, Key,
   Eye, EyeOff, AlertCircle,
@@ -32,7 +31,7 @@ import { Input } from '../ui/macos';
 // ============================================================================
 // PASSWORD STRENGTH (shared with Setup.jsx — same logic)
 // ============================================================================
-function getPasswordStrength(password, t) {
+function getPasswordStrength(password: string, t: (key: string) => string) {
   if (!password) return { score: 0, label: '', color: 'transparent', percent: 0 };
   let score = 0;
   if (password.length >= 8) score += 1;
@@ -53,7 +52,13 @@ function getPasswordStrength(password, t) {
 
 const RESEND_COOLDOWN_SECONDS = 30;
 
-const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
+interface ForgotPasswordProps {
+  onBack?: () => void;
+  onSuccess?: () => void;
+  language?: string;
+}
+
+const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }: ForgotPasswordProps) => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // All state at the top (UX Audit #15 — was scattered)
@@ -68,7 +73,7 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
   const [inlineError, setInlineError] = useState('');
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [passwordsMatch, setPasswordsMatch] = useState(null);
+  const [passwordsMatch, setPasswordsMatch] = useState<boolean | null>(null);
   const [resendCountdown, setResendCountdown] = useState(0);
 
   const passwordStrength = getPasswordStrength(newPassword, t);
@@ -89,8 +94,8 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
     setPasswordsMatch(newPassword === confirmPassword);
   }, [newPassword, confirmPassword]);
 
-  const validatePhone = (phone) => /^\+998\d{9}$/.test(phone);
-  const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const validatePhone = (phone: string) => /^\+998\d{9}$/.test(phone);
+  const validateEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
   // UX Audit ForgotPassword #1: formatPhone переписан с нуля.
   //
@@ -109,7 +114,7 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
   //     +998XXXXXXXXX, 8XXXXXXXXX (РФ-стиль, считается опечаткой);
   //   - ограничивает длину до 12 цифр (защита от paste-атак);
   //   - всегда возвращает либо '', либо строку, начинающуюся с '+998'.
-  const formatPhone = (value) => {
+  const formatPhone = (value: string) => {
     if (!value) return '';
     const digits = String(value).replace(/\D/g, '');
 
@@ -290,7 +295,7 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
   const textSecondary = 'var(--mac-text-secondary, #86868b)';
   const textTertiary = 'var(--mac-text-tertiary, #aeaeb2)';
 
-  const iconCircleStyle = (color) => ({
+  const iconCircleStyle = (color: string) => ({
     width: '64px',
     height: '64px',
     background: `color-mix(in srgb, ${color}, transparent 88%)`,
@@ -781,10 +786,5 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
   );
 };
 
-ForgotPassword.propTypes = {
-  language: PropTypes.oneOf(['RU', 'UZ', 'EN']),
-  onBack: PropTypes.func,
-  onSuccess: PropTypes.func,
-};
 
 export default ForgotPassword;

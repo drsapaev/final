@@ -774,7 +774,7 @@ const DepartmentManagement = () => {
                 size="default"
                 onClick={() => setShowAddForm(!showAddForm)}>
                 
-                                <Plus size={16 as never} className="mr-2" />
+                                <Plus size={16} className="mr-2" />
                                 {t('admin2.dept_add_btn')}
                             </Button>
 
@@ -784,7 +784,7 @@ const DepartmentManagement = () => {
                 onClick={handleExport}
                 title={t('admin2.dept_export_title')}>
                 
-                                <Download size={16 as never} className="mr-2" />
+                                <Download size={16} className="mr-2" />
                                 {t('admin2.dept_export_btn')}
                             </Button>
 
@@ -796,7 +796,7 @@ const DepartmentManagement = () => {
                   className="admin-cursor-pointer"
                   title={t('admin2.dept_import_title')}>
                   
-                                    <Upload size={16 as never} className="mr-2" />
+                                    <Upload size={16} className="mr-2" />
                                     {t('admin2.dept_import_btn')}
                                 </Button>
                                 <input
@@ -813,7 +813,7 @@ const DepartmentManagement = () => {
                     {/* Панель поиска и фильтров */}
                     <div className="admin-flex-gap-16-wrap-mb-24">
                         <div className="admin-flex-search-row">
-                            <Search size={16 as never} className="text-[var(--mac-text-secondary)]" />
+                            <Search size={16} className="text-[var(--mac-text-secondary)]" />
                             <Input
                 placeholder={t('admin2.dept_search_placeholder')}
                 value={searchTerm}
@@ -1004,7 +1004,7 @@ const DepartmentManagement = () => {
 
                             <div className="admin-flex-gap-12-mt-16">
                                 <Button variant="primary" onClick={handleAddDepartment}>
-                                    <Save size={16 as never} className="mr-2" />
+                                    <Save size={16} className="mr-2" />
                                     {t('admin2.dept_save_btn')}
                                 </Button>
                                 <Button variant="secondary" onClick={() => {
@@ -1012,7 +1012,7 @@ const DepartmentManagement = () => {
                 setFormData(DEFAULT_FORM);
                 setServiceMapping(DEFAULT_SERVICE_MAPPING);
               }}>
-                                    <X size={16 as never} className="mr-2" />
+                                    <X size={16} className="mr-2" />
                                     {t('admin2.dept_cancel_btn')}
                                 </Button>
                             </div>
@@ -1031,7 +1031,7 @@ const DepartmentManagement = () => {
               size="small"
               onClick={handleBulkDelete}>
               
-                                <Trash2 size={14 as never} className="admin-mr-6" />
+                                <Trash2 size={14} className="admin-mr-6" />
                                 {t('admin2.dept_delete_btn')}
                             </Button>
 
@@ -1040,7 +1040,7 @@ const DepartmentManagement = () => {
               size="small"
               onClick={() => handleBulkActivate(true)}>
               
-                                <CheckCircle size={14 as never} className="admin-mr-6" />
+                                <CheckCircle size={14} className="admin-mr-6" />
                                 {t('admin2.dept_activate_btn')}
                             </Button>
 
@@ -1049,7 +1049,7 @@ const DepartmentManagement = () => {
               size="small"
               onClick={() => handleBulkActivate(false)}>
               
-                                <XCircle size={14 as never} className="admin-mr-6" />
+                                <XCircle size={14} className="admin-mr-6" />
                                 {t('admin2.dept_deactivate_btn')}
                             </Button>
 
@@ -1061,7 +1061,7 @@ const DepartmentManagement = () => {
                 setSelectAll(false);
               }}>
               
-                                <X size={14 as never} className="admin-mr-6" />
+                                <X size={14} className="admin-mr-6" />
                                 {t('admin2.dept_clear_btn')}
                             </Button>
                         </div>
@@ -1116,7 +1116,7 @@ const DepartmentManagement = () => {
                                             <td className="admin-td-padded">
                                                 <div className="admin-icon-cell-40" style={{ '--admin-icon-bg': dept.color || 'var(--mac-accent-blue)' } as CSSProperties}>
                                                     {IconComponent ?
-                          <IconComponent size={20 as never} /> :
+                          <IconComponent size={20} /> :
 
                           <span className="admin-icon-fallback-20">{dept.icon || '🏥'}</span>
                           }
@@ -1163,7 +1163,7 @@ const DepartmentManagement = () => {
                             onClick={() => openEditModal(dept)}
                             title={t('admin2.dept_edit_title')}>
                             
-                                                        <Edit2 size={16 as never} />
+                                                        <Edit2 size={16} />
                                                     </Button>
                                                     <Button
                             size="small"
@@ -1172,7 +1172,7 @@ const DepartmentManagement = () => {
                             onClick={() => handleDeleteDepartment(dept.id)}
                             title={t('admin2.dept_delete_action_title')}>
                             
-                                                        <Trash2 size={16 as never} />
+                                                        <Trash2 size={16} />
                                                     </Button>
                                                 </div>
                                             </td>
@@ -1421,7 +1421,7 @@ const DepartmentManagement = () => {
             variant="primary"
             onClick={handleUpdateDepartment}>
             
-                        <Save size={16 as never} className="mr-2" />
+                        <Save size={16} className="mr-2" />
                         {t('admin2.dept_save_changes_btn')}
                     </Button>
                 </div>

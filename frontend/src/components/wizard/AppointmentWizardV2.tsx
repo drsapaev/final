@@ -1730,7 +1730,7 @@ interface PatientRecord {
 
 
       const originalServiceIds = new Set();
-      const originalQueueIds = new Set(); // ✅ Moved here for availability in handleComplete
+      const originalQueueIds = new Set<string | number>(); // ✅ Moved here for availability in handleComplete
       // PR-14: collect updated_at per queue entry for optimistic locking.
       // Map<entryId, isoString> — passed to applyRegistrarEditDelta as
       // expectedEntryUpdatedAt so backend can detect concurrent edits.
@@ -1778,7 +1778,7 @@ interface PatientRecord {
             const cartServices = wizardData.cart.items.map((item) => ({
               service_id: (item as { service_id?: string | number }).service_id,
               quantity: item.quantity || 1
-            })).filter((s) => s.service_id);
+            })).filter((s): s is { service_id: string | number; quantity: unknown } => s.service_id != null);
 
             // Определяем visit_type и discount_mode
             const visitType = wizardData.cart.discount_mode === 'repeat' ? 'repeat' :
@@ -2572,21 +2572,21 @@ interface PatientRecord {
     label: t('misc.aw_clear_form'),
     onClick: clearDraft,
     variant: 'secondary',
-    icon: <Trash2 size={16 as never} />,
+    icon: <Trash2 size={16} />,
     disabled: isProcessing
   },
   currentStep > STEP_PATIENT && {
     label: t('misc.aw_back'),
     onClick: prevStep,
     variant: 'secondary',
-    icon: <ArrowLeft size={16 as never} />,
+    icon: <ArrowLeft size={16} />,
     disabled: isProcessing
   },
   {
     label: currentStep === totalSteps ? t('misc.aw_finish') : t('misc.aw_next'),
     onClick: currentStep === totalSteps ? handleComplete : nextStep,
     variant: 'primary',
-    icon: currentStep === totalSteps ? <Check size={16 as never} /> : <ArrowRight size={16 as never} />,
+    icon: currentStep === totalSteps ? <Check size={16} /> : <ArrowRight size={16} />,
     disabled: isProcessing,
     loading: isProcessing
   }].
@@ -2690,7 +2690,7 @@ interface PatientRecord {
   <div style={wizardHeaderShellStyle}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-3)', minWidth: 0 }}>
         <div style={wizardHeaderIconStyle}>
-          <Check size={18 as never} />
+          <Check size={18} />
         </div>
         <div style={{ minWidth: 0 }}>
           {editModeBanner}
@@ -2717,7 +2717,7 @@ interface PatientRecord {
         e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)';
         e.currentTarget.style.borderColor = 'var(--mac-border)';
       }}>
-        <X size={18 as never} />
+        <X size={18} />
       </button>
     </div>;
 
@@ -2781,10 +2781,10 @@ interface PatientRecord {
         }}>
 
             <span style={{ fontSize: 'var(--mac-font-size-lg)', display: 'inline-flex', alignItems: 'center' }}>
-            {cat.icon === 'stethoscope' ? <Stethoscope size={16 as never} /> :
-             cat.icon === 'flask' ? <FlaskConical size={16 as never} /> :
-             cat.icon === 'syringe' ? <Syringe size={16 as never} /> :
-             cat.icon === 'clipboard' ? <ClipboardList size={16 as never} /> : null}
+            {cat.icon === 'stethoscope' ? <Stethoscope size={16} /> :
+             cat.icon === 'flask' ? <FlaskConical size={16} /> :
+             cat.icon === 'syringe' ? <Syringe size={16} /> :
+             cat.icon === 'clipboard' ? <ClipboardList size={16} /> : null}
           </span>
             {cat.label}
           </button>
@@ -2832,7 +2832,7 @@ interface PatientRecord {
           e.currentTarget.style.color = 'var(--mac-text-secondary)';
         }}>
 
-          <RefreshCw size={16 as never} className={isReloadingServices ? 'spin' : ''} />
+          <RefreshCw size={16} className={isReloadingServices ? 'spin' : ''} />
         </button>
 
         {/* Кнопка закрытия */}
@@ -2866,7 +2866,7 @@ interface PatientRecord {
           e.currentTarget.style.color = 'var(--mac-text-secondary)';
         }}>
 
-          <X size={18 as never} />
+          <X size={18} />
         </button>
       </div>
     </div>;
@@ -2886,7 +2886,7 @@ interface PatientRecord {
           textAlign: 'center'
         }}>
           <AlertCircle
-            size={48 as never}
+            size={48}
             style={{
               color: 'var(--mac-danger)',
               marginBottom: 'var(--mac-spacing-4)'

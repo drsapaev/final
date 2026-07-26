@@ -62,13 +62,14 @@ async function mcpRequest(method: string, path: string, config: Record<string, u
 
     return response.data;
   } catch (error) {
-    const status = error?.response?.status;
-    const detail = error?.response?.data?.detail || error?.response?.data?.message;
+    const axiosErr = error as { response?: { status?: number; data?: { detail?: string; message?: string } } };
+    const status = axiosErr?.response?.status;
+    const detail = axiosErr?.response?.data?.detail || axiosErr?.response?.data?.message;
 
     logger.error(`[MCP] ${method.toUpperCase()} ${MCP_PREFIX}${path}`, {
       status,
       detail,
-      data: error?.response?.data,
+      data: axiosErr?.response?.data,
     });
 
     // 401 уже обрабатывается в api/client.js response interceptor
@@ -143,7 +144,7 @@ export const mcpAPI = {
   /**
    * Валидация жалоб
    */
-  async validateComplaint(complaint) {
+  async validateComplaint(complaint: string) {
     return mcpRequest('post', '/complaint/validate', {
       params: { complaint },
     });
@@ -178,7 +179,7 @@ export const mcpAPI = {
   /**
    * Валидация кода МКБ-10
    */
-  async validateICD10(code, symptoms = null, diagnosis = null) {
+  async validateICD10(code: string, symptoms: string | null = null, diagnosis: string | null = null) {
     return mcpRequest('post', '/icd10/validate', {
       params: { code, symptoms, diagnosis },
     });
@@ -187,7 +188,7 @@ export const mcpAPI = {
   /**
    * Поиск кодов МКБ-10
    */
-  async searchICD10(query, category = null, limit = 10) {
+  async searchICD10(query: string, category: string | null = null, limit: number = 10) {
     return mcpRequest('get', '/icd10/search', {
       params: { query, category, limit },
     });
@@ -213,7 +214,7 @@ export const mcpAPI = {
   /**
    * Проверка критических значений
    */
-  async checkCriticalValues(results) {
+  async checkCriticalValues(results: Record<string, unknown>) {
     return mcpRequest('post', '/lab/check-critical', { data: results });
   },
 
@@ -250,7 +251,7 @@ export const mcpAPI = {
   /**
    * Анализ кожных образований
    */
-  async analyzeSkinLesion(imageFile, lesionInfo = null, patientHistory = null, provider = null) {
+  async analyzeSkinLesion(imageFile: File | Blob, lesionInfo: Record<string, unknown> | null = null, patientHistory: Record<string, unknown> | null = null, provider: string | null = null) {
     const formData = new FormData();
     formData.append('image', imageFile);
 
@@ -277,7 +278,7 @@ export const mcpAPI = {
   /**
    * Пакетная обработка запросов
    */
-  async batchProcess(requests, parallel = true) {
+  async batchProcess(requests: Array<Record<string, unknown>>, parallel: boolean = true) {
     return mcpRequest('post', '/batch', {
       data: { requests, parallel },
     });

@@ -1,4 +1,3 @@
-import PropTypes from 'prop-types';
 import PaymentProviderDialog from './PaymentProviderDialog';
 import './PaymentClick.css';
 
@@ -14,6 +13,16 @@ import './PaymentClick.css';
  * MEDIUM #10 fix: removed `void useState(null)` artifact (the file no
  * longer has any useState — rules-of-hooks can no longer break).
  */
+interface PaymentClickProps {
+  isOpen: boolean;
+  onClose: () => void;
+  invoiceId: string | number;
+  totalAmount: number;
+  currency?: string;
+  onSuccess?: (...args: unknown[]) => void;
+  onError?: (...args: unknown[]) => void;
+}
+
 const PaymentClick = ({
   isOpen,
   onClose,
@@ -22,7 +31,7 @@ const PaymentClick = ({
   currency = 'UZS',
   onSuccess,
   onError
-}) => (
+}: PaymentClickProps) => (
   <PaymentProviderDialog
     isOpen={isOpen}
     onClose={onClose}
@@ -36,15 +45,5 @@ const PaymentClick = ({
     onError={onError} />
 );
 
-PaymentClick.propTypes = {
-  ...(PaymentClick.propTypes || {}),
-  currency: PropTypes.any,
-  invoiceId: PropTypes.any,
-  isOpen: PropTypes.any,
-  onClose: PropTypes.any,
-  onError: PropTypes.any,
-  onSuccess: PropTypes.any,
-  totalAmount: PropTypes.any,
-};
 
 export default PaymentClick;

@@ -71,8 +71,8 @@ const MacOSEmptyState = ({
     }
   };
 
-  const currentSize = sizeStyles[size];
-  const currentVariant = variantStyles[variant];
+  const currentSize = sizeStyles[size as 'sm' | 'md' | 'lg'];
+  const currentVariant = variantStyles[variant as 'default' | 'filled' | 'minimal'];
 
   const containerStyle: CSSProperties = {
     display: 'flex',

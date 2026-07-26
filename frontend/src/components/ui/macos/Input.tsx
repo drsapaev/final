@@ -82,8 +82,8 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(({
   };
 
   const currentVariant = error ? 'error' : variant;
-  const currentSize = sizeStyles[size];
-  const currentVariantStyle = variantStyles[currentVariant];
+  const currentSize = sizeStyles[size as InputSize];
+  const currentVariantStyle = variantStyles[currentVariant as InputVariant];
   const hasRightIcon = Boolean(Icon) && iconPosition === 'right';
   const hasValue = props.value !== undefined && props.value !== null && String(props.value).length > 0;
   const showClearButton = clearable && typeof onClear === 'function' && hasValue && !disabled;

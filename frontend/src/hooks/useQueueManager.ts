@@ -9,117 +9,38 @@ import {
   closeReceptionSlot,
   callNextQueuePatient,
 } from '../api/queue';
+import type {
+  QueueSpecialist,
+  QueueStats,
+  QueueEntry,
+  QueueData,
+  QueuePayload,
+  QrData,
+  LoadQueueSnapshotArgs,
+  GenerateDoctorQRCodeArgs,
+  GenerateClinicQRCodeArgs,
+  ReceptionSlotArgs,
+  QueueActionResponse,
+} from '../types/domain/queue';
 
-// === Domain value objects ===
-// These describe the canonical shapes produced by the queue API and consumed
-// by ModernQueueManager, IntegrationDemo, and other callers. The index
-// signature lets extra backend fields ride along without forcing `any`.
+// Re-export domain types for backwards compatibility with any callers
+// that still import from '@/hooks/useQueueManager'. New code should
+// import directly from '@/types/domain/queue'.
+export type {
+  QueueSpecialist,
+  QueueStats,
+  QueueEntry,
+  QueueData,
+  QueuePayload,
+  QrData,
+  LoadQueueSnapshotArgs,
+  GenerateDoctorQRCodeArgs,
+  GenerateClinicQRCodeArgs,
+  ReceptionSlotArgs,
+  QueueActionResponse,
+} from '../types/domain/queue';
 
-export interface QueueSpecialist {
-  id: number | string;
-  doctor_name?: string;
-  full_name?: string;
-  name?: string;
-  user?: { full_name?: string };
-  specialty?: string;
-  specialty_display?: string;
-  cabinet?: string | number;
-  department?: string;
-  [key: string]: unknown;
-}
-
-export interface QueueStats {
-  total_entries?: number;
-  total?: number;
-  totalEntries?: number;
-  waiting?: number;
-  waiting_entries?: number;
-  waitingCount?: number;
-  completed?: number;
-  served?: number;
-  served_count?: number;
-  [key: string]: unknown;
-}
-
-export interface QueueEntry {
-  id?: number;
-  status?: string;
-  patient_name?: string;
-  phone?: string;
-  [key: string]: unknown;
-}
-
-export interface QueueData {
-  id?: number;
-  entries?: QueueEntry[];
-  stats?: QueueStats | null;
-  statistics?: QueueStats | null;
-  opened_at?: string | null;
-  is_open?: boolean;
-  online_start_time?: string;
-  specialist_id?: number | string;
-  specialty?: string;
-  queue_id?: number;
-  [key: string]: unknown;
-}
-
-export interface QrData {
-  qr_code_base64?: string;
-  day?: string;
-  specialist_name?: string;
-  is_clinic_wide?: boolean;
-  department_name?: string;
-  department?: string;
-  target_date?: string;
-  token?: string;
-  expires_at?: string;
-  [key: string]: unknown;
-}
-
-export interface QueuePayload {
-  queues?: QueueData[];
-  [key: string]: unknown;
-}
-
-export interface LoadQueueSnapshotArgs {
-  specialistId: string | number;
-  targetDate: string;
-  doctor?: QueueSpecialist;
-}
-
-export interface GenerateDoctorQRCodeArgs {
-  specialistId: string | number;
-  targetDate: string;
-  department?: string;
-  specialistName?: string;
-  expiresHours?: number;
-}
-
-export interface GenerateClinicQRCodeArgs {
-  targetDate: string;
-  expiresHours?: number;
-}
-
-export interface ReceptionSlotArgs {
-  specialistId: string | number;
-  targetDate: string;
-}
-
-// Backend response for reception-slot operations and queue/call-next.
-// Backend returns a dynamic object; we expose the canonical fields the UI
-// reads and let extra fields ride along via the index signature.
-export interface QueueActionResponse {
-  success?: boolean;
-  message?: string;
-  patient?: {
-    id?: number;
-    name?: string;
-    number?: number | string;
-    [key: string]: unknown;
-  };
-  [key: string]: unknown;
-}
-
+// Hook-specific return type — React surface, stays local.
 export interface UseQueueManagerReturn {
   loading: boolean;
   specialists: QueueSpecialist[];

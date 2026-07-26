@@ -22,12 +22,12 @@ import {
   normalizeColorScheme,
   persistColorSchemeLocally,
   resolveThemeMode,
-} from '../theme/colorScheme.js';
-import apiClient from '../api/client.js';
-import { mixColors, toRgbaString } from '../theme/colorUtils.js';
+} from '../theme/colorScheme';
+import apiClient from '../api/client';
+import { mixColors, toRgbaString } from '../theme/colorUtils';
 import logger from '../utils/logger';
-import tokenManager from '../utils/tokenManager.js';
-import { isPublicRoutePath } from '../routing/routeSelectors.js';
+import tokenManager from '../utils/tokenManager';
+import { isPublicRoutePath } from '../routing/routeSelectors';
 
 type ThemeMode = 'light' | 'dark';
 type ColorScheme = string;
@@ -352,19 +352,21 @@ export const ThemeProvider = ({ children }: ThemeProviderProps) => {
     const semanticColors = (tokenColors as { semantic?: Record<string, Record<string, string>> }).semantic;
     const primaryColors = (tokenColors as { primary?: Record<number, string> }).primary;
     const statusColors = (tokenColors as { status?: Record<string, string> }).status;
-    const macBgPrimary = computedStyle.getPropertyValue('--mac-bg-primary').trim() || semanticColors?.background.primary;
-    const macBgSecondary = computedStyle.getPropertyValue('--mac-bg-secondary').trim() || semanticColors?.background.secondary;
-    const macBgTertiary = computedStyle.getPropertyValue('--mac-bg-tertiary').trim() || semanticColors?.background.tertiary;
-    const macTextPrimary = computedStyle.getPropertyValue('--mac-text-primary').trim() || semanticColors?.text.primary;
-    const macTextSecondary = computedStyle.getPropertyValue('--mac-text-secondary').trim() || semanticColors?.text.secondary;
-    const macBorder = computedStyle.getPropertyValue('--mac-border').trim() || semanticColors?.border.medium;
-    const macHover =
+    const macBgPrimary: string = computedStyle.getPropertyValue('--mac-bg-primary').trim() || semanticColors?.background.primary || '';
+    const macBgSecondary: string = computedStyle.getPropertyValue('--mac-bg-secondary').trim() || semanticColors?.background.secondary || '';
+    const macBgTertiary: string = computedStyle.getPropertyValue('--mac-bg-tertiary').trim() || semanticColors?.background.tertiary || '';
+    const macTextPrimary: string = computedStyle.getPropertyValue('--mac-text-primary').trim() || semanticColors?.text.primary || '';
+    const macTextSecondary: string = computedStyle.getPropertyValue('--mac-text-secondary').trim() || semanticColors?.text.secondary || '';
+    const macBorder: string = computedStyle.getPropertyValue('--mac-border').trim() || semanticColors?.border.medium || '';
+    const macHover: string =
       computedStyle.getPropertyValue('--mac-nav-item-hover').trim() ||
       computedStyle.getPropertyValue('--mac-bg-secondary').trim() ||
-      semanticColors?.surface.hover;
-    const macAccent =
+      semanticColors?.surface.hover ||
+      '';
+    const macAccent: string =
       computedStyle.getPropertyValue('--mac-accent').trim() ||
-      primaryColors?.[isDark ? 400 : 500];
+      primaryColors?.[isDark ? 400 : 500] ||
+      '';
 
     root.style.setProperty('--bg-primary', macBgPrimary);
     root.style.setProperty('--bg-secondary', macBgSecondary);
@@ -376,10 +378,10 @@ export const ThemeProvider = ({ children }: ThemeProviderProps) => {
     root.style.setProperty('--hover-bg', macHover);
     root.style.setProperty('--accent-color', macAccent);
 
-    const success = computedStyle.getPropertyValue('--mac-success').trim() || statusColors?.success;
-    const warning = computedStyle.getPropertyValue('--mac-warning').trim() || statusColors?.warning;
-    const error = computedStyle.getPropertyValue('--mac-error').trim() || statusColors?.danger;
-    const info = computedStyle.getPropertyValue('--mac-accent').trim() || macAccent;
+    const success: string = computedStyle.getPropertyValue('--mac-success').trim() || statusColors?.success || '';
+    const warning: string = computedStyle.getPropertyValue('--mac-warning').trim() || statusColors?.warning || '';
+    const error: string = computedStyle.getPropertyValue('--mac-error').trim() || statusColors?.danger || '';
+    const info: string = computedStyle.getPropertyValue('--mac-accent').trim() || macAccent;
 
     root.style.setProperty('--success-color', success);
     root.style.setProperty('--warning-color', warning);

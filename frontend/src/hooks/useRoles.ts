@@ -6,20 +6,21 @@ import { useCallback, useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { getErrorMessage } from '../utils/errorHandler';
 import logger from '../utils/logger';
+import type { RoleRecord } from '../types/domain/auth';
+
+// Re-export for backwards compatibility with any caller that still imports
+// `Role` from this module. New code should import RoleRecord from
+// '@/types/domain/auth' directly.
+export type { RoleRecord } from '../types/domain/auth';
+/**
+ * @deprecated Use `RoleRecord` from '@/types/domain/auth' instead.
+ * Kept as an alias so existing imports keep compiling.
+ */
+export type Role = RoleRecord;
 
 export interface RoleOption {
   value: string;
   label: string;
-}
-
-export interface Role {
-  id: number;
-  name: string;
-  display_name: string;
-  description: string;
-  level: number;
-  is_active: boolean;
-  is_system: boolean;
 }
 
 export interface UseRolesOptions {
@@ -28,7 +29,7 @@ export interface UseRolesOptions {
 
 export interface UseRolesReturn {
   roleOptions: RoleOption[];
-  roles: Role[];
+  roles: RoleRecord[];
   loading: boolean;
   error: string | null;
   refetch: () => Promise<void>;
@@ -37,7 +38,7 @@ export interface UseRolesReturn {
 
 export function useRoles({ includeAll = false }: UseRolesOptions = {}): UseRolesReturn {
   const [roleOptions, setRoleOptions] = useState<RoleOption[]>([]);
-  const [roles, setRoles] = useState<Role[]>([]);
+  const [roles, setRoles] = useState<RoleRecord[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 

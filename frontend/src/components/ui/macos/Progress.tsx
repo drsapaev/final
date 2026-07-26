@@ -3,7 +3,7 @@ import { useTheme } from '../../../contexts/ThemeContext';
 
 type ProgressVariant = 'default' | 'primary' | 'success' | 'warning' | 'danger' | 'determinate' | string;
 type ProgressSize = 'small' | 'default' | 'large';
-type CircularProgressSize = 'small' | 'default' | 'large' | 'xlarge';
+type CircularProgressSize = 'small' | 'default' | 'large' | 'xlarge' | number;
 type ProgressThickness = 'thin' | 'medium' | 'thick';
 
 interface ProgressProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'children' | 'style'> {
@@ -114,7 +114,6 @@ const Progress = React.forwardRef<HTMLDivElement, ProgressProps>(({
     width: '100%',
     backgroundColor: variantStyles[variant]?.backgroundColor || variantStyles.default.backgroundColor,
     border: variantStyles[variant]?.border || variantStyles.default.border,
-    borderRadius: sizeStyles.borderRadius,
     overflow: 'hidden',
     position: 'relative',
     ...sizeStyles,

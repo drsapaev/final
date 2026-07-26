@@ -21,6 +21,8 @@ import { useHotkeys } from '../hooks/useHotkeys';
 import { useSessionTimeoutWarning } from '../hooks/useSessionTimeoutWarning';
 import { getApiOrigin } from '../api/runtime';
 import { api } from '../api/client';  // PR-53: replace raw fetch with axios
+import { getPatient as fetchPatientById } from '../api/patients';
+import type { Patient } from '../types/domain/clinic';
 import { printPanelReceiptInBrowser } from '../services/panelPrint';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
@@ -390,11 +392,11 @@ const CashierPanel = () => {
       const loadPatientForSearch = async () => {
         try {
           // PR-53: migrated from raw fetch() to axios client
+          // Wave G5: use api/patients.ts which returns domain Patient via mapper
           const token = tokenManager.getAccessToken();
           if (!token) return;
 
-          const response = (await api.get(`/patients/${patientIdFromUrl}`)) as import('axios').AxiosResponse<Record<string, unknown>>;
-          const patientData = response.data;
+          const patientData: Patient = await fetchPatientById(patientIdFromUrl);
           const patientName = `${patientData.last_name || ''} ${patientData.first_name || ''}`.trim();
           setQuery(patientName);
           logger.info('[Cashier] Patient loaded from URL', { patientId: patientData?.id });
@@ -1541,7 +1543,7 @@ const CashierPanel = () => {
 
               (/* UX Audit #4.3: actionable empty state вместо голого текста. */
               <div className="cashier-empty-state" role="status">
-                <CheckCircle size={32 as never} className="cashier-empty-state-icon" aria-hidden="true" />
+                <CheckCircle size={32} className="cashier-empty-state-icon" aria-hidden="true" />
                 <div className="cashier-empty-state-title">{tI18n('cashier.empty_pending_title')}</div>
                 <div className="cashier-empty-state-text">
                   {tI18n('cashier.empty_pending_text')}
@@ -1654,13 +1656,13 @@ const CashierPanel = () => {
                                   disabled={!hasBackendPaymentAction(row, 'confirm') || processingAction?.id === row.id}
                                   aria-label={tI18n('cashier.confirm_payment_aria')}>
                                   {processingAction?.id === row.id && processingAction?.type === 'confirm' ?
-                                    <Loader2 size={14 as never} className="animate-spin" aria-hidden="true" /> :
-                                    <CheckCircle size={14 as never} />}
+                                    <Loader2 size={14} className="animate-spin" aria-hidden="true" /> :
+                                    <CheckCircle size={14} />}
                                   {tI18n('cashier.confirm_payment_confirm')}
                                 </Button>
                                 <details className="cashier-overflow-menu">
                                   <summary className="cashier-overflow-trigger" aria-label={tI18n('cashier.more_actions_aria')}>
-                                    <MoreVertical size={16 as never} aria-hidden="true" />
+                                    <MoreVertical size={16} aria-hidden="true" />
                                   </summary>
                                   <div className="cashier-overflow-popover" role="menu">
                                     <button
@@ -1670,7 +1672,7 @@ const CashierPanel = () => {
                                       disabled={!hasBackendPaymentAction(row, 'cancel') || processingAction?.id === row.id}
                                       role="menuitem"
                                       aria-label={tI18n('cashier.btn_cancel')}>
-                                      <XCircle size={14 as never} aria-hidden="true" /> {tI18n('cashier.btn_cancel')}
+                                      <XCircle size={14} aria-hidden="true" /> {tI18n('cashier.btn_cancel')}
                                     </button>
                                     <button
                                       type="button"
@@ -1679,7 +1681,7 @@ const CashierPanel = () => {
                                       disabled={!hasBackendPaymentAction(row, 'refund') || processingAction?.id === row.id}
                                       role="menuitem"
                                       aria-label={tI18n('cashier.refund_aria')}>
-                                      <Undo2 size={14 as never} aria-hidden="true" /> {tI18n('cashier.refund_confirm')}
+                                      <Undo2 size={14} aria-hidden="true" /> {tI18n('cashier.refund_confirm')}
                                     </button>
                                     <button
                                       type="button"
@@ -1688,7 +1690,7 @@ const CashierPanel = () => {
                                       disabled={!hasBackendPaymentAction(row, 'print_receipt') || processingAction?.id === row.id}
                                       role="menuitem"
                                       aria-label={tI18n('cashier.print_receipt_aria')}>
-                                      <Receipt size={14 as never} aria-hidden="true" /> {tI18n('cashier.print_receipt_btn')}
+                                      <Receipt size={14} aria-hidden="true" /> {tI18n('cashier.print_receipt_btn')}
                                     </button>
                                   </div>
                                 </details>
@@ -1799,7 +1801,7 @@ const CashierPanel = () => {
                 variant="danger"
                 onClick={handleCancelPayment}
                 disabled={processingAction?.type === 'cancel' || cancelReason.trim().length < 10}>
-                {processingAction?.type === 'cancel' ? <Loader2 size={14 as never} className="animate-spin" aria-hidden="true" /> : null}
+                {processingAction?.type === 'cancel' ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : null}
                 {tI18n('cashier.btn_cancel')}
               </Button>
             </DialogActions>
@@ -1948,7 +1950,7 @@ const CashierPanel = () => {
                 {tI18n('cashier.cancel')}
               </Button>
               <Button variant="danger" onClick={handleRefund} disabled={processingAction?.type === 'refund'}>
-                {processingAction?.type === 'refund' ? <Loader2 size={14 as never} className="animate-spin" aria-hidden="true" /> : null}
+                {processingAction?.type === 'refund' ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : null}
                 {tI18n('cashier.refund_execute_btn')}
               </Button>
             </DialogActions>

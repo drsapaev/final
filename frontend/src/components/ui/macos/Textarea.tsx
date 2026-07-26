@@ -77,8 +77,8 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(({
   };
 
   const currentVariant = error ? 'error' : variant;
-  const currentSize = sizeStyles[size];
-  const currentVariantStyle = variantStyles[currentVariant];
+  const currentSize = sizeStyles[size as TextareaSize];
+  const currentVariantStyle = variantStyles[currentVariant as TextareaVariant];
 
   const textareaStyles: TextareaStyle = {
     width: '100%',

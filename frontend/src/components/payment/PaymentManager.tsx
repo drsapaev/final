@@ -13,7 +13,6 @@ import {
 } from '../../api/payments';
 import logger from '../../utils/logger';
 import './PaymentManager.css';
-import PropTypes from 'prop-types';
 import { Input } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
 
@@ -397,15 +396,5 @@ const PaymentManager = ({
 
 // UX Audit Stage 3 (Payment issue 8.4):
 // Почищены propTypes-артефакты из codemod-sweep.
-PaymentManager.propTypes = {
-  initialAmount: PropTypes.number,
-  invoiceId: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
-  isOpen: PropTypes.bool.isRequired,
-  onClose: PropTypes.func.isRequired,
-  patientInfo: PropTypes.shape({
-    fio: PropTypes.string,
-    phone: PropTypes.string,
-  }),
-};
 
 export default PaymentManager;

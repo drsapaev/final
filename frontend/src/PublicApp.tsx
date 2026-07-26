@@ -2,13 +2,13 @@ import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { TranslationProvider } from './i18n/useTranslation';
-import { MacOSThemeProvider } from './theme/macosTheme.jsx';
-import Landing from './pages/Landing.jsx';
-import Login from './pages/Login.jsx';
-import LoginFormStyled from './components/auth/LoginFormStyled.jsx';
+import { MacOSThemeProvider } from './theme/macosTheme';
+import Landing from './pages/Landing';
+import Login from './pages/Login';
+import LoginFormStyled from './components/auth/LoginFormStyled';
 import PropTypes from 'prop-types';
 
-const App = lazy(() => import('./App.jsx'));
+const App = lazy(() => import('./App'));
 
 function PublicProviders({ children }) {
   return (

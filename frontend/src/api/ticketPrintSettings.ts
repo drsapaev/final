@@ -66,9 +66,18 @@ export const TICKET_PRINT_SETTINGS_DEFINITIONS = [
   },
 ];
 
-export function normalizeTicketPrintSettings(settings = {}) {
-  return Object.keys(TICKET_PRINT_SETTINGS_DEFAULTS).reduce((acc, key) => {
-    const fallback = TICKET_PRINT_SETTINGS_DEFAULTS[key];
+/**
+ * @api-transport
+ * Returns a free-form boolean-keyed map because the backend stores ticket
+ * print settings as an arbitrary set of feature flags. The shape is
+ * dictated by `TICKET_PRINT_SETTINGS_DEFAULTS` (a static const in this
+ * file), not by a domain entity — there is no canonical `TicketPrintSettings`
+ * in `types/domain/*`. The boolean values come directly from user settings
+ * (UI checkboxes), so they cannot be a loose `unknown` at the call site.
+ */
+export function normalizeTicketPrintSettings(settings: Record<string, unknown> = {}): Record<string, boolean> {
+  return Object.keys(TICKET_PRINT_SETTINGS_DEFAULTS).reduce((acc: Record<string, boolean>, key: string) => {
+    const fallback = TICKET_PRINT_SETTINGS_DEFAULTS[key as keyof typeof TICKET_PRINT_SETTINGS_DEFAULTS];
     const value = settings?.[key];
     acc[key] = typeof value === 'boolean' ? value : fallback;
     return acc;

@@ -14,7 +14,6 @@ import { api } from '../../api/client';
 import { toast } from 'react-toastify';
 
 import logger from '../../utils/logger';
-import PropTypes from 'prop-types';
 import { useSafeInput } from '../../hooks/useSafeInput';  // PR-39 / P0-5: sanitizer wired to form
 import { useTranslation } from '../../i18n/useTranslation';
 
@@ -72,17 +71,17 @@ const PhoneVerification = ({
   const [codeSent, setCodeSent] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
   const [attemptsLeft, setAttemptsLeft] = useState(3);
-  const [verificationStatus, setVerificationStatus] = useState(null);
+  const [verificationStatus, setVerificationStatus] = useState<{ verified?: boolean; message?: string } | null>(null);
 
   useEffect(() => {
-    let timer;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     if (timeLeft > 0) {
       timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
     }
     return () => clearTimeout(timer);
   }, [timeLeft]);
 
-  const formatPhone = (value) => {
+  const formatPhone = (value: string) => {
     // Удаляем все символы кроме цифр
     const digits = value.replace(/\D/g, '');
     
@@ -99,7 +98,7 @@ const PhoneVerification = ({
     return value;
   };
 
-  const validatePhone = (phone) => {
+  const validatePhone = (phone: string) => {
     const phoneRegex = /^\+998\d{9}$/;
     return phoneRegex.test(phone);
   };
@@ -158,9 +157,10 @@ const PhoneVerification = ({
     } catch (error) {
       logger.error('Error sending verification code:', error);
       
-      if (error.response?.status === 429) {
+      const sendErrResponse = (error as { response?: { status?: number } })?.response;
+      if (sendErrResponse?.status === 429) {
         toast.error(t('misc.pv_slishkom_chastye_zaprosy_pop'));
-      } else if (error.response?.status === 502) {
+      } else if (sendErrResponse?.status === 502) {
         toast.error(t('misc.pv_oshibka_otpravki_sms_provert'));
       } else {
         toast.error(t('misc.pv_oshibka_otpravki_koda_verifi'));
@@ -196,15 +196,16 @@ const PhoneVerification = ({
     } catch (error) {
       logger.error('Error verifying code:', error);
       
-      const errorData = error.response?.data?.detail;
+      const errorResponse = (error as { response?: { status?: number; data?: { detail?: { attempts_left?: number } } } })?.response;
+      const errorData = errorResponse?.data?.detail;
       
-      if (error.response?.status === 404) {
+      if (errorResponse?.status === 404) {
         toast.error(t('misc.pv_kod_ne_nayden_ili_istek'));
         setCodeSent(false);
-      } else if (error.response?.status === 410) {
+      } else if (errorResponse?.status === 410) {
         toast.error(t('misc.pv_kod_istek_zaprosite_novyy_ko'));
         setCodeSent(false);
-      } else if (error.response?.status === 429) {
+      } else if (errorResponse?.status === 429) {
         toast.error(t('misc.pv_prevysheno_kolichestvo_popyt'));
         setCodeSent(false);
       } else if (errorData?.attempts_left !== undefined) {
@@ -237,18 +238,18 @@ const PhoneVerification = ({
     }
   };
 
-  const formatTime = (seconds) => {
+  const formatTime = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
-  const handlePhoneChange = (e) => {
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const formatted = formatPhone(e.target.value);
     setCurrentPhone(formatted);
   };
 
-  const handleCodeChange = (e) => {
+  const handleCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/\D/g, '').slice(0, 6);
     setVerificationCode(value);
   };
@@ -396,16 +397,6 @@ const PhoneVerification = ({
 };
 
 
-PhoneVerification.propTypes = {
-  ...(PhoneVerification.propTypes || {}),
-  customMessage: PropTypes.any,
-  onCancel: PropTypes.any,
-  onVerified: PropTypes.any,
-  phone: PropTypes.any,
-  purpose: PropTypes.any,
-  showPhoneInput: PropTypes.any,
-  title: PropTypes.any,
-};
 
 export default PhoneVerification;
 

@@ -1,8 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import PropTypes from 'prop-types';
 import { Navigate, useLocation } from 'react-router-dom';
-import auth from '../stores/auth.js';
-import type { AuthState } from '../stores/auth';
+import auth from '../stores/auth';
+import type { AuthState } from '../types/domain/auth';
 import logger from '../utils/logger';
 import {
   getEffectiveRouteByPath,
@@ -10,7 +10,7 @@ import {
   getProfileRoles,
   isInternalDemoEnabled,
   normalizeRole,
-} from './routeSelectors.js';
+} from './routeSelectors';
 import { useTranslation } from '../i18n/useTranslation';
 
 // Reuse the route selector's structural type so we don't duplicate the

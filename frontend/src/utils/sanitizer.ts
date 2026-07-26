@@ -165,7 +165,7 @@ export function escapeHTML(str: string): string {
     return '';
   }
 
-  const htmlEscapeMap = {
+  const htmlEscapeMap: Record<string, string> = {
     '&': '&amp;',
     '<': '&lt;',
     '>': '&gt;',
@@ -191,7 +191,7 @@ export function escapeHTML(str: string): string {
  * const ok = sanitizeURL('https://example.com');
  * // Результат: 'https://example.com'
  */
-export function sanitizeURL(url: string): string {
+export function sanitizeURL(url: string): string | null {
   if (!url || typeof url !== 'string') {
     return null;
   }
@@ -339,7 +339,7 @@ export function sanitizePhone(phone: string): string {
  * @example
  * sanitizeEmail('user@example.com<script>') // 'user@example.com'
  */
-export function sanitizeEmail(email: string): string {
+export function sanitizeEmail(email: string): string | null {
   if (!email || typeof email !== 'string') {
     return null;
   }

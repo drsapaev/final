@@ -48,6 +48,18 @@ const useAdminData = (
   const fetchData = useCallback(async (): Promise<void> => {
     if (!enabled || !url || !mountedRef.current) return;
 
+    // audit/phase-4, BS-13: previously a new AbortController was created and
+    // stored in the ref, but its `signal` was NEVER passed to `api.get()`.
+    // Cleanup aborted nothing — in-flight requests completed on the network
+    // and ran `setData`/`onSuccessRef` even after unmount (only `mountedRef`
+    // prevented the state update, not the wasted bandwidth/CPU). Two fixes:
+    //   1. Abort the PREVIOUS controller before creating a new one — without
+    //      this, rapid re-fetches (e.g., refreshInterval tick during a slow
+    //      request) accumulated multiple in-flight requests.
+    //   2. Pass `{ signal }` to axios so the request actually gets cancelled.
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
     const currentAbortController = new AbortController();
     abortControllerRef.current = currentAbortController;
 
@@ -56,8 +68,9 @@ const useAdminData = (
       setError(null);
 
       const cleanUrl = url.startsWith('/api/v1') ? url.replace('/api/v1', '') : url;
-      const response = await api.get(cleanUrl);
+      const response = await api.get(cleanUrl, { signal: currentAbortController.signal });
 
+      if (!mountedRef.current) return;
       setData(response.data);
       onSuccessRef.current(response.data);
     } catch (err) {
@@ -70,10 +83,13 @@ const useAdminData = (
         return;
       }
 
+      if (!mountedRef.current) return;
       setError(String(err));
       onErrorRef.current(err);
     } finally {
-      setLoading(false);
+      if (mountedRef.current) {
+        setLoading(false);
+      }
     }
   }, [url, enabled]);
 

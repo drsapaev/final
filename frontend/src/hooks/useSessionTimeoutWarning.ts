@@ -63,6 +63,22 @@ export function useSessionTimeoutWarning({
   const warningFiredRef = useRef(false);
   const expiredFiredRef = useRef(false);
 
+  // audit/phase-4, BS-21: keep latest callbacks in refs so the polling
+  // interval always invokes the CURRENT closure. Previously `check` captured
+  // the FIRST-render `onWarning`/`onExpired` (deps array excluded them on
+  // purpose to avoid re-subscribing), so a parent that re-created these
+  // closures (extremely common — `onWarning={() => setShowWarningDialog(true)}`
+  // capturing state) was stuck with stale callbacks forever. If those
+  // closures depended on state that changed between renders, the dialog
+  // would either not show or show with stale data.
+  // The ref-update effect runs on every render (no dep array) — cheap, and
+  // guarantees the polling `check` sees the latest. This is the same
+  // pattern useAdminData uses for onErrorRef/onSuccessRef.
+  const onWarningRef = useRef(onWarning);
+  const onExpiredRef = useRef(onExpired);
+  onWarningRef.current = onWarning;
+  onExpiredRef.current = onExpired;
+
   useEffect(() => {
     if (!enabled) return;
     if (typeof onWarning !== 'function' && typeof onExpired !== 'function') {
@@ -94,7 +110,9 @@ export function useSessionTimeoutWarning({
             expiredFiredRef.current = true;
             warningFiredRef.current = true; // no point warning after expiry
             logger.info('[useSessionTimeoutWarning] session expired');
-            if (typeof onExpired === 'function') (onExpired as (...args: unknown[]) => void)();
+            // Call through the ref so we get the latest closure.
+            const fn = onExpiredRef.current;
+            if (typeof fn === 'function') fn();
           }
           return;
         }
@@ -105,7 +123,9 @@ export function useSessionTimeoutWarning({
             logger.info(
               `[useSessionTimeoutWarning] session expiring in ${Math.round(remaining / 1000)}s`
             );
-            if (typeof onWarning === 'function') (onWarning as (...args: unknown[]) => void)(new Date(expiresAt));
+            // Call through the ref so we get the latest closure.
+            const fn = onWarningRef.current;
+            if (typeof fn === 'function') fn(new Date(expiresAt));
           }
         } else {
           // Token was refreshed (or user logged in anew) — reset the flags
@@ -127,9 +147,9 @@ export function useSessionTimeoutWarning({
     return () => {
       if (intervalId) clearInterval(intervalId);
     };
-    // We intentionally do NOT include onWarning/onExpired in deps — the
-    // parent usually passes inline closures and we don't want to
-    // re-subscribe on every render. The refs guard against double-firing.
+    // onWarning/onExpired are intentionally NOT in deps — the refs above
+    // keep the latest closures without forcing re-subscription. The
+    // interval is re-created only when timing/config deps change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, warningThresholdMs, pollIntervalMs]);
 }

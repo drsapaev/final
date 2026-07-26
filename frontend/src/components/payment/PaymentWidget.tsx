@@ -31,7 +31,6 @@ import { api as apiClient, getToken } from '../../api/client';
 // заменён на var(--mac-accent-blue) через CSS-класс .pw-header-icon.
 import { getErrorMessage } from '../../utils/errorHandler';
 import logger from '../../utils/logger';
-import PropTypes from 'prop-types';
 import './PaymentWidget.css';
 import { useTranslation } from '../../i18n/useTranslation';
 
@@ -557,7 +556,7 @@ const PaymentWidget = ({
 
             {loading ?
             <>
-                <CircularProgress size={20 as never} className="pw-submit-spinner" />
+                <CircularProgress size={20} className="pw-submit-spinner" />
                 {t('payment.pay_widg_processing')}
               </> :
 
@@ -583,15 +582,5 @@ const PaymentWidget = ({
 };
 
 
-PaymentWidget.propTypes = {
-  ...(PaymentWidget.propTypes || {}),
-  amount: PropTypes.any,
-  currency: PropTypes.any,
-  description: PropTypes.any,
-  onCancel: PropTypes.any,
-  onError: PropTypes.any,
-  onSuccess: PropTypes.any,
-  visitId: PropTypes.any,
-};
 
 export default PaymentWidget;

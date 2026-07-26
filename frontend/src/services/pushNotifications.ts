@@ -92,7 +92,7 @@ class PushNotificationService {
   /**
    * Show a notification for new message
    */
-  showMessageNotification(message, senderName) {
+  showMessageNotification(message: { message_type?: string; content?: string; id?: string | number; sender_id?: string | number }, senderName: string) {
     if (!this.isEnabled()) {
       return;
     }
@@ -143,7 +143,7 @@ class PushNotificationService {
   /**
    * Show notification for multiple unread messages
    */
-  showUnreadCountNotification(count) {
+  showUnreadCountNotification(count: number) {
     if (!this.isEnabled() || document.visibilityState === 'visible') {
       return;
     }
@@ -184,7 +184,7 @@ export function usePushNotifications() {
     return granted;
   }, []);
 
-  const showNotification = useCallback((message, senderName) => {
+  const showNotification = useCallback((message: { message_type?: string; content?: string; id?: string | number; sender_id?: string | number }, senderName: string) => {
     pushNotifications.showMessageNotification(message, senderName);
   }, []);
 

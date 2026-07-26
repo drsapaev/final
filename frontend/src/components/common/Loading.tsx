@@ -1,7 +1,6 @@
 
 // Компоненты для отображения состояния загрузки
 import React, { type CSSProperties } from 'react';
-import PropTypes from 'prop-types';
 import { useTheme } from '../../contexts/ThemeContext';
 import AnimatedLoader from '../AnimatedLoader';
 import { useTranslation } from '../../i18n/useTranslation';
@@ -9,6 +8,15 @@ import { useTranslation } from '../../i18n/useTranslation';
 /**
  * Основной компонент загрузки
  */
+interface LoadingProps {
+  size?: string;
+  variant?: string;
+  text?: string;
+  overlay?: boolean;
+  fullScreen?: boolean;
+  color?: string;
+}
+
 export function Loading({
   size = 'medium',
   variant = 'spinner',
@@ -16,12 +24,12 @@ export function Loading({
   overlay = false,
   fullScreen = false,
   color = 'primary'
-}) {
+}: LoadingProps = {}) {
   const theme = useTheme();
   const { getColor, getSpacing, getFontSize } = theme;
 
-  const getSize = (size) => {
-    const sizes = {
+  const getSize = (size: string): string => {
+    const sizes: Record<string, string> = {
       small: '20px',
       medium: '40px',
       large: '60px',
@@ -133,7 +141,15 @@ export function Loading({
 /**
  * Компонент для загрузки кнопки
  */
-export function ButtonLoading({ loading, children, style = {}, disabled = false, ...props }) {
+interface ButtonLoadingProps {
+  loading?: boolean;
+  children?: React.ReactNode;
+  style?: CSSProperties;
+  disabled?: boolean;
+  [key: string]: unknown;
+}
+
+export function ButtonLoading({ loading, children, style = {}, disabled = false, ...props }: ButtonLoadingProps = {}) {
   const theme = useTheme();
   const { getSpacing } = theme;
 
@@ -344,7 +360,7 @@ export function ListLoading({ count = 5 }) {
 /**
  * Хук для управления состоянием загрузки
  */
-export function useLoading(initialState = false) {
+export function useLoading(initialState: boolean = false) {
   const [loading, setLoading] = React.useState(initialState);
 
   const startLoading = React.useCallback(() => {
@@ -355,7 +371,7 @@ export function useLoading(initialState = false) {
     setLoading(false);
   }, []);
 
-  const withLoading = React.useCallback(async (asyncFunction) => {
+  const withLoading = React.useCallback(async (asyncFunction: () => Promise<unknown>) => {
     try {
       startLoading();
       const result = await asyncFunction();
@@ -373,43 +389,12 @@ export function useLoading(initialState = false) {
   };
 }
 
-Loading.propTypes = {
-  size: PropTypes.oneOf(['small', 'medium', 'large', 'xlarge']),
-  variant: PropTypes.oneOf(['spinner', 'dots', 'pulse']),
-  text: PropTypes.string,
-  overlay: PropTypes.bool,
-  fullScreen: PropTypes.bool,
-  color: PropTypes.string
-};
 
-ButtonLoading.propTypes = {
-  loading: PropTypes.bool,
-  children: PropTypes.node,
-  style: PropTypes.object,
-  disabled: PropTypes.bool
-};
 
-TableLoading.propTypes = {
-  columns: PropTypes.number,
-  rows: PropTypes.number
-};
 
-TableLoadingOld.propTypes = {
-  columns: PropTypes.number,
-  rows: PropTypes.number
-};
 
-CardLoading.propTypes = {
-  count: PropTypes.number
-};
 
-CardLoadingOld.propTypes = {
-  count: PropTypes.number
-};
 
-ListLoading.propTypes = {
-  count: PropTypes.number
-};
 
 // CSS анимации
 const style = document.createElement('style');

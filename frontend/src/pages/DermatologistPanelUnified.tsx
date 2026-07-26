@@ -1083,7 +1083,7 @@ const DermatologistPanelUnified = () => {
         setPrescription(savedPrescription);
         notify.success(t('derma.prescription_saved'));
       } else {
-        const error = response.data;
+        const error = response.data as { detail?: string };
         notify.error(error.detail || t('derma.derma_panel_prescription_save_failed_short'));
       }
     } catch (error: unknown) {
@@ -1376,7 +1376,7 @@ const DermatologistPanelUnified = () => {
               <MacOSCard className="derma-card-w-full">
                 <div style={dermatologyAppointmentsHeaderStyle}>
                   <h3 style={dermatologyAppointmentsTitleStyle}>
-                    <Icon name="calendar" size={20 as never} className="derma-icon-mr-green" />
+                    <Icon name="calendar" size={20} className="derma-icon-mr-green" />
                     {t('derma.derma_panel_appointments_title')}
                   </h3>
                   <AppointmentSummaryBar
@@ -1411,7 +1411,7 @@ const DermatologistPanelUnified = () => {
               <MacOSCard className="derma-p-8">
                 <div className="derma-flex-center">
                   <h3 className="derma-flex-center">
-                    <Icon name="person" size={20 as never} className="derma-icon-mr-green" />
+                    <Icon name="person" size={20} className="derma-icon-mr-green" />
                     {t('derma.derma_panel_patients_title')}
                   </h3>
                   <Badge variant="info">{t('derma.derma_panel_patients_count', { count: patients.length })}</Badge>
@@ -1419,7 +1419,7 @@ const DermatologistPanelUnified = () => {
 
                 {loading ?
               <div className="derma-loading-state">
-                    <Icon name="arrow.clockwise" size={32 as never} className="derma-loading-icon" />
+                    <Icon name="arrow.clockwise" size={32} className="derma-loading-icon" />
                     <p className="derma-p-14-secondary">{t('derma.derma_panel_patients_loading')}</p>
                   </div> :
 
@@ -1436,15 +1436,15 @@ const DermatologistPanelUnified = () => {
                             </div>
                             <div className="derma-patient-info-list">
                               <div className="derma-flex-center">
-                                <Icon name="phone" size={18 as never} className="derma-icon-mr derma-text-accent" />
+                                <Icon name="phone" size={18} className="derma-icon-mr derma-text-accent" />
                                 {patient.phone}
                               </div>
                               <div className="derma-flex-center">
-                                <Icon name="calendar" size={14 as never} className="derma-icon-mr" />
+                                <Icon name="calendar" size={14} className="derma-icon-mr" />
                                 {patient.birth_date}
                               </div>
                               <div className="derma-flex-center">
-                                <Icon name="person" size={14 as never} className="derma-icon-mr" />
+                                <Icon name="person" size={14} className="derma-icon-mr" />
                                 ID: {patient.id}
                               </div>
                             </div>
@@ -1463,7 +1463,7 @@ const DermatologistPanelUnified = () => {
                         }}
                         className="derma-flex-center">
 
-                              <Icon name="waveform.path.ecg" size={16 as never} />
+                              <Icon name="waveform.path.ecg" size={16} />
                               {t('derma.derma_panel_button_exam')}
                             </Button>
                             <Button
@@ -1479,7 +1479,7 @@ const DermatologistPanelUnified = () => {
                         }}
                         className="derma-flex-center">
 
-                              <Icon name="sparkles" size={16 as never} />
+                              <Icon name="sparkles" size={16} />
                               {t('derma.derma_panel_button_procedure')}
                             </Button>
                             <Button
@@ -1487,7 +1487,7 @@ const DermatologistPanelUnified = () => {
                         onClick={() => setSelectedPatient(patient)}
                         className="derma-flex-center">
 
-                              <Icon name="person" size={16 as never} />
+                              <Icon name="person" size={16} />
                               {t('derma.derma_panel_button_view')}
                             </Button>
                           </div>
@@ -1510,7 +1510,7 @@ const DermatologistPanelUnified = () => {
               <MacOSCard className="derma-p-8">
                 <div className="derma-flex-center">
                   <h3 className="derma-flex-center">
-                    <Icon name="stethoscope" size={20 as never} className="derma-icon-mr-orange" />
+                    <Icon name="stethoscope" size={20} className="derma-icon-mr-orange" />
                     {t('derma.derma_panel_visit_title', { name: currentAppointment.patient_name || t('derma.derma_panel_visit_name_unspecified') })}
                   </h3>
                   <Badge variant="info">
@@ -1528,7 +1528,7 @@ const DermatologistPanelUnified = () => {
                 {/* EMR система */}
                 <div className="derma-mt-24">
                   <h4 className="derma-flex-center">
-                    <Icon name="doc.text" size={20 as never} className="derma-icon-mr-blue" />
+                    <Icon name="doc.text" size={20} className="derma-icon-mr-blue" />
                     {t('derma.derma_panel_emr_title')}
                   </h4>
                   <EMRContainerV2
@@ -1542,7 +1542,7 @@ const DermatologistPanelUnified = () => {
                 {emr && !emr.is_draft &&
               <div className="derma-mt-24">
                     <h4 className="derma-flex-center">
-                      <Icon name="doc.text" size={20 as never} className="derma-icon-mr-green" />
+                      <Icon name="doc.text" size={20} className="derma-icon-mr-green" />
                       {t('derma.derma_panel_prescription_title')}
                     </h4>
                     <PrescriptionSystem
@@ -1565,9 +1565,9 @@ const DermatologistPanelUnified = () => {
                   className="derma-flex-center">
 
                       {loading ?
-                  <Icon name="arrow.clockwise" size={20 as never} className="animate-spin" /> :
+                  <Icon name="arrow.clockwise" size={20} className="animate-spin" /> :
 
-                  <Icon name="checkmark.circle" size={20 as never} />
+                  <Icon name="checkmark.circle" size={20} />
                   }
                       {loading ? t('derma.derma_panel_completing') : t('derma.derma_panel_complete_button')}
                     </Button>
@@ -1644,7 +1644,7 @@ const DermatologistPanelUnified = () => {
           <div className="derma-flex-col-24">
               <MacOSCard className="derma-p-8">
                 <h3 className="derma-flex-center">
-                  <Icon name="scissors" size={20 as never} className="derma-icon-mr-orange" />
+                  <Icon name="scissors" size={20} className="derma-icon-mr-orange" />
                   {t('derma.derma_panel_services_title')}
                 </h3>
 
@@ -1685,7 +1685,7 @@ const DermatologistPanelUnified = () => {
                       </label>
                       <div className="derma-flex-gap-8">
                         <div className="derma-pos-rel-flex-1">
-                          <Icon name="dollarsign.circle" size={16 as never} className="derma-dollar-icon-abs" />
+                          <Icon name="dollarsign.circle" size={16} className="derma-dollar-icon-abs" />
                           <Input
                           type="text"
                           value={doctorPrice}
@@ -1705,7 +1705,7 @@ const DermatologistPanelUnified = () => {
                         aria-label={t('derma.derma_panel_change_price_aria')}
                         title={t('derma.derma_panel_change_price_aria')}>
 
-                          <Icon name="dollarsign.circle" size={16 as never} />
+                          <Icon name="dollarsign.circle" size={16} />
                         </Button>
                       </div>
                     </div>

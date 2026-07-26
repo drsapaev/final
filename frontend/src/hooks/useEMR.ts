@@ -13,7 +13,7 @@ import { emrReducer, initialState, emrActions } from '../reducers/emrReducer';
 import { apiClient } from '../api/client';
 import logger from '../utils/logger';
 import { buildInitialEMRData, normalizeEMRData } from '../utils/emrSpecialty';
-import type { EMRApiError, EMRStatus } from '../types/domain/emr';
+import type { EMRApiError, EMRHttpStatus } from '../types/domain/emr';
 
 let fallbackSessionCounter = 0;
 
@@ -39,7 +39,7 @@ const generateSessionId = () => {
 };
 
 const emrCache = new Map();
-const isAccessDeniedStatus = (status: EMRStatus) => status === 401 || status === 403;
+const isAccessDeniedStatus = (status: EMRHttpStatus) => status === 401 || status === 403;
 
 const getAccessDeniedMessage = (error: EMRApiError): string => (
     error?.response?.data?.detail ||
@@ -113,9 +113,20 @@ export function useEMR(visitId, { autoLoad = true, specialty = 'general' } = {})
             }
 
             if (cachedEntry?.promise) {
+                // audit/phase-final, BS-18: dispatch to this instance when promise resolves.
+                cachedEntry.promise.then((result: unknown) => {
+                    if (result && !forceRefresh) {
+                        dispatch(emrActions.load(result as Record<string, unknown>));
+                    }
+                }).catch(() => {});
                 return cachedEntry.promise;
             }
         } else if (cachedEntry?.promise) {
+            cachedEntry.promise.then((result: unknown) => {
+                if (result) {
+                    dispatch(emrActions.load(result as Record<string, unknown>));
+                }
+            }).catch(() => {});
             return cachedEntry.promise;
         }
 

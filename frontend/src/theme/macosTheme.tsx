@@ -1,6 +1,6 @@
 import PropTypes from 'prop-types';
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { ensureMinContrast, getReadableTextColor, mixColors, toRgbaString } from './colorUtils.js';
+import { ensureMinContrast, getReadableTextColor, mixColors, toRgbaString } from './colorUtils';
 
 export type AccentName = 'blue' | 'purple' | 'pink' | 'red' | 'orange' | 'yellow' | 'green' | 'graphite';
 type ThemeMode = 'light' | 'dark';

@@ -203,7 +203,13 @@ const defaultPolicyEvents = policyEventFields.reduce((acc, item) => {
   return acc;
 }, {});
 
+// audit/phase-6, BS-62: use structuredClone with JSON fallback for older
+// environments. structuredClone preserves Date objects (JSON roundtrip
+// converts them to ISO strings), is faster, and is the platform-standard API.
 function cloneValue(value) {
+  if (typeof structuredClone === 'function') {
+    return structuredClone(value);
+  }
   return JSON.parse(JSON.stringify(value));
 }
 

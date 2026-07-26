@@ -163,19 +163,19 @@ export default function LabTemplateWorkbench({
     }
   }
 
-  async function ensureDraftVersion() {
+  async function ensureDraftVersion(): Promise<string | number> {
     if (!selectedTemplate) {
       throw new Error(t('misc.ltw_snachala_vyberite_shablon'));
     }
     if (hasTemplateVersionAction(activeVersion, 'update')) {
-      return (activeVersion as Record<string, unknown>)?.id;
+      return (activeVersion as Record<string, unknown>)?.id as string | number;
     }
     if (!hasTemplateVersionAction(activeVersion, 'create_draft')) {
       throw new Error(t('misc.ltw_server_ne_razreshil_sozdat_c'));
     }
-    const version = (await labReportingApi.createTemplateVersion((selectedTemplate as { id?: string | number })?.id, (activeVersion as Record<string, unknown>)?.id || null)) as Record<string, unknown>;
+    const version = (await labReportingApi.createTemplateVersion((selectedTemplate as { id?: string | number })?.id as string | number, (activeVersion as Record<string, unknown>)?.id as string | number | null)) as Record<string, unknown>;
     await onTemplatesChanged();
-    return (version as Record<string, unknown>)?.id;
+    return (version as Record<string, unknown>)?.id as string | number;
   }
 
   // PR-57: validate reference ranges (low < high) before save/publish
@@ -293,7 +293,7 @@ export default function LabTemplateWorkbench({
     if (!ok) return;
     setSaving(true);
     try {
-      await labReportingApi.archiveTemplateVersion((activeVersion as Record<string, unknown>)?.id);
+      await labReportingApi.archiveTemplateVersion((activeVersion as Record<string, unknown>)?.id as string | number);
       notify('success', t('success.template_archived'));
       await onTemplatesChanged();
     } catch (error) {
@@ -493,11 +493,11 @@ export default function LabTemplateWorkbench({
         <CardHeader className="ltw-card-header">
           <CardTitle className="ltw-card-title">
             <span className="ltw-flex-center">
-              <Icon name="rectangle.stack.badge.plus" size={20 as never} />
+              <Icon name="rectangle.stack.badge.plus" size={20} />
               {t('template.title')}
             </span>
             <Button variant="primary" size="small" onClick={() => setShowNewTemplateDialog(true)} disabled={saving}>
-              <Icon name="plus" size={14 as never} />
+              <Icon name="plus" size={14} />
               {t('template.new_template')}
             </Button>
           </CardTitle>
@@ -555,13 +555,13 @@ export default function LabTemplateWorkbench({
         <CardHeader className="ltw-card-header">
           <CardTitle className="ltw-card-title-gap-12">
             <span className="ltw-flex-center">
-              <Icon name="slider.horizontal.3" size={20 as never} />
+              <Icon name="slider.horizontal.3" size={20} />
               Редактор бланка
             </span>
             {selectedTemplate && (
               <div className="ltw-flex-gap-8">
                 <Button variant="outline" onClick={handleCloneTemplate} disabled={saving}>
-                  <Icon name="doc.on.doc" size={16 as never} />
+                  <Icon name="doc.on.doc" size={16} />
                   {t('template.clone')}
                 </Button>
                 <Button
@@ -589,19 +589,19 @@ export default function LabTemplateWorkbench({
                   disabled={saving || !activeVersion}
                   title={t('misc.ltw_otmenit_izmeneniya_i_vosstan')}
                 >
-                  <Icon name="arrow.counterclockwise" size={16 as never} />
+                  <Icon name="arrow.counterclockwise" size={16} />
                   Отменить
                 </Button>
                 <Button variant="outline" onClick={handleSaveTemplate} disabled={saving}>
-                  <Icon name="square.and.arrow.down" size={16 as never} />
+                  <Icon name="square.and.arrow.down" size={16} />
                   {t('common.save_draft')}
                 </Button>
                 <Button variant="primary" onClick={handlePublishVersion} disabled={saving}>
-                  <Icon name="checkmark.seal" size={16 as never} />
+                  <Icon name="checkmark.seal" size={16} />
                   {t('template.publish')}
                 </Button>
                 <Button variant="outline" onClick={handleArchiveTemplate} disabled={saving || !activeVersion} title={t('template.archive')}>
-                  <Icon name="archivebox" size={16 as never} />
+                  <Icon name="archivebox" size={16} />
                   {t('template.archive')}
                 </Button>
               </div>

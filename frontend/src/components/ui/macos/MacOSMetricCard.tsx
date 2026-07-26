@@ -1,6 +1,23 @@
 import { useState } from 'react';
+import type { ReactNode, CSSProperties, ComponentType, KeyboardEvent } from 'react';
 import { Minus, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { useTranslation } from '../../../i18n/useTranslation';
+
+interface MacOSMetricCardProps {
+  title: ReactNode;
+  value: ReactNode;
+  previousValue?: number | string;
+  unit?: string;
+  icon?: ComponentType<{ size?: number | string; className?: string; style?: CSSProperties }>;
+  trendPeriod?: string;
+  color?: 'blue' | 'green' | 'orange' | 'red' | 'purple' | 'gray' | string;
+  size?: 'sm' | 'md' | 'lg' | string;
+  variant?: 'default' | 'filled' | 'elevated' | string;
+  loading?: boolean;
+  onClick?: () => void;
+  className?: string;
+  style?: CSSProperties;
+}
 
 const MacOSMetricCard = ({
   title,
@@ -16,7 +33,7 @@ const MacOSMetricCard = ({
   onClick,
   className,
   style
-}) => {
+}: MacOSMetricCardProps) => {
   const [isHovered, setIsHovered] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
 
@@ -72,16 +89,16 @@ const MacOSMetricCard = ({
     gray: 'var(--mac-text-secondary)'
   };
 
-  const currentSize = sizeStyles[size];
-  const currentVariant = variantStyles[variant];
-  const currentColor = colorStyles[color] || colorStyles.blue;
+  const currentSize = sizeStyles[size as 'sm' | 'md' | 'lg'];
+  const currentVariant = variantStyles[variant as 'default' | 'filled' | 'elevated'];
+  const currentColor = colorStyles[color as 'blue' | 'green' | 'orange' | 'red' | 'purple' | 'gray'] || colorStyles.blue;
 
-  const cardStyle = {
+  const cardStyle: CSSProperties = {
     padding: currentSize.padding,
     background: currentVariant.background,
     border: currentVariant.border,
     borderRadius: currentVariant.borderRadius,
-    boxShadow: (isHovered || isFocused) && onClick ? 'var(--mac-shadow-md)' : (currentVariant.boxShadow || 'none'),
+    boxShadow: (isHovered || isFocused) && onClick ? 'var(--mac-shadow-md)' : (('boxShadow' in currentVariant ? currentVariant.boxShadow : null) || 'none'),
     cursor: onClick ? 'pointer' : 'default',
     transition: 'all var(--mac-duration-normal) var(--mac-ease)',
     position: 'relative',
@@ -136,9 +153,11 @@ const MacOSMetricCard = ({
   };
 
   const calculateTrend = () => {
-    if (!previousValue || previousValue === 0) return null;
+    const numericValue = typeof value === 'number' ? value : Number(value);
+    const numericPrev = typeof previousValue === 'number' ? previousValue : Number(previousValue);
+    if (!numericPrev || numericPrev === 0 || isNaN(numericValue) || isNaN(numericPrev)) return null;
 
-    const change = (value - previousValue) / previousValue * 100;
+    const change = (numericValue - numericPrev) / numericPrev * 100;
     const isPositive = change > 0;
     const isNegative = change < 0;
 
@@ -185,7 +204,7 @@ const MacOSMetricCard = ({
       onClick();
     }
   };
-  const handleKeyDown = (e) => {
+  const handleKeyDown = (e: KeyboardEvent<HTMLElement>) => {
     if ((e.key === 'Enter' || e.key === ' ') && onClick) {
       e.preventDefault();
       onClick();
