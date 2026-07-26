@@ -63,10 +63,10 @@ export const SPECIALTY_ALIASES = Object.freeze({
  * @param {string} canonicalKey - One of SPECIALTY_KEYS.*.
  * @returns {boolean}
  */
-export function matchesSpecialty(candidate, canonicalKey) {
+export function matchesSpecialty(candidate: string, canonicalKey: string): boolean {
   if (!candidate || !canonicalKey) return false;
   if (candidate === canonicalKey) return true;
-  const aliases = SPECIALTY_ALIASES[canonicalKey];
+  const aliases = SPECIALTY_ALIASES[canonicalKey as keyof typeof SPECIALTY_ALIASES];
   return Array.isArray(aliases) && aliases.includes(candidate);
 }
 
@@ -82,11 +82,11 @@ export function matchesSpecialty(candidate, canonicalKey) {
  * @param {string[]} statuses
  * @returns {number}
  */
-export function countAppointmentsByStatuses(appointments, statuses) {
+export function countAppointmentsByStatuses(appointments: Array<{ status?: string }>, statuses: unknown[]): number {
   if (!Array.isArray(appointments) || !Array.isArray(statuses) || statuses.length === 0) {
     return 0;
   }
-  const statusSet = new Set(statuses);
+  const statusSet = new Set<unknown>(statuses);
   let count = 0;
   for (let i = 0; i < appointments.length; i++) {
     if (statusSet.has(appointments[i]?.status)) {
@@ -105,11 +105,11 @@ export function countAppointmentsByStatuses(appointments, statuses) {
  * @param {*} value
  * @returns {number|null}
  */
-export function normalizeNumericId(value) {
+export function normalizeNumericId(value: unknown): number | null {
   if (value === null || value === undefined || value === '') {
     return null;
   }
-  const parsed = parseInt(value, 10);
+  const parsed = parseInt(String(value), 10);
   return Number.isFinite(parsed) ? parsed : null;
 }
 
@@ -125,18 +125,20 @@ export function normalizeNumericId(value) {
  * @param {Array<{patient_id: *, services?: Array, service_codes?: Array}>} allAppointments
  * @returns {{services: Array, service_codes: Array}} Deduplicated arrays.
  */
-export function getAllPatientServices(patientId, allAppointments) {
-  const patientServices = new Set();
-  const patientServiceCodes = new Set();
+export function getAllPatientServices(patientId: number | string, allAppointments: Array<Record<string, unknown>>): { services: unknown[]; service_codes: unknown[] } {
+  const patientServices = new Set<unknown>();
+  const patientServiceCodes = new Set<unknown>();
 
   if (Array.isArray(allAppointments)) {
     allAppointments.forEach((appointment) => {
       if (appointment && appointment.patient_id === patientId) {
-        if (Array.isArray(appointment.services)) {
-          appointment.services.forEach((service) => patientServices.add(service));
+        const services = appointment.services;
+        if (Array.isArray(services)) {
+          services.forEach((service: unknown) => patientServices.add(service));
         }
-        if (Array.isArray(appointment.service_codes)) {
-          appointment.service_codes.forEach((code) => patientServiceCodes.add(code));
+        const serviceCodes = appointment.service_codes;
+        if (Array.isArray(serviceCodes)) {
+          serviceCodes.forEach((code: unknown) => patientServiceCodes.add(code));
         }
       }
     });
@@ -176,13 +178,16 @@ export function getAllPatientServices(patientId, allAppointments) {
  *   canonical visit_id via backend API.
  * @returns {(row: {appointment_id?: *, visit_id?: *, id: *}) => Promise<number|null>}
  */
-export function makeEnsureCanonicalVisitId(setAppointments, resolveCanonicalVisitId) {
-  return async function ensureCanonicalVisitId(row) {
-    const appointmentId = row?.appointment_id || null;
-    const visitId = row?.visit_id || (appointmentId && typeof resolveCanonicalVisitId === 'function' ? await resolveCanonicalVisitId(appointmentId) : null);
+export function makeEnsureCanonicalVisitId(
+  setAppointments: (updater: (prev: unknown) => unknown) => void,
+  resolveCanonicalVisitId: (appointmentId: number | string) => Promise<number | null>
+): (row: Record<string, unknown>) => Promise<number | null> {
+  return async function ensureCanonicalVisitId(row: Record<string, unknown>): Promise<number | null> {
+    const appointmentId = (row?.appointment_id as number | string | undefined) || null;
+    const visitId = (row?.visit_id as number | null) || (appointmentId && typeof resolveCanonicalVisitId === 'function' ? await resolveCanonicalVisitId(appointmentId) : null);
 
     if (visitId && typeof setAppointments === 'function') {
-      setAppointments((prev) => (Array.isArray(prev) ? prev.map((appointment) =>
+      setAppointments((prev: unknown) => (Array.isArray(prev) ? (prev as Array<Record<string, unknown>>).map((appointment) =>
         appointment && appointment.id === row.id ? { ...appointment, visit_id: visitId } : appointment
       ) : prev));
     }

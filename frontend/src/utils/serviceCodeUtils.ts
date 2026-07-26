@@ -8,14 +8,14 @@
  * @param {string} code - The category code to normalize
  * @returns {string} Normalized category code
  */
-export const normalizeCategoryCode = (code) => {
+export const normalizeCategoryCode = (code: string): string => {
     if (!code) return 'other';
 
     const normalized = code.toLowerCase().trim();
 
     // Map common variations to standard codes
     // ВАЖНО: Порядок важен - более специфичные коды должны быть раньше
-    const codeMap = {
+    const codeMap: Record<string, string> = {
         // Procedures (проверяем первыми, так как это более специфично)
         'd_proc': 'procedures',  // Дерматологические процедуры
         'p': 'procedures',       // Физиотерапия
@@ -56,7 +56,7 @@ export const normalizeCategoryCode = (code) => {
  * @param {string} code - Service code to normalize
  * @returns {string} Normalized code (UPPERCASE for SSOT format, lowercase for legacy)
  */
-export const normalizeServiceCode = (code) => {
+export const normalizeServiceCode = (code: string): string => {
     if (!code) return '';
 
     const trimmed = code.trim();
@@ -77,10 +77,10 @@ export const normalizeServiceCode = (code) => {
  * @param {string} language - Language for the name (default: 'ru')
  * @returns {string} Category name
  */
-export const getCategoryName = (code, language = 'ru') => {
+export const getCategoryName = (code: string, language: string = 'ru'): string => {
     const normalized = normalizeCategoryCode(code);
 
-    const names = {
+    const names: Record<string, Record<string, string>> = {
         ru: {
             specialists: 'Специалисты',
             laboratory: 'Лаборатория',
@@ -109,10 +109,10 @@ export const getCategoryName = (code, language = 'ru') => {
  * @param {string} code - The category code
  * @returns {string} Category icon
  */
-export const getCategoryIcon = (code) => {
+export const getCategoryIcon = (code: string): string => {
     const normalized = normalizeCategoryCode(code);
 
-    const icons = {
+    const icons: Record<string, string> = {
         specialists: '👨‍⚕️',
         laboratory: '🧪',
         procedures: '💉',
@@ -127,7 +127,7 @@ export const getCategoryIcon = (code) => {
  * @param {string} serviceCode - Service code (e.g., 'K01', 'L05')
  * @returns {object} Object with category and number
  */
-export const parseServiceCode = (serviceCode) => {
+export const parseServiceCode = (serviceCode: unknown): { category: string; number: number | null } => {
     if (!serviceCode || typeof serviceCode !== 'string') {
         return { category: 'other', number: null };
     }
@@ -149,7 +149,7 @@ export const parseServiceCode = (serviceCode) => {
  * @param {string} serviceCode - Service code to format
  * @returns {string} Formatted service code
  */
-export const formatServiceCode = (serviceCode) => {
+export const formatServiceCode = (serviceCode: string): string => {
     if (!serviceCode) return '';
     return serviceCode.toUpperCase();
 };
@@ -159,7 +159,7 @@ export const formatServiceCode = (serviceCode) => {
  * @param {string} input - Raw input
  * @returns {string} Formatted service code
  */
-export const formatServiceCodeInput = (input) => {
+export const formatServiceCodeInput = (input: string): string => {
     if (!input) return '';
     // Remove any non-alphanumeric characters and convert to uppercase
     return input.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
@@ -170,7 +170,7 @@ export const formatServiceCodeInput = (input) => {
  * @param {string} serviceCode - Service code to validate
  * @returns {boolean} True if valid
  */
-export const isValidServiceCode = (serviceCode) => {
+export const isValidServiceCode = (serviceCode: unknown): boolean => {
     if (!serviceCode || typeof serviceCode !== 'string') return false;
     return /^[A-Za-z]+\d+$/.test(serviceCode);
 };
@@ -180,7 +180,7 @@ export const isValidServiceCode = (serviceCode) => {
  * @param {string} code - Category code to validate
  * @returns {boolean} True if valid
  */
-export const isValidCategoryCode = (code) => {
+export const isValidCategoryCode = (code: unknown): boolean => {
     if (!code || typeof code !== 'string') return false;
 
     const validCodes = [
@@ -202,20 +202,23 @@ export const isValidCategoryCode = (code) => {
  * @param {Array} services - Array of service objects
  * @returns {object} Services grouped by category
  */
-export const groupServicesByCategory = (services) => {
+export const groupServicesByCategory = (services: Array<Record<string, unknown>>): Record<string, Array<Record<string, unknown>>> => {
     if (!Array.isArray(services)) return {};
 
-    return services.reduce((groups, service) => {
-        const category = service.category || service.group ||
-            normalizeCategoryCode(service.service_code) || 'other';
+    return services.reduce<Record<string, Array<Record<string, unknown>>>>(
+        (groups, service) => {
+            const category = (service.category as string) || (service.group as string) ||
+                normalizeCategoryCode(service.service_code as string) || 'other';
 
-        if (!groups[category]) {
-            groups[category] = [];
-        }
+            if (!groups[category]) {
+                groups[category] = [];
+            }
 
-        groups[category].push(service);
-        return groups;
-    }, {});
+            groups[category].push(service);
+            return groups;
+        },
+        {}
+    );
 };
 
 /**
@@ -223,12 +226,12 @@ export const groupServicesByCategory = (services) => {
  * @param {Array} services - Array of service objects
  * @returns {Array} Sorted services
  */
-export const sortServicesByCode = (services) => {
+export const sortServicesByCode = (services: Array<Record<string, unknown>>): Array<Record<string, unknown>> => {
     if (!Array.isArray(services)) return [];
 
-    return [...services].sort((a, b) => {
-        const codeA = a.service_code || '';
-        const codeB = b.service_code || '';
+    return [...services].sort((a: Record<string, unknown>, b: Record<string, unknown>) => {
+        const codeA = (a.service_code as string) || '';
+        const codeB = (b.service_code as string) || '';
         return codeA.localeCompare(codeB);
     });
 };

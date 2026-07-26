@@ -80,9 +80,9 @@ export const designRules = {
 /**
  * Проверяет использование цветов в коде
  */
-export const validateColors = (code) => {
-  const errors = [];
-  const warnings = [];
+export const validateColors = (code: string): { errors: string[]; warnings: string[] } => {
+  const errors: string[] = [];
+  const warnings: string[] = [];
 
   // Проверяем запрещенные цвета
   designRules.colors.forbiddenColors.forEach(color => {
@@ -106,9 +106,9 @@ export const validateColors = (code) => {
 /**
  * Проверяет использование отступов в коде
  */
-export const validateSpacing = (code) => {
-  const errors = [];
-  const warnings = [];
+export const validateSpacing = (code: string): { errors: string[]; warnings: string[] } => {
+  const errors: string[] = [];
+  const warnings: string[] = [];
 
   // Проверяем запрещенные отступы
   designRules.spacing.forbiddenSpacing.forEach(spacing => {
@@ -132,9 +132,9 @@ export const validateSpacing = (code) => {
 /**
  * Проверяет использование типографии в коде
  */
-export const validateTypography = (code) => {
-  const errors = [];
-  const warnings = [];
+export const validateTypography = (code: string): { errors: string[]; warnings: string[] } => {
+  const errors: string[] = [];
+  const warnings: string[] = [];
 
   // Проверяем запрещенные размеры шрифтов
   designRules.typography.forbiddenFontSizes.forEach(fontSize => {
@@ -158,9 +158,9 @@ export const validateTypography = (code) => {
 /**
  * Проверяет использование теней в коде
  */
-export const validateShadows = (code) => {
-  const errors = [];
-  const warnings = [];
+export const validateShadows = (code: string): { errors: string[]; warnings: string[] } => {
+  const errors: string[] = [];
+  const warnings: string[] = [];
 
   // Проверяем запрещенные тени
   designRules.shadows.forbiddenShadows.forEach(shadow => {
@@ -184,8 +184,8 @@ export const validateShadows = (code) => {
 /**
  * Основная функция валидации компонента
  */
-export const validateComponentDesign = (code, componentName = 'Component') => {
-  const results = {
+export const validateComponentDesign = (code: string, componentName: string = 'Component') => {
+  const results: Record<string, unknown> = {
     component: componentName,
     colors: validateColors(code),
     spacing: validateSpacing(code),
@@ -200,8 +200,10 @@ export const validateComponentDesign = (code, componentName = 'Component') => {
   // Подсчитываем общее количество ошибок и предупреждений
   Object.keys(results).forEach(category => {
     if (category !== 'component' && category !== 'summary') {
-      results.summary.totalErrors += results[category].errors.length;
-      results.summary.totalWarnings += results[category].warnings.length;
+      const catResult = results[category] as { errors: string[]; warnings: string[] };
+      const summary = results.summary as { totalErrors: number; totalWarnings: number };
+      summary.totalErrors += catResult.errors.length;
+      summary.totalWarnings += catResult.warnings.length;
     }
   });
 
@@ -211,8 +213,8 @@ export const validateComponentDesign = (code, componentName = 'Component') => {
 /**
  * Генерирует отчет о соответствии дизайн-системе
  */
-export const generateDesignReport = (validationResults) => {
-  const report = {
+export const generateDesignReport = (validationResults: Array<Record<string, unknown>>) => {
+  const report: Record<string, unknown> = {
     timestamp: new Date().toISOString(),
     summary: {
       totalComponents: validationResults.length,
@@ -225,13 +227,16 @@ export const generateDesignReport = (validationResults) => {
 
   // Подсчитываем общую статистику
   validationResults.forEach(result => {
-    report.summary.totalErrors += result.summary.totalErrors;
-    report.summary.totalWarnings += result.summary.totalWarnings;
+    const summary = report.summary as { totalErrors: number; totalWarnings: number; complianceScore: number };
+    const resultSummary = result.summary as { totalErrors: number; totalWarnings: number };
+    summary.totalErrors += resultSummary.totalErrors;
+    summary.totalWarnings += resultSummary.totalWarnings;
   });
 
   // Вычисляем общий балл соответствия (0-100)
-  const totalIssues = report.summary.totalErrors + report.summary.totalWarnings;
-  report.summary.complianceScore = Math.max(0, 100 - (totalIssues * 10));
+  const summary = report.summary as { totalErrors: number; totalWarnings: number; complianceScore: number };
+  const totalIssues = summary.totalErrors + summary.totalWarnings;
+  summary.complianceScore = Math.max(0, 100 - (totalIssues * 10));
 
   return report;
 };
@@ -239,7 +244,7 @@ export const generateDesignReport = (validationResults) => {
 /**
  * Проверяет конкретный файл на соответствие дизайн-системе
  */
-export const validateFile = async (filePath) => {
+export const validateFile = async (filePath: string): Promise<unknown> => {
   try {
     // UX Audit: api.get() с params вместо ручного URL-constructed query string.
     const response = await api.get('/validate-design', { params: { file: filePath } });
