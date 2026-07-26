@@ -12,7 +12,19 @@ import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
 
 // Дефолтные EMR настройки
-const DEFAULT_EMR_PREFERENCES = {
+interface UserPreferences {
+    emr_smart_field_mode?: string;
+    emr_show_mode_switcher?: boolean;
+    emr_debounce_ms?: number;
+    emr_recent_icd10?: string[];
+    emr_recent_templates?: Array<string | number>;
+    emr_favorite_templates?: Record<string, Array<string | number>>;
+    emr_custom_templates?: unknown[];
+    _cachedAt?: number;
+    [key: string]: unknown;
+}
+
+const DEFAULT_EMR_PREFERENCES: UserPreferences = {
     emr_smart_field_mode: 'ghost',
     emr_show_mode_switcher: true,
     emr_debounce_ms: 500,
@@ -31,12 +43,12 @@ const LOCAL_STORAGE_KEY = 'user_preferences_cache';
  * @param {boolean} autoLoad - автоматически загружать при mount
  */
 export const useUserPreferences = (userId: unknown = null, autoLoad: boolean = true) => {
-    const [preferences, setPreferences] = useState(null);
+    const [preferences, setPreferences] = useState<UserPreferences | null>(null);
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
+    const [error, setError] = useState<string | null>(null);
     const [isDirty, setIsDirty] = useState(false);
 
-    const saveTimeoutRef = useRef(null);
+    const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const loadedRef = useRef(false);
 
     // Загрузка preferences из API
@@ -90,6 +102,7 @@ export const useUserPreferences = (userId: unknown = null, autoLoad: boolean = t
                 return prefs;
             }
         } catch (err) {
+            const apiErr = err as { response?: { status?: number; data?: Record<string, unknown> }; message?: string };
             logger.warn('Failed to load preferences:', err);
 
             // Если 401, значит токен протух - чистим его
@@ -100,7 +113,7 @@ export const useUserPreferences = (userId: unknown = null, autoLoad: boolean = t
             // interceptors.ts (no auth-state notification fired). Use the
             // SSOT method instead — it clears the full auth tuple and any
             // future storage additions are picked up automatically.
-            if (err.response && err.response.status === 401) {
+            if (apiErr.response && apiErr.response.status === 401) {
                 tokenManager.clearAll();
             }
 
@@ -151,9 +164,9 @@ export const useUserPreferences = (userId: unknown = null, autoLoad: boolean = t
     }, [preferences, userId]);
 
     // Обновить одно поле (с дебаунсом сохранения)
-    const updatePreference = useCallback((key, value, saveImmediately: boolean = false) => {
+    const updatePreference = useCallback((key: string, value: unknown, saveImmediately: boolean = false) => {
         setPreferences(prev => {
-            const updated = { ...prev, [key]: value };
+            const updated = { ...(prev ?? {}), [key]: value };
             localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({ ...updated, _cachedAt: Date.now() }));
             return updated;
         });
@@ -200,7 +213,7 @@ export const useUserPreferences = (userId: unknown = null, autoLoad: boolean = t
         const current = preferences?.emr_recent_icd10 || [];
         if (current.includes(code)) {
             // Перемещаем в начало
-            const updated = [code, ...current.filter(c => c !== code)].slice(0, 15);
+            const updated = [code, ...current.filter((c: string) => c !== code)].slice(0, 15);
             updatePreference('emr_recent_icd10', updated);
         } else {
             const updated = [code, ...current].slice(0, 15);
@@ -238,7 +251,7 @@ export const useUserPreferences = (userId: unknown = null, autoLoad: boolean = t
 
         const updated = {
             ...current,
-            [specialty]: specialtyFavorites.filter(id => id !== templateId)
+            [specialty]: specialtyFavorites.filter((id: string | number) => id !== templateId)
         };
         updatePreference('emr_favorite_templates', updated);
     }, [preferences?.emr_favorite_templates, updatePreference]);
