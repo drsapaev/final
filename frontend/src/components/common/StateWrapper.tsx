@@ -56,7 +56,7 @@ export function StateWrapper({
   useEffect(() => {
     if (!isLoading && !error && !isEmpty) {
       hasHadDataRef.current = true;
-      forceTick((t) => t + 1);
+      forceTick((t: string) => t + 1);
     }
   }, [isLoading, error, isEmpty]);
 

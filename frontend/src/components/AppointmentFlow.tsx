@@ -62,7 +62,7 @@ const AppointmentFlow = ({ appointment }: AppointmentFlowProps) => {
     }
   };
 
-  const getStepStatus = (step) => {
+  const getStepStatus = (step: string) => {
     switch (step) {
       case 'payment':
         return appointment?.status === APPOINTMENT_STATUS.PENDING ? 'current' :
@@ -83,7 +83,7 @@ const AppointmentFlow = ({ appointment }: AppointmentFlowProps) => {
     }
   };
 
-  const getStepColor = (status) => {
+  const getStepColor = (status: string) => {
     switch (status) {
       case 'completed':
         return 'border-green-500 bg-green-50 text-green-700';

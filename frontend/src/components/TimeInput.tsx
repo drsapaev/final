@@ -67,8 +67,8 @@ export default function TimeInput({
 }
 
 
+// audit/strict: removed self-referencing propTypes spread
 TimeInput.propTypes = {
-  ...(TimeInput.propTypes || {}),
   disabled: PropTypes.any,
   ariaLabel: PropTypes.string,
   onChange: PropTypes.any,

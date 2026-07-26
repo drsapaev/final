@@ -186,8 +186,8 @@ const PhoneInput = ({
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 PhoneInput.propTypes = {
-  ...(PhoneInput.propTypes || {}),
   className: PropTypes.any,
   onChange: PropTypes.any,
   placeholder: PropTypes.any,

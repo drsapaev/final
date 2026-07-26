@@ -12,12 +12,12 @@ import { useTheme } from '../../contexts/ThemeContext';
 const LazyQueueProfilesManager = React.lazy(() => import('./QueueProfilesManager'));
 const LazyServiceCatalog = React.lazy(() => import('./ServiceCatalog'));
 
-const getServiceTabs = (t) => [
+const getServiceTabs = (t: string) => [
   { key: 'catalog', label: t('admin2.asv_tab_catalog'), icon: Package },
   { key: 'queue-profiles', label: t('admin2.asv_tab_queue_profiles'), icon: FolderTree },
 ];
 
-const getInitialServicesTab = (search) => {
+const getInitialServicesTab = (search: string) => {
   const params = new URLSearchParams(search);
   return params.get('servicesTab') || localStorage.getItem('servicesTab') || 'catalog';
 };
@@ -34,7 +34,7 @@ const AdminServices = () => {
     localStorage.setItem('servicesTab', servicesTab);
   }, [servicesTab]);
 
-  const selectTab = (tabKey) => {
+  const selectTab = (tabKey: string) => {
     setServicesTab(tabKey);
     const params = new URLSearchParams(location.search);
     params.set('servicesTab', tabKey);

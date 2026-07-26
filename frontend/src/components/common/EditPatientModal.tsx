@@ -55,7 +55,7 @@ const EditPatientModal = ({ isOpen, onClose, patient, onSave, loading = false, t
       }
     : null;
 
-  const handleComplete = (wizardData) => {
+  const handleComplete = (wizardData: Record<string, unknown>) => {
     logger.info('[EditPatientModal] AppointmentWizardV2 completed (edit mode)', wizardData);
     if (typeof onSave === 'function') {
       // Fire-and-forget: parent decides whether to await.
@@ -81,8 +81,8 @@ const EditPatientModal = ({ isOpen, onClose, patient, onSave, loading = false, t
   );
 };
 
+// audit/strict: removed self-referencing propTypes spread
 EditPatientModal.propTypes = {
-  ...(EditPatientModal.propTypes || {}),
   isOpen: PropTypes.any,
   onClose: PropTypes.any,
   patient: PropTypes.any,

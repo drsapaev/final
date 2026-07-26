@@ -66,8 +66,8 @@ const MessageContextMenu = ({ x, y, message, onBlur, onAction, isOwn }: MessageC
   );
 };
 
+// audit/strict: removed self-referencing propTypes spread
 MessageContextMenu.propTypes = {
-  ...(MessageContextMenu.propTypes || {}),
   isOwn: PropTypes.any,
   message: PropTypes.any,
   onAction: PropTypes.any,

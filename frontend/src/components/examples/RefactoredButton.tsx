@@ -228,7 +228,7 @@ const RefactoredButton = ({
     ...(fullWidth && { width: '100%' }),
   };
 
-  const handleClick = (event) => {
+  const handleClick = (event: React.MouseEvent) => {
     if (disabled || loading) return;
     onClick?.(event);
   };

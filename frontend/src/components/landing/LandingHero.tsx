@@ -32,7 +32,7 @@ export const LandingHero = ({ onGetStarted }) => {
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 LandingHero.propTypes = {
-  ...(LandingHero.propTypes || {}),
   onGetStarted: PropTypes.any,
 };

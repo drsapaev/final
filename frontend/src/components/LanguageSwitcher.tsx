@@ -19,7 +19,7 @@ const LanguageSwitcher = ({ compact = false }) => {
 
     // Закрытие меню при клике вне
     useEffect(() => {
-        const handleClickOutside = (e) => {
+        const handleClickOutside = (e: React.MouseEvent) => {
             if (menuRef.current && !menuRef.current.contains(e.target)) {
                 setIsOpen(false);
             }
@@ -28,7 +28,7 @@ const LanguageSwitcher = ({ compact = false }) => {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    const handleSelect = (code) => {
+    const handleSelect = (code: string) => {
         setLanguage(code);
         setIsOpen(false);
     };
@@ -112,8 +112,8 @@ const LanguageSwitcher = ({ compact = false }) => {
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 LanguageSwitcher.propTypes = {
-  ...(LanguageSwitcher.propTypes || {}),
   compact: PropTypes.any,
 };
 
