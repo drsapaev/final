@@ -20,7 +20,7 @@ const ChatButton = () => {
     const pendingUserIdRef = useRef(null);
 
     useEffect(() => {
-        const handleOpenChat = (event) => {
+        const handleOpenChat = (event: React.MouseEvent) => {
             setIsOpen(true);
             if (event?.detail?.userId && loadMessages) {
                 pendingUserIdRef.current = event.detail.userId;

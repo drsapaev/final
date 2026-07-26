@@ -72,8 +72,8 @@ const ModernContainer = ({
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 ModernContainer.propTypes = {
-  ...(ModernContainer.propTypes || {}),
   centered: PropTypes.any,
   children: PropTypes.any,
   className: PropTypes.any,

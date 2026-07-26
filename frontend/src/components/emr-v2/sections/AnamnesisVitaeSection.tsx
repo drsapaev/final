@@ -52,7 +52,7 @@ export function AnamnesisVitaeSection({
     });
 
     // Handle template apply
-    const handleApplyTemplate = useCallback((text) => {
+    const handleApplyTemplate = useCallback((text: string) => {
         if (!text) return;
         const current = value || '';
         const newValue = current.trim()

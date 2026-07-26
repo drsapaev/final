@@ -138,7 +138,7 @@ const RefactoredCard = ({
     ...style,
   };
 
-  const handleCardKeyDown = (event) => {
+  const handleCardKeyDown = (event: React.MouseEvent) => {
     if (!clickable) {
       return;
     }

@@ -21,7 +21,7 @@ export default {
     },
   },
   decorators: [
-    (Story) => (
+    (Story: React.FC) => (
       <div style={{ padding: '20px', background: 'var(--mac-bg-secondary)', minHeight: '100vh' }}>
         <Story />
       </div>

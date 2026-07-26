@@ -133,8 +133,8 @@ const QueuePositionCard = ({ queueEntry }: QueuePositionCardProps) => {
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 QueuePositionCard.propTypes = {
-  ...(QueuePositionCard.propTypes || {}),
   cabinet: PropTypes.any,
   doctorName: PropTypes.any,
   estimatedWaitTime: PropTypes.any,

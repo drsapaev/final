@@ -11,7 +11,7 @@ const roleGradients = {
     default: 'linear-gradient(135deg, #a8c0ff, #3f2b96)'
 };
 
-const Avatar = ({ user, size = 40, showStatus = false, isOnline = false, className = '' }) => {
+const Avatar = ({ user: unknown, size = 40, showStatus = false, isOnline = false, className = '' }) => {
   const { t } = useTranslation();
     const roleKey = user?.role?.toLowerCase() || 'default';
     const background = roleGradients[roleKey] || roleGradients.default;
@@ -55,8 +55,8 @@ const Avatar = ({ user, size = 40, showStatus = false, isOnline = false, classNa
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 Avatar.propTypes = {
-  ...(Avatar.propTypes || {}),
   className: PropTypes.any,
   full_name: PropTypes.any,
   isOnline: PropTypes.any,

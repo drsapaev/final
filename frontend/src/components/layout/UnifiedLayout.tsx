@@ -118,8 +118,8 @@ const UnifiedLayout = ({ children, showSidebar = true }) => {
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 UnifiedLayout.propTypes = {
-  ...(UnifiedLayout.propTypes || {}),
   children: PropTypes.any,
   showSidebar: PropTypes.any,
 };

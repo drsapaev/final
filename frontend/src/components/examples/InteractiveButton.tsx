@@ -125,8 +125,8 @@ const InteractiveButton = ({
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 InteractiveButton.propTypes = {
-  ...(InteractiveButton.propTypes || {}),
   children: PropTypes.any,
   onClick: PropTypes.any,
   size: PropTypes.any,

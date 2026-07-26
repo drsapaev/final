@@ -12,12 +12,12 @@ import React from 'react';
 import { useTranslation } from '../../i18n/useTranslation';
 
 
-const UnifiedFinance = ({ renderFinance }) => {
+const UnifiedFinance = ({ renderFinance: unknown }) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [searchParams] = useSearchParams();
   const section = searchParams.get('section') || 'finance';
 
-  const getActiveTab = (section) => {
+  const getActiveTab = (section: string) => {
     switch (section) {
       case 'finance':return 'overview';
       case 'billing':return 'billing';

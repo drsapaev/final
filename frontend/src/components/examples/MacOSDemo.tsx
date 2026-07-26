@@ -59,7 +59,7 @@ const MacOSDemo = () => {
       document.documentElement.classList.remove('dark-theme');
     }
 
-    const handleChange = (e) => {
+    const handleChange = (e: React.MouseEvent) => {
       const newIsDark = e.matches;
       setIsDarkMode(newIsDark);
 

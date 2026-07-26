@@ -19,7 +19,7 @@ const PWAInstallPrompt = () => {
     }
 
     // Слушаем событие beforeinstallprompt
-    const handleBeforeInstallPrompt = (e) => {
+    const handleBeforeInstallPrompt = (e: React.MouseEvent) => {
       e.preventDefault();
       setDeferredPrompt(e);
       setShowInstallPrompt(true);

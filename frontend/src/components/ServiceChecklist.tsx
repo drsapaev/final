@@ -86,8 +86,8 @@ const ServiceChecklist = ({ value = [], onChange, department }: ServiceChecklist
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 ServiceChecklist.propTypes = {
-  ...(ServiceChecklist.propTypes || {}),
   department: PropTypes.any,
   onChange: PropTypes.any,
   toLowerCase: PropTypes.any,
