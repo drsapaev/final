@@ -76,7 +76,8 @@
     "src/hooks/useFinance.ts",
     "src/hooks/useUserPreferences.ts",
     "src/hooks/usePatients.ts",
-    "src/hooks/useEMR.ts"
+    "src/hooks/useEMR.ts",
+    "src/hooks/useReports.ts"
   ],
   "exclude": ["node_modules", "dist", "e2e"]
 }
