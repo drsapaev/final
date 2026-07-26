@@ -113,9 +113,20 @@ export function useEMR(visitId, { autoLoad = true, specialty = 'general' } = {})
             }
 
             if (cachedEntry?.promise) {
+                // audit/phase-final, BS-18: dispatch to this instance when promise resolves.
+                cachedEntry.promise.then((result: unknown) => {
+                    if (result && !forceRefresh) {
+                        dispatch(emrActions.load(result as Record<string, unknown>));
+                    }
+                }).catch(() => {});
                 return cachedEntry.promise;
             }
         } else if (cachedEntry?.promise) {
+            cachedEntry.promise.then((result: unknown) => {
+                if (result) {
+                    dispatch(emrActions.load(result as Record<string, unknown>));
+                }
+            }).catch(() => {});
             return cachedEntry.promise;
         }
 

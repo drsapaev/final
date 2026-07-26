@@ -448,7 +448,9 @@ export const ChatProvider = ({ children }: ChatProviderProps) => {
           ws.close(1000, 'Unmount before open');
           return;
         }
-        // F-001: send auth as first message (token no longer in URL)
+        // F-001: send auth as first message (token no longer in URL).
+      // audit/phase-final, BS-59: intentionally uses first-message auth instead of
+      // subprotocol — chat WS endpoint may not support subprotocol auth. Requires BE coordination to migrate.
         ws.send(JSON.stringify({
           type: 'auth',
           token: latestToken,

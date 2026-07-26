@@ -556,7 +556,7 @@ const PaymentWidget = ({
 
             {loading ?
             <>
-                <CircularProgress size={20 as never} className="pw-submit-spinner" />
+                <CircularProgress size={20} className="pw-submit-spinner" />
                 {t('payment.pay_widg_processing')}
               </> :
 

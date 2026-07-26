@@ -18,7 +18,7 @@ import {
   Clock,
   Bell } from
 'lucide-react';
-import api from '../../services/api';
+import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import './QueueManagementCard.css';
 import { useTranslation } from '../../i18n/useTranslation';

@@ -2,7 +2,7 @@ import React, { type CSSProperties, type ReactElement } from 'react';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { useTranslation } from '../../../i18n/useTranslation';
 
-type IconSize = 'small' | 'default' | 'large' | 'xlarge';
+type IconSize = 'small' | 'default' | 'large' | 'xlarge' | number;
 type IconColor = 'default' | 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'white' | 'black' | 'accent' | string;
 type IconVariant = 'multicolor' | 'monochrome';
 
@@ -470,8 +470,9 @@ const Icon = React.forwardRef<SVGSVGElement, IconProps>(({
     xlarge: 32
   };
 
-  const sizeKey = (size in sizeMap ? size : 'default') as 'small' | 'default' | 'large' | 'xlarge';
-  const iconSize = sizeMap[sizeKey];
+  const iconSize = typeof size === 'number'
+    ? size
+    : sizeMap[(size in sizeMap ? size : 'default') as 'small' | 'default' | 'large' | 'xlarge'];
 
   // Color mapping
   const colorMap: Record<string, string> = {

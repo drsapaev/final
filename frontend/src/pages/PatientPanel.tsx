@@ -223,7 +223,7 @@ const PatientPanel = () => {
                 onKeyDown={(e: React.KeyboardEvent<HTMLElement>) => handleTabKeyDown(e, tab.id)}
                 className={`pp-tab ${isActive ? 'pp-tab-active' : ''}`}
               >
-                <Icon name={tab.icon} size={16 as never} />
+                <Icon name={tab.icon} size={16} />
                 {tab.label}
               </button>
             );
@@ -255,7 +255,7 @@ const PatientPanel = () => {
           {isSectionMode ? (
             <Card className="pp-card" data-testid={`patient-section-${activeSection}`}>
               <div className="pp-home-card-header">
-                <Icon name={sectionConfig.icon} size={16 as never} />
+                <Icon name={sectionConfig.icon} size={16} />
                 <h3 className="pp-home-card-title">{sectionTitle}</h3>
               </div>
               <div className="pp-card-body">
@@ -287,7 +287,7 @@ const PatientPanel = () => {
             <div className="pp-home-grid">
               <Card className="pp-card">
                 <div className="pp-home-card-header">
-                  <Icon name="calendar" size={16 as never} />
+                  <Icon name="calendar" size={16} />
                   <h3 className="pp-home-card-title">{t('misc.pp_predstoyaschie_vizity')}</h3>
                 </div>
                 <div className="pp-home-list">
@@ -315,7 +315,7 @@ const PatientPanel = () => {
 
               <Card className="pp-card">
                 <div className="pp-home-card-header">
-                  <Icon name="heart" size={16 as never} />
+                  <Icon name="heart" size={16} />
                   <h3 className="pp-home-card-title">{t('misc.pp_rezultaty_analizov')}</h3>
                 </div>
                 <div className="pp-home-list">
@@ -327,7 +327,7 @@ const PatientPanel = () => {
                           <div className="pp-list-item-secondary">{r.date}</div>
                         </div>
                         <Button variant="outline" size="small">
-                          <Icon name="doc.text" size={16 as never} />
+                          <Icon name="doc.text" size={16} />
                           Открыть
                         </Button>
                       </div>

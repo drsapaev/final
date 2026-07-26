@@ -1,3 +1,8 @@
+// audit/phase-final, BS-6: i18n typed resources policy.
+// Decision: keep resources untyped (flat-key convention) for now.
+// 700+ call sites use t('common.save') flat keys without namespace prefixes.
+// Typed resources would require migrating locale files .js -> .ts with as const
+// and fixing any key typos surfaced. Deferred to a dedicated i18n migration cycle.
 // Module augmentation for react-i18next / i18next.
 //
 // The project uses flat string keys (e.g. t('common.save'),

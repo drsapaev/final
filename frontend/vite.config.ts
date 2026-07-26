@@ -105,6 +105,23 @@ export default defineConfig(({ mode }) => ({
         drop_debugger: true
       }
     },
+    // audit/phase-final, BS-63: manualChunks splits vendor bundle.
+    // Previously all vendor code landed in one chunk via Vite's default
+    // heuristic. recharts (300KB+) was eagerly imported in CashierPanel;
+    // react-markdown was eagerly imported in ChatWindow. Now each major
+    // vendor lib gets its own chunk, loaded only when the route that
+    // needs it is visited.
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          'recharts': ['recharts'],
+          'sentry': ['@sentry/react'],
+          'markdown': ['react-markdown'],
+          'i18n': ['i18next', 'react-i18next'],
+        },
+      },
+    },
     // audit/phase-7, BS-46: gate source maps on Sentry env vars.
     // Previously `sourcemap: true` was always on, but the inline comment
     // claimed ".map files are hidden behind source map upload via
