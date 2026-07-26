@@ -140,11 +140,11 @@ async function readFileSignature(file: File | Blob, bytesToRead: number = 12): P
  * @param {string} mimeType - MIME type
  * @returns {boolean} true если соответствует
  */
-function validateExtensionMatch(filename, mimeType) {
+function validateExtensionMatch(filename: string, mimeType: string): boolean {
   const ext = filename.split('.').pop()?.toLowerCase();
   if (!ext) return false;
 
-  const expectedMime = EXTENSION_TO_MIME[ext];
+  const expectedMime = EXTENSION_TO_MIME[ext as keyof typeof EXTENSION_TO_MIME];
   if (!expectedMime) return false;
 
   return expectedMime === mimeType;
@@ -156,7 +156,7 @@ void validateExtensionMatch;
  * @param {File} file - Файл для проверки
  * @returns {Promise<{valid: boolean, detectedType: string|null}>}
  */
-async function validateMagicNumber(file) {
+async function validateMagicNumber(file: File): Promise<{ valid: boolean; detectedType: string | null }> {
   try {
     const signature = await readFileSignature(file);
 
@@ -242,8 +242,8 @@ export async function validateFile(file: File, options: FileValidationOptions = 
     strictMagicNumber = true
   } = options;
 
-  const errors = [];
-  const warnings = [];
+  const errors: string[] = [];
+  const warnings: string[] = [];
 
   // 1. Проверка размера файла
   if (file.size > maxSize) {
@@ -256,7 +256,7 @@ export async function validateFile(file: File, options: FileValidationOptions = 
 
   // 2. Получить разрешённые MIME types
   const allowedTypes = allowedCategories.flatMap(cat =>
-    ALLOWED_MIME_TYPES[cat] || []
+    ALLOWED_MIME_TYPES[cat as keyof typeof ALLOWED_MIME_TYPES] || []
   );
 
   if (allowedTypes.length === 0) {
@@ -274,7 +274,7 @@ export async function validateFile(file: File, options: FileValidationOptions = 
   if (!ext) {
     errors.push('Файл должен иметь расширение');
   } else {
-    const expectedMime = EXTENSION_TO_MIME[ext];
+    const expectedMime = EXTENSION_TO_MIME[ext as keyof typeof EXTENSION_TO_MIME];
     if (!expectedMime) {
       warnings.push(`Неизвестное расширение файла: .${ext}`);
     } else if (expectedMime !== file.type) {
@@ -290,13 +290,13 @@ export async function validateFile(file: File, options: FileValidationOptions = 
       errors.push('Содержимое файла не соответствует заявленному типу (неверная сигнатура файла)');
     } else if (magicCheck.detectedType !== file.type) {
       // Специальные случаи для совместимых типов
-      const compatibleTypes = [
+      const compatibleTypes: string[][] = [
         ['text/xml', 'application/xml'],
         ['image/jpeg', 'image/jpg']
       ];
 
       const isCompatible = compatibleTypes.some(pair =>
-        (pair.includes(file.type) && pair.includes(magicCheck.detectedType))
+        (pair.includes(file.type) && pair.includes(magicCheck.detectedType as string))
       );
 
       if (!isCompatible) {
@@ -329,9 +329,9 @@ export async function validateFile(file: File, options: FileValidationOptions = 
  * @param {Object} options - Опции валидации
  * @returns {Promise<{valid: boolean, results: Array<{file: File, validation: Object}>}>}
  */
-export async function validateFiles(files, options = {}) {
+export async function validateFiles(files: File[], options: FileValidationOptions = {}) {
   const results = await Promise.all(
-    files.map(async (file) => ({
+    files.map(async (file: File) => ({
       file,
       validation: await validateFile(file, options)
     }))
@@ -350,8 +350,8 @@ export async function validateFiles(files, options = {}) {
  * @param {Array<string>} categories - Категории
  * @returns {string} Описание
  */
-export function getAllowedTypesDescription(categories) {
-  const descriptions = {
+export function getAllowedTypesDescription(categories: string[]): string {
+  const descriptions: Record<string, string> = {
     images: 'изображения (JPEG, PNG, GIF, HEIC, WebP)',
     documents: 'документы (PDF, DOC, DOCX, TXT)',
     spreadsheets: 'таблицы (CSV, XLS, XLSX)',

@@ -12,7 +12,7 @@ const SERVICE_WORKER_CONVERSION_TIMEOUT_MS = 8000;
  * @param {File} file - Файл для проверки
  * @returns {boolean}
  */
-export function isHEICFile(file) {
+export function isHEICFile(file: File): boolean {
   if (!file) return false;
 
   // Проверяем по MIME типу
@@ -25,11 +25,11 @@ export function isHEICFile(file) {
   return fileName.endsWith('.heic') || fileName.endsWith('.heif');
 }
 
-function getConvertedBlob(convertedBlob) {
+function getConvertedBlob(convertedBlob: Blob | Blob[]): Blob {
   return Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob;
 }
 
-function createJPEGFile(sourceFile, convertedBlob) {
+function createJPEGFile(sourceFile: File, convertedBlob: Blob | Blob[]): File {
   return new File(
     [getConvertedBlob(convertedBlob)],
     sourceFile.name.replace(/\.(heic|heif)$/i, '.jpg'),
@@ -40,7 +40,7 @@ function createJPEGFile(sourceFile, convertedBlob) {
   );
 }
 
-function timeoutAfter(ms, message) {
+function timeoutAfter(ms: number, message: string): Promise<never> {
   return new Promise((_, reject) => {
     setTimeout(() => reject(new Error(message)), ms);
   });
@@ -75,7 +75,7 @@ async function getActiveServiceWorkerRegistration() {
  * @param {number} quality - Качество JPEG (0.1 - 1.0)
  * @returns {Promise<File>} - Конвертированный JPEG файл
  */
-export async function convertHEICToJPEG(heicFile: File | Blob, quality: number = 0.8): Promise<File> {
+export async function convertHEICToJPEG(heicFile: File, quality: number = 0.8): Promise<File> {
   try {
     // Проверяем поддержку Service Worker
     if (!('serviceWorker' in navigator)) {
@@ -84,16 +84,17 @@ export async function convertHEICToJPEG(heicFile: File | Blob, quality: number =
 
     const registration = (await getActiveServiceWorkerRegistration()) as ServiceWorkerRegistration;
 
-    if (!registration.active) {
+    const activeWorker = registration.active;
+    if (!activeWorker) {
       throw new Error('Service Worker не активен');
     }
 
     // Создаем MessageChannel для двусторонней связи
     const messageChannel = new MessageChannel();
 
-    const convertedFileFromWorker = await new Promise((resolve, rejectWorker) => {
+    const convertedFileFromWorker = await new Promise<File>((resolve, rejectWorker) => {
       let isSettled = false;
-      const settle = (handler, value) => {
+      const settle = (handler: (value: File | Error | PromiseLike<File>) => void, value: File | Error | PromiseLike<File>) => {
         if (isSettled) return;
         isSettled = true;
         clearTimeout(timeoutId);
@@ -101,25 +102,25 @@ export async function convertHEICToJPEG(heicFile: File | Blob, quality: number =
         messageChannel.port2.close?.();
         handler(value);
       };
-      const reject = (value) => settle(rejectWorker, value);
+      const reject = (value: Error) => settle(rejectWorker as (value: File | Error | PromiseLike<File>) => void, value);
       const timeoutId = setTimeout(() => {
         reject(new Error('Service Worker HEIC conversion timed out'));
       }, SERVICE_WORKER_CONVERSION_TIMEOUT_MS);
 
       // Настраиваем обработчик ответа
-      messageChannel.port1.onmessage = (event) => {
-        const { success, convertedFile, error } = event.data;
+      messageChannel.port1.onmessage = (event: MessageEvent) => {
+        const { success, convertedFile, error } = event.data as { success: boolean; convertedFile?: Blob | Blob[]; error?: string };
 
         if (success) {
           // Создаем новый File объект из Blob
-          settle(resolve, createJPEGFile(heicFile, convertedFile));
+          settle(resolve as (value: File | Error | PromiseLike<File>) => void, createJPEGFile(heicFile, convertedFile as Blob | Blob[]));
         } else {
           reject(new Error(error || 'Ошибка конвертации'));
         }
       };
 
       // Отправляем файл в Service Worker
-      registration.active.postMessage({
+      activeWorker.postMessage({
         type: 'CONVERT_HEIC',
         file: heicFile,
         quality
@@ -142,7 +143,7 @@ export async function convertHEICToJPEG(heicFile: File | Blob, quality: number =
  * @param {number} quality - Качество JPEG
  * @returns {Promise<File>} - Конвертированный файл
  */
-async function convertHEICFallback(heicFile, quality = 0.8) {
+async function convertHEICFallback(heicFile: File, quality: number = 0.8): Promise<File> {
   try {
     // Динамически импортируем heic2any
     const heic2any = (await import('heic2any')).default;
@@ -197,7 +198,15 @@ export async function convertMultipleFiles(files: File[] | FileList | Iterable<F
  * @param {File} file - Файл изображения
  * @returns {Promise<Object>} - Информация о файле
  */
-export async function getImageInfo(file) {
+export async function getImageInfo(file: File): Promise<{
+  width: number;
+  height: number;
+  size: number;
+  type: string;
+  name: string;
+  aspectRatio: number;
+  megapixels: string;
+}> {
   return new Promise((resolve, reject) => {
     if (!file.type.startsWith('image/')) {
       reject(new Error('Файл не является изображением'));
@@ -238,7 +247,7 @@ export async function getImageInfo(file) {
  * @param {number} maxHeight - Максимальная высота превью
  * @returns {Promise<string>} - Data URL превью
  */
-export async function createImagePreview(file, maxWidth = 300, maxHeight = 300) {
+export async function createImagePreview(file: File, maxWidth: number = 300, maxHeight: number = 300): Promise<string> {
   return new Promise((resolve, reject) => {
     if (!file.type.startsWith('image/')) {
       reject(new Error('Файл не является изображением'));
@@ -270,7 +279,9 @@ export async function createImagePreview(file, maxWidth = 300, maxHeight = 300) 
       canvas.height = height;
 
       // Рисуем изображение на canvas
-      ctx.drawImage(img, 0, 0, width, height);
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, width, height);
+      }
 
       // Получаем data URL
       const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
@@ -292,7 +303,7 @@ export async function createImagePreview(file, maxWidth = 300, maxHeight = 300) 
  * Проверяет поддержку HEIC в браузере
  * @returns {Promise<boolean>}
  */
-export async function checkHEICSupport() {
+export async function checkHEICSupport(): Promise<boolean> {
   try {
     // Создаем тестовый HEIC data URL (минимальный)
     const testHEIC = 'data:image/heic;base64,AAAAFGZ0eXBoZWljAAAAAG1pZjFoZWljbWlhZgAAABhtZXRhAAAAAAAAACFoZGxyAAAAAAAAAABtZGlyAAAAAAAAAAAAAAAAAAAAAAA=';
@@ -316,13 +327,14 @@ export async function checkHEICSupport() {
  * @param {Event} event - Event от input
  * @param {Function} callback - Callback с конвертированными файлами
  */
-export async function handleFileInputWithHEICConversion(event, callback) {
-  const files = event.target.files;
+export async function handleFileInputWithHEICConversion(event: Event, callback: (files: File[]) => void): Promise<void> {
+  const target = event.target as HTMLInputElement;
+  const files = target.files;
   if (!files || files.length === 0) return;
 
   try {
     logger.log('Processing files with HEIC conversion...');
-    const convertedFiles = await convertMultipleFiles(files);
+    const convertedFiles = await convertMultipleFiles(Array.from(files));
 
     // Вызываем callback с конвертированными файлами
     callback(convertedFiles);

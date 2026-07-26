@@ -5,8 +5,8 @@ import { tokenManager } from '../utils/tokenManager';
 interface WebSocketAuthOptions {
   requireAuth?: boolean;
   onAuthError?: (err?: unknown) => void;
-  onConnect?: (event?: unknown) => void;
-  onDisconnect?: (event?: unknown) => void;
+  onConnect?: (event?: Event) => void;
+  onDisconnect?: (event?: CloseEvent) => void;
   onMessage?: (event: MessageEvent) => void;
   onError?: (err?: unknown) => void;
   onMaxReconnectAttempts?: () => void;
@@ -139,9 +139,9 @@ export function createDisplayBoardWebSocket(boardId: string, options: WebSocketA
  * @param {WebSocket} ws - WebSocket соединение
  * @param {Object} message - Сообщение для отправки
  */
-export function sendAuthenticatedMessage(ws, message) {
+export function sendAuthenticatedMessage(ws: WebSocket, message: Record<string, unknown>): void {
   if (ws.readyState === WebSocket.OPEN) {
-    const messageWithAuth = {
+    const messageWithAuth: Record<string, unknown> = {
       ...message,
       timestamp: new Date().toISOString(),
       token: tokenManager.getAccessToken() // Централизованный доступ к токену
@@ -163,7 +163,7 @@ export function sendAuthenticatedMessage(ws, message) {
  */
 interface ReconnectingWebSocketHandle {
   disconnect: () => void;
-  send: (data: unknown) => void;
+  send: (data: Record<string, unknown>) => void;
   readonly readyState: number;
   readonly isConnected: boolean;
 }
@@ -176,15 +176,15 @@ export function createReconnectingAuthWebSocket(baseUrl: string, params: Record<
     ...wsOptions
   } = options;
 
-  let ws = null;
-  let reconnectTimeout = null;
+  let ws: WebSocket | null = null;
+  let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
   let reconnectAttempts = 0;
   let isManuallyDisconnected = false;
-  let heartbeatInterval = null;
-  let lastPongTime = null;
+  let heartbeatInterval: ReturnType<typeof setInterval> | null = null;
+  let lastPongTime: number | null = null;
 
   // ✅ SECURITY: Exponential backoff calculation
-  const getReconnectDelay = (attempt) => {
+  const getReconnectDelay = (attempt: number): number => {
     const delay = Math.min(
       initialReconnectDelay * Math.pow(2, attempt),
       maxReconnectDelay
@@ -200,7 +200,7 @@ export function createReconnectingAuthWebSocket(baseUrl: string, params: Record<
     try {
       ws = createAuthenticatedWebSocket(baseUrl, params, {
         ...wsOptions,
-        onConnect: (event: Event) => {
+        onConnect: (event?: Event) => {
           logger.log('✅ Переподключающийся WebSocket подключен');
           reconnectAttempts = 0;
           lastPongTime = Date.now();
@@ -208,13 +208,13 @@ export function createReconnectingAuthWebSocket(baseUrl: string, params: Record<
           // ✅ SECURITY: Start heartbeat monitoring
           startHeartbeat();
 
-          if (wsOptions.onConnect) wsOptions.onConnect(event);
+          if (wsOptions.onConnect && event) wsOptions.onConnect(event);
         },
-        onDisconnect: (event: CloseEvent) => {
+        onDisconnect: (event?: CloseEvent) => {
           logger.log('❌ Переподключающийся WebSocket отключен');
           stopHeartbeat();
 
-          if (wsOptions.onDisconnect) wsOptions.onDisconnect(event);
+          if (wsOptions.onDisconnect && event) wsOptions.onDisconnect(event);
 
           // ✅ SECURITY: Exponential backoff reconnection
           if (!isManuallyDisconnected && reconnectAttempts < maxReconnectAttempts) {
@@ -238,7 +238,7 @@ export function createReconnectingAuthWebSocket(baseUrl: string, params: Record<
         onMessage: (event: MessageEvent) => {
           // ✅ SECURITY: Handle heartbeat pong messages
           try {
-            const data = JSON.parse(event.data);
+            const data = JSON.parse(event.data as string);
             if (data.type === 'ping') {
               // Respond to ping with pong
               if (ws && ws.readyState === WebSocket.OPEN) {
@@ -327,7 +327,7 @@ export function createReconnectingAuthWebSocket(baseUrl: string, params: Record<
       return ws ? ws.readyState : WebSocket.CLOSED;
     },
     get isConnected() {
-      return ws && ws.readyState === WebSocket.OPEN;
+      return ws ? ws.readyState === WebSocket.OPEN : false;
     }
   };
 }
