@@ -165,7 +165,7 @@ export const ID_TO_NAME = {
  * @param {string} value - Значение для проверки
  * @returns {boolean}
  */
-export function isServiceCode(value) {
+export function isServiceCode(value: unknown): value is string {
     if (!value || typeof value !== 'string') return false;
     return /^[A-Z]\d{2}$/i.test(value.trim());
 }
@@ -182,7 +182,7 @@ export function isServiceCode(value) {
  * toServiceCode('K01')        // 'K01'
  * toServiceCode(null)         // null
  */
-export function toServiceCode(value) {
+export function toServiceCode(value: unknown): string | null {
     if (!value) return null;
 
     const normalized = String(value).toLowerCase().trim();
@@ -193,7 +193,7 @@ export function toServiceCode(value) {
     }
 
     // Ищем в маппинге (audit/phase-8, BS-40: use merged view, not the mutated const)
-    return getMergedSpecialtyToCode()[normalized] || null;
+    return (getMergedSpecialtyToCode()[normalized] as string) || null;
 }
 
 /**
@@ -207,7 +207,7 @@ export function toServiceCode(value) {
  * getServiceDisplayName('K01') // 'Консультация кардиолога'
  * getServiceDisplayName('K01', [...services]) // 'Консультация кардиолога' из API
  */
-export function getServiceDisplayName(code, servicesData = []) {
+export function getServiceDisplayName(code: unknown, servicesData: Array<Record<string, unknown>> = []): string {
     if (!code) return '';
 
     const normalizedCode = String(code).toUpperCase().trim();
@@ -215,25 +215,26 @@ export function getServiceDisplayName(code, servicesData = []) {
     // Приоритет 1: Ищем в загруженных данных из API
     if (Array.isArray(servicesData) && servicesData.length > 0) {
         const service = servicesData.find(s => {
-            const sCode = (s.code || s.service_code || '').toUpperCase();
+            const sCode = ((s.code || s.service_code || '') as string).toUpperCase();
             return sCode === normalizedCode;
         });
-        if (service?.name) return service.name;
+        if (service?.name) return service.name as string;
     }
 
     // Приоритет 2: SSOT маппинг (audit/phase-8, BS-40: use merged view, not the mutated const)
     const mergedCodeToName = getMergedCodeToName();
     if (mergedCodeToName[normalizedCode]) {
-        return mergedCodeToName[normalizedCode];
+        return mergedCodeToName[normalizedCode] as string;
     }
 
     // Приоритет 3: Legacy маппинг
-    if (LEGACY_CODE_TO_NAME[code]) {
-        return LEGACY_CODE_TO_NAME[code];
+    const legacyKey = code as keyof typeof LEGACY_CODE_TO_NAME;
+    if (LEGACY_CODE_TO_NAME[legacyKey]) {
+        return LEGACY_CODE_TO_NAME[legacyKey];
     }
 
     // Fallback: возвращаем сам код
-    return code;
+    return code as string;
 }
 
 /**
@@ -246,7 +247,7 @@ export function getServiceDisplayName(code, servicesData = []) {
  * getServiceCategory('K01') // 'K'
  * getServiceCategory('K10') // 'K'
  */
-export function getServiceCategory(code) {
+export function getServiceCategory(code: unknown): string | null {
     if (!isServiceCode(code)) return null;
     return code.charAt(0).toUpperCase();
 }
@@ -258,13 +259,13 @@ export function getServiceCategory(code) {
  * @param {string} department - Department key (cardio, derma, etc.)
  * @returns {boolean}
  */
-export function isServiceInDepartment(code, department) {
+export function isServiceInDepartment(code: unknown, department: unknown): boolean {
     if (!code || !department) return false;
 
     const category = getServiceCategory(code);
     if (!category) return false;
 
-    const departmentToCategory = {
+    const departmentToCategory: Record<string, string> = {
         cardio: 'K',
         cardiology: 'K',
         echokg: 'K',
@@ -278,7 +279,7 @@ export function isServiceInDepartment(code, department) {
         cosmetology: 'C',
     };
 
-    const expectedCategory = departmentToCategory[department.toLowerCase()];
+    const expectedCategory = departmentToCategory[(department as string).toLowerCase()];
     return category === expectedCategory;
 }
 
@@ -289,8 +290,8 @@ export function isServiceInDepartment(code, department) {
  * @param {Array} servicesData - Данные услуг из API
  * @returns {Object} - { service_id, service_code, service_name }
  */
-export function resolveService(serviceItem, servicesData = []) {
-    const result = {
+export function resolveService(serviceItem: Record<string, unknown> | null, servicesData: Array<Record<string, unknown>> = []): Record<string, unknown> {
+    const result: Record<string, unknown> = {
         service_id: null,
         service_code: null,
         service_name: null,
@@ -348,16 +349,16 @@ export function resolveService(serviceItem, servicesData = []) {
  * @example
  * const cartItems = normalizeServicesFromInitialData(initialData, servicesData);
  */
-export function normalizeServicesFromInitialData(initialData, servicesData = []) {
+export function normalizeServicesFromInitialData(initialData: Record<string, unknown>, servicesData: Array<Record<string, unknown>> = []): Array<Record<string, unknown>> {
     if (!initialData) return [];
 
-    const items = [];
+    const items: Array<Record<string, unknown>> = [];
     const today = new Date().toISOString().split('T')[0];
 
     // Получаем doctor_id из initialData
     const defaultDoctorId = initialData.doctor_id
         || initialData.specialist_id
-        || (initialData.queue_numbers?.[0]?.specialist_id)
+        || ((initialData.queue_numbers as Array<Record<string, unknown>> | undefined)?.[0]?.specialist_id)
         || null;
 
     const defaultDate = initialData.date || today;
@@ -365,7 +366,7 @@ export function normalizeServicesFromInitialData(initialData, servicesData = [])
     /**
      * Helper: Создаёт cart item из данных услуги
      */
-    const createCartItem = (serviceData, queueId = null) => {
+    const createCartItem = (serviceData: Record<string, unknown>, queueId: unknown = null): Record<string, unknown> => {
         const resolved = resolveService(serviceData, servicesData);
 
         return {
@@ -398,22 +399,24 @@ export function normalizeServicesFromInitialData(initialData, servicesData = [])
         const serviceCode = toServiceCode(serviceData.service_code || serviceData.code || serviceData.name || '');
         const serviceName = String(serviceData.name || serviceData.service_name || '').toLowerCase().trim();
 
-        const match = initialData.queue_numbers.find((queueItem) => {
+        const match = initialData.queue_numbers.find((queueItem: unknown) => {
             if (!queueItem) return false;
-            if (serviceId && queueItem.service_id && Number(queueItem.service_id) === Number(serviceId)) {
+            const q = queueItem as Record<string, unknown>;
+            if (serviceId && q.service_id && Number(q.service_id) === Number(serviceId)) {
                 return true;
             }
-            const queueCode = toServiceCode(queueItem.service_code || queueItem.code || queueItem.service_name || '');
+            const queueCode = toServiceCode(q.service_code || q.code || q.service_name || '');
             if (serviceCode && queueCode && serviceCode === queueCode) {
                 return true;
             }
-            const queueName = String(queueItem.service_name || queueItem.name || '').toLowerCase().trim();
+            const queueName = String(q.service_name || q.name || '').toLowerCase().trim();
             return Boolean(serviceName && queueName && serviceName === queueName);
         });
 
         if (!match) return null;
 
-        const matchedQueueEntryId = pickExplicitQueueEntryId(match);
+        const matchedQueue = match as Record<string, unknown>;
+        const matchedQueueEntryId = pickExplicitQueueEntryId(matchedQueue);
         if (matchedQueueEntryId !== null && matchedQueueEntryId !== undefined && matchedQueueEntryId !== '') {
             return matchedQueueEntryId;
         }
@@ -421,24 +424,24 @@ export function normalizeServicesFromInitialData(initialData, servicesData = [])
         // In current registrar DTOs `queue_id` is DailyQueue.id, not a
         // cancelable OnlineQueueEntry.id. If both are present, never treat the
         // row id as an entry id; it may collide with an unrelated queue entry.
-        if (match.queue_id !== null && match.queue_id !== undefined) {
+        if (matchedQueue.queue_id !== null && matchedQueue.queue_id !== undefined) {
             return null;
         }
 
-        return match.id ?? null;
+        return matchedQueue.id ?? null;
     };
 
     /**
      * Helper: Дедупликация и сортировка услуг
      */
-    const finalizeItems = (rawItems) => {
-        const uniqueItems = [];
-        const seenKeys = new Set();
+    const finalizeItems = (rawItems: Array<Record<string, unknown>>): Array<Record<string, unknown>> => {
+        const uniqueItems: Array<Record<string, unknown>> = [];
+        const seenKeys = new Set<unknown>();
 
         rawItems.forEach(item => {
             // Формируем уникальный ключ: ID > Code > Name
             // Используем toLowerCase для кодов и имен для надежности
-            let key = null;
+            let key: string | null = null;
             if (item.service_id) {
                 key = `id:${item.service_id}`;
             } else if (item.service_code) {
@@ -460,11 +463,12 @@ export function normalizeServicesFromInitialData(initialData, servicesData = [])
 
     // ⭐ Приоритет 1: service_details (полные данные из backend)
     if (Array.isArray(initialData.service_details) && initialData.service_details.length > 0) {
-        initialData.service_details.forEach(svc => {
+        (initialData.service_details as Array<unknown>).forEach((svc: unknown) => {
             if (svc) {
+                const service = svc as Record<string, unknown>;
                 items.push(createCartItem(
-                    { ...svc, _source: 'service_details' },
-                    resolveOriginalQueueId(svc)
+                    { ...service, _source: 'service_details' },
+                    resolveOriginalQueueId(service)
                 ));
             }
         });
@@ -473,27 +477,28 @@ export function normalizeServicesFromInitialData(initialData, servicesData = [])
 
     // ⭐ Приоритет 2: services (массив строк/кодов ИЛИ объектов)
     if (Array.isArray(initialData.services) && initialData.services.length > 0) {
-        initialData.services.forEach(serviceItem => {
+        (initialData.services as Array<unknown>).forEach((serviceItem: unknown) => {
             if (!serviceItem) return;
 
             // ⭐ FIX: Обрабатываем как объекты (новый формат), так и строки (legacy)
             if (typeof serviceItem === 'object' && serviceItem !== null) {
+                const item = serviceItem as Record<string, unknown>;
                 // Объект с service_id, name, code, price, queue_time, etc.
                 const foundService = servicesData.find(s =>
-                    s.id === serviceItem.service_id ||
-                    s.service_code === serviceItem.code ||
-                    s.code === serviceItem.code
+                    s.id === item.service_id ||
+                    s.service_code === item.code ||
+                    s.code === item.code
                 );
 
                 items.push(createCartItem({
-                    id: serviceItem.service_id || foundService?.id || null,
-                    service_id: serviceItem.service_id || foundService?.id || null,
-                    name: serviceItem.name || foundService?.name || 'Услуга',
-                    code: serviceItem.code || foundService?.service_code || null,
-                    price: serviceItem.price || foundService?.price || 0,
-                    quantity: serviceItem.quantity || 1,
+                    id: item.service_id || foundService?.id || null,
+                    service_id: item.service_id || foundService?.id || null,
+                    name: item.name || foundService?.name || 'Услуга',
+                    code: item.code || foundService?.service_code || null,
+                    price: item.price || foundService?.price || 0,
+                    quantity: item.quantity || 1,
                     _source: 'services_array',
-                }, resolveOriginalQueueId(serviceItem)));
+                }, resolveOriginalQueueId(item)));
             } else {
                 // Строка - legacy формат (код или название услуги)
                 const serviceName = serviceItem;
@@ -518,7 +523,7 @@ export function normalizeServicesFromInitialData(initialData, servicesData = [])
 
     // ⭐ Приоритет 3: service_codes (массив кодов)
     if (Array.isArray(initialData.service_codes) && initialData.service_codes.length > 0) {
-        initialData.service_codes.forEach(serviceCode => {
+        (initialData.service_codes as Array<unknown>).forEach((serviceCode: unknown) => {
             if (serviceCode) {
                 const normalizedCode = toServiceCode(serviceCode);
                 const foundService = servicesData.find(s =>
@@ -540,16 +545,19 @@ export function normalizeServicesFromInitialData(initialData, servicesData = [])
     // ⭐ Приоритет 4: queue_numbers с service_details
     if (Array.isArray(initialData.queue_numbers)) {
         // Сначала проверяем service_details в queue_numbers
-        const firstQueueWithDetails = initialData.queue_numbers.find(q =>
-            Array.isArray(q.service_details) && q.service_details.length > 0
-        );
+        const firstQueueWithDetails = initialData.queue_numbers.find((q: unknown) => {
+            const qRec = q as Record<string, unknown>;
+            return Array.isArray(qRec.service_details) && (qRec.service_details as Array<unknown>).length > 0;
+        });
 
         if (firstQueueWithDetails) {
-            firstQueueWithDetails.service_details.forEach(svc => {
+            const firstQueue = firstQueueWithDetails as Record<string, unknown>;
+            const queueServiceDetails = firstQueue.service_details as Array<Record<string, unknown>>;
+            queueServiceDetails.forEach(svc => {
                 if (svc) {
                     items.push(createCartItem(
                         { ...svc, _source: 'queue_numbers.service_details' },
-                        firstQueueWithDetails.id
+                        firstQueue.id
                     ));
                 }
             });
@@ -557,30 +565,31 @@ export function normalizeServicesFromInitialData(initialData, servicesData = [])
         }
 
         // ⭐ Приоритет 5: queue_numbers только по явным полям очереди
-        initialData.queue_numbers.forEach(q => {
-            const serviceName = q.service_name || null;
+        (initialData.queue_numbers as Array<unknown>).forEach((q: unknown) => {
+            const qRec = q as Record<string, unknown>;
+            const serviceName = qRec.service_name || null;
             const serviceCode = serviceName ? toServiceCode(serviceName) : null;
             const foundService = servicesData.find(s =>
                 s.service_code === serviceCode ||
                 s.code === serviceCode ||
-                s.id === q.service_id
+                s.id === qRec.service_id
             );
 
-            if (!foundService && !q.service_id && !serviceCode) {
+            if (!foundService && !qRec.service_id && !serviceCode) {
                 return;
             }
 
             items.push(createCartItem({
-                id: q.service_id || foundService?.id || null,
+                id: qRec.service_id || foundService?.id || null,
                 name: foundService?.name || serviceName || 'Услуга',
                 code: serviceCode,
-                price: foundService?.price || q.service_price || 0,
-                quantity: q.quantity || 1,
-                doctor_id: q.doctor_id,
-                date: q.date,
-                visit_time: q.visit_time,
+                price: foundService?.price || qRec.service_price || 0,
+                quantity: qRec.quantity || 1,
+                doctor_id: qRec.doctor_id,
+                date: qRec.date,
+                visit_time: qRec.visit_time,
                 _source: 'queue_numbers',
-            }, q.id));
+            }, qRec.id));
         });
         return finalizeItems(items);
     }
@@ -598,7 +607,7 @@ export function normalizeServicesFromInitialData(initialData, servicesData = [])
 /**
  * Кэш для динамически загруженных маппингов
  */
-let cachedMappings = null;
+let cachedMappings: Record<string, unknown> | null = null;
 let lastLoadTime = 0;
 const CACHE_TTL = 5 * 60 * 1000; // 5 минут
 // audit/phase-8, BS-40: backend overrides stored separately from the
@@ -614,7 +623,7 @@ let backendCodeNameOverrides: Record<string, unknown> = {};
  * 
  * @returns {Promise<Object>} - { specialty_to_code, code_to_name, category_mapping, specialty_aliases }
  */
-export async function loadMappingsFromBackend() {
+export async function loadMappingsFromBackend(): Promise<Record<string, unknown>> {
     const now = Date.now();
 
     // Используем кэш если он валиден
@@ -646,7 +655,7 @@ export async function loadMappingsFromBackend() {
             backendSpecialtyOverrides = { ...(resp.specialty_to_code || {}) };
             backendCodeNameOverrides = { ...(resp.code_to_name || {}) };
 
-            return response;
+            return response as Record<string, unknown>;
         }
     } catch (error) {
                 logger.warn('[serviceCodeResolver] Failed to load mappings from backend:', (error as Error)?.message);
