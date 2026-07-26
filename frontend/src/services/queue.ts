@@ -16,7 +16,7 @@ interface QueueRequestOptions {
   body?: unknown;
 }
 
-async function apiRequest<T = unknown>(path: string, options: QueueRequestOptions = {}): Promise<T> {
+async function apiRequest<T = unknown>(path: string, options: QueueRequestOptions = {}): Promise<T | null> {
   const base = options.absolute ? '' : getApiOrigin();
   const token = getAuthToken();
 
@@ -99,12 +99,12 @@ function selectNextCallEntry(queue: Record<string, unknown> | null | undefined):
 
 export const queueService = {
   // Очередь врача на сегодня по специальности
-  getTodayQueue: async (specialty) => {
+  getTodayQueue: async (specialty: string) => {
     return apiRequest(`/doctor/${encodeURIComponent(specialty)}/queue/today`);
   },
 
   // Вызвать пациента в кабинет (по id записи очереди)
-  callPatient: async (entryId) => {
+  callPatient: async (entryId: string | number) => {
     const result = await apiRequest(`/doctor/queue/${entryId}/call`, { method: 'POST' });
     // Уведомляем об обновлении
     notifyQueueUpdate('all', 'patientCalled');
@@ -112,7 +112,7 @@ export const queueService = {
   },
 
   // Начать прием пациента
-  startVisit: async (entryId) => {
+  startVisit: async (entryId: string | number) => {
     const result = await apiRequest(`/doctor/queue/${entryId}/start-visit`, { method: 'POST' });
     // Уведомляем об обновлении
     notifyQueueUpdate('all', 'visitStarted');
@@ -120,7 +120,7 @@ export const queueService = {
   },
 
   // Завершить прием пациента (можно передать med data)
-  completeVisit: async (entryId, visitData) => {
+  completeVisit: async (entryId: string | number, visitData: Record<string, unknown>) => {
     const result = await apiRequest(`/doctor/queue/${entryId}/complete`, {
       method: 'POST',
       body: visitData || {}
@@ -132,7 +132,7 @@ export const queueService = {
   },
 
   // Вызвать следующего ожидающего пациента по специальности
-  callNextWaiting: async (specialty) => {
+  callNextWaiting: async (specialty: string) => {
     const queue = await apiRequest<{ entries?: Array<Record<string, unknown>>; next_call_entry_id?: unknown }>(`/doctor/${encodeURIComponent(specialty)}/queue/today`);
     if (!queue?.entries?.length) return { success: false, message: 'Очередь пуста' };
     const nextEntry = selectNextCallEntry(queue);

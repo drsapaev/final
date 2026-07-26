@@ -47,19 +47,21 @@ const MEDICAL_PII_KEYS = [
   'token', 'access_token', 'refresh_token', 'secret', 'api_key', 'password',
 ];
 
-function scrubPIIFromObject(obj) {
+function scrubPIIFromObject(obj: unknown): unknown {
   if (!obj || typeof obj !== 'object') return obj;
-  if (Array.isArray(obj)) return obj.map(scrubPIIFromObject);
+  const o = obj as Record<string, unknown>;
+  if (!obj || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return (Array.isArray(o) ? o.map(scrubPIIFromObject) : o);
 
   const cleaned = {};
   for (const [key, value] of Object.entries(obj)) {
     const lowerKey = key.toLowerCase();
     if (MEDICAL_PII_KEYS.some((pii) => lowerKey.includes(pii))) {
-      cleaned[key] = '[REDACTED]';
+      (cleaned as Record<string, unknown>)[key] = '[REDACTED]';
     } else if (typeof value === 'object') {
-      cleaned[key] = scrubPIIFromObject(value);
+      (cleaned as Record<string, unknown>)[key] = scrubPIIFromObject(value);
     } else {
-      cleaned[key] = value;
+      (cleaned as Record<string, unknown>)[key] = value;
     }
   }
   return cleaned;
@@ -102,19 +104,19 @@ export function initSentry() {
       // so PII attached by Sentry SDK integrations (e.g., device context,
       // custom contexts set via Sentry.setContext()) leaked through.
       if (event.request) {
-        event.request = scrubPIIFromObject(event.request);
+        event.request = scrubPIIFromObject(event.request) as typeof event.request;
       }
       if (event.breadcrumbs) {
         event.breadcrumbs = event.breadcrumbs.map((b) => ({
           ...b,
-          data: scrubPIIFromObject(b.data),
+          data: scrubPIIFromObject(b.data) as Record<string, unknown> | undefined,
         }));
       }
       if (event.extra) {
-        event.extra = scrubPIIFromObject(event.extra);
+        event.extra = scrubPIIFromObject(event.extra) as typeof event.extra;
       }
       if (event.contexts) {
-        event.contexts = scrubPIIFromObject(event.contexts);
+        event.contexts = scrubPIIFromObject(event.contexts) as typeof event.contexts;
       }
       return event;
     },
@@ -123,7 +125,7 @@ export function initSentry() {
   isInitialized = true;
 }
 
-export function captureException(error, context) {
+export function captureException(error: unknown, context: Record<string, unknown>): void {
   if (!isInitialized) {
     // eslint-disable-next-line no-console
     console.error('[sentry-disabled]', error, context);
