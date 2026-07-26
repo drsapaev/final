@@ -59,9 +59,9 @@ async function apiRequest<T = unknown>(path: string, options: QueueRequestOption
     throw new Error(detail);
   }
   try {
-    return await res.json();
+    return await res.json() as T;
   } catch {
-    return null;
+    return null as T;
   }
 }
 
