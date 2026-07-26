@@ -6,7 +6,7 @@ const CANONICAL_SPECIALTIES = new Set([
     'lab',
 ]);
 
-const SPECIALTY_ALIASES = {
+const SPECIALTY_ALIASES: Record<string, string> = {
     '': 'general',
     doctor: 'general',
     therapy: 'general',
@@ -21,7 +21,7 @@ const SPECIALTY_ALIASES = {
     laboratory: 'lab',
 };
 
-const SPECIALTY_SKELETONS = {
+const SPECIALTY_SKELETONS: Record<string, Record<string, unknown>> = {
     general: {},
     cardiology: {
         ecg: {},
@@ -49,7 +49,7 @@ const SPECIALTY_SKELETONS = {
     },
 };
 
-export function normalizeSpecialty(value, fallback = 'general') {
+export function normalizeSpecialty(value: unknown, fallback: string = 'general'): string {
     const raw = String(value || '').trim().toLowerCase();
     const normalizedFallback = String(fallback || '').trim().toLowerCase();
     const fallbackValue = CANONICAL_SPECIALTIES.has(normalizedFallback)
@@ -67,17 +67,17 @@ export function normalizeSpecialty(value, fallback = 'general') {
     return SPECIALTY_ALIASES[raw] || fallbackValue;
 }
 
-export function isCanonicalSpecialty(value) {
+export function isCanonicalSpecialty(value: unknown): boolean {
     return CANONICAL_SPECIALTIES.has(String(value || '').trim().toLowerCase());
 }
 
-export function buildSpecialtySkeleton(specialty) {
+export function buildSpecialtySkeleton(specialty: unknown): Record<string, unknown> {
     const canonical = normalizeSpecialty(specialty);
     return structuredClone(SPECIALTY_SKELETONS[canonical] || {});
 }
 
-export function normalizeEMRData(data, specialty = 'general') {
-    const payload = data && typeof data === 'object' ? structuredClone(data) : {};
+export function normalizeEMRData(data: Record<string, unknown>, specialty: string = 'general'): Record<string, unknown> {
+    const payload: Record<string, unknown> = data && typeof data === 'object' ? structuredClone(data) : {};
     const canonicalSpecialty = normalizeSpecialty(
         payload.specialty,
         specialty,
@@ -89,13 +89,13 @@ export function normalizeEMRData(data, specialty = 'general') {
     payload.specialty = canonicalSpecialty;
     payload.specialty_data = {
         ...buildSpecialtySkeleton(canonicalSpecialty),
-        ...specialtyData,
+        ...specialtyData as Record<string, unknown>,
     };
 
     return payload;
 }
 
-export function buildInitialEMRData(specialty = 'general') {
+export function buildInitialEMRData(specialty: string = 'general'): Record<string, unknown> {
     return normalizeEMRData({
         complaints: '',
         anamnesis_morbi: '',

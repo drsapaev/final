@@ -20,6 +20,8 @@ export async function registerServiceWorker() {
       registration.addEventListener('updatefound', () => {
         const newWorker = registration.installing;
 
+        if (!newWorker) return;
+
         newWorker.addEventListener('statechange', () => {
           if (newWorker.state === 'installed') {
             if (navigator.serviceWorker.controller) {
@@ -117,13 +119,15 @@ export async function subscribeToPushNotifications() {
 }
 
 // Отправка подписки на сервер
-async function sendSubscriptionToServer(subscription) {
+async function sendSubscriptionToServer(subscription: PushSubscription): Promise<boolean> {
   try {
     // UX Audit: api.post() автоматически добавляет Authorization + Content-Type headers.
     await api.post('/mobile/notifications/subscribe', subscription);
     logger.log('Подписка отправлена на сервер');
+    return true;
   } catch (error) {
     logger.error('Ошибка отправки подписки:', error);
+    return false;
   }
 }
 
@@ -188,7 +192,7 @@ export function setupConnectionHandlers() {
 }
 
 // Показ уведомления о статусе подключения
-function showConnectionNotification(status) {
+function showConnectionNotification(status: 'online' | 'offline') {
   // Создаем простое уведомление
   const notification = document.createElement('div');
   notification.style.cssText = `
@@ -223,7 +227,7 @@ function showConnectionNotification(status) {
 }
 
 // Кэширование данных для офлайн работы
-export async function cacheDataForOffline(key, data) {
+export async function cacheDataForOffline(key: string, data: unknown) {
   if ('caches' in window) {
     try {
       const cache = await caches.open('clinic-offline-data');
@@ -236,7 +240,7 @@ export async function cacheDataForOffline(key, data) {
 }
 
 // Получение кэшированных данных
-export async function getCachedData(key) {
+export async function getCachedData(key: string): Promise<unknown> {
   if ('caches' in window) {
     try {
       const cache = await caches.open('clinic-offline-data');
