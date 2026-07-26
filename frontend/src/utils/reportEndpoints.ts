@@ -28,6 +28,6 @@ export const REPORT_ENDPOINTS = {
 /**
  * Resolve a report type to its backend endpoint slug, or null if unknown.
  */
-export const getReportEndpoint = (type) => REPORT_ENDPOINTS[type] || null;
+export const getReportEndpoint = (type: string): string | null => REPORT_ENDPOINTS[type as keyof typeof REPORT_ENDPOINTS] || null;
 
 export default REPORT_ENDPOINTS;

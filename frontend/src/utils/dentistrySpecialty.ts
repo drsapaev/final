@@ -5,7 +5,7 @@ export const DENTISTRY_SPECIALTIES = [
   'stomatology',
 ];
 
-export function isDentistrySpecialty(value) {
+export function isDentistrySpecialty(value: unknown): boolean {
   if (typeof value !== 'string') {
     return false;
   }
