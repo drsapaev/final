@@ -26,8 +26,9 @@ export const readTelegramMiniAppInitData = () => {
 
 // ─── Date helpers ──────────────────────────────────────────────────────────
 
-export const toLocalDateInputValue = (value) => {
-  const localDate = new Date(value.getTime() - (value.getTimezoneOffset() * 60_000));
+export const toLocalDateInputValue = (value: Date | string | null | undefined) => {
+  const date = value instanceof Date ? value : new Date(value || '');
+  const localDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60_000));
   return localDate.toISOString().slice(0, 10);
 };
 
@@ -46,11 +47,11 @@ export const getTodayDateInputValue = () => toLocalDateInputValue(new Date());
 // Теперь split respects parenthesized content — comma inside () не разделяет.
 // Это best-effort для user-typed input. Backend должен валидировать отдельно.
 
-export const splitBookingServices = (value) => {
+export const splitBookingServices = (value: unknown) => {
   const text = String(value || '').trim();
   if (!text) return [];
 
-  const result = [];
+  const result: string[] = [];
   let current = '';
   let parenDepth = 0;
 
@@ -134,7 +135,7 @@ const DEFAULT_ERROR_MESSAGES = {
  * @param {string} reason — reason-код с backend
  * @returns {string}
  */
-export function describePatientError(domain, reason) {
-  const domainMessages = PATIENT_ERROR_MESSAGES[domain] || {};
-  return domainMessages[reason] || DEFAULT_ERROR_MESSAGES[domain] || 'Произошла ошибка.';
+export function describePatientError(domain: string, reason: string) {
+  const domainMessages = (PATIENT_ERROR_MESSAGES as Record<string, Record<string, string>>)[domain] || {};
+  return domainMessages[reason] || (DEFAULT_ERROR_MESSAGES as Record<string, string>)[domain] || 'Произошла ошибка.';
 }
