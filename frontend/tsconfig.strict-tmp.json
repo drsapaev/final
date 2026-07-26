@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true
+  },
+  "include": [
+    "src/services/**/*.ts",
+    "src/services/**/*.tsx"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "e2e"
+  ]
+}
