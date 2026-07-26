@@ -89,7 +89,7 @@ describe('LabResultsSection UX-AUDIT-FIX6 — migrate lucide-react to macos Icon
 
   it('STRAT#12: order confirm dialog uses t() and tInterpolate() from unified i18n', () => {
     // STRAT#12: order confirm dialog мигрирован на t()
-    expect(source).toContain("from '../../../i18n/useTranslation'");
+    expect(source).toContain("from '@/components/i18n/useTranslation'");
     expect(source).toContain('import { useTranslation }');
 
     // Order dialog

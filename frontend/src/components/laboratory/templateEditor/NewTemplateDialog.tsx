@@ -4,7 +4,7 @@ import PropTypes from 'prop-types';
 import {
   Alert, Button, Dialog, DialogTitle, DialogContent, DialogActions, Input, Label, Textarea, Icon,
 } from '../../ui/macos';
-import { useTranslation } from '../../../i18n/useTranslation';
+import { useTranslation } from '@/i18n/useTranslation';
 import React from "react";
 
 /**

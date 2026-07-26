@@ -14,9 +14,9 @@ import EMRSection from './EMRSection';
 import React from 'react';
 import EMRSmartFieldV2 from './EMRSmartFieldV2';
 import EMRTextField from './EMRTextField';
-import { useDoctorPhrases } from '../../../hooks/useDoctorPhrases';
+import { useDoctorPhrases } from '@/hooks/useDoctorPhrases';
 import './DiagnosisSection.css';
-import { useTranslation } from '../../../i18n/useTranslation';
+import { useTranslation } from '@/i18n/useTranslation';
 
 
 function normalizeTextValue(value) {

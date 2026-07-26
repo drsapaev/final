@@ -1,8 +1,8 @@
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import FinanceModal from '../FinanceModal';
-import { ThemeProvider } from '../../../contexts/ThemeContext';
-import { MacOSThemeProvider } from '../../../theme/macosTheme';
+import { ThemeProvider } from '@/contexts/ThemeContext';
+import { MacOSThemeProvider } from '@/theme/macosTheme';
 
 const renderFinanceModal = (props = {}) => render(
   <MacOSThemeProvider>

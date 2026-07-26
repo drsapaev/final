@@ -1,5 +1,5 @@
 import React, { type ReactNode, type CSSProperties, type MouseEvent, type KeyboardEvent } from 'react';
-import { useTheme } from '../../../contexts/ThemeContext';
+import { useTheme } from '@/contexts/ThemeContext';
 
 type ListVariant = 'default' | 'compact' | 'inset';
 type DividerVariant = 'fullWidth' | 'inset' | 'middle';

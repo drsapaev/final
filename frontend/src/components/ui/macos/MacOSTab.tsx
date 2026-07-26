@@ -1,4 +1,4 @@
-import { useTranslation } from '../../../i18n/useTranslation';
+import { useTranslation } from '@/i18n/useTranslation';
 import type { CSSProperties, ReactNode, ComponentType, KeyboardEvent, MouseEvent as ReactMouseEvent, FocusEvent } from 'react';
 
 type TabSize = 'sm' | 'md' | 'lg';

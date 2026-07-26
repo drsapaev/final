@@ -1,4 +1,4 @@
-import { useTranslation } from '../../../i18n/useTranslation';
+import { useTranslation } from '@/i18n/useTranslation';
 import type { CSSProperties, ReactNode } from 'react';
 
 type SkeletonVariant = 'text' | 'circle' | 'rect' | 'card' | 'table' | 'list';

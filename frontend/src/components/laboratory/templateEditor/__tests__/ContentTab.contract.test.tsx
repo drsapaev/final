@@ -105,7 +105,7 @@ describe('ContentTab UX-AUDIT-FIX4 — confirm dialog on field/section delete', 
   it('STRAT#11: both delete dialogs use t() from unified i18n', () => {
     // STRAT#11: delete section и delete field dialogs мигрированы на t()
     // i18n-unification: tInterpolate() replaced with t(key, params) — react-i18next handles interpolation
-    expect(source).toContain("from '../../../i18n/useTranslation'");
+    expect(source).toContain("from '@/components/i18n/useTranslation'");
     expect(source).toContain('useTranslation');
 
     // Delete section dialog

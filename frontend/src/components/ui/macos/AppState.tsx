@@ -1,7 +1,7 @@
 import React, { type ReactNode, type CSSProperties, type ComponentType, type ReactElement } from 'react';
 import Alert from './Alert';
 import MacOSEmptyState from './MacOSEmptyState';
-import { useTranslation } from '../../../i18n/useTranslation';
+import { useTranslation } from '@/i18n/useTranslation';
 
 const fontFamily = '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif';
 

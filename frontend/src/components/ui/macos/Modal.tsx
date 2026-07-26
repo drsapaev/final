@@ -1,7 +1,7 @@
 import React, { useEffect, useId, useRef, type ReactNode, type CSSProperties, type MouseEvent, type KeyboardEvent, type RefObject } from 'react';
-import { useTheme } from '../../../contexts/ThemeContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import Button from './Button';
-import { useTranslation } from '../../../i18n/useTranslation';
+import { useTranslation } from '@/i18n/useTranslation';
 
 type ModalSize = 'small' | 'default' | 'large' | 'fullscreen' | 'sm' | 'md' | 'lg' | string;
 type ModalVariant = 'default' | 'compact' | 'sheet' | string;

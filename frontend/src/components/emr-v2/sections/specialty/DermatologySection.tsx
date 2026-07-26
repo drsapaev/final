@@ -15,13 +15,13 @@ import { Camera, X, Image as ImageIcon, Sparkles } from 'lucide-react';
 import EMRSection from '../EMRSection';
 
 import EMRSmartFieldV2 from '../EMRSmartFieldV2';
-import { useEMRAI } from '../../../../hooks/useEMRAI';
-import { MCP_PROVIDERS } from '../../../../constants/ai';
-import logger from '../../../../utils/logger';
+import { useEMRAI } from '@/hooks/useEMRAI';
+import { MCP_PROVIDERS } from '@/constants/ai';
+import logger from '@/utils/logger';
 import './DermatologySection.css';
-import { Checkbox } from '../../../ui/macos';
-import { useTranslation } from '../../../../i18n/useTranslation';
-import i18n from '../../../../i18n';
+import { Checkbox } from '@/components/ui/macos';
+import { useTranslation } from '@/i18n/useTranslation';
+import i18n from '@/i18n';
 const i18nT = i18n.t as unknown as (key: string, options?: Record<string, unknown>) => string;
 
 /**
