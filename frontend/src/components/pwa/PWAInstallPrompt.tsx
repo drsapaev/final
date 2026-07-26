@@ -148,7 +148,7 @@ CapabilityChip.propTypes = {
 };
 
 
-const PWAInstallPrompt = ({ onClose }) => {
+const PWAInstallPrompt = ({ onClose }: { onClose?: () => void }) => {
   const {
     isInstallable,
     isInstalled,
@@ -248,7 +248,7 @@ const PWAInstallPrompt = ({ onClose }) => {
                   {isOnline ? t18('misc.pip_onlayn') : t18('misc.pip_oflayn_rezhim')}
                 </CapabilityChip>
 
-                {(capabilities as Record<string, unknown>).notifications && (
+                {(capabilities as Record<string, unknown>).notifications ? (
                   <CapabilityChip
                     icon={Bell}
                     variant={notificationPermission === 'granted' ? 'success' : 'outline'}
@@ -257,7 +257,7 @@ const PWAInstallPrompt = ({ onClose }) => {
                   >
                     Push уведомления
                   </CapabilityChip>
-                )}
+                ) : null}
               </div>
 
               <div style={styles.actions}>
@@ -272,7 +272,7 @@ const PWAInstallPrompt = ({ onClose }) => {
                   {isInstalling ? t18('misc.pip_ustanovka') : t18('misc.pip_ustanovit_prilozhenie')}
                 </Button>
 
-                {(capabilities as Record<string, unknown>).notifications && notificationPermission === 'default' && (
+                {(capabilities as Record<string, unknown>).notifications && notificationPermission === 'default' ? (
                   <Button
                     type="button"
                     variant="outline"
@@ -282,7 +282,7 @@ const PWAInstallPrompt = ({ onClose }) => {
                     <Bell size={14} aria-hidden="true" style={styles.actionIcon} />
                     Разрешить уведомления
                   </Button>
-                )}
+                ) : null}
               </div>
             </>
           ) : (
@@ -294,18 +294,18 @@ const PWAInstallPrompt = ({ onClose }) => {
           <div>
             <p style={styles.capabilityLabel as unknown as CSSProperties}>{t18('misc.pip_vozmozhnosti_prilozheniya_2')}</p>
             <div style={styles.chipGrid as unknown as CSSProperties} aria-label={t18('misc.pip_vozmozhnosti_prilozheniya')}>
-              {(capabilities as Record<string, unknown>).serviceWorker && (
+              {(capabilities as Record<string, unknown>).serviceWorker ? (
                 <CapabilityChip variant="outline">{t18('misc.pip_oflayn_rabota')}</CapabilityChip>
-              )}
-              {(capabilities as Record<string, unknown>).notifications && (
+              ) : null}
+              {(capabilities as Record<string, unknown>).notifications ? (
                 <CapabilityChip variant="outline">{t18('misc.pip_uvedomleniya')}</CapabilityChip>
-              )}
-              {(capabilities as Record<string, unknown>).backgroundSync && (
+              ) : null}
+              {(capabilities as Record<string, unknown>).backgroundSync ? (
                 <CapabilityChip variant="outline">{t18('misc.pip_sinhronizatsiya')}</CapabilityChip>
-              )}
-              {(capabilities as Record<string, unknown>).webShare && (
+              ) : null}
+              {(capabilities as Record<string, unknown>).webShare ? (
                 <CapabilityChip variant="outline">{t18('misc.pip_bystryy_dostup')}</CapabilityChip>
-              )}
+              ) : null}
             </div>
           </div>
         </CardContent>

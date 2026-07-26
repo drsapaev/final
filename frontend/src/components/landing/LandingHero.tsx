@@ -1,5 +1,5 @@
 import PropTypes from 'prop-types';
-export const LandingHero = ({ onGetStarted }) => {
+export const LandingHero = ({ onGetStarted }: { onGetStarted: () => void }) => {
   return (
     <section className="landing-hero">
       <div className="hero-content">

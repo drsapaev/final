@@ -7,14 +7,31 @@ import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 
-const MultipleTicketsPrinter = ({ tickets, onClose, onAllPrinted }) => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
-  const [printedTickets, setPrintedTickets] = useState(new Set());
-  const [currentPrinting, setCurrentPrinting] = useState(null);
+type TFunc = (key: string, options?: Record<string, unknown>) => string;
+
+interface Ticket {
+  queue_id: string | number;
+  queue_name?: string;
+  queue_number?: string | number;
+  patient_name?: string;
+  doctor_name?: string;
+  visit_date?: string;
+  visit_time?: string;
+  [key: string]: unknown;
+}
+
+const MultipleTicketsPrinter = ({ tickets, onClose, onAllPrinted }: {
+  tickets: Ticket[];
+  onClose: () => void;
+  onAllPrinted?: () => void;
+}) => {
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as TFunc;
+  const [printedTickets, setPrintedTickets] = useState<Set<string | number>>(new Set());
+  const [currentPrinting, setCurrentPrinting] = useState<string | number | null>(null);
   const [countdown, setCountdown] = useState(0);
 
   // Функция печати одного талона
-  const printSingleTicket = async (ticket) => {
+  const printSingleTicket = async (ticket: Ticket) => {
     setCurrentPrinting(ticket.queue_id);
 
     try {
@@ -73,7 +90,6 @@ const MultipleTicketsPrinter = ({ tickets, onClose, onAllPrinted }) => {
 
   const allPrinted = printedTickets.size >= tickets.length;
   const hasUnprinted = tickets.some((ticket) => !printedTickets.has(ticket.queue_id));
-
   return (
     <div className="multiple-tickets-printer">
       <div className="printer-header">
@@ -104,7 +120,7 @@ const MultipleTicketsPrinter = ({ tickets, onClose, onAllPrinted }) => {
                 <div className="doctor-name">{ticket.doctor_name}</div>
                 }
                 <div className="visit-info">
-                  {new Date(ticket.visit_date).toLocaleDateString('ru-RU')} • {ticket.visit_time}
+                  {ticket.visit_date ? new Date(ticket.visit_date).toLocaleDateString('ru-RU') : ''} • {ticket.visit_time}
                 </div>
               </div>
 

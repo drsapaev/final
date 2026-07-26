@@ -9,12 +9,27 @@ import { FileText } from 'lucide-react';
 import ProtocolTemplates from './ProtocolTemplates';
 import { useTranslation } from '../../i18n/useTranslation';
 
+type TFunc = (key: string, options?: Record<string, unknown>) => string;
+
+interface DentalTemplate {
+  id: string | number;
+  name: string;
+  category?: string;
+  estimatedTime?: string;
+  description?: string;
+}
+
 export function DentalTemplatesTab({
   onManageTemplates,
   templates = [],
   onApplyTemplate,
+}: {
+  onManageTemplates?: () => void;
+  templates?: DentalTemplate[];
+  onApplyTemplate?: (template: DentalTemplate) => void;
 }) {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as TFunc;
+  const typedTemplates: DentalTemplate[] = templates;
   return (
     <div className="dental-flex-col dental-gap-24">
       <Card padding="large">
@@ -31,9 +46,9 @@ export function DentalTemplatesTab({
           </Button>
         </div>
 
-        {templates.length > 0 ? (
+        {typedTemplates.length > 0 ? (
           <div className="dental-grid-auto-fill-280 dental-mt-16">
-            {templates.map((template) => (
+            {typedTemplates.map((template) => (
               <div key={template.id} className="dental-protocol-card-flex">
                 <div className="dental-text-primary">{template.name}</div>
                 <div className="dental-text-desc dental-text-secondary">
@@ -46,7 +61,7 @@ export function DentalTemplatesTab({
                 )}
                 <Button
                   variant="outline"
-                  onClick={() => onApplyTemplate(template)}
+                  onClick={() => onApplyTemplate?.(template)}
                   className="dental-align-self-start dental-mt-8">
                   {t('dental.dental_dtt_btn_apply')}
                 </Button>

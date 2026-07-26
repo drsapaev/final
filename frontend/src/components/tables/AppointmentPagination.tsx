@@ -8,6 +8,8 @@ import PropTypes from 'prop-types';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useTranslation } from '../../i18n/useTranslation';
 
+type TFunc = (key: string, options?: Record<string, unknown>) => string;
+
 const AppointmentPagination = ({
   currentPage,
   totalPages,
@@ -15,7 +17,15 @@ const AppointmentPagination = ({
   pageSize,
   onPageChange,
   t,
+}: {
+  currentPage: number;
+  totalPages: number;
+  totalItems: number;
+  pageSize: number;
+  onPageChange: (page: number) => void;
+  t?: TFunc;
 }) => {
+  void t;
   if (totalItems === 0) return null;
 
   const start = (currentPage - 1) * pageSize + 1;

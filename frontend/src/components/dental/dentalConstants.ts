@@ -80,7 +80,7 @@ export const PROSTHETIC_PROCEDURE_IDS = Object.freeze(
   TOOTH_PROCEDURE_LIST.filter((p) => p.isProsthetic).map((p) => p.id),
 );
 
-export const isProstheticProcedure = (procedureId) =>
+export const isProstheticProcedure = (procedureId: string) =>
   PROSTHETIC_PROCEDURE_IDS.includes(procedureId);
 
 // =============================================================================
@@ -137,16 +137,16 @@ export const TOOTH_NAMES_BY_POSITION = Object.freeze({
  * Resolve a human-readable name for a tooth by its FDI number.
  * Falls back to `Зуб №{number}` for unknown positions (e.g. deciduous teeth).
  */
-export const getToothName = (fdiNumber) => {
+export const getToothName = (fdiNumber: string | number) => {
   const position = parseInt(String(fdiNumber).slice(-1), 10);
-  return TOOTH_NAMES_BY_POSITION[position] || `Зуб №${fdiNumber}`;
+  return TOOTH_NAMES_BY_POSITION[position as keyof typeof TOOTH_NAMES_BY_POSITION] || `Зуб №${fdiNumber}`;
 };
 
 /**
  * Resolve the quadrant (1-4) of an FDI tooth number.
  * 1 = upper right, 2 = upper left, 3 = lower left, 4 = lower right.
  */
-export const getToothQuadrant = (fdiNumber) =>
+export const getToothQuadrant = (fdiNumber: string | number) =>
   parseInt(String(fdiNumber).slice(0, -1), 10);
 
 // =============================================================================
@@ -154,7 +154,7 @@ export const getToothQuadrant = (fdiNumber) =>
 // =============================================================================
 export const DENTAL_CURRENCY_SUFFIX = 'сум';
 
-export const formatDentalPrice = (amount) => {
+export const formatDentalPrice = (amount: number | null | undefined) => {
   if (amount === null || amount === undefined || Number.isNaN(amount)) {
     return '0';
   }
@@ -162,7 +162,7 @@ export const formatDentalPrice = (amount) => {
 };
 
 // Compact format for buttons/lists: "150k сум" instead of "150 000 сум"
-export const formatDentalPriceCompact = (amount) => {
+export const formatDentalPriceCompact = (amount: number | null | undefined) => {
   if (!amount) return `0 ${DENTAL_CURRENCY_SUFFIX}`;
   const kValue = Math.round(amount / 1000);
   return `${kValue}k ${DENTAL_CURRENCY_SUFFIX}`;
@@ -175,12 +175,12 @@ export const formatDentalPriceCompact = (amount) => {
  * Compute the total price for a tooth given its procedures + material.
  * Pure function, used by ToothModal.
  */
-export const computeToothTotalPrice = ({ procedures = [], materialId = '' }) => {
+export const computeToothTotalPrice = ({ procedures = [], materialId = '' }: { procedures?: { price?: number }[]; materialId?: string }) => {
   const proceduresTotal = procedures.reduce(
     (sum, proc) => sum + (proc.price || 0),
     0,
   );
-  const material = MATERIALS[materialId?.toUpperCase?.()];
+  const material = MATERIALS[materialId?.toUpperCase?.() as keyof typeof MATERIALS];
   const materialPrice = material ? material.price : 0;
   return proceduresTotal + materialPrice;
 };

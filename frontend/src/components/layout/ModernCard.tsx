@@ -5,6 +5,20 @@ import PropTypes from 'prop-types';
 import './ModernCard.css';
 import { useTranslation } from '../../i18n/useTranslation';
 
+interface ModernCardProps {
+  children?: React.ReactNode;
+  variant?: string;
+  padding?: 'none' | 'small' | 'medium' | 'large' | 'xl';
+  shadow?: 'none' | 'small' | 'medium' | 'large' | 'xl';
+  border?: boolean;
+  rounded?: boolean;
+  hoverable?: boolean;
+  clickable?: boolean;
+  onClick?: (e: React.MouseEvent<HTMLDivElement> | React.KeyboardEvent<HTMLDivElement>) => void;
+  className?: string;
+  [key: string]: unknown;
+}
+
 const ModernCard = ({
   children,
   variant = 'default',
@@ -17,7 +31,7 @@ const ModernCard = ({
   onClick,
   className = '',
   ...props
-}) => {
+}: ModernCardProps) => {
   const { theme, getColor } = useTheme();
 
   const paddingValues = {
@@ -40,19 +54,19 @@ const ModernCard = ({
     backgroundColor: getColor('cardBg'),
     color: getColor('textPrimary'),
     borderColor: border ? getColor('border') : 'transparent',
-    padding: paddingValues[padding] || paddingValues.medium,
+    padding: paddingValues[padding as keyof typeof paddingValues] || paddingValues.medium,
     boxShadow: theme === 'dark' 
-      ? shadowValues[shadow]?.replace('rgba(0, 0, 0,', 'rgba(0, 0, 0,') 
-      : shadowValues[shadow] || shadowValues.medium,
+      ? shadowValues[shadow as keyof typeof shadowValues]?.replace('rgba(0, 0, 0,', 'rgba(0, 0, 0,') 
+      : shadowValues[shadow as keyof typeof shadowValues] || shadowValues.medium,
     cursor: clickable ? 'pointer' : 'default'
   };
 
-  const handleClick = (e) => {
+  const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (clickable && onClick) {
       onClick(e);
     }
   };
-  const handleKeyDown = (e) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (clickable && onClick && (e.key === 'Enter' || e.key === ' ')) {
       e.preventDefault();
       onClick(e);
@@ -88,11 +102,17 @@ const ModernCard = ({
 };
 
 // Компоненты частей карточки
+interface CardPartProps {
+  children?: React.ReactNode;
+  className?: string;
+  [key: string]: unknown;
+}
+
 export const CardHeader = ({ 
   children, 
   className = '',
   ...props 
-}) => (
+}: CardPartProps) => (
   <div className={`card-header ${className}`} {...props}>
     {children}
   </div>
@@ -102,7 +122,7 @@ export const CardBody = ({
   children, 
   className = '',
   ...props 
-}) => (
+}: CardPartProps) => (
   <div className={`card-body ${className}`} {...props}>
     {children}
   </div>
@@ -112,18 +132,22 @@ export const CardFooter = ({
   children, 
   className = '',
   ...props 
-}) => (
+}: CardPartProps) => (
   <div className={`card-footer ${className}`} {...props}>
     {children}
   </div>
 );
+
+interface CardTitleProps extends CardPartProps {
+  level?: number;
+}
 
 export const CardTitle = ({ 
   children, 
   level = 3,
   className = '',
   ...props 
-}) => {
+}: CardTitleProps) => {
   const Tag = `h${level}` as unknown as React.ElementType;
   return (
     <Tag className={`card-title ${className}`} {...props}>
@@ -136,7 +160,7 @@ export const CardDescription = ({
   children, 
   className = '',
   ...props 
-}) => (
+}: CardPartProps) => (
   <p className={`card-description ${className}`} {...props}>
     {children}
   </p>

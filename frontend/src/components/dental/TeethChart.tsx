@@ -85,17 +85,17 @@ const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }: TeethC
     setSelectedTooth(toothNumber);
 
     // Обновляем статус зуба
-    const newData = {
+    const newData: TeethChartMap = {
       ...teethData,
-      [toothNumber]: {
-        ...(teethData[toothNumber] || {}),
+      [String(toothNumber)]: {
+        ...(teethData[String(toothNumber)] || {}),
         status: selectedStatus,
         updatedAt: new Date().toISOString()
       }
     };
 
     setTeethData(newData);
-    onToothClick && onToothClick(toothNumber, newData[toothNumber]);
+    onToothClick && onToothClick(toothNumber, newData[String(toothNumber)]);
   };
 
   // Очистить все данные
@@ -106,7 +106,7 @@ const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }: TeethC
 
   // Отрисовка одного зуба
   const renderTooth = (toothNumber: number) => {
-    const toothData: ToothData = teethData[toothNumber] || { status: TOOTH_STATUS.HEALTHY };
+    const toothData: ToothData = teethData[String(toothNumber)] || { status: TOOTH_STATUS.HEALTHY };
     const isSelected = selectedTooth === toothNumber;
     const status = toothData.status || TOOTH_STATUS.HEALTHY;
 
@@ -121,13 +121,13 @@ const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }: TeethC
     return (
       <div
         key={toothNumber}
-        title={t('dental.dental_tc_tooth_title', { toothNumber, status: STATUS_NAMES[status] })}>
+        title={t('dental.dental_tc_tooth_title', { toothNumber, status: STATUS_NAMES[status as keyof typeof STATUS_NAMES] })}>
         
         <button
           onClick={() => handleToothClick(toothNumber)}
-          aria-label={t('dental.dental_tc_tooth_aria', { toothNumber, status: STATUS_NAMES[status] })}
+          aria-label={t('dental.dental_tc_tooth_aria', { toothNumber, status: STATUS_NAMES[status as keyof typeof STATUS_NAMES] })}
           style={{
-            color: STATUS_COLORS[status],
+            color: STATUS_COLORS[status as keyof typeof STATUS_COLORS],
             border: isSelected ? '2px solid var(--mac-accent-blue)' : '1px solid var(--mac-border)',
             transform: `scale(${zoom})`,
             transition: 'transform 0.2s',
@@ -157,7 +157,7 @@ const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }: TeethC
   };
 
   // Отрисовка ряда зубов
-  const renderTeethRow = (teeth, reverse = false) => {
+  const renderTeethRow = (teeth: number[], reverse = false) => {
     const teethToRender = reverse ? [...teeth].reverse() : teeth;
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', gap: 0.5 }}>
@@ -265,9 +265,9 @@ const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }: TeethC
               key={status}
               variant={selectedStatus === status ? 'primary' : 'info'}
               style={{
-                backgroundColor: selectedStatus === status ? STATUS_COLORS[status] : 'transparent',
-                color: selectedStatus === status ? 'white' : STATUS_COLORS[status],
-                border: `2px solid ${STATUS_COLORS[status]}`,
+                backgroundColor: selectedStatus === status ? STATUS_COLORS[status as keyof typeof STATUS_COLORS] : 'transparent',
+                color: selectedStatus === status ? 'white' : STATUS_COLORS[status as keyof typeof STATUS_COLORS],
+                border: `2px solid ${STATUS_COLORS[status as keyof typeof STATUS_COLORS]}`,
                 cursor: 'pointer',
                 padding: '8px 12px',
                 borderRadius: 4
@@ -353,7 +353,7 @@ const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }: TeethC
                 sx={{
                   width: 20,
                   height: 20,
-                  bgcolor: STATUS_COLORS[status],
+                  bgcolor: STATUS_COLORS[status as keyof typeof STATUS_COLORS],
                   borderRadius: '50%'
                 }} />
               
@@ -378,12 +378,12 @@ const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }: TeethC
               }, {})
             ).map(([status, count]) =>
             <Badge key={status} variant="info" style={{
-              backgroundColor: STATUS_COLORS[status],
+              backgroundColor: STATUS_COLORS[status as keyof typeof STATUS_COLORS],
               color: 'white',
               padding: '4px 8px',
               borderRadius: 6
             }}>
-                  {`${STATUS_NAMES[status]}: ${count}`}
+                  {`${STATUS_NAMES[status as keyof typeof STATUS_NAMES]}: ${count}`}
                 </Badge>
             )}
             </Box>

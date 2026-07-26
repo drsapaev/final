@@ -9,7 +9,7 @@ import PropTypes from 'prop-types';
 import './AISuggestionCard.css';
 import { useTranslation } from '@/i18n/useTranslation';
 
-interface AISuggestionCardData {
+export interface AISuggestionCardData {
   id: string | number;
   content: string;
   confidence?: number;

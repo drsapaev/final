@@ -120,14 +120,14 @@ export function EMRSmartFieldV2({
     const [isFocused, setIsFocused] = useState(false);
     const [showPopover, setShowPopover] = useState(false);
     const [ghostText, setGhostText] = useState('');
-    const fieldRef = useRef(null);
-    const containerRef = useRef(null);
+    const fieldRef = useRef<HTMLTextAreaElement | HTMLInputElement | null>(null);
+    const containerRef = useRef<HTMLDivElement | null>(null);
 
     // Has pending suggestions
     const hasSuggestions = suggestions.length > 0;
 
     // Handle value change
-    const handleChange = useCallback((e) => {
+    const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         onChange?.(e.target.value);
     }, [onChange]);
 
@@ -152,25 +152,26 @@ export function EMRSmartFieldV2({
         if (hasSuggestions) {
             setShowPopover(!showPopover);
         } else if (onRequestAI) {
-            onRequestAI(fieldName);
+            onRequestAI(fieldName as string);
         }
     }, [hasSuggestions, showPopover, onRequestAI, fieldName]);
 
     // Handle apply suggestion
-    const handleApply = useCallback((suggestion) => {
+    const handleApply = useCallback((suggestion: EMRSmartFieldV2Suggestion) => {
         // Merge strategy: append or replace based on current value
-        let newValue;
+        let newValue: string;
+        const content = String(suggestion.content ?? '');
         if (value.trim()) {
-            if (experimentalGhostMode && suggestion.content.startsWith(value)) {
+            if (experimentalGhostMode && content.startsWith(value)) {
                 // If suggestion extends current value (completion), replace it
-                newValue = suggestion.content;
+                newValue = content;
                 onTelemetry?.({ type: 'ghost.accepted', payload: { suggestionId: suggestion.id, source: suggestion.source } });
             } else {
                 // Append with newline
-                newValue = `${value.trim()}\n${suggestion.content}`;
+                newValue = `${value.trim()}\n${content}`;
             }
         } else {
-            newValue = suggestion.content;
+            newValue = content;
         }
 
         onChange?.(newValue, {
@@ -187,7 +188,7 @@ export function EMRSmartFieldV2({
     }, [value, onChange, onApplySuggestion, experimentalGhostMode, onTelemetry]);
 
     // Handle dismiss
-    const handleDismiss = useCallback((suggestionId) => {
+    const handleDismiss = useCallback((suggestionId: string | number | undefined) => {
         onTelemetry?.({ type: 'ai.dismissed', payload: { suggestionId } });
         onDismissSuggestion?.(suggestionId);
         if (suggestions.length <= 1) {
@@ -224,10 +225,11 @@ export function EMRSmartFieldV2({
     useEffect(() => {
         if (!showPopover || suggestions.length === 0) return;
 
-        const handleKeyDown = (e) => {
+        const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === 'Tab' && !e.shiftKey && document.activeElement === fieldRef.current) {
                 e.preventDefault();
-                handleApply(suggestions[0]);
+                const first = suggestions[0] as EMRSmartFieldV2Suggestion;
+                handleApply(first);
             }
         };
 
@@ -245,7 +247,7 @@ export function EMRSmartFieldV2({
             {/* Field */}
             <div className="emr-smart-field-v2__input-wrapper">
                 <InputComponent
-                    ref={fieldRef}
+                    ref={fieldRef as unknown as never}
                     id={id}
                     className="emr-smart-field-v2__input"
                     value={value}
@@ -283,7 +285,7 @@ export function EMRSmartFieldV2({
             {/* Suggestion Popover */}
             {showPopover && (
                 <AISuggestionPopover
-                    suggestions={suggestions}
+                    suggestions={suggestions as unknown as never[]}
                     onApply={handleApply}
                     onDismiss={handleDismiss}
                     disabled={disabled}

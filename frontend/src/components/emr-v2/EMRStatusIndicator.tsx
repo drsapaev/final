@@ -22,11 +22,13 @@ import { useTranslation } from '../../i18n/useTranslation';
 /**
  * Format relative time (e.g., "2 мин назад")
  */
-function formatRelativeTime(date, t) {
+type TFunc = (key: string, options?: Record<string, unknown>) => string;
+
+function formatRelativeTime(date: string | number | Date | null | undefined, t: TFunc) {
     if (!date) return null;
 
     const now = Date.now();
-    const then = typeof date === 'string' ? new Date(date).getTime() : date;
+    const then: number = typeof date === 'string' ? new Date(date).getTime() : typeof date === 'number' ? date : date.getTime();
     const diffMs = now - then;
     const diffSec = Math.floor(diffMs / 1000);
     const diffMin = Math.floor(diffSec / 60);
@@ -46,9 +48,9 @@ function formatRelativeTime(date, t) {
 /**
  * Format absolute time for tooltip
  */
-function formatAbsoluteTime(date) {
+function formatAbsoluteTime(date: string | number | Date | null | undefined) {
     if (!date) return '';
-    const d = typeof date === 'string' ? new Date(date) : new Date(date);
+    const d = date instanceof Date ? date : new Date(date);
     return d.toLocaleString('ru-RU', {
         hour: '2-digit',
         minute: '2-digit',
@@ -82,8 +84,19 @@ export function EMRStatusIndicator({
     conflict,
     version,
     autosaveConfig = { debounceMs: 3000, enabled: true },
+}: {
+    status?: 'idle' | 'saving' | 'conflict' | 'error';
+    isDirty?: boolean;
+    isSigned?: boolean;
+    isAmended?: boolean;
+    lastSaved?: string | number | Date | null;
+    lastAutosave?: string | number | Date | null;
+    error?: string | { message?: string; status?: number } | null;
+    conflict?: { yourVersion?: string | number; serverVersion?: string | number } | null;
+    version?: number;
+    autosaveConfig?: { debounceMs: number; enabled: boolean };
 }) {
-    const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+    const { t: rawT } = useTranslation(); const t = rawT as unknown as TFunc;
     // Update relative time every 10 seconds
     const [, setTick] = useState(0);
 
@@ -104,9 +117,10 @@ export function EMRStatusIndicator({
 
     if (status === 'error' || error) {
         // Error state
-        const errorMsg = typeof error === 'string' ? error : error?.message || t('misc.esi_oshibka');
-        const is401 = error?.status === 401 || errorMsg.includes('401');
-        const is403 = error?.status === 403 || errorMsg.includes('403');
+        const errorObj = typeof error === 'object' && error !== null ? error : null;
+        const errorMsg = typeof error === 'string' ? error : errorObj?.message || t('misc.esi_oshibka');
+        const is401 = errorObj?.status === 401 || errorMsg.includes('401');
+        const is403 = errorObj?.status === 403 || errorMsg.includes('403');
 
         if (is401) {
             content = t('misc.esi_sessiya_istekla');
@@ -192,7 +206,7 @@ export function EMRStatusIndicator({
                 {content}
             </span>
 
-            {version > 0 && (
+            {version != null && version > 0 && (
                 <span className="emr-status-indicator__version" title={t('misc.esi_versiya_version', { version: version })}>
                     v{version}
                 </span>

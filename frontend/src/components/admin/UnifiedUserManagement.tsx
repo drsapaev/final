@@ -27,7 +27,7 @@ const UnifiedUserManagement = () => {
   const [searchParams] = useSearchParams();
   const section = searchParams.get('section') || 'users';
 
-  const getActiveTab = (section) => {
+  const getActiveTab = (section: string): string => {
     switch (section) {
       case 'users':return 'management';
       case 'user-data-transfer':return 'transfer';

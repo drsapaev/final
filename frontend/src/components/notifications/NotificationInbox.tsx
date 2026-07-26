@@ -23,7 +23,7 @@ const STATUS_FILTER_OPTIONS = [
   { value: 'archived', label: '\u0410\u0440\u0445\u0438\u0432' }
 ];
 
-function formatDate(value) {
+function formatDate(value: string | null | undefined) {
   if (!value) return '';
   try {
     return new Date(value).toLocaleString('ru-RU');
@@ -46,13 +46,13 @@ function getSeverityStyle(severity = 'info') {
   }
 }
 
-function extractMetadata(item) {
+function extractMetadata(item: { payloadSnapshot?: unknown; raw?: Record<string, unknown> } | null | undefined): Record<string, unknown> {
   if (!item) {
     return {};
   }
 
   const payloadSnapshot = item.payloadSnapshot || item.raw?.payload_snapshot || item.raw?.payloadSnapshot;
-  let snapshotData = payloadSnapshot;
+  let snapshotData: unknown = payloadSnapshot;
   if (typeof snapshotData === 'string') {
     try {
       snapshotData = JSON.parse(snapshotData);
@@ -61,23 +61,24 @@ function extractMetadata(item) {
     }
   }
 
-  const metadata =
-    snapshotData?.metadata ||
+  const snapshotRecord = (snapshotData && typeof snapshotData === 'object' ? snapshotData : {}) as Record<string, unknown>;
+  const metadata: unknown =
+    snapshotRecord.metadata ||
     item.raw?.metadata ||
     item.raw?.data ||
     {};
 
-  return metadata && typeof metadata === 'object' ? metadata : {};
+  return metadata && typeof metadata === 'object' ? (metadata as Record<string, unknown>) : {};
 }
 
-function resolveNotificationTarget(item, userRole) {
+function resolveNotificationTarget(item: { deepLink?: string | null; type?: string; eventType?: string; payloadSnapshot?: unknown; raw?: unknown } | null | undefined, userRole: string | null | undefined) {
   const explicitDeepLink = String(item?.deepLink || '').trim();
   if (explicitDeepLink) {
     return explicitDeepLink;
   }
 
   const type = String(item?.type || item?.eventType || '').trim().toLowerCase();
-  const metadata = extractMetadata(item);
+  const metadata = extractMetadata(item as { payloadSnapshot?: unknown; raw?: Record<string, unknown> } | null | undefined);
 
   switch (type) {
     case 'all_free_requested':
@@ -85,7 +86,7 @@ function resolveNotificationTarget(item, userRole) {
     case 'all_free_rejected':
       return '/admin/all-free-requests';
     case 'message_received':
-      return metadata.conversation_id ? `/messages?conversation=${metadata.conversation_id}` : '/messages';
+      return metadata.conversation_id ? `/messages?conversation=${String(metadata.conversation_id)}` : '/messages';
     case 'lab_results':
       return '/lab/results';
     case 'lab_critical_result':
@@ -115,7 +116,7 @@ function resolveNotificationTarget(item, userRole) {
   }
 }
 
-function navigateToNotificationTarget(target) {
+function navigateToNotificationTarget(target: string | null) {
   if (!target || typeof window === 'undefined') {
     return;
   }
@@ -132,7 +133,29 @@ function navigateToNotificationTarget(target) {
   }
 }
 
-export default function NotificationInbox({ userRole, onClose }) {
+interface NotificationInboxProps {
+  userRole: string | null | undefined;
+  onClose: () => void;
+}
+
+type NormalizedNotificationLike = {
+  id: string | number;
+  isSeen: boolean;
+  isRead: boolean;
+  isArchived: boolean;
+  deepLink?: string | null;
+  type?: string;
+  eventType?: string;
+  payloadSnapshot?: unknown;
+  raw?: unknown;
+  title?: string;
+  message?: string;
+  severity?: string;
+  sequenceId?: string | number;
+  createdAt: string;
+};
+
+export default function NotificationInbox({ userRole, onClose }: NotificationInboxProps) {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const {
     getNotificationsByRole,
@@ -146,7 +169,7 @@ export default function NotificationInbox({ userRole, onClose }) {
   const [searchText, setSearchText] = useState('');
 
   const notifications = useMemo(() => {
-    const scoped = getNotificationsByRole(userRole);
+    const scoped = getNotificationsByRole(userRole ?? null);
     const query = searchText.trim().toLowerCase();
 
     return scoped
@@ -196,7 +219,7 @@ export default function NotificationInbox({ userRole, onClose }) {
     [notifications]
   );
 
-  const handleOpen = async (item) => {
+  const handleOpen = async (item: NormalizedNotificationLike) => {
     try {
       if (!item.isSeen) {
         await markAsSeen(item.id);
@@ -213,7 +236,7 @@ export default function NotificationInbox({ userRole, onClose }) {
     }
   };
 
-  const handleArchive = async (item, event) => {
+  const handleArchive = async (item: { id: string | number }, event: React.MouseEvent<HTMLElement>) => {
     event.stopPropagation();
     try {
       await archiveNotification(item.id);

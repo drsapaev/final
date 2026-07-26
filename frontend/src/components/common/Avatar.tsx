@@ -11,10 +11,24 @@ const roleGradients = {
     default: 'linear-gradient(135deg, #a8c0ff, #3f2b96)'
 };
 
-const Avatar = ({ user: unknown, size = 40, showStatus = false, isOnline = false, className = '' }) => {
+interface AvatarUser {
+  role?: string;
+  name?: string;
+  full_name?: string;
+  user_name?: string;
+}
+
+const Avatar = ({ user, size = 40, showStatus = false, isOnline = false, className = '' }: {
+  user?: AvatarUser | null;
+  size?: number;
+  showStatus?: boolean;
+  isOnline?: boolean;
+  className?: string;
+}) => {
   const { t } = useTranslation();
+  void t;
     const roleKey = user?.role?.toLowerCase() || 'default';
-    const background = roleGradients[roleKey] || roleGradients.default;
+    const background = roleGradients[roleKey as keyof typeof roleGradients] || roleGradients.default;
     const name = user?.name || user?.full_name || user?.user_name || '?';
     const initials = (name[0] || '?').toUpperCase();
     const displayRole = user?.role || (roleKey.charAt(0).toUpperCase() + roleKey.slice(1));

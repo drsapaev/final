@@ -48,8 +48,8 @@ const ClinicSettings = () => {
     timezone: 'Asia/Tashkent',
     logo_url: '/static/logo.png'
   });
-  const [logoFile, setLogoFile] = useState(null);
-  const [logoPreview, setLogoPreview] = useState(null);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [message, setMessage] = useState({ type: '', text: '' });
   const [ticketPrintSettings, setTicketPrintSettings] = useState({ ...TICKET_PRINT_SETTINGS_DEFAULTS });
   const [ticketPrintLoading, setTicketPrintLoading] = useState(true);
@@ -74,10 +74,10 @@ const ClinicSettings = () => {
     try {
       setLoading(true);
       const data = await fetchClinicSettings('clinic');
-      const settingsObj = {};
+      const settingsObj: Record<string, string> = {};
 
       if (Array.isArray(data)) {
-        data.forEach(setting => {
+        data.forEach((setting: { key: string; value: string }) => {
           settingsObj[setting.key] = setting.value;
         });
       }
@@ -91,7 +91,7 @@ const ClinicSettings = () => {
     }
   };
 
-  const handleInputChange = (key, value) => {
+  const handleInputChange = (key: string, value: string) => {
     setSettings(prev => ({ ...prev, [key]: value }));
   };
 
@@ -109,12 +109,12 @@ const ClinicSettings = () => {
     }
   };
 
-  const handleTicketPrintChange = (key, value) => {
+  const handleTicketPrintChange = (key: string, value: unknown) => {
     setTicketPrintSettings(prev => ({ ...prev, [key]: value }));
   };
 
-  const handleLogoSelect = (event) => {
-    const file = event.target.files[0];
+  const handleLogoSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
     if (file) {
       // Проверяем тип файла
       if (!file.type.startsWith('image/')) {
@@ -133,7 +133,9 @@ const ClinicSettings = () => {
       // Создаем превью
       const reader = new FileReader();
       reader.onload = (e) => {
-        setLogoPreview(e.target.result);
+        if (e.target?.result) {
+          setLogoPreview(e.target.result as string);
+        }
       };
       reader.readAsDataURL(file);
     }
@@ -369,7 +371,7 @@ const ClinicSettings = () => {
                 <Select
                   aria-label={t('admin2.cset_aria_timezone')}
                   value={settings.timezone || 'Asia/Tashkent'}
-                  onChange={(value) => handleInputChange('timezone', value)}
+                  onChange={(value) => handleInputChange('timezone', value.target.value)}
                   options={timezones}
                   size="large"
                   className="w-full"
@@ -510,7 +512,7 @@ const ClinicSettings = () => {
                   className="admin-p-14-radius-var--mac-radius-md-bd-1solidvar-mac-border-bg-bg-secondary"
                 >
                   <Checkbox
-                    checked={Boolean(ticketPrintSettings[item.key])}
+                    checked={Boolean(ticketPrintSettings[item.key as keyof typeof ticketPrintSettings])}
                     onChange={(checked) => handleTicketPrintChange(item.key, checked)}
                     label={item.label}
                     description={item.description}

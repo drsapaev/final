@@ -7,6 +7,20 @@ import { Brain, Sparkles, Bot } from 'lucide-react';
 import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 
+interface AIButtonProps {
+  onClick: (provider?: string) => void;
+  loading?: boolean;
+  variant?: 'default' | 'contained' | 'outlined';
+  size?: 'small' | 'medium' | 'large';
+  fullWidth?: boolean;
+  tooltip?: string;
+  icon?: boolean;
+  text?: string;
+  providers?: string[] | null;
+  onProviderSelect?: ((provider: string) => void) | null;
+  disabled?: boolean;
+}
+
 const AIButton = ({
   onClick,
   loading = false,
@@ -19,13 +33,13 @@ const AIButton = ({
   providers = null,
   onProviderSelect = null,
   disabled = false
-}) => {
+}: AIButtonProps) => {
   const [open, setOpen] = useState(false);
-  const anchorRef = useRef(null);
+  const anchorRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    const handler = (e) => {
-      if (anchorRef.current && !anchorRef.current.contains(e.target)) {
+    const handler = (e: MouseEvent) => {
+      if (anchorRef.current && !anchorRef.current.contains(e.target as Node)) {
         setOpen(false);
       }
     };
@@ -41,13 +55,13 @@ const AIButton = ({
     }
   };
 
-  const handleProviderClick = (provider) => {
+  const handleProviderClick = (provider: string) => {
     setOpen(false);
     if (onProviderSelect) onProviderSelect(provider);
     onClick(provider);
   };
 
-  const getProviderIcon = (provider) => {
+  const getProviderIcon = (provider: string) => {
     switch (provider) {
       case 'openai':
         return <Bot style={{ width: 16, height: 16 }} />;
@@ -60,7 +74,7 @@ const AIButton = ({
     }
   };
 
-  const getProviderName = (provider) => {
+  const getProviderName = (provider: string) => {
     switch (provider) {
       case 'openai':
         return 'OpenAI';

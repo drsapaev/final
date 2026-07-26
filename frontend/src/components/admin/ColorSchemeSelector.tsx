@@ -20,7 +20,9 @@ const ICONS = {
   gradient: Sparkles,
 };
 
-const getMetrics = (t) => [
+type TFunc = (key: string, options?: Record<string, unknown>) => string;
+
+const getMetrics = (t: TFunc) => [
   { key: 'mood', label: t('admin2.css_metric_mood') },
   { key: 'surfaces', label: t('admin2.css_metric_surfaces') },
   { key: 'contrast', label: t('admin2.css_metric_contrast') },
@@ -38,9 +40,29 @@ const ACCENT_LABELS = {
   graphite: 'Graphite',
 };
 
-function ThemePreviewCard({ scheme, isActive, onSelect }) {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
-  const Icon = ICONS[scheme.id] || Sun;
+interface ThemePreviewCardProps {
+  scheme: {
+    id: string;
+    name: string;
+    mood: string;
+    surfaces: string;
+    contrast: string;
+    preview: {
+      background: string;
+      surface: string;
+      surfaceAlt: string;
+      accent: string;
+      text: string;
+      border: string;
+    };
+  };
+  isActive: boolean;
+  onSelect: (id: string) => void;
+}
+
+function ThemePreviewCard({ scheme, isActive, onSelect }: ThemePreviewCardProps) {
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as TFunc;
+  const Icon = ICONS[scheme.id as keyof typeof ICONS] || Sun;
   const preview = scheme.preview;
   const buttonLabel = isActive
     ? t('admin2.css_aria_current_scheme', { name: scheme.name, mood: scheme.mood, contrast: scheme.contrast })
@@ -118,18 +140,18 @@ ThemePreviewCard.propTypes = {
 };
 
 export default function ColorSchemeSelector() {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as TFunc;
   const { colorScheme, setColorScheme } = useTheme();
   const { accent } = useMacOSTheme();
 
   const colorSchemes = useMemo(() =>
     COLOR_SCHEMES.map((scheme) => ({
       ...scheme,
-      icon: ICONS[scheme.id] || Sun,
+      icon: ICONS[scheme.id as keyof typeof ICONS] || Sun,
     })), []);
 
   const currentScheme = colorSchemes.find((scheme) => scheme.id === colorScheme) || colorSchemes[0];
-  const currentAccentLabel = ACCENT_LABELS[accent] || accent;
+  const currentAccentLabel = ACCENT_LABELS[accent as keyof typeof ACCENT_LABELS] || accent;
   const ActiveIcon = currentScheme.icon;
   const selectorTitleId = 'color-scheme-selector-title';
   const selectorDescriptionId = 'color-scheme-selector-description';
@@ -271,7 +293,7 @@ export default function ColorSchemeSelector() {
                   {metric.label}
                 </span>
                 <span className="admin-fontsize-0cf08e-primary-semi">
-                  {currentScheme[metric.key]}
+                  {String(currentScheme[metric.key as keyof typeof currentScheme] ?? '')}
                 </span>
               </div>
             ))}

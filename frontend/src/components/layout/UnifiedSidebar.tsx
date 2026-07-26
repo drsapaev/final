@@ -15,9 +15,18 @@ import { useTranslation } from '../../i18n/useTranslation';
  * Унифицированный сайдбар в стиле MediLab
  * Используется во всех панелях для единообразия
  */
-const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
+interface NavItem {
+  id: string;
+  label: string;
+  iconName: string;
+  path: string;
+  roles: string[];
+}
+
+const UnifiedSidebar = ({ isCollapsed = false, onToggle }: { isCollapsed?: boolean; onToggle?: () => void }) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
-  const asideRef = useRef(null);
+  void t;
+  const asideRef = useRef<HTMLElement | null>(null);
   const location = useLocation();
   const { isDark, toggleTheme } = useTheme();
   const [language, setLanguage] = useState('en');
@@ -74,7 +83,7 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
   const role = isDemoPage ? 'admin' : String(profile?.role || profile?.role_name || '').toLowerCase();
 
   // Основные навигационные элементы
-  const mainNavItems = [
+  const mainNavItems: NavItem[] = [
     {
       id: 'dashboard',
       label: 'Dashboard',
@@ -107,11 +116,11 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
 
 
   // Дополнительные элементы: в demo-режиме они не нужны
-  const additionalItems = [];
+  const additionalItems: NavItem[] = [];
 
 
   // Фильтруем элементы по роли пользователя
-  const getVisibleItems = (items) => {
+  const getVisibleItems = (items: NavItem[]) => {
     // Для демо-страницы показываем все элементы
     if (isDemoPage) {
       return items;
@@ -128,7 +137,7 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
   const visibleAdditionalItems = getVisibleItems(additionalItems);
 
   // Проверяем активность элемента
-  const isActive = (path) => {
+  const isActive = (path: string) => {
     if (location.pathname.startsWith('/medilab-demo')) {
       const slug = String(path || '').replace(/^\/+/, '');
       const demoPath = slug === 'dashboard'
@@ -145,7 +154,7 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
   };
 
   // Стили для навигационных элементов
-  const navItemStyle = (isActive) => ({
+  const navItemStyle = (isActive: boolean) => ({
     display: 'flex',
     alignItems: 'center',
     justifyContent: isCollapsed ? 'center' : 'flex-start',

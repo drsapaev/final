@@ -7,7 +7,9 @@ import { getCanonicalRouteById, getEffectiveRouteByPath } from '../../routing/ro
 
 const SWITCHER_ROUTE_IDS = ['admin-dashboard', 'admin-analytics'];
 
-const getRoutePresentation = (t) => ({
+type TranslationFunc = (key: string, options?: Record<string, unknown>) => string;
+
+const getRoutePresentation = (t: TranslationFunc) => ({
   'admin-dashboard': {
     description: t('admin2.ars_desc_dashboard'),
     icon: LayoutDashboard,
@@ -18,10 +20,10 @@ const getRoutePresentation = (t) => ({
   },
 });
 
-const buildSwitcherRoutes = (t) => SWITCHER_ROUTE_IDS
+const buildSwitcherRoutes = (t: TranslationFunc) => SWITCHER_ROUTE_IDS
   .map((routeId) => {
     const route = getCanonicalRouteById(routeId);
-    const presentation = getRoutePresentation(t)[routeId];
+    const presentation = getRoutePresentation(t)[routeId as keyof ReturnType<typeof getRoutePresentation>];
 
     if (!route || !presentation) {
       return null;
@@ -84,7 +86,7 @@ const routeDescriptionStyle = {
   color: 'var(--mac-text-secondary)',
 };
 
-const getRouteButtonStyle = (isActive) => ({
+const getRouteButtonStyle = (isActive: boolean) => ({
   display: 'flex',
   alignItems: 'center',
   gap: 'var(--mac-spacing-3)',
@@ -99,7 +101,7 @@ const getRouteButtonStyle = (isActive) => ({
   boxShadow: isActive ? 'var(--mac-shadow-md)' : 'var(--mac-shadow-sm)',
 });
 
-const getRouteIconStyle = (isActive) => ({
+const getRouteIconStyle = (isActive: boolean) => ({
   width: '38px',
   height: '38px',
   borderRadius: 'var(--mac-radius-md)',
@@ -122,7 +124,7 @@ export default function AdminRouteSwitcher({ current }: AdminRouteSwitcherProps 
   const location = useLocation();
 
   const currentRoute = getEffectiveRouteByPath(location.pathname);
-  const activeId = current ?? (SWITCHER_ROUTE_IDS.includes(currentRoute?.id) ? currentRoute.id : 'admin-dashboard');
+  const activeId = current ?? (currentRoute && SWITCHER_ROUTE_IDS.includes(currentRoute.id) ? currentRoute.id : 'admin-dashboard');
   const switcherRoutes = buildSwitcherRoutes(t);
 
   return (
@@ -137,6 +139,7 @@ export default function AdminRouteSwitcher({ current }: AdminRouteSwitcherProps 
       </div>
       <div style={routeGridStyle as CSSProperties}>
         {switcherRoutes.map((route) => {
+          if (!route) return null;
           const Icon = route.icon;
           const isActive = activeId === route.id;
 

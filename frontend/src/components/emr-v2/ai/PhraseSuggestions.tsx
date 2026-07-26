@@ -88,20 +88,22 @@ const PHRASE_DATABASE = {
     },
 };
 
+type TFunc = (key: string, options?: Record<string, unknown>) => string;
+
 /**
  * Find matching phrases based on input
  */
-function findMatchingPhrases(text, fieldName, t, maxResults = 5) {
+function findMatchingPhrases(text: string, fieldName: string, t: TFunc, maxResults = 5) {
     if (!text || text.length < 3) return [];
 
-    const fieldPhrases = PHRASE_DATABASE[fieldName] || {};
+    const fieldPhrases = (PHRASE_DATABASE as Record<string, Record<string, string[]>>)[fieldName] || {};
     const words = text.toLowerCase().split(/\s+/);
-    const matches = [];
+    const matches: Array<{ key: string; text: string }> = [];
 
-    for (const [keyword, phraseKeys] of Object.entries(fieldPhrases as Record<string, unknown[]>)) {
+    for (const [keyword, phraseKeys] of Object.entries(fieldPhrases)) {
         const keywordLower = keyword.toLowerCase();
         if (words.some(word => keywordLower.includes(word) || word.includes(keywordLower))) {
-            for (const key of phraseKeys as unknown[]) {
+            for (const key of phraseKeys) {
                 const phraseText = t(`misc.${key}`);
                 // Don't suggest what's already in the text
                 if (!text.includes(phraseText)) {
@@ -111,7 +113,7 @@ function findMatchingPhrases(text, fieldName, t, maxResults = 5) {
         }
     }
 
-    return [...new Map((matches as Array<Record<string, unknown>>).map(m => [m.key, m])).values()].slice(0, maxResults);
+    return [...new Map(matches.map(m => [m.key, m])).values()].slice(0, maxResults);
 }
 
 /**
@@ -130,9 +132,15 @@ export function PhraseSuggestions({
     onInsert,
     disabled = false,
     isOpen = true,
+}: {
+    currentText?: string;
+    fieldName: string;
+    onInsert?: (text: string) => void;
+    disabled?: boolean;
+    isOpen?: boolean;
 }) {
-    const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
-    const [selectedPhrases, setSelectedPhrases] = useState(new Set());
+    const { t: rawT } = useTranslation(); const t = rawT as unknown as TFunc;
+    const [selectedPhrases, setSelectedPhrases] = useState<Set<string>>(new Set());
 
     // Find matching phrases
     const phrases = useMemo(() => {
@@ -140,7 +148,7 @@ export function PhraseSuggestions({
     }, [currentText, fieldName, t]);
 
     // Toggle phrase selection
-    const togglePhrase = useCallback((key) => {
+    const togglePhrase = useCallback((key: string) => {
         setSelectedPhrases(prev => {
             const next = new Set(prev);
             if (next.has(key)) {
@@ -174,7 +182,7 @@ export function PhraseSuggestions({
             </div>
 
             <div className="phrase-suggestions__list">
-                {phrases.map((phrase: Record<string, unknown>) => {
+                {phrases.map((phrase) => {
                     const isSelected = selectedPhrases.has(phrase.key);
                     return (
                         <label

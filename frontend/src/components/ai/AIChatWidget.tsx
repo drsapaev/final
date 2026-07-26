@@ -6,7 +6,7 @@
  * Может использоваться на любой странице.
  */
 
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useAIChat } from '../../hooks/useAIChat';
 import './AIChatWidget.css';
 import PropTypes from 'prop-types';
@@ -28,12 +28,18 @@ const AIChatWidget = ({
   useWebSocket = false,
   minimized: initialMinimized = true,
   position = 'bottom-right'
+}: {
+  contextType?: string;
+  specialty?: string | null;
+  useWebSocket?: boolean;
+  minimized?: boolean;
+  position?: string;
 }) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [minimized, setMinimized] = useState(initialMinimized);
   const [inputValue, setInputValue] = useState('');
-  const messagesEndRef = useRef(null);
-  const inputRef = useRef(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
   const {
     messages,
@@ -66,7 +72,7 @@ const AIChatWidget = ({
     }
   }, [minimized]);
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!inputValue.trim() || loading || streaming) return;
@@ -81,22 +87,31 @@ const AIChatWidget = ({
     }
   };
 
-  const handleKeyDown = (e) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSubmit(e);
+      handleSubmit(e as unknown as React.FormEvent);
     }
   };
 
-  const formatTime = (isoString) => {
+  const formatTime = (isoString: string) => {
     if (!isoString) return '';
     const date = new Date(isoString);
     return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
   };
 
-  const renderMessage = (msg, index) => {
+  const renderMessage = (msg: {
+    id?: string | number;
+    role: string;
+    content: unknown;
+    _streaming?: boolean;
+    _pending?: boolean;
+    created_at?: string;
+    [key: string]: unknown;
+  }, index: number) => {
     const isUser = msg.role === 'user';
     const isStreaming = msg._streaming;
+    const content = String(msg.content ?? '');
 
     return (
       <div
@@ -108,17 +123,17 @@ const AIChatWidget = ({
                 </div>
                 <div className="message-content">
                     <div className="message-text">
-                        {msg.content}
+                        {content}
                         {isStreaming && <span className="cursor">▌</span>}
                     </div>
                     <div className="message-meta">
-                        {!isUser && msg.provider &&
-            <span className="provider-badge">{msg.provider}</span>
-            }
-                        {!isUser && msg.was_cached &&
+                        {!isUser && msg.provider ? (
+            <span className="provider-badge">{String(msg.provider)}</span>
+            ) : null}
+                        {!isUser && msg.was_cached ? (
             <span className="cached-badge">⚡ cached</span>
-            }
-                        <span className="time">{formatTime(msg.created_at)}</span>
+            ) : null}
+                        <span className="time">{formatTime(msg.created_at || '')}</span>
                     </div>
                 </div>
             </div>);

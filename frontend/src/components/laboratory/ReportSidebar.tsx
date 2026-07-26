@@ -1,4 +1,5 @@
 import PropTypes from 'prop-types';
+import React from 'react';
 // STRAT#25: ReportSidebar — extracted from LabReportWorkbench.
 // Объединяет LabReportHistoryPanel и LabReportAIAnalysis в одном
 // sidebar-компоненте. Ранее оба рендерились inline в разных местах
@@ -31,16 +32,33 @@ import { useTranslation } from '../../i18n/useTranslation';
  *   - onSeverityFilterChange: (filter) => void
  *   - onOpenInstance: (instanceId) => void
  */
+interface ReportInstance {
+  id?: string | number;
+  [key: string]: unknown;
+}
+
+interface ReportSidebarProps {
+  activeInstance?: ReportInstance | null;
+  notify?: (type: string, message: string) => void;
+  showRecentReportsBrowser?: boolean;
+  recentReports?: unknown[];
+  reportHistory?: unknown[];
+  historySeverityFilter?: string;
+  onSeverityFilterChange?: (filter: string) => void;
+  onOpenInstance?: (instanceId: string | number) => void;
+}
+
 export default function ReportSidebar({
   activeInstance,
   notify,
   showRecentReportsBrowser,
-  recentReports,
-  reportHistory,
+  recentReports = [],
+  reportHistory = [],
   historySeverityFilter,
   onSeverityFilterChange,
   onOpenInstance,
-}) {
+}: ReportSidebarProps) {
+  void React; // satisfy import usage in case of future jsx types
   const showHistory = showRecentReportsBrowser || reportHistory.length > 0;
   const showAI = Boolean(activeInstance);
 
@@ -59,12 +77,12 @@ export default function ReportSidebar({
       {showHistory && (
         <LabReportHistoryPanel
           showRecentReportsBrowser={showRecentReportsBrowser}
-          recentReports={recentReports}
-          reportHistory={reportHistory}
+          recentReports={recentReports as never[]}
+          reportHistory={reportHistory as never[]}
           historySeverityFilter={historySeverityFilter}
-          onSeverityFilterChange={onSeverityFilterChange}
-          activeInstanceId={activeInstance?.id}
-          onOpenInstance={onOpenInstance}
+          onSeverityFilterChange={onSeverityFilterChange as (filter: string) => void}
+          activeInstanceId={(typeof activeInstance?.id === 'number' ? null : undefined)}
+          onOpenInstance={onOpenInstance as (instanceId: string | number) => void}
         />
       )}
     </>

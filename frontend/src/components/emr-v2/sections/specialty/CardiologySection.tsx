@@ -22,6 +22,7 @@ import { useState, useCallback } from 'react';
 import EMRSection from '../EMRSection';
 import React from 'react';
 import EMRTextField from '../EMRTextField';
+import type { EMRTextFieldChangeEvent } from '../EMRTextField';
 import './CardiologySection.css';
 import { Heart, FileText } from 'lucide-react';
 import { useTranslation } from '@/i18n/useTranslation';
@@ -61,7 +62,7 @@ export function CardiologySection({
   const [activeTab, setActiveTab] = useState('ecg'); // 'ecg' | 'echo' | 'labs' | 'risk'
 
   // Handlers
-  const handleLabResultChange = useCallback((field, value) => {
+  const handleLabResultChange = useCallback((field: string, value: unknown) => {
     onChange?.('cardio_labs', {
       ...labResults,
       [field]: value
@@ -222,7 +223,7 @@ export function CardiologySection({
                         <EMRTextField
             label={t('misc.cs_lab_troponin')}
             value={labResults?.troponin_i || ''}
-            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleLabResultChange('troponin_i', e.target.value)}
+            onChange={(e: EMRTextFieldChangeEvent) => handleLabResultChange('troponin_i', e.target.value)}
             disabled={disabled}
             type="number"
             placeholder="< 0.04" />
@@ -230,7 +231,7 @@ export function CardiologySection({
                         <EMRTextField
             label={t('misc.cs_lab_crp')}
             value={labResults?.crp || ''}
-            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleLabResultChange('crp', e.target.value)}
+            onChange={(e: EMRTextFieldChangeEvent) => handleLabResultChange('crp', e.target.value)}
             disabled={disabled}
             type="number"
             placeholder="< 3.0" />
@@ -238,7 +239,7 @@ export function CardiologySection({
                         <EMRTextField
             label={t('misc.cs_lab_cholesterol_total')}
             value={labResults?.cholesterol_total || ''}
-            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleLabResultChange('cholesterol_total', e.target.value)}
+            onChange={(e: EMRTextFieldChangeEvent) => handleLabResultChange('cholesterol_total', e.target.value)}
             disabled={disabled}
             type="number"
             placeholder="< 200" />
@@ -246,7 +247,7 @@ export function CardiologySection({
                         <EMRTextField
             label={t('misc.cs_lab_cholesterol_hdl')}
             value={labResults?.cholesterol_hdl || ''}
-            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleLabResultChange('cholesterol_hdl', e.target.value)}
+            onChange={(e: EMRTextFieldChangeEvent) => handleLabResultChange('cholesterol_hdl', e.target.value)}
             disabled={disabled}
             type="number"
             placeholder="> 40" />
@@ -254,7 +255,7 @@ export function CardiologySection({
                         <EMRTextField
             label={t('misc.cs_lab_cholesterol_ldl')}
             value={labResults?.cholesterol_ldl || ''}
-            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleLabResultChange('cholesterol_ldl', e.target.value)}
+            onChange={(e: EMRTextFieldChangeEvent) => handleLabResultChange('cholesterol_ldl', e.target.value)}
             disabled={disabled}
             type="number"
             placeholder="< 100" />
@@ -262,7 +263,7 @@ export function CardiologySection({
                         <EMRTextField
             label={t('misc.cs_lab_triglycerides')}
             value={labResults?.triglycerides || ''}
-            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleLabResultChange('triglycerides', e.target.value)}
+            onChange={(e: EMRTextFieldChangeEvent) => handleLabResultChange('triglycerides', e.target.value)}
             disabled={disabled}
             type="number"
             placeholder="< 150" />
@@ -270,7 +271,7 @@ export function CardiologySection({
                         <EMRTextField
             label={t('misc.cs_lab_glucose')}
             value={labResults?.glucose || ''}
-            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleLabResultChange('glucose', e.target.value)}
+            onChange={(e: EMRTextFieldChangeEvent) => handleLabResultChange('glucose', e.target.value)}
             disabled={disabled}
             type="number"
             placeholder="70-100" />
@@ -293,7 +294,7 @@ export function CardiologySection({
                             <EMRTextField
               label={t('misc.cs_age')}
               value={labResults?.patient_age || ''}
-              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleLabResultChange('patient_age', e.target.value)}
+              onChange={(e: EMRTextFieldChangeEvent) => handleLabResultChange('patient_age', e.target.value)}
               disabled={disabled}
               type="number"
               placeholder="40-69" />
@@ -327,7 +328,7 @@ export function CardiologySection({
                             <EMRTextField
               label={t('misc.cs_systolic_bp')}
               value={labResults?.systolic_bp || ''}
-              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleLabResultChange('systolic_bp', e.target.value)}
+              onChange={(e: EMRTextFieldChangeEvent) => handleLabResultChange('systolic_bp', e.target.value)}
               disabled={disabled}
               type="number"
               placeholder="120-180" />
@@ -335,7 +336,7 @@ export function CardiologySection({
                             <EMRTextField
               label={t('misc.cs_score2_chol')}
               value={labResults?.cholesterol_total || ''}
-              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleLabResultChange('cholesterol_total', e.target.value)}
+              onChange={(e: EMRTextFieldChangeEvent) => handleLabResultChange('cholesterol_total', e.target.value)}
               disabled={disabled}
               type="number"
               placeholder={t('misc.cs_score2_chol_ph')} />

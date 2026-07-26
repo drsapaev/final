@@ -42,8 +42,10 @@ export interface PrescriptionEditorProps {
   [key: string]: unknown;
 }
 
+type TFunc = (key: string, options?: Record<string, unknown>) => string;
+
 // Mock DB препаратов
-const getMockDrugs = (t) => [
+const getMockDrugs = (t: TFunc) => [
 { name: t('misc.pe_drug_amoxicillin'), defaultDose: t('misc.pe_drug_amoxicillin_dose'), defaultFreq: t('misc.pe_drug_amoxicillin_freq') },
 { name: t('misc.pe_drug_ibuprofen'), defaultDose: t('misc.pe_drug_ibuprofen_dose'), defaultFreq: t('misc.pe_drug_ibuprofen_freq') },
 { name: t('misc.pe_drug_bisoprolol'), defaultDose: t('misc.pe_drug_bisoprolol_dose'), defaultFreq: t('misc.pe_drug_bisoprolol_freq') },
@@ -52,6 +54,12 @@ const getMockDrugs = (t) => [
 { name: t('misc.pe_drug_omeprazole'), defaultDose: t('misc.pe_drug_omeprazole_dose'), defaultFreq: t('misc.pe_drug_omeprazole_freq') },
 { name: t('misc.pe_drug_paracetamol'), defaultDose: t('misc.pe_drug_paracetamol_dose'), defaultFreq: t('misc.pe_drug_paracetamol_freq') }];
 
+interface DrugSuggestion {
+  name: string;
+  defaultDose: string;
+  defaultFreq: string;
+}
+
 
 const PrescriptionEditor = ({
   prescriptions = [],
@@ -59,7 +67,7 @@ const PrescriptionEditor = ({
   isEditable = true,
   onFieldTouch
 }: PrescriptionEditorProps) => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as TFunc;
   const [isAdding, setIsAdding] = useState(false);
   const [newItem, setNewItem] = useState({
     name: '',
@@ -68,10 +76,10 @@ const PrescriptionEditor = ({
     duration: '',
     note: ''
   });
-  const [suggestions, setSuggestions] = useState([]);
+  const [suggestions, setSuggestions] = useState<DrugSuggestion[]>([]);
 
   // Handlers
-  const handleInputChange = (field, value) => {
+  const handleInputChange = (field: string, value: string) => {
     setNewItem((prev) => ({ ...prev, [field]: value }));
 
     // Search drugs
@@ -87,7 +95,7 @@ const PrescriptionEditor = ({
     }
   };
 
-  const handleSelectDrug = (drug) => {
+  const handleSelectDrug = (drug: DrugSuggestion) => {
     setNewItem((prev) => ({
       ...prev,
       name: drug.name,
@@ -109,7 +117,7 @@ const PrescriptionEditor = ({
     setIsAdding(false);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = (id: string | number) => {
     const updated = prescriptions.filter((p) => p.id !== id);
     onChange?.(updated);
     onFieldTouch?.('prescriptions');
@@ -135,7 +143,7 @@ const PrescriptionEditor = ({
           <div className="prescription-item__actions">
                                     <button
               className="prescription-action-btn prescription-action-btn--delete"
-              onClick={() => handleDelete(p.id)}
+              onClick={() => p.id !== undefined && handleDelete(p.id)}
               title={t('misc.pe_udalit')}
               aria-label={t('misc.pe_udalit_naznachenie')}>
               

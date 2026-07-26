@@ -25,14 +25,18 @@ import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
 
-const PhotoComparison = ({ beforePhoto, afterPhoto, metadata: metadataRaw = {} }) => {
-  const metadata = metadataRaw as Record<string, any>;
+const PhotoComparison = ({ beforePhoto, afterPhoto, metadata: metadataRaw = {} }: {
+  beforePhoto?: string | null;
+  afterPhoto?: string | null;
+  metadata?: Record<string, unknown>;
+}) => {
+  const metadata = metadataRaw as Record<string, unknown>;
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [sliderPosition, setSliderPosition] = useState(50);
   const [viewMode, setViewMode] = useState('slider'); // slider, side-by-side, overlay
   const [zoom, setZoom] = useState(1);
   const [isDragging, setIsDragging] = useState(false);
-  const containerRef = useRef(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const [containerWidth, setContainerWidth] = useState(0);
 
   // Обновление размера контейнера
@@ -49,12 +53,12 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata: metadataRaw = {} }
   }, []);
 
   // Обработка перетаскивания слайдера
-  const handleMouseDown = (e) => {
+  const handleMouseDown = (e: React.PointerEvent<HTMLDivElement>) => {
     setIsDragging(true);
     updateSliderPosition(e);
   };
 
-  const handleMouseMove = (e) => {
+  const handleMouseMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (isDragging) {
       updateSliderPosition(e);
     }
@@ -64,7 +68,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata: metadataRaw = {} }
     setIsDragging(false);
   };
 
-  const updateSliderPosition = (e) => {
+  const updateSliderPosition = (e: React.PointerEvent<HTMLDivElement>) => {
     if (containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
       const x = e.clientX - rect.left;
@@ -243,10 +247,10 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata: metadataRaw = {} }
         </div>
 
         {/* Метаданные */}
-        {metadata.zone &&
+        {metadata.zone ? (
         <div style={{ marginBottom: 16 }}>
             <Badge variant="info" style={{ marginRight: 8 }}>
-              {t('derma.derma_cmp_zone_inline', { zone: metadata.zone })}
+              {t('derma.derma_cmp_zone_inline', { zone: String(metadata.zone) })}
             </Badge>
             <Badge variant="info" style={{ marginRight: 8 }}>
               {t('derma.derma_cmp_angle_inline', { angle: metadata.angle || 'front' })}
@@ -255,7 +259,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata: metadataRaw = {} }
               {t('derma.derma_cmp_lighting_inline', { lighting: metadata.lighting || 'natural' })}
             </Badge>
           </div>
-        }
+        ) : null}
 
         {/* Режим слайдера */}
         {viewMode === 'slider' &&

@@ -140,7 +140,7 @@ const ReportsAndAnalytics = ({
   const reportHasData = hasAnalyticsData(analyticsData);
 
   // Обработчики
-  const handleDateRangeChange = (range) => {
+  const handleDateRangeChange = (range: string) => {
     setDateRange(range);
     // Здесь можно добавить логику загрузки данных для выбранного периода
   };
@@ -148,7 +148,7 @@ const ReportsAndAnalytics = ({
   const handleExportReport = (_format?: string) => {};
 
   // Рендер карточки метрики
-  const renderMetricCard = (title, value, change, icon, color = 'blue') =>
+  const renderMetricCard = (title: string, value: string | number, change: number | null, icon: React.ReactNode, color = 'blue') =>
   <div className="bg-white rounded-lg p-6 shadow-sm border">
       <div className="flex items-center justify-between">
         <div>
@@ -225,7 +225,7 @@ const ReportsAndAnalytics = ({
           <div key={index} className="flex flex-col items-center">
                 <div
               className="bg-blue-500 rounded-t w-8 mb-2"
-              style={{ height: `${item.revenue / 350000 * 200}px` }}>
+              style={{ height: `${(item.revenue ?? 0) / 350000 * 200}px` }}>
             </div>
                 <span className="text-xs text-gray-600">{item.month}</span>
         </div>
@@ -250,7 +250,7 @@ const ReportsAndAnalytics = ({
         </div>
                 <div className="text-right">
                   <div className="text-sm font-semibold">{item.percentage}%</div>
-                  <div className="text-xs text-gray-600">{t('dental.dental_ra_revenue_sum', { value: item.revenue.toLocaleString() })}</div>
+                  <div className="text-xs text-gray-600">{t('dental.dental_ra_revenue_sum', { value: (item.revenue ?? 0).toLocaleString() })}</div>
             </div>
             </div>
           )}
@@ -399,7 +399,7 @@ const ReportsAndAnalytics = ({
                     <div className="text-sm text-gray-900">{doctor.appointments}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{t('dental.dental_ra_revenue_sum', { value: doctor.revenue.toLocaleString() })}</div>
+                    <div className="text-sm text-gray-900">{t('dental.dental_ra_revenue_sum', { value: (doctor.revenue ?? 0).toLocaleString() })}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center" aria-label={`Rating ${doctor.rating}`}>
@@ -482,18 +482,18 @@ const ReportsAndAnalytics = ({
                     <div className="text-sm text-gray-900">{procedure.count}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{t('dental.dental_ra_revenue_sum', { value: procedure.revenue.toLocaleString() })}</div>
+                    <div className="text-sm text-gray-900">{t('dental.dental_ra_revenue_sum', { value: (procedure.revenue ?? 0).toLocaleString() })}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className={`flex items-center ${
-                procedure.growth > 0 ? 'text-green-600' : 'text-red-600'}`
+                (procedure.growth ?? 0) > 0 ? 'text-green-600' : 'text-red-600'}`
                 }>
-                      {procedure.growth > 0 ?
+                      {(procedure.growth ?? 0) > 0 ?
                   <TrendingUp className="h-4 w-4 mr-1" /> :
 
                   <TrendingDown className="h-4 w-4 mr-1" />
                   }
-                      <span className="text-sm font-medium">{Math.abs(procedure.growth)}%</span>
+                      <span className="text-sm font-medium">{Math.abs(procedure.growth ?? 0)}%</span>
         </div>
                   </td>
               </tr>

@@ -36,7 +36,7 @@ const toneConfig = {
   }
 };
 
-const toastPositionStyle = (position) => ({
+const toastPositionStyle = (position: string) => ({
   position: 'fixed',
   top: position === 'top' ? 16 : 'auto',
   bottom: position === 'top' ? 'auto' : 16,
@@ -131,13 +131,24 @@ const styles = {
   }
 };
 
-function ConnectionToast({ open, position, tone, icon: Icon, title, description, onClose }) {
+interface ConnectionToastProps {
+  open: boolean;
+  position: string;
+  tone: 'primary' | 'success' | 'warning' | 'danger';
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement> & { size?: number | string }>;
+  title: string;
+  description: string;
+  onClose: () => void;
+}
+
+function ConnectionToast({ open, position, tone, icon: Icon, title, description, onClose }: ConnectionToastProps) {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  void t;
   if (!open) {
     return null;
   }
 
-  const config = toneConfig[tone] || toneConfig.primary;
+  const config = toneConfig[tone as keyof typeof toneConfig] || toneConfig.primary;
 
   return (
     <div style={toastPositionStyle(position) as unknown as CSSProperties}>
@@ -179,11 +190,11 @@ ConnectionToast.propTypes = {
   tone: PropTypes.oneOf(['primary', 'success', 'warning', 'danger']).isRequired
 };
 
-const ConnectionStatus = ({ showOfflineAlert = true, position = 'top' }) => {
+const ConnectionStatus = ({ showOfflineAlert = true, position = 'top' }: { showOfflineAlert?: boolean; position?: string }) => {
   const { isOnline, isServiceWorkerReady } = usePWA();
   const [showOfflineToast, setShowOfflineToast] = useState(false);
   const [showOnlineToast, setShowOnlineToast] = useState(false);
-  const [lastSyncTime, setLastSyncTime] = useState(null);
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
 
   // Отслеживание изменений статуса подключения
@@ -202,11 +213,12 @@ const ConnectionStatus = ({ showOfflineAlert = true, position = 'top' }) => {
   // Слушаем сообщения от Service Worker о синхронизации
   useEffect(() => {
     if ('serviceWorker' in navigator) {
-      const handleMessage = (event) => {
-        if (event.data && event.data.type === 'SYNC_COMPLETE') {
-          setLastSyncTime(new Date(event.data.timestamp));
+      const handleMessage = (event: MessageEvent) => {
+        const data = event.data as { type?: string; timestamp?: number } | undefined;
+        if (data && data.type === 'SYNC_COMPLETE') {
+          setLastSyncTime(new Date(data.timestamp ?? Date.now()));
           setIsSyncing(false);
-        } else if (event.data && event.data.type === 'SYNC_START') {
+        } else if (data && data.type === 'SYNC_START') {
           setIsSyncing(true);
         }
       };
@@ -246,7 +258,7 @@ const ConnectionStatus = ({ showOfflineAlert = true, position = 'top' }) => {
     if (!lastSyncTime) return null;
 
     const now = new Date();
-    const diffMs = now.getTime() - (lastSyncTime as Date).getTime();
+    const diffMs = now.getTime() - lastSyncTime.getTime();
     const diffMins = Math.floor(diffMs / 60000);
 
     if (diffMins < 1) return t18('misc.cs_tolko_chto');
@@ -261,7 +273,7 @@ const ConnectionStatus = ({ showOfflineAlert = true, position = 'top' }) => {
   const Icon = getConnectionIcon();
   const tone = getConnectionTone();
   const label = getConnectionLabel();
-  const toneStyle = toneConfig[tone] || toneConfig.primary;
+  const toneStyle = toneConfig[tone as keyof typeof toneConfig] || toneConfig.primary;
 
   return (
     <>

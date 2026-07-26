@@ -36,9 +36,9 @@ const TwoFactorSetupWizard = ({ onComplete, onCancel }: { onComplete?: () => voi
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [selectedMethod, setSelectedMethod] = useState('totp');
-  const [setupData, setSetupData] = useState(null);
+  const [setupData, setSetupData] = useState<Record<string, unknown> | null>(null);
   const [verificationCode, setVerificationCode] = useState('');
-  const [backupCodes, setBackupCodes] = useState([]);
+  const [backupCodes, setBackupCodes] = useState<string[]>([]);
   const [recoveryEmail, setRecoveryEmail] = useState('');
   const [recoveryPhone, setRecoveryPhone] = useState('');
   const [showSecret, setShowSecret] = useState(false);
@@ -76,7 +76,7 @@ const TwoFactorSetupWizard = ({ onComplete, onCancel }: { onComplete?: () => voi
   }];
 
 
-  const handleMethodSelect = (methodId) => {
+  const handleMethodSelect = (methodId: string) => {
     setSelectedMethod(methodId);
     setError('');
   };
@@ -96,7 +96,7 @@ const TwoFactorSetupWizard = ({ onComplete, onCancel }: { onComplete?: () => voi
 
       if (response.ok) {
         setSetupData(data);
-        setBackupCodes((data.backup_codes as unknown[]) || []);
+        setBackupCodes((data.backup_codes as string[]) || []);
         setCurrentStep(3);
         setSuccess(t('misc.tfsw_setup_created'));
       } else {
@@ -145,7 +145,7 @@ const TwoFactorSetupWizard = ({ onComplete, onCancel }: { onComplete?: () => voi
     }
   };
 
-  const copyToClipboard = (text) => {
+  const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     setSuccess(t('misc.tfsw_copied_to_clipboard'));
   };
@@ -356,7 +356,7 @@ const TwoFactorSetupWizard = ({ onComplete, onCancel }: { onComplete?: () => voi
             </div>
             <div className="flex items-center space-x-2">
               <code className="px-3 py-2 bg-gray-100 rounded font-mono text-sm">
-                {showSecret ? setupData.secret : '••••••••••••••••'}
+                {showSecret ? String(setupData?.secret ?? '') : '••••••••••••••••'}
               </code>
               <button
             onClick={() => setShowSecret(!showSecret)}
@@ -366,7 +366,7 @@ const TwoFactorSetupWizard = ({ onComplete, onCancel }: { onComplete?: () => voi
                 {showSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
               <button
-            onClick={() => copyToClipboard(setupData.secret)}
+            onClick={() => copyToClipboard(String(setupData?.secret ?? ''))}
             aria-label={t('misc.tfsw_aria_copy_secret')}
             className="text-gray-400 hover:text-gray-600">
             

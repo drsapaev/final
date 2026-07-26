@@ -33,16 +33,25 @@ const ModernFilters = ({
   appointmentsCount = 0,
   className = '',
   ...props
+}: {
+  searchParams: URLSearchParams;
+  onParamsChange: (params: URLSearchParams) => void;
+  autoRefresh: boolean;
+  onAutoRefreshChange: (value: unknown) => void;
+  appointmentsCount?: number;
+  className?: string;
+  [key: string]: unknown;
 }) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  void t;
   const { getColor } = useTheme();
   const [isExpanded, setIsExpanded] = useState(false);
   const [searchValue, setSearchValue] = useState(searchParams.get('q') || '');
   const [dateValue, setDateValue] = useState(searchParams.get('date') || '');
   const [statusValue, setStatusValue] = useState(searchParams.get('status') || '');
 
-  const searchInputRef = useRef(null);
-  const searchTimeoutRef = useRef(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Обновляем локальные значения при изменении searchParams
   useEffect(() => {
@@ -52,7 +61,7 @@ const ModernFilters = ({
   }, [searchParams]);
 
   // Debounced search
-  const handleSearchChange = (value) => {
+  const handleSearchChange = (value: string) => {
     setSearchValue(value);
 
     if (searchTimeoutRef.current) {
@@ -64,7 +73,7 @@ const ModernFilters = ({
     }, 300);
   };
 
-  const updateParam = (key, value) => {
+  const updateParam = (key: string, value: string) => {
     const params = new URLSearchParams(searchParams);
     if (value && value.trim()) {
       params.set(key, value.trim());

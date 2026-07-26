@@ -27,6 +27,29 @@ export function VisitTab({
   onGoToAppointments,
   getColor,
   getFontSize,
+}: {
+  selectedPatient?: {
+    patient_name?: string;
+    patient?: { full_name?: string; id?: number };
+    patient_id?: number;
+    number?: string | number;
+    phone?: string;
+    visit_id?: number | string;
+  } | null;
+  emr?: {
+    id?: number | string;
+    status?: string;
+    version?: number;
+    updated_at?: string;
+    signed_at?: string;
+    signed_by?: number;
+  } | null;
+  loading?: boolean;
+  onCancel: () => void;
+  onComplete: () => void;
+  onGoToAppointments: () => void;
+  getColor: (key: string) => string;
+  getFontSize: (key: string) => string;
 }) {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // Empty state: no patient selected
@@ -120,7 +143,7 @@ export function VisitTab({
           {t('cardio.cardio_visit_emr_title')}
         </h3>
         <EMRContainerV2
-          visitId={selectedPatient?.visit_id}
+          visitId={selectedPatient?.visit_id ?? ''}
           patientId={selectedPatient?.patient?.id || selectedPatient?.patient_id}
           specialty="cardiology"
         />
