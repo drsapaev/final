@@ -65,7 +65,12 @@
     "src/utils/sanitizer.ts",
     "src/utils/navigation.ts",
     "src/utils/errorHandler.ts",
-    "src/hooks/useSetupStatus.ts"
+    "src/hooks/useSetupStatus.ts",
+    "src/hooks/useSessionTimeoutWarning.ts",
+    "src/hooks/uiAnimations.ts",
+    "src/hooks/useEMRTemplateLibrary.ts",
+    "src/hooks/useUsers.ts",
+    "src/hooks/usePWA.ts"
   ],
   "exclude": ["node_modules", "dist", "e2e"]
 }

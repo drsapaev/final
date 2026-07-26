@@ -7,7 +7,7 @@ import type {
   EMRTemplateSuggestion,
 } from '../types/domain/emr';
 
-const EMR_TEMPLATE_FIELD_HINTS = {
+const EMR_TEMPLATE_FIELD_HINTS: Record<string, string[]> = {
   complaints: ['complaint', 'symptom', 'pain', 'жалоб'],
   anamnesisMorbi: ['anamnesis', 'history', 'onset', 'забол'],
   anamnesisVitae: ['chronic', 'allergy', 'medical history', 'анамнез'],
@@ -93,8 +93,8 @@ export function backendTemplateMatches(fieldName: string, text: string, template
 }
 
 export function mergeTemplateSuggestions(primary: EMRTemplateSuggestion[], secondary: EMRTemplateSuggestion[]): EMRTemplateSuggestion[] {
-  const seen = new Set();
-  const merged = [];
+  const seen = new Set<string>();
+  const merged: EMRTemplateSuggestion[] = [];
 
   for (const suggestion of [...primary, ...secondary]) {
     const key = `${suggestion.text}::${suggestion.source}`;

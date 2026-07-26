@@ -2,6 +2,12 @@ import { useState, useEffect, useCallback } from 'react';
 
 import logger from '../utils/logger';
 
+// Minimal BeforeInstallPromptEvent type (not in standard TS DOM lib yet).
+interface BeforeInstallPromptEvent extends Event {
+  prompt(): Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
+}
+
 // Window augmentation for PWA internal flags
 interface PWABrowserWindow extends Window {
   __sw_registration_pending?: boolean;
@@ -120,7 +126,6 @@ export const usePWA = () => {
         // Проверка обновлений
         registration.addEventListener('updatefound', () => {
           const newWorker = registration.installing;
-
           if (!newWorker) return;
 
           newWorker.addEventListener('statechange', () => {
