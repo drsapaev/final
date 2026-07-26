@@ -70,7 +70,8 @@
     "src/hooks/uiAnimations.ts",
     "src/hooks/useEMRTemplateLibrary.ts",
     "src/hooks/useUsers.ts",
-    "src/hooks/usePWA.ts"
+    "src/hooks/usePWA.ts",
+    "src/hooks/useAppointments.ts"
   ],
   "exclude": ["node_modules", "dist", "e2e"]
 }
