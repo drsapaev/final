@@ -44,6 +44,24 @@ function run(cmd, cwd = REPO) {
 }
 
 /**
+ * Check if a pattern exists in a file. Uses rg if available, falls back to grep.
+ * Returns true if pattern is found.
+ */
+function fileContains(pattern, filePath, cwd = FRONTEND) {
+  // Try rg first (faster, respects gitignore)
+  const rgResult = run(`rg -c ${pattern} ${filePath} 2>/dev/null || true`, cwd);
+  if (rgResult && rgResult.trim() !== '') {
+    return parseInt(rgResult.trim(), 10) > 0;
+  }
+  // Fallback to grep with -E for regex support
+  const grepResult = run(`grep -cE ${pattern} ${filePath} 2>/dev/null || true`, cwd);
+  if (grepResult && grepResult.trim() !== '') {
+    return parseInt(grepResult.trim(), 10) > 0;
+  }
+  return false;
+}
+
+/**
  * Check definition:
  *   id:       BS-ID
  *   category: structural | static | behavioural | configuration
@@ -146,8 +164,7 @@ const checks = [
     category: 'static',
     name: 'EMRHttpStatus exists in domain/emr.ts',
     check: () => {
-      const out = run(`rg "export type EMRHttpStatus" src/types/domain/emr.ts`, FRONTEND);
-      return out.length > 0;
+      return fileContains('"export type EMRHttpStatus"', 'src/types/domain/emr.ts');
     },
   },
   {
@@ -164,8 +181,7 @@ const checks = [
     category: 'static',
     name: 'ChatContext value wrapped in useMemo',
     check: () => {
-      const out = run(`rg "useMemo" src/contexts/ChatContext.tsx`, FRONTEND);
-      return out.length > 0;
+      return fileContains('"useMemo"', 'src/contexts/ChatContext.tsx');
     },
   },
   {
@@ -192,8 +208,7 @@ const checks = [
     category: 'static',
     name: 'CONFLICT_RESOLVED resets history: []',
     check: () => {
-      const out = run(`rg "history: \\[\\]" src/reducers/emrReducer.ts`, FRONTEND);
-      return out.length > 0;
+      return fileContains('"history: \\[\\]"', 'src/reducers/emrReducer.ts');
     },
   },
   {
@@ -201,8 +216,7 @@ const checks = [
     category: 'static',
     name: 'useFinance.deletedIds has TTL (DELETED_IDS_TTL_MS)',
     check: () => {
-      const out = run(`rg "DELETED_IDS_TTL_MS" src/hooks/useFinance.ts`, FRONTEND);
-      return out.length > 0;
+      return fileContains('"DELETED_IDS_TTL_MS"', 'src/hooks/useFinance.ts');
     },
   },
   {
@@ -247,8 +261,7 @@ const checks = [
     category: 'static',
     name: 'ChatWindow uses safeMessageURL helper',
     check: () => {
-      const out = run(`rg "safeMessageURL" src/components/chat/ChatWindow.tsx`, FRONTEND);
-      return out.length > 0;
+      return fileContains('"safeMessageURL"', 'src/components/chat/ChatWindow.tsx');
     },
   },
   {
