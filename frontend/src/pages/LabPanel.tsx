@@ -572,7 +572,7 @@ export default function LabPanel() {
               id={LAB_PANEL_TITLE_ID}
               className="lab-panel-title"
             >
-              <Icon name="cross.case" size={22 as never} />
+              <Icon name="cross.case" size={22} />
               <span>{t('misc.lp_panel_laboratorii')}</span>
             </h1>
             <div
@@ -595,7 +595,7 @@ export default function LabPanel() {
                   onClick={() => switchTab(tab.id)}
                   onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => handleTabKeyDown(event, tab.id)}
                 >
-                  <Icon name={tab.icon} size={16 as never} />
+                  <Icon name={tab.icon} size={16} />
                   {tab.label}
                   <Badge
                     aria-hidden="true"
@@ -632,7 +632,7 @@ export default function LabPanel() {
                         setTimeout(() => action(), 0);
                       }}
                     >
-                      <Icon name="arrow.clockwise" size={14 as never} />
+                      <Icon name="arrow.clockwise" size={14} />
                       {String(message.retryLabel || t('misc.lp_povtorit'))}
                     </Button>
                   )}
@@ -642,7 +642,7 @@ export default function LabPanel() {
                     onClick={dismissMessage}
                     aria-label={t('misc.lp_zakryt_uvedomlenie')}
                   >
-                    <Icon name="xmark" size={14 as never} />
+                    <Icon name="xmark" size={14} />
                   </Button>
                 </div>
               )}

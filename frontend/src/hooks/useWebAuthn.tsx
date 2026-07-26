@@ -192,7 +192,7 @@ export function useWebAuthn(): UseWebAuthnReturn {
           challenge: base64urlToBuffer(optionsData.options.challenge),
           rpId: optionsData.options.rpId,
           timeout: optionsData.options.timeout || 60000,
-          userVerification: 'preferred' as UserVerificationRequirement,
+          userVerification: 'required' as UserVerificationRequirement,
         };
 
         const assertion = (await navigator.credentials.get({

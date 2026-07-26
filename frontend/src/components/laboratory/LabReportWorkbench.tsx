@@ -526,7 +526,7 @@ export default function LabReportWorkbench({
       <Card variant="filled" padding="none">
         <CardHeader style={{ background: 'var(--mac-bg-tertiary)', borderBottom: '1px solid var(--mac-border)', padding: 'var(--mac-spacing-4)' }}>
           <CardTitle style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
-            <Icon name="doc.text" size={20 as never} />
+            <Icon name="doc.text" size={20} />
             {t('workbench.title')}
           </CardTitle>
         </CardHeader>
@@ -620,7 +620,7 @@ export default function LabReportWorkbench({
                   onClick={() => handleCreateInstance()}
                   disabled={saving || templateResolutionLoading || (resolutionHasBlockingGap && !escapeHatchActive) || !selectedTemplateId}
                 >
-                  <Icon name="plus.rectangle.on.folder" size={16 as never} />
+                  <Icon name="plus.rectangle.on.folder" size={16} />
                   {busyAction === 'create' ? t('workbench.creating_report') : t('workbench.create_report')}
                 </Button>
               </div>

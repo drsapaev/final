@@ -46,6 +46,10 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
     const wsRef = useRef(null);
     const reconnectTimeoutRef = useRef(null);
     const handleWebSocketMessageRef = useRef(null);
+    // audit/phase-final, BS-15: shouldReconnect ref + reconnect attempt counter.
+    const shouldReconnectRef = useRef(true);
+    const reconnectAttemptRef = useRef(0);
+    const MAX_RECONNECT_ATTEMPTS = 5;
     const currentSessionRef = useRef(null);
     const loadSessionRequestRef = useRef(0);
     const contractVersionMismatchRef = useRef(false);
@@ -267,6 +271,10 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
             return;
         }
 
+        // audit/phase-final, BS-15: reset reconnect state on explicit connect.
+        shouldReconnectRef.current = true;
+        reconnectAttemptRef.current = 0;
+
         // P0 security fix: JWT sent via Sec-WebSocket-Protocol subprotocol (bearer.<token>)
         // instead of URL query (?token=...). The URL query form leaked the JWT into nginx
         // access logs, browser history, and Referer headers. Backend supports subprotocol
@@ -286,12 +294,22 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
                 logger.info('AI Chat WebSocket closed:', event.code, event.reason);
                 setConnected(false);
 
-                // Reconnect after 3 seconds (если не был явный logout)
-                if (event.code !== 1000 && event.code !== 4001) {
-                    reconnectTimeoutRef.current = setTimeout(() => {
-                        logger.info('Attempting to reconnect WebSocket...');
-                        connectWebSocket();
-                    }, 3000);
+                // audit/phase-final, BS-15: exponential backoff + max retries.
+                if (event.code !== 1000 && event.code !== 4001 && shouldReconnectRef.current) {
+                    reconnectAttemptRef.current += 1;
+                    if (reconnectAttemptRef.current <= MAX_RECONNECT_ATTEMPTS) {
+                        const baseDelay = Math.min(1000 * Math.pow(2, reconnectAttemptRef.current - 1), 16000);
+                        const jitter = Math.random() * 500;
+                        const delay = baseDelay + jitter;
+                        logger.info(`Attempting to reconnect WebSocket (${reconnectAttemptRef.current}/${MAX_RECONNECT_ATTEMPTS}) in ${Math.round(delay)}ms...`);
+                        reconnectTimeoutRef.current = setTimeout(() => {
+                            if (shouldReconnectRef.current) {
+                                connectWebSocket();
+                            }
+                        }, delay);
+                    } else {
+                        logger.warn(`WebSocket reconnect giving up after ${MAX_RECONNECT_ATTEMPTS} attempts`);
+                    }
                 }
             };
 
@@ -468,11 +486,19 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
      * Отключиться от WebSocket
      */
     const disconnectWebSocket = useCallback(() => {
+        // audit/phase-final, BS-15: set shouldReconnect=false so any in-flight
+        // onclose handler won't schedule a reconnect after we close.
+        shouldReconnectRef.current = false;
+
         if (reconnectTimeoutRef.current) {
             clearTimeout(reconnectTimeoutRef.current);
         }
 
         if (wsRef.current) {
+            wsRef.current.onclose = null;
+            wsRef.current.onerror = null;
+            wsRef.current.onopen = null;
+            wsRef.current.onmessage = null;
             wsRef.current.close(1000, 'User disconnect');
             wsRef.current = null;
         }
