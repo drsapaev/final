@@ -41,7 +41,7 @@ import { Button } from '../ui/macos';
 import { Input } from '../ui/macos';
 import React from "react";
 
-const INTENT_CONFIG = {
+const INTENT_CONFIG: Record<string, { icon: typeof Trash2; iconColor: string; confirmVariant: string }> = {
   danger: {
     icon: Trash2,
     iconColor: 'var(--mac-error, #ff3b30)',
@@ -262,10 +262,10 @@ export function useConfirm() {
     isOpen: false,
     options: {},
   });
-  const resolverRef = useRef(null);
+  const resolverRef = useRef<((value: boolean) => void) | null>(null);
 
-  const confirm = useCallback((options) => {
-    return new Promise((resolve) => {
+  const confirm = useCallback((options: Record<string, unknown>) => {
+    return new Promise<boolean>((resolve) => {
       // If a previous confirm is somehow still open, resolve it as false
       // (user implicitly cancelled by triggering a new confirm).
       if (resolverRef.current) {
