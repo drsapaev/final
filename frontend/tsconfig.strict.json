@@ -1,21 +1,15 @@
 {
-  // Wave G7: per-directory strict mode.
+  // Wave G7-G8: per-directory strict mode.
   //
   // This tsconfig enables `strict: true` for directories that are ready
   // (0 errors under strict). The main tsconfig.json stays non-strict
   // until ALL directories are ready, then G8 flips the main config.
   //
-  // Currently strict-ready (verified by scripts/per-directory-strict.mjs):
-  //   - src/api/mappers/   (Wave G4 code, fully typed)
-  //   - src/types/domain/  (Wave G1-G3 domain types, pure type defs)
-  //
   // Usage:
   //   npx tsc --noEmit -p tsconfig.strict.json
   //
-  // CI gate (planned): run this in CI to prevent strict-ready directories
-  // from regressing. When a new directory becomes ready, add it to `include`
-  // and commit. When ALL directories are ready, delete this file and flip
-  // strict: true in tsconfig.json (G8).
+  // CI gate: scripts/strict-gate.mjs runs this and fails on any error.
+  // When a new directory becomes ready, add it to `include` and commit.
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "strict": true,
@@ -40,16 +34,38 @@
     "src/components/Icon.tsx",
     "src/components/ui/macos/**/*.ts",
     "src/components/ui/macos/**/*.tsx",
+    "src/components/ui/**/*.ts",
+    "src/components/ui/**/*.tsx",
     "src/components/registrar/**/*.ts",
     "src/components/registrar/**/*.tsx",
     "src/components/common/Loading.tsx",
     "src/components/common/RoleGuard.tsx",
+    "src/components/common/ConfirmDialog.tsx",
     "src/components/auth/RequireAuth.tsx",
     "src/components/auth/ForgotPassword.tsx",
     "src/components/auth/LoginFormStyled.tsx",
     "src/components/auth/PhoneVerification.tsx",
     "src/components/auth/loginErrorUtils.ts",
-    "src/components/AnimatedLoader.tsx"
+    "src/components/AnimatedLoader.tsx",
+    "src/components/TwoFactorVerify.tsx",
+    "src/components/dialogs/ModernDialog.tsx",
+    "src/components/dialogs/CancelDialog.tsx",
+    "src/components/dialogs/PaymentDialog.tsx",
+    "src/components/queue/**/*.ts",
+    "src/components/queue/**/*.tsx",
+    "src/contexts/**/*.ts",
+    "src/contexts/**/*.tsx",
+    "src/services/sentry.ts",
+    "src/services/queue.ts",
+    "src/services/notify.ts",
+    "src/services/pushNotifications.ts",
+    "src/constants/routes.ts",
+    "src/constants/messagingContract.ts",
+    "src/utils/heicConverter.ts",
+    "src/utils/sanitizer.ts",
+    "src/utils/navigation.ts",
+    "src/utils/errorHandler.ts",
+    "src/hooks/useSetupStatus.ts"
   ],
-  "exclude": ["node_modules", "dist", "e2e", "src/api/__tests__/**", "src/routing/__tests__/**"]
+  "exclude": ["node_modules", "dist", "e2e"]
 }

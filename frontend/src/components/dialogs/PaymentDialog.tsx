@@ -70,7 +70,7 @@ const PaymentDialog = ({
     try {
       // UX Audit Registrar: убрана 1.5-секундная «имитация» (setTimeout).
       // Теперь: onPaymentSuccess callback делает РЕАЛЬНЫЙ API-запрос.
-      if (onPaymentSuccess) {
+      if (onPaymentSuccess && appointment) {
         await onPaymentSuccess({
           appointmentId: appointment.id,
           amount: parseFloat(paymentAmount),

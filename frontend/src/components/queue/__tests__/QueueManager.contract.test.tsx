@@ -4,7 +4,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const ROOT = path.resolve(process.cwd(), 'src');
-const read = (filePath) => fs.readFileSync(path.join(ROOT, filePath), 'utf8');
+const read = (filePath: string) => fs.readFileSync(path.join(ROOT, filePath), 'utf8');
 
 describe('Queue manager command contract', () => {
   it('keeps registrar queue call-next as a backend-owned command, not a row command', () => {
