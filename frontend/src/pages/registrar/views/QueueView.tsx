@@ -18,13 +18,13 @@
  * @param {Array} props.doctors - doctors list for ModernQueueManager
  */
 import React from 'react';
-import { Card, CardHeader, CardContent } from '../../../components/ui/macos';
-import { AnimatedTransition } from '../../../components/ui';
-import ModernQueueManager from '../../../components/queue/ModernQueueManager';
-import { getLocalDateString } from '../../../utils/dateUtils';
-import logger from '../../../utils/logger';
+import { Card, CardHeader, CardContent } from '@/components/ui/macos';
+import { AnimatedTransition } from '@/components/ui';
+import ModernQueueManager from '@/components/queue/ModernQueueManager';
+import { getLocalDateString } from '@/utils/dateUtils';
+import logger from '@/utils/logger';
 // i18n-unification: use unified useTranslation instead of getRegistrarTranslator
-import { useTranslation } from '../../../i18n/useTranslation';
+import { useTranslation } from '@/i18n/useTranslation';
 
 interface QueueViewProps {
   searchParams: URLSearchParams;

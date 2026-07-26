@@ -7,7 +7,7 @@
 import PropTypes from 'prop-types';
 import AISuggestionCard from './AISuggestionCard';
 import './AISuggestionPanel.css';
-import { useTranslation } from '../../../i18n/useTranslation';
+import { useTranslation } from '@/i18n/useTranslation';
 
 /**
  * Field labels for grouping

@@ -13,11 +13,11 @@
 
 import { useState, useMemo, useCallback } from 'react';
 import PropTypes from 'prop-types';
-import treatmentTemplatesData from '../../../data/treatmentTemplates.json';
+import treatmentTemplatesData from '@/data/treatmentTemplates.json';
 import './TreatmentTemplatesPanel.css';
 import { Input } from '../../ui/macos';
-import { useTranslation } from '../../../i18n/useTranslation';
-import i18n from '../../../i18n';
+import { useTranslation } from '@/i18n/useTranslation';
+import i18n from '@/i18n';
 const t18 = i18n.t as unknown as (key: string, options?: Record<string, unknown>) => string;
 
 /**

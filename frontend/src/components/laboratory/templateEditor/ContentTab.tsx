@@ -6,7 +6,7 @@ import { useConfirm } from '../../common/ConfirmDialog';
 // STRAT#11: t() и tInterpolate() для i18n — delete dialogs мигрированы.
 import { fieldTypeOptions, referenceModeOptions } from './config';
 import ReferenceRuleEditor from './ReferenceRuleEditor';
-import { useTranslation } from '../../../i18n/useTranslation';
+import { useTranslation } from '@/i18n/useTranslation';
 
 /**
  * L-H-6 fix: ContentTab выделен в отдельный файл (~250 строк).

@@ -1,5 +1,5 @@
 import React, { type ReactNode, type CSSProperties } from 'react';
-import { useTheme } from '../../../contexts/ThemeContext';
+import { useTheme } from '@/contexts/ThemeContext';
 
 type GridSize = number | boolean | string;
 type GridSpacing = number | string;

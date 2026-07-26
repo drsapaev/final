@@ -2,9 +2,9 @@ import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
-import { ThemeProvider } from '../../../contexts/ThemeContext';
-import { MacOSThemeProvider } from '../../../theme/macosTheme';
-import { TranslationProvider } from '../../../i18n/useTranslation';  // PR-50
+import { ThemeProvider } from '@/contexts/ThemeContext';
+import { MacOSThemeProvider } from '@/theme/macosTheme';
+import { TranslationProvider } from '@/i18n/useTranslation';  // PR-50
 import HeaderNew, { isThemeMenuInteraction } from '../HeaderNew';
 
 const authState = {

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { ReactNode, CSSProperties, ComponentType, KeyboardEvent } from 'react';
 import { Minus, ArrowUpRight, ArrowDownRight } from 'lucide-react';
-import { useTranslation } from '../../../i18n/useTranslation';
+import { useTranslation } from '@/i18n/useTranslation';
 
 interface MacOSMetricCardProps {
   title: ReactNode;

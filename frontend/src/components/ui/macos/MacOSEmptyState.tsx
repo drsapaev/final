@@ -1,6 +1,6 @@
 import React, { useId, type ReactNode, type CSSProperties } from 'react';
 import PropTypes from 'prop-types';
-import { useTranslation } from '../../../i18n/useTranslation';
+import { useTranslation } from '@/i18n/useTranslation';
 
 interface MacOSEmptyStateProps {
   icon?: React.ComponentType<any> | ReactNode;

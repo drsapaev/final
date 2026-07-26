@@ -1,6 +1,6 @@
 // Minimal macOS-style Dialog components to replace MUI Dialog API used in CashierPanel
 // Props compatibility: open, onClose, maxWidth, fullWidth, children
-import { useTranslation } from '../../../i18n/useTranslation';
+import { useTranslation } from '@/i18n/useTranslation';
 import type { ReactNode, CSSProperties, MouseEvent } from 'react';
 
 type DialogMaxWidth = 'xs' | 'sm' | 'md' | 'lg' | 'xl';

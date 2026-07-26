@@ -17,7 +17,7 @@ import { useState, useMemo, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import './PhraseSuggestions.css';
 import { Checkbox } from '../../ui/macos';
-import { useTranslation } from '../../../i18n/useTranslation';
+import { useTranslation } from '@/i18n/useTranslation';
 
 /**
  * Common clinical phrases by field.

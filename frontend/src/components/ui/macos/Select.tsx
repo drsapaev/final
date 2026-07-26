@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, type CSSProperties, type ReactNode, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { useTranslation } from '../../../i18n/useTranslation';
-import { toFormValue } from '../../../utils/formValue';
+import { useTranslation } from '@/i18n/useTranslation';
+import { toFormValue } from '@/utils/formValue';
 
 type SelectSize = 'small' | 'default' | 'large';
 type SelectValue = string | number;

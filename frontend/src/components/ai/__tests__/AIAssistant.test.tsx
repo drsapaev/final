@@ -30,7 +30,7 @@ vi.mock('../../../api/mcpClient', () => ({
 }));
 
 import AIAssistant from '../AIAssistant';
-import { mcpAPI } from '../../../api/mcpClient';
+import { mcpAPI } from '@/api/mcpClient';
 
 const mcpAPIMocks = mcpAPI as unknown as {
   analyzeComplaint: { mockResolvedValue: (v: unknown) => void; mockRejectedValue: (e: unknown) => void };

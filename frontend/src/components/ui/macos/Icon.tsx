@@ -1,6 +1,6 @@
 import React, { type CSSProperties, type ReactElement } from 'react';
-import { useTheme } from '../../../contexts/ThemeContext';
-import { useTranslation } from '../../../i18n/useTranslation';
+import { useTheme } from '@/contexts/ThemeContext';
+import { useTranslation } from '@/i18n/useTranslation';
 
 type IconSize = 'small' | 'default' | 'large' | 'xlarge' | number;
 type IconColor = 'default' | 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'white' | 'black' | 'accent' | string;
