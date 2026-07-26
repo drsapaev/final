@@ -7,33 +7,8 @@ import type { Patient } from '../types/domain/clinic';
 
 interface CatchError {
   status?: number;
-  response?: { status?: number; data?: { detail?: string; [key: string]: unknown } };
+  response?: { status?: number; data?: unknown };
   message?: string;
-}
-
-interface TransformedPatient {
-  id: string | number;
-  firstName: unknown;
-  lastName: unknown;
-  middleName: unknown;
-  email: unknown;
-  phone: unknown;
-  birthDate: unknown;
-  gender: string;
-  address: unknown;
-  passport: string;
-  insuranceNumber: string;
-  emergencyContact: string;
-  emergencyPhone: string;
-  bloodType: string;
-  allergies: string;
-  chronicDiseases: string;
-  notes: string;
-  createdAt: string;
-  lastVisit: null;
-  visitsCount: number;
-  is_deleted?: boolean;
-  [key: string]: unknown;
 }
 
 /**
@@ -51,9 +26,13 @@ interface TransformedPatient {
  */
 
 const usePatients = () => {
-  const [patients, setPatients] = useState<TransformedPatient[]>([]);
+  // TECH-DEBT(g8-usePatients-001): patients state uses ReturnType<typeof transformPatient>
+  // inferred shape. Consumers access camelCase fields (firstName, lastName, etc.)
+  // which come from transformPatient. Migrating to a typed Patient state requires
+  // updating all consumers that access these transformed fields.
+  const [patients, setPatients] = useState<ReturnType<typeof transformPatient>[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<Error | string | null>(null);
+  const [error, setError] = useState<Error | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterGender, setFilterGender] = useState('');
   const [filterAgeRange, setFilterAgeRange] = useState('');
@@ -66,19 +45,19 @@ const usePatients = () => {
   // implementation silently wiped these fields on every load/create/update,
   // which caused clinicians to see empty allergy warnings and made filter-by-
   // blood-type impossible. This was a medical-safety defect.
-  const transformPatient = (p: Patient): TransformedPatient => {
+  const transformPatient = (p: Patient) => {
     const raw = p as Record<string, unknown>;
     return {
       id: p.id,
-      firstName: raw.first_name,
-      lastName: raw.last_name,
-      middleName: raw.middle_name,
-      email: raw.email || '',
-      phone: raw.phone || '',
-      birthDate: raw.birth_date || '',
+      firstName: String(raw.first_name ?? ''),
+      lastName: String(raw.last_name ?? ''),
+      middleName: String(raw.middle_name ?? ''),
+      email: String(raw.email ?? ''),
+      phone: String(raw.phone ?? ''),
+      birthDate: String(raw.birth_date ?? ''),
       gender: raw.sex === 'M' ? 'male' : raw.sex === 'F' ? 'female' : '',
-      address: raw.address || '',
-      passport: p.doc_number || '',
+      address: String(raw.address ?? ''),
+      passport: String(p.doc_number ?? ''),
       // Medical / identity fields — read with `?? ''` so a missing key
       // collapses to empty string without losing real backend data.
       insuranceNumber: (raw.insurance_number ?? raw.insuranceNumber ?? '') as string,
@@ -106,8 +85,7 @@ const usePatients = () => {
       const transformedPatients = data.map(transformPatient);
       setPatients(transformedPatients);
     } catch (err) {
-      const apiErr = err as CatchError;
-      const message = apiErr?.response?.data?.detail || apiErr?.message || 'Ошибка загрузки пациентов';
+      const message = (err as { response?: { data?: { detail?: string } }; message?: string })?.response?.data?.detail || (err as { message?: string })?.message || 'Ошибка загрузки пациентов';
       setError(new Error(message));
       logger.error('Ошибка загрузки пациентов:', err);
     } finally {
@@ -122,7 +100,7 @@ const usePatients = () => {
 
     try {
       const documentFields = buildPatientDocumentFields(
-        (patientData.passport as string | null | undefined) ?? patientData.doc_number
+        patientData.doc_number
       );
 
       const apiData = {
@@ -144,12 +122,11 @@ const usePatients = () => {
       setPatients(prev => [transformedPatient, ...prev]);
       return transformedPatient;
     } catch (err) {
-      const apiErr = err as CatchError;
-      const message = apiErr?.response?.data?.detail || apiErr?.message || 'Ошибка создания пациента';
+      const message = (err as { response?: { data?: { detail?: string } }; message?: string })?.response?.data?.detail || (err as { message?: string })?.message || 'Ошибка создания пациента';
       const wrapped = new Error(message);
-      (wrapped as CatchError).status = apiErr?.response?.status;
-      (wrapped as CatchError).response = apiErr?.response;
-      setError(String(wrapped));
+      (wrapped as CatchError).status = (err as { response?: { status?: number } })?.response?.status;
+      (wrapped as CatchError).response = (err as { response?: { status?: number; data?: unknown } })?.response;
+      setError(new Error(String(wrapped)));
       throw wrapped;
     } finally {
       setLoading(false);
@@ -157,7 +134,7 @@ const usePatients = () => {
   }, []);
 
   // Обновление пациента
-  const updatePatient = useCallback(async (id: string | number, patientData: Partial<Patient> & Record<string, unknown>) => {
+  const updatePatient = useCallback(async (id: string | number, patientData: Partial<Patient>) => {
     setLoading(true);
     setError(null);
 
@@ -170,10 +147,10 @@ const usePatients = () => {
       if (patientData.gender !== undefined) (apiData as Record<string, unknown>).sex = patientData.gender === 'male' ? 'M' : patientData.gender === 'female' ? 'F' : null;
       if ((patientData as Record<string, unknown>).phone !== undefined) (apiData as Record<string, unknown>).phone = (patientData as Record<string, unknown>).phone;
       if ((patientData as Record<string, unknown>).email !== undefined) (apiData as Record<string, unknown>).email = (patientData as Record<string, unknown>).email;
-      if (patientData.passport !== undefined || patientData.doc_number !== undefined) {
+      if (patientData.doc_number !== undefined) {
         Object.assign(
           apiData,
-          buildPatientDocumentFields((patientData.passport as string | null | undefined) ?? patientData.doc_number)
+          buildPatientDocumentFields(patientData.doc_number)
         );
       }
       if ((patientData as Record<string, unknown>).address !== undefined) (apiData as Record<string, unknown>).address = (patientData as Record<string, unknown>).address;
@@ -191,12 +168,11 @@ const usePatients = () => {
       ));
       return transformedPatient;
     } catch (err) {
-      const apiErr = err as CatchError;
-      const message = apiErr?.response?.data?.detail || apiErr?.message || 'Ошибка обновления пациента';
+      const message = (err as { response?: { data?: { detail?: string } }; message?: string })?.response?.data?.detail || (err as { message?: string })?.message || 'Ошибка обновления пациента';
       const wrapped = new Error(message);
-      (wrapped as CatchError).status = apiErr?.response?.status;
-      (wrapped as CatchError).response = apiErr?.response;
-      setError(String(wrapped));
+      (wrapped as CatchError).status = (err as { response?: { status?: number } })?.response?.status;
+      (wrapped as CatchError).response = (err as { response?: { status?: number; data?: unknown } })?.response;
+      setError(new Error(String(wrapped)));
       throw wrapped;
     } finally {
       setLoading(false);
@@ -213,12 +189,11 @@ const usePatients = () => {
       await api.delete(`/patients/${id}`);
       setPatients(prev => prev.filter(patient => patient.id !== id));
     } catch (err) {
-      const apiErr = err as CatchError;
-      const message = apiErr?.response?.data?.detail || apiErr?.message || 'Ошибка удаления пациента';
+      const message = (err as { response?: { data?: { detail?: string } }; message?: string })?.response?.data?.detail || (err as { message?: string })?.message || 'Ошибка удаления пациента';
       const wrapped = new Error(message);
-      (wrapped as CatchError).status = apiErr?.response?.status;
-      (wrapped as CatchError).response = apiErr?.response;
-      setError(String(wrapped));
+      (wrapped as CatchError).status = (err as { response?: { status?: number } })?.response?.status;
+      (wrapped as CatchError).response = (err as { response?: { status?: number; data?: unknown } })?.response;
+      setError(new Error(String(wrapped)));
       throw wrapped;
     } finally {
       setLoading(false);
@@ -251,7 +226,7 @@ const usePatients = () => {
 
     const matchesGender = !filterGender || patient.gender === filterGender;
 
-    const patientAge = calculateAge(patient.birthDate as string);
+    const patientAge = calculateAge(String(patient.birthDate));
     const matchesAgeRange = !filterAgeRange || (() => {
       switch (filterAgeRange) {
         case '0-18': return patientAge >= 0 && patientAge <= 18;
@@ -282,12 +257,11 @@ const usePatients = () => {
           : patient
       ));
     } catch (err) {
-      const apiErr = err as CatchError;
-      const message = apiErr?.response?.data?.detail || apiErr?.message || 'Ошибка архивирования пациента';
+      const message = (err as { response?: { data?: { detail?: string } }; message?: string })?.response?.data?.detail || (err as { message?: string })?.message || 'Ошибка архивирования пациента';
       const wrapped = new Error(message);
-      (wrapped as CatchError).status = apiErr?.response?.status;
-      (wrapped as CatchError).response = apiErr?.response;
-      setError(String(wrapped));
+      (wrapped as CatchError).status = (err as { response?: { status?: number } })?.response?.status;
+      (wrapped as CatchError).response = (err as { response?: { status?: number; data?: unknown } })?.response;
+      setError(new Error(String(wrapped)));
       throw wrapped;
     } finally {
       setLoading(false);
@@ -308,12 +282,11 @@ const usePatients = () => {
           : patient
       ));
     } catch (err) {
-      const apiErr = err as CatchError;
-      const message = apiErr?.response?.data?.detail || apiErr?.message || 'Ошибка восстановления пациента';
+      const message = (err as { response?: { data?: { detail?: string } }; message?: string })?.response?.data?.detail || (err as { message?: string })?.message || 'Ошибка восстановления пациента';
       const wrapped = new Error(message);
-      (wrapped as CatchError).status = apiErr?.response?.status;
-      (wrapped as CatchError).response = apiErr?.response;
-      setError(String(wrapped));
+      (wrapped as CatchError).status = (err as { response?: { status?: number } })?.response?.status;
+      (wrapped as CatchError).response = (err as { response?: { status?: number; data?: unknown } })?.response;
+      setError(new Error(String(wrapped)));
       throw wrapped;
     } finally {
       setLoading(false);
