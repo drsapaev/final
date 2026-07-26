@@ -77,7 +77,8 @@
     "src/hooks/useUserPreferences.ts",
     "src/hooks/usePatients.ts",
     "src/hooks/useEMR.ts",
-    "src/hooks/useReports.ts"
+    "src/hooks/useReports.ts",
+    "src/hooks/useAIChat.ts"
   ],
   "exclude": ["node_modules", "dist", "e2e"]
 }

@@ -18,44 +18,25 @@ import {
     isSupportedMessagingContractVersion,
 } from '../constants/messagingContract';
 
-// audit/strict: renamed from AIChatMessageRecord to AIChatMessageRecord to avoid
-// shadowing domain types (custom/no-domain-type-duplication lint rule).
-interface AIChatMessageRecord {
-    id: number | string;
+/** AI chat session shape. */
+interface ChatSession {
+    id: string | number;
+    title?: string;
+    [key: string]: unknown;
+}
+
+/** AI chat message shape. */
+interface ChatMessage {
+    id: string | number;
     role: string;
-    content: string;
+    content: unknown;
     created_at?: string;
     _pending?: boolean;
-    _streaming?: boolean;
-    provider?: string;
-    model?: string;
-    tokens_used?: number;
-    latency_ms?: number;
-    was_cached?: boolean;
     [key: string]: unknown;
 }
 
-interface ChatSession {
-    id: number | string;
-    context_type?: string;
-    specialty?: string;
-    [key: string]: unknown;
-}
-
-interface WSMessage {
-    session_id?: string | number;
-    type?: string;
-    content?: string;
-    message_id?: string | number;
-    provider?: string;
-    model?: string;
-    tokens?: number;
-    latency_ms?: number;
-    cached?: boolean;
-    message?: string;
-    contract_version?: string;
-    [key: string]: unknown;
-}
+/** WebSocket message handler shape. */
+type WsMessageHandler = ((data: unknown) => void) | null;
 
 /**
  * Хук для AI чата
@@ -75,7 +56,7 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
     // State
     const [sessions, setSessions] = useState<ChatSession[]>([]);
     const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);
-    const [messages, setMessages] = useState<AIChatMessageRecord[]>([]);
+    const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [loading, setLoading] = useState(false);
     const [streaming, setStreaming] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -84,7 +65,7 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
     // Refs
     const wsRef = useRef<WebSocket | null>(null);
     const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const handleWebSocketMessageRef = useRef<((data: WSMessage) => void) | null>(null);
+    const handleWebSocketMessageRef = useRef<WsMessageHandler>(null);
     // audit/phase-final, BS-15: shouldReconnect ref + reconnect attempt counter.
     const shouldReconnectRef = useRef(true);
     const reconnectAttemptRef = useRef(0);
@@ -104,16 +85,15 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
     /**
      * Загрузить список сессий
      */
-    const loadSessions = useCallback(async (limit: number = 20) => {
+    const loadSessions = useCallback(async (limit = 20) => {
         try {
             setLoading(true);
             const response = await api.get('/ai/chat/sessions', { params: { limit } });
-            setSessions(response.data as ChatSession[]);
-            return response.data as ChatSession[];
+            setSessions(response.data);
+            return response.data;
         } catch (err) {
-            const apiErr = err as { response?: { status?: number; data?: { detail?: string; [key: string]: unknown } }; message?: string };
             logger.error('Failed to load chat sessions:', err);
-            setError(apiErr.response?.data?.detail || 'Failed to load sessions');
+            setError((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Failed to load sessions');
             return [];
         } finally {
             setLoading(false);
@@ -131,7 +111,7 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
                 specialty: customSpecialty || specialty
             });
 
-            const session = response.data as ChatSession;
+            const session = response.data;
             setSessions(prev => [session, ...prev]);
             setCurrentSession(session);
             currentSessionRef.current = session;
@@ -141,9 +121,8 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
 
             return session;
         } catch (err) {
-            const apiErr = err as { response?: { status?: number; data?: { detail?: string; [key: string]: unknown } }; message?: string };
             logger.error('Failed to create chat session:', err);
-            setError(apiErr.response?.data?.detail || 'Failed to create session');
+            setError((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Failed to create session');
             return null;
         } finally {
             setLoading(false);
@@ -163,27 +142,25 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
             // Загружаем сессию
             const sessionResponse = await api.get(`/ai/chat/sessions/${sessionId}`);
             if (requestId !== loadSessionRequestRef.current) {
-                return sessionResponse.data as ChatSession;
+                return sessionResponse.data;
             }
 
             // Загружаем сообщения
             const messagesResponse = await api.get(`/ai/chat/sessions/${sessionId}/messages`);
             if (requestId !== loadSessionRequestRef.current) {
-                return sessionResponse.data as ChatSession;
+                return sessionResponse.data;
             }
 
-            const session = sessionResponse.data as ChatSession;
-            setCurrentSession(session);
-            currentSessionRef.current = session;
-            setMessages(messagesResponse.data as AIChatMessageRecord[]);
+            setCurrentSession(sessionResponse.data);
+            currentSessionRef.current = sessionResponse.data;
+            setMessages(messagesResponse.data);
             setStreaming(false);
             setError(null);
 
-            return session;
+            return sessionResponse.data;
         } catch (err) {
-            const apiErr = err as { response?: { status?: number; data?: { detail?: string; [key: string]: unknown } }; message?: string };
             logger.error('Failed to load chat session:', err);
-            setError(apiErr.response?.data?.detail || 'Failed to load session');
+            setError((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Failed to load session');
             return null;
         } finally {
             setLoading(false);
@@ -219,7 +196,7 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
             setError(null);
 
             // Оптимистично добавляем user message
-            const userMessage: AIChatMessageRecord = {
+            const userMessage = {
                 id: Date.now(),
                 role: 'user',
                 content,
@@ -234,23 +211,20 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
                 include_history: includeHistory
             });
 
-            const responseMessage = response.data as AIChatMessageRecord;
-
             // Обновляем сообщения
             if (currentSessionRef.current?.id !== sessionId) {
                 setMessages(prev => prev.filter(m => m.id !== userMessage.id));
-                return responseMessage;
+                return response.data;
             }
             setMessages(prev => {
                 const filtered = prev.filter(m => m.id !== userMessage.id);
-                return [...filtered, { ...userMessage, _pending: false }, responseMessage];
+                return [...filtered, { ...userMessage, _pending: false }, response.data];
             });
 
-            return responseMessage;
+            return response.data;
         } catch (err) {
-            const apiErr = err as { response?: { status?: number; data?: { detail?: string; [key: string]: unknown } }; message?: string };
             logger.error('Failed to send message:', err);
-            setError(apiErr.response?.data?.detail || 'Failed to send message');
+            setError((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Failed to send message');
 
             // Откатываем оптимистичное обновление
             setMessages(prev => prev.filter(m => !m._pending));
@@ -279,9 +253,8 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
 
             return true;
         } catch (err) {
-            const apiErr = err as { response?: { status?: number; data?: { detail?: string; [key: string]: unknown } }; message?: string };
             logger.error('Failed to delete session:', err);
-            setError(apiErr.response?.data?.detail || 'Failed to delete session');
+            setError((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Failed to delete session');
             return false;
         }
     }, []);
@@ -329,15 +302,15 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
         const wsUrl = `${buildWsUrl('/api/v1/ai/chat/ws')}`;
 
         try {
-            const ws = new WebSocket(wsUrl, [`bearer.${token}`]);
+            wsRef.current = new WebSocket(wsUrl, [`bearer.${token}`]);
 
-            ws.onopen = () => {
+            wsRef.current.onopen = () => {
                 logger.info('AI Chat WebSocket connected');
                 setConnected(true);
                 setError(null);
             };
 
-            ws.onclose = (event: CloseEvent) => {
+            wsRef.current.onclose = (event) => {
                 logger.info('AI Chat WebSocket closed:', event.code, event.reason);
                 setConnected(false);
 
@@ -360,14 +333,14 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
                 }
             };
 
-            ws.onerror = (error: Event) => {
+            wsRef.current.onerror = (error) => {
                 logger.error('AI Chat WebSocket error:', error);
                 setError('WebSocket connection failed');
             };
 
-            ws.onmessage = (event: MessageEvent) => {
+            wsRef.current.onmessage = (event) => {
                 try {
-                    const data = JSON.parse(event.data) as WSMessage;
+                    const data = JSON.parse(event.data);
                     if (
                         data.contract_version &&
                         !isSupportedMessagingContractVersion(data.contract_version) &&
@@ -385,8 +358,6 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
                     logger.error('Failed to parse WebSocket message:', err);
                 }
             };
-
-            wsRef.current = ws;
         } catch (err) {
             logger.error('Failed to create WebSocket:', err);
             setError('Failed to connect to chat');
@@ -396,7 +367,7 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
     /**
      * Обработка WebSocket сообщений
      */
-    const handleWebSocketMessage = useCallback((data: WSMessage) => {
+    const handleWebSocketMessage = useCallback((data: Record<string, unknown>) => {
         if (
             data.session_id &&
             currentSessionRef.current?.id &&
@@ -422,7 +393,7 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
                         // Добавляем к текущему streaming сообщению
                         return [
                             ...prev.slice(0, -1),
-                            { ...last, content: last.content + (data.content as string) }
+                            { ...last, content: String(last.content ?? '') + String(data.content ?? '') }
                         ];
                     } else {
                         // Создаем новое streaming сообщение
@@ -431,7 +402,7 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
                             {
                                 id: Date.now(),
                                 role: 'assistant',
-                                content: data.content as string,
+                                content: data.content,
                                 _streaming: true
                             }
                         ];
@@ -445,19 +416,20 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
                 setMessages(prev => {
                     const last = prev[prev.length - 1];
                     if (last?._streaming) {
+                        const updated: ChatMessage = {
+                            ...last,
+                            id: (data.message_id as string | number) ?? last.id,
+                            provider: data.provider,
+                            model: data.model,
+                            tokens_used: data.tokens,
+                            latency_ms: data.latency_ms,
+                            was_cached: data.cached,
+                            _streaming: false,
+                            created_at: new Date().toISOString()
+                        };
                         return [
                             ...prev.slice(0, -1),
-                            {
-                                ...last,
-                                id: data.message_id as string | number,
-                                provider: data.provider,
-                                model: data.model,
-                                tokens_used: data.tokens,
-                                latency_ms: data.latency_ms,
-                                was_cached: data.cached,
-                                _streaming: false,
-                                created_at: new Date().toISOString()
-                            }
+                            updated
                         ];
                     }
                     return prev;
@@ -466,7 +438,7 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
 
             case 'error':
                 setStreaming(false);
-                setError(data.message ?? null);
+                setError(String(data.message ?? 'Unknown error'));
                 break;
 
             case 'session_closed':
@@ -488,15 +460,14 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
     }, []);
 
     useEffect(() => {
-        handleWebSocketMessageRef.current = handleWebSocketMessage;
+        handleWebSocketMessageRef.current = handleWebSocketMessage as WsMessageHandler;
     }, [handleWebSocketMessage]);
 
     /**
      * Отправить сообщение через WebSocket
      */
     const sendMessageWS = useCallback((content: string) => {
-        const ws = wsRef.current;
-        if (!ws || ws.readyState !== WebSocket.OPEN) {
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
             setError('WebSocket not connected');
             return false;
         }
@@ -520,7 +491,7 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
         ]);
 
         // Отправляем
-        ws.send(JSON.stringify({
+        wsRef.current.send(JSON.stringify({
             type: 'message',
             session_id: currentSessionRef.current?.id,
             content,
@@ -544,13 +515,12 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
             clearTimeout(reconnectTimeoutRef.current);
         }
 
-        const ws = wsRef.current;
-        if (ws) {
-            ws.onclose = null;
-            ws.onerror = null;
-            ws.onopen = null;
-            ws.onmessage = null;
-            ws.close(1000, 'User disconnect');
+        if (wsRef.current) {
+            wsRef.current.onclose = null;
+            wsRef.current.onerror = null;
+            wsRef.current.onopen = null;
+            wsRef.current.onmessage = null;
+            wsRef.current.close(1000, 'User disconnect');
             wsRef.current = null;
         }
 
@@ -577,9 +547,8 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
         if (!useWebSocket || !connected) return;
 
         const interval = setInterval(() => {
-            const ws = wsRef.current;
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({
+            if (wsRef.current?.readyState === WebSocket.OPEN) {
+                wsRef.current.send(JSON.stringify({
                     type: 'ping',
                     session_id: currentSessionRef.current?.id,
                     contract_version: MESSAGING_CONTRACT_VERSION
