@@ -133,7 +133,7 @@ const MacOSPagination = ({
   };
 
   const getVisiblePages = () => {
-    const pages = [];
+    const pages: number[] = [];
     const halfVisible = Math.floor(maxVisiblePages / 2);
 
     let startPage = Math.max(1, currentPage - halfVisible);
