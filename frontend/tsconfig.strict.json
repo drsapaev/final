@@ -83,7 +83,8 @@
     "src/components/ui/macos/MacOSPagination.tsx",
     "src/components/mobile/QueuePositionCard.tsx",
     "src/components/patient/patientUtils.ts",
-    "src/components/common/StateWrapper.tsx"
+    "src/components/common/StateWrapper.tsx",
+    "src/services/queue.ts"
   ],
   "exclude": ["node_modules", "dist", "e2e"]
 }
