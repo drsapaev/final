@@ -388,7 +388,7 @@ export const AppDataProvider = ({ children }: { children: ReactNode }) => {
     // memoized; only its wrapper identity changes per render, which useMemo
     // smooths out. `state` is the real dep.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [state]);
+  }) as AppDataContextValue, [state]);
 
   return (
     <AppDataContext.Provider value={value}>
@@ -399,7 +399,7 @@ export const AppDataProvider = ({ children }: { children: ReactNode }) => {
 
 
 AppDataProvider.propTypes = {
-  ...(AppDataProvider.propTypes || {}),
+  // audit/strict: removed self-referencing propTypes spread
   children: PropTypes.any,
 };
 

@@ -403,7 +403,7 @@ function normalizeDepartmentKey(departmentKey: unknown): string | null {
 
 function normalizeNotificationType(type: unknown): string {
   const normalized = normalizeSlug(type || 'notification');
-  return TYPE_ALIASES[normalized] || normalized;
+  return TYPE_ALIASES[normalized as keyof typeof TYPE_ALIASES] || normalized;
 }
 
 function inferRoleFromType(type: unknown): string | null {
@@ -919,7 +919,7 @@ export function NotificationCenterProvider({ children }: NotificationCenterProvi
       return inbox;
     }
 
-    const roleTypes = ROLE_NOTIFICATION_TYPES[normalizedRole] || [];
+    const roleTypes = ROLE_NOTIFICATION_TYPES[normalizedRole as keyof typeof ROLE_NOTIFICATION_TYPES] || [];
     return inbox.filter((item) => {
       if (item.role) {
         return item.role === normalizedRole;
