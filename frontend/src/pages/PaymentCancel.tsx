@@ -83,7 +83,7 @@ const PaymentCancel = () => {
       'provider_error': t('misc.pc_oshibka_platezhnoy_sistemy')
     };
 
-    return reasons[reason] || t('misc.pc_platezh_byl_otmenen_ili_ne_p');
+    return (reason && reasons[reason as keyof typeof reasons]) || t('misc.pc_platezh_byl_otmenen_ili_ne_p');
   };
 
   return (
