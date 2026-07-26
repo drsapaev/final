@@ -110,7 +110,7 @@ const readFinanceCache = () => {
   }
 };
 
-const writeFinanceCache = (transactions, deletedIds: unknown[] = []) => {
+const writeFinanceCache = (transactions: unknown[], deletedIds: unknown[] = []) => {
   try {
     // audit/phase-8, BS-36: write deletedIds with timestamps for TTL.
     // Accept both legacy number[] and new DeletedIdEntry[] formats.
@@ -128,7 +128,7 @@ const writeFinanceCache = (transactions, deletedIds: unknown[] = []) => {
       FINANCE_CACHE_KEY,
       JSON.stringify({
         updatedAt: new Date().toISOString(),
-        transactions: sortTransactions(transactions.map(normalizeTransaction)),
+        transactions: sortTransactions(transactions.map((tx) => normalizeTransaction(tx as Record<string, unknown>))),
         deletedIds: stampedEntries
       })
     );
@@ -137,7 +137,10 @@ const writeFinanceCache = (transactions, deletedIds: unknown[] = []) => {
   }
 };
 
-const mergeTransactions = (serverTransactions: unknown[] = [], cacheState = { transactions: [], deletedIds: [] }) => {
+const mergeTransactions = (
+  serverTransactions: unknown[] = [],
+  cacheState: { transactions: unknown[]; deletedIds: unknown[] } = { transactions: [], deletedIds: [] }
+) => {
   // audit/phase-8, BS-36: deletedIds are pruned by TTL on read, so this
   // Set only contains IDs still within their TTL window.
   const deletedIds = new Set<number>(normalizeDeletedIds(cacheState.deletedIds as unknown[]));
@@ -162,7 +165,7 @@ const mergeTransactions = (serverTransactions: unknown[] = [], cacheState = { tr
   return sortTransactions(Array.from(merged.values()));
 };
 
-const toApiPayload = (transactionData) => ({
+const toApiPayload = (transactionData: Record<string, unknown>) => ({
   type: transactionData.type,
   category: transactionData.category,
   amount: Number(transactionData.amount),
@@ -178,9 +181,9 @@ const toApiPayload = (transactionData) => ({
 
 const useFinance = () => {
   const initialCache = readFinanceCache();
-  const [transactions, setTransactions] = useState(initialCache.transactions);
+  const [transactions, setTransactions] = useState<unknown[]>(initialCache.transactions);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
@@ -195,7 +198,7 @@ const useFinance = () => {
   }, [transactions]);
 
   const persistTransactions = useCallback((nextTransactions: unknown[], nextDeletedIds: unknown[] | Set<number> = deletedIdsRef.current) => {
-    const normalizedTransactions = sortTransactions(nextTransactions.map(normalizeTransaction));
+    const normalizedTransactions = sortTransactions(nextTransactions.map((tx) => normalizeTransaction(tx as Record<string, unknown>)));
     const normalizedDeletedIds = normalizeDeletedIds(Array.isArray(nextDeletedIds) ? nextDeletedIds : Array.from(nextDeletedIds || []));
 
     transactionsRef.current = normalizedTransactions;
@@ -278,7 +281,7 @@ const useFinance = () => {
     }
   }, [loadTransactions, persistTransactions]);
 
-  const updateTransaction = useCallback(async (id: string | number, transactionData) => {
+  const updateTransaction = useCallback(async (id: string | number, transactionData: Record<string, unknown>) => {
     setLoading(true);
     setError(null);
 
@@ -311,7 +314,7 @@ const useFinance = () => {
     }
   }, [loadTransactions, persistTransactions]);
 
-  const deleteTransaction = useCallback(async (id) => {
+  const deleteTransaction = useCallback(async (id: string | number) => {
     setLoading(true);
     setError(null);
 
@@ -403,7 +406,7 @@ const useFinance = () => {
   };
 
   const getCategoryStats = () => {
-    const categoryStats = {};
+    const categoryStats: Record<string, { income: number; expense: number; count: number }> = {};
 
     transactions.forEach((transaction) => {
       if (!categoryStats[String((transaction as Record<string, unknown>).category)]) {
@@ -427,7 +430,7 @@ const useFinance = () => {
   };
 
   const getDailyStats = (days = 7) => {
-    const dailyStats = {};
+    const dailyStats: Record<string, { income: number; expense: number; count: number }> = {};
     const today = new Date();
 
     for (let i = 0; i < days; i += 1) {

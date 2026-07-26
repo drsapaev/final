@@ -39,9 +39,9 @@ const generateSessionId = () => {
 };
 
 const emrCache = new Map();
-const isAccessDeniedStatus = (status: EMRHttpStatus) => status === 401 || status === 403;
+const isAccessDeniedStatus = (status: EMRHttpStatus | undefined | null): boolean => status === 401 || status === 403;
 
-const getAccessDeniedMessage = (error: EMRApiError): string => (
+const getAccessDeniedMessage = (error: EMRApiError | undefined): string => (
     error?.response?.data?.detail ||
     error?.response?.data?.message ||
     error?.message ||
@@ -57,7 +57,10 @@ const getAccessDeniedMessage = (error: EMRApiError): string => (
  * @param {string} options.specialty - Canonical specialty for this EMR flow
  * @returns {Object} EMR state and actions
  */
-export function useEMR(visitId, { autoLoad = true, specialty = 'general' } = {}) {
+export function useEMR(
+    visitId: number | string | null | undefined,
+    { autoLoad = true, specialty = 'general' }: { autoLoad?: boolean; specialty?: string } = {}
+) {
     const [state, dispatch] = useReducer(emrReducer, initialState);
     const clientSessionId = useRef(generateSessionId());
     const isMountedRef = useRef(true);
@@ -169,15 +172,16 @@ export function useEMR(visitId, { autoLoad = true, specialty = 'general' } = {})
                 }
                 return normalizedEmr;
             } catch (error) {
-                if (isAccessDeniedStatus(error?.response?.status)) {
+                const apiError = error as EMRApiError;
+                if (isAccessDeniedStatus(apiError?.response?.status)) {
                     emrCache.delete(cacheKey);
-                    return handleAccessDenied('loadEMR', error);
+                    return handleAccessDenied('loadEMR', apiError);
                 }
 
                 logger.error('Failed to load EMR:', error);
                 emrCache.delete(cacheKey);
                 if (isMountedRef.current) {
-                    dispatch(emrActions.saveError(error.message || 'Failed to load EMR'));
+                    dispatch(emrActions.saveError(apiError.message || 'Failed to load EMR'));
                 }
                 throw error;
             }
@@ -233,25 +237,26 @@ export function useEMR(visitId, { autoLoad = true, specialty = 'general' } = {})
             dispatch(emrActions.saveSuccess(response.data));
             return response.data;
         } catch (error) {
-            if (isAccessDeniedStatus(error?.response?.status)) {
-                return handleAccessDenied('saveEMR', error);
+            const apiError = error as EMRApiError;
+            if (isAccessDeniedStatus(apiError?.response?.status)) {
+                return handleAccessDenied('saveEMR', apiError);
             }
 
             // Check for conflict (409)
-            if (error.response?.status === 409) {
-                const conflictData = error.response.data?.detail || error.response.data;
+            if (apiError.response?.status === 409) {
+                const conflictData = (apiError.response.data?.detail || apiError.response.data || {}) as unknown as { current_version: unknown; your_version: unknown; last_edited_by: string; last_edited_at: string };
                 dispatch(emrActions.conflictDetected(conflictData));
                 return { conflict: true, ...conflictData };
             }
 
             // Check for signed EMR error (400)
-            if (error.response?.status === 400 &&
-                error.response.data?.detail?.includes('signed')) {
+            if (apiError.response?.status === 400 &&
+                apiError.response.data?.detail?.includes('signed')) {
                 dispatch(emrActions.saveError('EMR подписана. Используйте "Внести поправку".'));
                 return { signed: true };
             }
 
-            dispatch(emrActions.saveError(error.message || 'Ошибка сохранения'));
+            dispatch(emrActions.saveError(apiError.message || 'Ошибка сохранения'));
             throw error;
         }
     }, [handleAccessDenied, specialty, visitId, state.data, state.rowVersion]);
@@ -285,17 +290,18 @@ export function useEMR(visitId, { autoLoad = true, specialty = 'general' } = {})
             dispatch(emrActions.saveSuccess(response.data));
             return response.data;
         } catch (error) {
-            if (isAccessDeniedStatus(error?.response?.status)) {
-                return handleAccessDenied('signEMR', error);
+            const apiError = error as EMRApiError;
+            if (isAccessDeniedStatus(apiError?.response?.status)) {
+                return handleAccessDenied('signEMR', apiError);
             }
 
-            if (error.response?.status === 409) {
-                const conflictData = error.response.data?.detail || error.response.data;
+            if (apiError.response?.status === 409) {
+                const conflictData = (apiError.response.data?.detail || apiError.response.data || {}) as unknown as { current_version: unknown; your_version: unknown; last_edited_by: string; last_edited_at: string };
                 dispatch(emrActions.conflictDetected(conflictData));
                 return { conflict: true, ...conflictData };
             }
 
-            dispatch(emrActions.saveError(error.message || 'Ошибка подписания'));
+            dispatch(emrActions.saveError(apiError.message || 'Ошибка подписания'));
             throw error;
         }
     }, [handleAccessDenied, specialty, visitId, state.data, state.rowVersion]);
@@ -335,11 +341,12 @@ export function useEMR(visitId, { autoLoad = true, specialty = 'general' } = {})
             dispatch(emrActions.saveSuccess(response.data));
             return response.data;
         } catch (error) {
-            if (isAccessDeniedStatus(error?.response?.status)) {
-                return handleAccessDenied('amendEMR', error);
+            const apiError = error as EMRApiError;
+            if (isAccessDeniedStatus(apiError?.response?.status)) {
+                return handleAccessDenied('amendEMR', apiError);
             }
 
-            dispatch(emrActions.saveError(error.message || 'Ошибка внесения поправки'));
+            dispatch(emrActions.saveError(apiError.message || 'Ошибка внесения поправки'));
             throw error;
         }
     }, [handleAccessDenied, specialty, visitId, state.data, state.rowVersion]);
