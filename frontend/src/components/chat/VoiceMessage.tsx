@@ -258,8 +258,8 @@ const VoiceMessage = ({ message, fileUrl }) => {
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 VoiceMessage.propTypes = {
-  ...(VoiceMessage.propTypes || {}),
   fileUrl: PropTypes.any,
   message: PropTypes.any,
   voice_duration: PropTypes.any,

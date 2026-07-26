@@ -881,8 +881,8 @@ const PatientCard = ({
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 PatientCard.propTypes = {
-  ...(PatientCard.propTypes || {}),
   emergencyContact: PropTypes.any,
   insurance: PropTypes.any,
   isEditMode: PropTypes.any,

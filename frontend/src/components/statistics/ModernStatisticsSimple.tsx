@@ -12,8 +12,8 @@ const ModernStatistics = ({ appointments, onExport, onRefresh }) => {
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 ModernStatistics.propTypes = {
-  ...(ModernStatistics.propTypes || {}),
   appointments: PropTypes.any,
   length: PropTypes.any,
   onExport: PropTypes.any,

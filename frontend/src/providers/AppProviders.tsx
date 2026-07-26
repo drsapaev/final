@@ -40,8 +40,8 @@ export function AppProviders({ children }) {
 }
 
 
+// audit/strict: removed self-referencing propTypes spread
 AppProviders.propTypes = {
-  ...(AppProviders.propTypes || {}),
   children: PropTypes.any,
 };
 

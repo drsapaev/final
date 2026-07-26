@@ -437,8 +437,8 @@ const DisplayContentManager = ({
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 DisplayContentManager.propTypes = {
-  ...(DisplayContentManager.propTypes || {}),
   boardId: PropTypes.any,
   className: PropTypes.any,
 };

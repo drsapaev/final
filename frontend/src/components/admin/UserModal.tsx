@@ -158,8 +158,8 @@ const UserModal = ({
   );
 
 
-  ErrorMessage.propTypes = {
-    ...(ErrorMessage.propTypes || {}),
+  // audit/strict: removed self-referencing propTypes spread
+ErrorMessage.propTypes = {
     message: PropTypes.any,
   };
 
@@ -187,8 +187,8 @@ const UserModal = ({
   );
 
 
+// audit/strict: removed self-referencing propTypes spread
 FormField.propTypes = {
-    ...(FormField.propTypes || {}),
     children: PropTypes.any,
     error: PropTypes.any,
     icon: PropTypes.any,
@@ -349,8 +349,8 @@ FormField.propTypes = {
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 UserModal.propTypes = {
-  ...(UserModal.propTypes || {}),
   isOpen: PropTypes.any,
   loading: PropTypes.any,
   onClose: PropTypes.any,

@@ -321,8 +321,8 @@ const SMSEmail2FA = ({
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 SMSEmail2FA.propTypes = {
-  ...(SMSEmail2FA.propTypes || {}),
   emailAddress: PropTypes.any,
   method: PropTypes.any,
   onCancel: PropTypes.any,

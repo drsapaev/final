@@ -122,7 +122,7 @@ export function EMRDiffViewer({
                 setDiff(response.data);
             } catch (err) {
                 logger.error('Failed to load diff:', err);
-                setError(err.message || t('misc.edv_ne_udalos_zagruzit_sravnenie'));
+                setError((err instanceof Error ? err.message : String(err)) || t('misc.edv_ne_udalos_zagruzit_sravnenie'));
             } finally {
                 setLoading(false);
             }

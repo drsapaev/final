@@ -204,8 +204,8 @@ const VoiceRecorder = ({ onSend, onCancel }) => {
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 VoiceRecorder.propTypes = {
-  ...(VoiceRecorder.propTypes || {}),
   onCancel: PropTypes.any,
   onSend: PropTypes.any,
 };

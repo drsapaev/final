@@ -649,8 +649,8 @@ const ProtocolTemplates = ({
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 ProtocolTemplates.propTypes = {
-  ...(ProtocolTemplates.propTypes || {}),
   onClose: PropTypes.any,
   onSelectTemplate: PropTypes.any,
 };

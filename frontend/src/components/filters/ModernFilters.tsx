@@ -299,8 +299,8 @@ const ModernFilters = ({
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 ModernFilters.propTypes = {
-  ...(ModernFilters.propTypes || {}),
   appointmentsCount: PropTypes.any,
   autoRefresh: PropTypes.any,
   className: PropTypes.any,

@@ -114,7 +114,7 @@ const FileUpload = ({
         onFilesSelected(processedFiles);
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Error processing files';
+      const message = err instanceof Error ? (err instanceof Error ? err.message : String(err)) : 'Error processing files';
       setError(message);
     } finally {
       setConverting(false);
@@ -328,8 +328,8 @@ const FileUpload = ({
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 FileUpload.propTypes = {
-  ...(FileUpload.propTypes || {}),
   accept: PropTypes.any,
   className: PropTypes.any,
   clearOnSelect: PropTypes.any,

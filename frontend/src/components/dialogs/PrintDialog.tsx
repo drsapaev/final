@@ -108,7 +108,7 @@ const PrintDialog = ({
       );
     } catch (err) {
       logger.error('Printers load error:', err);
-      setError(err.message || t('misc.pd_ne_udalos_zagruzit_printery'));
+      setError((err instanceof Error ? err.message : String(err)) || t('misc.pd_ne_udalos_zagruzit_printery'));
     } finally {
       setIsLoading(false);
     }

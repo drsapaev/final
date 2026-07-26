@@ -213,8 +213,8 @@ const AIClinicalText = ({ content, variant = 'info' }) => {
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 AIClinicalText.propTypes = {
-  ...(AIClinicalText.propTypes || {}),
   content: PropTypes.any,
   variant: PropTypes.any,
 };

@@ -799,8 +799,8 @@ const DiagnosisForm = ({
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 DiagnosisForm.propTypes = {
-  ...(DiagnosisForm.propTypes || {}),
   initialData: PropTypes.any,
   onClose: PropTypes.any,
   onSave: PropTypes.any,

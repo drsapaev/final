@@ -140,8 +140,8 @@ const CompactConnectionStatus = ({ className = '', showTooltip = true }) => {
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 CompactConnectionStatus.propTypes = {
-  ...(CompactConnectionStatus.propTypes || {}),
   className: PropTypes.any,
   showTooltip: PropTypes.any,
 };

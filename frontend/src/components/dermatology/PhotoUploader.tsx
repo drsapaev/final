@@ -685,8 +685,8 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 PhotoUploader.propTypes = {
-  ...(PhotoUploader.propTypes || {}),
   onDataUpdate: PropTypes.any,
   patientId: PropTypes.any,
   visitId: PropTypes.any,

@@ -589,8 +589,8 @@ const PriceOverrideManager = ({
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 PriceOverrideManager.propTypes = {
-  ...(PriceOverrideManager.propTypes || {}),
   isOpen: PropTypes.any,
   onClose: PropTypes.any,
   onPriceOverrideCreated: PropTypes.any,

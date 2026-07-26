@@ -561,8 +561,8 @@ const DoctorServiceSelector = ({
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 DoctorServiceSelector.propTypes = {
-  ...(DoctorServiceSelector.propTypes || {}),
   canEditPrices: PropTypes.bool,
   className: PropTypes.string,
   onServicesChange: PropTypes.func,

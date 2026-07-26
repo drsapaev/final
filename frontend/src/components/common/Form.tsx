@@ -413,8 +413,8 @@ export function FormField({
 }
 
 
+// audit/strict: removed self-referencing propTypes spread
 FormField.propTypes = {
-  ...(FormField.propTypes || {}),
   id: PropTypes.any,
 };
 
@@ -544,8 +544,8 @@ export function FormTextArea({
 }
 
 
+// audit/strict: removed self-referencing propTypes spread
 FormTextArea.propTypes = {
-  ...(FormTextArea.propTypes || {}),
   id: PropTypes.any,
 };
 
@@ -681,8 +681,8 @@ export function FormSelect({
 }
 
 
+// audit/strict: removed self-referencing propTypes spread
 FormSelect.propTypes = {
-  ...(FormSelect.propTypes || {}),
   id: PropTypes.any,
 };
 

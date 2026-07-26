@@ -70,8 +70,8 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
 }
 
 
+// audit/strict: removed self-referencing propTypes spread
 ErrorBoundary.propTypes = {
-  ...(ErrorBoundary.propTypes || {}),
   children: PropTypes.any,
   onError: PropTypes.any,
   theme: PropTypes.any,
@@ -177,8 +177,8 @@ function ErrorFallback({ error, errorInfo, onRetry, theme }) {
 }
 
 
+// audit/strict: removed self-referencing propTypes spread
 ErrorFallback.propTypes = {
-  ...(ErrorFallback.propTypes || {}),
   componentStack: PropTypes.any,
   error: PropTypes.any,
   errorInfo: PropTypes.any,

@@ -447,8 +447,8 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 EchoForm.propTypes = {
-  ...(EchoForm.propTypes || {}),
   initialData: PropTypes.any,
   onDataUpdate: PropTypes.func,
   onSave: PropTypes.any,

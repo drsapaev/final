@@ -219,7 +219,7 @@ export default function LabReportWorkbench({
       await onQueueChanged?.();
       notify('success', options.successMessage || t('success.report_created'));
     } catch (error) {
-      notify('error', error.message);
+      notify('error', (error instanceof Error ? error.message : String(error)));
     } finally {
       setSaving(false);
       setBusyAction(null);
@@ -312,7 +312,7 @@ export default function LabReportWorkbench({
         notify('success', t('success.draft_saved'));
       }
     } catch (error) {
-      notify('error', error.message);
+      notify('error', (error instanceof Error ? error.message : String(error)));
     } finally {
       setSaving(false);
       setBusyAction('');
@@ -355,7 +355,7 @@ export default function LabReportWorkbench({
       await onQueueChanged?.();
       notify('success', t('success.finalized'));
     } catch (error) {
-      notify('error', error.message);
+      notify('error', (error instanceof Error ? error.message : String(error)));
     } finally {
       setSaving(false);
       setBusyAction('');
@@ -386,7 +386,7 @@ export default function LabReportWorkbench({
       await onRefreshRecentReports?.();
       notify('success', t('success.revised'));
     } catch (error) {
-      notify('error', error.message);
+      notify('error', (error instanceof Error ? error.message : String(error)));
     } finally {
       setSaving(false);
       setBusyAction('');
@@ -475,7 +475,7 @@ export default function LabReportWorkbench({
     } catch (error) {
       setPrintFeedback({
         severity: 'error',
-        text: error.message
+        text: (error instanceof Error ? error.message : String(error))
       });
       notify('error', error.message);
     } finally {

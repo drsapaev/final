@@ -104,7 +104,7 @@ export function EMRHistoryPanel({
                 setHistory(response.data.revisions || []);
             } catch (err) {
                 logger.error('Failed to load history:', err);
-                setError(err.message || t('misc.ehp_ne_udalos_zagruzit_istoriyu'));
+                setError((err instanceof Error ? err.message : String(err)) || t('misc.ehp_ne_udalos_zagruzit_istoriyu'));
             } finally {
                 setLoading(false);
             }

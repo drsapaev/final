@@ -547,8 +547,8 @@ const TreatmentPlanner = ({ visitId, onUpdate, patientId, teethData }: { visitId
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 TreatmentPlanner.propTypes = {
-  ...(TreatmentPlanner.propTypes || {}),
   onUpdate: PropTypes.any,
   visitId: PropTypes.any,
 };

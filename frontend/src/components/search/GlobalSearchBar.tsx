@@ -531,7 +531,7 @@ export default function GlobalSearchBar({ className = '' }) {
 }
 
 
+// audit/strict: removed self-referencing propTypes spread
 GlobalSearchBar.propTypes = {
-  ...(GlobalSearchBar.propTypes || {}),
   className: PropTypes.any,
 };

@@ -61,8 +61,8 @@ export const ControlCenter = ({ onActivate, onLogin }) => {
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 ControlCenter.propTypes = {
-  ...(ControlCenter.propTypes || {}),
   onActivate: PropTypes.any,
   onLogin: PropTypes.any,
 };

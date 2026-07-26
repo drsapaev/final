@@ -449,8 +449,8 @@ const ModernStatistics = ({
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 ModernStatistics.propTypes = {
-  ...(ModernStatistics.propTypes || {}),
   appointments: PropTypes.any,
   language: PropTypes.any,
   onExport: PropTypes.any,

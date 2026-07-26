@@ -70,8 +70,8 @@ const EmojiPicker = ({ onEmojiSelect, disabled = false }) => {
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 EmojiPicker.propTypes = {
-  ...(EmojiPicker.propTypes || {}),
   disabled: PropTypes.any,
   onEmojiSelect: PropTypes.any,
 };

@@ -84,8 +84,8 @@ const InteractiveCard = ({
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 InteractiveCard.propTypes = {
-  ...(InteractiveCard.propTypes || {}),
   children: PropTypes.any,
   className: PropTypes.any,
   onClick: PropTypes.any,
@@ -199,8 +199,8 @@ export const InteractiveListItem = ({
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 InteractiveListItem.propTypes = {
-  ...(InteractiveListItem.propTypes || {}),
   icon: PropTypes.any,
   onClick: PropTypes.any,
   subtitle: PropTypes.any,

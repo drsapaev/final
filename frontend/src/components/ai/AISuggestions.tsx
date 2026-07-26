@@ -56,8 +56,8 @@ const AISuggestions = ({
   };
 
 
-  Pill.propTypes = {
-    ...(Pill.propTypes || {}),
+  // audit/strict: removed self-referencing propTypes spread
+Pill.propTypes = {
     children: PropTypes.any,
     color: PropTypes.any,
   };
@@ -187,8 +187,8 @@ const AISuggestions = ({
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 AISuggestions.propTypes = {
-  ...(AISuggestions.propTypes || {}),
   clinicalRecommendations: PropTypes.any,
   fallbackProvider: PropTypes.any,
   maxHeight: PropTypes.any,

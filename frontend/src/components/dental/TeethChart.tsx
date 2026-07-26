@@ -395,8 +395,8 @@ const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }: TeethC
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 TeethChart.propTypes = {
-  ...(TeethChart.propTypes || {}),
   initialData: PropTypes.any,
   onToothClick: PropTypes.any,
   readOnly: PropTypes.any,

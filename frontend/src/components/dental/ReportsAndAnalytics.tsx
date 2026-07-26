@@ -586,8 +586,8 @@ const ReportsAndAnalytics = ({
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 ReportsAndAnalytics.propTypes = {
-  ...(ReportsAndAnalytics.propTypes || {}),
   initialData: PropTypes.object,
   onClose: PropTypes.any,
 };
