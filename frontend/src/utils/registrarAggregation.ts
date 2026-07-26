@@ -1,13 +1,13 @@
 import { parseRegistrarTimestamp } from './dateUtils';
 
-export const normalizeRegistrationMode = (value) => {
+export const normalizeRegistrationMode = (value: unknown) => {
   const normalized = String(value || 'none').toLowerCase();
   return ['none', 'repeat', 'benefit', 'all_free'].includes(normalized) ? normalized : 'none';
 };
 
-export const normalizePaymentStatus = (value) => String(value || 'pending').toLowerCase() === 'paid' ? 'paid' : 'pending';
+export const normalizePaymentStatus = (value: unknown) => String(value || 'pending').toLowerCase() === 'paid' ? 'paid' : 'pending';
 
-export const getRecordAmount = (appointment) => {
+export const getRecordAmount = (appointment: Record<string, unknown>) => {
   const amount = Number(appointment?.cost ?? 0);
   return Number.isFinite(amount) ? amount : 0;
 };
@@ -26,15 +26,15 @@ export const getRecordAmount = (appointment) => {
  *
  * Usage:
  *   import { adaptTimeFields } from '../utils/registrarAggregation';
- *   const row = { ...otherFields, ...adaptTimeFields(entry, data) };
+ *   const row = { ...otherFields, ...adaptTimeFields(entry: Record<string, unknown>, data: Record<string, unknown>) };
  *
  * @param {Object} entry - backend queue entry (from /registrar/queues/today)
  * @param {Object} [data] - top-level response (for timezone fallback)
  * @returns {Object} { created_at, queue_time, updated_at, last_changed_at, display_time_kind, timezone }
  */
-export const adaptTimeFields = (entry, data) => {
-  const fullEntry = entry?.data || entry || {};
-  const sourceEntry = entry || {};
+export const adaptTimeFields = (entry: Record<string, unknown>, data: Record<string, unknown>): Record<string, unknown> => {
+  const fullEntry: Record<string, unknown> = (entry?.data as Record<string, unknown>) || entry || {};
+  const sourceEntry: Record<string, unknown> = entry || {};
 
   const createdAt = fullEntry.created_at || sourceEntry.created_at || null;
   const hasQueueTime = Boolean(fullEntry.queue_time || sourceEntry.queue_time);
@@ -50,14 +50,14 @@ export const adaptTimeFields = (entry, data) => {
   };
 };
 
-export const getRegistrarPresentationSortTime = (record) => {
+export const getRegistrarPresentationSortTime = (record: Record<string, unknown>) => {
   const value = record?.queue_time || record?.created_at || null;
   if (!value) return 0;
   const date = parseRegistrarTimestamp(value);
   return !date || Number.isNaN(date.getTime()) ? 0 : date.getTime();
 };
 
-export const compareRegistrarPresentationOrder = (a, b) => {
+export const compareRegistrarPresentationOrder = (a: Record<string, unknown>, b: Record<string, unknown>) => {
   const aTime = getRegistrarPresentationSortTime(a);
   const bTime = getRegistrarPresentationSortTime(b);
   if (aTime === bTime) {
@@ -66,65 +66,66 @@ export const compareRegistrarPresentationOrder = (a, b) => {
   return aTime - bTime;
 };
 
-export const sortRegistrarRowsForPresentation = (records = []) => (
+export const sortRegistrarRowsForPresentation = (records: Record<string, unknown>[] = []) => (
   [...records].sort(compareRegistrarPresentationOrder)
 );
 
-const normalizeRecordKind = (appointment) => String(
+const normalizeRecordKind = (appointment: Record<string, unknown>): string => String(
   appointment?.record_kind ?? appointment?.source_kind ?? appointment?.record_type ?? appointment?.type ?? ''
 ).trim().toLowerCase();
 
-const pickCanonicalVisitId = (appointment) => appointment?.visit_id ?? appointment?.visitId ?? null;
+const pickCanonicalVisitId = (appointment: Record<string, unknown>): unknown => appointment?.visit_id ?? appointment?.visitId ?? null;
 
-const pickCanonicalAppointmentId = (appointment) => appointment?.appointment_id ?? null;
+const pickCanonicalAppointmentId = (appointment: Record<string, unknown>): unknown => appointment?.appointment_id ?? null;
 
-const hasQueueIdentityValue = (value) => value !== null && value !== undefined && value !== '';
+const hasQueueIdentityValue = (value: unknown) => value !== null && value !== undefined && value !== '';
 
-const pickQueueNumberEntryId = (queueNumber) => {
+const pickQueueNumberEntryId = (queueNumber: unknown): string | number | null => {
   if (!queueNumber || typeof queueNumber !== 'object') return null;
+  const qn = queueNumber as Record<string, unknown>;
 
-  const explicitQueueEntryId = queueNumber.original_queue_id ??
-    queueNumber.queue_entry_id ??
-    queueNumber.doctor_queue_entry_id ??
+  const explicitQueueEntryId = qn.original_queue_id ??
+    qn.queue_entry_id ??
+    qn.doctor_queue_entry_id ??
     null;
   if (hasQueueIdentityValue(explicitQueueEntryId)) {
-    return explicitQueueEntryId;
+    return explicitQueueEntryId as string | number;
   }
 
-  if (hasQueueIdentityValue(queueNumber.queue_id)) {
+  if (hasQueueIdentityValue(qn.queue_id)) {
     return null;
   }
 
-  return hasQueueIdentityValue(queueNumber.id) ? queueNumber.id : null;
+  return hasQueueIdentityValue(qn.id) ? (qn.id as string | number) : null;
 };
 
-const pickCanonicalQueueEntryId = (appointment) => {
+const pickCanonicalQueueEntryId = (appointment: Record<string, unknown>) => {
   const explicitQueueEntryId = appointment?.queue_entry_id ??
     appointment?.original_queue_id ??
     appointment?.doctor_queue_entry_id ??
     null;
   if (hasQueueIdentityValue(explicitQueueEntryId)) {
-    return explicitQueueEntryId;
+    return explicitQueueEntryId as string | number;
   }
 
-  return pickQueueNumberEntryId(appointment?.queue_numbers?.[0]);
+  return pickQueueNumberEntryId((appointment?.queue_numbers as unknown[])?.[0]);
 };
 
-const pickOnlineQueueRecordId = (appointment) => {
+const pickOnlineQueueRecordId = (appointment: Record<string, unknown>) => {
   const queueEntryId = pickCanonicalQueueEntryId(appointment);
   if (hasQueueIdentityValue(queueEntryId)) {
     return queueEntryId;
   }
   if (
     hasQueueIdentityValue(appointment?.queue_id) ||
-    hasQueueIdentityValue(appointment?.queue_numbers?.[0]?.queue_id)
+    hasQueueIdentityValue((appointment?.queue_numbers as unknown[])?.[0] && ((appointment?.queue_numbers as unknown[])[0] as Record<string, unknown>)?.queue_id)
   ) {
     return null;
   }
   return appointment?.id;
 };
 
-const buildRecordRef = (appointment) => {
+const buildRecordRef = (appointment: Record<string, unknown>) => {
   const recordKind = normalizeRecordKind(appointment);
   const recordId = appointment?.canonical_record_id
     ?? (recordKind === 'visit' ? appointment?.visit_id : null)
@@ -138,7 +139,7 @@ const buildRecordRef = (appointment) => {
   return { record_kind: recordKind, record_id: numericId };
 };
 
-const buildPatientGroupKey = (appointment, index = 0) => {
+const buildPatientGroupKey = (appointment: Record<string, unknown>, index: number = 0): string => {
   const patientId = appointment?.patient_id;
   if (patientId !== null && patientId !== undefined && String(patientId).trim() !== '') {
     return `patient:${patientId}`;
@@ -164,25 +165,26 @@ const buildPatientGroupKey = (appointment, index = 0) => {
   return `row:${appointment?.id ?? index}`;
 };
 
-const pickPatientGender = (appointment) => (
-  appointment?.patient_gender ??
-  appointment?.patient_sex ??
-  appointment?.gender ??
-  appointment?.sex ??
-  null
-);
+const pickPatientGender = (appointment: Record<string, unknown>): string => {
+  const gender = appointment?.patient_gender ??
+    appointment?.patient_sex ??
+    appointment?.gender ??
+    appointment?.sex ??
+    null;
+  return gender != null ? String(gender) : '';
+};
 
-export const aggregatePatientsForAllDepartments = (appointments = []) => {
+export const aggregatePatientsForAllDepartments = (appointments: Record<string, unknown>[] = []) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- aggregation result has heterogeneous shapes per group; tightening requires modeling the full aggregation pipeline (Phase 9 cleanup)
   const patientGroups: Record<string, any> = {};
 
-  const toTime = (value) => {
+  const toTime = (value: unknown) => {
     if (!value) return null;
     const date = parseRegistrarTimestamp(value);
     return !date || Number.isNaN(date.getTime()) ? null : date.getTime();
   };
 
-  const pickEarlierTimestamp = (currentValue, nextValue) => {
+  const pickEarlierTimestamp = (currentValue: unknown, nextValue: unknown) => {
     if (!currentValue) return nextValue || currentValue;
     if (!nextValue) return currentValue;
 
@@ -195,7 +197,7 @@ export const aggregatePatientsForAllDepartments = (appointments = []) => {
     return nextTime < currentTime ? nextValue : currentValue;
   };
 
-  const pickLaterTimestamp = (currentValue, nextValue) => {
+  const pickLaterTimestamp = (currentValue: unknown, nextValue: unknown) => {
     if (!currentValue) return nextValue || currentValue;
     if (!nextValue) return currentValue;
 
@@ -208,13 +210,13 @@ export const aggregatePatientsForAllDepartments = (appointments = []) => {
     return nextTime > currentTime ? nextValue : currentValue;
   };
 
-  appointments.forEach((appointment, index) => {
+  appointments.forEach((appointment: Record<string, unknown>, index: number) => {
     const patientKey = buildPatientGroupKey(appointment, index);
     const normalizedDiscountMode = normalizeRegistrationMode(appointment.discount_mode);
     const normalizedPayment = normalizePaymentStatus(appointment.payment_status);
     const appointmentCost = getRecordAmount(appointment);
     const recordRef = buildRecordRef(appointment);
-    const patientGender = pickPatientGender(appointment);
+    const patientGender: string = String(pickPatientGender(appointment) || '');
 
     if (!patientGroups[patientKey]) {
       const initialVisitId = pickCanonicalVisitId(appointment);
@@ -238,7 +240,7 @@ export const aggregatePatientsForAllDepartments = (appointments = []) => {
         visit_ids_set: new Set(initialVisitId !== null && initialVisitId !== undefined ? [initialVisitId] : []),
         appointment_ids_set: new Set(initialAppointmentId !== null && initialAppointmentId !== undefined ? [initialAppointmentId] : []),
         queue_entry_ids_set: new Set(initialQueueEntryId !== null && initialQueueEntryId !== undefined ? [initialQueueEntryId] : []),
-        aggregated_ids_set: new Set(appointment.aggregated_ids ? [...appointment.aggregated_ids] : [appointment.id]),
+        aggregated_ids_set: new Set((appointment.aggregated_ids as unknown[]) ? [...(appointment.aggregated_ids as unknown[])] : [appointment.id]),
         patient_id: appointment.patient_id,
         patient_fio: appointment.patient_fio,
         patient_birth_year: appointment.patient_birth_year,
@@ -282,16 +284,16 @@ export const aggregatePatientsForAllDepartments = (appointments = []) => {
         // audit/phase-6, BS-60: arrays kept in sync with Sets for backward
         // compat (some consumers read array.length / array[0]); Sets are the
         // dedup source of truth.
-        aggregated_ids: appointment.aggregated_ids ? [...appointment.aggregated_ids] : [appointment.id],
+        aggregated_ids: (appointment.aggregated_ids as unknown[]) ? [...(appointment.aggregated_ids as unknown[])] : [appointment.id],
         // (old field retained for shape compat; the Set above is the SSOT)
       };
     } else {
       // audit/phase-6, BS-60: dedup via Set.add (O(1) per id) instead of
       // [...new Set(array)] (O(k) per appointment). The array field is
       // rebuilt from the Set at the finalization step (line 440+).
-      const newIds = appointment.aggregated_ids || [appointment.id];
+      const newIds = (appointment.aggregated_ids as unknown[]) || [appointment.id];
       const aggregatedSet = patientGroups[patientKey].aggregated_ids_set as Set<unknown>;
-      for (const id of newIds) {
+      for (const id of newIds as unknown[]) {
         aggregatedSet.add(id);
       }
       patientGroups[patientKey].aggregated_ids = [...aggregatedSet];
@@ -348,10 +350,10 @@ export const aggregatePatientsForAllDepartments = (appointments = []) => {
 
       if (Array.isArray(appointment.queue_numbers)) {
         const existingQueueIds = new Set(
-          (patientGroups[patientKey].queue_numbers || []).map((qn) => qn.id?.toString() || `${qn.queue_tag}_${qn.service_id}`),
+          (patientGroups[patientKey].queue_numbers || []).map((qn: Record<string, unknown>) => qn.id?.toString() || `${qn.queue_tag}_${qn.service_id}`),
         );
 
-        appointment.queue_numbers.forEach((qn) => {
+        appointment.queue_numbers.forEach((qn: Record<string, unknown>) => {
           const queueId = qn.id?.toString() || `${qn.queue_tag}_${qn.service_id}`;
           if (!existingQueueIds.has(queueId)) {
             patientGroups[patientKey].queue_numbers.push(qn);
@@ -360,7 +362,7 @@ export const aggregatePatientsForAllDepartments = (appointments = []) => {
         });
       }
 
-      const isQRSource = (src) => src === 'online';
+      const isQRSource = (src: unknown): boolean => src === 'online';
       const currentIsQR = isQRSource(appointment.source);
       const aggregatedIsQR = isQRSource(patientGroups[patientKey].source);
 
@@ -379,7 +381,7 @@ export const aggregatePatientsForAllDepartments = (appointments = []) => {
     if (recordRef) {
       const refKey = `${recordRef.record_kind}:${recordRef.record_id}`;
       const existingRefKeys = new Set(
-        patientGroups[patientKey].grouped_record_refs.map((ref) => `${ref.record_kind}:${ref.record_id}`),
+        patientGroups[patientKey].grouped_record_refs.map((ref: Record<string, unknown>) => `${ref.record_kind}:${ref.record_id}`),
       );
       if (!existingRefKeys.has(refKey)) {
         patientGroups[patientKey].grouped_record_refs.push(recordRef);
@@ -424,17 +426,17 @@ export const aggregatePatientsForAllDepartments = (appointments = []) => {
         patientGroups[patientKey].service_details = [];
       }
       const existingServiceDetailKeys = new Set(
-        patientGroups[patientKey].service_details.map((serviceDetail) => (
+        patientGroups[patientKey].service_details.map((serviceDetail: Record<string, unknown>) => (
           serviceDetail?.service_id ??
           serviceDetail?.id ??
           serviceDetail?.service_code ??
           serviceDetail?.code ??
           serviceDetail?.service_name ??
           serviceDetail?.name
-        )).filter((value) => value !== null && value !== undefined).map(String),
+        )).filter((value: unknown) => value !== null && value !== undefined).map(String),
       );
 
-      appointment.service_details.forEach((serviceDetail) => {
+      appointment.service_details.forEach((serviceDetail: Record<string, unknown>) => {
         if (!serviceDetail) return;
         const serviceDetailKey = serviceDetail.service_id ??
           serviceDetail.id ??
@@ -481,7 +483,7 @@ export const aggregatePatientsForAllDepartments = (appointments = []) => {
     const groupedPaymentTypes: unknown[] = Array.isArray(group.grouped_payment_types) ? group.grouped_payment_types as unknown[] : [];
     const uniquePaymentTypes = [...new Set(groupedPaymentTypes.filter(Boolean))];
 
-    const allApprovedZeroCostRegistrations = records.length > 0 && records.every((record: Record<string, unknown>) => (
+    const allApprovedZeroCostRegistrations = records.length > 0 && (records as Record<string, unknown>[]).every((record: Record<string, unknown>) => (
       Number(record.cost) <= 0 &&
       (
         record.discount_mode === 'repeat' ||
@@ -490,11 +492,11 @@ export const aggregatePatientsForAllDepartments = (appointments = []) => {
       )
     ));
 
-    const allPendingAllFree = records.length > 0 && records.every(
+    const allPendingAllFree = records.length > 0 && (records as Record<string, unknown>[]).every(
       (record: Record<string, unknown>) => record.discount_mode === 'all_free' && record.approval_status !== 'approved',
     );
-    const allPaid = records.length > 0 && records.every((record: Record<string, unknown>) => record.payment_status === 'paid');
-    const allUnpaidMonetary = records.length > 0 && records.every((record: Record<string, unknown>) => (
+    const allPaid = records.length > 0 && (records as Record<string, unknown>[]).every((record: Record<string, unknown>) => record.payment_status === 'paid');
+    const allUnpaidMonetary = records.length > 0 && (records as Record<string, unknown>[]).every((record: Record<string, unknown>) => (
       Number(record.cost) > 0 &&
       record.payment_status !== 'paid' &&
       record.discount_mode !== 'all_free'
