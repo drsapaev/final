@@ -14,7 +14,7 @@ import { useTranslation } from '@/i18n/useTranslation';
 const VitalsWidget = ({ vitals: vitalsRaw = {}, onChange, onFieldTouch, disabled }: { vitals?: Record<string, unknown>; onChange?: (v: Record<string, any>) => void; onFieldTouch?: (field: string) => void; disabled?: boolean }) => {
   const vitals = vitalsRaw as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
-    const handleChange = (field, value) => {
+    const handleChange = (field: string, value: string) => {
         onChange?.({ ...vitals, [field]: value });
         onFieldTouch?.(`vitals.${field}`);
     };

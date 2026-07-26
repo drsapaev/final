@@ -180,11 +180,11 @@ const AppointmentFlow = ({ appointment }: AppointmentFlowProps) => {
           <div>
             <div className="font-medium">{t('misc.af_status_zapisi')}</div>
             <div className="text-sm text-gray-600">
-              {STATUS_LABELS[appointment?.status] || t('misc.af_neizvestno')}
+              {STATUS_LABELS[appointment?.status ?? ''] || t('misc.af_neizvestno')}
             </div>
           </div>
-          <Badge variant={STATUS_COLORS[appointment?.status] as unknown as "default" | "primary" | "secondary" | "success" | "warning" | "danger" | "info" | "outline"}>
-            {STATUS_LABELS[appointment?.status]}
+          <Badge variant={STATUS_COLORS[appointment?.status ?? ''] as unknown as "default" | "primary" | "secondary" | "success" | "warning" | "danger" | "info" | "outline"}>
+            {STATUS_LABELS[appointment?.status ?? '']}
           </Badge>
         </div>
       </div>

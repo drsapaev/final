@@ -9,7 +9,7 @@ import { useTranslation } from '../../i18n/useTranslation';
  * DermatologistPanelUnified. Uses macos tokens + Modal component for
  * consistent styling and dark mode support.
  */
-const SessionWarningModal = ({ visible, onDismiss, onExtend }) => {
+const SessionWarningModal = ({ visible, onDismiss, onExtend }: { visible: boolean; onDismiss: () => void; onExtend?: () => void }) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   if (!visible) return null;
 

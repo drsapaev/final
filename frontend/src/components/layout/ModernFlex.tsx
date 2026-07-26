@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 
 import { useTheme } from '../../contexts/ThemeContext';
 import PropTypes from 'prop-types';
@@ -15,6 +15,16 @@ const ModernFlex = ({
   responsive = true,
   className = '',
   ...props
+}: {
+  children?: ReactNode;
+  direction?: string;
+  wrap?: string;
+  justify?: string;
+  align?: string;
+  gap?: string | number;
+  responsive?: boolean;
+  className?: string;
+  [key: string]: unknown;
 }) => {
   useTheme();
 
@@ -54,6 +64,13 @@ export const FlexItem = ({
   order = 'auto',
   className = '',
   ...props
+}: {
+  children?: ReactNode;
+  flex?: string | number;
+  alignSelf?: string;
+  order?: string | number;
+  className?: string;
+  [key: string]: unknown;
 }) => {
   const itemStyles = {
     flex,

@@ -21,14 +21,14 @@ import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
 const WizardSettings = () => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
-  const [settings, setSettings] = useState({
+  const [settings, setSettings] = useState<{ use_new_wizard: boolean; updated_at: string | null }>({
     use_new_wizard: false,
     updated_at: null
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   // Загрузка настроек

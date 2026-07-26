@@ -4,12 +4,18 @@ import { Download, X, Smartphone, Monitor } from 'lucide-react';
 import { Button, Card } from '../ui/macos';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
+
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
+}
+
 /**
  * Компонент для предложения установки PWA
  */
 const PWAInstallPrompt = () => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
-  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showInstallPrompt, setShowInstallPrompt] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
 
@@ -24,9 +30,9 @@ const PWAInstallPrompt = () => {
     checkIfInstalled();
 
     // Слушаем событие beforeinstallprompt
-    const handleBeforeInstallPrompt = (e) => {
+    const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
-      setDeferredPrompt(e);
+      setDeferredPrompt(e as BeforeInstallPromptEvent);
       setShowInstallPrompt(true);
     };
 

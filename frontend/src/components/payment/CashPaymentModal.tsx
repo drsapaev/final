@@ -97,7 +97,7 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }: CashPaymen
             return;
         }
         // Pass change due up to parent for receipt printing (HIGH #9 fix).
-        onProcessPayment(appointment, {
+        onProcessPayment?.(appointment, {
             ...paymentData,
             amount: Number(paymentData.amount),
             change_due: changeDue,
@@ -179,7 +179,7 @@ const CashPaymentModal = ({ appointment, onProcessPayment, onClose }: CashPaymen
                             id="cash-payment-method"
                             aria-label={t('payment.pay_cash_method_aria')}
                             value={paymentData.method}
-                            onChange={(value: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setPaymentData(prev => ({ ...prev, method: value as unknown as string }))}
+                            onChange={(value) => setPaymentData(prev => ({ ...prev, method: value as unknown as string }))}
                             options={getPaymentMethodOptions(t)}
                             className="cpm-select-full"
                         />

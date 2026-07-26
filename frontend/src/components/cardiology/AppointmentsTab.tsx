@@ -27,6 +27,15 @@ export function AppointmentsTab({
   onActionClick,
   services = {},
   isDark = false,
+}: {
+  appointments?: Array<Record<string, unknown>>;
+  appointmentsLoading?: boolean;
+  appointmentSummaryItems?: Array<{ key: string; label: string; value: string | number; variant: string }>;
+  onRefresh: () => void;
+  onRowClick?: (row: unknown) => void;
+  onActionClick?: (action: string, row: unknown, event?: unknown) => void;
+  services?: Record<string, unknown>;
+  isDark?: boolean;
 }) {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   return (
@@ -52,7 +61,7 @@ export function AppointmentsTab({
           <MacOSEmptyState type="calendar" title={t('cardio.cardio_appt_empty_title')} description={t('cardio.cardio_appt_empty_desc')} />
         ) : (
           <EnhancedAppointmentsTable
-            data={appointments}
+            data={appointments as never[]}
             loading={appointmentsLoading}
             theme={isDark ? 'dark' : 'light'}
             language="ru"

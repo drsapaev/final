@@ -35,7 +35,7 @@ export default function RoleGate({ allow = [], roles, fallback, children }: Role
   const p = st.profile || null;
 
   // Собираем набор ролей пользователя из разных полей профиля
-  const have = new Set();
+  const have = new Set<string>();
   if (p) {
     if (p.role) have.add(String(p.role).toLowerCase());
     if (p.role_name) have.add(String(p.role_name).toLowerCase());
@@ -55,7 +55,7 @@ export default function RoleGate({ allow = [], roles, fallback, children }: Role
   return fallback !== undefined ? fallback : denyBox(Array.from(have), Array.from(need));
 }
 
-function denyBox(have, need) {
+function denyBox(have: string[], need: string[]) {
   const roleLabel = have.length ? have.join(', ') : '—';
   return (
     <div style={box}>

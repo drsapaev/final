@@ -95,7 +95,7 @@ export const formUtils = {
 
   // Очистка значений формы
   clearForm: (schema: Record<string, unknown>) => {
-    const clearedValues = {};
+    const clearedValues: Record<string, unknown> = {};
     
     Object.keys(schema).forEach(fieldName => {
       clearedValues[fieldName] = '';
@@ -111,7 +111,7 @@ export const formUtils = {
 
   // Получение только измененных полей
   getChangedFields: (currentValues: Record<string, unknown>, initialValues: Record<string, unknown>) => {
-    const changes = {};
+    const changes: Record<string, unknown> = {};
     
     Object.keys(currentValues).forEach(key => {
       if (currentValues[key] !== initialValues[key]) {

@@ -72,9 +72,9 @@ const FileUpload = ({
         let fileToProcess: File | Blob = file;
 
         // Check if HEIC/HEIF
-        if (isHEICFile(file)) {
+        if (isHEICFile(file as File)) {
           try {
-            fileToProcess = await convertHEICToJPEG(file, 0.9);
+            fileToProcess = await convertHEICToJPEG(file as File, 0.9);
           } catch {
             logger.warn(`Could not convert ${(file as File).name}, using original`);
           }

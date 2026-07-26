@@ -12,7 +12,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 const LazyQueueProfilesManager = React.lazy(() => import('./QueueProfilesManager'));
 const LazyServiceCatalog = React.lazy(() => import('./ServiceCatalog'));
 
-const getServiceTabs = (t: string) => [
+const getServiceTabs = (t: (key: string, options?: Record<string, unknown>) => string) => [
   { key: 'catalog', label: t('admin2.asv_tab_catalog'), icon: Package },
   { key: 'queue-profiles', label: t('admin2.asv_tab_queue_profiles'), icon: FolderTree },
 ];

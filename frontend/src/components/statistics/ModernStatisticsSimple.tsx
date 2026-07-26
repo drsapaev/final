@@ -1,5 +1,5 @@
 import PropTypes from 'prop-types';
-const ModernStatistics = ({ appointments, onExport, onRefresh }) => {
+const ModernStatistics = ({ appointments, onExport, onRefresh }: { appointments?: unknown[]; onExport?: () => void; onRefresh?: () => void }) => {
   return (
     <div style={{ padding: 'var(--mac-spacing-5)', border: '1px solid #ccc', borderRadius: 'var(--mac-radius-md)', marginBottom: 'var(--mac-spacing-5)' }}>
       <h3>Статистика (упрощенная версия)</h3>

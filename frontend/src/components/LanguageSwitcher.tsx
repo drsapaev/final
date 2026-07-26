@@ -13,14 +13,14 @@ import PropTypes from 'prop-types';
 const LanguageSwitcher = ({ compact = false }) => {
     const { language, setLanguage, availableLanguages, t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
     const [isOpen, setIsOpen] = useState(false);
-    const menuRef = useRef(null);
+    const menuRef = useRef<HTMLDivElement>(null);
 
     const currentLang = availableLanguages.find(l => l.code === language) || availableLanguages[0];
 
     // Закрытие меню при клике вне
     useEffect(() => {
-        const handleClickOutside = (e: React.MouseEvent) => {
-            if (menuRef.current && !menuRef.current.contains(e.target)) {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
                 setIsOpen(false);
             }
         };
