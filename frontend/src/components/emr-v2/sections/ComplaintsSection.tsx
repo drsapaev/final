@@ -15,11 +15,11 @@ import PropTypes from 'prop-types';
 import EMRSection from './EMRSection';
 import React from 'react';
 import ComplaintsField from './ComplaintsField';
-import { api } from '../../../api/client';
+import { api } from '@/api/client';
 import { DoctorTemplatesPanel, DoctorTemplatesButton } from '../DoctorTemplatesPanel';
-import { useDoctorSectionTemplates } from '../../../hooks/useDoctorSectionTemplates';
-import logger from '../../../utils/logger';
-import { useTranslation } from '../../../i18n/useTranslation';
+import { useDoctorSectionTemplates } from '@/hooks/useDoctorSectionTemplates';
+import logger from '@/utils/logger';
+import { useTranslation } from '@/i18n/useTranslation';
 
 
 /**

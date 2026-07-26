@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { ReactElement } from 'react';
 
-import { ThemeProvider } from '../../../../contexts/ThemeContext';
+import { ThemeProvider } from '@/contexts/ThemeContext';
 import Button from '../Button';
 import Typography from '../Typography';
 

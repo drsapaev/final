@@ -392,3 +392,13 @@ if (failed > 0) {
   console.log('All audit invariants intact. No regressions detected.');
   process.exit(0);
 }
+
+// ========================================================================
+// Strict island invariants — directories that are strict-clean must stay clean
+// ========================================================================
+// These are checked via tsconfig.strict.json which enables strict:true for
+// specific directories. If a PR introduces implicit-any in these directories,
+// the strict check fails.
+//
+// Note: this check requires `npx tsc --noEmit -p tsconfig.strict.json` to pass.
+// It's run as a separate CI step (or can be added here if performance allows).

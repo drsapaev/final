@@ -1,6 +1,6 @@
 import React, { type ReactNode, type CSSProperties, type MouseEvent, type KeyboardEvent } from 'react';
-import { useTheme } from '../../../contexts/ThemeContext';
-import { useTranslation } from '../../../i18n/useTranslation';
+import { useTheme } from '@/contexts/ThemeContext';
+import { useTranslation } from '@/i18n/useTranslation';
 
 type CardVariant = 'default' | 'elevated' | 'outlined' | 'filled';
 type CardPadding = 'none' | 'small' | 'default' | 'large';

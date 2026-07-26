@@ -1,6 +1,6 @@
 import { MoreHorizontal } from 'lucide-react';
 import type { CSSProperties, MouseEvent, KeyboardEvent, FocusEvent } from 'react';
-import { useTranslation } from '../../../i18n/useTranslation';
+import { useTranslation } from '@/i18n/useTranslation';
 
 interface MacOSPaginationProps {
   currentPage?: number;

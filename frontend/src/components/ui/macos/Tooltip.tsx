@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useLayoutEffect, type ReactNode, type CSSProperties, type PointerEvent, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
-import { useTheme } from '../../../contexts/ThemeContext';
-import { useTranslation } from '../../../i18n/useTranslation';
+import { useTheme } from '@/contexts/ThemeContext';
+import { useTranslation } from '@/i18n/useTranslation';
 
 type TooltipPosition =
   | 'top'

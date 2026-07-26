@@ -1,8 +1,8 @@
 import React, { useState, useEffect, type ReactNode, type CSSProperties, type MouseEvent, type KeyboardEvent } from 'react';
-import { useTheme } from '../../../contexts/ThemeContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import Button from './Button';
 import Icon from './Icon';
-import { useTranslation } from '../../../i18n/useTranslation';
+import { useTranslation } from '@/i18n/useTranslation';
 
 type SidebarVariant = 'default' | 'compact' | 'inset';
 

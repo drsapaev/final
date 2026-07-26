@@ -1,12 +1,12 @@
 import DOMPurify from 'dompurify';
 
-export const sanitizePrintableHtml = (html) => DOMPurify.sanitize(String(html ?? ''), {
+export const sanitizePrintableHtml = (html: string) => DOMPurify.sanitize(String(html ?? ''), {
   WHOLE_DOCUMENT: true,
   ADD_TAGS: ['html', 'head', 'body', 'style'],
   ADD_ATTR: ['style', 'class', 'id', 'role', 'aria-label', 'colspan', 'rowspan']
 });
 
-export const finalizePrintableWindow = (printWindow, html, logger) => {
+export const finalizePrintableWindow = (printWindow: Window, html: string, logger: { log: (...args: unknown[]) => void; warn: (...args: unknown[]) => void }) => {
   if (!printWindow) {
     return false;
   }
@@ -47,7 +47,7 @@ export const finalizePrintableWindow = (printWindow, html, logger) => {
 interface OpenPrintableWindowOptions {
   html: string;
   features?: string;
-  logger?: unknown;
+  logger?: { log: (...args: unknown[]) => void; warn: (...args: unknown[]) => void };
   onOpenFailure?: () => void;
 }
 
@@ -66,5 +66,5 @@ export const openPrintableWindow = ({
     return false;
   }
 
-  return finalizePrintableWindow(printWindow, html, logger);
+  return finalizePrintableWindow(printWindow, html, logger || { log: () => {}, warn: () => {} });
 };

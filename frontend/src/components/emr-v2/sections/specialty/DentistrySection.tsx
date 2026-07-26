@@ -15,10 +15,10 @@ import { useState, useCallback } from 'react';
 import EMRSection from '../EMRSection';
 import React from 'react';
 import EMRTextField from '../EMRTextField';
-import TeethChart from '../../../dental/TeethChart';
+import TeethChart from '@/components/dental/TeethChart';
 import './DentistrySection.css';
-import { Input, Checkbox } from '../../../ui/macos';
-import { useTranslation } from '../../../../i18n/useTranslation';
+import { Input, Checkbox } from '@/components/ui/macos';
+import { useTranslation } from '@/i18n/useTranslation';
 
 /**
  * DentistrySection Component

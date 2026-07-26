@@ -7,9 +7,9 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import LabReportWorkbench from '../LabReportWorkbench';
-import { labReportingApi } from '../../../api/labReporting';
-import { ThemeProvider } from '../../../contexts/ThemeContext';
-import { MacOSThemeProvider } from '../../../theme/macosTheme';
+import { labReportingApi } from '@/api/labReporting';
+import { ThemeProvider } from '@/contexts/ThemeContext';
+import { MacOSThemeProvider } from '@/theme/macosTheme';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const workbenchPath = path.resolve(__dirname, '../LabReportWorkbench.tsx');

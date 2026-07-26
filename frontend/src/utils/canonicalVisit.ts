@@ -2,7 +2,7 @@ import logger from './logger';
 // UX Audit: миграция raw fetch() → api/client.js.
 import { api } from '../api/client';
 
-export async function resolveCanonicalVisitId(appointmentId) {
+export async function resolveCanonicalVisitId(appointmentId: string | number): Promise<string | number | null> {
   if (!appointmentId) {
     return null;
   }
@@ -15,7 +15,7 @@ export async function resolveCanonicalVisitId(appointmentId) {
   } catch (error) {
     logger.warn('[canonical-visit] failed to resolve visit_id', {
       appointmentId,
-      error: error?.message || 'unknown error'
+      error: error instanceof Error ? error.message : 'unknown error'
     });
     return null;
   }

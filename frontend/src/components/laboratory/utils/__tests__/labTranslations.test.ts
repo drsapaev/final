@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { t as rawT, tInterpolate, TRANSLATIONS } from '../../../../i18n/useTranslation';
+import { t as rawT, tInterpolate, TRANSLATIONS } from '@/i18n/useTranslation';
 
 // Cast t() to a looser signature so we can test null/undefined/number inputs.
 const t = rawT as unknown as (key: unknown) => unknown;

@@ -1,5 +1,5 @@
 import React, { type CSSProperties } from 'react';
-import { useTheme } from '../../../contexts/ThemeContext';
+import { useTheme } from '@/contexts/ThemeContext';
 
 type ProgressVariant = 'default' | 'primary' | 'success' | 'warning' | 'danger' | 'determinate' | string;
 type ProgressSize = 'small' | 'default' | 'large';

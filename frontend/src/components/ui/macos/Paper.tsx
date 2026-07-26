@@ -1,5 +1,5 @@
 import React, { type ReactNode, type CSSProperties } from 'react';
-import { useTheme } from '../../../contexts/ThemeContext';
+import { useTheme } from '@/contexts/ThemeContext';
 type PaperVariant = 'elevation' | 'outlined' | 'filled';
 type PaperElevation = 0 | 1 | 2 | 3 | 4 | 5;
 

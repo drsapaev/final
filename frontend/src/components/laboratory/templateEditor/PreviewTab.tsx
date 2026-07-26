@@ -2,7 +2,7 @@
 import PropTypes from 'prop-types';
 import { Alert, Card } from '../../ui/macos';
 import React from 'react';
-import { useTranslation } from '../../../i18n/useTranslation';
+import { useTranslation } from '@/i18n/useTranslation';
 
 /**
  * L-H-6 fix: PreviewTab выделен в отдельный файл (~70 строк).

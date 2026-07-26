@@ -20,10 +20,10 @@ import EMRSection from './EMRSection';
 import EMRSmartFieldV2 from './EMRSmartFieldV2';
 import { TreatmentTemplatesButton, TreatmentTemplatesPanel } from '../templates';
 import PrescriptionEditor from './PrescriptionEditor';
-import { useDoctorPhrases } from '../../../hooks/useDoctorPhrases';
-import { useDoctorTreatmentTemplates } from '../../../hooks/useDoctorTreatmentTemplates';
-import logger from '../../../utils/logger';
-import { useTranslation } from '../../../i18n/useTranslation';
+import { useDoctorPhrases } from '@/hooks/useDoctorPhrases';
+import { useDoctorTreatmentTemplates } from '@/hooks/useDoctorTreatmentTemplates';
+import logger from '@/utils/logger';
+import { useTranslation } from '@/i18n/useTranslation';
 import React from "react";
 
 /**

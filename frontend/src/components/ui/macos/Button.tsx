@@ -1,5 +1,5 @@
 import React, { type ReactNode, type CSSProperties, type MouseEvent } from 'react';
-import { useTranslation } from '../../../i18n/useTranslation';
+import { useTranslation } from '@/i18n/useTranslation';
 
 type ButtonVariant = 'default' | 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'destructive' | 'error' | 'ghost' | 'outline' | 'link' | string;
 type ButtonSize = 'small' | 'default' | 'large' | 'sm' | 'md' | 'lg' | string;

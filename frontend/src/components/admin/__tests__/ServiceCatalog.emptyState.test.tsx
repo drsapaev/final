@@ -2,9 +2,9 @@ import '@testing-library/jest-dom';
 import { render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { ThemeProvider } from '../../../contexts/ThemeContext';
+import { ThemeProvider } from '@/contexts/ThemeContext';
 import ServiceCatalog from '../ServiceCatalog';
-import { api } from '../../../api/client';
+import { api } from '@/api/client';
 
 vi.mock('../../../api/client', () => {
   const apiMock = {

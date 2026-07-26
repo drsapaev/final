@@ -1,6 +1,6 @@
 import React, { useState, type ReactNode, type CSSProperties, type MouseEvent, type KeyboardEvent } from 'react';
 import { ChevronUp, ChevronDown } from 'lucide-react';
-import { useTranslation } from '../../../i18n/useTranslation';
+import { useTranslation } from '@/i18n/useTranslation';
 
 type TableSize = 'sm' | 'md' | 'lg';
 type TableVariant = 'default' | 'filled' | 'minimal';

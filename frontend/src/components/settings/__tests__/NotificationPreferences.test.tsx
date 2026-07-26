@@ -1,8 +1,8 @@
 import React, { StrictMode } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ThemeProvider } from '../../../contexts/ThemeContext';
-import { MacOSThemeProvider } from '../../../theme/macosTheme';
+import { ThemeProvider } from '@/contexts/ThemeContext';
+import { MacOSThemeProvider } from '@/theme/macosTheme';
 
 const {
   apiGet,

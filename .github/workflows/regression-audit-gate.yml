@@ -1,0 +1,47 @@
+# Regression Audit Gate
+# Runs scripts/regression-audit-check.mjs on every PR to verify that
+# audit invariants from VERIFICATION_AND_ROADMAP.md are intact.
+# If any invariant is violated, this check fails and blocks the PR.
+#
+# See VERIFICATION_AND_ROADMAP.md "Invalidation Criteria" table for
+# the full list of checks and their corresponding BS-IDs.
+
+name: Regression Audit Gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'frontend/src/**'
+      - 'frontend/vite.config.ts'
+      - 'frontend/eslint.config.js'
+      - 'frontend/package.json'
+      - 'frontend/tsconfig.json'
+      - 'scripts/regression-audit-check.mjs'
+      - 'scripts/strict-baseline.json'
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/src/**'
+      - 'frontend/vite.config.ts'
+      - 'frontend/eslint.config.js'
+      - 'frontend/package.json'
+      - 'frontend/tsconfig.json'
+      - 'scripts/regression-audit-check.mjs'
+      - 'scripts/strict-baseline.json'
+
+jobs:
+  regression-audit:
+    name: Regression Audit Gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run regression audit checks
+        run: node scripts/regression-audit-check.mjs

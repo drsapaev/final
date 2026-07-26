@@ -55,14 +55,14 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import {
   Button, Card, CardHeader, CardContent, Badge, Icon, Input,
-} from '../../../components/ui/macos';
-import { AnimatedTransition } from '../../../components/ui';
-import ModernStatistics from '../../../components/statistics/ModernStatistics';
-import EnhancedAppointmentsTable from '../../../components/tables/EnhancedAppointmentsTable';
-import { getLocalDateString, getYesterdayDateString } from '../../../utils/dateUtils';
-import logger from '../../../utils/logger';
-import notify from '../../../services/notify';
-import tokenManager from '../../../utils/tokenManager';
+} from '@/components/ui/macos';
+import { AnimatedTransition } from '@/components/ui';
+import ModernStatistics from '@/components/statistics/ModernStatistics';
+import EnhancedAppointmentsTable from '@/components/tables/EnhancedAppointmentsTable';
+import { getLocalDateString, getYesterdayDateString } from '@/utils/dateUtils';
+import logger from '@/utils/logger';
+import notify from '@/services/notify';
+import tokenManager from '@/utils/tokenManager';
 
 // === Domain types ===
 // WelcomeView is a registrar-facing dashboard. Most state lives in the

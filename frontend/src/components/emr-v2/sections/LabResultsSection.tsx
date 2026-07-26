@@ -22,7 +22,7 @@ import PropTypes from 'prop-types';
 // (Consistency & Standards) — разные stroke-width, optical size, padding.
 import EMRSection from './EMRSection';
 import React from 'react';
-import { labReportingApi } from '../../../api/labReporting';
+import { labReportingApi } from '@/api/labReporting';
 import { Badge, Button, Dialog, DialogTitle, DialogContent, DialogActions, Icon } from '../../ui/macos';
 import { useConfirm } from '../../common/ConfirmDialog';
 // UX-AUDIT-FIX10: ранее STATUS_LABELS / STATUS_VARIANTS дублировались локально.
@@ -32,9 +32,9 @@ import { useConfirm } from '../../common/ConfirmDialog';
 // 'Unknown'. Теперь используется единый источник истины.
 import { formatLabStatus, getLabStatusVariant } from '../../laboratory/labUiLabels';
 // STRAT#12: t() и tInterpolate() для i18n — order confirm dialog мигрирован.
-import logger from '../../../utils/logger';
-import notify from '../../../services/notify';
-import { useTranslation } from '../../../i18n/useTranslation';
+import logger from '@/utils/logger';
+import notify from '@/services/notify';
+import { useTranslation } from '@/i18n/useTranslation';
 
 // UX-AUDIT-FIX10: STATUS_LABELS и STATUS_VARIANTS удалены —
 // используются formatLabStatus() и getLabStatusVariant() из labUiLabels.js.

@@ -18,8 +18,8 @@
 import { useState, useEffect, useRef, useCallback, useId } from 'react';
 import PropTypes from 'prop-types';
 import './ComplaintsField.css';
-import logger from '../../../utils/logger';
-import { useTranslation } from '../../../i18n/useTranslation';
+import logger from '@/utils/logger';
+import { useTranslation } from '@/i18n/useTranslation';
 
 // === Domain types ===
 export interface ComplaintsFieldSuggestion {
