@@ -25,13 +25,19 @@ interface ChatSession {
     [key: string]: unknown;
 }
 
-/** AI chat message shape. */
-interface ChatMessage {
+// TECH-DEBT(g8-useAIChat-001): AIAssistantMsg is a local shape for the AI
+// assistant chat. The canonical domain ChatMessage (types/domain/chat.ts)
+// is for 1:1 staff messaging (sender_id/recipient_id required, id: number).
+// AI chat uses role-based messages (user/assistant/system) with string|number
+// ids and _pending flags for optimistic UI. These will converge when the AI
+// chat subsystem gets its own domain type.
+interface AIAssistantMsg {
     id: string | number;
     role: string;
     content: unknown;
     created_at?: string;
     _pending?: boolean;
+    _streaming?: boolean;
     [key: string]: unknown;
 }
 
@@ -56,7 +62,7 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
     // State
     const [sessions, setSessions] = useState<ChatSession[]>([]);
     const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);
-    const [messages, setMessages] = useState<ChatMessage[]>([]);
+    const [messages, setMessages] = useState<AIAssistantMsg[]>([]);
     const [loading, setLoading] = useState(false);
     const [streaming, setStreaming] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -416,7 +422,7 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
                 setMessages(prev => {
                     const last = prev[prev.length - 1];
                     if (last?._streaming) {
-                        const updated: ChatMessage = {
+                        const updated: AIAssistantMsg = {
                             ...last,
                             id: (data.message_id as string | number) ?? last.id,
                             provider: data.provider,

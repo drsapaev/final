@@ -90,7 +90,7 @@ describe('P0-4: File upload validation via validateFile()', () => {
     // AND a call to validateFile(...) somewhere in the same file.
     const srcDir = path.join(ROOT, 'src');
     const files = collectSourceFiles(srcDir);
-    const filesUsingValidateFile: string[] = []
+    const filesUsingValidateFile: string[] = [];
     for (const file of files) {
       const src = fs.readFileSync(file, 'utf-8');
       if (/from\s+['"][^'"]*fileValidator['"]/.test(src) && /validateFile\s*\(/.test(src)) {
@@ -103,7 +103,7 @@ describe('P0-4: File upload validation via validateFile()', () => {
 
 function collectSourceFiles(dir) {
   const entries = fs.readdirSync(dir, { withFileTypes: true });
-  const files: string[] = []
+  const files: string[] = [];
   for (const entry of entries) {
     const fullPath = path.join(dir, entry.name);
     if (entry.isDirectory()) {

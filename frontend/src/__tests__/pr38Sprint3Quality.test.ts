@@ -64,7 +64,7 @@ describe('High-22: Dead code removal', () => {
     // Scan all source files (excluding examples/ and tests) for useUtils imports
     const srcDir = path.join(ROOT, 'src');
     const files = collectSourceFiles(srcDir);
-    const productionImporters: string[] = []
+    const productionImporters: string[] = [];
     for (const file of files) {
       // Normalize to forward slashes so the examples/__tests__ exclusion
       // works on both POSIX and Windows (path.relative returns OS separators).
@@ -98,7 +98,7 @@ describe('Medium-23: Silent catches in Search.tsx', () => {
 
 function collectSourceFiles(dir) {
   const entries = fs.readdirSync(dir, { withFileTypes: true });
-  const files: string[] = []
+  const files: string[] = [];
   for (const entry of entries) {
     const fullPath = path.join(dir, entry.name);
     if (entry.isDirectory()) {
