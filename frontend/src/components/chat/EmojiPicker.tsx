@@ -5,20 +5,30 @@ import { Smile } from 'lucide-react';
 import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 
-const EmojiPicker = ({ onEmojiSelect, disabled = false }) => {
+interface EmojiPickerProps {
+  onEmojiSelect: (emoji: string) => void;
+  disabled?: boolean;
+}
+
+interface EmojiData {
+  native?: string;
+  [key: string]: unknown;
+}
+
+const EmojiPicker = ({ onEmojiSelect, disabled = false }: EmojiPickerProps) => {
   const { t } = useTranslation();
     const [showPicker, setShowPicker] = useState(false);
-    const pickerRef = useRef(null);
-    const buttonRef = useRef(null);
+    const pickerRef = useRef<HTMLDivElement | null>(null);
+    const buttonRef = useRef<HTMLButtonElement | null>(null);
 
     // Close picker when clicking outside
     useEffect(() => {
-        const handleClickOutside = (event) => {
+        const handleClickOutside = (event: MouseEvent) => {
             if (
                 pickerRef.current &&
-                !pickerRef.current.contains(event.target) &&
+                !pickerRef.current.contains(event.target as Node) &&
                 buttonRef.current &&
-                !buttonRef.current.contains(event.target)
+                !buttonRef.current.contains(event.target as Node)
             ) {
                 setShowPicker(false);
             }
@@ -30,8 +40,9 @@ const EmojiPicker = ({ onEmojiSelect, disabled = false }) => {
         }
     }, [showPicker]);
 
-    const handleEmojiSelect = (emoji) => {
-        onEmojiSelect(emoji.native);
+    const handleEmojiSelect = (emoji: unknown) => {
+        const emojiData = emoji as EmojiData;
+        onEmojiSelect(emojiData.native || '');
         setShowPicker(false);
     };
 

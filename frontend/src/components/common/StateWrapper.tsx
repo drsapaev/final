@@ -33,6 +33,21 @@ import React from "react";
 
 const DEFAULT_SKELETON_ROWS = 4;
 
+interface StateWrapperProps {
+  isLoading?: boolean;
+  error?: unknown;
+  isEmpty?: boolean;
+  emptyTitle?: string;
+  emptyMessage?: string;
+  emptyAction?: React.ReactNode;
+  emptyIcon?: React.ReactNode;
+  skeletonRows?: number;
+  skeletonHeight?: number;
+  errorTitle?: string;
+  onRetry?: (() => void) | null;
+  children?: React.ReactNode;
+}
+
 export function StateWrapper({
   isLoading = false,
   error = null,
@@ -46,7 +61,7 @@ export function StateWrapper({
   errorTitle = 'Не удалось загрузить данные',
   onRetry = null,
   children,
-}) {
+}: StateWrapperProps = {}) {
   // Track whether the user has ever seen data, so we can keep showing
   // stale content with a refresh banner instead of a hard empty state
   // when a refetch fails. (Pattern borrowed from React Query's stale-while-revalidate.)
@@ -56,7 +71,7 @@ export function StateWrapper({
   useEffect(() => {
     if (!isLoading && !error && !isEmpty) {
       hasHadDataRef.current = true;
-      forceTick((t: string) => t + 1);
+      forceTick((t: number) => t + 1);
     }
   }, [isLoading, error, isEmpty]);
 
@@ -78,7 +93,8 @@ export function StateWrapper({
 
   // Hard error and never had data: show error state
   if (error && !hasHadDataRef.current) {
-    const errMsg = typeof error === 'string' ? error : (error?.message || error?.toString?.() || 'Неизвестная ошибка');
+    const errObj = error as { message?: string; toString?: () => string };
+    const errMsg = typeof error === 'string' ? error : (errObj?.message || errObj?.toString?.() || 'Неизвестная ошибка');
     return (
       <MacOSEmptyState
         icon={<AlertCircle size={36} style={{ color: 'var(--mac-error, #ff3b30)' }} />}

@@ -18,7 +18,7 @@ const LazyFileManager = React.lazy(() => import('../files/FileManager'));
 // one tabbed surface. The 5 routes are demoted to nav:false (bookmark-only);
 // this hub is the single sidebar entry under "Система".
 
-const INTEGRATION_TABS = (t: string) => [
+const INTEGRATION_TABS = (t: (key: string) => string) => [
   { id: 'webhooks', label: t('admin2.ui_tab_webhooks') },
   { id: 'graphql', label: 'GraphQL API' },
   { id: 'cloud-printing', label: t('admin2.ui_tab_cloud_printing') },
@@ -30,15 +30,15 @@ const UnifiedIntegrations = () => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [searchParams, setSearchParams] = useSearchParams();
   const section = searchParams.get('tab') || 'webhooks';
-  const [activeTab, setActiveTab] = useState(section);
+  const [activeTab, setActiveTab] = useState<string>(section);
 
   useEffect(() => {
     setActiveTab(section);
   }, [section]);
 
-  const handleTabChange = (tabId: string) => {
-    setActiveTab(tabId);
-    setSearchParams({ tab: tabId }, { replace: true });
+  const handleTabChange = (tabId: string | number) => {
+    setActiveTab(String(tabId));
+    setSearchParams({ tab: String(tabId) }, { replace: true });
   };
 
   const renderContent = () => {

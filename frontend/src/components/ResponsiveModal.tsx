@@ -4,6 +4,19 @@ import { useBreakpoint } from '../hooks/useEnhancedMediaQuery';
 import { Button } from './ui';
 import { X } from 'lucide-react';
 import PropTypes from 'prop-types';
+import React from 'react';
+
+type ResponsiveModalSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'full';
+
+interface ResponsiveModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  title?: React.ReactNode;
+  children?: React.ReactNode;
+  size?: ResponsiveModalSize;
+  className?: string;
+  style?: React.CSSProperties;
+}
 
 const ResponsiveModal = ({
   isOpen,
@@ -13,7 +26,7 @@ const ResponsiveModal = ({
   size = 'md',
   className = '',
   style = {}
-}) => {
+}: ResponsiveModalProps) => {
   const { isMobile } = useBreakpoint();
 
   // Блокируем скролл страницы когда модал открыт
@@ -31,7 +44,7 @@ const ResponsiveModal = ({
 
   // Закрытие по Escape
   useEffect(() => {
-    const handleEscape = (e) => {
+    const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         onClose();
       }
@@ -58,7 +71,7 @@ const ResponsiveModal = ({
     full: { width: '100vw', height: '100vh', maxWidth: '100vw' }
   };
 
-  const modalSize = sizes[size] || sizes.md;
+  const modalSize = sizes[size as keyof typeof sizes] || sizes.md;
 
   // Стили для мобильных
   const mobileStyles = isMobile ? {

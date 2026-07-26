@@ -8,6 +8,21 @@ import QueueCard from './QueueCard';
 import { Button, Icon } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
 
+interface VirtualizedQueueListAppointment {
+  id?: string | number;
+  [key: string]: unknown;
+}
+
+interface VirtualizedQueueListProps {
+  appointments: VirtualizedQueueListAppointment[];
+  selectedAppointment?: VirtualizedQueueListAppointment | null;
+  onOpenAppointment: (appointment: VirtualizedQueueListAppointment) => void;
+  onLoadMore?: () => void;
+  hasMore?: boolean;
+  loadingMore?: boolean;
+  queueTotal?: number;
+}
+
 /**
  * STRAT#27: VirtualizedQueueList — virtualized rendering for 1000+ queue entries.
  *
@@ -39,9 +54,9 @@ export default function VirtualizedQueueList({
   hasMore = false,
   loadingMore = false,
   queueTotal = 0,
-}) {
+}: VirtualizedQueueListProps) {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
-  const scrollRef = useRef(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
 
   const rowVirtualizer = useVirtualizer({
     count: appointments.length,

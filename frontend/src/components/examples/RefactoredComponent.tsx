@@ -28,9 +28,9 @@ const t18 = i18n.t as unknown as (key: string, options?: Record<string, unknown>
 // ❌ СТАРЫЙ ПОДХОД - НЕ ИСПОЛЬЗУЙТЕ
 function OldPatientComponent() {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
-  const [, setPatients] = useState([]);
+  const [, setPatients] = useState<unknown[]>([]);
   const [, setLoading] = useState(false);
-  const [, setError] = useState(null);
+  const [, setError] = useState<string | null>(null);
 
   // Дублирование логики авторизации
   const authHeader = () => ({
@@ -122,7 +122,7 @@ function NewPatientComponent() {
   };
 
   // Обработчик отправки формы
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     // Валидация
@@ -254,12 +254,12 @@ function RealtimeQueueComponent() {
         Статус: {connected ? t18('misc.rc_podklyuchen') : t18('misc.rc_otklyuchen')}
       </div>
 
-      {lastMessage &&
+      {lastMessage ?
       <div className="last-message">
           <h3>{t18('misc.rc_poslednee_obnovlenie')}</h3>
           <pre>{JSON.stringify(lastMessage, null, 2)}</pre>
         </div>
-      }
+      : null}
 
       <button
         onClick={() => sendMessage({ type: 'request_update' })}

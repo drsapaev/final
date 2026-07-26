@@ -7,13 +7,18 @@ import { validateFile } from '../../utils/fileValidator';  // PR-36 / P0-4
 import { toast } from 'react-toastify';
 import { useTranslation } from '../../i18n/useTranslation';
 
-const FileUploader = ({ onUpload, disabled }) => {
+interface FileUploaderProps {
+  onUpload: (file: File) => void;
+  disabled?: boolean;
+}
+
+const FileUploader = ({ onUpload, disabled }: FileUploaderProps) => {
   const { t } = useTranslation();
-  const fileInputRef = useRef(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [isValidating, setIsValidating] = useState(false);
 
-  const handleFileChange = async (e) => {
-    const file = e.target.files[0];
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
     if (file) {
       // PR-36 / P0-4: Validate file via magic-number check before upload.
       // Previously: file was passed directly to onUpload() with only the
@@ -30,7 +35,9 @@ const FileUploader = ({ onUpload, disabled }) => {
         if (!result.valid) {
           const msg = result.errors.join('; ');
           toast.error(`Файл отклонён: ${msg}`);
-          e.target.value = null;
+          if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+          }
           return;
         }
         if (result.warnings.length > 0) {
@@ -44,7 +51,9 @@ const FileUploader = ({ onUpload, disabled }) => {
         setIsValidating(false);
       }
       // Reset input
-      e.target.value = null;
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 

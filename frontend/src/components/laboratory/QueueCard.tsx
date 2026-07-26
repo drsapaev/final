@@ -11,6 +11,32 @@ import {
 
 import { useTranslation } from '../../i18n/useTranslation';
 import i18n from '../../i18n';
+
+interface QueueCardAppointment {
+  patient_fio?: string;
+  patient_id?: string | number;
+  patient_phone?: string;
+  visit_id?: string | number;
+  status?: string;
+  specialty?: string;
+  payment_status?: string;
+  appointment_time?: string;
+  report_template_name?: string;
+  report_instance_id?: string | number | null;
+  service_details?: Array<{ name?: string; code?: string }>;
+  service_codes?: string[];
+  [key: string]: unknown;
+}
+
+interface QueueCardProps {
+  appointment: QueueCardAppointment;
+  isSelected?: boolean;
+  onOpenAppointment: (appointment: QueueCardAppointment) => void;
+}
+
+interface MaskedPhoneProps {
+  phone?: string;
+}
 /**
  * STRAT#28: QueueCard — extracted from LabQueueWorkbench, wrapped in React.memo.
  *
@@ -22,7 +48,7 @@ import i18n from '../../i18n';
  * Performance impact: при 50+ записях в очереди, typing в search box
  * вызывает re-render только отфильтрованных карточек, а не всех.
  */
-function QueueCard({ appointment, isSelected = false, onOpenAppointment }) {
+function QueueCard({ appointment, isSelected = false, onOpenAppointment }: QueueCardProps) {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   return (
     <div
@@ -87,7 +113,7 @@ function QueueCard({ appointment, isSelected = false, onOpenAppointment }) {
 }
 
 // Inline MaskedPhone — same as in LabQueueWorkbench, kept here for encapsulation.
-function maskPhone(phone) {
+function maskPhone(phone?: string) {
   if (!phone || typeof phone !== 'string') return '';
   const trimmed = phone.trim();
   if (!trimmed) return '';
@@ -99,7 +125,7 @@ function maskPhone(phone) {
   return `${country} ***-**-${lastTwo}`;
 }
 
-function MaskedPhone({ phone }) {
+function MaskedPhone({ phone }: MaskedPhoneProps) {
   if (!phone) return <span className="lqw-masked-phone-empty">{(i18n.t as unknown as (key: string) => string)('pii.phone_not_set')}</span>;
   return (
     <span className="lqw-masked-phone-text">{maskPhone(phone)}</span>
@@ -108,7 +134,7 @@ function MaskedPhone({ phone }) {
 
 MaskedPhone.propTypes = { phone: PropTypes.string };
 
-function formatServices(appointment) {
+function formatServices(appointment: QueueCardAppointment) {
   const serviceDetails = appointment?.service_details || [];
   if (serviceDetails.length > 0) {
     return serviceDetails

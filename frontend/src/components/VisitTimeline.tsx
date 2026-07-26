@@ -1,4 +1,5 @@
 
+import React from 'react';
 import { useTranslation } from '../i18n/useTranslation';
 import { CheckCircle, Clock, AlertCircle, CreditCard, User, FileText, Pill } from 'lucide-react';
 import PropTypes from 'prop-types';
@@ -10,7 +11,34 @@ import {
   getProgress 
 } from '../constants/appointmentStatus';
 
-const VisitTimeline = ({ appointment, emr, prescription }) => {
+interface VisitTimelineAppointment {
+  created_at?: string;
+  paid_at?: string;
+  visit_started_at?: string;
+  status?: string;
+}
+
+interface VisitTimelineRecord {
+  isDraft?: boolean;
+  savedAt?: string;
+}
+
+interface VisitTimelineProps {
+  appointment?: VisitTimelineAppointment | null;
+  emr?: VisitTimelineRecord | null;
+  prescription?: VisitTimelineRecord | null;
+}
+
+interface TimelineStep {
+  id: string;
+  title: string;
+  description: string;
+  icon: React.ComponentType<{ className?: string }>;
+  status: 'completed' | 'current' | 'pending' | string;
+  completedAt?: string;
+}
+
+const VisitTimeline = ({ appointment, emr, prescription }: VisitTimelineProps) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const timelineSteps = [
     {
@@ -61,7 +89,7 @@ const VisitTimeline = ({ appointment, emr, prescription }) => {
     }
   ];
 
-  const getStepIcon = (step) => {
+  const getStepIcon = (step: TimelineStep) => {
     const IconComponent = step.icon;
     
     switch (step.status) {
@@ -76,7 +104,7 @@ const VisitTimeline = ({ appointment, emr, prescription }) => {
     }
   };
 
-  const getStepColor = (step) => {
+  const getStepColor = (step: TimelineStep) => {
     switch (step.status) {
       case 'completed':
         return 'border-green-500 bg-green-50';
@@ -155,11 +183,11 @@ const VisitTimeline = ({ appointment, emr, prescription }) => {
           <div>
             <div className="font-medium">{t('misc.vt_tekuschiy_status')}</div>
             <div className="text-sm text-gray-600">
-              {STATUS_LABELS[appointment?.status] || t('misc.vt_neizvestno')}
+              {STATUS_LABELS[appointment?.status as keyof typeof STATUS_LABELS] || t('misc.vt_neizvestno')}
             </div>
           </div>
-          <Badge variant={STATUS_COLORS[appointment?.status] as unknown as "default" | "primary" | "secondary" | "success" | "warning" | "danger" | "info" | "outline"}>
-            {STATUS_LABELS[appointment?.status]}
+          <Badge variant={STATUS_COLORS[appointment?.status as keyof typeof STATUS_COLORS] as unknown as "default" | "primary" | "secondary" | "success" | "warning" | "danger" | "info" | "outline"}>
+            {STATUS_LABELS[appointment?.status as keyof typeof STATUS_LABELS]}
           </Badge>
         </div>
       </div>

@@ -17,13 +17,14 @@ const ChatButton = () => {
     const [isOpen, setIsOpen] = useState(false);
     const { unreadCount, isConnected, loadMessages } = useChat();
     // PR-68 / P0-1: listen for 'openChat' CustomEvent from desktop notifications
-    const pendingUserIdRef = useRef(null);
+    const pendingUserIdRef = useRef<number | null>(null);
 
     useEffect(() => {
-        const handleOpenChat = (event: React.MouseEvent) => {
+        const handleOpenChat = (event: Event) => {
+            const customEvent = event as CustomEvent<{ userId?: number }>;
             setIsOpen(true);
-            if (event?.detail?.userId && loadMessages) {
-                pendingUserIdRef.current = event.detail.userId;
+            if (customEvent?.detail?.userId) {
+                pendingUserIdRef.current = customEvent.detail.userId;
             }
         };
         window.addEventListener('openChat', handleOpenChat);

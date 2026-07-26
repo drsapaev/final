@@ -9,10 +9,26 @@ import PropTypes from 'prop-types';
 import './AISuggestionCard.css';
 import { useTranslation } from '@/i18n/useTranslation';
 
+interface AISuggestionCardData {
+  id: string | number;
+  content: string;
+  confidence?: number;
+  explanation?: string;
+  source?: string;
+  [key: string]: unknown;
+}
+
+interface AISuggestionCardProps {
+  suggestion: AISuggestionCardData;
+  onApply?: (suggestion: AISuggestionCardData) => void;
+  onDismiss?: (id: string | number) => void;
+  disabled?: boolean;
+}
+
 /**
  * Format confidence as percentage
  */
-function formatConfidence(confidence) {
+function formatConfidence(confidence?: number) {
   if (typeof confidence !== 'number') return '';
   return `${Math.round(confidence * 100)}%`;
 }
@@ -20,7 +36,8 @@ function formatConfidence(confidence) {
 /**
  * Get confidence color class
  */
-function getConfidenceClass(confidence) {
+function getConfidenceClass(confidence?: number) {
+  if (confidence === undefined) return 'ai-suggestion-card__confidence--low';
   if (confidence >= 0.8) return 'ai-suggestion-card__confidence--high';
   if (confidence >= 0.5) return 'ai-suggestion-card__confidence--medium';
   return 'ai-suggestion-card__confidence--low';
@@ -28,7 +45,7 @@ function getConfidenceClass(confidence) {
 
 /**
  * AISuggestionCard Component
- * 
+ *
  * @param {Object} props
  * @param {Object} props.suggestion - Suggestion object
  * @param {Function} props.onApply - Apply callback (receives suggestion)
@@ -40,7 +57,7 @@ export function AISuggestionCard({
   onApply,
   onDismiss,
   disabled = false
-}) {
+}: AISuggestionCardProps) {
   const { id, content, confidence, explanation } = suggestion;
 
   const handleApply = () => {

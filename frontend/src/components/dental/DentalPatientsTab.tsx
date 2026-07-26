@@ -77,7 +77,7 @@ export function DentalPatientsTab({
                 size="small"
                 variant="outline"
                 aria-label={t('dental.dental_dpt_aria_view', { name: patient.name || patient.id })}
-                onClick={() => onSelectPatient(patient)}
+                onClick={() => onSelectPatient?.(patient)}
                 title={t('dental.dental_dpt_title_view')}
                 className="dental-p-8px">
                 <Eye aria-hidden="true" className="dental-icon-16" />
@@ -86,7 +86,7 @@ export function DentalPatientsTab({
                 size="small"
                 variant="outline"
                 aria-label={t('dental.dental_dpt_aria_chart', { name: patient.name || patient.id })}
-                onClick={() => onDentalChart(patient)}
+                onClick={() => onDentalChart?.(patient)}
                 title={t('dental.dental_dpt_title_chart')}
                 className="dental-p-8px">
                 <Tooth aria-hidden="true" className="dental-icon-16" />
@@ -95,7 +95,7 @@ export function DentalPatientsTab({
                 size="small"
                 variant="outline"
                 aria-label={t('dental.dental_dpt_aria_treatment', { name: patient.name || patient.id })}
-                onClick={() => onTreatment(patient)}
+                onClick={() => onTreatment?.(patient)}
                 title={t('dental.dental_dpt_title_treatment')}
                 className="dental-p-8px">
                 <Scissors aria-hidden="true" className="dental-icon-16" />
@@ -104,7 +104,7 @@ export function DentalPatientsTab({
                 size="small"
                 variant="outline"
                 aria-label={t('dental.dental_dpt_aria_prosthetic', { name: patient.name || patient.id })}
-                onClick={() => onProsthetic(patient)}
+                onClick={() => onProsthetic?.(patient)}
                 title={t('dental.dental_dpt_title_prosthetic')}
                 className="dental-p-8px">
                 <FileText aria-hidden="true" className="dental-icon-16" />

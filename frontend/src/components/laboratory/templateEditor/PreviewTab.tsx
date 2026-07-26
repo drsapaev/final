@@ -4,12 +4,39 @@ import { Alert, Card } from '../../ui/macos';
 import React from 'react';
 import { useTranslation } from '@/i18n/useTranslation';
 
+interface PreviewTabField {
+  label?: string;
+  field_key?: string;
+  required?: boolean;
+  unit?: string;
+  reference_text?: string;
+  reference_mode?: string;
+}
+
+interface PreviewTabSection {
+  title?: string;
+  key?: string;
+  fields: PreviewTabField[];
+}
+
+interface PreviewTabDraftVersion {
+  branding_overrides?: Record<string, string>;
+  signer_defaults?: Record<string, string>;
+  sections: PreviewTabSection[];
+  footer_notes?: string;
+  [key: string]: unknown;
+}
+
+interface PreviewTabProps {
+  draftVersion: PreviewTabDraftVersion;
+}
+
 /**
  * L-H-6 fix: PreviewTab выделен в отдельный файл (~70 строк).
  * Phase 4+ tab 4: read-only sample render of the template.
  * Shows branding + sections + fields as they'll appear in the PDF.
  */
-function PreviewTab({ draftVersion }) {
+function PreviewTab({ draftVersion }: PreviewTabProps) {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const branding = draftVersion.branding_overrides || {};
   const signers = draftVersion.signer_defaults || {};
@@ -29,7 +56,7 @@ function PreviewTab({ draftVersion }) {
           {branding.phone && <div className="ltw-text-12 ltw-text-secondary">{branding.phone}</div>}
         </div>
 
-        {draftVersion.sections.map((section, sectionIndex) => (
+        {draftVersion.sections.map((section: PreviewTabSection, sectionIndex: number) => (
           <div key={sectionIndex} className="ltw-preview-section">
             <div className="ltw-preview-section-title">
               {section.title || section.key}
@@ -44,7 +71,7 @@ function PreviewTab({ draftVersion }) {
                 </tr>
               </thead>
               <tbody>
-                {section.fields.map((field, fieldIndex) => (
+                {section.fields.map((field: PreviewTabField, fieldIndex: number) => (
                   <tr key={fieldIndex} className="ltw-preview-row">
                     <td className="ltw-preview-td">
                       {field.label || field.field_key}

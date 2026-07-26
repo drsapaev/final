@@ -17,12 +17,18 @@ const STEP_LABELS = {
   en: ['Patient', 'Services'],
 };
 
-const StepProgressIndicator = ({ currentStep, totalSteps, language = 'ru' }) => {
+interface StepProgressIndicatorProps {
+  currentStep: number;
+  totalSteps: number;
+  language?: 'ru' | 'uz' | 'en';
+}
+
+const StepProgressIndicator = ({ currentStep, totalSteps, language = 'ru' }: StepProgressIndicatorProps) => {
   const { t } = useTranslation();
-  const labels = (STEP_LABELS[language] || STEP_LABELS.ru).slice(0, totalSteps);
+  const labels = (STEP_LABELS[language as keyof typeof STEP_LABELS] || STEP_LABELS.ru).slice(0, totalSteps);
   return (
     <ol className="wizard-progress" aria-label="Шаги мастера записи">
-      {labels.map((label, i) => {
+      {labels.map((label: string, i: number) => {
         const step = i + 1;
         const state = currentStep > step ? 'completed' : currentStep === step ? 'active' : 'pending';
         return (

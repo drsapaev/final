@@ -59,7 +59,7 @@ const MacOSDemo = () => {
       document.documentElement.classList.remove('dark-theme');
     }
 
-    const handleChange = (e: React.MouseEvent) => {
+    const handleChange = (e: MediaQueryListEvent) => {
       const newIsDark = e.matches;
       setIsDarkMode(newIsDark);
 
@@ -99,7 +99,7 @@ const MacOSDemo = () => {
     }
   };
 
-  const showToast = (type, message) => {
+  const showToast = (type: 'success' | 'error' | 'warning' | 'info', message: string) => {
     // UX Audit #1930: Toast component removed in PR #1928. Use notify service.
     if (type === 'success') notify.success(message);
     else if (type === 'error') notify.error(message);

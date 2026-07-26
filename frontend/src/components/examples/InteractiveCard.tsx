@@ -5,6 +5,14 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useHover } from '../../hooks/useUtils';
 import PropTypes from 'prop-types';
 
+interface InteractiveCardProps {
+  children?: React.ReactNode;
+  onClick?: (event: React.MouseEvent<HTMLDivElement> | React.KeyboardEvent<HTMLDivElement>) => void;
+  className?: string;
+  style?: CSSProperties;
+  [key: string]: unknown;
+}
+
 /**
  * Пример интерактивной карточки с эффектами наведения
  */
@@ -14,7 +22,7 @@ const InteractiveCard = ({
   className = '',
   style = {},
   ...props
-}) => {
+}: InteractiveCardProps) => {
   const { getColor, getSpacing, getShadow } = useTheme();
   const getBorderRadius = (size: string) => "8px";
   const { ref, isHovered } = useHover();
@@ -92,6 +100,14 @@ InteractiveCard.propTypes = {
   style: PropTypes.any,
 };
 
+interface InteractiveListItemProps {
+  title?: React.ReactNode;
+  subtitle?: React.ReactNode;
+  icon?: React.ReactNode;
+  onClick?: (event: React.MouseEvent<HTMLDivElement> | React.KeyboardEvent<HTMLDivElement>) => void;
+  [key: string]: unknown;
+}
+
 /**
  * Пример интерактивного элемента списка
  */
@@ -101,7 +117,7 @@ export const InteractiveListItem = ({
   icon,
   onClick,
   ...props
-}) => {
+}: InteractiveListItemProps) => {
   const { getColor, getSpacing, getFontSize, getShadow } = useTheme();
   const { ref, isHovered } = useHover();
   const itemStyle = {
@@ -173,7 +189,7 @@ export const InteractiveListItem = ({
         onClick={onClick}
         role="button"
         tabIndex={0}
-        onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => {
+        onKeyDown={(event: React.KeyboardEvent<HTMLDivElement>) => {
           if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault();
             onClick(event);
