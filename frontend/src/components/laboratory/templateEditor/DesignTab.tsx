@@ -2,11 +2,25 @@ import PropTypes from 'prop-types';
 import { layoutOptions, brandingFieldLabels } from './config';
 import { useTranslation } from '@/i18n/useTranslation';
 
+interface DesignTabDraftVersion {
+  layout_preset?: string;
+  footer_notes?: string;
+  branding_overrides?: Record<string, string>;
+  [key: string]: unknown;
+}
+
+interface DesignTabProps {
+  draftVersion: DesignTabDraftVersion;
+  onUpdateLayout: (value: string) => void;
+  onUpdateFooter: (value: string) => void;
+  onUpdateBranding: (key: string, value: string) => void;
+}
+
 /**
  * L-H-6 fix: DesignTab выделен в отдельный файл (~50 строк).
  * Вкладка «Оформление» — макет печати, подвал, брендирование.
  */
-function DesignTab({ draftVersion, onUpdateLayout, onUpdateFooter, onUpdateBranding }) {
+function DesignTab({ draftVersion, onUpdateLayout, onUpdateFooter, onUpdateBranding }: DesignTabProps) {
   const { t } = useTranslation();
   return (
     <div className="ltw-grid-18">
@@ -41,10 +55,10 @@ function DesignTab({ draftVersion, onUpdateLayout, onUpdateFooter, onUpdateBrand
         <div className="ltw-grid-3-minmax">
           {['document_title', 'document_subtitle', 'clinic_name', 'address', 'phone', 'logo_url'].map((key) => (
             <label key={key} className="ltw-grid-6">
-              <span>{brandingFieldLabels[key] || key}</span>
+              <span>{brandingFieldLabels[key as keyof typeof brandingFieldLabels] || key}</span>
               <input
                 className="macos-input"
-                aria-label={brandingFieldLabels[key] || key}
+                aria-label={brandingFieldLabels[key as keyof typeof brandingFieldLabels] || key}
                 value={draftVersion.branding_overrides?.[key] || ''}
                 onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => onUpdateBranding(key, event.target.value)}
               />

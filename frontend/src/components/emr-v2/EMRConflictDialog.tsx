@@ -20,6 +20,23 @@ import { useState } from 'react';
 import './EMRConflictDialog.css';
 import { useTranslation } from '../../i18n/useTranslation';
 
+interface EMRConflictInfo {
+    serverVersion?: string | number;
+    yourVersion?: string | number;
+    lastEditedBy?: number;
+    lastEditedAt?: string;
+}
+
+interface EMRConflictDialogProps {
+    conflict?: EMRConflictInfo | null;
+    isSigned?: boolean;
+    onReload?: () => void;
+    onCompare?: () => void;
+    onAmend?: () => void;
+    onForceOverwrite?: () => void;
+    loading?: boolean;
+}
+
 /**
  * EMRConflictDialog Component
  * 
@@ -44,12 +61,12 @@ export function EMRConflictDialog({
     onAmend,
     onForceOverwrite,
     loading = false,
-}) {
+}: EMRConflictDialogProps = {}) {
     const [showAdvanced, setShowAdvanced] = useState(false);
 
     if (!conflict) return null;
 
-    const formatTime = (dateStr) => {
+    const formatTime = (dateStr?: string) => {
         if (!dateStr) return '—';
         return new Date(dateStr).toLocaleString('ru-RU', {
             hour: '2-digit',
@@ -96,7 +113,7 @@ export function EMRConflictDialog({
                                 </span>
                             </div>
                         )}
-                        {conflict.lastEditedBy > 0 && (
+                        {conflict.lastEditedBy !== undefined && conflict.lastEditedBy > 0 && (
                             <div className="emr-conflict-dialog__info-row">
                                 <span className="emr-conflict-dialog__info-label">Кем:</span>
                                 <span className="emr-conflict-dialog__info-value">

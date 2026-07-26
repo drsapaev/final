@@ -7,8 +7,14 @@ import React from 'react';
 import { Download, X, Smartphone, Monitor } from 'lucide-react';
 
 import logger from '../utils/logger';
+
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
+}
+
 const PWAInstallPrompt = () => {
-  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showInstallPrompt, setShowInstallPrompt] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
 
@@ -19,9 +25,9 @@ const PWAInstallPrompt = () => {
     }
 
     // Слушаем событие beforeinstallprompt
-    const handleBeforeInstallPrompt = (e: React.MouseEvent) => {
+    const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
-      setDeferredPrompt(e);
+      setDeferredPrompt(e as BeforeInstallPromptEvent);
       setShowInstallPrompt(true);
     };
 

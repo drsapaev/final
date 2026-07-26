@@ -72,7 +72,7 @@ export function ExaminationSection({
 
   // 🧠 Connect Doctor History (Personal Learning)
   const { suggestions: doctorSuggestions, loading: historyLoading } = useDoctorPhrases({
-    doctorId,
+    doctorId: doctorId ?? undefined,
     field: 'examination',
     specialty,
     currentText: value,
@@ -94,18 +94,21 @@ export function ExaminationSection({
 
   // Merge suggestions: Doctor History first, then Generic AI
   const allSuggestions = useMemo(() => {
-    const historyItems = doctorSuggestions.map((s: Record<string, unknown>) => ({
-      id: s.id,
-      content: s.text,
-      source: 'history', // Badge will show "История"
-      confidence: 1.0
-    }));
+    const historyItems = doctorSuggestions.map((raw: unknown) => {
+      const s = raw as Record<string, unknown>;
+      return {
+        id: s.id,
+        content: s.text,
+        source: 'history', // Badge will show "История"
+        confidence: 1.0
+      };
+    });
 
     return [...historyItems, ...suggestions];
   }, [doctorSuggestions, suggestions]);
 
   // Append generated text from matrix
-  const handleMatrixText = (text) => {
+  const handleMatrixText = (text: string) => {
     if (!text) return;
     const current = value || '';
     const newValue = current ? `${current} ${text}` : text;
@@ -113,7 +116,7 @@ export function ExaminationSection({
   };
 
   // Handle AI request - only if complaints exist
-  const handleRequestAI = useCallback((fieldName) => {
+  const handleRequestAI = useCallback((fieldName: string) => {
     if (!aiEnabled) {
       // Show info message instead of silent failure
       logger.log('[ExaminationSection] AI disabled - no complaints');
@@ -123,7 +126,7 @@ export function ExaminationSection({
   }, [aiEnabled, onRequestAI]);
 
   // Handle template apply
-  const handleApplyTemplate = useCallback((text) => {
+  const handleApplyTemplate = useCallback((text: string) => {
     if (!text) return;
     const current = value || '';
     const newValue = current.trim() ?
@@ -168,7 +171,7 @@ export function ExaminationSection({
         aiLoading={aiLoading || historyLoading}
         onApplySuggestion={onApplySuggestion}
         onDismissSuggestion={onDismissSuggestion}
-        onRequestAI={aiEnabled ? handleRequestAI : null}
+        onRequestAI={aiEnabled ? handleRequestAI : undefined}
         showAIButton={aiEnabled}
         experimentalGhostMode={experimentalGhostMode}
         onTelemetry={onTelemetry}

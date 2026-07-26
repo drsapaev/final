@@ -14,7 +14,7 @@ import { useState, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import EMRSection from './EMRSection';
 import React from 'react';
-import ComplaintsField from './ComplaintsField';
+import ComplaintsField, { type ComplaintsFieldSuggestion } from './ComplaintsField';
 import { api } from '@/api/client';
 import { DoctorTemplatesPanel, DoctorTemplatesButton } from '../DoctorTemplatesPanel';
 import { useDoctorSectionTemplates } from '@/hooks/useDoctorSectionTemplates';
@@ -66,7 +66,7 @@ export function ComplaintsSection({
 
     // 📜 Doctor History Request Handler (NOT AI!)
     // Returns phrases from doctor's past records
-    const handleRequestHistory = useCallback(async (text) => {
+    const handleRequestHistory = useCallback(async (text: string) => {
         if (!doctorId || !text || text.length < 2) return [];
 
         try {
@@ -80,26 +80,27 @@ export function ComplaintsSection({
             });
 
             // Format for ComplaintsField with clear source marker
-            const historyItems = (historyResponse.data?.suggestions || []).map(s => ({
-                id: s.id,
-                text: s.text,
+            const historyItems: ComplaintsFieldSuggestion[] = ((historyResponse.data?.suggestions as Array<Record<string, unknown>>) || []).map(s => ({
+                id: s.id as string | number | undefined,
+                text: s.text as string | undefined,
                 source: '📜 История'  // Clear visual marker
             }));
 
             return historyItems;
 
         } catch (e) {
+            const err = e as { message?: string };
             logger.error('[ComplaintsSection] Не удалось получить историю жалоб', {
                 doctorId,
                 specialty,
-                error: e?.message || String(e),
+                error: err?.message || String(e),
             });
             return [];
         }
     }, [doctorId, specialty]);
 
     // Handle template apply
-    const handleApplyTemplate = useCallback((text) => {
+    const handleApplyTemplate = useCallback((text: string) => {
         if (!text) return;
         const current = value || '';
         const newValue = current.trim()

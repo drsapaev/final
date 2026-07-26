@@ -5,10 +5,15 @@
 import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 
-const EMRHelpDialog = ({ isOpen, onClose }) => {
+interface EMRHelpDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+const EMRHelpDialog = ({ isOpen, onClose }: EMRHelpDialogProps) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
     if (!isOpen) return null;
-    const handleActivationKeyDown = (event, action) => {
+    const handleActivationKeyDown = (event: React.KeyboardEvent<HTMLElement>, action: () => void) => {
         if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault();
             action();

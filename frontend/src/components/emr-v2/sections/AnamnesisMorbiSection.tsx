@@ -57,7 +57,7 @@ export function AnamnesisMorbiSection({
 
   // 📜 Doctor History (Personal Learning) - NOT AI
   const { suggestions: doctorSuggestions, loading: historyLoading } = useDoctorPhrases({
-    doctorId,
+    doctorId: doctorId ?? undefined,
     field: 'anamnesis_morbi',
     specialty,
     currentText: value,
@@ -76,16 +76,19 @@ export function AnamnesisMorbiSection({
 
   // History suggestions only - no AI for this field
   const allSuggestions = useMemo(() => {
-    return doctorSuggestions.map((s: Record<string, unknown>) => ({
-      id: s.id,
-      content: s.text,
-      source: 'history', // Badge shows "📜 История"
-      confidence: 1.0
-    }));
+    return doctorSuggestions.map((raw: unknown) => {
+      const s = raw as Record<string, unknown>;
+      return {
+        id: s.id,
+        content: s.text,
+        source: 'history', // Badge shows "📜 История"
+        confidence: 1.0
+      };
+    });
   }, [doctorSuggestions]);
 
   // Handle template apply
-  const handleApplyTemplate = useCallback((text) => {
+  const handleApplyTemplate = useCallback((text: string) => {
     if (!text) return;
     const current = value || '';
     const newValue = current.trim() ?

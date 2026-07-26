@@ -18,7 +18,14 @@ import { AccentPicker } from '../ui/macos';
 import StateWrapper from '../common/StateWrapper';
 import { useTranslation } from '../../i18n/useTranslation';
 
-const stripPasswordFields = (formData) => {
+interface SecurityFormData {
+  currentPassword?: string;
+  newPassword?: string;
+  confirmPassword?: string;
+  [key: string]: unknown;
+}
+
+const stripPasswordFields = (formData: SecurityFormData) => {
   const persistedSettings = { ...(formData || {}) };
   delete persistedSettings.currentPassword;
   delete persistedSettings.newPassword;
@@ -41,7 +48,7 @@ const UnifiedSettings = () => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const routeSection = ADMIN_SETTINGS_ROUTE_SECTION_MAP[location.pathname.replace(/\/$/, '')];
+  const routeSection = ADMIN_SETTINGS_ROUTE_SECTION_MAP[location.pathname.replace(/\/$/, '') as keyof typeof ADMIN_SETTINGS_ROUTE_SECTION_MAP];
   const section = routeSection || searchParams.get('section') || 'general';
   const [securitySettings, setSecuritySettings] = useState({});
   const [securityLoading, setSecurityLoading] = useState(false);
@@ -49,7 +56,7 @@ const UnifiedSettings = () => {
   // a proper error state instead of silently rendering SecuritySettings
   // with empty {} (which previously made the form look broken without
   // explanation).
-  const [securityError, setSecurityError] = useState(null);
+  const [securityError, setSecurityError] = useState<string | null>(null);
 
   const loadSecuritySettings = useCallback(async () => {
     try {
@@ -67,7 +74,8 @@ const UnifiedSettings = () => {
       // P-025 fix: capture error for StateWrapper. Keep securitySettings
       // as-is (likely {} on first load) so the user can still see the form
       // structure if they retry.
-      setSecurityError(error?.message || t('admin2.us_load_error'));
+      const err = error as { message?: string };
+      setSecurityError(err?.message || t('admin2.us_load_error'));
       setSecuritySettings({});
     } finally {
       setSecurityLoading(false);
@@ -75,7 +83,7 @@ const UnifiedSettings = () => {
   }, []);
 
   // Handler for saving security settings
-  const handleSaveSecuritySettings = useCallback(async (formData, activeTab = 'password') => {
+  const handleSaveSecuritySettings = useCallback(async (formData: SecurityFormData, activeTab = 'password') => {
     try {
       setSecurityLoading(true);
       const persistedSecuritySettings = stripPasswordFields(formData);

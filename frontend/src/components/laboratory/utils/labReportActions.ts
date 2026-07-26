@@ -22,19 +22,19 @@ export const LAB_REPORT_ACTION_CAN_FIELD = {
   print: 'can_print'
 };
 
-export function hasLabReportAction(instance, action) {
+export function hasLabReportAction(instance: Record<string, unknown> | null | undefined, action: string) {
   const normalizedAction = String(action || '').trim().toLowerCase();
   if (!instance || !normalizedAction) {
     return false;
   }
 
   if (Array.isArray(instance.available_actions)) {
-    return instance.available_actions.some(
-      (availableAction) => String(availableAction || '').trim().toLowerCase() === normalizedAction
+    return (instance.available_actions as unknown[]).some(
+      (availableAction: unknown) => String(availableAction || '').trim().toLowerCase() === normalizedAction
     );
   }
 
-  const canField = LAB_REPORT_ACTION_CAN_FIELD[normalizedAction];
+  const canField = LAB_REPORT_ACTION_CAN_FIELD[normalizedAction as keyof typeof LAB_REPORT_ACTION_CAN_FIELD];
   if (canField && Object.prototype.hasOwnProperty.call(instance, canField)) {
     return Boolean(instance[canField]);
   }
@@ -42,7 +42,7 @@ export function hasLabReportAction(instance, action) {
   return false;
 }
 
-export function flagVariant(flag, severity = null) {
+export function flagVariant(flag: string, severity: number | null = null) {
   if (severity !== null && severity >= 300) {
     return 'danger';
   }

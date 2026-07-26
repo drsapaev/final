@@ -20,6 +20,14 @@ import { tokenManager } from '../../utils/tokenManager';
 import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 
+interface SMSEmail2FAProps {
+  method?: 'sms' | 'email';
+  onSuccess?: (data: unknown) => void;
+  onCancel?: () => void;
+  phoneNumber?: string;
+  emailAddress?: string;
+}
+
 /**
  * Компонент для SMS/Email двухфакторной аутентификации
  * Поддерживает отправку кодов по SMS и Email
@@ -30,7 +38,7 @@ const SMSEmail2FA = ({
   onCancel,
   phoneNumber = '',
   emailAddress = ''
-}) => {
+}: SMSEmail2FAProps) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -137,19 +145,19 @@ const SMSEmail2FA = ({
     }
   };
 
-  const handleCodeChange = (e) => {
+  const handleCodeChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const value = e.target.value.replace(/\D/g, '').slice(0, codeLength);
     setCode(value);
     setError('');
   };
 
-  const handleKeyPress = (e) => {
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLElement>) => {
     if (e.key === 'Enter' && code.length === codeLength) {
       verifyCode();
     }
   };
 
-  const formatTime = (seconds) => {
+  const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;

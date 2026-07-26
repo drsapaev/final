@@ -3,6 +3,21 @@ import PropTypes from 'prop-types';
 import { Button, Icon } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
 
+interface LabReportActionsBarProps {
+  saving?: boolean;
+  busyAction?: string;
+  canSaveDraft?: boolean;
+  canFinalize?: boolean;
+  canRevise?: boolean;
+  canPrint?: boolean;
+  canNotify?: boolean;
+  onSaveDraft: () => void;
+  onFinalize: () => void;
+  onRevise: () => void;
+  onPrint: () => void;
+  onNotify?: () => void;
+}
+
 /**
  * P-04 fix: LabReportActionsBar выделен из LabReportWorkbench.
  *
@@ -33,7 +48,7 @@ export default function LabReportActionsBar({
   onRevise,
   onPrint,
   onNotify,
-}) {
+}: LabReportActionsBarProps) {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const showPrimaryGroup = canSaveDraft || canFinalize;
   const showSecondaryGroup = canRevise || canPrint || canNotify;

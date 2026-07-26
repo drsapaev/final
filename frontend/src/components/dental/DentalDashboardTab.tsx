@@ -8,17 +8,33 @@ import { Card, Button } from '../ui/macos';
 import { Calendar, Users, Activity, FileText } from 'lucide-react';
 import { useTranslation } from '../../i18n/useTranslation';
 
+interface DentalDashboardAppointment {
+  status?: string;
+  [key: string]: unknown;
+}
+
+interface DentalDashboardPatient {
+  [key: string]: unknown;
+}
+
+interface DentalDashboardTabProps {
+  appointments?: DentalDashboardAppointment[];
+  patients?: DentalDashboardPatient[];
+  onGoToAppointments?: () => void;
+  onGoToPatients?: () => void;
+}
+
 export function DentalDashboardTab({
   appointments = [],
   patients = [],
   onGoToAppointments,
   onGoToPatients,
-}) {
+}: DentalDashboardTabProps = {}) {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const totalAppointments = appointments.length;
-  const waitingCount = appointments.filter(a => ['waiting', 'confirmed', 'pending'].includes(a.status)).length;
-  const calledCount = appointments.filter(a => ['called', 'in_progress'].includes(a.status)).length;
-  const completedCount = appointments.filter(a => ['completed', 'done'].includes(a.status)).length;
+  const waitingCount = appointments.filter(a => ['waiting', 'confirmed', 'pending'].includes(a.status || '')).length;
+  const calledCount = appointments.filter(a => ['called', 'in_progress'].includes(a.status || '')).length;
+  const completedCount = appointments.filter(a => ['completed', 'done'].includes(a.status || '')).length;
 
   return (
     <div className="dental-flex-col dental-gap-24">
