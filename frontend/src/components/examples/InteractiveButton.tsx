@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, type CSSProperties, type ReactNode } from 'react';
 
 import { useTheme } from '../../contexts/ThemeContext';
 import { useHover } from '../../hooks/useUtils';
@@ -14,6 +14,13 @@ const InteractiveButton = ({
   size = 'md',
   onClick,
   ...props
+}: {
+  children: ReactNode;
+  variant?: string;
+  size?: string;
+  onClick?: () => void;
+  style?: CSSProperties;
+  [key: string]: unknown;
 }) => {
   const { getColor, getSpacing, getShadow } = useTheme();
   void size;
@@ -84,8 +91,8 @@ const InteractiveButton = ({
         fontWeight: 'var(--mac-font-weight-medium)',
         cursor: 'pointer',
         outline: 'none',
-        ...getButtonStyle(),
-        ...props.style
+        ...(getButtonStyle() as CSSProperties),
+        ...(props.style as CSSProperties)
       }}
       {...props}>
       

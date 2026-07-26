@@ -84,7 +84,7 @@ function ComponentTestInner() {
     fontSize: getFontSize('sm')
   };
 
-  const handleTestToast = (type) => {
+  const handleTestToast = (type: string) => {
     addToast({
       type,
       title: t('misc.ct_toast_title', { type }),
@@ -115,7 +115,7 @@ function ComponentTestInner() {
     setTimeout(() => setLoading(false), 2000);
   };
 
-  const handleFormSubmit = (values) => {
+  const handleFormSubmit = (values: Record<string, unknown>) => {
     logger.log('Form submitted:', values);
     addToast({
       type: 'success',
@@ -200,7 +200,7 @@ function ComponentTestInner() {
       {/* Тест форм */}
       <div style={sectionStyle}>
         <h2 style={titleStyle}>{t('misc.ct_section_forms')}</h2>
-        <form onSubmit={(e: React.FormEvent<HTMLFormElement>) => { e.preventDefault(); handleFormSubmit(form?.values); }}>
+        <form onSubmit={(e: React.FormEvent<HTMLFormElement>) => { e.preventDefault(); handleFormSubmit(form?.values ?? {}); }}>
           <input
             type="text"
             aria-label="Test form name"

@@ -30,6 +30,11 @@ export function EcgTab({
   onAddEcg,
   onDataUpdate,
   getSpacing,
+}: {
+  selectedPatient: Record<string, unknown> | null;
+  onAddEcg: () => void;
+  onDataUpdate: () => void;
+  getSpacing: (key: string) => string;
 }) {
   if (!selectedPatient) {
     return null;
@@ -50,13 +55,13 @@ export function EcgTab({
         </Button>
       </div>
       <ECGViewer
-        visitId={selectedPatient?.visit_id}
-        patientId={selectedPatient?.patient_id || selectedPatient?.patient?.id}
+        visitId={selectedPatient?.visit_id as string | number | undefined}
+        patientId={(selectedPatient?.patient_id || (selectedPatient?.patient as Record<string, unknown> | undefined)?.id) as string | number | undefined}
         onDataUpdate={onDataUpdate}
       />
       <EchoForm
-        visitId={selectedPatient?.visit_id}
-        patientId={selectedPatient?.patient_id || selectedPatient?.patient?.id}
+        visitId={selectedPatient?.visit_id as string | number | undefined}
+        patientId={(selectedPatient?.patient_id || (selectedPatient?.patient as Record<string, unknown> | undefined)?.id) as string | number | null | undefined}
         onDataUpdate={onDataUpdate}
       />
     </div>

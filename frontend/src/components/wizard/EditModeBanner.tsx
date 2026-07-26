@@ -12,7 +12,7 @@ import PropTypes from 'prop-types';
 import './EditModeBanner.css';
 import { useTranslation } from '../../i18n/useTranslation';
 
-const EditModeBanner = ({ editMode, initialData }) => {
+const EditModeBanner = ({ editMode, initialData }: { editMode?: boolean; initialData?: Record<string, unknown> | null }) => {
   const { t } = useTranslation();
   if (!editMode) return null;
 

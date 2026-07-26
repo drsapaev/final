@@ -48,7 +48,7 @@ export function RecommendationsSection({
   });
 
   // Handle template apply - append to current value
-  const handleApplyTemplate = useCallback((text) => {
+  const handleApplyTemplate = useCallback((text: string) => {
     if (!text) return;
     const current = value || '';
     const newValue = current.trim() ?

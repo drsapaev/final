@@ -21,11 +21,17 @@ import { useTranslation } from '@/i18n/useTranslation';
  * @param {string} props.size - 'small' | 'medium'
  */
 export function SmartAssistButton({
-    onClick: unknown,
+    onClick,
     isLoading = false,
     hasSuggestions = false,
     disabled = false,
     size = 'small',
+}: {
+    onClick: () => void;
+    isLoading?: boolean;
+    hasSuggestions?: boolean;
+    disabled?: boolean;
+    size?: 'small' | 'medium';
 }) {
     return (
         <button

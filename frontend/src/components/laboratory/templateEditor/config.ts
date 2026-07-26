@@ -53,6 +53,6 @@ export const EDITOR_TABS = [
   { id: 'preview',  label: 'Предпросмотр' },
 ];
 
-export function formatVersionStatus(status) {
-  return versionStatusLabels[status] || status;
+export function formatVersionStatus(status: string) {
+  return versionStatusLabels[status as keyof typeof versionStatusLabels] || status;
 }

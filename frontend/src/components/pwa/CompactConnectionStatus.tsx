@@ -14,7 +14,7 @@ const CompactConnectionStatus = ({ className = '', showTooltip = true }) => {
   ));
   const [isServiceWorkerReady, setIsServiceWorkerReady] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [lastSyncTime, setLastSyncTime] = useState(null);
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
@@ -58,7 +58,7 @@ const CompactConnectionStatus = ({ className = '', showTooltip = true }) => {
   // Слушаем сообщения от Service Worker о синхронизации
   useEffect(() => {
     if ('serviceWorker' in navigator) {
-      const handleMessage = (event) => {
+      const handleMessage = (event: MessageEvent) => {
         if (event.data && event.data.type === 'SYNC_COMPLETE') {
           setLastSyncTime(new Date(event.data.timestamp));
           setIsSyncing(false);

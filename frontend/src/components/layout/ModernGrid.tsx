@@ -1,3 +1,5 @@
+import type { CSSProperties, ReactNode } from 'react';
+
 import { useTheme } from '../../contexts/ThemeContext';
 import PropTypes from 'prop-types';
 import './ModernGrid.css';
@@ -13,6 +15,16 @@ const ModernGrid = ({
   minColumnWidth = '250px',
   className = '',
   ...props
+}: {
+  children?: ReactNode;
+  columns?: number | string;
+  gap?: string | number;
+  alignItems?: string;
+  justifyContent?: string;
+  responsive?: boolean;
+  minColumnWidth?: string;
+  className?: string;
+  [key: string]: unknown;
 }) => {
   useTheme();
 
@@ -34,10 +46,10 @@ const ModernGrid = ({
     xl: '32px'
   };
 
-  const gridStyles = {
+  const gridStyles: CSSProperties = {
     display: 'grid',
     gridTemplateColumns: getGridColumns(),
-    gap: gapValues[gap] || gap,
+    gap: (gapValues as Record<string, string>)[gap as string] || gap,
     alignItems,
     justifyContent
   };
@@ -62,6 +74,14 @@ export const GridItem = ({
   justifySelf = 'auto',
   className = '',
   ...props
+}: {
+  children?: ReactNode;
+  colSpan?: number;
+  rowSpan?: number;
+  alignSelf?: string;
+  justifySelf?: string;
+  className?: string;
+  [key: string]: unknown;
 }) => {
   const itemStyles = {
     gridColumn: colSpan > 1 ? `span ${colSpan}` : 'auto',

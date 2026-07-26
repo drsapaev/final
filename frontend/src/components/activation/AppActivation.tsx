@@ -75,7 +75,7 @@ const AppActivation = () => {
     }
   };
 
-  const handleKeyPress = (e: React.MouseEvent) => {
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') handleActivate();
   };
 

@@ -12,7 +12,7 @@ import React from 'react';
 import { useTranslation } from '../../i18n/useTranslation';
 
 
-const UnifiedFinance = ({ renderFinance: unknown }) => {
+const UnifiedFinance = ({ renderFinance }: { renderFinance?: () => React.ReactNode }) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [searchParams] = useSearchParams();
   const section = searchParams.get('section') || 'finance';

@@ -63,6 +63,7 @@ const PaymentDialog = ({
 
   const handlePayment = async () => {
     if (!validateForm()) return;
+    if (!appointment) return;
 
     setIsProcessing(true);
 
@@ -177,7 +178,7 @@ const PaymentDialog = ({
             <p className="payment-patient-name">
               {String(appointment.patient_fio ?? '')}
             </p>
-            {appointment.services && (
+            {!!appointment.services && (
               <p className="payment-patient-services">
                 Услуги:{' '}
                 {Array.isArray(appointment.services)

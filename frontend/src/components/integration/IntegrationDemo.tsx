@@ -30,7 +30,7 @@ const IntegrationDemo = () => {
   // Используем созданные хуки
   const queueManager = useQueueManager() as unknown as IntegrationDemoQueueManager;
   const emrAI = useEMRAI();
-  const { users, appointments, actions } = useAppData() as unknown as { users: unknown[]; appointments: unknown[]; actions: { setLoading: (key: string, v: boolean) => void; setUsers: (v: unknown[]) => void; [key: string]: unknown }; };
+  const { users, appointments, actions } = useAppData() as unknown as { users: Record<string, unknown>[]; appointments: unknown[]; actions: { setLoading: (key: string, v: boolean) => void; setUsers: (v: unknown[]) => void; [key: string]: unknown }; };
 
   // Локальные состояния для демо
   const [testSymptoms, setTestSymptoms] = useState(t('misc.id_golovnaya_bol_toshnota'));
@@ -51,7 +51,7 @@ const IntegrationDemo = () => {
 
   const handleQueueTest = async () => {
     const today = new Date().toISOString().split('T')[0];
-    await queueManager.generateQRCode(today, '1');
+    await queueManager.generateQRCode?.(today, '1');
   };
 
   const handleAITest = async () => {

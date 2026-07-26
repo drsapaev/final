@@ -53,14 +53,14 @@ export const PATIENT_SECTIONS = {
 export const PATIENT_SECTION_KEYS = Object.keys(PATIENT_SECTIONS);
 
 export const VISIBLE_PATIENT_TABS = PATIENT_SECTION_KEYS.filter(
-  (key) => PATIENT_SECTIONS[key].visibleInTabs
+  (key) => PATIENT_SECTIONS[key as keyof typeof PATIENT_SECTIONS].visibleInTabs
 );
 
-export function normalizeSection(value) {
+export function normalizeSection(value: unknown) {
   if (!value) {
     return 'home';
   }
-  return PATIENT_SECTIONS[String(value).toLowerCase()]
+  return PATIENT_SECTIONS[String(value).toLowerCase() as keyof typeof PATIENT_SECTIONS]
     ? String(value).toLowerCase()
     : 'home';
 }

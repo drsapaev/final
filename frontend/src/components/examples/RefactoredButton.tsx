@@ -160,7 +160,7 @@ const RefactoredButton = ({
       },
     };
 
-    return variantMap[variant] || variantMap.primary;
+    return variantMap[variant as keyof typeof variantMap] || variantMap.primary;
   };
 
   // ═══════════════════════════════════════════════════════════════════
@@ -185,7 +185,7 @@ const RefactoredButton = ({
       },
     };
 
-    return sizeMap[size] || sizeMap.medium;
+    return sizeMap[size as keyof typeof sizeMap] || sizeMap.medium;
   };
 
   const variantStyles = getVariantStyles();
@@ -228,7 +228,7 @@ const RefactoredButton = ({
     ...(fullWidth && { width: '100%' }),
   };
 
-  const handleClick = (event: React.MouseEvent) => {
+  const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     if (disabled || loading) return;
     onClick?.(event);
   };
@@ -238,7 +238,7 @@ const RefactoredButton = ({
       ref={buttonRef}
       className={className}
       type={type as "button" | "reset" | "submit"}
-      style={buttonStyles}
+      style={buttonStyles as React.CSSProperties}
       onClick={handleClick}
       disabled={disabled || loading}
       onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {

@@ -19,18 +19,19 @@ import './DiagnosisSection.css';
 import { useTranslation } from '@/i18n/useTranslation';
 
 
-function normalizeTextValue(value) {
+function normalizeTextValue(value: unknown): string {
     if (typeof value === 'string') {
         return value;
     }
 
     if (value && typeof value === 'object') {
+        const v = value as Record<string, unknown>;
         return (
-            value.main ||
-            value.primary ||
-            value.text ||
-            value.value ||
-            value.description ||
+            (typeof v.main === 'string' ? v.main : '') ||
+            (typeof v.primary === 'string' ? v.primary : '') ||
+            (typeof v.text === 'string' ? v.text : '') ||
+            (typeof v.value === 'string' ? v.value : '') ||
+            (typeof v.description === 'string' ? v.description : '') ||
             ''
         );
     }
@@ -95,7 +96,7 @@ export function DiagnosisSection({
 
     // 🧠 Connect Doctor History (Personal Learning)
     const { suggestions: doctorSuggestions, loading: historyLoading } = useDoctorPhrases({
-        doctorId,
+        doctorId: doctorId ?? undefined,
         field: 'diagnosis',
         specialty,
         currentText: diagnosisText,
@@ -104,7 +105,7 @@ export function DiagnosisSection({
 
     // Merge suggestions: Doctor History first, then Generic AI
     const allSuggestions = useMemo(() => {
-        const historyItems = doctorSuggestions.map((s: Record<string, unknown>) => ({
+        const historyItems = (doctorSuggestions as Record<string, unknown>[]).map((s) => ({
             id: s.id,
             content: s.text,
             source: 'history', // Badge will show "История"

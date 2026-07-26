@@ -40,6 +40,12 @@ export function DoctorTemplatesPanel({
     onApply,
     onClose,
     isOpen = false,
+}: {
+    section: string;
+    icd10Code?: string | null;
+    onApply?: (text: string) => void;
+    onClose?: () => void;
+    isOpen?: boolean;
 }) {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
     const {
