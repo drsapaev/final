@@ -63,7 +63,7 @@ export const SPECIALTY_ALIASES = Object.freeze({
  * @param {string} canonicalKey - One of SPECIALTY_KEYS.*.
  * @returns {boolean}
  */
-export function matchesSpecialty(candidate: string, canonicalKey: string): boolean {
+export function matchesSpecialty(candidate: string | null | undefined, canonicalKey: string | null | undefined): boolean {
   if (!candidate || !canonicalKey) return false;
   if (candidate === canonicalKey) return true;
   const aliases = SPECIALTY_ALIASES[canonicalKey as keyof typeof SPECIALTY_ALIASES];
@@ -82,7 +82,7 @@ export function matchesSpecialty(candidate: string, canonicalKey: string): boole
  * @param {string[]} statuses
  * @returns {number}
  */
-export function countAppointmentsByStatuses(appointments: Array<{ status?: string }>, statuses: unknown[]): number {
+export function countAppointmentsByStatuses(appointments: Array<{ status?: string | null }> | null | undefined, statuses: unknown[] | null | undefined): number {
   if (!Array.isArray(appointments) || !Array.isArray(statuses) || statuses.length === 0) {
     return 0;
   }
@@ -125,7 +125,7 @@ export function normalizeNumericId(value: unknown): number | null {
  * @param {Array<{patient_id: *, services?: Array, service_codes?: Array}>} allAppointments
  * @returns {{services: Array, service_codes: Array}} Deduplicated arrays.
  */
-export function getAllPatientServices(patientId: number | string, allAppointments: Array<Record<string, unknown>>): { services: unknown[]; service_codes: unknown[] } {
+export function getAllPatientServices(patientId: number | string | null | undefined, allAppointments: Array<Record<string, unknown>> | null | undefined): { services: unknown[]; service_codes: unknown[] } {
   const patientServices = new Set<unknown>();
   const patientServiceCodes = new Set<unknown>();
 
@@ -179,8 +179,8 @@ export function getAllPatientServices(patientId: number | string, allAppointment
  * @returns {(row: {appointment_id?: *, visit_id?: *, id: *}) => Promise<number|null>}
  */
 export function makeEnsureCanonicalVisitId(
-  setAppointments: (updater: (prev: unknown) => unknown) => void,
-  resolveCanonicalVisitId: (appointmentId: number | string) => Promise<number | null>
+  setAppointments: ((updater: (prev: unknown) => unknown) => void) | null | undefined,
+  resolveCanonicalVisitId: ((appointmentId: number | string) => Promise<number | null>) | null | undefined
 ): (row: Record<string, unknown>) => Promise<number | null> {
   return async function ensureCanonicalVisitId(row: Record<string, unknown>): Promise<number | null> {
     const appointmentId = (row?.appointment_id as number | string | undefined) || null;

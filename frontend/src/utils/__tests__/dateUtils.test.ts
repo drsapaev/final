@@ -13,6 +13,7 @@ describe('parseRegistrarTimestamp', () => {
     const parsed = parseRegistrarTimestamp('2026-04-16T09:30:00+05:00');
 
     expect(parsed).not.toBeNull();
+    if (!parsed) return;
     expect(parsed.toISOString()).toBe('2026-04-16T04:30:00.000Z');
   });
 
@@ -20,6 +21,7 @@ describe('parseRegistrarTimestamp', () => {
     const parsed = parseRegistrarTimestamp('2026-04-16T09:30:00');
 
     expect(parsed).not.toBeNull();
+    if (!parsed) return;
     expect(parsed.toISOString()).toBe('2026-04-16T04:30:00.000Z');
   });
 
