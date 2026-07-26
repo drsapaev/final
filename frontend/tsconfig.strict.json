@@ -73,7 +73,8 @@
     "src/hooks/usePWA.ts",
     "src/hooks/useAppointments.ts",
     "src/hooks/useDoctorPhrases.ts",
-    "src/hooks/useFinance.ts"
+    "src/hooks/useFinance.ts",
+    "src/hooks/useUserPreferences.ts"
   ],
   "exclude": ["node_modules", "dist", "e2e"]
 }
