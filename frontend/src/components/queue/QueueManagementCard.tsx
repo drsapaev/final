@@ -124,9 +124,9 @@ export const QueueActionButtons = ({
   const [loading, setLoading] = useState(false);
 
   const {
-    actionButtonStyle = null,
-    getColor = null,
-  } = styles as { actionButtonStyle?: Record<string, unknown>; getColor?: (category: string, variant: string) => string };
+    actionButtonStyle,
+    getColor,
+  } = styles as { actionButtonStyle?: Record<string, unknown>; getColor?: (category: string, variant: string | number) => string };
 
   const entryId = entry?.queue_entry_id ?? null;
   const status = entry?.queue_status || entry?.status || null;
@@ -189,7 +189,7 @@ export const QueueActionButtons = ({
 
   // Кнопки в зависимости от статуса
   const renderButtons = () => {
-    const buttons = [];
+    const buttons: React.ReactElement[] = [];
 
     if (hasBackendQueueAction(entry, 'no_show', 'can_no_show')) {
       buttons.push(
