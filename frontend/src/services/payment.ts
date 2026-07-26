@@ -19,7 +19,7 @@ export const paymentService = {
     } catch (error) {
       return {
         success: false,
-        error: error.response?.data?.detail || 'Ошибка получения провайдеров'
+        error: (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Ошибка получения провайдеров'
       };
     }
   },
@@ -27,7 +27,7 @@ export const paymentService = {
   /**
    * Инициализация платежа
    */
-  async initPayment(paymentData) {
+  async initPayment(paymentData: Record<string, unknown>) {
     try {
       const response = await api.post('/payments/init', paymentData);
       
@@ -38,7 +38,7 @@ export const paymentService = {
     } catch (error) {
       return {
         success: false,
-        error: error.response?.data?.detail || 'Ошибка инициализации платежа'
+        error: (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Ошибка инициализации платежа'
       };
     }
   },
@@ -46,7 +46,7 @@ export const paymentService = {
   /**
    * Получение статуса платежа
    */
-  async getPaymentStatus(paymentId) {
+  async getPaymentStatus(paymentId: string | number) {
     try {
       const response = await api.get(`/payments/${paymentId}`);
       
@@ -57,7 +57,7 @@ export const paymentService = {
     } catch (error) {
       return {
         success: false,
-        error: error.response?.data?.detail || 'Ошибка получения статуса платежа'
+        error: (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Ошибка получения статуса платежа'
       };
     }
   },
@@ -65,7 +65,7 @@ export const paymentService = {
   /**
    * Генерация квитанции
    */
-  async generateReceipt(paymentId, format = 'pdf') {
+  async generateReceipt(paymentId: string | number, format = 'pdf') {
     try {
       const response = await api.get(`/payments/${paymentId}/receipt`, {
         params: { format_type: format }
@@ -78,7 +78,7 @@ export const paymentService = {
     } catch (error) {
       return {
         success: false,
-        error: error.response?.data?.detail || 'Ошибка генерации квитанции'
+        error: (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Ошибка генерации квитанции'
       };
     }
   },
@@ -86,7 +86,7 @@ export const paymentService = {
   /**
    * Скачивание квитанции
    */
-    async downloadReceipt(paymentId) {
+    async downloadReceipt(paymentId: string | number) {
     try {
       const response = await api.get(`/payments/${paymentId}/receipt/download`, {
         responseType: 'blob'
@@ -111,7 +111,7 @@ export const paymentService = {
     } catch (error) {
       return {
         success: false,
-        error: error.response?.data?.detail || 'Ошибка скачивания квитанции'
+        error: (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Ошибка скачивания квитанции'
       };
     }
   },
@@ -123,8 +123,8 @@ export const paymentService = {
    * основной валюте (som/tenge), не в тийинах/копейках. Раньше все суммы
    * отображались в 100 раз меньше реальной (15000 UZS → "150 сум").
    */
-  formatAmount(amount, currency = 'UZS') {
-    const numAmount = parseFloat(amount) || 0;
+  formatAmount(amount: number | string, currency = 'UZS') {
+    const numAmount = parseFloat(String(amount)) || 0;
 
     if (currency === 'UZS') {
       return `${numAmount.toLocaleString('ru-RU')} сум`;
@@ -138,8 +138,8 @@ export const paymentService = {
   /**
    * Получение названия провайдера
    */
-  getProviderName(providerCode) {
-    const names = {
+  getProviderName(providerCode: string): string {
+    const names: Record<string, string> = {
       click: 'Click',
       payme: 'Payme',
       kaspi: 'Kaspi Pay'
@@ -150,12 +150,12 @@ export const paymentService = {
   /**
    * Получение статуса платежа (локализованный)
    */
-  getStatusText(status) {
+  getStatusText(status: string): string {
     // PAY-REAUDIT-28 P1-10: добавлены отсутствовавшие статусы `paid`,
     // `refunded`, `void`, `canceled`. Backend использует `paid` как
     // основной статус успеха (PaymentStatus.PAID.value), но фронтенд
     // показывал сырую английскую строку "paid".
-    const texts = {
+    const texts: Record<string, string> = {
       pending: 'Ожидает',
       processing: 'Обработка',
       paid: 'Оплачено',
