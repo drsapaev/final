@@ -144,10 +144,10 @@ export const animations = {
 };
 
 // Хук для анимации появления/исчезновения
-export const useAnimation = (isVisible, animationType = 'fade', duration = 300) => {
-  const [animationState, setAnimationState] = useState('hidden');
+export const useAnimation = (isVisible: boolean, animationType: keyof typeof animations = 'fade', duration = 300) => {
+  const [animationState, setAnimationState] = useState<string>('hidden');
   const [shouldRender, setShouldRender] = useState(false);
-  const timeoutRef = useRef(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (isVisible) {
@@ -173,7 +173,7 @@ export const useAnimation = (isVisible, animationType = 'fade', duration = 300) 
     };
   }, [isVisible, duration]);
 
-  const getAnimationStyles = () => {
+  const getAnimationStyles = (): React.CSSProperties => {
     const animation = animations[animationType];
     if (!animation) return {};
 
@@ -199,8 +199,8 @@ export const useAnimation = (isVisible, animationType = 'fade', duration = 300) 
 };
 
 // Хук для анимации списка
-export const useListAnimation = (items, animationType = 'tableRow') => {
-  const [animatedItems, setAnimatedItems] = useState([]);
+export const useListAnimation = <T extends { id?: string | number }>(items: T[], animationType: keyof typeof animations = 'tableRow') => {
+  const [animatedItems, setAnimatedItems] = useState<Array<T & { animationDelay: number }>>([]);
 
   useEffect(() => {
     const newItems = items.map((item, index) => ({
@@ -215,7 +215,7 @@ export const useListAnimation = (items, animationType = 'tableRow') => {
 };
 
 // Хук для анимации прогресса
-export const useProgressAnimation = (targetValue, duration = 1000) => {
+export const useProgressAnimation = (targetValue: number, duration = 1000) => {
   const [currentValue, setCurrentValue] = useState(0);
   const currentValueRef = useRef(0);
 
@@ -255,7 +255,15 @@ export const AnimatedTransition = ({
   className = '',
   style = {},
   ...props
-}) => {
+}: {
+  children?: React.ReactNode;
+  isVisible: boolean;
+  animationType?: keyof typeof animations;
+  duration?: number;
+  delay?: number;
+  className?: string;
+  style?: React.CSSProperties;
+} & React.HTMLAttributes<HTMLDivElement>) => {
   const { shouldRender, animationStyles } = useAnimation(isVisible, animationType, duration);
 
   if (!shouldRender) return null;
@@ -276,13 +284,18 @@ export const AnimatedTransition = ({
 };
 
 // Компонент анимированного списка
-export const AnimatedList = ({
+export const AnimatedList = <T extends { id?: string | number }>({
   items,
   renderItem,
   animationType = 'tableRow',
   className = '',
   ...props
-}) => {
+}: {
+  items: T[];
+  renderItem: (item: T & { animationDelay: number }, index: number) => React.ReactNode;
+  animationType?: keyof typeof animations;
+  className?: string;
+} & React.HTMLAttributes<HTMLDivElement>) => {
   const animatedItems = useListAnimation(items, animationType);
 
   return (
@@ -326,7 +339,13 @@ export const AnimatedProgress = ({
   showValue = true,
   className = '',
   ...props
-}) => {
+}: {
+  value: number;
+  max?: number;
+  animationDuration?: number;
+  showValue?: boolean;
+  className?: string;
+} & React.HTMLAttributes<HTMLDivElement>) => {
   const animatedValue = useProgressAnimation(value, animationDuration);
   const percentage = (animatedValue / max) * 100;
 
@@ -355,10 +374,15 @@ export const AnimatedProgress = ({
 export const AnimatedCounter = ({
   value,
   duration = 1000,
-  format = (v) => v.toLocaleString(),
+  format = (v: number) => v.toLocaleString(),
   className = '',
   ...props
-}) => {
+}: {
+  value: number;
+  duration?: number;
+  format?: (v: number) => string;
+  className?: string;
+} & React.HTMLAttributes<HTMLSpanElement>) => {
   const animatedValue = useProgressAnimation(value, duration);
 
   return (
@@ -401,7 +425,12 @@ AnimatedCounter.propTypes = {
 };
 
 // Утилита для создания кастомных анимаций
-export const createAnimation = (config) => {
+export const createAnimation = (config: {
+  enter?: string;
+  enterActive?: string;
+  exit?: string;
+  exitActive?: string;
+}) => {
   return {
     enter: config.enter || 'opacity-0',
     enterActive: config.enterActive || 'opacity-100 transition-all duration-300',

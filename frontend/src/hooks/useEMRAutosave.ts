@@ -60,9 +60,9 @@ export function useEMRAutosave({
     onAutosaveError?: (error: unknown) => void;
 }) {
     // Use refs to avoid recreating timers on each render
-    const debounceTimerRef = useRef(null);
-    const maxWaitTimerRef = useRef(null);
-    const lastSaveTimeRef = useRef(null);
+    const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const maxWaitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const lastSaveTimeRef = useRef<number | null>(null);
     const pendingSaveRef = useRef(false);
 
     // audit/phase-1, BS-17: keep latest `doAutosave` in a ref so the
@@ -73,7 +73,7 @@ export function useEMRAutosave({
     // over the ORIGINAL `saveEMR` → ORIGINAL `state.data`), silently
     // saving a stale snapshot and losing everything typed since.
     // The ref is updated on every render so timer callbacks see the latest.
-    const doAutosaveRef = useRef(null);
+    const doAutosaveRef = useRef<(() => Promise<void>) | null>(null);
 
     /**
      * Check if save is allowed
@@ -154,9 +154,12 @@ export function useEMRAutosave({
                 onAutosaveSuccess?.(result);
             }
         } catch (error) {
+            const err = error as Record<string, unknown>;
+            const response = err?.response as Record<string, unknown> | undefined;
+            const status = response?.status;
             errorCountRef.current += 1;
 
-            const isAccessDenied = error?.response?.status === 401 || error?.response?.status === 403;
+            const isAccessDenied = status === 401 || status === 403;
             if (isAccessDenied) {
                 errorCountRef.current = MAX_CONSECUTIVE_ERRORS;
                 pendingSaveRef.current = false;
@@ -172,11 +175,11 @@ export function useEMRAutosave({
 
             // Only log once, not spam
             if (errorCountRef.current === 1) {
-                                logger.error('[Autosave] Error:', error.message || error);
+                                logger.error('[Autosave] Error:', (error as Error).message || error);
             }
 
             // For 503 errors, apply backoff silently
-            const is503 = error?.response?.status === 503;
+            const is503 = status === 503;
             if (is503 && errorCountRef.current < MAX_CONSECUTIVE_ERRORS) {
                 // Schedule retry with backoff
                 const backoffDelay = getBackoffDelay();

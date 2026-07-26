@@ -98,7 +98,7 @@ const useSettings = () => {
   }, []);
 
   // Сохранение настроек
-  const saveSettings = useCallback(async (newSettings) => {
+  const saveSettings = useCallback(async (newSettings: Record<string, unknown>) => {
     setLoading(true);
     setError(null);
     
@@ -200,12 +200,12 @@ const useSettings = () => {
       backup: ['autoBackup', 'backupFrequency', 'backupRetention', 'encryptBackups']
     };
     
-    const fields = categoryMap[category] || [];
-    const result = {};
+    const fields = categoryMap[category as keyof typeof categoryMap] || [];
+    const result: Record<string, unknown> = {};
     
     fields.forEach((field: string) => {
       if (Object.prototype.hasOwnProperty.call(settings, field)) {
-        result[field] = settings[field];
+        result[field] = settings[field as keyof typeof settings];
       }
     });
     
@@ -213,7 +213,7 @@ const useSettings = () => {
   }, [settings]);
 
   // Валидация настроек
-  const validateSettings = useCallback((settingsToValidate) => {
+  const validateSettings = useCallback((settingsToValidate: Record<string, unknown>) => {
     const errors: Record<string, string> = {};
     
     // Валидация общих настроек

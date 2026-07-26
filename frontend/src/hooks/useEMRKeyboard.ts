@@ -34,8 +34,18 @@ export function useEMRKeyboard({
   canSave = true,
   canSign = false,
   enabled = true
+}: {
+  onSave?: () => void;
+  onUndo?: () => void;
+  onRedo?: () => void;
+  onSign?: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
+  canSave?: boolean;
+  canSign?: boolean;
+  enabled?: boolean;
 }) {
-  const handleKeyDown = useCallback((e) => {
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (!enabled) return;
 
     // QW-2 (UX audit): Ignore hotkeys when typing in input/textarea/select/contenteditable.
@@ -44,7 +54,7 @@ export function useEMRKeyboard({
     // actually prevented hotkeys from firing inside form fields.
     // Now we properly skip hotkeys when the user is typing in ANY input field, UNLESS the target
     // is inside an EMR section (where Ctrl+S/Z/Enter should work for EMR autosave/undo/sign).
-    const target = e.target;
+    const target = e.target as HTMLElement;
     const isTypingInInput = target.tagName === 'INPUT' ||
       target.tagName === 'TEXTAREA' ||
       target.tagName === 'SELECT' ||

@@ -56,7 +56,12 @@ export const useDoctorPhrases = ({
   const [error, setError] = useState<unknown>(null);
 
   // 🔥 READINESS STATE (automatic activation)
-  const [readiness, setReadiness] = useState({
+  const [readiness, setReadiness] = useState<{
+    ready: boolean;
+    checked: boolean;
+    progress: number | null;
+    message: string | null;
+  }>({
     ready: false,
     checked: false,
     progress: null,
@@ -67,8 +72,8 @@ export const useDoctorPhrases = ({
   // Доступно ТОЛЬКО после readiness=true
   const [paused, setPaused] = useState<boolean>(false);
 
-  const abortControllerRef = useRef(null);
-  const debounceRef = useRef(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastQueryRef = useRef('');
 
   const { debounceMs, minQueryLength, maxSuggestions } = {
@@ -129,7 +134,7 @@ export const useDoctorPhrases = ({
   // ============================================
 
   // Запрос подсказок с сервера
-  const fetchSuggestions = useCallback(async (text, cursor) => {
+  const fetchSuggestions = useCallback(async (text: string, cursor: number) => {
     // 🔒 НЕ запрашиваем если NOT READY
     if (!readiness.ready) {
       setSuggestions([]);
@@ -194,7 +199,7 @@ export const useDoctorPhrases = ({
   }, [doctorId, field, specialty, maxSuggestions, readiness.ready, paused]);
 
   // Дебаунс для запросов
-  const debouncedFetch = useCallback((text, cursor: Record<string, unknown>) => {
+  const debouncedFetch = useCallback((text: string, cursor: number) => {
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
     }
@@ -223,7 +228,7 @@ export const useDoctorPhrases = ({
 
   // Эффект при изменении текста
   useEffect(() => {
-    debouncedFetch(currentText, cursorPosition as unknown as Record<string, unknown>);
+    debouncedFetch(currentText, cursorPosition);
 
     return () => {
       if (debounceRef.current) {
@@ -266,7 +271,7 @@ export const useDoctorPhrases = ({
   }, [currentText, cursorPosition]);
 
   // Проиндексировать EMR данные (вызывается после сохранения)
-  const indexPhrases = useCallback(async (emrData) => {
+  const indexPhrases = useCallback(async (emrData: Record<string, unknown>) => {
     if (!doctorId) return;
 
     try {
@@ -287,7 +292,7 @@ export const useDoctorPhrases = ({
   }, [doctorId, specialty, checkReadiness]);
 
   // Record telemetry event
-  const recordTelemetry = useCallback(async (event, phraseId = null, timeMs = null) => {
+  const recordTelemetry = useCallback(async (event: string, phraseId: string | number | null = null, timeMs: number | null = null) => {
     if (!doctorId) return;
 
     try {

@@ -11,7 +11,7 @@ const useSecurity = () => {
 }
   const [securityData, setSecurityData] = useState<SecurityData>({});
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [filterSeverity, setFilterSeverity] = useState('');
@@ -237,7 +237,7 @@ const useSecurity = () => {
   }, []);
 
   // Блокировка IP адреса
-  const blockIP = useCallback(async (ip, reason, duration = 7) => {
+  const blockIP = useCallback(async (ip: string, reason: string, duration = 7) => {
     setLoading(true);
     setError(null);
     
@@ -259,10 +259,10 @@ const useSecurity = () => {
       
       setSecurityData(prev => ({
         ...prev,
-        blockedIPs: [newBlockedIP, ...prev.blockedIPs],
+        blockedIPs: [newBlockedIP, ...(prev.blockedIPs ?? [])],
         overview: {
           ...prev.overview,
-          blockedIPs: Number(prev.overview.blockedIPs) + 1
+          blockedIPs: Number(prev.overview?.blockedIPs) + 1
         }
       }));
       
@@ -276,7 +276,7 @@ const useSecurity = () => {
   }, []);
 
   // Разблокировка IP адреса
-  const unblockIP = useCallback(async (ipId) => {
+  const unblockIP = useCallback(async (ipId: number | string) => {
     setLoading(true);
     setError(null);
     
@@ -286,10 +286,10 @@ const useSecurity = () => {
       
       setSecurityData(prev => ({
         ...prev,
-        blockedIPs: prev.blockedIPs.filter(ip => ip.id !== ipId),
+        blockedIPs: (prev.blockedIPs ?? []).filter(ip => ip.id !== ipId),
         overview: {
           ...prev.overview,
-          blockedIPs: Math.max(0, Number(prev.overview.blockedIPs) - 1)
+          blockedIPs: Math.max(0, Number(prev.overview?.blockedIPs) - 1)
         }
       }));
     } catch (err) {
@@ -301,7 +301,7 @@ const useSecurity = () => {
   }, []);
 
   // Завершение сессии
-  const terminateSession = useCallback(async (sessionId) => {
+  const terminateSession = useCallback(async (sessionId: number | string) => {
     setLoading(true);
     setError(null);
     
@@ -311,10 +311,10 @@ const useSecurity = () => {
       
       setSecurityData(prev => ({
         ...prev,
-        sessions: prev.sessions.filter(session => session.id !== sessionId),
+        sessions: (prev.sessions ?? []).filter(session => session.id !== sessionId),
         overview: {
           ...prev.overview,
-          activeSessions: Math.max(0, Number(prev.overview.activeSessions) - 1)
+          activeSessions: Math.max(0, Number(prev.overview?.activeSessions) - 1)
         }
       }));
     } catch (err) {
@@ -336,7 +336,7 @@ const useSecurity = () => {
       
       setSecurityData(prev => ({
         ...prev,
-        sessions: prev.sessions.filter(session => session.isCurrent),
+        sessions: (prev.sessions ?? []).filter(session => session.isCurrent),
         overview: {
           ...prev.overview,
           activeSessions: 1
@@ -351,7 +351,7 @@ const useSecurity = () => {
   }, []);
 
   // Обновление статуса угрозы
-  const updateThreatStatus = useCallback(async (threatId, newStatus) => {
+  const updateThreatStatus = useCallback(async (threatId: number | string, newStatus: string) => {
     setLoading(true);
     setError(null);
     
@@ -361,7 +361,7 @@ const useSecurity = () => {
       
       setSecurityData(prev => ({
         ...prev,
-        threats: prev.threats.map(threat => 
+        threats: (prev.threats ?? []).map(threat => 
           threat.id === threatId 
             ? { ...threat, status: newStatus }
             : threat
@@ -484,7 +484,9 @@ const useSecurity = () => {
   const exportSecurityLogs = useCallback(async (format = 'json') => {
     try {
       const logsData = filteredLogs;
-      let content, mimeType, extension;
+      let content: string = '';
+      let mimeType: string = '';
+      let extension: string = '';
       
       if (format === 'json') {
         content = JSON.stringify(logsData, null, 2);

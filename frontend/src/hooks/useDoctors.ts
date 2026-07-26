@@ -24,10 +24,10 @@ const normalizeDoctorPayload = (doctorData: Record<string, unknown>) => ({
 });
 
 const useDoctors = () => {
-  const [doctors, setDoctors] = useState([]);
-  const [availableUsers, setAvailableUsers] = useState([]);
+  const [doctors, setDoctors] = useState<Doctor[]>([]);
+  const [availableUsers, setAvailableUsers] = useState<unknown[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterSpecialization, setFilterSpecialization] = useState('');
   const [filterDepartment, setFilterDepartment] = useState('');
@@ -39,7 +39,7 @@ const useDoctors = () => {
 
     try {
       const response = await api.get('/admin/doctors');
-      setDoctors(Array.isArray(response.data) ? response.data : []);
+      setDoctors(Array.isArray(response.data) ? response.data as Doctor[] : []);
     } catch (err) {
       logger.error('Ошибка загрузки врачей:', err);
       setError(String(err));
@@ -74,8 +74,9 @@ const useDoctors = () => {
         return response.data;
       } catch (err) {
         logger.error('Ошибка создания врача:', err);
+        const errObj = err as { response?: { data?: { detail?: string } }; message?: string };
         const errorMessage =
-          err.response?.data?.detail || err.message || 'Ошибка создания врача';
+          errObj?.response?.data?.detail || errObj?.message || 'Ошибка создания врача';
         setError(String(err));
         throw new Error(errorMessage);
       } finally {
@@ -86,7 +87,7 @@ const useDoctors = () => {
   );
 
   const updateDoctor = useCallback(
-    async (id, doctorData) => {
+    async (id: string | number, doctorData: Partial<Doctor>) => {
       setLoading(true);
       setError(null);
 
@@ -96,8 +97,9 @@ const useDoctors = () => {
         return response.data;
       } catch (err) {
         logger.error('Ошибка обновления врача:', err);
+        const errObj = err as { response?: { data?: { detail?: string } }; message?: string };
         const errorMessage =
-          err.response?.data?.detail || err.message || 'Ошибка обновления врача';
+          errObj?.response?.data?.detail || errObj?.message || 'Ошибка обновления врача';
         setError(String(err));
         throw new Error(errorMessage);
       } finally {
@@ -108,7 +110,7 @@ const useDoctors = () => {
   );
 
   const deleteDoctor = useCallback(
-    async (id) => {
+    async (id: string | number) => {
       setLoading(true);
       setError(null);
 
@@ -117,8 +119,9 @@ const useDoctors = () => {
         await Promise.all([loadDoctors(), loadAvailableUsers()]);
       } catch (err) {
         logger.error('Ошибка удаления врача:', err);
+        const errObj = err as { response?: { data?: { detail?: string } }; message?: string };
         const errorMessage =
-          err.response?.data?.detail || err.message || 'Ошибка удаления врача';
+          errObj?.response?.data?.detail || errObj?.message || 'Ошибка удаления врача';
         setError(String(err));
         throw new Error(errorMessage);
       } finally {
@@ -129,11 +132,11 @@ const useDoctors = () => {
   );
 
   const filteredDoctors = doctors.filter((doctor) => {
-    const doctorName = doctor.user?.full_name || doctor.user?.username || '';
-    const doctorEmail = doctor.user?.email || '';
-    const doctorPhone = doctor.user?.phone || '';
+    const doctorName = doctor.user?.full_name || (doctor.user as { username?: string } | undefined)?.username || '';
+    const doctorEmail = (doctor.user as { email?: string } | undefined)?.email || '';
+    const doctorPhone = (doctor.user as { phone?: string } | undefined)?.phone || '';
     const doctorSpecialty = doctor.specialty || '';
-    const doctorCabinet = doctor.cabinet || '';
+    const doctorCabinet = doctor.cabinet != null ? String(doctor.cabinet) : '';
 
     const matchesSearch =
       !searchTerm ||

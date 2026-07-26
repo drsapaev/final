@@ -25,10 +25,15 @@ export const useDentalHotkeys = ({
   handleTabChange,
   refreshData,
   clearSelection,
+}: {
+  handleTabChange?: (tab: string) => void;
+  refreshData?: () => void;
+  clearSelection?: () => void;
 }) => {
   useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
         return;
       }
 
@@ -36,7 +41,7 @@ export const useDentalHotkeys = ({
 
       if (isCtrl && ['1', '2', '3', '4', '5'].includes(e.key)) {
         e.preventDefault();
-        const tab = DENTAL_TAB_MAP[e.key];
+        const tab = DENTAL_TAB_MAP[e.key as keyof typeof DENTAL_TAB_MAP];
         if (tab && handleTabChange) {
           handleTabChange(tab);
           logger.info(`[DentalHotkeys] Switched to tab: ${tab}`);

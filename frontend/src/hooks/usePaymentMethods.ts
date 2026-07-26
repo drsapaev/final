@@ -25,7 +25,7 @@ export function usePaymentMethods(options: Record<string, unknown> = {}) {
 
   const [paymentMethods, setPaymentMethods] = useState(DEFAULT_PAYMENT_METHODS);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!enableBackendFetch) return;

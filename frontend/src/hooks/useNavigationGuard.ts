@@ -14,7 +14,7 @@
  */
 
 import { useEffect, useCallback, useRef } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, type NavigateOptions } from 'react-router-dom';
 
 /**
  * useNavigationGuard Hook
@@ -30,6 +30,11 @@ export function useNavigationGuard({
     enabled = true,
     message = 'У вас есть несохранённые изменения. Вы уверены, что хотите уйти?',
     onBlock,
+}: {
+    isDirty: boolean;
+    enabled?: boolean;
+    message?: string;
+    onBlock?: () => void;
 }) {
     const isBlocking = isDirty && enabled;
     const navigate = useNavigate();
@@ -43,7 +48,7 @@ export function useNavigationGuard({
     useEffect(() => {
         if (!isBlocking) return;
 
-        const handleBeforeUnload = (e) => {
+        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
             // Standard way to trigger browser's "unsaved changes" dialog
             e.preventDefault();
             e.returnValue = message; // Chrome requires this
@@ -90,7 +95,7 @@ export function useNavigationGuard({
      * If a custom modal is desired here, the calling component must own the
      * dialog state and call forceNavigate() instead of safeNavigate().
      */
-    const confirmNavigation = useCallback((to) => {
+    const confirmNavigation = useCallback((to: string) => {
         if (!isBlocking) {
             return true;
         }
@@ -117,7 +122,7 @@ export function useNavigationGuard({
      *
      * P-013 note: kept as window.confirm() — same reason as confirmNavigation.
      */
-    const safeNavigate = useCallback((to: string, options) => {
+    const safeNavigate = useCallback((to: string, options?: NavigateOptions) => {
         if (!isBlocking || window.confirm(message)) {
             isNavigatingRef.current = true;
             navigate(to, options);
@@ -129,7 +134,7 @@ export function useNavigationGuard({
     /**
      * Force navigate - bypass guard (use after save)
      */
-    const forceNavigate = useCallback((to: string, options) => {
+    const forceNavigate = useCallback((to: string, options?: NavigateOptions) => {
         isNavigatingRef.current = true;
         navigate(to, options);
     }, [navigate]);
@@ -146,11 +151,11 @@ export function useNavigationGuard({
  * Simple hook for just beforeunload (no router integration)
  * Use when React Router integration is not needed
  */
-export function useBeforeUnload(isDirty, message = 'У вас есть несохранённые изменения.') {
+export function useBeforeUnload(isDirty: boolean, message = 'У вас есть несохранённые изменения.') {
     useEffect(() => {
         if (!isDirty) return;
 
-        const handleBeforeUnload = (e) => {
+        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
             e.preventDefault();
             e.returnValue = message;
             return message;

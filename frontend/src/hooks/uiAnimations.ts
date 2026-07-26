@@ -64,10 +64,11 @@ export const useTouchDevice = () => {
   const [isTouch, setIsTouch] = useState(false);
 
   useEffect(() => {
+    const ms = (navigator as Navigator & { msMaxTouchPoints?: number }).msMaxTouchPoints;
     setIsTouch(
       'ontouchstart' in window ||
         navigator.maxTouchPoints > 0 ||
-        (navigator as Navigator & { msMaxTouchPoints?: number }).msMaxTouchPoints > 0
+        (typeof ms === 'number' && ms > 0)
     );
   }, []);
 

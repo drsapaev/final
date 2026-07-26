@@ -5,9 +5,9 @@ import { toast } from 'react-toastify';
 import logger from '../utils/logger';
 import { getErrorMessage } from '../utils/errorHandler';
 const useUsers = () => {
-  const [users, setUsers] = useState([]);
+  const [users, setUsers] = useState<unknown[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRole, setFilterRole] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
@@ -58,7 +58,7 @@ const useUsers = () => {
   }, [searchTerm, filterRole, filterStatus, pagination.per_page]);
 
   // Создание пользователя
-  const createUser = useCallback(async (userData) => {
+  const createUser = useCallback(async (userData: Record<string, unknown>) => {
     setLoading(true);
     setError(null);
     
@@ -86,7 +86,7 @@ const useUsers = () => {
   }, [loadUsers, pagination.page]);
 
   // Обновление пользователя
-  const updateUser = useCallback(async (id, userData) => {
+  const updateUser = useCallback(async (id: string | number, userData: Record<string, unknown>) => {
     setLoading(true);
     setError(null);
     
@@ -114,7 +114,7 @@ const useUsers = () => {
   }, [loadUsers, pagination.page]);
 
   // Удаление пользователя
-  const deleteUser = useCallback(async (id) => {
+  const deleteUser = useCallback(async (id: string | number) => {
     setLoading(true);
     setError(null);
     
@@ -153,7 +153,7 @@ const useUsers = () => {
   }, [loadUsers]);
 
   // Функция для смены страницы
-  const changePage = useCallback((newPage) => {
+  const changePage = useCallback((newPage: number) => {
     loadUsers(newPage);
   }, [loadUsers]);
 

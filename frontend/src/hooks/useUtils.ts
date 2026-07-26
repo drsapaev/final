@@ -136,7 +136,7 @@ export const useClipboard = () => {
   const [copied, setCopied] = useState<boolean>(false);
   const [error, setError] = useState<unknown>(null);
 
-  const copyToClipboard = useCallback(async (text) => {
+  const copyToClipboard = useCallback(async (text: string | number | boolean) => {
     try {
       await navigator.clipboard.writeText(String(text));
       setCopied(true);
@@ -455,15 +455,15 @@ export const useTimeout = (callback: () => void, delay: number) => {
 };
 
 // Хук для асинхронной функции
-export const useAsync = (asyncFunction, _dependencies: unknown[] = []) => {
+export const useAsync = (asyncFunction: (...args: unknown[]) => Promise<unknown>, _dependencies: unknown[] = []) => {
   void _dependencies;
-  const [state, setState] = useState({
+  const [state, setState] = useState<{ data: unknown; loading: boolean; error: string | null }>({
     data: null,
     loading: false,
     error: null
   });
 
-  const execute = useCallback(async (...args) => {
+  const execute = useCallback(async (...args: unknown[]) => {
     setState(prev => ({ ...prev, loading: true, error: null }));
 
     try {
@@ -471,7 +471,7 @@ export const useAsync = (asyncFunction, _dependencies: unknown[] = []) => {
       setState({ data, loading: false, error: null });
       return data;
     } catch (error) {
-      setState({ data: null, loading: false, error: error.message });
+      setState({ data: null, loading: false, error: (error as Error).message });
       throw error;
     }
   }, [asyncFunction]);
@@ -480,14 +480,14 @@ export const useAsync = (asyncFunction, _dependencies: unknown[] = []) => {
 };
 
 // Хук для мемоизации
-export const useMemoizedCallback = (callback, _dependencies: unknown[] = []) => {
+export const useMemoizedCallback = (callback: (...args: unknown[]) => unknown, _dependencies: unknown[] = []) => {
   void _dependencies;
-  const memoizedCallback = useCallback((...args) => callback(...args), [callback]);
+  const memoizedCallback = useCallback((...args: unknown[]) => callback(...args), [callback]);
   return memoizedCallback;
 };
 
 // Хук для мемоизации значения
-export const useMemoizedValue = (value, _dependencies: unknown[] = []) => {
+export const useMemoizedValue = (value: unknown, _dependencies: unknown[] = []) => {
   void _dependencies;
   const memoizedValue = useMemo(() => value, [value]);
   return memoizedValue;
@@ -495,7 +495,7 @@ export const useMemoizedValue = (value, _dependencies: unknown[] = []) => {
 
 // Утилиты для работы с датами
 export const useDateUtils = () => {
-  const formatDate = useCallback((date, format = 'DD.MM.YYYY') => {
+  const formatDate = useCallback((date: string | number | Date, format = 'DD.MM.YYYY') => {
     if (!date) return '';
     
     const d = new Date(date);
@@ -560,7 +560,7 @@ export const useDateUtils = () => {
 
 // Утилиты для работы с числами
 export const useNumberUtils = () => {
-  const formatNumber = useCallback((number, options: Record<string, unknown> = {}) => {
+  const formatNumber = useCallback((number: number | string | null | undefined, options: Record<string, unknown> = {}) => {
     if (number === null || number === undefined) return '';
     
     const {
@@ -575,14 +575,14 @@ export const useNumberUtils = () => {
     return parts.join(String(decimalSeparator));
   }, []);
 
-  const formatCurrency = useCallback((amount, currency = 'UZS') => {
+  const formatCurrency = useCallback((amount: number | string | null | undefined, currency = 'UZS') => {
     if (amount === null || amount === undefined) return '';
     
     const formatted = formatNumber(amount, { decimals: 0 });
     return `${formatted} ${currency}`;
   }, [formatNumber]);
 
-  const formatPercentage = useCallback((value, decimals = 1) => {
+  const formatPercentage = useCallback((value: number | string | null | undefined, decimals = 1) => {
     if (value === null || value === undefined) return '';
     
     return `${formatNumber(value, { decimals })}%`;
