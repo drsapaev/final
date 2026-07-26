@@ -178,7 +178,7 @@ export function useDoctorSectionTemplates({
      * Pin a template
      * @param {string} templateId
      */
-    const pinTemplate = useCallback(async (templateId) => {
+    const pinTemplate = useCallback(async (templateId: string) => {
         try {
             await apiClient.post(`/section-templates/${section}/${templateId}/pin`);
             await fetchTemplates(true); // Refresh list
@@ -193,7 +193,7 @@ export function useDoctorSectionTemplates({
      * Unpin a template
      * @param {string} templateId
      */
-    const unpinTemplate = useCallback(async (templateId) => {
+    const unpinTemplate = useCallback(async (templateId: string) => {
         try {
             await apiClient.delete(`/section-templates/${section}/${templateId}/pin`);
             await fetchTemplates(true);
@@ -210,7 +210,7 @@ export function useDoctorSectionTemplates({
      * @param {string} newText
      * @param {'replace'|'save_as_new'} mode
      */
-    const updateTemplate = useCallback(async (templateId, newText, mode = 'replace') => {
+    const updateTemplate = useCallback(async (templateId: string, newText: string, mode: 'replace' | 'save_as_new' = 'replace') => {
         try {
             const response = await apiClient.put(
                 `/section-templates/${section}/${templateId}`,
@@ -228,7 +228,7 @@ export function useDoctorSectionTemplates({
      * Delete a template
      * @param {string} templateId
      */
-    const deleteTemplate = useCallback(async (templateId) => {
+    const deleteTemplate = useCallback(async (templateId: string) => {
         try {
             await apiClient.delete(`/section-templates/${section}/${templateId}`);
             await fetchTemplates(true);

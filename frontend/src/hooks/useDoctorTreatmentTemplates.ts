@@ -16,6 +16,22 @@ import { api } from '../api/client';
 import logger from '../utils/logger';
 
 /**
+ * TreatmentTemplate — shape of items returned by /emr/doctor-templates/treatment.
+ * Consumers (TreatmentSection.tsx) read these fields directly.
+ */
+export interface TreatmentTemplate {
+  id: string | number;
+  treatment_text: string;
+  icd10_code?: string;
+  usage_count?: number;
+  last_used_at?: string;
+  is_pinned?: boolean;
+  frequency_label?: string | null;
+  is_stale?: boolean;
+  [key: string]: unknown;
+}
+
+/**
  * @typedef {Object} TreatmentTemplate
  * @property {string} id - Уникальный ID
  * @property {string} treatment_text - Текст назначения
@@ -39,10 +55,14 @@ export function useDoctorTreatmentTemplates({
     icd10Code = '',
     enabled = true,
     limit = 5,
+}: {
+    icd10Code?: string;
+    enabled?: boolean;
+    limit?: number;
 } = {}) {
-    const [templates, setTemplates] = useState([]);
+    const [templates, setTemplates] = useState<TreatmentTemplate[]>([]);
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
+    const [error, setError] = useState<string | null>(null);
 
     const fetchTemplates = useCallback(async () => {
         if (!enabled || !icd10Code) {
@@ -58,11 +78,11 @@ export function useDoctorTreatmentTemplates({
                 params: { icd10: icd10Code, limit }
             });
 
-            const data = response.data;
-            setTemplates(data.templates || []);
-        } catch (err) {
+            const data = response.data as Record<string, unknown>;
+            setTemplates((data.templates as TreatmentTemplate[]) || []);
+        } catch (err: unknown) {
             logger.error('[DoctorTemplates] Error fetching:', err);
-            setError(err.message || 'Ошибка загрузки шаблонов');
+            setError((err as Error).message || 'Ошибка загрузки шаблонов');
             setTemplates([]);
         } finally {
             setLoading(false);
@@ -75,31 +95,31 @@ export function useDoctorTreatmentTemplates({
     }, [fetchTemplates]);
 
     // 📌 Pin template
-    const pinTemplate = useCallback(async (templateId) => {
+    const pinTemplate = useCallback(async (templateId: string) => {
         try {
             await api.post(`/emr/doctor-templates/treatment/${templateId}/pin`);
             await fetchTemplates(); // Refresh
             return true;
-        } catch (err) {
+        } catch (err: unknown) {
             logger.error('[DoctorTemplates] Error pinning:', err);
             return false;
         }
     }, [fetchTemplates]);
 
     // Unpin template
-    const unpinTemplate = useCallback(async (templateId) => {
+    const unpinTemplate = useCallback(async (templateId: string) => {
         try {
             await api.delete(`/emr/doctor-templates/treatment/${templateId}/pin`);
             await fetchTemplates(); // Refresh
             return true;
-        } catch (err) {
+        } catch (err: unknown) {
             logger.error('[DoctorTemplates] Error unpinning:', err);
             return false;
         }
     }, [fetchTemplates]);
 
     // ✏️ Update template (inline edit)
-    const updateTemplate = useCallback(async (templateId, newText, mode = 'replace') => {
+    const updateTemplate = useCallback(async (templateId: string, newText: string, mode: 'replace' | 'save_as_new' = 'replace') => {
         try {
             await api.put(`/emr/doctor-templates/treatment/${templateId}`, {
                 treatment_text: newText,
@@ -107,7 +127,7 @@ export function useDoctorTreatmentTemplates({
             });
             await fetchTemplates(); // Refresh
             return true;
-        } catch (err) {
+        } catch (err: unknown) {
             logger.error('[DoctorTemplates] Error updating:', err);
             return false;
         }
@@ -131,11 +151,11 @@ export function useDoctorTreatmentTemplates({
  * @param {string} templateId - ID шаблона
  * @returns {Promise<boolean>}
  */
-export async function deleteTemplate(templateId) {
+export async function deleteTemplate(templateId: string) {
     try {
         await api.delete(`/emr/doctor-templates/treatment/${templateId}`);
         return true;
-    } catch (err) {
+    } catch (err: unknown) {
         logger.error('[DoctorTemplates] Error deleting:', err);
         return false;
     }

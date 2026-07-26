@@ -2,8 +2,15 @@ import { useState, useEffect } from 'react';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
 import { fetchWizardSettings } from '../api/adminSettings';
+
+interface WizardSettingsState {
+  use_new_wizard: boolean;
+  loading: boolean;
+  error: string | null;
+}
+
 const useWizardSettings = () => {
-  const [settings, setSettings] = useState({
+  const [settings, setSettings] = useState<WizardSettingsState>({
     use_new_wizard: true,  // 🎯 По умолчанию используем НОВЫЙ мастер (V2)
     loading: true,
     error: null
@@ -37,7 +44,9 @@ const useWizardSettings = () => {
           error: null
         });
       } catch (error) {
-        const status = error?.response?.status;
+        const err = error as Record<string, unknown>;
+        const response = err?.response as Record<string, unknown> | undefined;
+        const status = response?.status;
         if (status === 401) {
           logger.warn('Unauthorized access to wizard settings, using default');
           setSettings({

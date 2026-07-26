@@ -16,8 +16,8 @@ import logger from '../utils/logger';
 export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [icd10Suggestions, setIcd10Suggestions] = useState([]);
-  const [clinicalRecommendations, setClinicalRecommendations] = useState(null);
+  const [icd10Suggestions, setIcd10Suggestions] = useState<Record<string, unknown>[]>([]);
+  const [clinicalRecommendations, setClinicalRecommendations] = useState<Record<string, unknown> | null>(null);
 
   // Получение AI подсказок для МКБ-10 через MCP
   const getICD10Suggestions = useCallback(async (symptoms: string, diagnosis: string, specialty: string | null = null) => {
@@ -77,13 +77,14 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
           provider: provider
         });
 
-        const suggestions = response.data;
+        const suggestions = response.data as Record<string, unknown>[];
         setIcd10Suggestions(suggestions);
         return suggestions;
       }
     } catch (err) {
       logger.error('AI error:', err);
-      const errorMessage = err.response?.data?.detail || err.message || 'Ошибка получения AI подсказок';
+      const errObj = err as { response?: { data?: { detail?: string } }; message?: string };
+      const errorMessage = errObj?.response?.data?.detail || errObj?.message || 'Ошибка получения AI подсказок';
       setError(String(errorMessage));
       return [];
     } finally {
@@ -133,7 +134,8 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
       }
     } catch (err) {
       logger.error('AI analysis error:', err);
-      const errorMessage = err.response?.data?.detail || err.message || 'Ошибка анализа жалоб';
+      const errObj = err as { response?: { data?: { detail?: string } }; message?: string };
+      const errorMessage = errObj?.response?.data?.detail || errObj?.message || 'Ошибка анализа жалоб';
       setError(String(errorMessage));
       return null;
     } finally {
@@ -151,7 +153,8 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
       return response.data;
     } catch (err) {
       logger.error('AI recommendations error:', err);
-      const errorMessage = err.response?.data?.detail || 'Ошибка получения рекомендаций';
+      const errObj = err as { response?: { data?: { detail?: string } }; message?: string };
+      const errorMessage = errObj?.response?.data?.detail || 'Ошибка получения рекомендаций';
       setError(String(errorMessage));
       return null;
     } finally {
@@ -196,7 +199,8 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
       }
     } catch (err) {
       logger.error('AI lab interpretation error:', err);
-      const errorMessage = err.response?.data?.detail || err.message || 'Ошибка интерпретации анализов';
+      const errObj = err as { response?: { data?: { detail?: string } }; message?: string };
+      const errorMessage = errObj?.response?.data?.detail || errObj?.message || 'Ошибка интерпретации анализов';
       setError(String(errorMessage));
       return null;
     } finally {
@@ -218,7 +222,8 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
       return response.data;
     } catch (err) {
       logger.error('AI lab suggestions error:', err);
-      const errorMessage = err.response?.data?.detail || err.message || 'Ошибка получения предложений по анализам';
+      const errObj = err as { response?: { data?: { detail?: string } }; message?: string };
+      const errorMessage = errObj?.response?.data?.detail || errObj?.message || 'Ошибка получения предложений по анализам';
       setError(String(errorMessage));
       return [];
     } finally {
@@ -263,7 +268,8 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
       }
     } catch (err) {
       logger.error('AI image analysis error:', err);
-      const errorMessage = err.response?.data?.detail || err.message || 'Ошибка анализа изображения';
+      const errObj = err as { response?: { data?: { detail?: string } }; message?: string };
+      const errorMessage = errObj?.response?.data?.detail || errObj?.message || 'Ошибка анализа изображения';
       setError(String(errorMessage));
       return null;
     } finally {
@@ -296,7 +302,8 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
       }
     } catch (err) {
       logger.error('AI skin lesion analysis error:', err);
-      const errorMessage = err.response?.data?.detail || err.message || 'Ошибка анализа кожного образования';
+      const errObj = err as { response?: { data?: { detail?: string } }; message?: string };
+      const errorMessage = errObj?.response?.data?.detail || errObj?.message || 'Ошибка анализа кожного образования';
       setError(String(errorMessage));
       return null;
     } finally {

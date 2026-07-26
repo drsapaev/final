@@ -23,10 +23,15 @@ export const useDermaHotkeys = ({
   handleTabChange,
   refreshData,
   clearSelection,
+}: {
+  handleTabChange?: (tab: string) => void;
+  refreshData?: () => void;
+  clearSelection?: () => void;
 }) => {
   useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
         return;
       }
 
@@ -34,7 +39,7 @@ export const useDermaHotkeys = ({
 
       if (isCtrl && ['1', '2', '3', '4'].includes(e.key)) {
         e.preventDefault();
-        const tab = DERMA_TAB_MAP[e.key];
+        const tab = DERMA_TAB_MAP[e.key as keyof typeof DERMA_TAB_MAP];
         if (tab && handleTabChange) {
           handleTabChange(tab);
           logger.info(`[DermaHotkeys] Switched to tab: ${tab}`);

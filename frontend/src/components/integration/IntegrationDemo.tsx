@@ -163,9 +163,9 @@ const IntegrationDemo = () => {
             <div className="clinic-space-y-sm">
               {emrAI.icd10Suggestions.map((suggestion, index) => (
                 <div key={index} className="clinic-p-sm clinic-border clinic-rounded">
-                  <div className="clinic-font-semibold">{suggestion.code}</div>
+                  <div className="clinic-font-semibold">{suggestion.code as string}</div>
                   <div className="clinic-text-sm clinic-text-secondary">
-                    {suggestion.description}
+                    {suggestion.description as string}
                   </div>
                 </div>
               ))}

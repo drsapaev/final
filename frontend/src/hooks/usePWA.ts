@@ -12,6 +12,12 @@ interface PWABrowserWindow extends Window {
 function getPWABrowserWindow(): PWABrowserWindow {
   return window as unknown as PWABrowserWindow;
 }
+
+// Type for the beforeinstallprompt event
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
+}
 /**
  * Hook для работы с PWA функциональностью
  * ИСПРАВЛЕНО: Убран избыточный импорт React, добавлены SSR checks
@@ -26,7 +32,7 @@ export const usePWA = () => {
   const [isOnline, setIsOnline] = useState(isClient ? window.navigator.onLine : true);
   const [isServiceWorkerReady, setIsServiceWorkerReady] = useState(false);
   const [updateAvailable, setUpdateAvailable] = useState(false);
-  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
 
   // Проверка установки PWA
   useEffect(() => {
@@ -44,9 +50,10 @@ export const usePWA = () => {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
-    const handleBeforeInstallPrompt = (e) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
+    const handleBeforeInstallPrompt = (e: Event) => {
+      const promptEvent = e as BeforeInstallPromptEvent;
+      promptEvent.preventDefault();
+      setDeferredPrompt(promptEvent);
       setIsInstallable(true);
     };
 
@@ -113,7 +120,9 @@ export const usePWA = () => {
         // Проверка обновлений
         registration.addEventListener('updatefound', () => {
           const newWorker = registration.installing;
-          
+
+          if (!newWorker) return;
+
           newWorker.addEventListener('statechange', () => {
             if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
               setUpdateAvailable(true);
@@ -231,7 +240,7 @@ export const usePWA = () => {
   }, [requestNotificationPermission]);
 
   // Кэширование URL в Service Worker
-  const cacheUrls = useCallback(async (urls) => {
+  const cacheUrls = useCallback(async (urls: string[]) => {
     if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !navigator.serviceWorker.controller) return;
     
     navigator.serviceWorker.controller.postMessage({

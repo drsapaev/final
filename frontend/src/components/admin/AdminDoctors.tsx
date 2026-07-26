@@ -304,13 +304,13 @@ const AdminDoctors = () => {
                           <p
                             className="admin-patients-email"
                           >
-                            {doctor.user?.email || doctor.email || t('admin2.ad_no_email')}
+                            {(doctor.user?.email || doctor.email || t('admin2.ad_no_email')) as string}
                           </p>
                           {doctor.user?.phone ? (
                             <p
                               className="admin-patients-address"
                             >
-                              {doctor.user.phone}
+                              {doctor.user.phone as string}
                             </p>
                           ) : null}
                           <div className="admin-doctors-badges-row">
@@ -326,7 +326,7 @@ const AdminDoctors = () => {
                     </td>
                     <td className="admin-p-12-16">
                       <Badge variant="info">
-                        {doctor.specialty || doctor.specialization || t('admin2.ad_not_specified')}
+                        {(doctor.specialty || doctor.specialization || t('admin2.ad_not_specified')) as string}
                       </Badge>
                     </td>
                     <td className="admin-p-12-16">

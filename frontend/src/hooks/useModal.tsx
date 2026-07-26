@@ -8,7 +8,7 @@ import { useReducedMotion } from './useEnhancedMediaQuery';
 import PropTypes from 'prop-types';
 
 // Hook for managing animations
-const useAnimation = (isActive, type = 'fade', duration = 300) => {
+const useAnimation = (isActive: boolean, type = 'fade', duration = 300) => {
   void type;
   const [shouldRender, setShouldRender] = useState(isActive);
   const [animationClasses, setAnimationClasses] = useState('');
@@ -79,7 +79,7 @@ export const useModal = (initialOpen = false) => {
 
 // Хук для управления несколькими модальными окнами
 export const useModals = () => {
-  const [modals, setModals] = useState({});
+  const [modals, setModals] = useState<Record<string, { isOpen: boolean; isAnimating: boolean }>>({});
 
   const openModal = useCallback((id: string | number) => {
     setModals(prev => ({
@@ -140,10 +140,19 @@ export const Modal = ({
   maskClosable = true,
   className = '',
   ...props
-}) => {
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  title?: React.ReactNode;
+  children?: React.ReactNode;
+  size?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
+  closable?: boolean;
+  maskClosable?: boolean;
+  className?: string;
+} & React.HTMLAttributes<HTMLDivElement>) => {
   const { prefersReducedMotion } = useReducedMotion();
   const { shouldRender, animationClasses } = useAnimation(isOpen, 'modal', 300);
-  const modalRef = useRef(null);
+  const modalRef = useRef<HTMLDivElement | null>(null);
 
   const sizes = {
     sm: 'max-w-md',
@@ -154,7 +163,7 @@ export const Modal = ({
   };
 
   useEffect(() => {
-    const handleEscape = (e) => {
+    const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen && closable) {
         onClose();
       }
@@ -171,7 +180,7 @@ export const Modal = ({
     };
   }, [isOpen, closable, onClose]);
 
-  const handleMaskClick = (e) => {
+  const handleMaskClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.target === e.currentTarget && maskClosable && closable) {
       onClose();
     }
@@ -213,7 +222,7 @@ export const Modal = ({
           flexDirection: 'column',
           width: '100%'
         }}
-        onMouseDownCapture={(e) => e.stopPropagation()}
+        onMouseDownCapture={(e: React.MouseEvent<HTMLDivElement>) => e.stopPropagation()}
         {...props}
       >
         {title && (
@@ -287,7 +296,6 @@ export const Modal = ({
 
 
 Modal.propTypes = {
-  ...(Modal.propTypes || {}),
   children: PropTypes.any,
   className: PropTypes.any,
   closable: PropTypes.any,

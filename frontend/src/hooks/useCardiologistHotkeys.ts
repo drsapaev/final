@@ -27,11 +27,16 @@ export const useCardiologistHotkeys = ({
   setActiveTab,
   refreshData,
   closeModal,
+}: {
+  setActiveTab?: (tab: string) => void;
+  refreshData?: () => void;
+  closeModal?: () => void;
 }) => {
   useEffect(() => {
-    const handleKeyDown = (e) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
       // Ignore shortcuts when user is typing in an input/textarea
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
         return;
       }
 
@@ -47,7 +52,7 @@ export const useCardiologistHotkeys = ({
           '4': 'ecg',
           '5': 'blood',
         };
-        const tab = tabMap[e.key];
+        const tab = tabMap[e.key as keyof typeof tabMap];
         if (tab && setActiveTab) {
           setActiveTab(tab);
           logger.info(`[CardiologistHotkeys] Switched to tab: ${tab}`);

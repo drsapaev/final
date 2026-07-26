@@ -16,6 +16,22 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { apiClient } from '../api/client';
 import logger from '../utils/logger';
 
+interface DoctorHistoryEntry {
+    content?: string;
+    diagnosis?: string;
+    created_at?: string;
+    [key: string]: unknown;
+}
+
+interface UseDoctorHistoryOptions {
+    doctorId?: number | string;
+    specialty?: string;
+    fieldName?: string;
+    currentText?: string;
+    limit?: number;
+    enabled?: boolean;
+}
+
 /**
  * useDoctorHistory Hook
  * 
@@ -34,11 +50,11 @@ export function useDoctorHistory({
     currentText = '',
     limit = 10,
     enabled = true,
-}) {
-    const [history, setHistory] = useState([]);
+}: UseDoctorHistoryOptions) {
+    const [history, setHistory] = useState<DoctorHistoryEntry[]>([]);
     const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState(null);
-    const abortControllerRef = useRef(null);
+    const [error, setError] = useState<string | null>(null);
+    const abortControllerRef = useRef<AbortController | null>(null);
 
     /**
      * Fetch history from backend
@@ -50,7 +66,8 @@ export function useDoctorHistory({
         if (abortControllerRef.current) {
             abortControllerRef.current.abort();
         }
-        abortControllerRef.current = new AbortController();
+        const controller = new AbortController();
+        abortControllerRef.current = controller;
 
         setIsLoading(true);
         setError(null);
@@ -64,14 +81,15 @@ export function useDoctorHistory({
                     search_text: currentText.slice(0, 100), // Limit search text
                     limit,
                 },
-                signal: abortControllerRef.current.signal,
+                signal: controller.signal,
             });
 
-            setHistory(((response.data as Record<string, unknown>).entries as unknown[]) || []);
+            setHistory(((response.data as Record<string, unknown>).entries as DoctorHistoryEntry[]) || []);
         } catch (err) {
-            if (err.name !== 'AbortError' && err.code !== 'ERR_CANCELED') {
+            const errObj = err as { name?: string; code?: string; message?: string };
+            if (errObj?.name !== 'AbortError' && errObj?.code !== 'ERR_CANCELED') {
                 logger.error('[useDoctorHistory] Error:', err);
-                setError((err as Error).message);
+                setError(errObj?.message || 'Unknown error');
                 // Return empty on error - not critical
                 setHistory([]);
             }
@@ -84,8 +102,8 @@ export function useDoctorHistory({
      * Get unique phrases from history
      */
     const getUniquePhrases = useCallback(() => {
-        const phrases = new Set();
-        history.forEach(entry => {
+        const phrases = new Set<string>();
+        history.forEach((entry: DoctorHistoryEntry) => {
             if (entry.content) {
                 // Split by sentences/newlines
                 entry.content.split(/[.\n]/).forEach((phrase: string) => {
@@ -109,7 +127,7 @@ export function useDoctorHistory({
             doctor_id: doctorId,
             specialty,
             field_name: fieldName,
-            previous_entries: history.slice(0, 5).map(e => ({
+            previous_entries: history.slice(0, 5).map((e: DoctorHistoryEntry) => ({
                 content: e.content?.slice(0, 500), // Limit content size
                 diagnosis: e.diagnosis,
                 created_at: e.created_at,

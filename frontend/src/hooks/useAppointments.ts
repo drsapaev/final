@@ -3,30 +3,60 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { api } from '../api/client';
 import type { Appointment, Doctor } from '../types/domain/clinic';
 
-const normalizeAppointment = (appointment: Appointment) => ({
+/**
+ * Normalized appointment shape — extends the domain Appointment with the
+ * fields that `normalizeAppointment` synthesises plus the raw fields that
+ * consumers (AdminAppointments) read directly.
+ */
+interface NormalizedAppointment extends Appointment {
+  // Fields synthesised by normalizeAppointment
+  patientId?: string | number | null;
+  doctorId?: string | number | null;
+  patientName?: string;
+  doctorName?: string;
+  doctorSpecialization?: string;
+  appointmentDate?: string;
+  appointmentTime?: string;
+  reason?: string;
+  notes?: string;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  effectiveCabinet?: string | null;
+  queueCabinet?: string | null;
+  doctorCabinet?: string | null;
+  integrityWarnings?: string[];
+  hasIntegrityWarnings?: boolean;
+  // Raw fields read directly by consumers
+  phone?: string;
+  duration?: number;
+  doctor?: { active?: boolean; user_active?: boolean; [k: string]: unknown };
+}
+
+const normalizeAppointment = (appointment: Appointment): NormalizedAppointment => ({
   ...appointment,
-  patientId: appointment.patientId ?? appointment.patient_id ?? null,
-  doctorId: appointment.doctorId ?? appointment.doctor_id ?? null,
-  patientName: appointment.patientName ?? appointment.patient_name ?? 'Пациент',
-  doctorName: appointment.doctorName ?? appointment.doctor_name ?? 'Врач',
-  doctorSpecialization:
-    appointment.doctorSpecialization ??
+  patientId: (appointment.patientId ?? appointment.patient_id ?? null) as string | number | null,
+  doctorId: (appointment.doctorId ?? appointment.doctor_id ?? null) as string | number | null,
+  patientName: (appointment.patientName ?? appointment.patient_name ?? 'Пациент') as string,
+  doctorName: (appointment.doctorName ?? appointment.doctor_name ?? 'Врач') as string,
+  doctorSpecialization: (appointment.doctorSpecialization ??
     appointment.doctor_specialization ??
     appointment.specialization ??
-    '',
-  appointmentDate: appointment.appointmentDate ?? appointment.appointment_date ?? '',
-  appointmentTime: appointment.appointmentTime ?? appointment.appointment_time ?? '',
-  reason: appointment.reason ?? appointment.notes ?? '',
-  notes: appointment.notes ?? '',
-  createdAt: appointment.createdAt ?? appointment.created_at ?? null,
-  updatedAt: appointment.updatedAt ?? appointment.updated_at ?? null,
-  effectiveCabinet: appointment.effectiveCabinet ?? appointment.effective_cabinet ?? null,
-  queueCabinet: appointment.queueCabinet ?? appointment.queue_cabinet ?? null,
-  doctorCabinet: appointment.doctorCabinet ?? appointment.doctor_cabinet ?? null,
-  integrityWarnings:
-    appointment.integrityWarnings ?? appointment.integrity_warnings ?? [],
-  hasIntegrityWarnings:
-    appointment.hasIntegrityWarnings ?? appointment.has_integrity_warnings ?? false,
+    '') as string,
+  appointmentDate: (appointment.appointmentDate ?? appointment.appointment_date ?? '') as string,
+  appointmentTime: (appointment.appointmentTime ?? appointment.appointment_time ?? '') as string,
+  reason: (appointment.reason ?? appointment.notes ?? '') as string,
+  notes: (appointment.notes ?? '') as string,
+  createdAt: (appointment.createdAt ?? appointment.created_at ?? null) as string | null,
+  updatedAt: (appointment.updatedAt ?? appointment.updated_at ?? null) as string | null,
+  effectiveCabinet: (appointment.effectiveCabinet ?? appointment.effective_cabinet ?? null) as string | null,
+  queueCabinet: (appointment.queueCabinet ?? appointment.queue_cabinet ?? null) as string | null,
+  doctorCabinet: (appointment.doctorCabinet ?? appointment.doctor_cabinet ?? null) as string | null,
+  integrityWarnings: (appointment.integrityWarnings ??
+    appointment.integrity_warnings ??
+    []) as string[],
+  hasIntegrityWarnings: (appointment.hasIntegrityWarnings ??
+    appointment.has_integrity_warnings ??
+    false) as boolean,
 });
 
 const buildAppointmentPayload = (appointmentData: Record<string, unknown>, doctors: Doctor[] = []) => {
@@ -52,9 +82,9 @@ const buildAppointmentPayload = (appointmentData: Record<string, unknown>, docto
 };
 
 const useAppointments = (doctors: Doctor[] = []) => {
-  const [appointments, setAppointments] = useState([]);
+  const [appointments, setAppointments] = useState<NormalizedAppointment[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [filterDate, setFilterDate] = useState('');
@@ -88,7 +118,7 @@ const useAppointments = (doctors: Doctor[] = []) => {
   }, []);
 
   const createAppointment = useCallback(
-    async (appointmentData) => {
+    async (appointmentData: Record<string, unknown>) => {
       setLoading(true);
       setError(null);
 
@@ -110,7 +140,7 @@ const useAppointments = (doctors: Doctor[] = []) => {
   );
 
   const updateAppointment = useCallback(
-    async (id, appointmentData) => {
+    async (id: string | number, appointmentData: Record<string, unknown>) => {
       setLoading(true);
       setError(null);
 
@@ -132,7 +162,7 @@ const useAppointments = (doctors: Doctor[] = []) => {
   );
 
   const deleteAppointment = useCallback(
-    async (id) => {
+    async (id: string | number) => {
       setLoading(true);
       setError(null);
 
@@ -151,7 +181,7 @@ const useAppointments = (doctors: Doctor[] = []) => {
 
   const filteredAppointments = useMemo(
     () =>
-      appointments.filter((appointment: Appointment) => {
+      appointments.filter((appointment: NormalizedAppointment) => {
         const haystack = [
           appointment.patientName,
           appointment.doctorName,
@@ -178,7 +208,7 @@ const useAppointments = (doctors: Doctor[] = []) => {
   );
 
   const getStatusStats = useCallback(() => {
-    const stats = {
+    const stats: Record<string, number> = {
       pending: 0,
       confirmed: 0,
       paid: 0,
@@ -188,8 +218,11 @@ const useAppointments = (doctors: Doctor[] = []) => {
       no_show: 0,
     };
 
-    appointments.forEach((appointment: Appointment) => {
-      stats[appointment.status] = (stats[appointment.status] || 0) + 1;
+    appointments.forEach((appointment: NormalizedAppointment) => {
+      const status = appointment.status as string | undefined;
+      if (status) {
+        stats[status] = (stats[status] || 0) + 1;
+      }
     });
 
     return stats;
@@ -197,7 +230,7 @@ const useAppointments = (doctors: Doctor[] = []) => {
 
   const getTodayAppointments = useCallback(() => {
     const today = new Date().toISOString().split('T')[0];
-    return appointments.filter((appointment: Appointment) => appointment.appointmentDate === today);
+    return appointments.filter((appointment: NormalizedAppointment) => appointment.appointmentDate === today);
   }, [appointments]);
 
   const getTomorrowAppointments = useCallback(() => {
@@ -205,7 +238,7 @@ const useAppointments = (doctors: Doctor[] = []) => {
     tomorrow.setDate(tomorrow.getDate() + 1);
     const tomorrowStr = tomorrow.toISOString().split('T')[0];
     return appointments.filter(
-      (appointment: Appointment) => appointment.appointmentDate === tomorrowStr
+      (appointment: NormalizedAppointment) => appointment.appointmentDate === tomorrowStr
     );
   }, [appointments]);
 

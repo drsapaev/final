@@ -30,11 +30,16 @@ export const useLabHotkeys = ({
   switchTab,
   refreshData,
   clearSelection,
+}: {
+  switchTab?: (tab: string) => void;
+  refreshData?: () => void;
+  clearSelection?: () => void;
 }) => {
   useEffect(() => {
-    const handleKeyDown = (e) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
       // Ignore shortcuts when user is typing in an input/textarea
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
         return;
       }
 
@@ -43,7 +48,7 @@ export const useLabHotkeys = ({
       // Tab switching: Ctrl+1 through Ctrl+3
       if (isCtrl && ['1', '2', '3'].includes(e.key)) {
         e.preventDefault();
-        const tab = LAB_TAB_MAP[e.key];
+        const tab = LAB_TAB_MAP[e.key as keyof typeof LAB_TAB_MAP];
         if (tab && switchTab) {
           switchTab(tab);
           logger.info(`[LabHotkeys] Switched to tab: ${tab}`);

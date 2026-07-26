@@ -16,7 +16,7 @@ const EMR_TEMPLATE_FIELD_HINTS = {
   'plan.treatment': ['treatment', 'plan', 'therapy', 'назнач'],
 };
 
-let backendEmrTemplatesPromise = null;
+let backendEmrTemplatesPromise: Promise<EMRTemplate[]> | null = null;
 
 export async function loadBackendEmrTemplates() {
   if (!backendEmrTemplatesPromise) {
@@ -61,7 +61,7 @@ export function buildBackendTemplateSnippet(template: EMRTemplate): string {
 }
 
 export function backendTemplateMatches(fieldName: string, text: string, template: EMRTemplate): boolean {
-  const hints = EMR_TEMPLATE_FIELD_HINTS[fieldName] || [];
+  const hints = EMR_TEMPLATE_FIELD_HINTS[fieldName as keyof typeof EMR_TEMPLATE_FIELD_HINTS] || [];
   const haystack = [
     template?.name,
     template?.description,
@@ -87,7 +87,7 @@ export function backendTemplateMatches(fieldName: string, text: string, template
   }
 
   return (
-    hints.some((hint) => haystack.includes(hint)) ||
+    hints.some((hint: string) => haystack.includes(hint)) ||
     (lowerText.length >= 3 && haystack.includes(lowerText.slice(0, 12)))
   );
 }
