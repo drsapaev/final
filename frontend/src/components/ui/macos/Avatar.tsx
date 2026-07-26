@@ -76,4 +76,7 @@ export const Avatar = ({ src, name, size = 'medium', status, style = {}, classNa
     </div>
   );
 };
+
+
+
 export default Avatar;

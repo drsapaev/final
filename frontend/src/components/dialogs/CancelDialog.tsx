@@ -8,6 +8,11 @@ import './CancelDialog.css';
 
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
+// TECH-DEBT(g2d-dialogs-001): Appointment type narrowing for CancelDialog and
+// PaymentDialog is deferred — applying `appointment: Appointment | null`
+// cascades into ~20 caller errors in RegistrarPanel.tsx that need a separate
+// migration pass. For now, dialogs accept Record<string, unknown> | null and
+// coerce fields at the boundary (Number(appointment.cost ?? 0), String(...)).
 
 interface CancelDialogProps {
   isOpen: boolean;

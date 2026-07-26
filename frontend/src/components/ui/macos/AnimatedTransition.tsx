@@ -94,4 +94,6 @@ const AnimatedTransition = ({
     </div>
   );
 };
+
+
 export default AnimatedTransition;

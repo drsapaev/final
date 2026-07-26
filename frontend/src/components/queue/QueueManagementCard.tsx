@@ -49,7 +49,7 @@ const hasBackendQueueAction = (entry: Record<string, unknown> | null | undefined
     return false;
   }
 
-  const availableActions = new Set(entry.available_actions.map(normalizeQueueAction));
+  const availableActions = new Set((entry?.available_actions as unknown[] || []).map(normalizeQueueAction));
   const aliases = QUEUE_ACTION_ALIASES[action] || [action];
   return aliases.some((alias) => availableActions.has(normalizeQueueAction(alias)));
 };
@@ -60,7 +60,17 @@ const hasBackendQueueAction = (entry: Record<string, unknown> | null | undefined
  * Если передан styles.actionButtonStyle — используется он (backward compat),
  * иначе — CSS-класс .qm-action-btn.qm-action-btn--{color}.
  */
-const ActionButton = ({ color, icon: Icon, iconSize, onClick, disabled, ariaLabel, title, actionButtonStyle, getColor }: Record<string, any>) => {
+const ActionButton = ({ color, icon: Icon, iconSize, onClick, disabled, ariaLabel, title, actionButtonStyle, getColor }: {
+  color: string;
+  icon: React.ComponentType<{ size?: number }>;  
+  iconSize: number;
+  onClick: () => void;
+  disabled?: boolean;
+  ariaLabel?: string;
+  title?: string;
+  actionButtonStyle?: Record<string, unknown>;
+  getColor?: (category: string, variant: string | number) => string;
+}) => {
   // Backward compat: если передан custom actionButtonStyle — используем inline-стиль.
   if (actionButtonStyle) {
     return (
@@ -92,7 +102,6 @@ const ActionButton = ({ color, icon: Icon, iconSize, onClick, disabled, ariaLabe
   );
 };
 
-
 /**
  * Кнопки действий для одной записи в очереди
  * @param {object} entry - Запись из очереди (appointment/queue entry)
@@ -110,14 +119,14 @@ export const QueueActionButtons = ({
   styles?: Record<string, unknown>;
   compact?: boolean;
 }) => {
-  const styles = stylesRaw as Record<string, any>;
+  const styles = stylesRaw as Record<string, unknown>;
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [loading, setLoading] = useState(false);
 
   const {
-    actionButtonStyle = null, // UX Audit Registrar #3: по умолчанию null — используем CSS-классы
-    getColor = null,
-  } = styles;
+    actionButtonStyle,
+    getColor,
+  } = styles as { actionButtonStyle?: Record<string, unknown>; getColor?: (category: string, variant: string | number) => string };
 
   const entryId = entry?.queue_entry_id ?? null;
   const status = entry?.queue_status || entry?.status || null;
@@ -180,7 +189,7 @@ export const QueueActionButtons = ({
 
   // Кнопки в зависимости от статуса
   const renderButtons = () => {
-    const buttons = [];
+    const buttons: React.ReactElement[] = [];
 
     if (hasBackendQueueAction(entry, 'no_show', 'can_no_show')) {
       buttons.push(
@@ -390,8 +399,8 @@ export const QueueActionButtons = ({
 /**
  * Карточка статистики очереди (для хедера)
  */
-export const QueueStatsBar = ({ stats, getColor }: Record<string, any>) => {
-  const styles = {} as Record<string, any> as Record<string, any>;
+export const QueueStatsBar = ({ stats, getColor }: { stats: Record<string, unknown>; getColor?: (category: string, variant: string | number) => string }) => {
+  const styles: Record<string, unknown> = {};
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // UX Audit Registrar #3: если getColor не передан — используем CSS-классы.
   // Backward compat: если getColor передан — используем inline-стили.
@@ -463,7 +472,5 @@ export const getQueueStatusInfo = (status: string) => {
 
   return statusMap[status] || { label: status, variant: 'default', color: 'var(--mac-text-secondary)' };
 };
-
-
 
 export default QueueActionButtons;

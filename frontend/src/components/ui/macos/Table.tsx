@@ -378,6 +378,8 @@ const Table = ({
     </div>
   );
 };
+
+
 const TableHead = React.forwardRef<HTMLTableSectionElement, TablePartProps>(({
   children,
   className = '',
@@ -562,6 +564,12 @@ TableBody.displayName = 'TableBody';
 TableRow.displayName = 'TableRow';
 TableCell.displayName = 'TableCell';
 TableHeaderCell.displayName = 'TableHeaderCell';
+
+
+
+
+
+
 
 export default Table;
 export { TableHead, TableBody, TableRow, TableCell, TableHeaderCell };

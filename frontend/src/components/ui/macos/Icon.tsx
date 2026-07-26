@@ -539,6 +539,9 @@ const Icon = React.forwardRef<SVGSVGElement, IconProps>(({
     </svg>);
 
 });
+
+
+
 Icon.displayName = 'macOS Icon';
 
 export default Icon;

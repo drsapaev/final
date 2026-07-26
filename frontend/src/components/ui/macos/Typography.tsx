@@ -64,6 +64,9 @@ const Typography = ({
   const Tag = component || (variant.startsWith('h') ? 'h' + variant.replace('h', '') : 'p');
   return <Tag style={styles} {...props}>{children}</Tag>;
 };
+
+
+
 export default Typography;
 
 

@@ -1,12 +1,10 @@
 import React, { useState, type ReactNode, type CSSProperties } from 'react';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
-import PropTypes from 'prop-types';
-
 interface MacOSStatCardProps {
   title?: ReactNode;
   value?: ReactNode;
   subtitle?: ReactNode;
-  icon?: React.ComponentType<any> | ReactNode;
+  icon?: React.ElementType | ReactNode;
   trend?: ReactNode;
   trendType?: 'positive' | 'negative' | 'neutral' | string;
   trendLabel?: ReactNode;
@@ -90,7 +88,7 @@ const MacOSStatCard = ({
     gray: 'var(--mac-text-secondary)'
   };
 
-  const trendStyles: Record<string, { color: string; icon: React.ComponentType<any> }> = {
+  const trendStyles: Record<string, { color: string; icon: React.ElementType }> = {
     positive: {
       color: 'var(--mac-success)',
       icon: TrendingUp
@@ -289,21 +287,5 @@ const MacOSStatCard = ({
   );
 };
 
-MacOSStatCard.propTypes = {
-  title: PropTypes.node,
-  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number, PropTypes.node]),
-  subtitle: PropTypes.node,
-  icon: PropTypes.elementType,
-  trend: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-  trendType: PropTypes.oneOf(['positive', 'negative', 'neutral']),
-  trendLabel: PropTypes.node,
-  color: PropTypes.oneOf(['blue', 'green', 'orange', 'red', 'purple', 'gray']),
-  size: PropTypes.oneOf(['sm', 'md', 'lg']),
-  variant: PropTypes.oneOf(['default', 'filled', 'elevated']),
-  loading: PropTypes.bool,
-  onClick: PropTypes.func,
-  className: PropTypes.string,
-  style: PropTypes.object
-};
 
 export default MacOSStatCard;

@@ -118,6 +118,9 @@ const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>(({
     </span>);
 
 });
+
+
+
 Badge.displayName = 'macOS Badge';
 
 export default Badge;

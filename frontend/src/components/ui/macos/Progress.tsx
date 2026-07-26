@@ -168,6 +168,8 @@ const Progress = React.forwardRef<HTMLDivElement, ProgressProps>(({
 });
 
 Progress.displayName = 'macOS Progress';
+
+
 /**
  * Circular Progress Component
  */
@@ -304,4 +306,6 @@ export const CircularProgress = React.forwardRef<HTMLDivElement, CircularProgres
 });
 
 CircularProgress.displayName = 'macOS Circular Progress';
+
+
 export default Progress;

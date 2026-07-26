@@ -642,4 +642,8 @@ export const SidebarSection = React.forwardRef<HTMLDivElement, SidebarSectionPro
 });
 
 SidebarSection.displayName = 'macOS Sidebar Section';
+
+
+
+
 export default Sidebar;

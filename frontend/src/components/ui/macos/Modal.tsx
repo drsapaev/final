@@ -502,4 +502,10 @@ export const ModalFooter = React.forwardRef<HTMLDivElement, ModalPartProps>(({
 });
 
 ModalFooter.displayName = 'macOS Modal Footer';
+
+
+
+
+
+
 export default Modal;

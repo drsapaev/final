@@ -237,3 +237,4 @@ export const AppError = React.forwardRef<HTMLElement, AppErrorProps>(({
 ));
 
 AppError.displayName = 'AppError';
+

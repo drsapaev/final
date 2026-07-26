@@ -10,6 +10,8 @@ import './PaymentDialog.css';
 import logger from '../../utils/logger';
 import { Input } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
+// TECH-DEBT(g2d-dialogs-001): see CancelDialog.tsx for the deferred
+// Appointment type narrowing rationale.
 
 interface PaymentDialogProps {
   isOpen: boolean;

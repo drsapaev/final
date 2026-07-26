@@ -232,4 +232,7 @@ const MacOSTab = ({
     </div>);
 
 };
+
+
+
 export default MacOSTab;

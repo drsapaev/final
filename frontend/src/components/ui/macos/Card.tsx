@@ -384,4 +384,11 @@ export const CardFooter = React.forwardRef<HTMLDivElement, CardPartProps>(({
 });
 
 CardFooter.displayName = 'macOS Card Footer';
+
+
+
+
+
+
+
 export default Card;

@@ -66,5 +66,8 @@ export default function AccentPicker({ size = 22, className = '', style = {} }: 
     </div>
   );
 }
+
+
+
 // Silence unused-import warning in environments that strip type-only imports.
 export type { AccentKey };
