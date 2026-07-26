@@ -1,6 +1,5 @@
 import { createContext, useContext, useReducer, useCallback, useMemo } from 'react';
 import type { ReactNode } from 'react';
-import PropTypes from 'prop-types';
 import type {
   AppDataState,
   AppDataAction,
@@ -283,7 +282,7 @@ export const AppDataProvider = ({ children }: { children: ReactNode }) => {
       dispatch({ type: ActionTypes.SET_USERS, payload: users });
     }, []),
     
-    setCurrentUser: useCallback((user: AppUser) => {
+    setCurrentUser: useCallback((user: AppUser | null) => {
       dispatch({ type: ActionTypes.SET_CURRENT_USER, payload: user });
     }, []),
     
@@ -304,7 +303,7 @@ export const AppDataProvider = ({ children }: { children: ReactNode }) => {
       dispatch({ type: ActionTypes.SET_PATIENTS, payload: patients });
     }, []),
     
-    setSelectedPatient: useCallback((patient: AppPatient) => {
+    setSelectedPatient: useCallback((patient: AppPatient | null) => {
       dispatch({ type: ActionTypes.SET_SELECTED_PATIENT, payload: patient });
     }, []),
     
