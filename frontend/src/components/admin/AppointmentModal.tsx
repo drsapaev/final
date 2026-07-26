@@ -501,8 +501,8 @@ const AppointmentModal = ({
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 AppointmentModal.propTypes = {
-  ...(AppointmentModal.propTypes || {}),
   appointment: PropTypes.any,
   doctors: PropTypes.any,
   isOpen: PropTypes.any,

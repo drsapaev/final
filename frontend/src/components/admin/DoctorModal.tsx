@@ -146,7 +146,7 @@ const DoctorModal = ({
       });
       onClose();
     } catch (error) {
-      setSubmitError(error.message || t('admin2.dmdl_err_save_fallback'));
+      setSubmitError((error instanceof Error ? error.message : String(error)) || t('admin2.dmdl_err_save_fallback'));
     }
   };
 

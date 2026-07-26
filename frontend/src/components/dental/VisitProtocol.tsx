@@ -990,8 +990,8 @@ const VisitProtocol = ({
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 VisitProtocol.propTypes = {
-  ...(VisitProtocol.propTypes || {}),
   initialData: PropTypes.any,
   onClose: PropTypes.any,
   onComplete: PropTypes.func,

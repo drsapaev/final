@@ -69,7 +69,7 @@ const AppActivation = () => {
       }
     } catch (err) {
       logger.error('Ошибка активации:', err);
-      setError((err instanceof Error ? err.message : String(err)) || t('misc.aa_oshibka_aktivatsii_proverte_'));
+      setError((err instanceof Error ? (err instanceof Error ? err.message : String(err)) : String(err)) || t('misc.aa_oshibka_aktivatsii_proverte_'));
     } finally {
       setLoading(false);
     }

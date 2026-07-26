@@ -817,8 +817,8 @@ export default function DisplayBoardUnified({
 }
 
 
+// audit/strict: removed self-referencing propTypes spread
 DisplayBoardUnified.propTypes = {
-  ...(DisplayBoardUnified.propTypes || {}),
   announcement: PropTypes.any,
   boardId: PropTypes.any,
   contrast: PropTypes.any,

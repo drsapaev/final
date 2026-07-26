@@ -141,7 +141,7 @@ const DoctorCalendar = ({
 
     } catch (err) {
       logger.error('Error loading schedule:', err);
-      setError(err.message);
+      setError((err instanceof Error ? err.message : String(err)));
     } finally {
       setLoading(false);
     }
@@ -464,8 +464,8 @@ const DoctorCalendar = ({
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 DoctorCalendar.propTypes = {
-  ...(DoctorCalendar.propTypes || {}),
   compact: PropTypes.any,
   department: PropTypes.any,
   doctorId: PropTypes.any,

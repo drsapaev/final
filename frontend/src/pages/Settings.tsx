@@ -519,7 +519,7 @@ function ProviderModal({ provider, onClose, onSave, title }: { provider?: Record
     try {
       await onSave(formData);
     } catch (error) {
-      notify.error(t('misc.settings_save_operation_error', { msg: error.message || t('misc.settings_unknown_error') }));
+      notify.error(t('misc.settings_save_operation_error', { msg: (error instanceof Error ? error.message : String(error)) || t('misc.settings_unknown_error') }));
     }
   };
 

@@ -389,8 +389,8 @@ const ModernTabs = ({
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 ModernTabs.propTypes = {
-  ...(ModernTabs.propTypes || {}),
   activeTab: PropTypes.any,
   departmentStats: PropTypes.any,
   language: PropTypes.any,

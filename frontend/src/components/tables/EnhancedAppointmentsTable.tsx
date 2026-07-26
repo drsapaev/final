@@ -2264,8 +2264,8 @@ const EnhancedAppointmentsTable = ({
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 EnhancedAppointmentsTable.propTypes = {
-  ...(EnhancedAppointmentsTable.propTypes || {}),
   data: PropTypes.any,
   language: PropTypes.any,
   loading: PropTypes.any,

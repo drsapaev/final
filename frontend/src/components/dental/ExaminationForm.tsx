@@ -910,8 +910,8 @@ const ExaminationForm = ({
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 ExaminationForm.propTypes = {
-  ...(ExaminationForm.propTypes || {}),
   initialData: PropTypes.any,
   onClose: PropTypes.any,
   onSave: PropTypes.any,

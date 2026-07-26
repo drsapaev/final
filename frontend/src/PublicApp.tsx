@@ -21,8 +21,8 @@ function PublicProviders({ children }) {
 }
 
 
+// audit/strict: removed self-referencing propTypes spread
 PublicProviders.propTypes = {
-  ...(PublicProviders.propTypes || {}),
   children: PropTypes.any,
 };
 

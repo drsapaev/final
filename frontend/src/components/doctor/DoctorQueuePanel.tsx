@@ -264,7 +264,7 @@ const DoctorQueuePanel = ({
       }
     } catch (error) {
       logger.error('Ошибка вызова пациента:', error);
-      setMessage({ type: 'error', text: error.message });
+      setMessage({ type: 'error', text: (error instanceof Error ? error.message : String(error)) });
     }
   };
 
@@ -300,7 +300,7 @@ const DoctorQueuePanel = ({
       }
     } catch (error) {
       logger.error('Ошибка начала приема:', error);
-      setMessage({ type: 'error', text: error.message });
+      setMessage({ type: 'error', text: (error instanceof Error ? error.message : String(error)) });
     }
   };
 
@@ -343,7 +343,7 @@ const DoctorQueuePanel = ({
       }
     } catch (error) {
       logger.error('Ошибка завершения приема:', error);
-      setMessage({ type: 'error', text: error.message });
+      setMessage({ type: 'error', text: (error instanceof Error ? error.message : String(error)) });
     }
   };
 

@@ -197,8 +197,8 @@ const ResponsiveModal = ({
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 ResponsiveModal.propTypes = {
-  ...(ResponsiveModal.propTypes || {}),
   children: PropTypes.any,
   className: PropTypes.any,
   isOpen: PropTypes.any,

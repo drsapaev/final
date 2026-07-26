@@ -549,8 +549,8 @@ const TwoFactorSetupWizard = ({ onComplete, onCancel }: { onComplete?: () => voi
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 TwoFactorSetupWizard.propTypes = {
-  ...(TwoFactorSetupWizard.propTypes || {}),
   onComplete: PropTypes.any,
 };
 

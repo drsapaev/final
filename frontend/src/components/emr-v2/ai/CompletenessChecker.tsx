@@ -103,7 +103,7 @@ export function CompletenessChecker({
         isComplete: missingFields.length === 0
       });
     } catch (err) {
-      setError(err.message || t('misc.cc_oshibka_proverki'));
+      setError((err instanceof Error ? err.message : String(err)) || t('misc.cc_oshibka_proverki'));
     } finally {
       setIsLoading(false);
     }

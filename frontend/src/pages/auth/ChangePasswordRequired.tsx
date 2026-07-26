@@ -309,7 +309,7 @@ export default function ChangePasswordRequired({ currentPassword }) {
 }
 
 
+// audit/strict: removed self-referencing propTypes spread
 ChangePasswordRequired.propTypes = {
-  ...(ChangePasswordRequired.propTypes || {}),
   currentPassword: PropTypes.any,
 };

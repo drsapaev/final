@@ -178,8 +178,8 @@ const InteractivePanel = ({
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 InteractivePanel.propTypes = {
-  ...(InteractivePanel.propTypes || {}),
   actions: PropTypes.any,
   children: PropTypes.any,
   className: PropTypes.any,
@@ -313,8 +313,8 @@ export const StateInteractivePanel = ({
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 StateInteractivePanel.propTypes = {
-  ...(StateInteractivePanel.propTypes || {}),
   initialState: PropTypes.any,
   states: PropTypes.any,
   title: PropTypes.any,

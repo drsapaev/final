@@ -428,8 +428,8 @@ const ResponsiveTable = ({
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 ResponsiveTable.propTypes = {
-  ...(ResponsiveTable.propTypes || {}),
   actions: PropTypes.any,
   className: PropTypes.any,
   columns: PropTypes.any,

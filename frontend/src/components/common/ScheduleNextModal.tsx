@@ -246,7 +246,7 @@ const ScheduleNextModal = ({
         throw new Error(errorData.detail || t('misc.snm_err_create_visit'));
       }
     } catch (err) {
-      setError(err.message);
+      setError((err instanceof Error ? err.message : String(err)));
     } finally {
       setLoading(false);
     }

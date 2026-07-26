@@ -52,7 +52,7 @@ function OldPatientComponent() {
         throw new Error(t18('misc.rc_oshibka_zagruzki_patsientov'));
       }
     } catch (error) {
-      setError(error.message);
+      setError((error instanceof Error ? error.message : String(error)));
       logger.error('Ошибка загрузки пациентов:', error);
     } finally {
       setLoading(false);

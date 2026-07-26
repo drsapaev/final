@@ -277,7 +277,7 @@ const AIAssistant = ({
       setRetryCount(0);
     } catch (err) {
       const errorMsg = normalizeAIErrorMessage(
-        err.response?.data?.detail || err.response?.data?.error || err.message
+        err.response?.data?.detail || err.response?.data?.error || (err instanceof Error ? err.message : String(err))
       );
       setError(errorMsg);
       notify.error(t('misc.aia_analysis_error', { message: errorMsg }));

@@ -485,8 +485,8 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata: metadataRaw = {} }
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 PhotoComparison.propTypes = {
-  ...(PhotoComparison.propTypes || {}),
   afterPhoto: PropTypes.any,
   beforePhoto: PropTypes.any,
   metadata: PropTypes.any,

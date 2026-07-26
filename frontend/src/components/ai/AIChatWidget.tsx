@@ -229,8 +229,8 @@ const AIChatWidget = ({
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 AIChatWidget.propTypes = {
-  ...(AIChatWidget.propTypes || {}),
   contextType: PropTypes.any,
   minimized: PropTypes.any,
   position: PropTypes.any,

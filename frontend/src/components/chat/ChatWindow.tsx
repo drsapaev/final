@@ -400,7 +400,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
       loadConversations();
     } catch (error) {
       logger.error('Voice send error:', error);
-      addToast({ type: 'error', message: t('misc.cw_voice_send_error', { error: error.message }) });
+      addToast({ type: 'error', message: t('misc.cw_voice_send_error', { error: (error instanceof Error ? error.message : String(error)) }) });
     } finally {
       setIsSending(false);
     }

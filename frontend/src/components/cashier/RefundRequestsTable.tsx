@@ -107,7 +107,7 @@ const RefundRequestsTable = ({ onRefresh }) => {
       }
     } catch (err) {
       logger.error('[RefundRequestsTable] Error loading requests:', err);
-      setError(err.message);
+      setError((err instanceof Error ? err.message : String(err)));
     } finally {
       setLoading(false);
     }
@@ -140,7 +140,7 @@ const RefundRequestsTable = ({ onRefresh }) => {
       }
     } catch (err) {
       logger.error('[RefundRequestsTable] Process error:', err);
-      notify.error(t('payment.refund_error') + (err.message || t('payment.unknown_error')));
+      notify.error(t('payment.refund_error') + ((err instanceof Error ? err.message : String(err)) || t('payment.unknown_error')));
     } finally {
       setProcessingId(null);
     }

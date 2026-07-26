@@ -164,7 +164,7 @@ const AISettings = () => {
       await loadData();
     } catch (error) {
       logger.error('Ошибка сохранения:', error);
-      setMessage({ type: 'error', text: error.response?.data?.detail || error.message || t('admin2.ais_provider_save_error') });
+      setMessage({ type: 'error', text: error.response?.data?.detail || (error instanceof Error ? error.message : String(error)) || t('admin2.ais_provider_save_error') });
     }
   };
 
@@ -185,7 +185,7 @@ const AISettings = () => {
         ...prev,
         [providerId]: {
           success: false,
-          error_message: error.message
+          error_message: (error instanceof Error ? error.message : String(error))
         }
       }));
       setMessage({ type: 'error', text: t('admin2.ais_test_error') });

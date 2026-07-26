@@ -140,7 +140,7 @@ const [activations, setActivations] = useState<Activation[]>([]);
       return result;
     } catch (error) {
       logger.error('Ошибка создания ключа:', error);
-      setMessage({ type: 'error', text: error.message });
+      setMessage({ type: 'error', text: (error instanceof Error ? error.message : String(error)) });
     }
   };
 

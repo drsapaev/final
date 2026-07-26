@@ -79,8 +79,8 @@ const LinkPreview = ({ url }) => {
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 LinkPreview.propTypes = {
-  ...(LinkPreview.propTypes || {}),
   url: PropTypes.any,
 };
 

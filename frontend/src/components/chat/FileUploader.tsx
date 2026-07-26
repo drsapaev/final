@@ -73,8 +73,8 @@ const FileUploader = ({ onUpload, disabled }) => {
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 FileUploader.propTypes = {
-  ...(FileUploader.propTypes || {}),
   disabled: PropTypes.any,
   onUpload: PropTypes.any,
 };

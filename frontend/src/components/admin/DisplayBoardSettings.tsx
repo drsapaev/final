@@ -167,7 +167,7 @@ const DisplayBoardSettings = () => {
         ...prev,
         [testType]: {
           success: false,
-          error: error.message
+          error: (error instanceof Error ? error.message : String(error))
         }
       }));
       setMessage({ type: 'error', text: t('admin2.db_error_test') });

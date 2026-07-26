@@ -485,8 +485,8 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 UnifiedSidebar.propTypes = {
-  ...(UnifiedSidebar.propTypes || {}),
   isCollapsed: PropTypes.any,
   onToggle: PropTypes.any,
 };

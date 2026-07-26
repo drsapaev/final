@@ -164,8 +164,8 @@ const MultipleTicketsPrinter = ({ tickets, onClose, onAllPrinted }) => {
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 MultipleTicketsPrinter.propTypes = {
-  ...(MultipleTicketsPrinter.propTypes || {}),
   forEach: PropTypes.any,
   length: PropTypes.any,
   map: PropTypes.any,

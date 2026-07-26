@@ -805,8 +805,8 @@ const PhotoArchive = ({
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 PhotoArchive.propTypes = {
-  ...(PhotoArchive.propTypes || {}),
   initialData: PropTypes.any,
   onClose: PropTypes.any,
   onSave: PropTypes.any,

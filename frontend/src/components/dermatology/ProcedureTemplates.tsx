@@ -610,8 +610,8 @@ const ProcedureTemplates = ({ onSelectProcedure, visitId }: { onSelectProcedure?
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 ProcedureTemplates.propTypes = {
-  ...(ProcedureTemplates.propTypes || {}),
   onSelectProcedure: PropTypes.any,
 };
 

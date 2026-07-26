@@ -602,8 +602,8 @@ const PatientModal = ({
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 PatientModal.propTypes = {
-  ...(PatientModal.propTypes || {}),
   isOpen: PropTypes.any,
   loading: PropTypes.any,
   onClose: PropTypes.any,

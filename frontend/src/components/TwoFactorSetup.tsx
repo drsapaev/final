@@ -543,8 +543,8 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 TwoFactorSetup.propTypes = {
-  ...(TwoFactorSetup.propTypes || {}),
   onCancel: PropTypes.any,
   onComplete: PropTypes.any,
 };

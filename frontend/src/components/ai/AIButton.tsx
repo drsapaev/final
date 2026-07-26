@@ -119,8 +119,8 @@ const AIButton = ({
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 AIButton.propTypes = {
-  ...(AIButton.propTypes || {}),
   disabled: PropTypes.any,
   fullWidth: PropTypes.any,
   icon: PropTypes.any,

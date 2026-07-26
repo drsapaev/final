@@ -550,8 +550,8 @@ const ToothModal = ({
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 ToothModal.propTypes = {
-  ...(ToothModal.propTypes || {}),
   onClose: PropTypes.any,
   onSave: PropTypes.any,
   open: PropTypes.any,

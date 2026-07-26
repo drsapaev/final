@@ -340,8 +340,8 @@ const DentalPriceManager = ({
 };
 
 
+// audit/strict: removed self-referencing propTypes spread
 DentalPriceManager.propTypes = {
-  ...(DentalPriceManager.propTypes || {}),
   isOpen: PropTypes.any,
   onClose: PropTypes.any,
   onPriceSet: PropTypes.any,
