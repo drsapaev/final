@@ -80,7 +80,8 @@
     "src/hooks/useReports.ts",
     "src/hooks/useAIChat.ts",
     "src/utils/registrarAggregation.ts",
-    "src/components/ui/macos/MacOSPagination.tsx"
+    "src/components/ui/macos/MacOSPagination.tsx",
+    "src/components/mobile/QueuePositionCard.tsx"
   ],
   "exclude": ["node_modules", "dist", "e2e"]
 }
