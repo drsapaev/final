@@ -71,7 +71,8 @@
     "src/hooks/useEMRTemplateLibrary.ts",
     "src/hooks/useUsers.ts",
     "src/hooks/usePWA.ts",
-    "src/hooks/useAppointments.ts"
+    "src/hooks/useAppointments.ts",
+    "src/hooks/useDoctorPhrases.ts"
   ],
   "exclude": ["node_modules", "dist", "e2e"]
 }

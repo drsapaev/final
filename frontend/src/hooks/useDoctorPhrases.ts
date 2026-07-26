@@ -53,7 +53,7 @@ export const useDoctorPhrases = ({
 }: UseDoctorPhrasesOptions = {}) => {
   const [suggestions, setSuggestions] = useState<unknown[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<unknown>(null);
+  const [error, setError] = useState<string | null>(null);
 
   // 🔥 READINESS STATE (automatic activation)
   const [readiness, setReadiness] = useState<{
