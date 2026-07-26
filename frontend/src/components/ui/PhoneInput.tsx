@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect, type CSSProperties, type ChangeEvent, type ClipboardEvent, type KeyboardEvent, type RefObject } from 'react';
-import PropTypes from 'prop-types';
 import { Input } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
 

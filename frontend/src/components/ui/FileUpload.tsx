@@ -1,10 +1,10 @@
 import React, { useState, useCallback, useEffect, type CSSProperties, type MouseEvent } from 'react';
+import PropTypes from 'prop-types';
 import { useDropzone, type FileRejection, type DropzoneRootProps, type DropzoneInputProps, type Accept } from 'react-dropzone';
 import { Upload, X, File as FileIcon, AlertCircle, Loader } from 'lucide-react';
 import logger from '../../utils/logger';
 import { convertHEICToJPEG, isHEICFile } from '../../utils/heicConverter';
 import '../../styles/animations.css';
-import PropTypes from 'prop-types';
 import { Input } from '../ui/macos';
 
 interface FilePreview {
@@ -49,7 +49,7 @@ const FileUpload = ({
   const [error, setError] = useState<string | null>(null);
   const [previews, setPreviews] = useState<FilePreview[]>([]);
 
-  const handleDrop = useCallback(async (acceptedFiles: Array<File | Blob>, rejectedFiles: FileRejection[]) => {
+  const handleDrop = useCallback(async (acceptedFiles: File[], rejectedFiles: FileRejection[]) => {
     setError(null);
     setConverting(true);
 
@@ -69,7 +69,7 @@ const FileUpload = ({
       const newPreviews: FilePreview[] = [];
 
       for (const file of acceptedFiles) {
-        let fileToProcess: File | Blob = file;
+        let fileToProcess: File = file;
 
         // Check if HEIC/HEIF
         if (isHEICFile(file as File)) {
