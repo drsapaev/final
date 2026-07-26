@@ -67,8 +67,8 @@ export const QUEUE_STATUS_CONFIG = {
  * @param {string} status - queue status key
  * @returns {string} variant: 'warning' | 'primary' | 'info' | 'success' | 'danger' | 'default'
  */
-export function getQueueStatusVariant(status) {
-  return QUEUE_STATUS_CONFIG[status]?.variant || 'default';
+export function getQueueStatusVariant(status: string) {
+  return QUEUE_STATUS_CONFIG[status as keyof typeof QUEUE_STATUS_CONFIG]?.variant || 'default';
 }
 
 /**
@@ -76,8 +76,8 @@ export function getQueueStatusVariant(status) {
  * @param {string} status - queue status key
  * @returns {string} human-readable label
  */
-export function getQueueStatusLabel(status) {
-  return QUEUE_STATUS_CONFIG[status]?.label || status || '—';
+export function getQueueStatusLabel(status: string) {
+  return QUEUE_STATUS_CONFIG[status as keyof typeof QUEUE_STATUS_CONFIG]?.label || status || '—';
 }
 
 export default QUEUE_STATUS_CONFIG;

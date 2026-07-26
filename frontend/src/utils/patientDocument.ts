@@ -1,4 +1,4 @@
-export function buildPatientDocumentFields(passportValue) {
+export function buildPatientDocumentFields(passportValue: string | null | undefined) {
   const docNumber = typeof passportValue === 'string' ? passportValue.trim() : '';
 
   if (!docNumber) {

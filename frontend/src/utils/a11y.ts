@@ -2,7 +2,7 @@
  * A11Y-AUDIT: Accessibility utilities for WCAG 2.1 AA compliance.
  */
 
-export function announceToScreenReader(message) {
+export function announceToScreenReader(message: string) {
   if (typeof document === 'undefined') return;
   let liveRegion = document.getElementById('a11y-live-region');
   if (!liveRegion) {
@@ -22,7 +22,7 @@ export function prefersReducedMotion() {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
-export function trapFocus(element) {
+export function trapFocus(element: HTMLElement | null): () => void {
   if (!element) return () => {};
   const focusable = element.querySelectorAll(
     'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
@@ -30,12 +30,12 @@ export function trapFocus(element) {
   if (focusable.length === 0) return () => {};
   const first = focusable[0];
   const last = focusable[focusable.length - 1];
-  const handleKeyDown = (e) => {
+  const handleKeyDown = (e: KeyboardEvent) => {
     if (e.key !== 'Tab') return;
-    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
-    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); (last as HTMLElement).focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); (first as HTMLElement).focus(); }
   };
   element.addEventListener('keydown', handleKeyDown);
-  first.focus();
+  (first as HTMLElement).focus();
   return () => element.removeEventListener('keydown', handleKeyDown);
 }

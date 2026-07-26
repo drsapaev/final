@@ -6,7 +6,7 @@ export function getDefaultDentistDocuments() {
   };
 }
 
-export function parseDentistDocuments(rawValue) {
+export function parseDentistDocuments(rawValue: string | null) {
   if (!rawValue) {
     return getDefaultDentistDocuments();
   }
@@ -21,7 +21,7 @@ export function parseDentistDocuments(rawValue) {
   }
 }
 
-export function upsertDentistVisitProtocol(records, record, maxItems = 20) {
+export function upsertDentistVisitProtocol(records: Record<string, unknown>[], record: Record<string, unknown>, maxItems: number = 20) {
   if (!record?.visit_id) {
     return Array.isArray(records) ? records : [];
   }

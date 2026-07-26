@@ -11,7 +11,7 @@ import logger from './logger';
  * @param {string} eventType - Event type (ghost.enabled, ghost.accepted, etc.)
  * @param {Object} payload - Event payload (no PHI)
  */
-export function trackEMREvent(eventType, payload = {}) {
+export function trackEMREvent(eventType: string, payload: Record<string, unknown> = {}) {
     // Log to console in development
     if (process.env.NODE_ENV === 'development') {
         logger.log('[EMR Analytics]', eventType, payload);
