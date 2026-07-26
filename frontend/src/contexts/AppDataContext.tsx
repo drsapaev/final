@@ -1,4 +1,5 @@
 import { createContext, useContext, useReducer, useCallback, useMemo } from 'react';
+import PropTypes from 'prop-types';
 import type { ReactNode } from 'react';
 import type {
   AppDataState,
