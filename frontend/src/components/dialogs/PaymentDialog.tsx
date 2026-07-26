@@ -182,7 +182,7 @@ const PaymentDialog = ({
               <p className="payment-patient-services">
                 Услуги:{' '}
                 {Array.isArray(appointment.services)
-                  ? (appointment.services as string[]).join(', ')
+                  ? (appointment.services as unknown[]).map((s) => String(s)).join(', ')
                   : String(appointment.services ?? '')}
               </p>
             )}
