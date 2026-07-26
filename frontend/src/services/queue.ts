@@ -44,7 +44,7 @@ async function apiRequest<T = unknown>(path: string, options: QueueRequestOption
     let errorData = null;
     try {
       errorData = await res.json();
-      detail = errorData.detail || errorData.message || detail;
+      detail = (errorData as { detail?: string; message?: string })?.detail || (errorData as { message?: string })?.message || detail;
     } catch {
       detail = `HTTP ${res.status}: ${res.statusText}`;
     }
