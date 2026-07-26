@@ -78,7 +78,8 @@
     "src/hooks/usePatients.ts",
     "src/hooks/useEMR.ts",
     "src/hooks/useReports.ts",
-    "src/hooks/useAIChat.ts"
+    "src/hooks/useAIChat.ts",
+    "src/utils/registrarAggregation.ts"
   ],
   "exclude": ["node_modules", "dist", "e2e"]
 }

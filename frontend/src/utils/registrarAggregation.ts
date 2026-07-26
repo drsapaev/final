@@ -504,7 +504,7 @@ export const aggregatePatientsForAllDepartments = (appointments: Record<string, 
     const hasMixedPaymentState = uniquePaymentStatuses.length > 1;
     const hasMixedPaymentMethod = uniquePaymentTypes.length > 1;
 
-    let aggregatePaymentType = null;
+    let aggregatePaymentType: string | null = null;
     if (allPendingAllFree) {
       aggregatePaymentType = 'approval_pending';
     } else if (allApprovedZeroCostRegistrations && Number(group.cost as number | string) <= 0) {
@@ -512,7 +512,7 @@ export const aggregatePatientsForAllDepartments = (appointments: Record<string, 
     } else if (hasMixedPaymentState || hasMixedPaymentMethod) {
       aggregatePaymentType = 'mixed_payment';
     } else if (allPaid && uniquePaymentTypes.length === 1) {
-      aggregatePaymentType = uniquePaymentTypes[0];
+      aggregatePaymentType = String(uniquePaymentTypes[0] ?? 'unknown');
     } else if (allPaid) {
       aggregatePaymentType = 'unknown_payment';
     } else if (allUnpaidMonetary) {
