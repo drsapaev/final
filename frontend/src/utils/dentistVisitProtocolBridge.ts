@@ -1,29 +1,41 @@
-function cloneValue(value) {
+function cloneValue(value: unknown): Record<string, unknown> {
   if (value == null || typeof value !== 'object') {
-    return value ?? {};
+    if (value == null) return {};
+    return value as Record<string, unknown>;
   }
 
   if (typeof structuredClone === 'function') {
-    return structuredClone(value);
+    return structuredClone(value) as Record<string, unknown>;
   }
 
-  return JSON.parse(JSON.stringify(value));
+  return JSON.parse(JSON.stringify(value)) as Record<string, unknown>;
 }
 
-function resolvePatientId(patient) {
-  return patient?.patient?.id || patient?.patient_id || patient?.id || null;
-}
-
-function resolvePatientName(patient) {
-  return patient?.patient_name || patient?.patient_fio || patient?.name || 'Пациент';
-}
-
-function resolveSavedAt(visitData, fallback = null) {
+function resolvePatientId(patient: Record<string, unknown> | null | undefined): string | number | null {
+  const inner = patient?.patient as Record<string, unknown> | undefined;
   return (
-    visitData?.saved_at ||
-    visitData?.updatedAt ||
-    visitData?.createdAt ||
-    fallback ||
+    (inner?.id as string | number | undefined) ||
+    (patient?.patient_id as string | number | undefined) ||
+    (patient?.id as string | number | undefined) ||
+    null
+  );
+}
+
+function resolvePatientName(patient: Record<string, unknown> | null | undefined): string {
+  return (
+    (patient?.patient_name as string | undefined) ||
+    (patient?.patient_fio as string | undefined) ||
+    (patient?.name as string | undefined) ||
+    'Пациент'
+  );
+}
+
+function resolveSavedAt(visitData: Record<string, unknown> | null | undefined, fallback: unknown = null): string {
+  return (
+    (visitData?.saved_at as string | undefined) ||
+    (visitData?.updatedAt as string | undefined) ||
+    (visitData?.createdAt as string | undefined) ||
+    (fallback as string | undefined) ||
     new Date().toISOString()
   );
 }
@@ -31,8 +43,11 @@ function resolveSavedAt(visitData, fallback = null) {
 export function buildDentistVisitProtocolData(patient: unknown, visitData: Record<string, unknown>, options: Record<string, unknown> = {}): Record<string, unknown> {
   const source = options.source || 'local_cache';
   const protocolData = cloneValue(visitData);
-  const patientId = resolvePatientId(patient);
-  const patientName = resolvePatientName(patient);
+  const patientRecord = patient && typeof patient === 'object'
+    ? patient as Record<string, unknown>
+    : null;
+  const patientId = resolvePatientId(patientRecord);
+  const patientName = resolvePatientName(patientRecord);
   const visitId = options.visitId || (patient as { visit_id?: unknown })?.visit_id || protocolData.visit_id || null;
   const savedAt = resolveSavedAt(protocolData, options.savedAt);
 
@@ -62,7 +77,7 @@ export function buildDentistVisitProtocolCard(patient: unknown, visitData: Recor
   };
 }
 
-export function buildDentistVisitProtocolEmrPayload(patient, visitData) {
+export function buildDentistVisitProtocolEmrPayload(patient: unknown, visitData: Record<string, unknown>): Record<string, unknown> {
   const protocolData = buildDentistVisitProtocolData(patient, visitData, {
     source: 'emr_v2',
   });
@@ -93,13 +108,18 @@ export function buildDentistVisitProtocolSaveRequest(patient: unknown, visitData
   };
 }
 
-export function extractDentistVisitProtocolFromEmr(emrRecord) {
+export function extractDentistVisitProtocolFromEmr(emrRecord: Record<string, unknown> | null | undefined): Record<string, unknown> | null {
   const data = emrRecord?.data;
   if (!data || typeof data !== 'object') {
     return null;
   }
 
-  const protocol = data.visit_protocol || data.specialty_data?.visit_protocol;
+  const dataRecord = data as Record<string, unknown>;
+  const specialtyData = dataRecord.specialty_data;
+  const specialtyDataRecord = specialtyData && typeof specialtyData === 'object'
+    ? specialtyData as Record<string, unknown>
+    : null;
+  const protocol = dataRecord.visit_protocol || specialtyDataRecord?.visit_protocol;
   if (!protocol || typeof protocol !== 'object') {
     return null;
   }
@@ -107,13 +127,13 @@ export function extractDentistVisitProtocolFromEmr(emrRecord) {
   return cloneValue(protocol);
 }
 
-export function mapDentistVisitProtocolFromEmr(emrRecord, fallbackPatient = null) {
+export function mapDentistVisitProtocolFromEmr(emrRecord: Record<string, unknown> | null | undefined, fallbackPatient: Record<string, unknown> | null = null): Record<string, unknown> | null {
   const protocolData = extractDentistVisitProtocolFromEmr(emrRecord);
   if (!protocolData) {
     return null;
   }
 
-  const patient = fallbackPatient || {
+  const patient: Record<string, unknown> = fallbackPatient || {
     patient_id: emrRecord?.patient_id,
     patient_name: emrRecord?.patient_name,
     visit_id: emrRecord?.visit_id,
@@ -133,12 +153,12 @@ export function mapDentistVisitProtocolFromEmr(emrRecord, fallbackPatient = null
   });
 }
 
-export function mergeDentistVisitProtocolCards(records, incomingRecords, maxItems = 20) {
-  const currentRecords = Array.isArray(records) ? records : [];
-  const incoming = Array.isArray(incomingRecords) ? incomingRecords : [];
+export function mergeDentistVisitProtocolCards(records: ReadonlyArray<Record<string, unknown>> | null | undefined, incomingRecords: ReadonlyArray<Record<string, unknown>> | null | undefined, maxItems: number = 20): Record<string, unknown>[] {
+  const currentRecords: Record<string, unknown>[] = Array.isArray(records) ? records as Record<string, unknown>[] : [];
+  const incoming: Record<string, unknown>[] = Array.isArray(incomingRecords) ? incomingRecords as Record<string, unknown>[] : [];
   const merged = [...incoming, ...currentRecords];
-  const seenVisitIds = new Set();
-  const result = [];
+  const seenVisitIds = new Set<unknown>();
+  const result: Record<string, unknown>[] = [];
 
   for (const record of merged) {
     const visitId = record?.visit_id;

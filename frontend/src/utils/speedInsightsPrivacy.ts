@@ -2,7 +2,7 @@ const SENSITIVE_ROUTE_SEGMENT = '[redacted]';
 const UUID_SEGMENT_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ABSOLUTE_URL_PATTERN = /^[a-z][a-z0-9+.-]*:\/\/[^/]*(\/.*)?$/i;
 
-const getPathnameFromUrl = (url) => {
+const getPathnameFromUrl = (url: string): string | null => {
   const normalized = url.trim();
   if (!normalized) return null;
 
@@ -19,7 +19,7 @@ const getPathnameFromUrl = (url) => {
   return null;
 };
 
-const isDynamicRouteMatch = (routePath, pathname) => {
+const isDynamicRouteMatch = (routePath: string, pathname: string): boolean => {
   const routeParts = routePath.split('/').filter(Boolean);
   const pathParts = pathname.split('/').filter(Boolean);
 
@@ -27,10 +27,10 @@ const isDynamicRouteMatch = (routePath, pathname) => {
     return false;
   }
 
-  return routeParts.every((part, index) => part.startsWith(':') || part === pathParts[index]);
+  return routeParts.every((part: string, index: number) => part.startsWith(':') || part === pathParts[index]);
 };
 
-const redactUnmatchedPath = (pathname) => {
+const redactUnmatchedPath = (pathname: string) => {
   const redacted = pathname
     .split('/')
     .map((part) => {
@@ -45,7 +45,20 @@ const redactUnmatchedPath = (pathname) => {
   return redacted || '/';
 };
 
-export function sanitizeSpeedInsightsEvent(event, routes) {
+interface RouteEntry {
+  path?: string;
+}
+
+interface SpeedInsightsEvent {
+  url?: unknown;
+  route?: unknown;
+  [key: string]: unknown;
+}
+
+export function sanitizeSpeedInsightsEvent(
+  event: SpeedInsightsEvent,
+  routes: ReadonlyArray<RouteEntry>
+): SpeedInsightsEvent {
   if (!event || typeof event !== 'object' || typeof event.url !== 'string') {
     return event;
   }
@@ -59,11 +72,11 @@ export function sanitizeSpeedInsightsEvent(event, routes) {
     };
   }
 
-  const routeList = Array.isArray(routes) ? routes : [];
+  const routeList: ReadonlyArray<RouteEntry> = Array.isArray(routes) ? routes : [];
   const matchedRoute = routeList.find(
-    (route) => typeof route?.path === 'string' && isDynamicRouteMatch(route.path, pathname)
+    (route: RouteEntry) => typeof route?.path === 'string' && isDynamicRouteMatch(route.path as string, pathname)
   );
-  const safeUrl = matchedRoute?.path || redactUnmatchedPath(pathname);
+  const safeUrl: string = matchedRoute?.path || redactUnmatchedPath(pathname);
 
   return {
     ...event,

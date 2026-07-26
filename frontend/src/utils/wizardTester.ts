@@ -9,13 +9,13 @@ import { api } from '../api/client';
 
 class WizardTester {
   // Тест 1: Проверка настроек мастера
-  async testWizardSettings() {
+  async testWizardSettings(): Promise<Record<string, unknown> | null> {
     logger.log('🧪 Тестирование настроек мастера...');
 
     try {
       const response = await api.get('/registrar-wizard/admin/wizard-settings');
       logger.log('✅ Настройки мастера:', response.data);
-      return response.data;
+      return response.data as Record<string, unknown>;
     } catch (error) {
       logger.error('❌ Ошибка получения настроек:', error);
       return null;
@@ -23,10 +23,10 @@ class WizardTester {
   }
 
   // Тест 2: Проверка создания корзины
-  async testCartCreation(testData = null) {
+  async testCartCreation(testData: Record<string, unknown> | null = null): Promise<Record<string, unknown> | null> {
     logger.log('🧪 Тестирование создания корзины...');
 
-    const defaultTestData = {
+    const defaultTestData: Record<string, unknown> = {
       patient: {
         full_name: 'Тестовый Пациент',
         phone: '+998901234567',
@@ -48,12 +48,12 @@ class WizardTester {
       }
     };
 
-    const data = testData || defaultTestData;
+    const data: Record<string, unknown> = testData || defaultTestData;
 
     try {
       const response = await api.post('/registrar-wizard/registrar/cart', data);
       logger.log('✅ Корзина создана успешно:', response.data);
-      return response.data;
+      return response.data as Record<string, unknown>;
     } catch (error) {
       logger.error('❌ Ошибка запроса:', error);
       return null;
@@ -61,13 +61,13 @@ class WizardTester {
   }
 
   // Тест 3: Проверка льготных настроек
-  async testBenefitSettings() {
+  async testBenefitSettings(): Promise<Record<string, unknown> | null> {
     logger.log('🧪 Тестирование настроек льгот...');
 
     try {
       const response = await api.get('/registrar-wizard/admin/benefit-settings');
       logger.log('✅ Настройки льгот:', response.data);
-      return response.data;
+      return response.data as Record<string, unknown>;
     } catch (error) {
       logger.error('❌ Ошибка получения настроек льгот:', error);
       return null;
@@ -75,13 +75,13 @@ class WizardTester {
   }
 
   // Тест 4: Проверка заявок All Free
-  async testAllFreeRequests() {
+  async testAllFreeRequests(): Promise<Record<string, unknown> | null> {
     logger.log('🧪 Тестирование заявок All Free...');
 
     try {
       const response = await api.get('/registrar-wizard/admin/all-free-requests');
       logger.log('✅ Заявки All Free:', response.data);
-      return response.data;
+      return response.data as Record<string, unknown>;
     } catch (error) {
       logger.error('❌ Ошибка получения заявок All Free:', error);
       return null;
@@ -89,13 +89,13 @@ class WizardTester {
   }
 
   // Тест 5: Проверка изменений цен
-  async testPriceOverrides() {
+  async testPriceOverrides(): Promise<Record<string, unknown> | null> {
     logger.log('🧪 Тестирование изменений цен...');
 
     try {
       const response = await api.get('/registrar-wizard/registrar/price-overrides');
       logger.log('✅ Изменения цен:', response.data);
-      return response.data;
+      return response.data as Record<string, unknown>;
     } catch (error) {
       logger.error('❌ Ошибка получения изменений цен:', error);
       return null;
@@ -103,7 +103,7 @@ class WizardTester {
   }
 
   // Тест 6: Проверка автосохранения
-  testAutosave() {
+  testAutosave(): boolean {
     logger.log('🧪 Тестирование автосохранения...');
 
     const testData = {
@@ -118,7 +118,8 @@ class WizardTester {
     logger.log('✅ Данные сохранены в localStorage');
 
     // Проверяем восстановление
-    const restored = JSON.parse(localStorage.getItem('wizard_draft'));
+    const stored = localStorage.getItem('wizard_draft');
+    const restored = stored ? JSON.parse(stored) : null;
 
     if (JSON.stringify(restored) === JSON.stringify(testData)) {
       logger.log('✅ Автосохранение работает корректно');
@@ -130,24 +131,26 @@ class WizardTester {
   }
 
   // Тест 7: Проверка валидации данных
-  validateWizardData(data) {
+  validateWizardData(data: Record<string, unknown>): { valid: boolean; errors: string[] } {
     logger.log('🧪 Валидация данных мастера...');
 
-    const errors = [];
+    const errors: string[] = [];
 
     // Проверка пациента
-    if (!data.patient) {
+    const patient = data.patient as { full_name?: unknown; phone?: unknown } | undefined;
+    if (!patient) {
       errors.push('Отсутствуют данные пациента');
     } else {
-      if (!data.patient.full_name) errors.push('Не указано ФИО пациента');
-      if (!data.patient.phone) errors.push('Не указан телефон пациента');
+      if (!patient.full_name) errors.push('Не указано ФИО пациента');
+      if (!patient.phone) errors.push('Не указан телефон пациента');
     }
 
     // Проверка визитов
-    if (!data.visits || data.visits.length === 0) {
+    const visits = data.visits as Array<{ service_id?: unknown; visit_date?: unknown; visit_time?: unknown }> | undefined;
+    if (!visits || !Array.isArray(visits) || visits.length === 0) {
       errors.push('Не выбраны услуги');
     } else {
-      data.visits.forEach((visit, index) => {
+      visits.forEach((visit: { service_id?: unknown; visit_date?: unknown; visit_time?: unknown }, index: number) => {
         if (!visit.service_id) errors.push(`Визит ${index + 1}: не указана услуга`);
         if (!visit.visit_date) errors.push(`Визит ${index + 1}: не указана дата`);
         if (!visit.visit_time) errors.push(`Визит ${index + 1}: не указано время`);
@@ -155,11 +158,12 @@ class WizardTester {
     }
 
     // Проверка оплаты
-    if (!data.payment) {
+    const payment = data.payment as { method?: unknown; total_amount?: number } | undefined;
+    if (!payment) {
       errors.push('Отсутствуют данные оплаты');
     } else {
-      if (!data.payment.method) errors.push('Не указан способ оплаты');
-      if (!data.payment.total_amount || data.payment.total_amount <= 0) {
+      if (!payment.method) errors.push('Не указан способ оплаты');
+      if (!payment.total_amount || payment.total_amount <= 0) {
         errors.push('Некорректная сумма оплаты');
       }
     }
@@ -174,7 +178,7 @@ class WizardTester {
   }
 
   // Запуск всех тестов
-  async runAllTests() {
+  async runAllTests(): Promise<Record<string, unknown>> {
     logger.log('🚀 Запуск всех тестов мастера регистрации...');
     logger.log('='.repeat(50));
 
@@ -210,7 +214,7 @@ class WizardTester {
   }
 
   // Генерация тестовых данных для разных сценариев
-  generateTestData(scenario = 'basic') {
+  generateTestData(scenario: string = 'basic'): Record<string, unknown> {
     const scenarios = {
       basic: {
         patient: {
@@ -313,7 +317,7 @@ class WizardTester {
       }
     };
 
-    return scenarios[scenario] || scenarios.basic;
+    return scenarios[scenario as keyof typeof scenarios] || scenarios.basic;
   }
 }
 
