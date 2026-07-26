@@ -1,6 +1,7 @@
 import type { ReportConfig } from '../types/domain/clinic';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 
+/** Report item shape (used for mock + real reports). */
 interface ReportItem {
   id: number;
   name: string;
@@ -10,8 +11,8 @@ interface ReportItem {
   generatedAt: string | null;
   fileSize: string | null;
   format: string;
-  dateRange: { start: string; end: string };
-  filters: { department: string; status: string };
+  dateRange: { start: string; end: string } | string;
+  filters: unknown;
   downloadCount: number;
   description: string;
   error?: string | null;
@@ -28,7 +29,7 @@ const useReports = () => {
   const [filterDateRange, setFilterDateRange] = useState('');
 
   // Моковые данные для демонстрации
-  const mockReports = useMemo<ReportItem[]>(() => [
+  const mockReports = useMemo(() => [
     {
       id: 1,
       name: 'Финансовый отчет за январь 2024',
@@ -143,17 +144,17 @@ const useReports = () => {
       
       const newReport: ReportItem = {
         id: Date.now(),
-        name: `${getReportTypeLabel(reportConfig.type as string)} за ${formatDateRange(reportConfig.dateRange as unknown as { start: string; end: string })}`,
-        type: reportConfig.type as string,
+        name: `${getReportTypeLabel(reportConfig.type)} за ${formatDateRange(reportConfig.dateRange)}`,
+        type: reportConfig.type || 'unknown',
         status: 'generating',
         createdAt: new Date().toISOString(),
         generatedAt: null,
         fileSize: null,
-        format: reportConfig.format as string,
-        dateRange: reportConfig.dateRange as unknown as { start: string; end: string },
-        filters: reportConfig.filters as { department: string; status: string },
+        format: String(reportConfig.format || 'pdf'),
+        dateRange: reportConfig.dateRange || '',
+        filters: reportConfig.filters,
         downloadCount: 0,
-        description: getReportTypeDescription(reportConfig.type as string)
+        description: getReportTypeDescription(reportConfig.type)
       };
       
       setReports(prev => [newReport, ...prev]);
@@ -324,8 +325,8 @@ const useReports = () => {
   ];
 
   // Вспомогательные функции
-  const getReportTypeLabel = (type: string) => {
-    const typeMap = {
+  const getReportTypeLabel = (type: string | undefined) => {
+    const typeMap: Record<string, string> = {
       financial: 'Финансовый отчет',
       appointments: 'Отчет по записям',
       patients: 'Отчет по пациентам',
@@ -334,11 +335,11 @@ const useReports = () => {
       revenue: 'Отчет по доходам',
       performance: 'Отчет по эффективности'
     };
-    return typeMap[type as keyof typeof typeMap] || type;
+    return (type && typeMap[type]) || type || '';
   };
 
-  const getReportTypeDescription = (type: string) => {
-    const descMap = {
+  const getReportTypeDescription = (type: string | undefined) => {
+    const descMap: Record<string, string> = {
       financial: 'Детальный анализ доходов и расходов клиники',
       appointments: 'Статистика записей, загруженности и эффективности',
       patients: 'Анализ пациентской базы и демографии',
@@ -347,30 +348,31 @@ const useReports = () => {
       revenue: 'Анализ доходов по источникам и периодам',
       performance: 'KPI и метрики эффективности работы'
     };
-    return descMap[type as keyof typeof descMap] || 'Отчет по выбранным параметрам';
+    return (type && descMap[type]) || 'Отчет по выбранным параметрам';
   };
 
   const getStatusLabel = (status: string) => {
-    const statusMap = {
+    const statusMap: Record<string, string> = {
       completed: 'Завершен',
       generating: 'Генерируется',
       failed: 'Ошибка',
       pending: 'Ожидает'
     };
-    return statusMap[status as keyof typeof statusMap] || status;
+    return statusMap[status] || status;
   };
 
   const getStatusVariant = (status: string) => {
-    const variantMap = {
+    const variantMap: Record<string, string> = {
       completed: 'success',
       generating: 'warning',
       failed: 'error',
       pending: 'info'
     };
-    return variantMap[status as keyof typeof variantMap] || 'secondary';
+    return variantMap[status] || 'secondary';
   };
 
-  const formatDateRange = (dateRange: { start: string; end: string }) => {
+  const formatDateRange = (dateRange: { start?: string; end?: string } | string | undefined) => {
+    if (!dateRange || typeof dateRange === 'string') return dateRange || '';
     if (!dateRange.start || !dateRange.end) return '';
     const start = new Date(dateRange.start).toLocaleDateString('ru-RU');
     const end = new Date(dateRange.end).toLocaleDateString('ru-RU');

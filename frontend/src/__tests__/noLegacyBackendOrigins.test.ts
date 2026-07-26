@@ -9,7 +9,7 @@ const EXCLUDED_FILE_SUFFIXES = ['.test.js', '.test.tsx', '.spec.js', '.spec.tsx'
 
 function collectSourceFiles(dir) {
   const entries = fs.readdirSync(dir, { withFileTypes: true });
-  const files = [];
+  const files: string[] = [];
 
   for (const entry of entries) {
     const fullPath = path.join(dir, entry.name);
@@ -39,7 +39,7 @@ function collectSourceFiles(dir) {
 describe('frontend network origin guardrails', () => {
   it('does not hardcode legacy backend origin 8000 in runtime source files', () => {
     const runtimeFiles = collectSourceFiles(SOURCE_ROOT);
-    const matches = [];
+    const matches: string[] = [];
 
     for (const filePath of runtimeFiles) {
       const content = fs.readFileSync(filePath, 'utf8');

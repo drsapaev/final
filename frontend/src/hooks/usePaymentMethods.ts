@@ -38,7 +38,7 @@ export function usePaymentMethods(options: Record<string, unknown> = {}) {
         const response = await api.get('/payment-methods');
         if (response.data?.methods && !cancelled) {
           const mapped = mapBackendPaymentMethods(response.data.methods);
-          setPaymentMethods(mapped);
+          setPaymentMethods(mapped as typeof DEFAULT_PAYMENT_METHODS);
         }
       } catch (err) {
         if (!cancelled) {

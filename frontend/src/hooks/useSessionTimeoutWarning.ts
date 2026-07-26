@@ -86,7 +86,7 @@ export function useSessionTimeoutWarning({
       return;
     }
 
-    let intervalId = null;
+    let intervalId: ReturnType<typeof setInterval> | null = null;
 
     const check = () => {
       try {

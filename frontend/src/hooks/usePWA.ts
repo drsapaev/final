@@ -120,7 +120,6 @@ export const usePWA = () => {
         // Проверка обновлений
         registration.addEventListener('updatefound', () => {
           const newWorker = registration.installing;
-
           if (!newWorker) return;
 
           newWorker.addEventListener('statechange', () => {

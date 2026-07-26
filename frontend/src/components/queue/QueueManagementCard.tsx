@@ -68,8 +68,8 @@ const ActionButton = ({ color, icon: Icon, iconSize, onClick, disabled, ariaLabe
   disabled?: boolean;
   ariaLabel?: string;
   title?: string;
-  actionButtonStyle?: Record<string, unknown>;
-  getColor?: (category: string, variant: string | number) => string;
+  actionButtonStyle?: Record<string, unknown> | null;
+  getColor?: ((category: string, variant: string | number) => string) | null;
 }) => {
   // Backward compat: если передан custom actionButtonStyle — используем inline-стиль.
   if (actionButtonStyle) {

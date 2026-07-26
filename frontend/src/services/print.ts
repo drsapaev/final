@@ -4,7 +4,7 @@
  */
 import { api } from '../api/client';
 
-const normalizePrintResponse = (responseData: Record<string, unknown>, fallbackErrorMessage: string) => {
+const normalizePrintResponse = (responseData, fallbackErrorMessage: string) => {
   if (responseData?.success === false) {
     return {
       success: false,
@@ -19,9 +19,9 @@ const normalizePrintResponse = (responseData: Record<string, unknown>, fallbackE
   };
 };
 
-const normalizePrintError = (error: unknown, fallbackMessage: string) => ({
+const normalizePrintError = (error, fallbackMessage: string) => ({
   success: false,
-  error: (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || fallbackMessage
+  error: error.response?.data?.detail || fallbackMessage
 });
 
 export const printService = {
@@ -44,7 +44,7 @@ export const printService = {
   /**
    * Печать талона очереди
    */
-  async printTicket(ticketData: Record<string, unknown>) {
+  async printTicket(ticketData) {
     try {
       const response = await api.post('/print/ticket', ticketData);
 
@@ -57,7 +57,7 @@ export const printService = {
   /**
    * Печать рецепта (PDF)
    */
-  async printPrescription(prescriptionData: Record<string, unknown>) {
+  async printPrescription(prescriptionData) {
     try {
       const response = await api.post('/print/prescription', prescriptionData);
 
@@ -70,7 +70,7 @@ export const printService = {
   /**
    * Печать справки
    */
-  async printCertificate(certificateData: Record<string, unknown>) {
+  async printCertificate(certificateData) {
     try {
       const response = await api.post('/print/certificate', certificateData);
 
@@ -83,7 +83,7 @@ export const printService = {
   /**
    * Печать лабораторных результатов
    */
-  async printLabResults(labResultsData: Record<string, unknown>) {
+  async printLabResults(labResultsData) {
     try {
       const response = await api.post('/print/lab-results', labResultsData);
 
@@ -96,7 +96,7 @@ export const printService = {
   /**
    * Печать чека
    */
-  async printReceipt(receiptData: Record<string, unknown>) {
+  async printReceipt(receiptData) {
     try {
       const response = await api.post('/print/receipt', receiptData);
 
@@ -109,7 +109,7 @@ export const printService = {
   /**
    * Быстрая печать
    */
-  async quickPrint(text: string, printerName = 'default') {
+  async quickPrint(text, printerName = 'default') {
     return {
       success: false,
       error:
@@ -120,7 +120,7 @@ export const printService = {
   /**
    * Быстрая печать талона очереди
    */
-  async quickQueueTicket(ticketData: Record<string, unknown>) {
+  async quickQueueTicket(ticketData) {
     try {
       const response = await api.post('/print/quick/queue-ticket', ticketData);
 
@@ -133,7 +133,7 @@ export const printService = {
   /**
    * Быстрая печать чека
    */
-  async quickPaymentReceipt(receiptData: Record<string, unknown>) {
+  async quickPaymentReceipt(receiptData) {
     try {
       const response = await api.post('/print/quick/payment-receipt', receiptData);
 
@@ -146,7 +146,7 @@ export const printService = {
   /**
    * Получение шаблонов печати
    */
-  async getTemplates(templateType: string, language = 'ru') {
+  async getTemplates(templateType, language = 'ru') {
     try {
       const response = await api.get('/print/templates/templates', {
         params: { template_type: templateType, language }
@@ -164,7 +164,7 @@ export const printService = {
   /**
    * Проверка статуса принтера
    */
-  async checkPrinterStatus(printerName: string) {
+  async checkPrinterStatus(printerName) {
     try {
       const response = await api.get(`/print/printers/${printerName}/status`);
 
@@ -177,7 +177,7 @@ export const printService = {
   /**
    * Тестовая печать
    */
-  async testPrint(printerName: string) {
+  async testPrint(printerName) {
     try {
       const response = await api.post(
         `/print/printers/${encodeURIComponent(printerName)}/test`

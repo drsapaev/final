@@ -187,7 +187,7 @@ interface NotificationCenterProviderProps {
 
 const NotificationCenterContext = createContext<NotificationCenterContextValue | null>(null);
 
-export const ROLE_NOTIFICATION_TYPES = {
+export const ROLE_NOTIFICATION_TYPES: Record<string, string[]> = {
   doctor: [
     'message_received',
     'appointment_reminder',
@@ -320,7 +320,7 @@ export const ROLE_NOTIFICATION_TYPES = {
   ]
 };
 
-const TYPE_ALIASES = {
+const TYPE_ALIASES: Record<string, string> = {
   queue_changed: 'queue_update',
   diagnostics_return: 'diagnostics_return_needed',
   queue_status: 'queue_status_changed',

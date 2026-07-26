@@ -21,7 +21,7 @@ import {
 } from '../utils/dateUtils';
 import { finalizePrintableWindow, openPrintableWindow } from '../utils/printWindow';
 
-function normalizePrintableDateString(value) {
+function normalizePrintableDateString(value: unknown): string | null {
   if (value === null || value === undefined || value === '') {
     return null;
   }
@@ -32,7 +32,7 @@ function normalizePrintableDateString(value) {
     .replace(/(\.\d{3})\d+(?=(Z|[+-]\d{2}:\d{2})?$)/, '$1');
 }
 
-function tryParsePrintableDate(value) {
+function tryParsePrintableDate(value: unknown): Date | null {
   const normalized = normalizePrintableDateString(value);
   if (!normalized) {
     return null;
@@ -53,19 +53,19 @@ function tryParsePrintableDate(value) {
   return null;
 }
 
-function formatPrintableDate(date) {
+function formatPrintableDate(date: Date | string | null | undefined): string | null {
   return formatRegistrarDate(date);
 }
 
-function formatPrintableTime(date) {
+function formatPrintableTime(date: Date | string | null | undefined): string | null {
   return formatRegistrarTime(date);
 }
 
-function formatPrintableDateTime(date) {
+function formatPrintableDateTime(date: Date | string | null | undefined): string | null {
   return formatRegistrarDateTime(date);
 }
 
-function normalizeDateOnly(value) {
+function normalizeDateOnly(value: unknown): string | null {
   const normalized = normalizePrintableDateString(value);
   if (!normalized) {
     return null;
@@ -80,7 +80,7 @@ function normalizeDateOnly(value) {
   return parsed ? formatPrintableDate(parsed) : null;
 }
 
-function normalizeTimeOnly(value) {
+function normalizeTimeOnly(value: unknown): string | null {
   const normalized = normalizePrintableDateString(value);
   if (!normalized) {
     return null;
@@ -95,7 +95,7 @@ function normalizeTimeOnly(value) {
   return parsed ? formatPrintableTime(parsed) : null;
 }
 
-function formatTicketTimeWindow(row) {
+function formatTicketTimeWindow(row: Record<string, unknown>): string {
   const fullDateTimeCandidate = getFirstDefined(
     row?.appointment_time,
     row?.queue_time,
@@ -130,7 +130,7 @@ function formatTicketTimeWindow(row) {
   return null;
 }
 
-function extractQueueNumberCandidate(value) {
+function extractQueueNumberCandidate(value: unknown): string | null {
   if (value === undefined || value === null || value === '') {
     return null;
   }
@@ -139,41 +139,42 @@ function extractQueueNumberCandidate(value) {
     for (const item of value) {
       const candidate = extractQueueNumberCandidate(item);
       if (candidate !== null && candidate !== undefined && candidate !== '') {
-        return candidate;
+        return String(candidate);
       }
     }
     return null;
   }
 
-  if (typeof value === 'object') {
+  if (typeof value === 'object' && value !== null) {
+    const obj = value as Record<string, unknown>;
     const direct = getFirstDefined(
-      value.queue_number,
-      value.number,
-      value.ticket_number,
-      value.queue_position,
-      value.queue_no,
-      value.display_number,
-      value.id
+      obj.queue_number,
+      obj.number,
+      obj.ticket_number,
+      obj.queue_position,
+      obj.queue_no,
+      obj.display_number,
+      obj.id
     );
 
     if (direct !== null && direct !== undefined && direct !== '') {
-      return direct;
+      return String(direct);
     }
 
     for (const nestedValue of Object.values(value)) {
       const nestedCandidate = extractQueueNumberCandidate(nestedValue);
       if (nestedCandidate !== null && nestedCandidate !== undefined && nestedCandidate !== '') {
-        return nestedCandidate;
+        return String(nestedCandidate);
       }
     }
 
     return null;
   }
 
-  return value;
+  return String(value);
 }
 
-function resolveQueueNumber(row) {
+function resolveQueueNumber(row: Record<string, unknown> | null | undefined): string | null {
   const directCandidates = [
     row?.queue_number,
     row?.number,
@@ -181,18 +182,18 @@ function resolveQueueNumber(row) {
     row?.queue_position,
     row?.queue_no,
     row?.display_number,
-    row?.queue_entry?.queue_number,
-    row?.queue_entry?.number,
-    row?.queue_entry?.ticket_number,
-    row?.queue_entry?.queue_position,
-    row?.queue_entry?.queue_no,
-    row?.queue_entry?.display_number,
-    row?.queue_ticket?.queue_number,
-    row?.queue_ticket?.number,
-    row?.queue_ticket?.ticket_number,
-    row?.queue_ticket?.queue_position,
-    row?.queue_ticket?.queue_no,
-    row?.queue_ticket?.display_number,
+    (row?.queue_entry as Record<string, unknown> | undefined)?.queue_number,
+    (row?.queue_entry as Record<string, unknown> | undefined)?.number,
+    (row?.queue_entry as Record<string, unknown> | undefined)?.ticket_number,
+    (row?.queue_entry as Record<string, unknown> | undefined)?.queue_position,
+    (row?.queue_entry as Record<string, unknown> | undefined)?.queue_no,
+    (row?.queue_entry as Record<string, unknown> | undefined)?.display_number,
+    (row?.queue_ticket as Record<string, unknown> | undefined)?.queue_number,
+    (row?.queue_ticket as Record<string, unknown> | undefined)?.number,
+    (row?.queue_ticket as Record<string, unknown> | undefined)?.ticket_number,
+    (row?.queue_ticket as Record<string, unknown> | undefined)?.queue_position,
+    (row?.queue_ticket as Record<string, unknown> | undefined)?.queue_no,
+    (row?.queue_ticket as Record<string, unknown> | undefined)?.display_number,
   ];
 
   const nestedQueueNumber = extractQueueNumberCandidate(row?.queue_numbers);
@@ -207,13 +208,13 @@ function resolveQueueNumber(row) {
   );
 
   if (resolved !== null && resolved !== undefined && resolved !== '') {
-    return resolved;
+    return String(resolved);
   }
 
   return null;
 }
 
-function getFirstDefined(...values) {
+function getFirstDefined(...values: unknown[]): unknown {
   for (const value of values) {
     if (value !== undefined && value !== null && value !== '') {
       return value;
@@ -223,7 +224,7 @@ function getFirstDefined(...values) {
   return null;
 }
 
-function normalizeClinicBrandingSettings(settings) {
+function normalizeClinicBrandingSettings(settings: Record<string, unknown>): Record<string, unknown> {
   const normalized = {
     clinic_name: 'Programma Clinic',
     logo_url: '/static/logo.png',
@@ -248,7 +249,7 @@ function normalizeClinicBrandingSettings(settings) {
   return normalized;
 }
 
-function resolveQrPayload(row: Record<string, unknown>, overrides: Record<string, unknown> = {}): Record<string, unknown> {
+function resolveQrPayload(row: Record<string, unknown>, overrides: Record<string, unknown> = {}): unknown {
   return getFirstDefined(
     overrides.qrPayload,
     overrides.qrUrl,
@@ -263,7 +264,7 @@ function resolveQrPayload(row: Record<string, unknown>, overrides: Record<string
   );
 }
 
-function resolveClinicLogo(row: Record<string, unknown>, overrides: Record<string, unknown> = {}, branding: Record<string, unknown> = {}): Record<string, unknown> {
+function resolveClinicLogo(row: Record<string, unknown>, overrides: Record<string, unknown> = {}, branding: Record<string, unknown> = {}): unknown {
   return getFirstDefined(
     overrides.logoUrl,
     row?.logo_url,
@@ -272,7 +273,7 @@ function resolveClinicLogo(row: Record<string, unknown>, overrides: Record<strin
   );
 }
 
-function resolveClinicName(row: Record<string, unknown>, overrides: Record<string, unknown> = {}, branding: Record<string, unknown> = {}): Record<string, unknown> {
+function resolveClinicName(row: Record<string, unknown>, overrides: Record<string, unknown> = {}, branding: Record<string, unknown> = {}): unknown {
   return getFirstDefined(
     overrides.clinicName,
     row?.clinic_name,
@@ -282,7 +283,7 @@ function resolveClinicName(row: Record<string, unknown>, overrides: Record<strin
   );
 }
 
-function resolveServicePrice(row: Record<string, unknown>, overrides: Record<string, unknown> = {}): Record<string, unknown> {
+function resolveServicePrice(row: Record<string, unknown>, overrides: Record<string, unknown> = {}): unknown {
   return getFirstDefined(
     overrides.servicePrice,
     row?.service_price,
@@ -308,7 +309,7 @@ const QUEUE_DISPLAY_NAMES = {
   cosmetology: 'Косметология',
 };
 
-function normalizeDisplayLabel(value) {
+function normalizeDisplayLabel(value: unknown): string | null {
   if (value === null || value === undefined || value === '') {
     return null;
   }
@@ -357,7 +358,7 @@ function resolveServicePriceForTicket(row: Record<string, unknown>, source: Reco
     source?.amount
   );
   if (directPrice !== null && directPrice !== undefined && directPrice !== '') {
-    return directPrice;
+    return directPrice as Record<string, unknown>;
   }
 
   const normalizedCandidates = [
@@ -368,7 +369,7 @@ function resolveServicePriceForTicket(row: Record<string, unknown>, source: Reco
     normalizeDisplayLabel(source?.department),
   ]
     .filter(Boolean)
-    .map((value) => String(value).trim().toLowerCase());
+    .map((value: Record<string, unknown>) => String(value).trim().toLowerCase());
 
   if (normalizedCandidates.length === 0) {
     return null;
@@ -388,7 +389,7 @@ function resolveServicePriceForTicket(row: Record<string, unknown>, source: Reco
       service?.code,
     ]
       .filter(Boolean)
-      .map((value) => String(value).trim().toLowerCase());
+      .map((value: Record<string, unknown>) => String(value).trim().toLowerCase());
 
     if (serviceLabels.some((label) => normalizedCandidates.includes(label))) {
       return getFirstDefined(
@@ -396,14 +397,14 @@ function resolveServicePriceForTicket(row: Record<string, unknown>, source: Reco
         service?.service_price,
         service?.amount,
         service?.cost
-      );
+      ) as Record<string, unknown>;
     }
   }
 
-  return null;
+  return {};
 }
 
-function resolveTicketCabinet(row: Record<string, unknown>, source: Record<string, unknown> = null, overrides: Record<string, unknown> = {}): Record<string, unknown> {
+function resolveTicketCabinet(row: Record<string, unknown>, source: Record<string, unknown> | null = null, overrides: Record<string, unknown> = {}): unknown {
   return getFirstDefined(
     overrides.cabinet,
     source?.cabinet,
@@ -782,7 +783,7 @@ function renderPanelTicketHtml(payloads, settings, branding) {
         </style>
       </head>
       <body>
-        ${safePayloads.map((payload) => `
+        ${safePayloads.map((payload: Record<string, unknown>) => `
           <div class="ticket-page">
             ${renderPanelTicketMarkup(payload, settings, branding, issuedAt)}
           </div>
@@ -862,7 +863,7 @@ async function loadPanelTicketRenderContext(row: Record<string, unknown>, overri
   const branding =
     clinicSettingsResult.status === 'fulfilled'
       ? normalizeClinicBrandingSettings(clinicSettingsResult.value)
-      : normalizeClinicBrandingSettings([]);
+      : normalizeClinicBrandingSettings({});
 
   return { payloads, settings, branding };
 }
@@ -936,9 +937,9 @@ export async function printPanelTicket(row: Record<string, unknown>, overrides: 
   const payloads = resolvePanelTicketPayloads(row, overrides);
   logger.info('[PanelPrint] Ticket print dialog opened', {
     ticketCount: payloads.length,
-    queueNumbers: payloads.map((payload) => payload.queue_number),
+    queueNumbers: payloads.map((payload: Record<string, unknown>) => payload.queue_number),
     patientName: payloads[0]?.patient_name || null,
-    specialties: payloads.map((payload) => payload.specialty_name),
+    specialties: payloads.map((payload: Record<string, unknown>) => payload.specialty_name),
   });
 
   return {
@@ -964,7 +965,7 @@ export function buildPanelReceiptPrintableHtml(receiptPayload) {
   const issuedAt = formatRegistrarDateTime(new Date().toISOString());
 
   const serviceRows = services.length > 0
-    ? services.map((service) => `
+    ? services.map((service: Record<string, unknown>) => `
         <tr>
           <td>${escapeHtml(service?.name || '—')}</td>
           <td class="center">${escapeHtml(service?.quantity || 1)}</td>

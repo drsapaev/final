@@ -53,7 +53,7 @@ function scrubPIIFromObject(obj: unknown): unknown {
   if (!obj || typeof obj !== 'object') return obj;
   if (Array.isArray(obj)) return (Array.isArray(o) ? o.map(scrubPIIFromObject) : o);
 
-  const cleaned = {};
+  const cleaned: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(obj)) {
     const lowerKey = key.toLowerCase();
     if (MEDICAL_PII_KEYS.some((pii) => lowerKey.includes(pii))) {

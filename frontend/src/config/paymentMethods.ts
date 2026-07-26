@@ -64,8 +64,8 @@ export const DEFAULT_PAYMENT_METHODS = [
  * @param {string} iconKey - icon key (e.g. 'card', 'cash')
  * @returns {React.ComponentType} lucide icon component
  */
-export function getPaymentMethodIcon(iconKey) {
-  return PAYMENT_METHOD_ICONS[iconKey] || CreditCard;
+export function getPaymentMethodIcon(iconKey: string) {
+  return (PAYMENT_METHOD_ICONS as Record<string, typeof CreditCard>)[iconKey] || CreditCard;
 }
 
 /**
@@ -73,10 +73,10 @@ export function getPaymentMethodIcon(iconKey) {
  * @param {Array} backendMethods - [{ value, label_key, icon_name }]
  * @returns {Array} [{ value, label, Icon, iconKey }]
  */
-export function mapBackendPaymentMethods(backendMethods) {
+export function mapBackendPaymentMethods(backendMethods: Array<Record<string, unknown>>) {
   if (!Array.isArray(backendMethods)) return DEFAULT_PAYMENT_METHODS;
   return backendMethods.map((method) => {
-    const IconComponent = getPaymentMethodIcon(method.icon_name || method.iconKey);
+    const IconComponent = getPaymentMethodIcon(String(method.icon_name || method.iconKey || 'card'));
     return {
       value: method.value,
       label: method.label || method.label_key,

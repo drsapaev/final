@@ -14,7 +14,7 @@ const FORBIDDEN_PATTERNS = [
 
 function collectCodeFiles(dir) {
   const entries = fs.readdirSync(dir, { withFileTypes: true });
-  const files = [];
+  const files: string[] = [];
 
   for (const entry of entries) {
     const fullPath = path.join(dir, entry.name);
@@ -36,7 +36,7 @@ describe('legacy EMR references', () => {
     const legacyDir = path.resolve(ROOT, 'components/emr');
     expect(fs.existsSync(legacyDir)).toBe(false);
 
-    const offenders = [];
+    const offenders: string[] = [];
 
     for (const filePath of collectCodeFiles(ROOT)) {
       if (path.basename(filePath) === 'noLegacyEmrReferences.test.js') {

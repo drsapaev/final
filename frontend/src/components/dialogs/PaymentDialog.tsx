@@ -70,7 +70,7 @@ const PaymentDialog = ({
     try {
       // UX Audit Registrar: убрана 1.5-секундная «имитация» (setTimeout).
       // Теперь: onPaymentSuccess callback делает РЕАЛЬНЫЙ API-запрос.
-      if (onPaymentSuccess) {
+      if (onPaymentSuccess && appointment) {
         await onPaymentSuccess({
           appointmentId: appointment.id,
           amount: parseFloat(paymentAmount),
@@ -182,7 +182,7 @@ const PaymentDialog = ({
               <p className="payment-patient-services">
                 Услуги:{' '}
                 {Array.isArray(appointment.services)
-                  ? (appointment.services as string[]).join(', ')
+                  ? (appointment.services as unknown[]).map((s) => String(s)).join(', ')
                   : String(appointment.services ?? '')}
               </p>
             )}

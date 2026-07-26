@@ -108,7 +108,7 @@ const QueuePositionCard = ({ queueEntry }: QueuePositionCardProps) => {
                         {config.description}
                     </span>
                 </div>
-                {status === 'waiting' && estimatedWaitTime > 0 &&
+                {status === 'waiting' && (estimatedWaitTime ?? 0) > 0 &&
         <div className="flex items-center gap-2">
                         <Clock size={16} className="text-gray-400" />
                         <span className="text-sm text-gray-600">

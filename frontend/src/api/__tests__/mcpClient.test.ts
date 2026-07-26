@@ -145,7 +145,7 @@ describe('MCP Client API', () => {
 
       expect(result.status).toBe('success');
       expect(result.data.suggestions).toHaveLength(1);
-      expect(result.data.suggestions[0].code).toBe('G43.9');
+      expect(result.data!.suggestions![0].code).toBe('G43.9');
     });
   });
 

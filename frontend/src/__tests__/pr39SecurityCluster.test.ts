@@ -56,7 +56,7 @@ describe('P0-5: Sanitizers wired to production forms', () => {
   it('at least one production form uses useSafeInput or useSafeForm', () => {
     const srcDir = path.join(ROOT, 'src');
     const files = collectSourceFiles(srcDir);
-    const filesUsingSafeInput = [];
+    const filesUsingSafeInput: string[] = []
     for (const file of files) {
       if (file.includes('/examples/') || file.includes('/__tests__/')) continue;
       const src = fs.readFileSync(file, 'utf-8');
@@ -75,9 +75,11 @@ describe('P0-6: CSP script-src without unsafe-inline', () => {
     const src = fs.readFileSync(NGINX_PROD, 'utf-8');
     const cspMatch = src.match(/Content-Security-Policy\s+"([^"]+)"/);
     expect(cspMatch).not.toBeNull();
+    if (!cspMatch) return;
     const csp = cspMatch[1];
     const scriptSrcMatch = csp.match(/script-src\s+([^;]+)/);
     expect(scriptSrcMatch).not.toBeNull();
+    if (!scriptSrcMatch) return;
     const scriptSrc = scriptSrcMatch[1];
     // Must NOT have 'unsafe-inline' for script-src
     // (style-src 'unsafe-inline' is acceptable for Tailwind, but script-src is XSS-critical)
@@ -106,7 +108,7 @@ describe('P0-2: tokenManager storage', () => {
 
 function collectSourceFiles(dir) {
   const entries = fs.readdirSync(dir, { withFileTypes: true });
-  const files = [];
+  const files: string[] = []
   for (const entry of entries) {
     const fullPath = path.join(dir, entry.name);
     if (entry.isDirectory()) {

@@ -16,7 +16,7 @@ interface AxiosLikeError {
 }
 
 
-export function isExpectedApiErrorStatus(originalRequest: { expectedErrorStatuses?: number[] } | undefined, status: unknown): boolean {
+export function isExpectedApiErrorStatus(originalRequest: { expectedErrorStatuses?: number[] } | null | undefined, status: unknown): boolean {
   if (!originalRequest || typeof status !== 'number') {
     return false;
   }

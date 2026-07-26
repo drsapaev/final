@@ -123,9 +123,11 @@ describe('Medium-10: CSP connect-src tightened', () => {
     // We extract the connect-src directive and verify ws: is not present.
     const cspMatch = prodSrc.match(/Content-Security-Policy\s+"([^"]+)"/);
     expect(cspMatch).not.toBeNull();
+    if (!cspMatch) return;
     const csp = cspMatch[1];
     const connectSrcMatch = csp.match(/connect-src\s+([^;]+)/);
     expect(connectSrcMatch).not.toBeNull();
+    if (!connectSrcMatch) return;
     const connectSrc = connectSrcMatch[1];
     // Must NOT contain standalone ws: (only wss: is OK)
     // Match ws: that is NOT preceded by 's' (i.e., not wss:)
@@ -135,9 +137,11 @@ describe('Medium-10: CSP connect-src tightened', () => {
   it('staging nginx does not allow ws: (unencrypted) as a standalone source in connect-src', () => {
     const cspMatch = stagingSrc.match(/Content-Security-Policy\s+"([^"]+)"/);
     expect(cspMatch).not.toBeNull();
+    if (!cspMatch) return;
     const csp = cspMatch[1];
     const connectSrcMatch = csp.match(/connect-src\s+([^;]+)/);
     expect(connectSrcMatch).not.toBeNull();
+    if (!connectSrcMatch) return;
     const connectSrc = connectSrcMatch[1];
     expect(connectSrc).not.toMatch(/(?<!s)ws:/);
   });
