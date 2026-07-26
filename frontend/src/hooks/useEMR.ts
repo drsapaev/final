@@ -39,14 +39,22 @@ const generateSessionId = () => {
 };
 
 const emrCache = new Map();
-const isAccessDeniedStatus = (status: EMRHttpStatus | undefined | null): boolean => status === 401 || status === 403;
+const isAccessDeniedStatus = (status: EMRHttpStatus | undefined) => status === 401 || status === 403;
 
-const getAccessDeniedMessage = (error: EMRApiError | undefined): string => (
+const getAccessDeniedMessage = (error?: EMRApiError): string => (
     error?.response?.data?.detail ||
     error?.response?.data?.message ||
     error?.message ||
     'Нет доступа к EMR для текущей учётной записи'
 );
+
+/** Coerce a caught value (typed `unknown` in strict mode) to EMRApiError. */
+const toEMRApiError = (err: unknown): EMRApiError => {
+    if (err && typeof err === 'object' && ('response' in err || 'message' in err)) {
+        return err as EMRApiError;
+    }
+    return { message: String(err) };
+};
 
 /**
  * useEMR Hook
@@ -57,10 +65,7 @@ const getAccessDeniedMessage = (error: EMRApiError | undefined): string => (
  * @param {string} options.specialty - Canonical specialty for this EMR flow
  * @returns {Object} EMR state and actions
  */
-export function useEMR(
-    visitId: number | string | null | undefined,
-    { autoLoad = true, specialty = 'general' }: { autoLoad?: boolean; specialty?: string } = {}
-) {
+export function useEMR(visitId: number | string | null, { autoLoad = true, specialty = 'general' }: { autoLoad?: boolean; specialty?: string } = {}) {
     const [state, dispatch] = useReducer(emrReducer, initialState);
     const clientSessionId = useRef(generateSessionId());
     const isMountedRef = useRef(true);
@@ -172,7 +177,7 @@ export function useEMR(
                 }
                 return normalizedEmr;
             } catch (error) {
-                const apiError = error as EMRApiError;
+                const apiError = toEMRApiError(error);
                 if (isAccessDeniedStatus(apiError?.response?.status)) {
                     emrCache.delete(cacheKey);
                     return handleAccessDenied('loadEMR', apiError);
@@ -237,14 +242,20 @@ export function useEMR(
             dispatch(emrActions.saveSuccess(response.data));
             return response.data;
         } catch (error) {
-            const apiError = error as EMRApiError;
+            const apiError = toEMRApiError(error);
             if (isAccessDeniedStatus(apiError?.response?.status)) {
                 return handleAccessDenied('saveEMR', apiError);
             }
 
             // Check for conflict (409)
             if (apiError.response?.status === 409) {
-                const conflictData = (apiError.response.data?.detail || apiError.response.data || {}) as unknown as { current_version: unknown; your_version: unknown; last_edited_by: string; last_edited_at: string };
+                const conflictData = (apiError.response.data?.detail || apiError.response.data) as {
+                    current_version: unknown;
+                    your_version: unknown;
+                    last_edited_by: string;
+                    last_edited_at: string;
+                    [key: string]: unknown;
+                };
                 dispatch(emrActions.conflictDetected(conflictData));
                 return { conflict: true, ...conflictData };
             }
@@ -290,13 +301,19 @@ export function useEMR(
             dispatch(emrActions.saveSuccess(response.data));
             return response.data;
         } catch (error) {
-            const apiError = error as EMRApiError;
+            const apiError = toEMRApiError(error);
             if (isAccessDeniedStatus(apiError?.response?.status)) {
                 return handleAccessDenied('signEMR', apiError);
             }
 
             if (apiError.response?.status === 409) {
-                const conflictData = (apiError.response.data?.detail || apiError.response.data || {}) as unknown as { current_version: unknown; your_version: unknown; last_edited_by: string; last_edited_at: string };
+                const conflictData = (apiError.response.data?.detail || apiError.response.data) as {
+                    current_version: unknown;
+                    your_version: unknown;
+                    last_edited_by: string;
+                    last_edited_at: string;
+                    [key: string]: unknown;
+                };
                 dispatch(emrActions.conflictDetected(conflictData));
                 return { conflict: true, ...conflictData };
             }
@@ -341,7 +358,7 @@ export function useEMR(
             dispatch(emrActions.saveSuccess(response.data));
             return response.data;
         } catch (error) {
-            const apiError = error as EMRApiError;
+            const apiError = toEMRApiError(error);
             if (isAccessDeniedStatus(apiError?.response?.status)) {
                 return handleAccessDenied('amendEMR', apiError);
             }

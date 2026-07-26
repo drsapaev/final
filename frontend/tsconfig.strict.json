@@ -75,7 +75,8 @@
     "src/hooks/useDoctorPhrases.ts",
     "src/hooks/useFinance.ts",
     "src/hooks/useUserPreferences.ts",
-    "src/hooks/usePatients.ts"
+    "src/hooks/usePatients.ts",
+    "src/hooks/useEMR.ts"
   ],
   "exclude": ["node_modules", "dist", "e2e"]
 }
