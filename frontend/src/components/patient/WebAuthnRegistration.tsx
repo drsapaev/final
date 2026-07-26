@@ -14,17 +14,25 @@ import React from "react";
  * Allows patients to register passkeys (TouchID/FaceID/YubiKey) as
  * an alternative to Telegram Mini App authentication.
  */
-export default function WebAuthnRegistration({ patientId }) {
+interface WebAuthnCredential {
+  id: string;
+  name?: string;
+  device_type?: string;
+  last_used_at?: string;
+}
+
+export default function WebAuthnRegistration({ patientId }: { patientId?: string | number | null }) {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  void patientId;
   const { isSupported, isRegistering, error, register, listCredentials, deactivateCredential } = useWebAuthn();
-  const [credentials, setCredentials] = useState([]);
+  const [credentials, setCredentials] = useState<WebAuthnCredential[]>([]);
   const [credentialName, setCredentialName] = useState('');
   const [loading, setLoading] = useState(true);
 
   const loadCredentials = useCallback(async () => {
     setLoading(true);
     const creds = await listCredentials();
-    setCredentials(creds);
+    setCredentials(creds as WebAuthnCredential[]);
     setLoading(false);
   }, [listCredentials]);
 
@@ -42,7 +50,7 @@ export default function WebAuthnRegistration({ patientId }) {
     }
   };
 
-  const handleDeactivate = async (credentialId) => {
+  const handleDeactivate = async (credentialId: string) => {
     const success = await deactivateCredential(credentialId);
     if (success) {
       await loadCredentials();

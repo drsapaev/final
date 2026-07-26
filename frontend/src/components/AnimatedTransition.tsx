@@ -1,6 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, ReactNode, CSSProperties } from 'react';
 import PropTypes from 'prop-types';
 
+
+interface AnimatedTransitionProps {
+  children: ReactNode;
+  type?: 'fade' | 'slide' | 'scale' | 'zoom' | 'rotate';
+  duration?: number;
+  delay?: number;
+  direction?: 'up' | 'down' | 'left' | 'right';
+  className?: string;
+  style?: CSSProperties;
+}
 
 const AnimatedTransition = ({
   children,
@@ -10,7 +20,7 @@ const AnimatedTransition = ({
   direction = 'up',
   className = '',
   style = {}
-}) => {
+}: AnimatedTransitionProps) => {
   const [isVisible, setIsVisible] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
 
@@ -47,7 +57,7 @@ const AnimatedTransition = ({
           return {
             ...baseStyle,
             opacity: isAnimating ? 1 : 0,
-            transform: slideTransform[direction] || slideTransform.up
+            transform: slideTransform[direction as keyof typeof slideTransform] || slideTransform.up
           };
         }
 
@@ -90,15 +100,24 @@ const AnimatedTransition = ({
 };
 
 // Компонент для анимированного списка
-export const AnimatedList = ({
+interface AnimatedListProps<T> {
+  items?: T[];
+  renderItem: (item: T, index: number) => ReactNode;
+  animationType?: 'fade' | 'slide' | 'scale' | 'zoom' | 'rotate';
+  staggerDelay?: number;
+  className?: string;
+  style?: CSSProperties;
+}
+
+export const AnimatedList = <T,>({
   items = [],
   renderItem,
   animationType = 'fade',
   staggerDelay = 100,
   className = '',
   style = {}
-}) => {
-  const [, setVisibleItems] = useState([]);
+}: AnimatedListProps<T>) => {
+  const [, setVisibleItems] = useState<number[]>([]);
 
   useEffect(() => {
     const timers = items.map((_, index) =>
@@ -126,6 +145,17 @@ export const AnimatedList = ({
 };
 
 // Компонент для анимированной кнопки
+interface AnimatedButtonProps {
+  children: ReactNode;
+  onClick?: React.MouseEventHandler<HTMLButtonElement>;
+  variant?: 'primary' | 'secondary' | 'success' | 'danger';
+  size?: 'sm' | 'md' | 'lg';
+  animationType?: 'fade' | 'slide' | 'scale' | 'zoom' | 'rotate';
+  className?: string;
+  style?: CSSProperties;
+  [key: string]: unknown;
+}
+
 export const AnimatedButton = ({
   children,
   onClick,
@@ -135,7 +165,7 @@ export const AnimatedButton = ({
   className = '',
   style = {},
   ...props
-}) => {
+}: AnimatedButtonProps) => {
   void animationType;
   const [isPressed, setIsPressed] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -200,12 +230,12 @@ export const AnimatedButton = ({
 
     return {
       ...baseStyle,
-      ...sizes[size],
-      ...variants[variant],
+      ...sizes[size as keyof typeof sizes],
+      ...variants[variant as keyof typeof variants],
       transform,
       boxShadow: isHovered ?
-      variants[variant].boxShadow.replace('0.3', '0.4') :
-      variants[variant].boxShadow
+      variants[variant as keyof typeof variants].boxShadow.replace('0.3', '0.4') :
+      variants[variant as keyof typeof variants].boxShadow
     };
   };
 
@@ -226,13 +256,21 @@ export const AnimatedButton = ({
 };
 
 // Компонент для анимированной карточки
+interface AnimatedCardProps {
+  children: ReactNode;
+  hover?: boolean;
+  className?: string;
+  style?: CSSProperties;
+  [key: string]: unknown;
+}
+
 export const AnimatedCard = ({
   children,
   hover = true,
   className = '',
   style = {},
   ...props
-}) => {
+}: AnimatedCardProps) => {
   const [isHovered, setIsHovered] = useState(false);
 
   const getCardStyle = () => {

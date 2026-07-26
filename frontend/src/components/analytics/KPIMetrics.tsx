@@ -26,6 +26,20 @@ import {
  * Компонент для отображения KPI метрик
  * Включает анимированные карточки, тренды, сравнения
  */
+interface KPIMetricsData {
+  metrics?: Record<string, Record<string, unknown>>;
+  summary?: Record<string, number>;
+}
+
+interface KPIMetricsProps {
+  data?: KPIMetricsData | null;
+  loading?: boolean;
+  onRefresh?: (chart?: string) => void;
+  onExport?: (chart?: string) => void;
+  showTrends?: boolean;
+  showComparisons?: boolean;
+}
+
 const KPIMetrics = ({
   data,
   loading = false,
@@ -33,21 +47,22 @@ const KPIMetrics = ({
   onExport,
   showTrends = true,
   showComparisons = true
-}) => {
+}: KPIMetricsProps) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
-  const [animatedValues, setAnimatedValues] = useState<Record<string, any>>({});
+  const [animatedValues, setAnimatedValues] = useState<Record<string, { current: number; target: number; trend: number }>>({});
   const [selectedPeriod, setSelectedPeriod] = useState('30d');
 
   const animateValues = useCallback(() => {
+    if (!data?.metrics) return;
     const metrics = data.metrics;
-    const animated = {};
+    const animated: Record<string, { current: number; target: number; trend: number }> = {};
 
     Object.keys(metrics).forEach((key) => {
       const metric = metrics[key];
       animated[key] = {
         current: 0,
-        target: metric.value,
-        trend: metric.trend || 0
+        target: Number(metric.value ?? 0),
+        trend: Number(metric.trend ?? 0)
       };
     });
 
@@ -56,9 +71,10 @@ const KPIMetrics = ({
     // Анимация значений
     Object.keys(animated).forEach((key) => {
       const metric = metrics[key];
+      const value = Number(metric.value ?? 0);
       const duration = 2000;
       const steps = 60;
-      const stepValue = metric.value / steps;
+      const stepValue = value / steps;
       const stepDuration = duration / steps;
 
       let currentStep = 0;
@@ -68,7 +84,7 @@ const KPIMetrics = ({
           ...prev,
           [key]: {
             ...prev[key],
-            current: Math.min(stepValue * currentStep, metric.value)
+            current: Math.min(stepValue * currentStep, value)
           }
         }));
 
@@ -85,7 +101,7 @@ const KPIMetrics = ({
     }
   }, [data, animateValues]);
 
-  const getMetricIcon = (type) => {
+  const getMetricIcon = (type: string) => {
     const iconStyle = { width: '20px', height: '20px' };
     switch (type) {
       case 'revenue':return <DollarSign style={iconStyle} />;
@@ -99,19 +115,19 @@ const KPIMetrics = ({
     }
   };
 
-  const getTrendIcon = (trend) => {
+  const getTrendIcon = (trend: number) => {
     if (trend > 0) return <TrendingUp className="w-4 h-4 text-green-500" />;
     if (trend < 0) return <TrendingDown className="w-4 h-4 text-red-500" />;
     return <Activity className="w-4 h-4 text-gray-500" />;
   };
 
-  const getTrendColor = (trend) => {
+  const getTrendColor = (trend: number) => {
     if (trend > 0) return 'text-green-600';
     if (trend < 0) return 'text-red-600';
     return 'text-gray-600';
   };
 
-  const formatValue = (value, type) => {
+  const formatValue = (value: number, type: string) => {
     switch (type) {
       case 'revenue':
         // UX Audit: валюта — узбекский сум (не рубль ₽).
@@ -127,11 +143,16 @@ const KPIMetrics = ({
     }
   };
 
-  const renderMetricCard = (key, metric) => {
-    const animated = animatedValues[key] || { current: 0, trend: 0 };
-    const trend = metric.trend || 0;
+  const renderMetricCard = (key: string, metric: Record<string, unknown>) => {
+    const animated = animatedValues[key] || { current: 0, target: 0, trend: 0 };
+    const trend = Number(metric.trend ?? 0);
     const isPositive = trend > 0;
     const isNegative = trend < 0;
+    const metricType = String(metric.type ?? '');
+    const metricFormat = String(metric.format ?? '');
+    const metricTarget = Number(metric.target ?? 0);
+    const metricComparison = Number(metric.comparison ?? 0);
+    const metricGoal = Number(metric.goal ?? 0);
 
     return (
       <Card key={key} className="relative overflow-hidden">
@@ -142,14 +163,14 @@ const KPIMetrics = ({
               isPositive ? 'bg-green-100' :
               isNegative ? 'bg-red-100' : 'bg-gray-100'}`
               }>
-                {getMetricIcon(metric.type)}
+                {getMetricIcon(metricType)}
               </div>
               <div>
                 <h3 className="text-sm font-medium text-gray-600">
-                  {metric.label}
+                  {String(metric.label ?? '')}
                 </h3>
                 <p className="text-xs text-gray-500">
-                  {metric.description}
+                  {String(metric.description ?? '')}
                 </p>
               </div>
             </div>
@@ -164,11 +185,11 @@ const KPIMetrics = ({
           <div className="space-y-3">
             <div className="flex items-baseline space-x-2">
               <span className="text-3xl font-bold text-gray-900">
-                {formatValue(animated.current, metric.format)}
+                {formatValue(animated.current, metricFormat)}
               </span>
-              {metric.target &&
+              {metric.target != null &&
               <span className="text-sm text-gray-500">
-                  / {formatValue(metric.target, metric.format)}
+                  / {formatValue(metricTarget, metricFormat)}
                 </span>
               }
             </div>
@@ -191,22 +212,22 @@ const KPIMetrics = ({
               </div>
             }
 
-            {showComparisons && metric.comparison &&
+            {showComparisons && metric.comparison != null &&
             <div className="pt-2 border-t border-gray-100">
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-gray-500">{t('misc.km_srednee_po_otrasli')}</span>
                   <span className="font-medium">
-                    {formatValue(metric.comparison, metric.format)}
+                    {formatValue(metricComparison, metricFormat)}
                   </span>
                 </div>
                 <div className="mt-1">
                   <div className="w-full bg-gray-200 rounded-full h-1">
                     <div
                     className={`h-1 rounded-full ${
-                    animated.current > metric.comparison ? 'bg-green-500' : 'bg-yellow-500'}`
+                    animated.current > metricComparison ? 'bg-green-500' : 'bg-yellow-500'}`
                     }
                     style={{
-                      width: `${Math.min(animated.current / metric.comparison * 100, 100)}%`
+                      width: `${Math.min(animated.current / metricComparison * 100, 100)}%`
                     }}>
                   </div>
                   </div>
@@ -214,12 +235,12 @@ const KPIMetrics = ({
               </div>
             }
 
-            {metric.goal &&
+            {metric.goal != null &&
             <div className="pt-2 border-t border-gray-100">
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-gray-500">{t('misc.km_tsel')}</span>
                   <span className="font-medium">
-                    {formatValue(metric.goal, metric.format)}
+                    {formatValue(metricGoal, metricFormat)}
                   </span>
                 </div>
                 <div className="mt-1">
@@ -227,7 +248,7 @@ const KPIMetrics = ({
                     <div
                     className="h-1 rounded-full bg-blue-500"
                     style={{
-                      width: `${Math.min(animated.current / metric.goal * 100, 100)}%`
+                      width: `${Math.min(animated.current / metricGoal * 100, 100)}%`
                     }}>
                   </div>
                   </div>
@@ -367,7 +388,7 @@ const KPIMetrics = ({
       {/* Метрики */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {Object.entries(data.metrics).map(([key, metric]) =>
-        renderMetricCard(key, metric)
+        renderMetricCard(key, metric as Record<string, unknown>)
         )}
       </div>
     </div>);

@@ -1,5 +1,6 @@
 
 import { useState, useEffect } from 'react';
+import type { ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import UnifiedSidebar from './UnifiedSidebar';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -11,7 +12,7 @@ import { useTranslation } from '../../i18n/useTranslation';
  * Унифицированный макет с сайдбаром
  * Используется во всех панелях для единообразия
  */
-const UnifiedLayout = ({ children, showSidebar = true }) => {
+const UnifiedLayout = ({ children, showSidebar = true }: { children?: ReactNode; showSidebar?: boolean }) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);

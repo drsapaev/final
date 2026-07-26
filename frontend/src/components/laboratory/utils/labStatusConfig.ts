@@ -30,12 +30,12 @@ export const LAB_REPORT_STATUS_CONFIG = [
 ];
 
 // Быстрый lookup по ключу статуса.
-export const LAB_REPORT_STATUS_BY_KEY = LAB_REPORT_STATUS_CONFIG.reduce(
+export const LAB_REPORT_STATUS_BY_KEY: Record<string, { key: string; label: string; variant: string }> = LAB_REPORT_STATUS_CONFIG.reduce(
   (acc, item) => {
     acc[item.key] = item;
     return acc;
   },
-  {}
+  {} as Record<string, { key: string; label: string; variant: string }>
 );
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -60,13 +60,13 @@ export const LAB_QUEUE_STATUS_CONFIG = {
  * @param {string} status — ключ статуса
  * @returns {{ label: string, variant: string }}
  */
-export function getLabStatusConfig(status) {
+export function getLabStatusConfig(status: string) {
   if (!status) {
     return { label: 'Неизвестно', variant: 'info' };
   }
   return (
     LAB_REPORT_STATUS_BY_KEY[status]
-    || LAB_QUEUE_STATUS_CONFIG[status]
+    || (LAB_QUEUE_STATUS_CONFIG as Record<string, { label: string; variant: string }>)[status]
     || { label: status, variant: 'info' }
   );
 }
@@ -75,7 +75,7 @@ export function getLabStatusConfig(status) {
  * Возвращает человекочитаемый label статуса.
  * Заменяет старую formatLabStatus() из labUiLabels.js.
  */
-export function formatLabStatusLabel(status) {
+export function formatLabStatusLabel(status: string) {
   return getLabStatusConfig(status).label;
 }
 
@@ -83,7 +83,7 @@ export function formatLabStatusLabel(status) {
  * Возвращает badge-variant статуса.
  * Заменяет старую getLabStatusVariant() из labUiLabels.js.
  */
-export function getLabStatusBadgeVariant(status) {
+export function getLabStatusBadgeVariant(status: string) {
   return getLabStatusConfig(status).variant;
 }
 
@@ -91,7 +91,7 @@ export function getLabStatusBadgeVariant(status) {
  * Возвращает индекс шага в жизненном цикле бланка (для stepper).
  * -1 — статус не принадлежит жизненному циклу (например, status очереди).
  */
-export function getLabReportStepIndex(status) {
+export function getLabReportStepIndex(status: string) {
   if (!status) return -1;
   return LAB_REPORT_STATUS_CONFIG.findIndex((s) => s.key === status);
 }

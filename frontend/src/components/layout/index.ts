@@ -60,7 +60,7 @@ export const layoutUtils = {
   },
 
   // Создание адаптивных значений
-  createResponsiveValue: (values) => {
+  createResponsiveValue: (values: Record<string, string | undefined>) => {
     const { xs, sm, md, lg, xl } = values;
     return {
       default: xs || sm || md || lg || xl,
@@ -73,10 +73,11 @@ export const layoutUtils = {
   },
 
   // Получение значения для текущего размера экрана
-  getResponsiveValue: (responsiveValue, currentBreakpoint) => {
-    if (typeof responsiveValue !== 'object') {
+  getResponsiveValue: (responsiveValue: unknown, currentBreakpoint: string) => {
+    if (typeof responsiveValue !== 'object' || responsiveValue === null) {
       return responsiveValue;
     }
+    const rv = responsiveValue as Record<string, unknown>;
     
     const breakpointOrder = ['xs', 'sm', 'md', 'lg', 'xl'];
     const currentIndex = breakpointOrder.indexOf(currentBreakpoint);
@@ -84,17 +85,17 @@ export const layoutUtils = {
     // Ищем ближайшее доступное значение
     for (let i = currentIndex; i >= 0; i--) {
       const bp = breakpointOrder[i];
-      if (responsiveValue[bp] !== undefined) {
-        return responsiveValue[bp];
+      if (rv[bp] !== undefined) {
+        return rv[bp];
       }
     }
     
-    return responsiveValue.default || responsiveValue[breakpointOrder[0]];
+    return rv.default || rv[breakpointOrder[0]];
   },
 
   // Создание CSS Grid шаблона
-  createGridTemplate: (columns, rows) => {
-    const formatValue = (value) => {
+  createGridTemplate: (columns: number | string | string[], rows?: number | string | string[]) => {
+    const formatValue = (value: number | string | string[]) => {
       if (typeof value === 'number') {
         return `repeat(${value}, 1fr)`;
       }
@@ -131,7 +132,7 @@ export const layoutUtils = {
   },
 
   // Проверка размера экрана
-  isBreakpoint: (breakpoint, width) => {
+  isBreakpoint: (breakpoint: string, width: number) => {
     const breakpointValues = {
       xs: 480,
       sm: 640,
@@ -141,7 +142,7 @@ export const layoutUtils = {
       '2xl': 1536
     };
     
-    return width >= breakpointValues[breakpoint];
+    return width >= breakpointValues[breakpoint as keyof typeof breakpointValues];
   }
 };
 
@@ -176,7 +177,7 @@ export const useResponsive = () => {
     return 'xs';
   };
 
-  const isBreakpoint = (breakpoint) => {
+  const isBreakpoint = (breakpoint: string) => {
     return layoutUtils.isBreakpoint(breakpoint, windowSize.width);
   };
 
@@ -191,11 +192,11 @@ export const useResponsive = () => {
 };
 
 // Хук для создания адаптивных стилей
-export const useResponsiveStyles = (styles) => {
+export const useResponsiveStyles = (styles: Record<string, unknown>) => {
   const { currentBreakpoint } = useResponsive();
   
   return React.useMemo(() => {
-    const result = {};
+    const result: Record<string, unknown> = {};
     
     Object.keys(styles).forEach(property => {
       const value = styles[property];

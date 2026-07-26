@@ -13,6 +13,24 @@ import SkinAnalysis from './SkinAnalysis';
 import PhotoComparison from './PhotoComparison';
 import { useTranslation } from '../../i18n/useTranslation';
 
+type TFunc = (key: string, options?: Record<string, unknown>) => string;
+
+interface PhotoData {
+  before?: Array<{ url?: string } | string>;
+  after?: Array<{ url?: string } | string>;
+}
+
+interface CurrentAppointment {
+  visit_id?: number | string;
+  patient_id?: number;
+  patient?: { id?: number };
+}
+
+interface SelectedPatient {
+  patient_id?: number;
+  patient?: { id?: number };
+}
+
 export function DermaPhotosTab({
   hasPatient,
   currentAppointment,
@@ -20,8 +38,15 @@ export function DermaPhotosTab({
   photoData,
   onPhotoUpdate,
   onGoToAppointments,
+}: {
+  hasPatient?: boolean;
+  currentAppointment?: CurrentAppointment | null;
+  selectedPatient?: SelectedPatient | null;
+  photoData: PhotoData;
+  onPhotoUpdate?: (data: unknown) => void;
+  onGoToAppointments?: () => void;
 }) {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as TFunc;
   if (!hasPatient) {
     return (
       <MacOSEmptyState
@@ -54,7 +79,7 @@ export function DermaPhotosTab({
           photos={photoData}
           visitId={currentAppointment?.visit_id}
           patientId={currentAppointment?.patient_id || selectedPatient?.patient_id || selectedPatient?.patient?.id}
-          onAnalysisComplete={(result) => {
+          onAnalysisComplete={(result: unknown) => {
             logger.info('AI анализ завершен:', result);
           }}
         />
@@ -65,8 +90,8 @@ export function DermaPhotosTab({
           {t('derma.derma_photos_compare_title')}
         </h3>
         <PhotoComparison
-          beforePhoto={photoData.before?.[0]}
-          afterPhoto={photoData.after?.[0]}
+          beforePhoto={typeof photoData.before?.[0] === 'string' ? photoData.before[0] as string : (photoData.before?.[0] as { url?: string } | undefined)?.url ?? null}
+          afterPhoto={typeof photoData.after?.[0] === 'string' ? photoData.after[0] as string : (photoData.after?.[0] as { url?: string } | undefined)?.url ?? null}
           metadata={{ visitId: currentAppointment?.visit_id, patientId: currentAppointment?.patient_id || selectedPatient?.patient_id || selectedPatient?.patient?.id }}
         />
       </MacOSCard>

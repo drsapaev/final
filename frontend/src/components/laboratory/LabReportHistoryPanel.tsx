@@ -32,7 +32,19 @@ const SEVERITY_FILTER_KEY_MAP = {
   critical: 'queue.history_severity_critical',
 };
 
-function sortHistoryItems(items) {
+interface HistoryItem {
+  id: string | number;
+  patient_id?: string | number;
+  patient_snapshot?: { full_name?: string } | null;
+  visit_id?: string | number;
+  status?: string;
+  created_at: string;
+  template?: { name?: string } | null;
+  flagged_findings_count?: number;
+  critical_findings_count?: number;
+}
+
+function sortHistoryItems(items: HistoryItem[]) {
   return [...items].sort((left, right) => {
     const leftSeverity = historySeverityState(left);
     const rightSeverity = historySeverityState(right);
@@ -43,6 +55,16 @@ function sortHistoryItems(items) {
   });
 }
 
+interface LabReportHistoryPanelProps {
+  showRecentReportsBrowser?: boolean;
+  recentReports?: HistoryItem[];
+  reportHistory?: HistoryItem[];
+  historySeverityFilter?: string;
+  onSeverityFilterChange: (filter: string) => void;
+  activeInstanceId?: string | number | null;
+  onOpenInstance: (id: string | number) => void;
+}
+
 export default function LabReportHistoryPanel({
   showRecentReportsBrowser = false,
   recentReports = [],
@@ -51,7 +73,7 @@ export default function LabReportHistoryPanel({
   onSeverityFilterChange,
   activeInstanceId = null,
   onOpenInstance,
-}) {
+}: LabReportHistoryPanelProps) {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const sourceItems = showRecentReportsBrowser ? recentReports : reportHistory;
   const filteredItems = sortHistoryItems(
@@ -68,8 +90,8 @@ export default function LabReportHistoryPanel({
 
   // L-L-5 fix: keyboard-навигация между карточками (ArrowUp/Down).
   // Список карточек хранится в ref — при ArrowDown/Up перемещаем фокус.
-  const cardRefsRef = useRef([]);
-  const handleCardKeyDown = useCallback((event, index) => {
+  const cardRefsRef = useRef<Array<HTMLButtonElement | null>>([]);
+  const handleCardKeyDown = useCallback((event: React.KeyboardEvent<HTMLElement>, index: number) => {
     if (event.key === 'ArrowDown') {
       event.preventDefault();
       const next = Math.min(index + 1, filteredItems.length - 1);
@@ -104,7 +126,7 @@ export default function LabReportHistoryPanel({
               variant={historySeverityFilter === filterId ? 'primary' : 'outline'}
               onClick={() => onSeverityFilterChange(filterId)}
             >
-              {t(SEVERITY_FILTER_KEY_MAP[filterId])}
+              {t(SEVERITY_FILTER_KEY_MAP[filterId as keyof typeof SEVERITY_FILTER_KEY_MAP])}
             </Button>
           ))}
         </div>
@@ -119,11 +141,11 @@ export default function LabReportHistoryPanel({
               <button
                 key={item.id}
                 type="button"
-                ref={(el) => { cardRefsRef.current[index] = el; }}
+                ref={(el: HTMLButtonElement | null) => { cardRefsRef.current[index] = el; }}
                 onClick={() => onOpenInstance(item.id)}
                 // L-L-5 fix: ArrowUp/Down/Home/End для навигации между карточками.
                 onKeyDown={(e: React.KeyboardEvent<HTMLElement>) => handleCardKeyDown(e, index)}
-                aria-label={`${t('queue.history_report_number')} ${item.template?.name || `#${item.id}`}, ${patientLabel}, ${formatLabStatus(item.status)}`}
+                aria-label={`${t('queue.history_report_number')} ${item.template?.name || `#${item.id}`}, ${patientLabel}, ${formatLabStatus(item.status ?? '')}`}
                 style={{
                   border: '1px solid var(--mac-border)',
                   borderRadius: '14px',
@@ -160,16 +182,16 @@ export default function LabReportHistoryPanel({
                   flexWrap: 'wrap',
                   justifyContent: 'flex-end',
                 }}>
-                  <Badge variant={getLabStatusVariant(item.status)}>
-                    {formatLabStatus(item.status)}
+                  <Badge variant={getLabStatusVariant(item.status ?? '')}>
+                    {formatLabStatus(item.status ?? '')}
                   </Badge>
                   <Badge variant={severity.variant as unknown as "default" | "primary" | "secondary" | "success" | "warning" | "danger" | "info" | "outline"}>
                     {formatSeverityLabel(severity.label)}
                   </Badge>
-                  {item.flagged_findings_count > 0 && (
+                  {item.flagged_findings_count != null && item.flagged_findings_count > 0 && (
                     <Badge variant="info">{item.flagged_findings_count} {t('queue.history_flags')}</Badge>
                   )}
-                  {item.critical_findings_count > 0 && (
+                  {item.critical_findings_count != null && item.critical_findings_count > 0 && (
                     <Badge variant="danger">{item.critical_findings_count} {t('queue.history_critical')}</Badge>
                   )}
                 </div>

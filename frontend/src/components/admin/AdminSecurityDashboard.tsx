@@ -16,10 +16,10 @@ import React from "react";
  */
 export default function AdminSecurityDashboard() {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
-  const [dashboard, setDashboard] = useState(null);
-  const [compliance, setCompliance] = useState(null);
-  const [secrets, setSecrets] = useState(null);
-  const [backup, setBackup] = useState(null);
+  const [dashboard, setDashboard] = useState<Record<string, unknown> | null>(null);
+  const [compliance, setCompliance] = useState<Record<string, unknown> | null>(null);
+  const [secrets, setSecrets] = useState<Record<string, unknown> | null>(null);
+  const [backup, setBackup] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -119,9 +119,16 @@ export default function AdminSecurityDashboard() {
   );
 }
 
-function DashboardTab({ data }) {
+function DashboardTab({ data }: { data: Record<string, unknown> }) {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
-  const { summary, recent_logins, failed_logins, suspicious_ips, recent_downloads, recent_exports } = data;
+  const summary = (data.summary ?? null) as Record<string, unknown> | null;
+  const recent_logins = (data.recent_logins ?? []) as Array<Record<string, unknown>>;
+  const failed_logins = (data.failed_logins ?? []) as Array<Record<string, unknown>>;
+  const suspicious_ips = (data.suspicious_ips ?? []) as Array<Record<string, unknown>>;
+  const recent_downloads = (data.recent_downloads ?? []) as Array<Record<string, unknown>>;
+  void recent_downloads;
+  const recent_exports = (data.recent_exports ?? []) as Array<Record<string, unknown>>;
+  void recent_exports;
   return (
     <div style={{ display: 'grid', gap: 'var(--mac-spacing-4)' }}>
       {/* Summary cards */}
@@ -142,10 +149,10 @@ function DashboardTab({ data }) {
           </CardHeader>
           <CardContent style={{ padding: '12px 16px' }}>
             {failed_logins.slice(0, 10).map((entry) => (
-              <div key={entry.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--mac-border)' }}>
-                <span>{(entry as Record<string, unknown>).ip_address || 'N/A'} · {entry.actor_role || 'unknown'}</span>
+              <div key={String(entry.id)} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--mac-border)' }}>
+                <span>{String(entry.ip_address || 'N/A')} · {String(entry.actor_role || 'unknown')}</span>
                 <span style={{ color: 'var(--mac-text-muted)', fontSize: '12px' }}>
-                  {entry.timestamp ? new Date(entry.timestamp).toLocaleString('ru-RU') : ''}
+                  {entry.timestamp ? new Date(entry.timestamp as string).toLocaleString('ru-RU') : ''}
                 </span>
               </div>
             ))}
@@ -161,8 +168,8 @@ function DashboardTab({ data }) {
           </CardHeader>
           <CardContent style={{ padding: '12px 16px' }}>
             {suspicious_ips.map((ip) => (
-              <div key={ip.ip} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
-                <span>{ip.ip}</span>
+              <div key={String(ip.ip)} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
+                <span>{String(ip.ip)}</span>
                 <Badge variant="danger">{t('admin2.asd_ip_failures', { count: ip.fail_count })}</Badge>
               </div>
             ))}
@@ -178,10 +185,10 @@ function DashboardTab({ data }) {
           </CardHeader>
           <CardContent style={{ padding: '12px 16px' }}>
             {recent_logins.slice(0, 10).map((entry) => (
-              <div key={entry.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--mac-border)' }}>
-                <span>{entry.actor_role || 'user'} · {(entry as Record<string, unknown>).ip_address || 'N/A'}</span>
+              <div key={String(entry.id)} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--mac-border)' }}>
+                <span>{String(entry.actor_role || 'user')} · {String(entry.ip_address || 'N/A')}</span>
                 <Badge variant={entry.outcome === 'success' ? 'success' : 'danger'}>
-                  {entry.outcome}
+                  {String(entry.outcome ?? '')}
                 </Badge>
               </div>
             ))}
@@ -192,8 +199,10 @@ function DashboardTab({ data }) {
   );
 }
 
-function ComplianceTab({ data }) {
+function ComplianceTab({ data }: { data: Record<string, unknown> }) {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const summary = (data.summary ?? null) as Record<string, unknown> | null;
+  const checks = (data.checks ?? []) as Array<Record<string, unknown>>;
   return (
     <Card variant="filled" padding="default">
       <CardHeader>
@@ -201,19 +210,19 @@ function ComplianceTab({ data }) {
       </CardHeader>
       <CardContent>
         <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
-          <Badge variant={data.summary?.failed === 0 ? 'success' : 'warning'}>
-            {data.summary?.compliance_score || '0/0'}
+          <Badge variant={summary?.failed === 0 ? 'success' : 'warning'}>
+            {String(summary?.compliance_score ?? '0/0')}
           </Badge>
           <span style={{ color: 'var(--mac-text-secondary)' }}>
-            {t('admin2.asd_compliance_summary', { passed: data.summary?.passed || 0, failed: data.summary?.failed || 0 })}
+            {t('admin2.asd_compliance_summary', { passed: summary?.passed || 0, failed: summary?.failed || 0 })}
           </span>
         </div>
-        {data.checks?.map((check) => (
-          <div key={check.name} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: '1px solid var(--mac-border)' }}>
+        {checks.map((check) => (
+          <div key={String(check.name)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: '1px solid var(--mac-border)' }}>
             <Icon name={check.passed ? 'checkmark.circle.fill' : 'exclamationmark.triangle'} size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
             <div>
-              <div style={{ fontWeight: 500, color: 'var(--mac-text-primary)' }}>{check.label}</div>
-              <div style={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>{check.details}</div>
+              <div style={{ fontWeight: 500, color: 'var(--mac-text-primary)' }}>{String(check.label)}</div>
+              <div style={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>{String(check.details)}</div>
             </div>
           </div>
         ))}
@@ -222,25 +231,27 @@ function ComplianceTab({ data }) {
   );
 }
 
-function SecretsTab({ data }) {
+function SecretsTab({ data }: { data: Record<string, unknown> }) {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const rotation_interval_days = data.rotation_interval_days as number | undefined;
+  const secrets = (data.secrets ?? {}) as Record<string, Record<string, unknown>>;
   return (
     <Card variant="filled" padding="default">
       <CardHeader>
-        <CardTitle>{t('admin2.asd_secrets_status', { days: data.rotation_interval_days })}</CardTitle>
+        <CardTitle>{t('admin2.asd_secrets_status', { days: rotation_interval_days })}</CardTitle>
       </CardHeader>
       <CardContent>
-        {Object.entries((data as Record<string, unknown>).secrets || {}).map(([name, status]) => (
+        {Object.entries(secrets).map(([name, status]) => (
           <div key={name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--mac-border)' }}>
             <div>
               <div style={{ fontWeight: 500 }}>{name}</div>
               <div style={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>
-                {(status as Record<string, unknown>).last_rotated ? (t as unknown as (key: string, opts?: Record<string, unknown>) => string)('admin2.asd_secrets_rotation', { date: new Date((status as Record<string, unknown>).last_rotated as string).toLocaleDateString('ru-RU') }) : t('admin2.asd_secrets_never_rotated')}
-                {(status as Record<string, unknown>).days_since_rotation != null ? (t as unknown as (key: string, opts?: Record<string, unknown>) => string)('admin2.asd_secrets_days_ago', { days: (status as Record<string, unknown>).days_since_rotation }) : ''}
+                {status.last_rotated ? t('admin2.asd_secrets_rotation', { date: new Date(status.last_rotated as string).toLocaleDateString('ru-RU') }) : t('admin2.asd_secrets_never_rotated')}
+                {status.days_since_rotation != null ? t('admin2.asd_secrets_days_ago', { days: status.days_since_rotation }) : ''}
               </div>
             </div>
-            <Badge variant={(status as Record<string, unknown>).overdue ? 'danger' : 'success'}>
-              {(status as Record<string, unknown>).overdue ? t('admin2.asd_secrets_overdue') : t('admin2.asd_secrets_actual')}
+            <Badge variant={status.overdue ? 'danger' : 'success'}>
+              {status.overdue ? t('admin2.asd_secrets_overdue') : t('admin2.asd_secrets_actual')}
             </Badge>
           </div>
         ))}
@@ -249,7 +260,7 @@ function SecretsTab({ data }) {
   );
 }
 
-function BackupTab({ data, onVerify }) {
+function BackupTab({ data, onVerify }: { data: Record<string, unknown>; onVerify: () => void }) {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [verifying, setVerifying] = useState(false);
   const handleVerify = async () => {
@@ -264,6 +275,12 @@ function BackupTab({ data, onVerify }) {
     }
   };
 
+  const last_backup_at = data.last_backup_at as string | undefined;
+  const hours_since_last_backup = data.hours_since_last_backup as number | null | undefined;
+  const expected_interval_hours = data.expected_interval_hours as number | undefined;
+  const overdue = data.overdue as boolean | undefined;
+  const last_status = data.last_status as string | undefined;
+
   return (
     <Card variant="filled" padding="default">
       <CardHeader>
@@ -273,15 +290,15 @@ function BackupTab({ data, onVerify }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <div>
             <div style={{ fontWeight: 500 }}>
-              {t('admin2.asd_backup_last', { date: data.last_backup_at ? new Date(data.last_backup_at).toLocaleString('ru-RU') : t('admin2.asd_backup_never') })}
+              {t('admin2.asd_backup_last', { date: last_backup_at ? new Date(last_backup_at).toLocaleString('ru-RU') : t('admin2.asd_backup_never') })}
             </div>
             <div style={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>
-              {data.hours_since_last_backup != null ? t('admin2.asd_backup_hours_ago', { hours: data.hours_since_last_backup }) : ''}
-              {t('admin2.asd_backup_interval', { hours: data.expected_interval_hours })}
+              {hours_since_last_backup != null ? t('admin2.asd_backup_hours_ago', { hours: hours_since_last_backup }) : ''}
+              {t('admin2.asd_backup_interval', { hours: expected_interval_hours })}
             </div>
           </div>
-          <Badge variant={data.overdue ? 'danger' : 'success'}>
-            {data.last_status === 'verified' ? t('admin2.asd_backup_verified') : data.last_status === 'failed' ? t('admin2.asd_backup_failed') : t('admin2.asd_backup_no_data')}
+          <Badge variant={overdue ? 'danger' : 'success'}>
+            {last_status === 'verified' ? t('admin2.asd_backup_verified') : last_status === 'failed' ? t('admin2.asd_backup_failed') : t('admin2.asd_backup_no_data')}
           </Badge>
         </div>
         <Button variant="outline" onClick={handleVerify} loading={verifying}>
@@ -307,7 +324,7 @@ function SummaryCard({ label, value, variant }: Record<string, unknown>) {
       background: 'var(--mac-bg-tertiary)',
     }}>
       <div style={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>{String(label)}</div>
-      <div style={{ fontSize: '24px', fontWeight: 600, color: colors[variant as string] || colors.default }}>
+      <div style={{ fontSize: '24px', fontWeight: 600, color: colors[variant as keyof typeof colors] || colors.default }}>
         {String(value)}
       </div>
     </div>

@@ -8,8 +8,14 @@ import { Card, Button } from '../ui/macos';
 import { BarChart3 } from 'lucide-react';
 import { useTranslation } from '../../i18n/useTranslation';
 
-const ReportsAndAnalytics = ({ patients, diagnoses, prosthetics }) => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+type TFunc = (key: string, options?: Record<string, unknown>) => string;
+
+const ReportsAndAnalytics = ({ patients, diagnoses, prosthetics }: {
+  patients?: unknown[];
+  diagnoses?: unknown[];
+  prosthetics?: unknown[];
+}) => {
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as TFunc;
   return (
     <Card padding="large">
       <div className="dental-flex-between-16">
@@ -43,14 +49,28 @@ ReportsAndAnalytics.propTypes = {
   prosthetics: PropTypes.array,
 };
 
+interface SavedVisitProtocol {
+  visit_id: string | number;
+  patient_name: string;
+  saved_at: string;
+  visitData?: { chiefComplaint?: string };
+}
+
 export function DentalReportsTab({
   savedVisitProtocols = [],
   onReopenProtocol,
   patients = [],
   diagnoses = [],
   prosthetics = [],
+}: {
+  savedVisitProtocols?: SavedVisitProtocol[];
+  onReopenProtocol?: (protocol: SavedVisitProtocol) => void;
+  patients?: unknown[];
+  diagnoses?: unknown[];
+  prosthetics?: unknown[];
 }) {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as TFunc;
+  const protocols: SavedVisitProtocol[] = savedVisitProtocols;
   return (
     <div className="dental-flex-col dental-gap-24">
       {savedVisitProtocols.length > 0 && (
@@ -64,7 +84,7 @@ export function DentalReportsTab({
             </div>
           </div>
           <div className="dental-grid-auto-fill-280">
-            {savedVisitProtocols.map((protocol) => (
+            {protocols.map((protocol) => (
               <div key={protocol.visit_id} className="dental-protocol-card-flex">
                 <div>
                   <div className="dental-text-primary">{protocol.patient_name}</div>
@@ -76,7 +96,7 @@ export function DentalReportsTab({
                   {protocol.visitData?.chiefComplaint || t('dental.dental_drt_no_complaint')}
                 </div>
                 <Button
-                  onClick={() => onReopenProtocol(protocol)}
+                  onClick={() => onReopenProtocol?.(protocol)}
                   className="dental-align-self-start">
                   {t('dental.dental_drt_btn_open')}
                 </Button>

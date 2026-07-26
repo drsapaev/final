@@ -52,22 +52,22 @@ export const signerFieldLabels = {
 };
 
 // L-H-3 fix: formatLabStatus и getLabStatusVariant делегируют в labStatusConfig.
-export function formatLabStatus(status) {
+export function formatLabStatus(status: string) {
   return getLabStatusConfig(status).label;
 }
 
-export function getLabStatusVariant(status) {
+export function getLabStatusVariant(status: string) {
   return getLabStatusConfig(status).variant;
 }
 
-export function formatPaymentStatus(status) {
-  return _paymentStatusLabels[status] || status || 'Неизвестно';
+export function formatPaymentStatus(status: string) {
+  return _paymentStatusLabels[status as keyof typeof _paymentStatusLabels] || status || 'Неизвестно';
 }
 
-export function formatSpecialtyLabel(specialty) {
-  return _specialtyLabels[specialty] || specialty || 'Лаборатория';
+export function formatSpecialtyLabel(specialty: string) {
+  return _specialtyLabels[specialty as keyof typeof _specialtyLabels] || specialty || 'Лаборатория';
 }
 
-export function formatSeverityLabel(severity) {
-  return _severityLabels[severity] || severity || 'Без отклонений';
+export function formatSeverityLabel(severity: string) {
+  return _severityLabels[severity as keyof typeof _severityLabels] || severity || 'Без отклонений';
 }

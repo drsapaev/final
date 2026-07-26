@@ -46,8 +46,8 @@ const BenefitSettings = () => {
   const [originalSettings, setOriginalSettings] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [lastUpdated, setLastUpdated] = useState(null);
-  const [error, setError] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   useEffect(() => {
@@ -61,9 +61,10 @@ const BenefitSettings = () => {
       setSettings(data);
       setOriginalSettings(data);
       setLastUpdated(new Date(String(data?.updated_at ?? '')));
-    } catch (error) {
-      logger.error('Error loading benefit settings:', error);
-      setError(error.response?.data?.detail || t('admin2.bs_error_load_settings'));
+    } catch (err) {
+      logger.error('Error loading benefit settings:', err);
+      const errErr = err as { response?: { data?: { detail?: string } } };
+      setError(errErr.response?.data?.detail || t('admin2.bs_error_load_settings'));
       toast.error(t('admin2.bs_toast_load_error'));
     } finally {
       setLoading(false);
@@ -82,9 +83,10 @@ const BenefitSettings = () => {
       toast.success(response?.message || t('admin2.bs_toast_saved'));
       setOriginalSettings(settings);
       setLastUpdated(new Date());
-    } catch (error) {
-      logger.error('Error saving benefit settings:', error);
-      toast.error(error.response?.data?.detail || t('admin2.bs_toast_save_error'));
+    } catch (err) {
+      logger.error('Error saving benefit settings:', err);
+      const errErr = err as { response?: { data?: { detail?: string } } };
+      toast.error(errErr.response?.data?.detail || t('admin2.bs_toast_save_error'));
     } finally {
       setSaving(false);
     }
@@ -98,7 +100,7 @@ const BenefitSettings = () => {
     return JSON.stringify(settings) !== JSON.stringify(originalSettings);
   };
 
-  const handleInputChange = (key, value) => {
+  const handleInputChange = (key: string, value: unknown) => {
     setSettings(prev => ({
       ...prev,
       [key]: value

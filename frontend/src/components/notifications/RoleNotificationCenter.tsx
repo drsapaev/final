@@ -8,14 +8,19 @@ import { useNotificationCenter } from '../../contexts/NotificationCenterContext'
 import { getProfile } from '../../stores/auth';
 import logger from '../../utils/logger';
 
-export default function RoleNotificationCenter({ userRole }) {
+interface RecipientScope {
+  recipientId: string | number;
+  recipientType: string;
+}
+
+export default function RoleNotificationCenter({ userRole }: { userRole: string }) {
   const [open, setOpen] = useState(false);
-  const [recipientScope, setRecipientScope] = useState(null);
+  const [recipientScope, setRecipientScope] = useState<RecipientScope | null>(null);
   const { loadNotifications, getUnreadCount } = useNotificationCenter();
-  const lastLoadKeyRef = useRef(null);
+  const lastLoadKeyRef = useRef<string | null>(null);
   const lastLoadAtRef = useRef(0);
 
-  const shouldSkipLoad = useCallback((scope, source) => {
+  const shouldSkipLoad = useCallback((scope: RecipientScope | null, source: string) => {
     if (!scope?.recipientId) {
       return true;
     }
@@ -39,8 +44,8 @@ export default function RoleNotificationCenter({ userRole }) {
     return false;
   }, [userRole]);
 
-  const runLoadNotifications = useCallback((source) => {
-    if (shouldSkipLoad(recipientScope, source)) {
+  const runLoadNotifications = useCallback((source: string) => {
+    if (shouldSkipLoad(recipientScope, source) || !recipientScope) {
       return Promise.resolve([]);
     }
 
@@ -69,7 +74,7 @@ export default function RoleNotificationCenter({ userRole }) {
         }
 
         setRecipientScope({
-          recipientId: profile.id,
+          recipientId: profile.id as string | number,
           recipientType: userRole
         });
       } catch (error) {

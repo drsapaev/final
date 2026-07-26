@@ -6,7 +6,12 @@ import PropTypes from 'prop-types';
 import { Input } from './ui/macos';
 import { useTranslation } from '../i18n/useTranslation';
 
-const TwoFactorSetup = ({ onComplete, onCancel }) => {
+interface TwoFactorSetupProps {
+  onComplete?: () => void;
+  onCancel?: () => void;
+}
+
+const TwoFactorSetup = ({ onComplete, onCancel }: TwoFactorSetupProps) => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [step, setStep] = useState(1); // 1: Setup, 2: Verify, 3: Complete
@@ -15,13 +20,19 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
   const [success, setSuccess] = useState('');
 
   // Setup data
-  const [setupData, setSetupData] = useState(null);
+  interface TwoFactorSetupData {
+    qr_code_url?: string;
+    secret_key?: string;
+    backup_codes?: string[];
+    [key: string]: unknown;
+  }
+  const [setupData, setSetupData] = useState<TwoFactorSetupData | null>(null);
   const [recoveryEmail, setRecoveryEmail] = useState('');
   const [recoveryPhone, setRecoveryPhone] = useState('');
 
   // Verification
   const [totpCode, setTotpCode] = useState('');
-  const [backupCodes, setBackupCodes] = useState([]);
+  const [backupCodes, setBackupCodes] = useState<string[]>([]);
   const [copiedCode, setCopiedCode] = useState('');
 
   const handleSetup = async () => {
@@ -34,11 +45,12 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
         recovery_phone: recoveryPhone || null
       }) as import('axios').AxiosResponse<Record<string, unknown>>;
 
-      setSetupData(response);
-      setBackupCodes((response.data?.backup_codes as unknown[]) || []);
+      setSetupData(response.data as TwoFactorSetupData);
+      setBackupCodes((response.data?.backup_codes as string[]) || []);
       setStep(2);
     } catch (err) {
-      setError(err.response?.data?.detail || t('misc.tfs_oshibka_nastroyki_2fa'));
+      const e = err as { response?: { data?: { detail?: string } } };
+      setError(e.response?.data?.detail || t('misc.tfs_oshibka_nastroyki_2fa'));
     } finally {
       setLoading(false);
     }
@@ -65,14 +77,15 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
         setError(String(response.data?.message || t('misc.tfs_nevernyy_kod')));
       }
     } catch (err) {
-      setError(err.response?.data?.detail || t('misc.tfs_oshibka_verifikatsii'));
+      const e = err as { response?: { data?: { detail?: string } } };
+      setError(e.response?.data?.detail || t('misc.tfs_oshibka_verifikatsii'));
     } finally {
       setLoading(false);
     }
   };
 
-  const copyToClipboard = (text, code) => {
-    navigator.clipboard.writeText(text);
+  const copyToClipboard = (text: string | undefined, code: string) => {
+    navigator.clipboard.writeText(text ?? '');
     setCopiedCode(code);
     setTimeout(() => setCopiedCode(''), 2000);
   };

@@ -25,12 +25,19 @@ import { useTranslation } from '../../i18n/useTranslation';
  * Компонент для экспорта аналитических данных
  * Поддерживает множественные форматы и настройки
  */
+interface DataExporterProps {
+  data?: Record<string, unknown> | null;
+  onExport: (config: Record<string, unknown>) => Promise<{ success: boolean; error?: string }>;
+  availableFormats?: string[];
+  showAdvanced?: boolean;
+}
+
 const DataExporter = ({
   data,
   onExport,
   availableFormats = ['json', 'csv', 'xlsx', 'pdf'],
   showAdvanced = true
-}) => {
+}: DataExporterProps) => {
   const [selectedFormat, setSelectedFormat] = useState('json');
   const [selectedData, setSelectedData] = useState('all');
   const [includeCharts, setIncludeCharts] = useState(true);
@@ -38,7 +45,7 @@ const DataExporter = ({
   const [emailExport, setEmailExport] = useState(false);
   const [emailAddress, setEmailAddress] = useState('');
   const [isExporting, setIsExporting] = useState(false);
-  const [exportStatus, setExportStatus] = useState(null);
+  const [exportStatus, setExportStatus] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
   const [showAdvancedPanel, setShowAdvancedPanel] = useState(showAdvanced);
 
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;

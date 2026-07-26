@@ -73,8 +73,8 @@ function QueueCard({ appointment, isSelected = false, onOpenAppointment }: Queue
             <MaskedPhone phone={appointment.patient_phone} />
           </div>
         </div>
-        <Badge variant={getLabStatusVariant(appointment.status)}>
-          {formatLabStatus(appointment.status)}
+        <Badge variant={getLabStatusVariant(appointment.status ?? '')}>
+          {formatLabStatus(appointment.status ?? '')}
         </Badge>
       </div>
 
@@ -83,10 +83,10 @@ function QueueCard({ appointment, isSelected = false, onOpenAppointment }: Queue
       </div>
 
       <div className="lqw-meta-row">
-        <Badge variant="primary">{formatSpecialtyLabel(appointment.specialty)}</Badge>
+        <Badge variant="primary">{formatSpecialtyLabel(appointment.specialty ?? '')}</Badge>
         {appointment.payment_status && <Badge variant="info">{t('queue.payment')}: {formatPaymentStatus(appointment.payment_status)}</Badge>}
         {appointment.appointment_time && <Badge variant="default">{appointment.appointment_time}</Badge>}
-        {appointment.report_template_name && <Badge variant="info">{appointment.report_template_name}</Badge>}
+        {appointment.report_template_name && <Badge variant="info">{appointment.report_template_name ?? ''}</Badge>}
       </div>
 
       <div className="lqw-card-bottom">

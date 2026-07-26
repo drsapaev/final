@@ -25,7 +25,7 @@ import React from "react";
  *   - есть активный бланк (activeInstance)
  *   - есть заполненные поля (не только пустые values)
  */
-function normalizeSexForAI(sex) {
+function normalizeSexForAI(sex: unknown): 'male' | 'female' | 'other' | null {
   if (!sex) return null;
   const s = String(sex).trim().toUpperCase();
   if (s === 'M' || s === 'MALE') return 'male';
@@ -33,11 +33,31 @@ function normalizeSexForAI(sex) {
   return 'other';
 }
 
-function collectResultsFromInstance(instance) {
+interface LabField {
+  label?: string;
+  field_key?: string;
+  value_text?: string | null;
+  value_numeric?: number | null;
+  unit?: string;
+  reference_text?: string;
+  resolved_flag?: string;
+}
+
+interface LabSection {
+  fields?: LabField[];
+}
+
+interface LabInstance {
+  id?: string | number;
+  sections?: LabSection[];
+  patient_snapshot?: Record<string, unknown>;
+}
+
+function collectResultsFromInstance(instance: LabInstance | null | undefined) {
   if (!instance?.sections) return [];
   return instance.sections.flatMap((section) =>
     (section.fields || []).map((field) => ({
-      name: field.label || field.field_key,
+      name: field.label || field.field_key || '',
       value: field.value_text ?? (field.value_numeric != null ? String(field.value_numeric) : ''),
       unit: field.unit || '',
       reference: field.reference_text || '',
@@ -46,12 +66,18 @@ function collectResultsFromInstance(instance) {
   );
 }
 
-function hasAnyFilledResult(results) {
+function hasAnyFilledResult(results: Array<{ value: string | null | undefined }>) {
   return results.some((r) => r.value !== '' && r.value != null);
 }
 
-export default function LabReportAIAnalysis({ activeInstance, notify }) {
+interface LabReportAIAnalysisProps {
+  activeInstance?: LabInstance | null;
+  notify: (severity: string, message: string) => void;
+}
+
+export default function LabReportAIAnalysis({ activeInstance, notify }: LabReportAIAnalysisProps) {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  void t;
   const [showAIAnalysis, setShowAIAnalysis] = useState(false);
 
   // Извлекаем возраст и пол из patient_snapshot (backend уже вычислил age_years).
@@ -64,7 +90,7 @@ export default function LabReportAIAnalysis({ activeInstance, notify }) {
     () => collectResultsFromInstance(activeInstance),
     [activeInstance]
   );
-  const hasResults = hasAnyFilledResult(results);
+  const hasResults = hasAnyFilledResult(results as Array<{ value: string | null | undefined }>);
 
   const [aiBlockedReason, setAiBlockedReason] = useState('');
 
@@ -155,7 +181,7 @@ export default function LabReportAIAnalysis({ activeInstance, notify }) {
             <Alert severity="info" sx={{ mb: 2 }}>
               <Typography variant="caption" component="div">
                 <strong>{t('ai.patient_label')}:</strong>{' '}
-                {patientSnapshot.full_name || `#${patientSnapshot.patient_id || '?'}`}
+                {String(patientSnapshot.full_name || `#${patientSnapshot.patient_id || '?'}`)}
                 {' · '}
                 <strong>{t('ai.age_label')}:</strong>{' '}
                 {resolvedPatientAge != null ? `${resolvedPatientAge} ${t('ai.age_years')}` : t('ai.age_unknown')}
@@ -178,11 +204,11 @@ export default function LabReportAIAnalysis({ activeInstance, notify }) {
               analysisType="lab"
               data={{
                 results: results.map((r) => ({
-                  name: r.name,
-                  value: r.value,
-                  unit: r.unit,
-                  reference: r.reference,
-                  flag: r.flag,
+                  name: (r as { name: string }).name,
+                  value: (r as { value: string }).value,
+                  unit: (r as { unit: string }).unit,
+                  reference: (r as { reference: string }).reference,
+                  flag: (r as { flag?: string }).flag,
                 })),
                 patient_age: resolvedPatientAge,
                 patient_gender: resolvedPatientGender,

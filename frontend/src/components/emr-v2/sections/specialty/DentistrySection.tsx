@@ -62,28 +62,28 @@ export function DentistrySection({
   const [activeTab, setActiveTab] = useState('chart'); // 'chart' | 'hygiene' | 'periodontal' | 'occlusion' | 'radiographs'
 
     // Handlers
-    const handleToothChange = useCallback((toothNumber, toothData) => {
+    const handleToothChange = useCallback((toothNumber: string | number, toothData: unknown) => {
         onChange?.('tooth_status', {
             ...toothStatus,
             [toothNumber]: toothData
         });
     }, [toothStatus, onChange]);
 
-    const handleHygieneIndexChange = useCallback((field, value) => {
+    const handleHygieneIndexChange = useCallback((field: string, value: unknown) => {
         onChange?.('hygiene_indices', {
             ...hygieneIndices,
             [field]: value
         });
     }, [hygieneIndices, onChange]);
 
-    const handleMeasurementChange = useCallback((field, value) => {
+    const handleMeasurementChange = useCallback((field: string, value: unknown) => {
         onChange?.('measurements', {
             ...measurements,
             [field]: value
         });
     }, [measurements, onChange]);
 
-    const handleRadiographChange = useCallback((field, value) => {
+    const handleRadiographChange = useCallback((field: string, value: unknown) => {
         onChange?.('radiographs', {
             ...radiographs,
             [field]: value

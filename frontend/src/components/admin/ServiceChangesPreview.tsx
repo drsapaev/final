@@ -7,10 +7,20 @@ import {
   MacOSCard, Button, Badge, AppEmpty,
 } from '../ui/macos';
 
-const ServiceChangesPreview = ({ oldService, newService, onConfirm, onCancel }) => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
-  const formatFieldName = (field) => {
-    const fieldNames = {
+type TFunc = (key: string, options?: Record<string, unknown>) => string;
+type ServiceData = Record<string, unknown>;
+
+interface ServiceChangesPreviewProps {
+  oldService?: ServiceData | null;
+  newService: ServiceData;
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+const ServiceChangesPreview = ({ oldService, newService, onConfirm, onCancel }: ServiceChangesPreviewProps) => {
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as TFunc;
+  const formatFieldName = (field: string) => {
+    const fieldNames: Record<string, string> = {
       name: t('admin2.scp_field_name'),
       code: t('admin2.scp_field_code'),
       service_code: t('admin2.scp_field_service_code'),
@@ -30,7 +40,7 @@ const ServiceChangesPreview = ({ oldService, newService, onConfirm, onCancel }) 
     return fieldNames[field] || field;
   };
 
-  const formatValue = (value, field) => {
+  const formatValue = (value: unknown, field: string) => {
     if (value === null || value === undefined || value === '') return '—';
     if (typeof value === 'boolean') return value ? t('admin2.scp_value_yes') : t('admin2.scp_value_no');
     if (field === 'price' && typeof value === 'number') {
@@ -39,8 +49,15 @@ const ServiceChangesPreview = ({ oldService, newService, onConfirm, onCancel }) 
     return String(value);
   };
 
-  const calculateChanges = () => {
-    const changes = [];
+  interface ChangeRecord {
+    field: string;
+    oldValue: unknown;
+    newValue: unknown;
+    isImportant: boolean;
+  }
+
+  const calculateChanges = (): ChangeRecord[] => {
+    const changes: ChangeRecord[] = [];
     const trackedFields = [
       'name',
       'code',

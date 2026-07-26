@@ -9,10 +9,12 @@ import AISuggestionCard from './AISuggestionCard';
 import './AISuggestionPanel.css';
 import { useTranslation } from '@/i18n/useTranslation';
 
+type TranslationFunc = (key: string, options?: Record<string, unknown>) => string;
+
 /**
  * Field labels for grouping
  */
-const getFieldLabels = (t) => ({
+const getFieldLabels = (t: TranslationFunc) => ({
     complaints: t('misc.asp_field_complaints'),
     anamnesis_morbi: t('misc.asp_field_anamnesis_morbi'),
     anamnesis_vitae: t('misc.asp_field_anamnesis_vitae'),
@@ -23,6 +25,25 @@ const getFieldLabels = (t) => ({
     recommendations: t('misc.asp_field_recommendations'),
     notes: t('misc.asp_field_notes'),
 });
+
+interface AISuggestionPanelSuggestion {
+    id: string | number;
+    targetField: string;
+    content: string;
+    [key: string]: unknown;
+}
+
+interface AISuggestionPanelProps {
+    suggestions?: AISuggestionPanelSuggestion[];
+    onApply?: (suggestion: AISuggestionPanelSuggestion) => void;
+    onDismiss?: (id: string | number) => void;
+    onRefresh?: () => void;
+    isLoading?: boolean;
+    error?: React.ReactNode;
+    disabled?: boolean;
+    isOpen?: boolean;
+    onClose?: () => void;
+}
 
 /**
  * AISuggestionPanel Component
@@ -48,12 +69,12 @@ export function AISuggestionPanel({
     disabled = false,
     isOpen = true,
     onClose,
-}) {
+}: AISuggestionPanelProps) {
     const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
     if (!isOpen) return null;
 
     // Group suggestions by field
-    const groupedSuggestions = suggestions.reduce((acc: Record<string, unknown[]>, suggestion: Record<string, unknown>) => {
+    const groupedSuggestions = suggestions.reduce((acc: Record<string, AISuggestionPanelSuggestion[]>, suggestion: AISuggestionPanelSuggestion) => {
         const field = String(suggestion.targetField);
         if (!acc[field]) {
             acc[field] = [];
@@ -121,16 +142,16 @@ export function AISuggestionPanel({
 
                 {!isLoading && hasAnySuggestions && (
                     <div className="ai-suggestion-panel__groups">
-                        {Object.entries(groupedSuggestions as Record<string, unknown[]>).map(([field, fieldSuggestions]) => (
+                        {Object.entries(groupedSuggestions).map(([field, fieldSuggestions]) => (
                             <div key={field} className="ai-suggestion-panel__group">
                                 <div className="ai-suggestion-panel__group-header">
-                                    {getFieldLabels(t)[field] || field}
+                                    {getFieldLabels(t)[field as keyof ReturnType<typeof getFieldLabels>] || field}
                                 </div>
-                                {fieldSuggestions.map((suggestion: Record<string, unknown>) => (
+                                {fieldSuggestions.map((suggestion) => (
                                     <AISuggestionCard
                                         key={String(suggestion.id)}
-                                        suggestion={suggestion}
-                                        onApply={onApply}
+                                        suggestion={suggestion as unknown as import('./AISuggestionCard').AISuggestionCardData}
+                                        onApply={onApply as unknown as (suggestion: import('./AISuggestionCard').AISuggestionCardData) => void}
                                         onDismiss={onDismiss}
                                         disabled={disabled}
                                     />

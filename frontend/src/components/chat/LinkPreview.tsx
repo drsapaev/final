@@ -6,9 +6,21 @@ import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 import { api } from '../../api/client';
 
-const LinkPreview = ({ url }) => {
+interface LinkPreviewProps {
+  url: string;
+}
+
+interface LinkPreviewData {
+  image?: string;
+  title?: string;
+  description?: string;
+  error?: boolean;
+}
+
+const LinkPreview = ({ url }: LinkPreviewProps) => {
   const { t } = useTranslation();
-    const [preview, setPreview] = useState(null);
+  void t;
+    const [preview, setPreview] = useState<LinkPreviewData | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -27,20 +39,21 @@ const LinkPreview = ({ url }) => {
                     params: { url },
                     signal: abortController.signal,
                 });
-                const data = response.data;
+                const data = response.data as LinkPreviewData;
                 if (data && !data.error) {
                     setPreview(data);
                 }
             } catch (e) {
                 // axios.isCancel from api/client throws CanceledError on abort;
                 // silently ignore aborts (component unmounted).
-                const errName = (e && (e.name || e.code)) || '';
+                const err = e as { name?: string; code?: string; message?: string };
+                const errName = (err && (err.name || err.code)) || '';
                 if (errName === 'CanceledError' || errName === 'AbortError' || errName === 'ERR_CANCELED') {
                     return;
                 }
                 logger.error('[LinkPreview] Не удалось получить preview ссылки', {
                     url,
-                    error: e?.message || String(e),
+                    error: err?.message || String(e),
                 });
             } finally {
                 // Only update state if not aborted.

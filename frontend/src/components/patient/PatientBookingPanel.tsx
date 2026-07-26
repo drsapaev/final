@@ -15,6 +15,20 @@ import PanelEmptyState from './PanelEmptyState';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
 
+interface BookingAppointment {
+  appointment_date?: string;
+  appointment_time?: string;
+  department?: string;
+  payment_type?: string;
+  payment_currency?: string;
+  services?: string[];
+}
+
+interface BookingCreatedResponse {
+  appointment_id?: string | number;
+  preview?: { appointment?: BookingAppointment };
+}
+
 /**
  * L-H-4 fix: PatientBookingPanel выделен в отдельный файл (~120 строк).
  *
@@ -37,8 +51,8 @@ function PatientBookingPanel() {
     notes: '',
   }));
   const [bookingStatus, setBookingStatus] = useState('idle');
-  const [bookingPreview, setBookingPreview] = useState(null);
-  const [createdBooking, setCreatedBooking] = useState(null);
+  const [bookingPreview, setBookingPreview] = useState<{ appointment?: BookingAppointment; preview?: { appointment?: BookingAppointment } } | null>(null);
+  const [createdBooking, setCreatedBooking] = useState<BookingCreatedResponse | null>(null);
   const [bookingError, setBookingError] = useState('');
   const initData = readTelegramMiniAppInitData();
   const isBusy = bookingStatus === 'previewing' || bookingStatus === 'creating';
@@ -54,7 +68,7 @@ function PatientBookingPanel() {
     );
   }
 
-  const handleChange = (field, value) => {
+  const handleChange = (field: string, value: string) => {
     setBookingForm((current) => ({
       ...current,
       [field]: value,
@@ -78,10 +92,11 @@ function PatientBookingPanel() {
 
     try {
       const response = await api.post('/telegram/mini-app/appointments/preview', buildBookingPayload());
-      setBookingPreview(response.data);
+      setBookingPreview(response.data as { appointment?: BookingAppointment; preview?: { appointment?: BookingAppointment } });
       setBookingStatus('preview-ready');
     } catch (err) {
-      const reason = err?.response?.data?.detail?.reason || 'booking_preview_failed';
+      const errObj = err as { response?: { data?: { detail?: { reason?: string } } } };
+      const reason = errObj?.response?.data?.detail?.reason || 'booking_preview_failed';
       setBookingError(describePatientError('booking', reason));
       setBookingStatus('error');
     }
@@ -93,11 +108,12 @@ function PatientBookingPanel() {
 
     try {
       const response = await api.post('/telegram/mini-app/appointments', buildBookingPayload());
-      setCreatedBooking(response.data);
-      setBookingPreview(response.data?.preview || null);
+      setCreatedBooking(response.data as BookingCreatedResponse);
+      setBookingPreview((response.data as BookingCreatedResponse)?.preview || null);
       setBookingStatus('created');
     } catch (err) {
-      const reason = err?.response?.data?.detail?.reason || 'booking_create_failed';
+      const errObj = err as { response?: { data?: { detail?: { reason?: string } } } };
+      const reason = errObj?.response?.data?.detail?.reason || 'booking_create_failed';
       setBookingError(describePatientError('booking', reason));
       setBookingStatus('error');
     }

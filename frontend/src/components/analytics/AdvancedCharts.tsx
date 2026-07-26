@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import PropTypes from 'prop-types';
 const Chart = null as unknown as { new (ctx: unknown, config: unknown): { destroy: () => void; options: unknown }; registerables: unknown; register: (...args: unknown[]) => void };
-const registerables = null;
+const registerables: unknown[] = [];
 import { Card, Button,
   Checkbox } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
@@ -31,6 +31,15 @@ Chart.register(...registerables);
  * Продвинутые графики для аналитики
  * Включает интерактивные диаграммы, анимации, фильтры
  */
+interface AdvancedChartsProps {
+  data?: Record<string, unknown> | null;
+  loading?: boolean;
+  onRefresh?: (chartName?: string) => void;
+  onExport?: (chartName?: string) => void;
+  title?: string;
+  showFilters?: boolean;
+}
+
 const AdvancedCharts = ({
   data,
   loading = false,
@@ -38,10 +47,10 @@ const AdvancedCharts = ({
   onExport,
   title = t18('misc.ac_prodvinutaya_analitika'),
   showFilters = true
-}) => {
+}: AdvancedChartsProps) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   void title;
-  const chartRefs = useRef({});
+  const chartRefs = useRef<Record<string, { destroy: () => void }>>({});
   const [activeTab, setActiveTab] = useState('overview');
   const [chartType, setChartType] = useState('line');
   const [timeRange, setTimeRange] = useState('30d');
@@ -97,12 +106,12 @@ const AdvancedCharts = ({
                 cornerRadius: 8,
                 displayColors: true,
                 callbacks: {
-                  title: function (context) {
+                  title: function (context: Array<{ label?: string }>) {
                     return context[0].label;
                   },
-                  label: function (context) {
-                    const label = context.dataset.label || '';
-                    const value = context.parsed.y || context.parsed;
+                  label: function (context: { dataset?: { label?: string }; parsed: { y?: number; [key: string]: unknown } }) {
+                    const label = context.dataset?.label || '';
+                    const value = (context.parsed.y ?? context.parsed) as number;
                     return `${label}: ${value.toLocaleString()}`;
                   }
                 }
@@ -111,7 +120,7 @@ const AdvancedCharts = ({
           }
         };
 
-        chartRefs.current[chartName] = new Chart(ctx, advancedConfig);
+        chartRefs.current[chartName] = new Chart(ctx, advancedConfig) as unknown as { destroy: () => void };
       }
     }
   }, [data]);
@@ -122,7 +131,7 @@ const AdvancedCharts = ({
     }
   }, [data, activeTab, chartType, timeRange, selectedMetrics, renderAdvancedCharts]);
 
-  const getChartIcon = (chartType) => {
+  const getChartIcon = (chartType: string) => {
     const iconStyle = { width: '16px', height: '16px' };
     switch (chartType) {
       case 'line':return <TrendingUp style={iconStyle} />;
@@ -134,16 +143,19 @@ const AdvancedCharts = ({
     }
   };
 
-  const renderChartCard = (chartName, chartConfig) => {
+  const renderChartCard = (chartName: string, chartConfig: Record<string, unknown>) => {
     const canvasId = `advanced-chart-${chartName}`;
-    const chartLabel = chartConfig.options?.plugins?.title?.text || chartName;
+    const opts = (chartConfig.options ?? {}) as Record<string, unknown>;
+    const plugins = (opts.plugins ?? {}) as Record<string, unknown>;
+    const titleObj = (plugins.title ?? {}) as Record<string, unknown>;
+    const chartLabel = (titleObj.text as string | undefined) || chartName;
 
     return (
       <Card key={chartName} className="w-full">
         <div className="p-4 border-b border-gray-200">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              {getChartIcon(chartConfig.type)}
+              {getChartIcon(String(chartConfig.type))}
               <h3 className="text-lg font-semibold">
                 {chartLabel}
               </h3>
@@ -177,7 +189,7 @@ const AdvancedCharts = ({
             <canvas
               id={canvasId}
               role="img"
-              aria-label={`${chartConfig.title || chartName} chart`}
+              aria-label={`${(chartConfig.title as string | undefined) || chartName} chart`}
             ></canvas>
           </div>
         </div>
@@ -242,14 +254,15 @@ const AdvancedCharts = ({
   };
 
   const renderTabContent = (tabData: unknown, tabName?: string) => {
+    void tabName;
     if (!tabData || !(tabData as Record<string, unknown>).charts) return null;
 
-    const charts = Object.entries((tabData as Record<string, unknown>).charts);
+    const charts = Object.entries((tabData as Record<string, unknown>).charts as Record<string, unknown>);
 
     return (
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
         {charts.map(([chartName, chartConfig]) =>
-        renderChartCard(chartName, chartConfig)
+        renderChartCard(chartName, chartConfig as Record<string, unknown>)
         )}
       </div>);
 
@@ -288,13 +301,15 @@ const AdvancedCharts = ({
 
   }
 
+  const dataCharts = data.charts as Record<string, unknown>;
+
   return (
     <div className="space-y-6">
       {/* Фильтры */}
       {renderFilters()}
 
       {/* Навигация по вкладкам */}
-      {Object.keys(data.charts).length > 1 &&
+      {Object.keys(dataCharts).length > 1 &&
       <div className="border-b border-gray-200">
           <nav className="flex space-x-8">
             {[
@@ -323,11 +338,11 @@ const AdvancedCharts = ({
 
       {/* Контент вкладок */}
       <div className="space-y-6">
-        {activeTab === 'overview' && renderTabContent(data.charts.overview || data, 'overview')}
-        {activeTab === 'kpi' && renderTabContent(data.charts.kpi, 'kpi')}
-        {activeTab === 'doctors' && renderTabContent(data.charts.doctors, 'doctors')}
-        {activeTab === 'revenue' && renderTabContent(data.charts.revenue, 'revenue')}
-        {activeTab === 'appointments' && renderTabContent(data.charts.appointments, 'appointments')}
+        {activeTab === 'overview' && renderTabContent(dataCharts.overview || data, 'overview')}
+        {activeTab === 'kpi' && renderTabContent(dataCharts.kpi, 'kpi')}
+        {activeTab === 'doctors' && renderTabContent(dataCharts.doctors, 'doctors')}
+        {activeTab === 'revenue' && renderTabContent(dataCharts.revenue, 'revenue')}
+        {activeTab === 'appointments' && renderTabContent(dataCharts.appointments, 'appointments')}
       </div>
     </div>);
 

@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Card, Button, Badge } from '../ui/macos';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useHover } from '../../hooks/useUtils';
@@ -18,6 +18,14 @@ const InteractivePanel = ({
   onClick,
   className = '',
   ...props
+}: {
+  title?: React.ReactNode;
+  children?: React.ReactNode;
+  actions?: React.ReactNode;
+  status?: string;
+  onClick?: (e: React.MouseEvent<HTMLElement>) => void;
+  className?: string;
+  [key: string]: unknown;
 }) => {
   const { getColor, getSpacing, getFontSize, getShadow } = useTheme();
   const { ref, isHovered } = useHover();
@@ -196,12 +204,17 @@ export const StateInteractivePanel = ({
   initialState = 'idle',
   states = ['idle', 'loading', 'success', 'error'],
   ...props
+}: {
+  title?: React.ReactNode;
+  initialState?: string;
+  states?: string[];
+  [key: string]: unknown;
 }) => {
   const [currentState, setCurrentState] = useState(initialState);
   const { getColor, getSpacing, getFontSize } = useTheme();
 
-  const getStateColors = (state) => {
-    const stateColors = {
+  const getStateColors = (state: string) => {
+    const stateColors: Record<string, { bg: string; border: string; text: string }> = {
       idle: { bg: getColor('surface'), border: getColor('border'), text: getColor('text') },
       loading: { bg: getColor('primary', 50), border: getColor('primary', 200), text: getColor('primary', 600) },
       success: { bg: getColor('success', 50), border: getColor('success', 200), text: getColor('success', 600) },

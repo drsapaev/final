@@ -1,4 +1,4 @@
-import { toast } from 'react-toastify';
+import { toast, ToastOptions } from 'react-toastify';
 
 /**
  * STRAT#2: useLabToast — единая точка для всех лабораторных нотификаций.
@@ -49,19 +49,19 @@ import { toast } from 'react-toastify';
  * migrated, можно будет добавить единый toast container и убрать
  * react-toastify dependency (если полностью перейдём на inline alerts).
  */
-export function useLabToast(notify) {
+export function useLabToast(notify: (type: string, message: string) => void) {
   return {
     // Простые сообщения — делегируем в notify callback.
-    success: (message) => notify('success', message),
-    error: (message) => notify('error', message),
-    info: (message) => notify('info', message),
-    warning: (message) => notify('warning', message),
+    success: (message: string) => notify('success', message),
+    error: (message: string) => notify('error', message),
+    info: (message: string) => notify('info', message),
+    warning: (message: string) => notify('warning', message),
 
     // Interactive toasts — используем toast напрямую для backward compat.
     // Эти методы сохраняются для случаев, где нужен onClick/autoClose.
     // Постепенно migrated на обычные success/error когда UI упрощается.
-    interactiveError: (message, options = {}) => toast.error(message, options),
-    interactiveWarning: (message, options = {}) => toast.warning(message, options),
-    interactiveInfo: (message, options = {}) => toast.info(message, options),
+    interactiveError: (message: string, options: ToastOptions = {}) => toast.error(message, options),
+    interactiveWarning: (message: string, options: ToastOptions = {}) => toast.warning(message, options),
+    interactiveInfo: (message: string, options: ToastOptions = {}) => toast.info(message, options),
   };
 }

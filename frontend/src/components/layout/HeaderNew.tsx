@@ -23,13 +23,13 @@ const loginRoute = getCanonicalRouteById('login')?.path || '/login';
 const profileRoute = getCanonicalRouteById('clinical-profile')?.path || '/clinical/profile';
 const registrarHomeRoute = getRoleHomeRoute('registrar');
 
-export function isThemeMenuInteraction(event, themeMenuRoot) {
+export function isThemeMenuInteraction(event: { composedPath?: () => EventTarget[]; target: EventTarget | null; }, themeMenuRoot: HTMLElement | null) {
   const path = event.composedPath ? event.composedPath() : [];
   const inRef = Boolean(
     themeMenuRoot &&
-    (path.includes(themeMenuRoot) || themeMenuRoot.contains?.(event.target))
+    (path.includes(themeMenuRoot) || themeMenuRoot.contains?.(event.target as Node))
   );
-  const inMenu = path.some((node) => node?.dataset?.themeMenu === 'true');
+  const inMenu = path.some((node) => (node as HTMLElement)?.dataset?.themeMenu === 'true');
   return inRef || inMenu;
 }
 /**
@@ -50,8 +50,8 @@ export default function HeaderNew() {
   const [lang, setLang] = useState(language || 'ru');
   const [showThemeMenu, setShowThemeMenu] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);  // PR-50: profile dropdown
-  const themeMenuRef = useRef(null);
-  const themeButtonRef = useRef(null);
+  const themeMenuRef = useRef<HTMLDivElement | null>(null);
+  const themeButtonRef = useRef<HTMLButtonElement | null>(null);
   const [menuPos, setMenuPos] = useState({ left: 0, top: 0 });
 
   useEffect(() => auth.subscribe(setState), []);
@@ -73,7 +73,7 @@ export default function HeaderNew() {
 
   // Close theme menu when clicking outside
   useEffect(() => {
-    const handleClickOutside = (event) => {
+    const handleClickOutside = (event: MouseEvent) => {
       if (!isThemeMenuInteraction(event, themeMenuRef.current)) {
         setShowThemeMenu(false);
       }
@@ -82,7 +82,7 @@ export default function HeaderNew() {
     return () => document.removeEventListener('click', handleClickOutside, true);
   }, []);
 
-  const handleThemeClick = (schemeId) => {
+  const handleThemeClick = (schemeId: string) => {
     logger.info('[FIX:THEME] Header theme change requested', {
       currentColorScheme: colorScheme,
       nextColorScheme: schemeId,
@@ -91,7 +91,7 @@ export default function HeaderNew() {
     setShowThemeMenu(false);
   };
 
-  const renderSchemeIcon = (schemeId) => {
+  const renderSchemeIcon = (schemeId: string) => {
     switch (schemeId) {
       case 'vibrant':
         return <LRainbow size={16} />;
@@ -174,7 +174,7 @@ export default function HeaderNew() {
   // PR-50: changeLang now uses useTranslation's setLanguage (which updates
   // React context + triggers re-render). Previously only wrote to localStorage
   // — the toggle was decorative.
-  const changeLang = (v) => {
+  const changeLang = (v: string) => {
     setLang(v);
     setLanguage(v);  // updates useTranslation context → re-renders all consumers
   };

@@ -18,7 +18,20 @@ import React from "react";
  * generic error. Теперь показываем явный Alert под полем, если code
  * уже существует в переданном списке templates.
  */
-function NewTemplateDialog({ open, onClose, onCreate, saving, existingTemplates = [] }) {
+interface ExistingTemplate {
+  code: string;
+  name?: string;
+}
+
+interface NewTemplateDialogProps {
+  open: boolean;
+  onClose: () => void;
+  onCreate: (form: { code: string; name: string; family: string; description: string }) => void;
+  saving?: boolean;
+  existingTemplates?: ExistingTemplate[];
+}
+
+function NewTemplateDialog({ open, onClose, onCreate, saving, existingTemplates = [] }: NewTemplateDialogProps) {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [form, setForm] = useState({
     code: '',
@@ -37,12 +50,12 @@ function NewTemplateDialog({ open, onClose, onCreate, saving, existingTemplates 
   const codeConflict = useMemo(() => {
     if (!form.code.trim()) return null;
     const conflict = existingTemplates.find(
-      (t) => t.code.toLowerCase() === form.code.trim().toLowerCase()
+      (tmpl) => tmpl.code.toLowerCase() === form.code.trim().toLowerCase()
     );
     return conflict || null;
   }, [form.code, existingTemplates]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (codeConflict) {
       return; // L-L-1 fix: блокируем отправку если code уже существует
