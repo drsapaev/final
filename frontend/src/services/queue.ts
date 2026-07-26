@@ -41,7 +41,7 @@ async function apiRequest<T = unknown>(path: string, options: QueueRequestOption
 
   if (!res.ok) {
     let detail = 'Ошибка запроса';
-    let errorData = null;
+    let errorData: unknown = null;
     try {
       errorData = await res.json();
       detail = (errorData as { detail?: string; message?: string })?.detail || (errorData as { message?: string })?.message || detail;
