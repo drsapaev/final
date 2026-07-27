@@ -78,7 +78,7 @@ export function TreatmentTemplatesPanel({
     const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
     const [activeCategory, setActiveCategory] = useState('medications');
     const [searchQuery, setSearchQuery] = useState('');
-    const [previewTemplate, setPreviewTemplate] = useState(null);
+    const [previewTemplate, setPreviewTemplate] = useState<{ id: string; title: string; body: string; tags?: string[] } | null>(null);
 
     // Get templates for specialty
     const templates = useMemo(() => {
@@ -86,8 +86,8 @@ export function TreatmentTemplatesPanel({
     }, [specialty]);
 
     // Filter by search
-    const filteredTemplates = useMemo(() => {
-        const categoryTemplates = templates[activeCategory] || [];
+    const filteredTemplates = useMemo<{ id: string; title: string; body: string; tags?: string[] }[]>(() => {
+        const categoryTemplates = (templates[activeCategory] || []) as { id: string; title: string; body: string; tags?: string[] }[];
 
         if (!searchQuery.trim()) return categoryTemplates;
 

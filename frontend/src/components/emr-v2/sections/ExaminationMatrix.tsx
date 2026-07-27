@@ -139,7 +139,7 @@ const ExaminationMatrix = ({
   };
 
   const generateText = (currentStatus) => {
-    const phrases = [];
+    const phrases: string[] = [];
 
     Object.entries(currentStatus).forEach(([item, type]) => {
       const template = TEMPLATES[item];

@@ -29,7 +29,7 @@ vi.mock('../../hooks/useTranslation', () => ({
     language: 'ru',
     setLanguage: vi.fn(),
     availableLanguages: [{ code: 'ru', name: 'Русский', flag: '🇷🇺' }],
-    t: (key) => key,
+    t: (key: string) => key,
   }),
 }));
 
@@ -70,7 +70,9 @@ describe('Login canonical surface', () => {
     const { container } = renderLogin();
     const form = container.querySelector('form');
 
-    fireEvent.submit(form);
+    // Non-null assertion: Login always renders a <form>; preserves runtime
+    // behavior (would still throw if form were unexpectedly absent).
+    fireEvent.submit(form!);
 
     expect(global.fetch).not.toHaveBeenCalled();
   });
