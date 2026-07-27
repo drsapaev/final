@@ -163,7 +163,10 @@ const AdminFinanceOverview = () => {
     financeModal.setModalLoading(true);
     try {
       if (financeModal.selectedItem) {
-        await updateTransaction(financeModal.selectedItem.id, transactionData);
+        // useModal's selectedItem is typed as `null` (from useState(null));
+        // cast to the typed shape so the `.id` access type-checks. Runtime
+        // value is unchanged.
+        await updateTransaction((financeModal.selectedItem as { id: string | number }).id, transactionData);
       } else {
         await createTransaction(transactionData);
       }
@@ -455,8 +458,11 @@ const AdminFinanceOverview = () => {
         transaction={financeModal.selectedItem}
         onSave={handleSaveTransaction}
         loading={financeModal.loading}
-        patients={patients}
-        doctors={activeDoctors}
+        // FinanceModal's `patients`/`doctors` props are inferred as `never[]`
+        // from their `= []` default params (the component is otherwise
+        // untyped). Cast to satisfy the prop type without changing runtime.
+        patients={patients as never[]}
+        doctors={activeDoctors as never[]}
       />
       {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
       {confirmDialog as unknown as React.ReactNode}

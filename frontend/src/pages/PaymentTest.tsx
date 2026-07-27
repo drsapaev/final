@@ -304,7 +304,7 @@ const PaymentTest = () => {
                   {String(result.message || "")}
                 </Alert>
 
-                {result.data && (
+                {Boolean(result.data) && (
                   <pre style={resultPreStyle}>
                     {JSON.stringify(result.data, null, 2)}
                   </pre>

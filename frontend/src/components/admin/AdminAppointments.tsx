@@ -235,7 +235,10 @@ const AdminAppointments = () => {
     appointmentModal.setModalLoading(true);
     try {
       if (appointmentModal.selectedItem) {
-        await updateAppointment(appointmentModal.selectedItem.id, appointmentData);
+        // useModal's selectedItem is typed as `null` (from useState(null));
+        // cast to the typed shape so the `.id` access type-checks. Runtime
+        // value is unchanged.
+        await updateAppointment((appointmentModal.selectedItem as { id: string | number }).id, appointmentData);
       } else {
         await createAppointment(appointmentData);
       }
@@ -543,8 +546,12 @@ const AdminAppointments = () => {
         appointment={appointmentModal.selectedItem}
         onSave={handleSaveAppointment}
         loading={appointmentModal.loading}
-        doctors={allDoctors}
-        patients={patients}
+        // AppointmentModal's `doctors`/`patients` props are inferred as
+        // `never[]` from their `= []` default params (the component is
+        // otherwise untyped). Cast to satisfy the prop type without changing
+        // runtime.
+        doctors={allDoctors as never[]}
+        patients={patients as never[]}
       />
       {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
       {confirmDialog as unknown as React.ReactNode}
