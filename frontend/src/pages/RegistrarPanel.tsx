@@ -214,8 +214,8 @@ const RegistrarPanel = () => {
 
   // Состояния для печати
   const [printDialog, setPrintDialog] = useState({ open: false, type: 'ticket', data: null });
-  const [cancelDialog, setCancelDialog] = useState({ open: false, row: null, reason: '' });
-  const [paymentDialog, setPaymentDialog] = useState({ open: false, row: null, paid: false, source: null });
+  const [cancelDialog, setCancelDialog] = useState<{ open: boolean; row: Appointment | null; reason: string }>({ open: false, row: null, reason: '' });
+  const [paymentDialog, setPaymentDialog] = useState<{ open: boolean; row: Appointment | null; paid: boolean; source: string | null }>({ open: false, row: null, paid: false, source: null });
   const [recordPreviewDialog, setRecordPreviewDialog] = useState({ open: false, row: null });
   // ✅ State for rescheduling
   const [rescheduleData, setRescheduleData] = useState<Record<string, unknown> | null>(null);
@@ -1968,7 +1968,7 @@ const RegistrarPanel = () => {
             // Open payment/print dialog immediately — user can act while data refreshes
             if (postWizardPaymentRow) {
               if (Number(postWizardPaymentRow.cost || 0) > 0) {
-                setPaymentDialog({ open: true, row: postWizardPaymentRow, paid: false, source: wasEditMode ? 'wizard-edit' : 'wizard-create' });
+                setPaymentDialog({ open: true, row: postWizardPaymentRow as Appointment | null, paid: false, source: wasEditMode ? 'wizard-edit' : 'wizard-create' });
               } else {
                 setPrintDialog({ open: true, type: 'ticket', data: postWizardPaymentRow });
               }

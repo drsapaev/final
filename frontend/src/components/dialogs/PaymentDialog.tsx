@@ -10,13 +10,12 @@ import './PaymentDialog.css';
 import logger from '../../utils/logger';
 import { Input } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
-// TECH-DEBT(g2d-dialogs-001): see CancelDialog.tsx for the deferred
-// Appointment type narrowing rationale.
+import type { Appointment } from '../../types/domain/clinic';
 
 interface PaymentDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  appointment: Record<string, unknown> | null;
+  appointment: Appointment | null;
   onPaymentSuccess?: (paymentData?: unknown) => Promise<void> | void;
   onPrintTicket?: (appointment?: unknown) => void;
 }
