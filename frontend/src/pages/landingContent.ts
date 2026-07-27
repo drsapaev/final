@@ -319,7 +319,7 @@ const BASE_COPY = {
   activationTitle: 'Активация лицензии'
 };
 
-function deepMerge(base, override) {
+function deepMerge(base: Record<string, unknown>, override: Record<string, unknown>) {
   if (override === undefined) {
     return base;
   }

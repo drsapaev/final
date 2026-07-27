@@ -16,7 +16,7 @@ import { useTranslation } from '../../i18n/useTranslation';
  * Компонент для обязательной смены пароля при первом входе
  * Показывается когда must_change_password = true
  */
-export default function ChangePasswordRequired({ currentPassword }) {
+export default function ChangePasswordRequired({ currentPassword }: { currentPassword: string }) {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
     const navigate = useNavigate();
@@ -37,11 +37,11 @@ export default function ChangePasswordRequired({ currentPassword }) {
 
     // Проверка требований к паролю
     const passwordRequirements = [
-        { label: t('misc.cpr_minimum_8_simvolov'), test: (p) => p.length >= 8 },
-        { label: t('misc.cpr_zaglavnaya_bukva'), test: (p) => /[A-Z]/.test(p) },
-        { label: t('misc.cpr_strochnaya_bukva'), test: (p) => /[a-z]/.test(p) },
-        { label: t('misc.cpr_tsifra'), test: (p) => /[0-9]/.test(p) },
-        { label: t('misc.cpr_spetsialnyy_simvol'), test: (p) => /[!@#$%^&*(),.?":{}|<>]/.test(p) }
+        { label: t('misc.cpr_minimum_8_simvolov'), test: (p: string) => p.length >= 8 },
+        { label: t('misc.cpr_zaglavnaya_bukva'), test: (p: string) => /[A-Z]/.test(p) },
+        { label: t('misc.cpr_strochnaya_bukva'), test: (p: string) => /[a-z]/.test(p) },
+        { label: t('misc.cpr_tsifra'), test: (p: string) => /[0-9]/.test(p) },
+        { label: t('misc.cpr_spetsialnyy_simvol'), test: (p: string) => /[!@#$%^&*(),.?":{}|<>]/.test(p) }
     ];
 
     const isPasswordValid = passwordRequirements.every(req => req.test(formData.newPassword));
