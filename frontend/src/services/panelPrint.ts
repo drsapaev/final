@@ -95,7 +95,7 @@ function normalizeTimeOnly(value: unknown): string | null {
   return parsed ? formatPrintableTime(parsed) : null;
 }
 
-function formatTicketTimeWindow(row: Record<string, unknown>): string {
+function formatTicketTimeWindow(row: Record<string, unknown>): string | null {
   const fullDateTimeCandidate = getFirstDefined(
     row?.appointment_time,
     row?.queue_time,
@@ -349,7 +349,7 @@ function normalizeTicketSources(row: Record<string, unknown>, overrides: Record<
   return [];
 }
 
-function resolveServicePriceForTicket(row: Record<string, unknown>, source: Record<string, unknown>, overrides: Record<string, unknown> = {}): Record<string, unknown> {
+function resolveServicePriceForTicket(row: Record<string, unknown>, source: Record<string, unknown>, overrides: Record<string, unknown> = {}): Record<string, unknown> | null {
   const directPrice = getFirstDefined(
     overrides.servicePrice,
     source?.service_price,

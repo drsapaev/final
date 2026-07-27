@@ -23,6 +23,24 @@ import './EMRDiffViewer.css';
 import { useTranslation } from '../../i18n/useTranslation';
 
 /**
+ * Shape of a single field-level change returned by the EMR diff endpoint.
+ */
+interface EMRDiffChange {
+    field: string;
+    change_type: string;
+    old_value?: unknown;
+    new_value?: unknown;
+}
+
+/**
+ * Shape of the EMR diff payload returned from the API.
+ */
+interface EMRDiffData {
+    changes?: EMRDiffChange[];
+    summary?: string;
+}
+
+/**
  * Human-readable field labels (Russian)
  */
 const getFieldLabels = (t) => ({
@@ -103,9 +121,9 @@ export function EMRDiffViewer({
     onClose,
 }) {
     const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
-    const [diff, setDiff] = useState(null);
+    const [diff, setDiff] = useState<EMRDiffData | null>(null);
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
+    const [error, setError] = useState<string | null>(null);
 
     // Load diff when versions change
     useEffect(() => {
