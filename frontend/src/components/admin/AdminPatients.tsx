@@ -173,7 +173,10 @@ const AdminPatients = () => {
     patientModal.setModalLoading(true);
     try {
       if (patientModal.selectedItem) {
-        await updatePatient(patientModal.selectedItem.id, patientData);
+        // useModal's selectedItem is typed as `null` (from useState(null));
+        // cast to the typed shape so the `.id` access type-checks. Runtime
+        // value is unchanged.
+        await updatePatient((patientModal.selectedItem as { id: string | number }).id, patientData);
       } else {
         await createPatient(patientData);
       }

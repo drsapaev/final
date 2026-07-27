@@ -198,7 +198,7 @@ function AppShell({ children }) {
   const handleSidebarClick = (item) => {
     if (chrome.sidebarPreset?.navigation === 'query') {
       const params = new URLSearchParams(location.search);
-      params.set(chrome.sidebarPreset.queryParam, item.id);
+      params.set(String(chrome.sidebarPreset.queryParam), String(item.id));
       navigate({ pathname: location.pathname, search: `?${params.toString()}` });
       // Collapse after navigation on mobile
       if (compactSidebar) setMobileSidebarExpanded(false);
@@ -361,7 +361,7 @@ function AppShell({ children }) {
               margin: 0,
               padding: 0,
             }),
-            ...(chrome.fullscreen && {
+            ...(chrome.fullscreen ? {
               maxWidth: 'none',
               margin: 0,
               border: 'none',
@@ -369,7 +369,7 @@ function AppShell({ children }) {
               boxShadow: 'none',
               background: 'transparent',
               padding: 0,
-            }),
+            } : {}),
           }}
         >
           {children}

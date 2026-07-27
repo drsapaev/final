@@ -47,7 +47,9 @@ describe('labTranslations (STRAT#3)', () => {
 
     it('returns string as-is when no params provided', () => {
       expect(tInterpolate('common.save')).toBe('Сохранить');
-      expect(tInterpolate('common.save', null)).toBe('Сохранить');
+      // Cast preserves the runtime null argument (tInterpolate handles null
+      // via its `!params` guard) while satisfying the typed param signature.
+      expect(tInterpolate('common.save', null as unknown as Record<string, unknown>)).toBe('Сохранить');
     });
 
     it('leaves unmatched placeholders in place', () => {

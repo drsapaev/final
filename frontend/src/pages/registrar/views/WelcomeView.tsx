@@ -288,10 +288,10 @@ const WelcomeView = React.memo(({
 
           {/* Современная статистика */}
           <ModernStatistics
-          appointments={appointments}
+          appointments={appointments as never[]}
           departmentStats={departmentStats}
           language={language}
-          selectedDate={showCalendar && historyDate ? historyDate : getLocalDateString()}
+          selectedDate={(showCalendar && historyDate ? historyDate : getLocalDateString()) as never}
           onExport={() => {
             logger.info('Экспорт статистики');
           }}

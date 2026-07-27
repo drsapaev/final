@@ -85,7 +85,8 @@
     "src/components/patient/patientUtils.ts",
     "src/components/common/StateWrapper.tsx",
     "src/services/queue.ts",
-    "src/pages/PaymentCancel.tsx"
+    "src/pages/PaymentCancel.tsx",
+    "src/pages/__tests__/Login.accessibility.test.tsx"
   ],
   "exclude": ["node_modules", "dist", "e2e"]
 }
