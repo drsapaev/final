@@ -155,7 +155,7 @@ const ReportsManager = () => {
       }
     } catch (error) {
       logger.error('Ошибка генерации отчета:', error);
-      toast.error(error.response?.data?.detail || t('admin2.rm_report_generation_error'));
+      toast.error((error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('admin2.rm_report_generation_error'));
     } finally {
       setLoading(false);
     }

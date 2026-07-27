@@ -90,7 +90,7 @@ const TwoFactorSettings = () => {
         setError(t('misc.tfs_disable_invalid'));
       }
     } catch (err) {
-      setError(err.response?.data?.detail || t('misc.tfs_disable_error'));
+      setError((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('misc.tfs_disable_error'));
     } finally {
       setLoading(false);
     }
@@ -119,7 +119,7 @@ const TwoFactorSettings = () => {
       setShowBackupCodes(true);
       setSuccess(t('misc.tfs_regenerate_success'));
     } catch (err) {
-      setError(err.response?.data?.detail || t('misc.tfs_regenerate_error'));
+      setError((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('misc.tfs_regenerate_error'));
     } finally {
       setLoading(false);
     }
@@ -144,7 +144,7 @@ const TwoFactorSettings = () => {
       setSuccess(t('misc.tfs_untrust_success'));
       loadDevices();
     } catch (err) {
-      setError(err.response?.data?.detail || t('misc.tfs_untrust_error'));
+      setError((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('misc.tfs_untrust_error'));
     }
   };
 
