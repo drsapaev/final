@@ -39,15 +39,73 @@ import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
 const CircularProgressAny = CircularProgressRaw;
 const ProgressAny = ProgressRaw;
-const SkinAnalysis = ({ photos, visitId, patientId, onAnalysisComplete }) => {
+
+interface SkinPhoto {
+  id: string | number;
+  [key: string]: unknown;
+}
+
+interface SkinPhotos {
+  before?: SkinPhoto[];
+  after?: SkinPhoto[];
+  [key: string]: unknown;
+}
+
+interface SkinProblem {
+  type?: string;
+  name?: string;
+  description?: string;
+  severity?: string;
+  area?: string;
+  [key: string]: unknown;
+}
+
+interface SkinRecommendation {
+  title?: string;
+  description?: string;
+  procedures?: string[];
+  [key: string]: unknown;
+}
+
+interface SkinMetrics {
+  hydration?: number;
+  hydration_trend?: number | null;
+  oiliness?: number;
+  oiliness_trend?: number | null;
+  texture?: number;
+  texture_trend?: number | null;
+  tone?: number;
+  tone_trend?: number | null;
+  [key: string]: unknown;
+}
+
+interface SkinAnalysisResult {
+  error?: string;
+  overall_score?: number;
+  skin_type?: string;
+  metrics?: SkinMetrics;
+  problems?: SkinProblem[];
+  improvements?: string[];
+  recommendations?: SkinRecommendation[];
+  care_routine?: Record<string, string[]>;
+  [key: string]: unknown;
+}
+
+interface SkinAnalysisProps {
+  photos?: SkinPhotos | null;
+  visitId?: string | number;
+  patientId?: string | number;
+  onAnalysisComplete?: (result: SkinAnalysisResult) => void;
+}
+
+const SkinAnalysis = ({ photos, visitId, patientId, onAnalysisComplete }: SkinAnalysisProps) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [analyzing, setAnalyzing] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState(null);
-  useState(null);
+  const [analysisResult, setAnalysisResult] = useState<SkinAnalysisResult | null>(null);
   const [compareMode, setCompareMode] = useState(false);
 
   // Запуск AI анализа
-  const startAnalysis = async (photoType = 'current') => {
+  const startAnalysis = async (photoType: string = 'current') => {
     if (!photos || photos.length === 0) return;
 
     setAnalyzing(true);
@@ -85,16 +143,18 @@ const SkinAnalysis = ({ photos, visitId, patientId, onAnalysisComplete }) => {
 
   // Сравнительный анализ
   const startComparativeAnalysis = async () => {
-    if (!photos.before?.[0] || !photos.after?.[0]) return;
+    if (!photos?.before?.[0] || !photos?.after?.[0]) return;
 
     setAnalyzing(true);
     setCompareMode(true);
     setAnalysisResult(null);
 
     try {
+      const beforePhoto = photos.before[0];
+      const afterPhoto = photos.after[0];
       const response = await api.post('/ai/skin-analyze', {
-        before_file_id: photos.before[0].id,
-        after_file_id: photos.after[0].id,
+        before_file_id: beforePhoto.id,
+        after_file_id: afterPhoto.id,
         visit_id: visitId,
         patient_id: patientId,
         analysis_type: 'comparative'
@@ -114,7 +174,7 @@ const SkinAnalysis = ({ photos, visitId, patientId, onAnalysisComplete }) => {
   };
 
   // Получение иконки для типа проблемы
-  const getProblemIcon = (type) => {
+  const getProblemIcon = (type: string) => {
     switch (type) {
       case 'acne':return <Flame style={{ color: 'var(--mac-accent-red)' }} />;
       case 'wrinkles':return <Layers style={{ color: 'var(--mac-accent-orange)' }} />;
@@ -126,14 +186,14 @@ const SkinAnalysis = ({ photos, visitId, patientId, onAnalysisComplete }) => {
   };
 
   // Определение цвета для оценки
-  const getScoreColor = (score) => {
+  const getScoreColor = (score: number) => {
     if (score >= 80) return 'success';
     if (score >= 60) return 'warning';
     return 'error';
   };
 
   // Рендер метрики
-  const renderMetric = (label, value, icon, trend = null) =>
+  const renderMetric = (label: string, value: string, icon: React.ReactNode, trend: number | null = null) =>
   <div style={{ padding: 16, textAlign: 'center', border: '1px solid var(--mac-border)', borderRadius: 8 }}>
       <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
         {icon}
@@ -213,7 +273,7 @@ const SkinAnalysis = ({ photos, visitId, patientId, onAnalysisComplete }) => {
               </Button>
             }
             
-            {photos.before?.length > 0 && photos.after?.length > 0 &&
+            {((photos?.before?.length ?? 0) > 0 && (photos?.after?.length ?? 0) > 0) &&
             <Button
               variant="secondary"
               onClick={startComparativeAnalysis}
@@ -310,7 +370,7 @@ const SkinAnalysis = ({ photos, visitId, patientId, onAnalysisComplete }) => {
                     {analysisResult.problems.map((problem, index) =>
                 <div key={index} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 16 }}>
                         <div style={{ marginTop: 4 }}>
-                          {getProblemIcon(problem.type)}
+                          {getProblemIcon(problem.type || '')}
                         </div>
                         <div style={{ flex: 1 }}>
                           <Typography variant="body1" style={{ fontWeight: 'var(--mac-font-weight-medium)' }}>
@@ -388,7 +448,7 @@ const SkinAnalysis = ({ photos, visitId, patientId, onAnalysisComplete }) => {
                             </div>
                           </div>
                   }
-                        {index < analysisResult.recommendations.length - 1 &&
+                        {index < (analysisResult.recommendations?.length ?? 0) - 1 &&
                   <div style={{ height: 1, backgroundColor: 'var(--mac-border)', margin: '16px 0' }} />
                   }
                       </div>
@@ -405,13 +465,13 @@ const SkinAnalysis = ({ photos, visitId, patientId, onAnalysisComplete }) => {
                   </Typography>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
                     {['morning', 'evening'].map((time) =>
-                analysisResult.care_routine[time] &&
+                analysisResult.care_routine?.[time] &&
                 <div key={time}>
                           <Typography variant="subtitle2" gutterBottom>
                             {time === 'morning' ? t('derma.derma_skin_morning_care') : t('derma.derma_skin_evening_care')}
                           </Typography>
                           <div>
-                            {analysisResult.care_routine[time].map((step, index) =>
+                            {analysisResult.care_routine?.[time]?.map((step, index) =>
                     <div key={index} style={{ marginBottom: 8 }}>
                                 <Typography variant="body2">
                                   {index + 1}. {step}

@@ -368,10 +368,11 @@ const CashierPanel = () => {
     label: tI18n(`cashier.range_${p.id}`),
   }));
 
-  // ✅ Получаем patientId из URL для автоматического поиска
+// ✅ Получаем patientId из URL для автоматического поиска
   const getPatientIdFromUrl = useCallback(() => {
     const params = new URLSearchParams(location.search);
-    return params.get('patientId') ? parseInt(params.get('patientId'), 10) : null;
+    const patientIdParam = params.get('patientId');
+    return patientIdParam ? parseInt(patientIdParam, 10) : null;
   }, [location.search]);
 
   // Search state - инициализируем с patientId если есть
@@ -409,8 +410,8 @@ const CashierPanel = () => {
   }, [location.search, getPatientIdFromUrl]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [status, setStatus] = useState('all');
-  const [payments, setPayments] = useState([]);
-  const [appointments, setAppointments] = useState([]);
+  const [payments, setPayments] = useState<Record<string, unknown>[]>([]);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [paymentSuccess, setPaymentSuccess] = useState<Record<string, unknown> | null>(null);
   const [paymentError, setPaymentError] = useState<string | null>(null);
 
@@ -547,7 +548,7 @@ const CashierPanel = () => {
 
         if (pendingResult.success) {
           const appointmentsData = Array.isArray(pendingResult.data) ? pendingResult.data : [];
-          setAppointments(appointmentsData);
+          setAppointments(appointmentsData as Appointment[]);
 
           if (pendingResult.pagination) {
             setPendingTotalPages(pendingResult.pagination.pages);
@@ -586,7 +587,7 @@ const CashierPanel = () => {
 
         if (paymentsResult.success) {
           const paymentsData = Array.isArray(paymentsResult.data) ? paymentsResult.data : [];
-          setPayments(paymentsData);
+          setPayments(paymentsData as Record<string, unknown>[]);
 
           if (paymentsResult.pagination) {
             setTotalPages(paymentsResult.pagination.pages);
@@ -673,7 +674,7 @@ const CashierPanel = () => {
   useEffect(() => {
     if (!sessionWarning?.active || !sessionWarning.expiresAt) return undefined;
     const tick = () => {
-      const ms = sessionWarning.expiresAt - Date.now();
+      const ms = (sessionWarning.expiresAt ?? 0) - Date.now();
       setSessionSecondsLeft(Math.max(0, Math.floor(ms / 1000)));
     };
     tick();
@@ -712,7 +713,7 @@ const CashierPanel = () => {
       notify.error(message);
       return;
     }
-    paymentWidget.openModal(appointment);
+    paymentWidget.openModal(appointment as unknown as null);
     setPaymentError(null);
     setPaymentSuccess(null);
   };
@@ -883,8 +884,8 @@ const CashierPanel = () => {
     }
     try {
       // UX Audit #4.5: anti-double-click protection.
-      setProcessingAction({ type: 'refund', id: refundPaymentId });
-      const result = await paymentsHook.refundPayment(refundPaymentId, {
+      setProcessingAction({ type: 'refund', id: refundPaymentId ?? undefined });
+      const result = await paymentsHook.refundPayment(refundPaymentId ?? 0, {
         amount: parseFloat(refundAmount),
         reason: refundReason
       });
@@ -961,22 +962,24 @@ const CashierPanel = () => {
   };
 
   // ✅ ОТОБРАЖЕНИЕ УСЛУГ: Рендерим коды услуг с бейджами и tooltip (как в RegistrarPanel)
-  const renderServiceBadges = (serviceCodes, serviceNames) => {
+  const renderServiceBadges = (serviceCodes: unknown, serviceNames: unknown) => {
     // Если нет кодов, возвращаем пустой элемент
     if (!serviceCodes || !Array.isArray(serviceCodes) || serviceCodes.length === 0) {
       return <span className="cashier-empty">—</span>;
     }
 
+    type ServiceObject = { id?: string | number; name?: string; code?: string; price?: number; quantity?: number };
     // ✅ ИСПРАВЛЕНИЕ: Обрабатываем случай когда services - это массив объектов {id, name, price, quantity}
-    let codes = serviceCodes;
-    let names = serviceNames;
+    let codes: unknown[] = serviceCodes;
+    let names: unknown = serviceNames;
 
     // Проверяем, является ли первый элемент объектом
     if (serviceCodes.length > 0 && typeof serviceCodes[0] === 'object' && serviceCodes[0] !== null) {
       // Извлекаем имена услуг из объектов
-      codes = serviceCodes.map((s) => s.name || s.code || tI18n('cashier.service_fallback', { id: s.id || '?' }));
-      names = serviceCodes.map((s) => {
-        const parts = [];
+      const serviceObjs = serviceCodes as ServiceObject[];
+      codes = serviceObjs.map((s) => s.name || s.code || tI18n('cashier.service_fallback', { id: s.id || '?' }));
+      names = serviceObjs.map((s) => {
+        const parts: string[] = [];
         if (s.name) parts.push(s.name);
         if (s.price) parts.push(formatUZS(s.price));
         if (s.quantity && s.quantity > 1) parts.push(`x${s.quantity}`);
@@ -995,7 +998,7 @@ const CashierPanel = () => {
       ) :
       codes.map((code, idx) =>
       <div key={idx} className="cashier-tooltip-row">
-              {code}
+              {typeof code === 'string' ? code : String(code)}
             </div>
       )
       }
@@ -1030,19 +1033,20 @@ const CashierPanel = () => {
   // ✅ ГРУППИРОВКА: Объединяем платежи одного пациента, созданных в одно время
   // NOTE: Server pagination makes grouping across pages impossible. 
   // We only group within the current page.
-  const groupPaymentsByPatientAndTime = (paymentsList) => {
+  const groupPaymentsByPatientAndTime = (paymentsList: unknown) => {
     if (!paymentsList) return [];
 
     // Convert backend specific date/time format if needed
     // The backend returns 'created_at'. We can use that.
 
-    const grouped = {};
+    const grouped: Record<string, { services: unknown[]; services_names: unknown[]; service?: unknown; total_amount?: number; amount?: number; patient?: unknown; date?: string; time?: string; id?: string | number; payment_id?: string | number; method?: string; status?: string; grouped_payments: unknown[]; [k: string]: unknown }> = {};
 
-    paymentsList.forEach((payment) => {
+    (paymentsList as Record<string, unknown>[]).forEach((payment) => {
       // Parse dates from backend
-      const dateObj = parseRegistrarTimestamp(payment.created_at);
-      const dateKey = formatRegistrarDate(dateObj || payment.created_at);
-      const timeKey = formatRegistrarTime(dateObj || payment.created_at);
+      const createdAt = payment.created_at as string | undefined;
+      const dateObj = parseRegistrarTimestamp(createdAt);
+      const dateKey = formatRegistrarDate(dateObj || createdAt);
+      const timeKey = formatRegistrarTime(dateObj || createdAt);
 
       const groupKey = `${payment.patient_id}_${dateKey}_${timeKey}`;
 
@@ -1050,8 +1054,8 @@ const CashierPanel = () => {
         // Создаём новую группу
         grouped[groupKey] = {
           ...payment,
-          services: Array.isArray(payment.services) ? [...payment.services] : [],
-          services_names: Array.isArray(payment.services_names) ? [...payment.services_names] : [],
+          services: Array.isArray(payment.services) ? [...(payment.services as unknown[])] : [],
+          services_names: Array.isArray(payment.services_names) ? [...(payment.services_names as unknown[])] : [],
           grouped_payments: [payment.id],
           total_amount: Number(payment.amount || 0),
           date: dateKey, // Display helpers
@@ -1061,20 +1065,20 @@ const CashierPanel = () => {
         };
       } else {
         grouped[groupKey].grouped_payments.push(payment.id);
-        grouped[groupKey].total_amount += Number(payment.amount);
+        grouped[groupKey].total_amount = Number(grouped[groupKey].total_amount || 0) + Number(payment.amount);
         if (payment.service && !grouped[groupKey].service) {
           grouped[groupKey].service = payment.service;
         }
         if (Array.isArray(payment.services)) {
-          grouped[groupKey].services.push(...payment.services);
+          grouped[groupKey].services.push(...(payment.services as unknown[]));
         }
         if (Array.isArray(payment.services_names)) {
-          grouped[groupKey].services_names.push(...payment.services_names);
+          grouped[groupKey].services_names.push(...(payment.services_names as unknown[]));
         }
       }
     });
 
-    return Object.values(grouped).map((group: { services: unknown[]; services_names: unknown[]; service?: unknown; total_amount?: number; amount?: number; patient?: unknown; date?: string; time?: string; id?: string | number; payment_id?: string | number; method?: string; status?: string; [k: string]: unknown }) => ({
+    return Object.values(grouped).map((group) => ({
       ...group,
       services: Array.from(new Set(group.services.filter(Boolean))),
       services_names: Array.from(new Set(group.services_names.filter(Boolean))),
@@ -1084,7 +1088,7 @@ const CashierPanel = () => {
 
   // Group payments for display (already filtered by server)
   // UX Audit #4.2: client-side sort по sortField/sortDir.
-  const toggleSort = (field) => {
+  const toggleSort = (field: string) => {
     if (sortField === field) {
       setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
     } else {
@@ -1095,7 +1099,7 @@ const CashierPanel = () => {
 
   const groupedPayments = groupPaymentsByPatientAndTime(payments);
   const sortedPayments = [...groupedPayments].sort((a, b) => {
-    let aVal, bVal;
+    let aVal: string | number, bVal: string | number;
     if (sortField === 'amount') {
       aVal = Number(a.total_amount || a.amount || 0);
       bVal = Number(b.total_amount || b.amount || 0);
@@ -1435,7 +1439,7 @@ const CashierPanel = () => {
                       <tbody>
                         {appointments.map((appointment, index) =>
                     <tr
-                      key={`${appointment.record_type || 'appointment'}-${appointment.id || index}-${appointment.visit_ids?.join('-') || ''}`}
+                      key={`${appointment.record_type || 'appointment'}-${appointment.id || index}-${Array.isArray(appointment.visit_ids) ? (appointment.visit_ids as unknown[]).join('-') : ''}`}
                       className="cashier-table-row">
 
                             <td
@@ -1473,7 +1477,7 @@ const CashierPanel = () => {
                               {renderServiceBadges(appointment.services, appointment.services_names)}
                             </td>
                             <td className="cashier-text-sm cashier-text-accent">
-                              {format(appointment.total_amount || appointment.remaining_amount || appointment.payment_amount || 0)}
+                              {format(Number(appointment.total_amount || appointment.remaining_amount || appointment.payment_amount || 0))}
                             </td>
                             <td className="cashier-cell-padded">
                               <Badge
@@ -1500,7 +1504,7 @@ const CashierPanel = () => {
                                 <Button
                             size="small"
                             onClick={() => {
-                              paymentModal.openModal(appointment);
+                              paymentModal.openModal(appointment as unknown as null);
                             }}
                             disabled={!canCreateCashierPayment(appointment)}
                             aria-label={tI18n('cashier.cash_payment_aria')}
@@ -1766,7 +1770,7 @@ const CashierPanel = () => {
                   <Typography variant="body2" color="textSecondary">
                     {tI18n('cashier.payment_id_label', { id: cancelPaymentContext.id })}
                   </Typography>
-                  {cancelPaymentContext.patient && (
+                  {Boolean(cancelPaymentContext.patient) && (
                     <Typography variant="body1">
                       {tI18n('cashier.patient_label')} <strong>{String(cancelPaymentContext.patient)}</strong>
                     </Typography>
@@ -1829,7 +1833,7 @@ const CashierPanel = () => {
               </Typography>
               {paymentWidget.selectedItem &&
               <Typography variant="body2" color="textSecondary">
-                  {tI18n('cashier.patient_summary', { name: paymentWidget.selectedItem.patient_name, department: paymentWidget.selectedItem.department })}
+                  {tI18n('cashier.patient_summary', { name: (paymentWidget.selectedItem as unknown as Appointment).patient_name, department: (paymentWidget.selectedItem as unknown as Appointment).department })}
                 </Typography>
               }
             </DialogTitle>
@@ -1843,10 +1847,10 @@ const CashierPanel = () => {
 
               {paymentWidget.selectedItem &&
               <PaymentWidget
-                visitId={canCreateDirectCashierPayment(paymentWidget.selectedItem) ? resolveSingleCashierVisitId(paymentWidget.selectedItem) : null}
-                amount={paymentWidget.selectedItem.remaining_amount || paymentWidget.selectedItem.total_amount || paymentWidget.selectedItem.cost || 0}
+                visitId={canCreateDirectCashierPayment(paymentWidget.selectedItem as unknown as Appointment) ? resolveSingleCashierVisitId(paymentWidget.selectedItem as unknown as Appointment) : null}
+                amount={Number((paymentWidget.selectedItem as unknown as Appointment).remaining_amount || (paymentWidget.selectedItem as unknown as Appointment).total_amount || (paymentWidget.selectedItem as unknown as Appointment).cost || 0)}
                 currency="UZS"
-                description={tI18n('cashier.payment_description', { department: paymentWidget.selectedItem.department || tI18n('cashier.payment_note_default') })}
+                description={tI18n('cashier.payment_description', { department: (paymentWidget.selectedItem as unknown as Appointment).department || tI18n('cashier.payment_note_default') })}
                 onSuccess={handlePaymentSuccess}
                 onError={handlePaymentError}
                 onCancel={handlePaymentCancel} />

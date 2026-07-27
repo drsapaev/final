@@ -27,46 +27,49 @@ const LAB_PANEL_TABLIST_ID = 'lab-panel-tabs';
 // Backend maximum — 500 (Query(ge=1, le=500)).
 const LAB_QUEUE_PAGE_SIZE = 50;
 
-function getLabPanelTabId(tabId) {
+function getLabPanelTabId(tabId: string) {
   return `lab-panel-tab-${tabId}`;
 }
 
-function getLabPanelTabPanelId(tabId) {
+function getLabPanelTabPanelId(tabId: string) {
   return `lab-panel-tabpanel-${tabId}`;
 }
 
-function normalizeListPayload(payload) {
+function normalizeListPayload(payload: unknown): Record<string, unknown>[] {
   if (Array.isArray(payload)) {
-    return payload;
+    return payload as Record<string, unknown>[];
   }
-  if (Array.isArray(payload?.items)) {
-    return payload.items;
+  const obj = (payload || {}) as Record<string, unknown>;
+  if (Array.isArray(obj?.items)) {
+    return obj.items as Record<string, unknown>[];
   }
-  if (Array.isArray(payload?.results)) {
-    return payload.results;
+  if (Array.isArray(obj?.results)) {
+    return obj.results as Record<string, unknown>[];
   }
-  if (Array.isArray(payload?.data)) {
-    return payload.data;
+  if (Array.isArray(obj?.data)) {
+    return obj.data as Record<string, unknown>[];
   }
   return [];
 }
 
-function isAbortLikeError(error) {
-  const name = String(error?.name || '').toLowerCase();
-  const message = String(error?.message || '').toLowerCase();
+function isAbortLikeError(error: unknown) {
+  const err = error as Record<string, unknown> | null | undefined;
+  const name = String(err?.name || '').toLowerCase();
+  const message = String(err?.message || '').toLowerCase();
   return name === 'aborterror' || message.includes('aborted');
 }
 
-function buildTemplateResolutionPayload(appointment) {
+function buildTemplateResolutionPayload(appointment: Record<string, unknown> | null) {
   if (!appointment) {
     return null;
   }
+  const serviceDetails = (appointment.service_details || []) as Array<Record<string, unknown>>;
   return {
     patient_id: appointment.patient_id || null,
     appointment_id: appointment.appointment_id || null,
     visit_id: appointment.visit_id || null,
     service_codes: appointment.service_codes || [],
-    service_items: (appointment.service_details || []).map((item) => ({
+    service_items: serviceDetails.map((item) => ({
       service_id: item.id || null,
       code: item.code || null,
       name: item.name || null
@@ -87,7 +90,7 @@ export default function LabPanel() {
   const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
 
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'queue');
-  const [appointments, setAppointments] = useState([]);
+  const [appointments, setAppointments] = useState<Record<string, unknown>[]>([]);
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
   // STRAT#7: server-side pagination state для очереди.
   // queueTotal — общее количество записей на сервере (из payload.total).
@@ -99,16 +102,16 @@ export default function LabPanel() {
   const [loadingMore, setLoadingMore] = useState(false);
   // STRAT#16: ref для AbortController очереди — отменяет предыдущий
   // запрос при быстром повторном вызове loadLabAppointments.
-  const queueAbortControllerRef = useRef(null);
+  const queueAbortControllerRef = useRef<AbortController | null>(null);
   // STRAT#16: отдельный ref для load-more запросов.
-  const loadMoreAbortControllerRef = useRef(null);
-  const [templates, setTemplates] = useState([]);
-  const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const loadMoreAbortControllerRef = useRef<AbortController | null>(null);
+  const [templates, setTemplates] = useState<Record<string, unknown>[]>([]);
+  const [selectedTemplate, setSelectedTemplate] = useState<Record<string, unknown> | null>(null);
   const [selectedAppointment, setSelectedAppointment] = useState<Record<string, unknown> | null>(null);
-  const [reportHistory, setReportHistory] = useState([]);
-  const [recentReports, setRecentReports] = useState([]);
-  const [activeInstance, setActiveInstance] = useState(null);
-  const [templateResolution, setTemplateResolution] = useState(null);
+  const [reportHistory, setReportHistory] = useState<Record<string, unknown>[]>([]);
+  const [recentReports, setRecentReports] = useState<Record<string, unknown>[]>([]);
+  const [activeInstance, setActiveInstance] = useState<Record<string, unknown> | null>(null);
+  const [templateResolution, setTemplateResolution] = useState<Record<string, unknown> | null>(null);
   const [templateResolutionLoading, setTemplateResolutionLoading] = useState(false);
   // QW-4 fix: message теперь содержит опциональный retryAction — функцию,
   // которая вызывается при клике «Повторить» в Alert. Раньше ошибки
@@ -118,7 +121,7 @@ export default function LabPanel() {
   //   - info/success — 5 секунд (как раньше)
   //   - error с retryAction показывает кнопку «Повторить»
   //   - любой клик по Alert закрывает его
-  const [message, setMessage] = useState<{ text?: string; type?: string; retryAction?: () => void; [k: string]: unknown }>({});
+  const [message, setMessage] = useState<{ text?: string; type?: string; retryAction?: (() => void) | null; [k: string]: unknown }>({});
 
   const notify = useCallback((type: string, text: string, options: Record<string, unknown> = {}) => {
     setMessage({
@@ -136,7 +139,7 @@ export default function LabPanel() {
   // H-1 fix: session timeout warning — prevents silent JWT expiry while
   // a lab technician is mid-fill on a long report. Mirrors the pattern
   // used in CardiologistPanel/DentistPanel/DermatologistPanel.
-  const [sessionWarning, setSessionWarning] = useState(null);
+  const [sessionWarning, setSessionWarning] = useState<Record<string, unknown> | null>(null);
 
   // L-M-2 fix: ref-guard для дедупликации loadReportHistory.
   // Раньше loadReportHistory вызывался дважды: один раз из loadInstance
@@ -144,7 +147,7 @@ export default function LabPanel() {
   // второй — из useEffect [selectedAppointment] ниже. Теперь ref хранит
   // patient_id для которого история уже загружена, и useEffect пропускает
   // повторный вызов если patient_id совпадает.
-  const loadedHistoryForPatientRef = useRef(null);
+  const loadedHistoryForPatientRef = useRef<string | number | null>(null);
   useSessionTimeoutWarning({
     onWarning: () => setSessionWarning({ active: true }),
     onExpired: () => {
@@ -156,7 +159,7 @@ export default function LabPanel() {
     },
   });
 
-  const mergeResolvedVisitIntoState = useCallback((appointmentId, visitId) => {
+  const mergeResolvedVisitIntoState = useCallback((appointmentId: string | number, visitId: string | number) => {
     if (!appointmentId || !visitId) {
       return;
     }
@@ -185,7 +188,7 @@ export default function LabPanel() {
     }
   }, [activeTab, searchParams]);
 
-  const switchTab = useCallback((tabId) => {
+  const switchTab = useCallback((tabId: string) => {
     setActiveTab(tabId);
     // WF-15 fix: сохраняем patient/instance в URL при переключении таба.
     const params = new URLSearchParams(location.search);
@@ -193,7 +196,7 @@ export default function LabPanel() {
     navigate(`/lab?${params.toString()}`, { replace: true });
   }, [navigate, location.search]);
 
-  const handleTabKeyDown = useCallback((event, tabId) => {
+  const handleTabKeyDown = useCallback((event: React.KeyboardEvent, tabId: string) => {
     const currentIndex = tabs.findIndex((tab) => tab.id === tabId);
     if (currentIndex === -1) {
       return;
@@ -206,7 +209,7 @@ export default function LabPanel() {
       ArrowUp: -1
     };
 
-    let nextIndex = null;
+    let nextIndex: number | null = null;
     if (event.key === 'Home') {
       nextIndex = 0;
     } else if (event.key === 'End') {
@@ -258,10 +261,11 @@ export default function LabPanel() {
       })) as Record<string, unknown>;
       const queueEntries = normalizeListPayload(payload?.entries ?? []);
       setAppointments(queueEntries);
-      setQueueTotal(payload?.total ?? queueEntries.length);
+      const totalCount = typeof payload?.total === 'number' ? payload.total : queueEntries.length;
+      setQueueTotal(totalCount);
       setQueueOffset(queueEntries.length);
       // STRAT#7: помечаем, есть ли ещё записи для load-more
-      setHasMoreQueue((payload?.total ?? 0) > queueEntries.length);
+      setHasMoreQueue(totalCount > queueEntries.length);
       setSelectedAppointment((current) => {
         if (!current) {
           return current;
@@ -312,7 +316,8 @@ export default function LabPanel() {
       const newEntries = normalizeListPayload(payload?.entries ?? []);
       setAppointments((current) => [...current, ...newEntries]);
       setQueueOffset((current) => current + newEntries.length);
-      setHasMoreQueue((payload?.total ?? 0) > queueOffset + newEntries.length);
+      const totalCount = typeof payload?.total === 'number' ? payload.total : 0;
+      setHasMoreQueue(totalCount > queueOffset + newEntries.length);
       logger.info('[LabPanel] loaded more lab queue entries', newEntries.length);
     } catch (error) {
       // STRAT#16: не показываем error notification для отменённых запросов.
@@ -331,12 +336,12 @@ export default function LabPanel() {
     clearSelection: () => setSelectedAppointment(null),
   });
 
-  const loadTemplates = useCallback(async (preferredTemplateId = null) => {
+  const loadTemplates = useCallback(async (preferredTemplateId: string | number | null = null) => {
     try {
       const summary = await labReportingApi.listTemplates() as Record<string, unknown>;
       const templateSummary = normalizeListPayload(summary);
       setTemplates(templateSummary);
-      const templateId = preferredTemplateId || selectedTemplate?.id || templateSummary[0]?.id || null;
+      const templateId = preferredTemplateId || (selectedTemplate?.id as string | number | undefined) || (templateSummary[0]?.id as string | number | undefined) || null;
       if (templateId) {
         const detail = (await labReportingApi.getTemplate(templateId)) as Record<string, unknown>;
         setSelectedTemplate(detail);
@@ -362,7 +367,7 @@ export default function LabPanel() {
   // via ref, so identity is stable and mount effect doesn't re-fire.
   }, [notify]);
 
-  const loadReportHistory = useCallback(async (patientId) => {
+  const loadReportHistory = useCallback(async (patientId: string | number) => {
     if (!patientId) {
       setReportHistory([]);
       return;
@@ -396,7 +401,7 @@ export default function LabPanel() {
     }
   }, [notify]);
 
-  const loadTemplateResolution = useCallback(async (appointment) => {
+  const loadTemplateResolution = useCallback(async (appointment: Record<string, unknown> | null) => {
     if (!appointment) {
       setTemplateResolution(null);
       setTemplateResolutionLoading(false);
@@ -414,8 +419,10 @@ export default function LabPanel() {
     try {
       const resolution = (await labReportingApi.resolveTemplateOptions(payload)) as Record<string, unknown>;
       setTemplateResolution(resolution);
-      if (appointment?.appointment_id && resolution?.visit_id && !appointment.visit_id) {
-        mergeResolvedVisitIntoState(appointment.appointment_id, resolution.visit_id);
+      const apptId = appointment?.appointment_id as string | number | undefined;
+      const visitId = resolution?.visit_id as string | number | undefined;
+      if (apptId && visitId && !appointment.visit_id) {
+        mergeResolvedVisitIntoState(apptId, visitId);
       }
     } catch (error) {
       logger.error('[LabPanel] loadTemplateResolution failed', error);
@@ -432,7 +439,7 @@ export default function LabPanel() {
     }
   }, [mergeResolvedVisitIntoState, notify]);
 
-  const loadInstance = useCallback(async (instanceId) => {
+  const loadInstance = useCallback(async (instanceId: string | number) => {
     if (!instanceId) {
       return;
     }
@@ -507,12 +514,13 @@ export default function LabPanel() {
   }, []);
 
   useEffect(() => {
-    if (selectedAppointment?.patient_id) {
+    const patientId = selectedAppointment?.patient_id as string | number | undefined;
+    if (patientId) {
       // L-M-2 fix: пропускаем повторный вызов если история уже загружена
       // для этого patient_id (вызвана из loadInstance).
-      if (loadedHistoryForPatientRef.current !== selectedAppointment.patient_id) {
-        loadedHistoryForPatientRef.current = selectedAppointment.patient_id;
-        loadReportHistory(selectedAppointment.patient_id);
+      if (loadedHistoryForPatientRef.current !== patientId) {
+        loadedHistoryForPatientRef.current = patientId;
+        loadReportHistory(patientId);
       }
     } else {
       // Сброс ref при очистке выбора
@@ -629,7 +637,9 @@ export default function LabPanel() {
                         const action = message.retryAction;
                         dismissMessage();
                         // Небольшая задержка, чтобы UI успел обновиться
-                        setTimeout(() => action(), 0);
+                        if (typeof action === 'function') {
+                          setTimeout(() => action(), 0);
+                        }
                       }}
                     >
                       <Icon name="arrow.clockwise" size={14} />
@@ -675,20 +685,21 @@ export default function LabPanel() {
           loadingMore={loadingMore}
           queueTotal={queueTotal}
           onOpenAppointment={(appointment) => {
-            setSelectedAppointment(appointment);
+            setSelectedAppointment(appointment as unknown as Record<string, unknown>);
             setTemplateResolution(null);
             // WF-03 fix: если у пациента уже есть report_instance_id —
             // сразу открываем существующий отчёт, а не сбрасываем в режим
             // создания.
-            if (appointment.report_instance_id) {
-              loadInstance(appointment.report_instance_id);
+            const instanceId = appointment.report_instance_id as string | number | undefined;
+            if (instanceId) {
+              loadInstance(instanceId);
             } else {
               setActiveInstance(null);
             }
             switchTab('reports');
           }}
-          selectedAppointment={selectedAppointment}
-          reportHistory={reportHistory}
+          selectedAppointment={selectedAppointment as unknown as Record<string, unknown> & { id?: string | number; patient_fio?: string; patient_phone?: string; patient_id?: string | number; visit_id?: string | number; appointment_time?: string; status?: string }}
+          reportHistory={reportHistory as unknown as Array<Record<string, unknown> & { id: string | number; created_at: string; status: string; flagged_findings_count: number; critical_findings_count: number; max_flag_severity?: number }>}
         />
       </section>
 
@@ -740,16 +751,16 @@ export default function LabPanel() {
             {selectedAppointment && (
               <>
                 <span>›</span>
-                <span>{selectedAppointment.patient_fio || t('misc.lp_patsient_selectedappointment', { patient_id: selectedAppointment.patient_id })}</span>
+                <span>{String(selectedAppointment.patient_fio || t('misc.lp_patsient_selectedappointment', { patient_id: selectedAppointment.patient_id }))}</span>
               </>
             )}
             {activeInstance && (
               <>
                 <span>›</span>
                 <span>
-                  Отчёт #{activeInstance.id}
+                  Отчёт #{String(activeInstance.id)}
                   <span className="lab-text-muted-ml">
-                    ({formatLabStatus(activeInstance.status)})
+                    ({formatLabStatus(activeInstance.status as string)})
                   </span>
                 </span>
               </>
@@ -757,18 +768,18 @@ export default function LabPanel() {
           </nav>
         )}
         <LabReportWorkbench
-          selectedAppointment={selectedAppointment}
+          selectedAppointment={selectedAppointment as unknown as null}
           templates={templates}
-          templateResolution={templateResolution}
+          templateResolution={templateResolution as unknown as null}
           templateResolutionLoading={templateResolutionLoading}
-          reportHistory={reportHistory}
-          recentReports={recentReports}
-          activeInstance={activeInstance}
+          reportHistory={reportHistory as unknown as never[]}
+          recentReports={recentReports as unknown as never[]}
+          activeInstance={activeInstance as unknown as null}
           onInstanceChange={setActiveInstance}
-          onOpenInstance={loadInstance}
-          onRefreshHistory={loadReportHistory}
-          onRefreshRecentReports={loadRecentReports}
-          onQueueChanged={loadLabAppointments}
+          onOpenInstance={loadInstance as unknown as (id: string | number) => void}
+          onRefreshHistory={loadReportHistory as unknown as (patientId: string | number) => void}
+          onRefreshRecentReports={loadRecentReports as unknown as undefined}
+          onQueueChanged={loadLabAppointments as unknown as undefined}
           notify={notify}
         />
       </section>

@@ -33,15 +33,40 @@ import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 
-const emptyEquipmentStats = {
+interface EquipmentStats {
+  total_equipment: number;
+  active_equipment: number;
+  maintenance_equipment: number;
+  broken_equipment: number;
+}
+
+interface Equipment extends Record<string, unknown> {
+  id?: number | string;
+  name?: string;
+  model?: string;
+  serial_number?: string;
+  status?: string;
+  type?: string;
+  branch_id?: number | string | null;
+  cost?: number;
+  warranty_expiry?: string;
+  description?: string;
+}
+
+interface Branch extends Record<string, unknown> {
+  id?: number | string;
+  name?: string;
+}
+
+const emptyEquipmentStats: EquipmentStats = {
   total_equipment: 0,
   active_equipment: 0,
   maintenance_equipment: 0,
   broken_equipment: 0
 };
 
-const deriveEquipmentStats = (equipmentList) => {
-  const nextEquipment = Array.isArray(equipmentList) ? equipmentList : [];
+const deriveEquipmentStats = (equipmentList: unknown): EquipmentStats => {
+  const nextEquipment = (Array.isArray(equipmentList) ? equipmentList : []) as Equipment[];
   return {
     total_equipment: nextEquipment.length,
     active_equipment: nextEquipment.filter((item) => item.status === 'active').length,
@@ -67,13 +92,15 @@ const EQUIPMENT_TYPE_KEYS = [
   { value: 'other', labelKey: 'em_type_other' }
 ];
 
-const getStatusOptions = (t) => EQUIPMENT_STATUS_KEYS.map((option) => ({
+type TranslationFn = (key: string, options?: Record<string, unknown>) => string;
+
+const getStatusOptions = (t: TranslationFn) => EQUIPMENT_STATUS_KEYS.map((option) => ({
   value: option.value,
   label: t(`admin2.${option.labelKey}`),
   color: option.color
 }));
 
-const getTypeOptions = (t) => EQUIPMENT_TYPE_KEYS.map((option) => ({
+const getTypeOptions = (t: TranslationFn) => EQUIPMENT_TYPE_KEYS.map((option) => ({
   value: option.value,
   label: t(`admin2.${option.labelKey}`)
 }));
@@ -83,16 +110,16 @@ const EquipmentManagement = () => {
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [equipment, setEquipment] = useState([]);
-  const [branches, setBranches] = useState([]);
+  const [equipment, setEquipment] = useState<Equipment[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
   const [branchFilter, setBranchFilter] = useState('all');
   const [showAddForm, setShowAddForm] = useState(false);
-  const [editingEquipment, setEditingEquipment] = useState(null);
-  const [message, setMessage] = useState({ type: '', text: '' });
-  const [stats, setStats] = useState(null);
+  const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
+  const [message, setMessage] = useState<{ type: string; text: string }>({ type: '', text: '' });
+  const [stats, setStats] = useState<EquipmentStats | null>(null);
 
   // Форма оборудования
   const [formData, setFormData] = useState({
@@ -117,9 +144,9 @@ const EquipmentManagement = () => {
     try {
       setLoading(true);
       const response = (await api.get('/clinic/equipment')) as import('axios').AxiosResponse<Record<string, unknown>>;
-      const nextEquipment = Array.isArray(response.data)
+      const nextEquipment: Equipment[] = (Array.isArray(response.data)
         ? (response.data as unknown[])
-        : (response.data?.equipment as unknown[]) || [];
+        : (response.data?.equipment as unknown[]) || []) as Equipment[];
       setEquipment(nextEquipment);
       setStats(deriveEquipmentStats(nextEquipment));
     } catch (error) {
@@ -134,9 +161,9 @@ const EquipmentManagement = () => {
   const loadBranches = useCallback(async () => {
     try {
       const response = (await api.get('/clinic/branches')) as import('axios').AxiosResponse<Record<string, unknown>>;
-      const nextBranches = Array.isArray(response.data)
+      const nextBranches: Branch[] = (Array.isArray(response.data)
         ? (response.data as unknown[])
-        : (response.data?.branches as unknown[]) || [];
+        : (response.data?.branches as unknown[]) || []) as Branch[];
       setBranches(nextBranches);
     } catch (error) {
       logger.error('Ошибка загрузки филиалов:', error);
@@ -149,7 +176,7 @@ const EquipmentManagement = () => {
     loadBranches();
   }, [loadEquipment, loadBranches]);
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const hasBranch = formData.branch_id !== null && formData.branch_id !== undefined && formData.branch_id !== '';
     if (!String(formData.name ?? '').trim() || !formData.type || !hasBranch) {
@@ -179,13 +206,13 @@ const EquipmentManagement = () => {
     }
   };
 
-  const handleEdit = (equipmentItem) => {
+  const handleEdit = (equipmentItem: Equipment) => {
     setFormData(equipmentItem);
     setEditingEquipment(equipmentItem);
     setShowAddForm(true);
   };
 
-  const handleDelete = async (equipmentId) => {
+  const handleDelete = async (equipmentId: number | string) => {
     try {
       await api.delete(`/clinic/equipment/${equipmentId}`);
       setMessage({ type: 'success', text: t('admin2.em_delete_success') });
@@ -211,30 +238,30 @@ const EquipmentManagement = () => {
     });
   };
 
-  const getStatusColor = (status) => {
+  const getStatusColor = (status: string) => {
     const statusOption = EQUIPMENT_STATUS_KEYS.find((s) => s.value === status);
     return statusOption ? statusOption.color : 'gray';
   };
 
-  const getStatusLabel = (status) => {
+  const getStatusLabel = (status: string) => {
     const statusOption = statusOptions.find((s) => s.value === status);
     return statusOption ? statusOption.label : status;
   };
 
-  const getTypeLabel = (type) => {
+  const getTypeLabel = (type: string) => {
     const typeOption = typeOptions.find((opt) => opt.value === type);
     return typeOption ? typeOption.label : type;
   };
 
-  const getBranchName = (branchId) => {
+  const getBranchName = (branchId: number | string | null | undefined) => {
     const branch = branches.find((b) => b.id === branchId);
-    return branch ? branch.name : t('admin2.em_unknown_branch');
+    return branch && branch.name ? branch.name : t('admin2.em_unknown_branch');
   };
 
   const filteredEquipment = equipment.filter((item) => {
-    const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.model?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.serial_number?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = String(item.name ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    String(item.model ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    String(item.serial_number ?? '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || item.status === statusFilter;
     const matchesType = typeFilter === 'all' || item.type === typeFilter;
     const matchesBranch = branchFilter === 'all' || item.branch_id === parseInt(branchFilter);
@@ -568,21 +595,21 @@ const EquipmentManagement = () => {
                   </p>
                 </div>
                 <Badge
-              variant={getStatusColor(item.status)}
-              text={getStatusLabel(item.status)} />
+              variant={getStatusColor(String(item.status ?? ''))}
+              text={getStatusLabel(String(item.status ?? ''))} />
             
               </div>
 
               <div className="admin-d-flex-fd-column-gap-8-mb-16">
                 <div className="admin-d-flex-ai-center-gap-8-fs-sm-secondary-3">
                   <Building2 aria-hidden="true" className="w-4 h-4" />
-                  <span>{getBranchName(item.branch_id)}</span>
+                  <span>{getBranchName(item.branch_id ?? null)}</span>
                 </div>
                 <div className="admin-d-flex-ai-center-gap-8-fs-sm-secondary-2">
                   <Wrench aria-hidden="true" className="w-4 h-4" />
-                  <span>{getTypeLabel(item.type)}</span>
+                  <span>{getTypeLabel(String(item.type ?? ''))}</span>
                 </div>
-                {item.cost > 0 &&
+                {typeof item.cost === 'number' && item.cost > 0 &&
             <div className="admin-d-flex-ai-center-gap-8-fs-sm-secondary-1">
                     <DollarSign aria-hidden="true" className="w-4 h-4" />
                     <span>{item.cost.toLocaleString()} {t('admin2.em_currency')}</span>
@@ -608,7 +635,7 @@ const EquipmentManagement = () => {
                 <Button
               type="button"
               variant="outline"
-              aria-label={t('admin2.em_edit_aria', { name: item.name })}
+              aria-label={t('admin2.em_edit_aria', { name: String(item.name ?? '') })}
               onClick={() => handleEdit(item)}
               className="admin-p-6px-12px">
               
@@ -617,8 +644,8 @@ const EquipmentManagement = () => {
                 <Button
               type="button"
               variant="outline"
-              aria-label={t('admin2.em_delete_aria', { name: item.name })}
-              onClick={() => handleDelete(item.id)}
+              aria-label={t('admin2.em_delete_aria', { name: String(item.name ?? '') })}
+              onClick={() => handleDelete(item.id ?? '')}
               className="admin-p-6px-12px-error-bd-c-error">
               
                   <Trash2 aria-hidden="true" className="w-4 h-4" />

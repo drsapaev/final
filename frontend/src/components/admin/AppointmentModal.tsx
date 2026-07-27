@@ -15,6 +15,20 @@ import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
 
+type DoctorItem = Record<string, any>;
+type PatientItem = Record<string, any>;
+type AppointmentItem = Record<string, any>;
+
+interface AppointmentModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  appointment?: AppointmentItem | null;
+  onSave: (data: Record<string, any>) => Promise<void> | void;
+  loading?: boolean;
+  doctors?: DoctorItem[];
+  patients?: PatientItem[];
+}
+
 const AppointmentModal = ({
   isOpen,
   onClose,
@@ -23,7 +37,7 @@ const AppointmentModal = ({
   loading = false,
   doctors = [],
   patients = []
-}) => {
+}: AppointmentModalProps) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [formData, setFormData] = useState<Record<string, any>>({
     patientId: '',
@@ -39,8 +53,8 @@ const AppointmentModal = ({
   });
   const [errors, setErrors] = useState<Record<string, any>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState(null);
-  const selectedDoctor = useMemo(
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const selectedDoctor = useMemo<DoctorItem | null>(
     () => doctors.find((doctor) => doctor.id === parseInt(formData.doctorId, 10)) || null,
     [doctors, formData.doctorId]
   );
@@ -119,7 +133,7 @@ const AppointmentModal = ({
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!validateForm()) return;
@@ -145,20 +159,21 @@ const AppointmentModal = ({
       onClose();
     } catch (error) {
       logger.error('Ошибка сохранения записи:', error);
-      setSubmitError(error?.response?.data?.detail || error?.message || t('admin2.am_err_save'));
+      const err = error as Record<string, any>;
+      setSubmitError(err?.response?.data?.detail || err?.message || t('admin2.am_err_save'));
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleChange = (field, value) => {
+  const handleChange = (field: string, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: null }));
     }
   };
 
-  const getPatientDisplayName = (patient) => {
+  const getPatientDisplayName = (patient: PatientItem | null | undefined) => {
     if (!patient) return '';
     return (
       patient.fullName ||
@@ -169,17 +184,17 @@ const AppointmentModal = ({
     );
   };
 
-  const getPatientName = (patientId) => {
+  const getPatientName = (patientId: string) => {
     const patient = patients.find((p) => p.id === parseInt(patientId));
     return getPatientDisplayName(patient);
   };
 
-  const getDoctorDisplayName = (doctor) => {
+  const getDoctorDisplayName = (doctor: DoctorItem | null | undefined) => {
     if (!doctor) return '';
     return doctor.user?.full_name || doctor.user?.username || doctor.name || t('admin2.am_doctor_fallback', { id: doctor.id });
   };
 
-  const getDoctorName = (doctorId) => {
+  const getDoctorName = (doctorId: string) => {
     const doctor = doctors.find((d) => d.id === parseInt(doctorId));
     return doctor ? `${getDoctorDisplayName(doctor)} (${doctor.specialty || doctor.specialization || '—'})` : '';
   };

@@ -65,7 +65,7 @@ interface DiscountAnalytics {
   [key: string]: unknown;
 }
 
-const sanitizePayload = (form) =>
+const sanitizePayload = (form: Record<string, unknown>) =>
   Object.fromEntries(
     Object.entries(form).filter(([, value]) => {
       if (value === '' || value === null || typeof value === 'undefined') {
@@ -88,9 +88,9 @@ const DiscountBenefitsManager = () => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [activeTab, setActiveTab] = useState('discounts');
-  const [discounts, setDiscounts] = useState([]);
-  const [benefits, setBenefits] = useState([]);
-  const [loyaltyPrograms, setLoyaltyPrograms] = useState([]);
+  const [discounts, setDiscounts] = useState<Record<string, any>[]>([]);
+  const [benefits, setBenefits] = useState<Record<string, any>[]>([]);
+  const [loyaltyPrograms, setLoyaltyPrograms] = useState<Record<string, any>[]>([]);
   const [loading, setLoading] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [analytics, setAnalytics] = useState<DiscountAnalytics | null>(null);
@@ -152,15 +152,15 @@ const DiscountBenefitsManager = () => {
       );
 
       if (discountsResponse.status === 'fulfilled') {
-        setDiscounts(discountsResponse.value.data?.discounts || discountsResponse.value.data || []);
+        setDiscounts((discountsResponse.value.data?.discounts || discountsResponse.value.data || []) as Record<string, any>[]);
       }
 
       if (benefitsResponse.status === 'fulfilled') {
-        setBenefits(benefitsResponse.value.data?.benefits || benefitsResponse.value.data || []);
+        setBenefits((benefitsResponse.value.data?.benefits || benefitsResponse.value.data || []) as Record<string, any>[]);
       }
 
       if (loyaltyResponse.status === 'fulfilled') {
-        setLoyaltyPrograms(loyaltyResponse.value.data?.programs || loyaltyResponse.value.data || []);
+        setLoyaltyPrograms((loyaltyResponse.value.data?.programs || loyaltyResponse.value.data || []) as Record<string, any>[]);
       }
 
     } catch (error) {
