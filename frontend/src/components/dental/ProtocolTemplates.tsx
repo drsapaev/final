@@ -266,6 +266,8 @@ const ProtocolTemplates = ({
   };
 
   useEffect(() => {
+    // TECH-DEBT(protocol-templates-handlers): event is `any` — handlers
+    // are attached to mixed Element subtypes with different Event subtypes.
     const handlers: Array<[Element, (event: any) => void]> = [];
 
     document.querySelectorAll('button[data-protocol-template-select="true"]').forEach((button) => {
