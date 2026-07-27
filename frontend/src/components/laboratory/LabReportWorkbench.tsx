@@ -595,7 +595,7 @@ export default function LabReportWorkbench({
               )}
               {!templateResolutionLoading && singleAllowedTemplate && !resolutionHasBlockingGap && (
                 <Alert severity="info">
-                  {t('workbench.single_template_found')} <strong>{singleAllowedTemplate.name}</strong>. {t('workbench.click_create_to_open')}
+                  {t('workbench.single_template_found')} <strong>{String(singleAllowedTemplate.name ?? '')}</strong>. {t('workbench.click_create_to_open')}
                 </Alert>
               )}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 'var(--mac-spacing-3)', alignItems: 'end' }}>
@@ -610,7 +610,7 @@ export default function LabReportWorkbench({
                     <option value="">Выберите шаблон</option>
                     {effectiveTemplateOptions.map((template) => (
                       <option key={template.id} value={template.id}>
-                        {template.name} ({template.family})
+                        {String(template.name ?? '')} ({String(template.family ?? '')})
                       </option>
                     ))}
                   </select>
@@ -775,7 +775,7 @@ export default function LabReportWorkbench({
                       <Input
                         className="macos-input"
                         aria-label={signerFieldLabels[key] || key}
-                        value={signerSnapshot?.[key] || ''}
+                        value={String(signerSnapshot?.[key] ?? '')}
                         onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setSignerSnapshot((prev) => ({ ...prev, [key]: event.target.value }))}
                         // WF-09 fix: signer fields должны блокироваться на FINALIZED/PRINTED,
                         // иначе persistDraft вызовет updateInstance → 409 Conflict (silent failure).
@@ -829,7 +829,7 @@ export default function LabReportWorkbench({
               {/* STRAT#24: sections/fields editor extracted to ReportEditor component */}
               <ReportEditor
                 activeInstance={activeInstance}
-                draftValues={draftValues}
+                draftValues={draftValues as Record<string, string>}
                 collapsedSections={collapsedSections}
                 onToggleSection={(sectionKey) => {
                   setCollapsedSections((prev) => {

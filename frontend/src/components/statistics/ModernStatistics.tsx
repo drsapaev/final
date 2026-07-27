@@ -48,12 +48,14 @@ const getAverageWaitTime = (appointments) => {
 };
 
 interface ModernStatisticsProps {
-  appointments?: any[];
+  // TECH-DEBT(modern-stats-appointments): appointments is `any[]` — parent passes raw API responses
+  appointments?: any[]; // eslint-disable-line @typescript-eslint/no-explicit-any
   language?: string;
   selectedDate?: string | null;
   onExport?: () => void;
   onRefresh?: () => void;
-  [key: string]: any;
+  // TECH-DEBT(modern-stats-index-sig): index signature is `any` — callers pass ad-hoc props
+  [key: string]: any; // eslint-disable-line @typescript-eslint/no-explicit-any
 }
 
 const ModernStatistics = ({
