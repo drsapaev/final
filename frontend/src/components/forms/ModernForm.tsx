@@ -7,6 +7,23 @@ import logger from '../../utils/logger';
 import './ModernForm.css';
 import { useTranslation } from '../../i18n/useTranslation';
 
+type Validator = (value: unknown, values: Record<string, unknown>) => true | string;
+type FieldValidation = Validator | Validator[];
+
+interface ModernFormProps {
+  children?: React.ReactNode;
+  onSubmit?: (values: Record<string, unknown>) => void | Promise<void>;
+  validation?: Record<string, FieldValidation>;
+  initialValues?: Record<string, unknown>;
+  loading?: boolean;
+  error?: React.ReactNode;
+  success?: React.ReactNode;
+  className?: string;
+  layout?: 'vertical' | 'horizontal';
+  spacing?: 'small' | 'medium' | 'large';
+  [key: string]: unknown;
+}
+
 const ModernForm = ({
   children,
   onSubmit,
@@ -19,16 +36,16 @@ const ModernForm = ({
   layout = 'vertical',
   spacing = 'medium',
   ...props
-}) => {
+}: ModernFormProps) => {
   const { getColor } = useTheme();
-  const [values, setValues] = useState(initialValues);
-  const [errors, setErrors] = useState({});
-  const [touched, setTouched] = useState({});
+  const [values, setValues] = useState<Record<string, unknown>>(initialValues);
+  const [errors, setErrors] = useState<Record<string, string | null>>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
 
   // Обновление значения поля
-  const updateValue = (name, value) => {
+  const updateValue = (name: string, value: unknown) => {
     setValues((prev) => ({ ...prev, [name]: value }));
 
     // Очистка ошибки при изменении значения
@@ -38,12 +55,12 @@ const ModernForm = ({
   };
 
   // Пометка поля как затронутого
-  const markTouched = (name) => {
+  const markTouched = (name: string) => {
     setTouched((prev) => ({ ...prev, [name]: true }));
   };
 
   // Валидация поля
-  const validateField = (name, value) => {
+  const validateField = (name: string, value: unknown) => {
     if (!validation || !validation[name]) return null;
 
     const fieldValidation = validation[name];
@@ -64,13 +81,13 @@ const ModernForm = ({
 
   // Валидация всей формы
   const validateForm = () => {
-    const newErrors = {};
+    const newErrors: Record<string, string | null> = {};
     let hasErrors = false;
 
     if (validation) {
       Object.keys(validation).forEach((fieldName) => {
         const error = validateField(fieldName, values[fieldName]);
-        if (error) {
+        if (error && error !== true) {
           newErrors[fieldName] = error;
           hasErrors = true;
         }
@@ -137,8 +154,8 @@ const ModernForm = ({
           onBlur: (e) => {
             markTouched(name);
             const error = validateField(name, values[name]);
-            if (error) {
-              setErrors((prev) => ({ ...prev, [name]: error }));
+            if (error && error !== true) {
+              setErrors((prev) => ({ ...prev, [name]: String(error) }));
             }
             ((child.props as Record<string, unknown>).onBlur as ((...args: unknown[]) => void) | undefined)?.(e);
           },

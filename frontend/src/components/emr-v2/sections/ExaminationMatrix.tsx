@@ -103,26 +103,32 @@ const TEMPLATES = {
   em_item_very_poor: { norm: 'em_tpl_very_poor_norm', path: null }
 };
 
+interface ExaminationMatrixProps {
+  specialty?: string;
+  onGenerateText?: (text: string) => void;
+  isEditable?: boolean;
+}
+
 const ExaminationMatrix = ({
   specialty = 'general',
   onGenerateText,
   isEditable = true
-}) => {
+}: ExaminationMatrixProps) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
-  const [activeCategory, setActiveCategory] = useState(Object.keys(MATRICES[specialty] || MATRICES.general)[0]);
-  const [status, setStatus] = useState({}); // { 'em_item_tones': 'norm' | 'path' }
+  const [activeCategory, setActiveCategory] = useState(Object.keys(MATRICES[specialty as keyof typeof MATRICES] || MATRICES.general)[0]);
+  const [status, setStatus] = useState<Record<string, string>>({}); // { 'em_item_tones': 'norm' | 'path' }
 
   // Update categories if specialty changes
   useEffect(() => {
-    const matrix = MATRICES[specialty] || MATRICES.general;
+    const matrix = MATRICES[specialty as keyof typeof MATRICES] || MATRICES.general;
     setActiveCategory(Object.keys(matrix)[0]);
   }, [specialty]);
 
-  const handleToggle = (item, type) => {
+  const handleToggle = (item: string, type: string) => {
     if (!isEditable) return;
 
     const current = status[item];
-    let newType = type;
+    let newType: string | null = type;
 
     // Toggle off if clicking same
     if (current === type) {
@@ -138,13 +144,13 @@ const ExaminationMatrix = ({
     generateText(newStatus);
   };
 
-  const generateText = (currentStatus) => {
+  const generateText = (currentStatus: Record<string, string | null>) => {
     const phrases: string[] = [];
 
     Object.entries(currentStatus).forEach(([item, type]) => {
-      const template = TEMPLATES[item];
-      if (template && template[type]) {
-        phrases.push(t(`misc.${template[type]}`));
+      const template = TEMPLATES[item as keyof typeof TEMPLATES];
+      if (template && type && template[type as 'norm' | 'path']) {
+        phrases.push(t(`misc.${template[type as 'norm' | 'path']}`));
       } else {
         // Fallback for missing templates
         const prefix = type === 'norm' ? 'N: ' : 'Path: ';
@@ -159,8 +165,8 @@ const ExaminationMatrix = ({
     onGenerateText?.(text);
   };
 
-  const matrix = MATRICES[specialty] || MATRICES.general;
-  const items = matrix[activeCategory] || [];
+  const matrix = MATRICES[specialty as keyof typeof MATRICES] || MATRICES.general;
+  const items: string[] = (matrix[activeCategory as keyof typeof matrix] as string[] | undefined) || [];
 
   return (
     <div className={`ex-matrix ${!isEditable ? 'ex-matrix--readonly' : ''}`}>
