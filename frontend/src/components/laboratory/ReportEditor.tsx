@@ -26,6 +26,49 @@ import { useTranslation } from '../../i18n/useTranslation';
  *   - reportHistory: array — for previous-result trending
  *   - notify: parent notify callback (for labToast)
  */
+interface LabReportField {
+  field_key: string;
+  label: string;
+  value_type?: string;
+  reference_text?: string;
+  resolved_flag_meta?: {
+    matched_threshold?: { value: string; operator: string };
+  };
+  resolved_flag_source?: string;
+  resolved_flag?: string;
+  resolved_flag_severity?: number | null;
+  required?: boolean;
+  unit?: string;
+  choice_options?: string[];
+  value_text?: string;
+}
+
+interface LabReportSection {
+  key: string;
+  title?: string;
+  fields: LabReportField[];
+}
+
+interface LabReportInstance {
+  sections: LabReportSection[];
+}
+
+interface LabReportHistoryEntry {
+  sections?: LabReportSection[];
+  created_at?: string;
+}
+
+interface ReportEditorProps {
+  activeInstance: LabReportInstance;
+  draftValues: Record<string, string>;
+  collapsedSections: Set<unknown>;
+  onToggleSection: (sectionKey: string) => void;
+  onUpdateField: (fieldKey: string, value: string) => void;
+  canEditActiveInstance?: boolean;
+  reportHistory?: LabReportHistoryEntry[];
+  notify?: (type: string, message: string) => void;
+}
+
 export default function ReportEditor({
   activeInstance,
   draftValues,
@@ -33,14 +76,16 @@ export default function ReportEditor({
   onToggleSection,
   onUpdateField,
   canEditActiveInstance,
-  reportHistory,
+  reportHistory = [],
   notify,
-}) {
+}: ReportEditorProps) {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // STRAT#2: labToast for interactive numeric validation toasts.
-  const labToast = useLabToast(notify);
+  // Fallback no-op preserves runtime behavior: ReportEditor only uses the
+  // interactive* methods (which call toast directly, not the notify callback).
+  const labToast = useLabToast(notify ?? ((_type: string, _message: string) => {}));
 
-  function updateField(fieldKey, value) {
+  function updateField(fieldKey: string, value: string) {
     onUpdateField(fieldKey, value);
   }
 
@@ -205,7 +250,7 @@ export default function ReportEditor({
                     <div style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-sm)' }}>
                       {field.unit || '—'}
                     </div>
-                    <Badge variant={flagVariant(field.resolved_flag, field.resolved_flag_severity)}>
+                    <Badge variant={flagVariant(field.resolved_flag ?? '', field.resolved_flag_severity ?? null)}>
                       {formatFlagLabel(field)}
                     </Badge>
                     {field.required ? <Badge variant="warning">{t('content.field_required')}</Badge> : <span aria-hidden="true" />}

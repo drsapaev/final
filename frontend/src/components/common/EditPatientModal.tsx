@@ -72,7 +72,12 @@ const EditPatientModal = ({ isOpen, onClose, patient, onSave, loading = false, t
     <AppointmentWizardV2
       isOpen={isOpen}
       editMode={true}
-      initialData={initialData}
+      // The wizard's `initialData` prop is inferred as `null | undefined` from
+      // its default value (it is otherwise untyped — see AppointmentWizardV2).
+      // We carry a structured object here at runtime; the wizard does its own
+      // null/undefined checks before reading fields, so the assertion is safe
+      // and preserves runtime behavior.
+      initialData={initialData as Record<string, unknown> | null}
       isProcessing={loading}
       setIsProcessing={() => { /* no-op: parent does not track processing state */ }}
       onClose={onClose}

@@ -41,8 +41,8 @@ const VISIBLE_STEPPER_STEPS = LAB_REPORT_STATUS_CONFIG.filter(
   (step) => !HIDDEN_STEPPER_STATUSES.has(step.key)
 );
 
-export default function LabStatusStepper({ status: unknown }) {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+export default function LabStatusStepper({ status }: { status: string }) {
+  const { t } = useTranslation();
   // Индекс считаем по полной конфигурации, чтобы READY (если пришёл с бэкенда)
   // корректно отображался как текущий шаг.
   const fullIndex = getLabReportStepIndex(status);

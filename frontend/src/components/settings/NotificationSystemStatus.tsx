@@ -5,9 +5,35 @@ import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 
+interface NotificationChannelStatus {
+  configured?: boolean;
+  server?: string;
+  port?: number | string;
+  bot_token?: string;
+  chat_id?: string;
+  api_url?: string;
+}
+
+interface NotificationStatus {
+  email?: NotificationChannelStatus;
+  telegram?: NotificationChannelStatus;
+  sms?: NotificationChannelStatus;
+}
+
+interface StatusCardDetail {
+  label: string;
+  value?: string | number | boolean;
+}
+
+interface StatusCardProps {
+  title: string;
+  configured?: boolean;
+  details: StatusCardDetail[];
+}
+
 export default function NotificationSystemStatus() {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
-    const [status, setStatus] = useState(null);
+    const [status, setStatus] = useState<NotificationStatus | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -57,7 +83,7 @@ export default function NotificationSystemStatus() {
     );
 }
 
-function StatusCard({ title, configured, details }) {
+function StatusCard({ title, configured, details }: StatusCardProps) {
     const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
     return (
         <div style={{
