@@ -340,7 +340,7 @@ const GraphQLExplorer = () => {
       }
     } catch (error) {
       logger.error('Ошибка выполнения GraphQL запроса:', error);
-      setError(t('admin2.gql_error_execution', { message: (error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)) }));
+      setError(t('admin2.gql_error_execution', { message: (error instanceof Error ? (error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)) : String(error)) }));
       setResult({ error: error.message });
     } finally {
       setLoading(false);
