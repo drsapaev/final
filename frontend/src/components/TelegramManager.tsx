@@ -152,11 +152,11 @@ interface BotContract {
 
 interface BotStatusEntry {
   features?: Array<{ enabled?: boolean; key?: string; route?: string; endpoint?: string; contract?: BotContract; [k: string]: unknown }>;
-  commands?: Record<string, unknown>;
+  commands?: Array<Record<string, unknown>>;
   supported_languages?: Array<string | { code?: string; label?: string; [k: string]: unknown }>;
-  readiness?: Record<string, unknown> & { ready?: boolean; runtime_guard_enabled?: boolean };
+  readiness?: Array<{ ready?: boolean; runtime_guard_enabled?: boolean; [k: string]: unknown }>;
   supported_roles?: string[];
-  read_only_menu_contract?: Record<string, unknown>;
+  read_only_menu_contract?: Array<{ items?: Array<unknown>; [k: string]: unknown }>;
   role_menus?: Record<string, unknown>;
   role_checks?: Record<string, unknown>;
   token_contract?: Record<string, unknown>;
@@ -189,12 +189,32 @@ interface BotStatus {
   [k: string]: unknown;
 }
 
+interface OnboardingRequest {
+  id: string;
+  status?: string;
+  duplicateCandidates?: unknown[];
+  duplicateSearch?: { highConfidenceCandidateExists?: boolean; topCandidates?: unknown[]; [k: string]: unknown } | null;
+  duplicateReviewSnapshot?: { highConfidenceCandidateExists?: boolean; topCandidates?: unknown[]; [k: string]: unknown } | null;
+  auditTrail?: Array<{ action?: string; reviewer?: string; timestamp?: string; reasonCode?: string; [k: string]: unknown }>;
+  notificationPreview?: { title?: string; body?: string; ctaLabel?: string; [k: string]: unknown } | null;
+  [k: string]: unknown;
+}
+
+interface TelegramTemplate {
+  id: string;
+  name?: string;
+  message_type?: string;
+  content?: string;
+  is_active?: boolean;
+  [k: string]: unknown;
+}
+
 const TelegramManager = () => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [botStatus, setBotStatus] = useState<BotStatus | null>(null);
-  const [templates, setTemplates] = useState([]);
-  const [onboardingRequests, setOnboardingRequests] = useState([]);
+  const [templates, setTemplates] = useState<TelegramTemplate[]>([]);
+  const [onboardingRequests, setOnboardingRequests] = useState<OnboardingRequest[]>([]);
   const [onboardingTotal, setOnboardingTotal] = useState(0);
   const [onboardingReviewForms, setOnboardingReviewForms] = useState<Record<string, Record<string, unknown>>>({});
   const [onboardingActionId, setOnboardingActionId] = useState('');
@@ -250,9 +270,10 @@ const TelegramManager = () => {
     };
   };
 
-  const hydrateOnboardingRequests = async (items) => {
-    const hydrated = await Promise.all((items || []).map(async (request) => {
-      if (!['pending_review', 'needs_more_info'].includes(request.status)) {
+  const hydrateOnboardingRequests = async (items: unknown[]): Promise<OnboardingRequest[]> => {
+    const hydrated = await Promise.all((items || []).map(async (rawRequest) => {
+      const request = rawRequest as OnboardingRequest;
+      if (!['pending_review', 'needs_more_info'].includes(request.status || '')) {
         return {
           ...request,
           duplicateCandidates: request.duplicateCandidates || [],
@@ -279,7 +300,7 @@ const TelegramManager = () => {
       }
     }));
 
-    return hydrated;
+    return hydrated as OnboardingRequest[];
   };
 
   const loadTelegramData = async () => {
@@ -315,8 +336,8 @@ const TelegramManager = () => {
         raw: { status: statusData, integration: integrationData }
       });
 
-      const normalizedTemplates = Array.isArray(templatesData) ?
-      templatesData :
+      const normalizedTemplates: TelegramTemplate[] = Array.isArray(templatesData) ?
+      (templatesData as TelegramTemplate[]) :
       Object.entries(templatesData).map(([key, value]: [string, any]) => ({
         id: key,
         name: value?.subject || key,
@@ -441,7 +462,7 @@ const TelegramManager = () => {
   };
 
   const handleOnboardingReviewAction = async (requestId, action, options = {}) => {
-    const request = onboardingRequests.find((item) => item.id === requestId) || {};
+    const request = onboardingRequests.find((item) => item.id === requestId) || ({} as OnboardingRequest);
     const form: Record<string, unknown> = onboardingReviewForms[requestId] || {};
     const safeNote = String(form.safeNote || '').trim();
     const reasonCode = form.reasonCode || undefined;
@@ -995,7 +1016,7 @@ const TelegramManager = () => {
     return 'Low risk';
   };
   const formatCandidateReasons = (candidate) => {
-    const reasons = [];
+    const reasons: string[] = [];
     const matchReasons = getCandidateValue<Record<string, unknown>>(candidate, 'matchReasons', 'match_reasons', {});
     if (matchReasons?.phone_match || matchReasons?.phoneMatch) reasons.push('Phone match');
     const similarity = Number(matchReasons?.name_similarity ?? matchReasons?.nameSimilarity ?? 0);
@@ -1671,14 +1692,14 @@ const TelegramManager = () => {
                     t('misc.tg_results_notification')} />
 
                 </ListItem>
-                {botStatus?.webhook_error &&
+                {Boolean(botStatus?.webhook_error) &&
                 <ListItem>
                     <ListItemIcon>
                       <Settings />
                     </ListItemIcon>
                     <ListItemText
                       primary="Telegram API"
-                      secondary={String(botStatus.webhook_error ?? '')} />
+                      secondary={String(botStatus?.webhook_error ?? '')} />
 
                   </ListItem>
                 }

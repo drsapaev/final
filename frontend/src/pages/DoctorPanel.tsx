@@ -60,7 +60,47 @@ import DoctorQueuePanel from '../components/doctor/DoctorQueuePanel';
 // i18n-unification: useTranslation hook from unified i18n (replaces adapter shim)
 import { useTranslation } from '../i18n/useTranslation';
 
-const hasBackendQueueAction = (entry, action, flagName) => {
+// Local shape used for queue entries / patient context helpers.
+// Mirrors the relevant fields from QueueEntry (domain/queue.ts) without
+// importing that type here, to keep the file's dependency surface minimal.
+type QueueEntryLike = {
+  id?: string | number;
+  number?: string | number;
+  patient_name?: string;
+  status?: string;
+  available_actions?: unknown[];
+  [key: string]: unknown;
+};
+
+interface Patient {
+  id: string | number;
+  name?: string;
+  phone?: string;
+  gender?: string;
+  diagnosis?: string;
+  status?: string;
+  age?: number | null;
+  [key: string]: unknown;
+}
+
+interface Appointment {
+  id: string | number;
+  patientId?: number | null;
+  patientName?: string;
+  time?: string;
+  type?: string;
+  status?: string;
+  notes?: string;
+  appointmentDate?: string;
+  confirmationToken?: string | null;
+  confirmationChannel?: string;
+  totalAmount?: number | null;
+  servicesCount?: number;
+  source?: string;
+  [key: string]: unknown;
+}
+
+const hasBackendQueueAction = (entry: QueueEntryLike | null | undefined, action: string, flagName: string) => {
   if (!entry) return false;
   if (Array.isArray(entry.available_actions)) {
     return entry.available_actions.includes(action);
@@ -71,7 +111,7 @@ const hasBackendQueueAction = (entry, action, flagName) => {
   return false;
 };
 
-const DOCTOR_PANEL_TABS = new Set(['dashboard', 'patients', 'appointments', 'queue', 'ai', 'reports']);
+const DOCTOR_PANEL_TABS = new Set<string>(['dashboard', 'patients', 'appointments', 'queue', 'ai', 'reports']);
 
 const DoctorPanel = () => {
   const location = useLocation();
@@ -86,11 +126,12 @@ const DoctorPanel = () => {
   // ✅ Получаем patientId из URL для автоматического выбора пациента
   const getPatientIdFromUrl = useCallback(() => {
     const params = new URLSearchParams(location.search);
-    return params.get('patientId') ? parseInt(params.get('patientId'), 10) : null;
+    const pid = params.get('patientId');
+    return pid ? parseInt(pid, 10) : null;
   }, [location.search]);
 
   // Состояние
-  const [activeTab, setActiveTab] = useState(() => {
+  const [activeTab, setActiveTab] = useState<string>(() => {
     // Если есть patientId, переходим на вкладку пациентов
     const params = new URLSearchParams(window.location.search);
     const requestedTab = params.get('tab');
@@ -102,13 +143,24 @@ const DoctorPanel = () => {
     }
     return 'dashboard';
   });
-  const [patients, setPatients] = useState([]);
-  const [appointments, setAppointments] = useState([]);
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   // ✅ УЛУЧШЕНИЕ: Универсальный хук вместо дублированных состояний
-  const patientModal = useModal();
-  const [scheduleNextModal, setScheduleNextModal] = useState({ open: false, patient: null });
+  // Cast to a typed shape — useModal is generic-free (selectedItem: null),
+  // so we narrow it here for type-safe access in this panel.
+  const patientModal = useModal() as unknown as {
+    isOpen: boolean;
+    isAnimating: boolean;
+    selectedItem: Patient | null;
+    loading: boolean;
+    openModal: (item: Patient | Record<string, unknown> | null) => void;
+    closeModal: () => void;
+    toggleModal: (item?: Patient | Record<string, unknown> | null) => void;
+    setModalLoading: (isLoading: boolean) => void;
+  };
+  const [scheduleNextModal, setScheduleNextModal] = useState<{ open: boolean; patient: Record<string, unknown> | null }>({ open: false, patient: null });
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
 
@@ -119,7 +171,7 @@ const DoctorPanel = () => {
     completed: appointments.filter((a) => a.status === 'completed').length,
   }), [appointments]);
 
-  const setDoctorTab = useCallback((tabId) => {
+  const setDoctorTab = useCallback((tabId: string) => {
     if (!DOCTOR_PANEL_TABS.has(tabId)) {
       return;
     }
@@ -182,7 +234,7 @@ const DoctorPanel = () => {
   } = useDoctorQueue(doctorSpecialty);
 
   // ✅ Функция отправки push-уведомления "Вернуться с диагностики"
-  const callFromDiagnostics = async (entryId) => {
+  const callFromDiagnostics = async (entryId: string | number) => {
     try {
       const token = tokenManager.getAccessToken();
       const apiBase = getApiOrigin();
@@ -205,7 +257,7 @@ const DoctorPanel = () => {
   };
 
   // ✅ Хелпер для отображения времени с момента события
-  const formatElapsedTime = (timestamp) => {
+  const formatElapsedTime = (timestamp: string | number | Date) => {
     if (!timestamp) return null;
     const start = new Date(timestamp);
     const now = new Date();
@@ -219,8 +271,10 @@ const DoctorPanel = () => {
   };
 
   // Refs
-  const headerRef = useRef(null);
+  const headerRef = useRef<HTMLDivElement | null>(null);
   const [headerHeight, setHeaderHeight] = useState(0);
+  void headerRef;
+  void headerHeight;
 
   // Используем централизованную систему темизации
   const {
@@ -260,19 +314,21 @@ const DoctorPanel = () => {
     loadData();
   }, [loadData]);
 
-  const handleScheduleNextSuccess = useCallback((result, submittedFormData) => {
-    const confirmation = result?.confirmation || {};
-    const normalizedPatientId = submittedFormData?.patient_id ? Number(submittedFormData.patient_id) : null;
+  const handleScheduleNextSuccess = useCallback((result?: Record<string, unknown>, submittedFormData?: Record<string, unknown>) => {
+    const confirmation = (result?.confirmation as Record<string, unknown> | undefined) ?? {};
+    const patientIdRaw = submittedFormData?.patient_id;
+    const normalizedPatientId = patientIdRaw ? Number(patientIdRaw) : null;
     const selectedPatient = normalizedPatientId
       ? patients.find((patient) => Number(patient.id) === normalizedPatientId)
       : null;
-    const visitDate = confirmation.visit_date || submittedFormData?.visit_date || '';
-    const visitTime = confirmation.visit_time || submittedFormData?.visit_time || '';
+    const visitDate = String(confirmation.visit_date ?? submittedFormData?.visit_date ?? '');
+    const visitTime = String(confirmation.visit_time ?? submittedFormData?.visit_time ?? '');
+    const servicesRaw = submittedFormData?.services as unknown[] | undefined;
 
-    const nextAppointment = {
-      id: result?.visit_id || Date.now(),
+    const nextAppointment: Appointment = {
+      id: (result?.visit_id as string | number | undefined) ?? Date.now(),
       patientId: normalizedPatientId,
-      patientName: confirmation.patient_name || selectedPatient?.name || t('doctor.new_patient'),
+      patientName: String(confirmation.patient_name ?? selectedPatient?.name ?? t('doctor.new_patient')),
       time: visitTime,
       type:
         submittedFormData?.discount_mode === 'repeat'
@@ -281,12 +337,12 @@ const DoctorPanel = () => {
             ? t('doctor.benefit_visit')
             : t('doctor.next_visit'),
       status: 'scheduled',
-      notes: result?.message || (visitDate ? t('doctor.awaiting_confirmation_on_date', { date: visitDate }) : t('doctor.awaiting_confirmation')),
+      notes: String(result?.message ?? (visitDate ? t('doctor.awaiting_confirmation_on_date', { date: visitDate }) : t('doctor.awaiting_confirmation'))),
       appointmentDate: visitDate,
-      confirmationToken: confirmation.token || null,
-      confirmationChannel: confirmation.channel || submittedFormData?.confirmation_channel || 'telegram',
-      totalAmount: confirmation.total_amount || null,
-      servicesCount: confirmation.services_count || submittedFormData?.services?.length || 1,
+      confirmationToken: (confirmation.token as string | null | undefined) ?? null,
+      confirmationChannel: String(confirmation.channel ?? submittedFormData?.confirmation_channel ?? 'telegram'),
+      totalAmount: (confirmation.total_amount as number | null | undefined) ?? null,
+      servicesCount: Number(confirmation.services_count ?? servicesRaw?.length ?? 1),
       source: 'schedule-next'
     };
 
@@ -301,7 +357,7 @@ const DoctorPanel = () => {
       patientName: nextAppointment.patientName,
       status: nextAppointment.status
     });
-  }, [patients]);
+  }, [patients, t]);
 
   // ✅ Автоматическая загрузка пациента из URL параметра patientId
   useEffect(() => {
@@ -321,17 +377,17 @@ const DoctorPanel = () => {
         });
 
         if (patientResponse.ok) {
-          const patientData = await patientResponse.json();
+          const patientData: Record<string, unknown> = await patientResponse.json();
 
           // Создаем объект пациента для отображения
-          const patientObj = {
-            id: patientData.id,
+          const patientObj: Patient = {
+            id: patientData.id as string | number,
             name: `${patientData.last_name || ''} ${patientData.first_name || ''} ${patientData.middle_name || ''}`.trim(),
-            phone: patientData.phone || '',
-            gender: patientData.sex || '',
+            phone: String(patientData.phone ?? ''),
+            gender: String(patientData.sex ?? ''),
             diagnosis: '',
             status: 'active',
-            age: patientData.birth_date ? new Date().getFullYear() - new Date(patientData.birth_date).getFullYear() : null
+            age: patientData.birth_date ? new Date().getFullYear() - new Date(patientData.birth_date as string).getFullYear() : null
           };
 
           // Добавляем пациента в список и устанавливаем поисковый запрос
@@ -343,7 +399,7 @@ const DoctorPanel = () => {
             return prev;
           });
 
-          setSearchQuery(patientObj.name);
+          setSearchQuery(patientObj.name ?? '');
           setActiveTab('patients');
 
           // Открываем модальное окно с данными пациента
@@ -465,8 +521,8 @@ const DoctorPanel = () => {
 
 
   // Функции
-  const getStatusVariant = (status) => {
-    const statusMap = {
+  const getStatusVariant = (status: string | undefined) => {
+    const statusMap: Record<string, string> = {
       'active': 'success',
       'recovery': 'warning',
       'critical': 'danger',
@@ -483,11 +539,11 @@ const DoctorPanel = () => {
       'incomplete': 'danger',
       'no_show': 'danger'
     };
-    return statusMap[status] || 'default';
+    return statusMap[status ?? ''] || 'default';
   };
 
-  const getStatusText = (status) => {
-    const statusMap = {
+  const getStatusText = (status: string | undefined) => {
+    const statusMap: Record<string, string> = {
       'active': t('doctor.status_active'),
       'recovery': t('doctor.status_recovery'),
       'critical': t('doctor.status_critical'),
@@ -504,52 +560,58 @@ const DoctorPanel = () => {
       'incomplete': t('doctor.status_incomplete'),
       'no_show': t('doctor.status_no_show')
     };
-    return statusMap[status] || status;
+    return statusMap[status ?? ''] || (status ?? '');
   };
 
-  const getQueuePatientContext = (entry) => {
+  const getQueuePatientContext = (entry: QueueEntryLike | null | undefined) => {
     const queueNumber = entry?.number || entry?.id || 'unknown';
     const patientName = entry?.patient_name || 'unknown patient';
     return `queue entry ${queueNumber} for ${patientName}`;
   };
 
-  const getPatientA11yContext = (patient) => {
+  const getPatientA11yContext = (patient: Patient | null | undefined) => {
     const patientId = patient?.id || 'unknown';
     const patientName = patient?.name || 'patient';
     return `patient ${patientName} (${patientId})`;
   };
 
-  const getAppointmentA11yContext = (appointment) => {
+  const getAppointmentA11yContext = (appointment: Appointment | null | undefined) => {
     const appointmentId = appointment?.id || 'unknown';
     const patientName = appointment?.patientName || 'patient';
     const appointmentTime = appointment?.time ? ` at ${appointment.time}` : '';
     return `appointment ${appointmentId} for ${patientName}${appointmentTime}`;
   };
 
-  const getCurrentVisitMeta = (entry) => {
-    const statusMap = {
+  const getCurrentVisitMeta = (entry: QueueEntryLike | null | undefined) => {
+    const statusMap: Record<string, { label: string; variant: string }> = {
       called: { label: t('doctor.queue_called'), variant: 'primary' },
       in_service: { label: t('doctor.queue_in_service'), variant: 'info' },
       diagnostics: { label: t('doctor.queue_diagnostics'), variant: 'info' }
     };
 
-    return statusMap[entry?.status] || null;
+    return statusMap[entry?.status ?? ''] || null;
   };
 
-  const getQueueActionA11yProps = (action, entry) => ({
-    type: 'button',
+  const getQueueActionA11yProps = (action: string, entry: QueueEntryLike | null | undefined) => ({
+    type: 'button' as const,
     'aria-label': `${action} for ${getQueuePatientContext(entry)}`,
-    onFocus: (event) => {
+    onFocus: (event: React.FocusEvent<HTMLElement>) => {
       event.currentTarget.style.outline = `2px solid ${primaryColor}`;
       event.currentTarget.style.boxShadow = '0 0 0 4px color-mix(in srgb, var(--mac-accent), transparent 72%)';
     },
-    onBlur: (event) => {
+    onBlur: (event: React.FocusEvent<HTMLElement>) => {
       event.currentTarget.style.outline = '2px solid transparent';
       event.currentTarget.style.boxShadow = 'none';
     }
   });
 
-  const renderEmptyState = ({ icon: Icon, title, description, tone = 'default', action = null }) => {
+  const renderEmptyState = ({ icon: Icon, title, description, tone = 'default', action = null }: {
+    icon: React.ComponentType<{ size?: number | string; className?: string }>;
+    title: React.ReactNode;
+    description?: React.ReactNode;
+    tone?: string;
+    action?: React.ReactNode;
+  }) => {
     return (
       <div className="doctor-empty" data-tone={tone}>
         <Icon size={48} className="doctor-empty-icon" />
@@ -571,7 +633,7 @@ const DoctorPanel = () => {
   };
 
   // ✅ УЛУЧШЕНИЕ: Обработчик с универсальным хуком
-  const handlePatientClick = (patient) => {
+  const handlePatientClick = (patient: Patient | Record<string, unknown> | null) => {
     patientModal.openModal(patient);
   };
 
@@ -591,7 +653,7 @@ const DoctorPanel = () => {
     return matchesSearch && matchesFilter;
   });
 
-  const handleInactiveTabHover = (event, isActive, hovered) => {
+  const handleInactiveTabHover = (event: React.MouseEvent<HTMLElement>, isActive: boolean, hovered: boolean) => {
     if (isActive) {
       return;
     }
@@ -651,7 +713,7 @@ const DoctorPanel = () => {
 
             <Users size={isMobile ? 16 : 20} />
             {!isMobile && <span>{t("doctor.tab_queue")}</span>}
-            {queueStats.waiting > 0 &&
+            {Number(queueStats.waiting ?? 0) > 0 &&
             <Badge variant="warning" className="doctor-badge-ml">
                 {queueStats.waiting}
               </Badge>
@@ -1090,7 +1152,7 @@ const DoctorPanel = () => {
         <AnimatedTransition type="fade" delay={100}>
           <DoctorQueuePanel
             specialty={doctorSpecialty}
-            onPatientSelect={(entry) => {
+            onPatientSelect={(entry: Record<string, unknown>) => {
               // Open patient modal when selecting from queue
               handlePatientClick(entry);
             }}
@@ -1109,7 +1171,7 @@ const DoctorPanel = () => {
               <CardContent>
                 <AIAssistant
                 specialty={doctorSpecialty}
-                onSuggestionSelect={(type, suggestion) => {
+                onSuggestionSelect={(type: string, suggestion: unknown) => {
                   logger.log('AI предложение для общего врача:', type, suggestion);
                 }} />
 
@@ -1247,7 +1309,7 @@ const DoctorPanel = () => {
         isOpen={scheduleNextModal.open}
         onClose={() => setScheduleNextModal({ open: false, patient: null })}
         onSuccess={handleScheduleNextSuccess}
-        patient={scheduleNextModal.patient}
+        patient={scheduleNextModal.patient ?? undefined}
         theme={{ isDark, getColor, getSpacing, getFontSize }} />
 
       }

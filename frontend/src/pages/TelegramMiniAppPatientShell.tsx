@@ -69,7 +69,7 @@ const MINI_APP_STATUS_ALERT_PROPS = {
 };
 const MINI_APP_SUPPORT_TG_URL = 'https://t.me/clinic_support';
 
-function getMiniAppOnboardingValue(request, camelKey, snakeKey, fallback = '') {
+function getMiniAppOnboardingValue(request: Record<string, any> | null, camelKey: string, snakeKey: string, fallback = '') {
   if (!request || typeof request !== 'object') {
     return fallback;
   }
@@ -82,11 +82,11 @@ function getMiniAppOnboardingValue(request, camelKey, snakeKey, fallback = '') {
   return fallback;
 }
 
-function canEditMiniAppOnboardingRequest(status) {
+function canEditMiniAppOnboardingRequest(status: string) {
   return ['not_found', 'needs_more_info', 'rejected', 'cancelled', 'expired'].includes(status);
 }
 
-function shouldShowMiniAppOnboardingSummary(status) {
+function shouldShowMiniAppOnboardingSummary(status: string) {
   return status !== 'not_found';
 }
 
@@ -98,18 +98,18 @@ function getTelegramMiniAppInitData() {
   return window.Telegram?.WebApp?.initData || '';
 }
 
-function getTelegramMiniAppEntryToken(search) {
+function getTelegramMiniAppEntryToken(search: string) {
   const token = new URLSearchParams(search || '').get('entryToken') || '';
   return token.trim();
 }
 
-function getTelegramMiniAppEntryTokenSection(search) {
+function getTelegramMiniAppEntryTokenSection(search: string) {
   const token = getTelegramMiniAppEntryToken(search);
   const tokenSection = token.split('_')[1] || '';
   return MINI_APP_SECTION_ALIASES[tokenSection.trim().toLowerCase()] || '';
 }
 
-function getTelegramMiniAppAuthPayload(search, section) {
+function getTelegramMiniAppAuthPayload(search: string, section: string) {
   const initData = getTelegramMiniAppInitData();
   const selectedSection = section || getTelegramMiniAppSelectedSection(search);
   if (initData) {
@@ -133,12 +133,12 @@ function getTelegramMiniAppAuthPayload(search, section) {
   return null;
 }
 
-function getTelegramMiniAppSelectedSection(search) {
+function getTelegramMiniAppSelectedSection(search: string) {
   const section = new URLSearchParams(search || '').get('section') || '';
   return MINI_APP_SECTION_ALIASES[section.trim().toLowerCase()] || '';
 }
 
-function normalizeMiniAppLanguage(languageCode) {
+function normalizeMiniAppLanguage(languageCode: string) {
   const value = String(languageCode || '').trim().toLowerCase().replace('_', '-');
   return value.startsWith('uz') ? MINI_APP_LANGUAGE_UZ : MINI_APP_LANGUAGE_RU;
 }
@@ -150,11 +150,11 @@ function getTelegramMiniAppClientLanguage() {
   return window.Telegram?.WebApp?.initDataUnsafe?.user?.language_code || MINI_APP_LANGUAGE_RU;
 }
 
-function camelToSnakeCase(segment) {
+function camelToSnakeCase(segment: string) {
   return segment.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
 }
 
-function miniAppKeyToI18nKey(key) {
+function miniAppKeyToI18nKey(key: string) {
   const flatKey = key.split('.').map(camelToSnakeCase).join('_');
   return `final.tgs_${flatKey}`;
 }
@@ -170,14 +170,14 @@ function translateMiniAppText(languageCode: string, key: string, params: Record<
   return result === i18nKey ? key : String(result);
 }
 
-function localizeMiniAppCapabilityStatus(languageCode, status) {
+function localizeMiniAppCapabilityStatus(languageCode: string, status: string) {
   const key = status || 'manifest_only';
   const lookupKey = `capabilityStatus.${key}`;
   const translated = translateMiniAppText(languageCode, lookupKey);
   return translated === lookupKey ? key : translated;
 }
 
-function localizeMiniAppPatientForm(languageCode, form) {
+function localizeMiniAppPatientForm(languageCode: string, form: Record<string, any>) {
   const language = normalizeMiniAppLanguage(languageCode);
   const fixedT = i18n.getFixedT(language) as unknown as (key: string, options?: Record<string, unknown>) => string;
   const titleKey = `final.tgs_forms_${form.id}_title`;
@@ -187,7 +187,7 @@ function localizeMiniAppPatientForm(languageCode, form) {
     ...form,
     title: i18n.exists(titleKey, { lng: language }) ? fixedT(titleKey) : form.title,
     description: i18n.exists(descriptionKey, { lng: language }) ? fixedT(descriptionKey) : form.description,
-    fields: (form.fields || []).map((field) => {
+    fields: (form.fields || []).map((field: Record<string, any>) => {
       const fieldKey = `${fieldsPrefix}${field.key}`;
       return {
         ...field,
@@ -197,7 +197,7 @@ function localizeMiniAppPatientForm(languageCode, form) {
   };
 }
 
-function formatMiniAppMoney(languageCode, value) {
+function formatMiniAppMoney(languageCode: string, value: unknown) {
   const amount = String(value == null || value === '' ? '0' : value).trim();
   const suffix = translateMiniAppText(languageCode, 'currencySuffix');
   return /\b(сум|so'?m)\b/i.test(amount) ? amount : `${amount} ${suffix}`;
@@ -225,7 +225,7 @@ function createMiniAppAppointmentPreviewForm() {
   };
 }
 
-function buildMiniAppAppointmentRequestBody(authPayload, form) {
+function buildMiniAppAppointmentRequestBody(authPayload: Record<string, any>, form: Record<string, any>) {
   return {
     ...authPayload,
     appointmentDate: form.appointmentDate,
@@ -235,7 +235,7 @@ function buildMiniAppAppointmentRequestBody(authPayload, form) {
   };
 }
 
-function buildMiniAppOnboardingRequestBody(authPayload, form, languageCode) {
+function buildMiniAppOnboardingRequestBody(authPayload: Record<string, any>, form: Record<string, any>, languageCode: string) {
   return {
     ...authPayload,
     languageCode,
@@ -249,7 +249,7 @@ function buildMiniAppOnboardingRequestBody(authPayload, form, languageCode) {
   };
 }
 
-function hydrateMiniAppAppointmentFormFromOnboardingRequest(form, request) {
+function hydrateMiniAppAppointmentFormFromOnboardingRequest(form: Record<string, any>, request: Record<string, any> | null) {
   if (!request) {
     return form;
   }
@@ -266,7 +266,7 @@ function hydrateMiniAppAppointmentFormFromOnboardingRequest(form, request) {
   };
 }
 
-function getMiniAppTelemetryReasonCode(reasonCode) {
+function getMiniAppTelemetryReasonCode(reasonCode: unknown) {
   const value = String(reasonCode || '').trim().toLowerCase();
   if (!/^[a-z0-9_:-]{1,64}$/.test(value)) {
     return null;
@@ -281,7 +281,7 @@ function emitMiniAppOnboardingTelemetry(event: string, meta: Record<string, unkn
     role: 'patient',
     scope: 'onboarding',
     section,
-    language: normalizeMiniAppLanguage(meta.language),
+    language: normalizeMiniAppLanguage(String(meta.language || '')),
     success: meta.success !== false,
     reason_code: getMiniAppTelemetryReasonCode(meta.reason_code),
     timestamp: new Date().toISOString(),
@@ -299,8 +299,8 @@ function emitMiniAppOnboardingTelemetry(event: string, meta: Record<string, unkn
   }, MINI_APP_TELEMETRY_REQUEST_CONFIG).catch(() => {});
 }
 
-function emitMiniAppOnboardingStatusTelemetry(status, meta = {}) {
-  const event = MINI_APP_ONBOARDING_STATUS_EVENTS[status];
+function emitMiniAppOnboardingStatusTelemetry(status: string, meta: Record<string, unknown> = {}) {
+  const event = (MINI_APP_ONBOARDING_STATUS_EVENTS as Record<string, string>)[status];
   if (!event) {
     return;
   }
@@ -310,7 +310,7 @@ function emitMiniAppOnboardingStatusTelemetry(status, meta = {}) {
   });
 }
 
-function getMiniAppApiErrorReason(error, fallback) {
+function getMiniAppApiErrorReason(error: any, fallback: string) {
   const detail = error?.response?.data?.detail;
   if (typeof detail === 'string') {
     return detail;
@@ -322,7 +322,7 @@ function getMiniAppApiErrorReason(error, fallback) {
   return typeof reason === 'string' ? reason : fallback;
 }
 
-function getMiniAppPatientSessionErrorMessage(error, languageCode) {
+function getMiniAppPatientSessionErrorMessage(error: any, languageCode: string) {
   const reason = getMiniAppApiErrorReason(error, 'session_not_confirmed');
   if (MINI_APP_EXPIRED_ENTRY_TOKEN_REASONS.has(reason)) {
     return translateMiniAppText(languageCode, 'sessionExpired');
@@ -330,7 +330,7 @@ function getMiniAppPatientSessionErrorMessage(error, languageCode) {
   return translateMiniAppText(languageCode, 'sessionNotConfirmed');
 }
 
-function getMiniAppStatusBadge(status, languageCode) {
+function getMiniAppStatusBadge(status: string, languageCode: string) {
   switch (status) {
     case 'ready':
       return { variant: 'success', label: translateMiniAppText(languageCode, 'sessionReady') };
@@ -344,7 +344,7 @@ function getMiniAppStatusBadge(status, languageCode) {
   }
 }
 
-function isMiniAppCapabilityEnabled(capability) {
+function isMiniAppCapabilityEnabled(capability: Record<string, any> | null) {
   return Boolean(
     capability?.create_enabled ||
     capability?.preview_enabled ||
@@ -374,14 +374,14 @@ function notifyTelegramMiniAppReady() {
   }
 }
 
-function getMiniAppFormsInitialAnswers(forms = []) {
-  return forms.reduce((acc, form) => {
+function getMiniAppFormsInitialAnswers(forms: any[] = []) {
+  return forms.reduce((acc: Record<string, any>, form: any) => {
     acc[form.id] = form.submission?.answers || {};
     return acc;
   }, {});
 }
 
-function getMiniAppFormFieldValue(answers, formId, field) {
+function getMiniAppFormFieldValue(answers: Record<string, any> | null, formId: string, field: Record<string, any>) {
   const value = answers?.[formId]?.[field.key];
   if (field.type === 'boolean') {
     return Boolean(value);
@@ -389,7 +389,7 @@ function getMiniAppFormFieldValue(answers, formId, field) {
   return value == null ? '' : String(value);
 }
 
-function getMiniAppReportFileName(report) {
+function getMiniAppReportFileName(report: Record<string, any> | null) {
   const safeName = String(report?.name || `report-${report?.id || 'result'}`)
     .trim()
     .replace(/[\\/:*?"<>|]+/g, '-')
@@ -409,49 +409,85 @@ function TelegramMiniAppPatientShell() {
   const location = useLocation();
   const navigate = useNavigate();
   const selectedSection = getTelegramMiniAppSelectedSection(location.search);
-  const [state, setState] = useState({
+  const [state, setState] = useState<{
+    status: string;
+    manifest: Record<string, any> | null;
+    error: string | null;
+  }>({
     status: 'checking',
     manifest: null,
     error: null,
   });
-  const [appointmentPreviewForm, setAppointmentPreviewForm] = useState(createMiniAppAppointmentPreviewForm);
-  const [appointmentPreview, setAppointmentPreview] = useState({
+  const [appointmentPreviewForm, setAppointmentPreviewForm] = useState<Record<string, any>>(createMiniAppAppointmentPreviewForm);
+  const [appointmentPreview, setAppointmentPreview] = useState<{
+    status: string;
+    payload: Record<string, any> | null;
+    error: string | null;
+  }>({
     status: 'idle',
     payload: null,
     error: null,
   });
-  const [appointmentCreate, setAppointmentCreate] = useState({
+  const [appointmentCreate, setAppointmentCreate] = useState<{
+    status: string;
+    payload: Record<string, any> | null;
+    error: string | null;
+  }>({
     status: 'idle',
     payload: null,
     error: null,
   });
-  const [onboardingSubmit, setOnboardingSubmit] = useState({
+  const [onboardingSubmit, setOnboardingSubmit] = useState<{
+    status: string;
+    payload: Record<string, any> | null;
+    error: string | null;
+  }>({
     status: 'idle',
     payload: null,
     error: null,
   });
-  const [cabinetSummary, setCabinetSummary] = useState({
+  const [cabinetSummary, setCabinetSummary] = useState<{
+    status: string;
+    payload: Record<string, any> | null;
+    error: string | null;
+  }>({
     status: 'idle',
     payload: null,
     error: null,
   });
-  const [formsPreview, setFormsPreview] = useState({
+  const [formsPreview, setFormsPreview] = useState<{
+    status: string;
+    payload: Record<string, any> | null;
+    error: string | null;
+  }>({
     status: 'idle',
     payload: null,
     error: null,
   });
   const [formAnswers, setFormAnswers] = useState<Record<string, unknown>>({});
-  const [formSubmit, setFormSubmit] = useState({
+  const [formSubmit, setFormSubmit] = useState<{
+    status: string;
+    formId: string | null;
+    error: string | null;
+  }>({
     status: 'idle',
     formId: null,
     error: null,
   });
-  const [resultsSummary, setResultsSummary] = useState({
+  const [resultsSummary, setResultsSummary] = useState<{
+    status: string;
+    payload: Record<string, any> | null;
+    error: string | null;
+  }>({
     status: 'idle',
     payload: null,
     error: null,
   });
-  const [reportDownload, setReportDownload] = useState({
+  const [reportDownload, setReportDownload] = useState<{
+    status: string;
+    reportId: string | null;
+    error: string | null;
+  }>({
     status: 'idle',
     reportId: null,
     error: null,
@@ -678,7 +714,7 @@ function TelegramMiniAppPatientShell() {
     canEditOnboardingRequest
   );
 
-  const handleMiniAppCapabilitySelect = (section) => {
+  const handleMiniAppCapabilitySelect = (section: string) => {
     if (!section || section === selectedSection) {
       return;
     }
@@ -730,7 +766,7 @@ function TelegramMiniAppPatientShell() {
     });
   };
 
-  const handleAppointmentPreviewFieldChange = (field) => (event) => {
+  const handleAppointmentPreviewFieldChange = (field: string) => (event: { target: { value: string } }) => {
     setAppointmentPreviewForm((current) => ({
       ...current,
       [field]: event.target.value,
@@ -752,7 +788,7 @@ function TelegramMiniAppPatientShell() {
     });
   };
 
-  const handleAppointmentPreviewSubmit = (event) => {
+  const handleAppointmentPreviewSubmit = (event: { preventDefault: () => void }) => {
     event.preventDefault();
 
     const authPayload = getTelegramMiniAppAuthPayload(location.search, 'appointments');
@@ -840,7 +876,7 @@ function TelegramMiniAppPatientShell() {
       });
   };
 
-  const handleOnboardingRequestSubmit = (event) => {
+  const handleOnboardingRequestSubmit = (event: { preventDefault: () => void }) => {
     event.preventDefault();
 
     const authPayload = getTelegramMiniAppAuthPayload(location.search, 'appointments');
@@ -899,8 +935,8 @@ function TelegramMiniAppPatientShell() {
       });
   };
 
-  const handlePatientFormFieldChange = (formId, field) => (event) => {
-    const value = field.type === 'boolean' ? event.target.checked : event.target.value;
+  const handlePatientFormFieldChange = (formId: string, field: Record<string, any>) => (event: any) => {
+    const value = field.type === 'boolean' ? (event?.target?.checked ?? event) : (event?.target?.value ?? event);
     setFormAnswers((current) => ({
       ...current,
       [formId]: {
@@ -910,7 +946,7 @@ function TelegramMiniAppPatientShell() {
     }));
   };
 
-  const handlePatientFormSubmit = (form) => (event) => {
+  const handlePatientFormSubmit = (form: Record<string, any>) => (event: { preventDefault: () => void }) => {
     event.preventDefault();
 
     const authPayload = getTelegramMiniAppAuthPayload(location.search, 'forms');
@@ -962,7 +998,7 @@ function TelegramMiniAppPatientShell() {
       });
   };
 
-  const handleReportDownload = (report) => () => {
+  const handleReportDownload = (report: Record<string, any>) => () => {
     const authPayload = getTelegramMiniAppAuthPayload(location.search, 'results');
     if (!authPayload) {
       setReportDownload({

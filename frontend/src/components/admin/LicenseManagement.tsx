@@ -36,35 +36,57 @@ import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 
-const emptyLicenseStats = {
+interface License {
+  id: string | number;
+  name?: string;
+  vendor?: string;
+  license_key?: string;
+  status?: string;
+  type?: string;
+  cost?: number;
+  seats?: number;
+  purchase_date?: string;
+  expiry_date?: string;
+  description?: string;
+  [k: string]: unknown;
+}
+
+interface LicenseStats {
+  total_licenses: number;
+  active_licenses: number;
+  expired_licenses: number;
+  expiring_licenses: number;
+}
+
+const emptyLicenseStats: LicenseStats = {
   total_licenses: 0,
   active_licenses: 0,
   expired_licenses: 0,
   expiring_licenses: 0
 };
 
-const deriveLicenseStats = (licenseList) => {
+const deriveLicenseStats = (licenseList: unknown[]): LicenseStats => {
   const nextLicenses = Array.isArray(licenseList) ? licenseList : [];
   return {
     total_licenses: nextLicenses.length,
-    active_licenses: nextLicenses.filter((license) => license.status === 'active').length,
-    expired_licenses: nextLicenses.filter((license) => license.status === 'expired').length,
-    expiring_licenses: nextLicenses.filter((license) => license.status === 'expiring').length
+    active_licenses: nextLicenses.filter((license) => (license as License)?.status === 'active').length,
+    expired_licenses: nextLicenses.filter((license) => (license as License)?.status === 'expired').length,
+    expiring_licenses: nextLicenses.filter((license) => (license as License)?.status === 'expiring').length
   };
 };
 
 const LicenseManagement = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [licenses, setLicenses] = useState([]);
+  const [licenses, setLicenses] = useState<License[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
   const [showAddForm, setShowAddForm] = useState(false);
-  const [editingLicense, setEditingLicense] = useState(null);
+  const [editingLicense, setEditingLicense] = useState<License | null>(null);
   const [message, setMessage] = useState({ type: '', text: '' });
-  const [stats, setStats] = useState(null);
-  const [showKeys, setShowKeys] = useState({});
+  const [stats, setStats] = useState<LicenseStats | null>(null);
+  const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
 
@@ -103,8 +125,8 @@ const LicenseManagement = () => {
       setLoading(true);
       const response = (await api.get('/clinic/licenses')) as import('axios').AxiosResponse<Record<string, unknown>>;
       const nextLicenses = Array.isArray(response.data)
-        ? (response.data as unknown[])
-        : (response.data?.licenses as unknown[]) || [];
+        ? (response.data as License[])
+        : ((response.data?.licenses as License[]) || []);
       setLicenses(nextLicenses);
       setStats(deriveLicenseStats(nextLicenses));
     } catch (error) {
@@ -216,7 +238,7 @@ const LicenseManagement = () => {
   };
 
   const filteredLicenses = licenses.filter((license) => {
-    const matchesSearch = license.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const matchesSearch = (license.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     license.vendor?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     license.license_key?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || license.status === statusFilter;
@@ -526,7 +548,7 @@ const LicenseManagement = () => {
                     {license.name}
                   </h3>
                   <p className="admin-sm-secondary-m-0">
-                    {license.vendor} • {getTypeLabel(license.type)}
+                    {license.vendor} • {getTypeLabel(license.type || '')}
                   </p>
                 </div>
                 <Badge
@@ -564,10 +586,10 @@ const LicenseManagement = () => {
                     <Copy aria-hidden="true" className="admin-w-12-h-12" />
                   </Button>
                 </div>
-                {license.cost > 0 &&
+                {Number(license.cost) > 0 &&
             <div className="admin-flex-ai-center-gap-8-sm-secondary">
                     <DollarSign aria-hidden="true" className="w-4 h-4" />
-                    <span>{t('admin2.lm_cost_display', { cost: license.cost.toLocaleString() })}</span>
+                    <span>{t('admin2.lm_cost_display', { cost: Number(license.cost || 0).toLocaleString() })}</span>
                   </div>
             }
                 <div className="admin-flex-ai-center-gap-8-sm-secondary">

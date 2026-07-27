@@ -31,16 +31,50 @@ import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
+
+interface DisplayBoard {
+  id: string | number;
+  display_name?: string;
+  location?: string;
+  theme?: string;
+  show_patient_names?: string;
+  queue_display_count?: number;
+  show_doctor_photos?: boolean;
+  show_announcements?: boolean;
+  show_banners?: boolean;
+  show_videos?: boolean;
+  call_display_duration?: number;
+  sound_enabled?: boolean;
+  voice_announcements?: boolean;
+  voice_language?: string;
+  volume_level?: number;
+  [key: string]: unknown;
+}
+
+interface DisplayTheme {
+  name: string;
+  display_name: string;
+  [key: string]: unknown;
+}
+
+interface DisplayBanner {
+  id: string | number;
+  title?: string;
+  description?: string;
+  image_url?: string;
+  [key: string]: unknown;
+}
+
 const DisplayBoardSettings = () => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [boards, setBoards] = useState([]); // P2 fix: restored value (was const [, setX]; used in loadDisplayData L75)
-  const [selectedBoard, setSelectedBoard] = useState(null);
-  const [themes, setThemes] = useState([]);
+  const [boards, setBoards] = useState<DisplayBoard[]>([]); // P2 fix: restored value (was const [, setX]; used in loadDisplayData L75)
+  const [selectedBoard, setSelectedBoard] = useState<DisplayBoard | null>(null);
+  const [themes, setThemes] = useState<DisplayTheme[]>([]);
   const [stats, setStats] = useState<Record<string, unknown>>({});
-  const [banners] = useState([]);
+  const [banners] = useState<DisplayBanner[]>([]);
   const [showBannerForm, setShowBannerForm] = useState(false); // P2 fix: restored value (used at L545 onClick)
   const [testResults, setTestResults] = useState<Record<string, { testing?: boolean; success?: boolean; message?: string; error?: string; [k: string]: unknown }>>({});
   const [message, setMessage] = useState({ type: '', text: '' });
@@ -100,8 +134,8 @@ const DisplayBoardSettings = () => {
     }
   };
 
-  const handleBoardSettingChange = (key, value) => {
-    setSelectedBoard((prev) => ({ ...prev, [key]: value }));
+  const handleBoardSettingChange = (key: string, value: unknown) => {
+    setSelectedBoard((prev) => (prev ? { ...prev, [key]: value } : prev));
   };
 
   const saveBoard = async () => {
@@ -127,7 +161,7 @@ const DisplayBoardSettings = () => {
     }
   };
 
-  const testBoard = async (testType) => {
+  const testBoard = async (testType: string) => {
     if (!selectedBoard) return;
 
     try {
@@ -153,7 +187,7 @@ const DisplayBoardSettings = () => {
           ...prev,
           [testType]: {
             success: true,
-            message: result.message,
+            message: String(result.message ?? ''),
             data: result.test_data
           }
         }));

@@ -45,6 +45,43 @@ import { parseECGFile, analyzeECGParameters } from './ECGParser';
 
 const iconSize = 16;
 
+interface EcgParameters {
+  heartRate?: number;
+  prInterval?: number;
+  qrsInterval?: number;
+  qtInterval?: number;
+  qtCorrected?: number;
+  rhythm?: string;
+  stSegment?: string;
+  tWave?: string;
+  axis?: string | number;
+  interpretation?: string;
+  [key: string]: unknown;
+}
+
+interface EcgFile {
+  id: string | number;
+  name: string;
+  type: string;
+  size: number;
+  uploadedAt: string;
+  parameters: EcgParameters | null;
+  [key: string]: unknown;
+}
+
+interface AnalysisResult {
+  findings?: string[];
+  interpretation?: string;
+  recommendations?: string;
+  error?: string;
+  [key: string]: unknown;
+}
+
+// Styles object contains a mix of CSSProperties and one function (dropzone).
+// `any` is used here intentionally to keep the mixed-type access ergonomic;
+// explicit `any` is permitted under noImplicitAny (which only flags inferred
+// any). See ADR-0014 for the rationale on legacy style objects.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const styles: Record<string, any> = {
   root: {
     display: 'grid',
@@ -235,16 +272,16 @@ const styles: Record<string, any> = {
 const ECGViewer = ({ visitId, patientId, onDataUpdate }: { visitId?: string | number; patientId?: string | number; onDataUpdate?: (data: unknown) => void }) => {
   const { t: tI18n } = useTranslation();
   const t = tI18n as unknown as (key: string, options?: Record<string, unknown>) => string;
-  const [ecgFiles, setEcgFiles] = useState([]);
-  const [selectedFile, setSelectedFile] = useState(null);
+  const [ecgFiles, setEcgFiles] = useState<EcgFile[]>([]);
+  const [selectedFile, setSelectedFile] = useState<EcgFile | null>(null);
   const [viewerOpen, setViewerOpen] = useState(false);
-  const [viewerBlobUrl, setViewerBlobUrl] = useState(null);
+  const [viewerBlobUrl, setViewerBlobUrl] = useState<string | null>(null);
   const [viewerLoading, setViewerLoading] = useState(false);
   const [viewerError, setViewerError] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState(null);
+  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [ecgParameters, setEcgParameters] = useState(null);
+  const [ecgParameters, setEcgParameters] = useState<EcgParameters | null>(null);
 
   useEffect(() => () => {
     if (viewerBlobUrl) {
@@ -262,7 +299,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }: { visitId?: string | nu
   };
 
   // Загрузка файлов
-  const onDrop = async (acceptedFiles) => {
+  const onDrop = async (acceptedFiles: File[]) => {
     for (const file of acceptedFiles) {
       setUploadProgress(0);
       
@@ -281,20 +318,21 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }: { visitId?: string | nu
         
         const response = await api.post('/files/upload', formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
-          onUploadProgress: (progressEvent) => {
+          onUploadProgress: (progressEvent: { loaded: number; total?: number }) => {
             const percentCompleted = Math.round(
-              (progressEvent.loaded * 100) / progressEvent.total
+              (progressEvent.loaded * 100) / (progressEvent.total ?? 1)
             );
             setUploadProgress(percentCompleted);
           },
         });
         
-        const newFile = {
-          id: response.data.id,
-          name: response.data.original_filename || file.name,
-          type: response.data.mime_type || file.type,
-          size: response.data.file_size || file.size,
-          uploadedAt: response.data.created_at || new Date().toISOString(),
+        const responseData = response.data as Record<string, unknown>;
+        const newFile: EcgFile = {
+          id: responseData.id as string | number,
+          name: String(responseData.original_filename ?? file.name),
+          type: String(responseData.mime_type ?? file.type),
+          size: Number(responseData.file_size ?? file.size),
+          uploadedAt: String(responseData.created_at ?? new Date().toISOString()),
           parameters: null,
         };
         
@@ -323,7 +361,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }: { visitId?: string | nu
   });
 
   // Парсинг ЭКГ файла
-  const parseECGFileData = async (originalFile, uploadedFile) => {
+  const parseECGFileData = async (originalFile: File, uploadedFile: EcgFile) => {
     try {
       // Сначала пробуем локальный парсинг
       const parseResult = await parseECGFile(originalFile) as unknown as Record<string, unknown>;
@@ -335,12 +373,12 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }: { visitId?: string | nu
           ...analysis,
         };
         
-        setEcgParameters(enrichedParams);
+        setEcgParameters(enrichedParams as EcgParameters);
         
         // Обновляем файл с параметрами
         setEcgFiles(prev => prev.map(f => 
           f.id === uploadedFile.id 
-            ? { ...f, parameters: enrichedParams }
+            ? { ...f, parameters: enrichedParams as EcgParameters }
             : f
         ));
 
@@ -384,7 +422,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }: { visitId?: string | nu
     }
   };
 
-  const openFileBlobUrl = async (fileId, mode = 'preview') => {
+  const openFileBlobUrl = async (fileId: string | number, mode = 'preview') => {
     const response = (await api.get(`/files/${fileId}/${mode}`, {
       responseType: 'blob',
     })) as import('axios').AxiosResponse<Record<string, unknown>>;
@@ -392,7 +430,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }: { visitId?: string | nu
     return window.URL.createObjectURL(response.data as unknown as Blob);
   };
 
-  const downloadFile = async (file) => {
+  const downloadFile = async (file: EcgFile) => {
     if (!file?.id) {
       return;
     }
@@ -413,7 +451,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }: { visitId?: string | nu
   };
 
   // AI анализ ЭКГ
-  const analyzeECG = async (file) => {
+  const analyzeECG = async (file: EcgFile) => {
     setAnalyzing(true);
     setAnalysisResult(null);
     
@@ -424,7 +462,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }: { visitId?: string | nu
         patient_id: patientId,
       })) as import('axios').AxiosResponse<Record<string, unknown>>;
       
-      setAnalysisResult(response.data);
+      setAnalysisResult(response.data as unknown as AnalysisResult);
       onDataUpdate?.(undefined);
       
     } catch (error) {
@@ -438,7 +476,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }: { visitId?: string | nu
   };
 
   // Открыть просмотрщик
-  const openViewer = async (file) => {
+  const openViewer = async (file: EcgFile) => {
     setSelectedFile(file);
     setViewerOpen(true);
     setViewerLoading(true);
@@ -475,7 +513,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }: { visitId?: string | nu
   };
 
   // Удалить файл
-  const deleteFile = async (fileId) => {
+  const deleteFile = async (fileId: string | number) => {
     try {
       await api.delete(`/files/${fileId}`);
       setEcgFiles(prev => prev.filter(f => f.id !== fileId));
@@ -487,27 +525,27 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }: { visitId?: string | nu
   };
 
   // Форматирование размера файла
-  const formatFileSize = (bytes) => {
+  const formatFileSize = (bytes: number) => {
     if (bytes < 1024) return bytes + ' B';
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   };
 
   // Определение критичных параметров
-  const getCriticalParameters = (params) => {
-    const critical = [];
+  const getCriticalParameters = (params: EcgParameters | null | undefined) => {
+    const critical: Array<{ name: string; value: string }> = [];
     
-    if (params?.heartRate > 100) {
-      critical.push({ name: t('cardio.cardio_ecg_critical_tachycardia'), value: t('cardio.cardio_ecg_bpm_value', { count: params.heartRate }) });
+    if (Number(params?.heartRate ?? 0) > 100) {
+      critical.push({ name: t('cardio.cardio_ecg_critical_tachycardia'), value: t('cardio.cardio_ecg_bpm_value', { count: params?.heartRate ?? 0 }) });
     }
-    if (params?.heartRate < 60) {
-      critical.push({ name: t('cardio.cardio_ecg_critical_bradycardia'), value: t('cardio.cardio_ecg_bpm_value', { count: params.heartRate }) });
+    if (Number(params?.heartRate ?? 0) < 60) {
+      critical.push({ name: t('cardio.cardio_ecg_critical_bradycardia'), value: t('cardio.cardio_ecg_bpm_value', { count: params?.heartRate ?? 0 }) });
     }
-    if (params?.qtInterval > 450) {
-      critical.push({ name: t('cardio.cardio_ecg_critical_qt_prolonged'), value: t('cardio.cardio_ecg_ms_value', { count: params.qtInterval }) });
+    if (Number(params?.qtInterval ?? 0) > 450) {
+      critical.push({ name: t('cardio.cardio_ecg_critical_qt_prolonged'), value: t('cardio.cardio_ecg_ms_value', { count: params?.qtInterval ?? 0 }) });
     }
-    if (params?.prInterval > 200) {
-      critical.push({ name: t('cardio.cardio_ecg_critical_av_block'), value: t('cardio.cardio_ecg_ms_value', { count: params.prInterval }) });
+    if (Number(params?.prInterval ?? 0) > 200) {
+      critical.push({ name: t('cardio.cardio_ecg_critical_av_block'), value: t('cardio.cardio_ecg_ms_value', { count: params?.prInterval ?? 0 }) });
     }
     
     return critical;
@@ -578,13 +616,13 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }: { visitId?: string | nu
 
                       {file.parameters && (
                         <div style={styles.badgeRow}>
-                          <Badge variant={file.parameters.heartRate > 100 || file.parameters.heartRate < 60 ? 'warning' : 'info'}>
+                          <Badge variant={Number(file.parameters.heartRate ?? 0) > 100 || Number(file.parameters.heartRate ?? 0) < 60 ? 'warning' : 'info'}>
                             {t('cardio.cardio_ecg_hr_label', { value: file.parameters.heartRate })}
                           </Badge>
-                          <Badge variant={file.parameters.qtInterval > 450 ? 'warning' : 'info'}>
+                          <Badge variant={Number(file.parameters.qtInterval ?? 0) > 450 ? 'warning' : 'info'}>
                             {t('cardio.cardio_ecg_qt_label', { value: file.parameters.qtInterval })}
                           </Badge>
-                          <Badge variant={file.parameters.prInterval > 200 ? 'warning' : 'info'}>
+                          <Badge variant={Number(file.parameters.prInterval ?? 0) > 200 ? 'warning' : 'info'}>
                             {t('cardio.cardio_ecg_pr_label', { value: file.parameters.prInterval })}
                           </Badge>
                         </div>
@@ -813,10 +851,10 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }: { visitId?: string | nu
         </DialogContent>
 
         <DialogActions>
-          <Button onClick={() => analyzeECG(selectedFile)} disabled={analyzing}>
+          <Button onClick={() => { if (selectedFile) analyzeECG(selectedFile); }} disabled={analyzing}>
             {t('cardio.cardio_ecg_ai_analysis_action')}
           </Button>
-          <Button onClick={() => downloadFile(selectedFile)} variant="primary">
+          <Button onClick={() => { if (selectedFile) downloadFile(selectedFile); }} variant="primary">
             {t('cardio.cardio_ecg_download')}
           </Button>
           <Button onClick={closeViewer}>{t('cardio.cardio_ecg_close')}</Button>
