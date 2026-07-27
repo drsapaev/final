@@ -1,6 +1,7 @@
 import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect, useCallback } from 'react';
 import type { CSSProperties } from 'react';
+import type { LucideIcon } from 'lucide-react';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import {
@@ -32,8 +33,62 @@ import {
   Input,
   Select,
 } from '../ui/macos';
+import type { SelectChangeEvent } from '../ui/macos/Select';
 
-const ICON_MAP = {
+type TranslationFn = (key: string, options?: Record<string, unknown>) => string;
+
+interface Doctor {
+  id?: number;
+  active?: boolean;
+  cabinet?: string;
+  specialty?: string;
+  user?: {
+    full_name?: string;
+    username?: string;
+  };
+}
+
+interface QueueProfile {
+  key: string;
+  title_ru?: string;
+  title?: string;
+  icon?: string;
+  color?: string;
+  queue_tags?: string[];
+}
+
+interface Specialty {
+  key: string;
+  name: string;
+  icon: LucideIcon;
+  color: string;
+  description: string;
+}
+
+interface QueueSettingsState {
+  timezone: string;
+  queue_start_hour: number;
+  auto_close_time: string;
+  start_numbers: Record<string, number>;
+  max_per_day: Record<string, number>;
+  dev_mode_enabled: boolean;
+}
+
+interface TestResult {
+  token?: string;
+  selected_doctor_id?: number;
+  selected_doctor_name?: string;
+  selected_doctor_cabinet?: string;
+  doctor_id?: number;
+  doctor_specialty?: string;
+  doctor_cabinet?: string;
+  start_number?: number;
+  max_per_day?: number;
+  matched_doctors_count?: number;
+  qr_url?: string;
+}
+
+const ICON_MAP: Record<string, LucideIcon> = {
   'Heart': Heart,
   'Activity': Activity,
   'Sparkles': Sparkles,
@@ -53,22 +108,27 @@ const TIMEZONE_OPTIONS = [
   { value: 'Asia/Dubai', labelKey: 'admin2.qs_tz_dubai' }
 ];
 
-const normalizeNumber = (value, fallback) => {
+const normalizeNumber = (value: unknown, fallback: number): number => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
-const getNumberSetting = (collection, key, fallback) => (
-  normalizeNumber(collection?.[key], fallback)
+const getNumberSetting = (
+  collection: Record<string, unknown> | null | undefined,
+  key: string,
+  fallback: number
+): number => normalizeNumber(collection?.[key], fallback);
+
+const normalizeText = (value: unknown): string => String(value ?? '').trim().toLowerCase();
+
+const getDoctorDisplayName = (doctor: Doctor | null | undefined, t: TranslationFn): string => (
+  doctor?.user?.full_name || doctor?.user?.username || t('admin2.qs_doctor_fallback', { id: doctor?.id ?? '—' })
 );
 
-const normalizeText = (value) => String(value || '').trim().toLowerCase();
-
-const getDoctorDisplayName = (doctor, t) => (
-  doctor?.user?.full_name || doctor?.user?.username || t('admin2.qs_doctor_fallback', { id: doctor?.id || '—' })
-);
-
-const pickCanonicalDoctorForSpecialty = (doctorsList, specialtyKey) => {
+const pickCanonicalDoctorForSpecialty = (
+  doctorsList: Doctor[] | null | undefined,
+  specialtyKey: string
+): { doctor: Doctor | null; candidates: Doctor[] } => {
   const specialty = normalizeText(specialtyKey);
   const candidates = (Array.isArray(doctorsList) ? doctorsList : [])
     .filter((doctor) => normalizeText(doctor?.specialty) === specialty)
@@ -96,7 +156,7 @@ const pickCanonicalDoctorForSpecialty = (doctorsList, specialtyKey) => {
     });
 
   return {
-    doctor: candidates[0] || null,
+    doctor: candidates[0] ?? null,
     candidates,
   };
 };
@@ -107,7 +167,7 @@ const QueueSettings = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
-  const [settings, setSettings] = useState({
+  const [settings, setSettings] = useState<QueueSettingsState>({
     timezone: 'Asia/Tashkent',
     queue_start_hour: 7,
     auto_close_time: '09:00',
@@ -115,12 +175,12 @@ const QueueSettings = () => {
     max_per_day: {},
     dev_mode_enabled: false
   });
-  const [message, setMessage] = useState({ type: '', text: '' });
-  const [testResult, setTestResult] = useState(null);
+  const [message, setMessage] = useState<{ type: string; text: string }>({ type: '', text: '' });
+  const [testResult, setTestResult] = useState<TestResult | null>(null);
 
   // ⭐ SSOT: Загружаем специальности из QueueProfiles API
-  const [specialties, setSpecialties] = useState([]);
-  const [doctors, setDoctors] = useState([]);
+  const [specialties, setSpecialties] = useState<Specialty[]>([]);
+  const [doctors, setDoctors] = useState<Doctor[]>([]);
 
   // Загрузка профилей и докторов
   const loadProfiles = useCallback(async () => {
@@ -130,18 +190,19 @@ const QueueSettings = () => {
       api.get('/admin/doctors').catch(() => ({ data: [] }))]
       );
 
-      const profiles = profilesRes.data.profiles || [];
-      setSpecialties(profiles.map((p) => ({
+      const profilesRaw = (profilesRes.data?.profiles ?? []) as QueueProfile[];
+      setSpecialties(profilesRaw.map((p) => ({
         key: p.key,
-        name: p.title_ru || p.title,
-        icon: ICON_MAP[p.icon] || Stethoscope,
+        name: p.title_ru || p.title || p.key,
+        icon: ICON_MAP[p.icon ?? ''] || Stethoscope,
         color: p.color || 'var(--mac-text-primary)',
         description: (p.queue_tags || []).join(', ')
       })));
 
-      setDoctors(doctorsRes.data || []);
+      const doctorsData = (doctorsRes.data ?? []) as Doctor[];
+      setDoctors(doctorsData);
 
-      logger.info(`Loaded ${profiles.length} queue profiles and ${doctorsRes.data?.length || 0} doctors`);
+      logger.info(`Loaded ${profilesRaw.length} queue profiles and ${doctorsData.length} doctors`);
     } catch (error) {
       logger.error('Error loading profiles:', error);
       // Не устанавливаем fallback данные - показываем пустой список
@@ -157,13 +218,13 @@ const QueueSettings = () => {
     try {
       setLoading(true);
       const response = await api.get('/admin/queue/settings');
-      const data = response.data || {};
+      const data = (response.data ?? {}) as Partial<QueueSettingsState> & Record<string, unknown>;
       setSettings({
         timezone: data.timezone || 'Asia/Tashkent',
         queue_start_hour: normalizeNumber(data.queue_start_hour, 7),
         auto_close_time: data.auto_close_time || '09:00',
-        start_numbers: data.start_numbers || {},
-        max_per_day: data.max_per_day || {},
+        start_numbers: (data.start_numbers as Record<string, number>) || {},
+        max_per_day: (data.max_per_day as Record<string, number>) || {},
         dev_mode_enabled: Boolean(data.dev_mode_enabled),
       });
     } catch (error) {
@@ -174,15 +235,19 @@ const QueueSettings = () => {
     }
   };
 
-  const handleSettingChange = (path, value) => {
+  const handleSettingChange = (path: string, value: unknown) => {
     setSettings((prev) => {
-      const newSettings = { ...prev };
+      const newSettings: QueueSettingsState = { ...prev };
       const keys = path.split('.');
+      const topKey = keys[0] as keyof QueueSettingsState;
+      const newSettingsRecord = newSettings as unknown as Record<string, unknown>;
 
       if (keys.length === 1) {
-        newSettings[keys[0]] = value;
+        newSettingsRecord[topKey] = value;
       } else if (keys.length === 2) {
-        newSettings[keys[0]] = { ...newSettings[keys[0]], [keys[1]]: value };
+        const nested = newSettingsRecord[topKey];
+        const nestedRecord = (typeof nested === 'object' && nested !== null ? nested : {}) as Record<string, unknown>;
+        newSettingsRecord[topKey] = { ...nestedRecord, [keys[1]]: value };
       }
 
       return newSettings;
@@ -195,9 +260,11 @@ const QueueSettings = () => {
       setMessage({ type: '', text: '' });
 
       const response = await api.put('/admin/queue/settings', settings);
-
-      setMessage({ type: 'success', text: response.data.message });
-      setSettings(response.data.settings);
+      const data = response.data as { message?: string; settings?: QueueSettingsState };
+      setMessage({ type: 'success', text: data.message ?? '' });
+      if (data.settings) {
+        setSettings(data.settings);
+      }
     } catch (error) {
       logger.error('Ошибка сохранения:', error);
       setMessage({ type: 'error', text: t('admin2.qs_save_error') });
@@ -206,28 +273,28 @@ const QueueSettings = () => {
     }
   };
 
-  const testQueueGeneration = async (specialty) => {
+  const testQueueGeneration = async (specialty: string) => {
     try {
       setTesting(true);
       setTestResult(null);
 
       // ⭐ SSOT: Выбираем врача детерминированно среди докторов этой специальности.
       const { doctor, candidates } = pickCanonicalDoctorForSpecialty(doctors, specialty);
-      const doctorId = doctor?.id;
 
-      if (!doctorId) {
+      if (!doctor || !doctor.id) {
         setMessage({ type: 'error', text: t('admin2.qs_doctor_not_found', { specialty }) });
         setTesting(false);
         return;
       }
 
       const response = await api.post('/admin/queue/test', {
-        doctor_id: doctorId,
+        doctor_id: doctor.id,
         date: new Date().toISOString().split('T')[0]
       });
 
+      const testData = ((response.data?.test_data ?? {}) as Partial<TestResult>);
       setTestResult({
-        ...(response.data.test_data || {}),
+        ...testData,
         selected_doctor_id: doctor.id,
         selected_doctor_name: getDoctorDisplayName(doctor, t),
         selected_doctor_cabinet: doctor.cabinet || t('admin2.qs_not_specified'),
@@ -395,7 +462,7 @@ const QueueSettings = () => {
                 </label>
                 <Select
                   value={Number(settings.queue_start_hour)}
-                  onChange={(value: unknown) => handleSettingChange('queue_start_hour', parseInt(String(value), 10))}
+                  onChange={(event: SelectChangeEvent) => handleSettingChange('queue_start_hour', parseInt(event.target.value, 10))}
                   options={Array.from({ length: 24 }, (_, i) => ({
                     value: i,
                     label: `${String(i).padStart(2, '0')}:00`
@@ -428,7 +495,7 @@ const QueueSettings = () => {
                 </label>
                 <Select
                   value={settings.timezone}
-                  onChange={(value: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleSettingChange('timezone', value)}
+                  onChange={(event: SelectChangeEvent) => handleSettingChange('timezone', event.target.value)}
                   options={TIMEZONE_OPTIONS.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
                   className="w-full"></Select>
                 
