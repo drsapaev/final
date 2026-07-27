@@ -223,9 +223,9 @@ const ProtocolTemplates = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
   const [filterDifficulty, setFilterDifficulty] = useState('all');
-  const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<typeof templates[number] | null>(null);
   const [, setIsEditing] = useState(false);
-  const [, setEditingTemplate] = useState(null);
+  const [, setEditingTemplate] = useState<typeof templates[number] | null>(null);
 
   // Фильтрация шаблонов
   const filteredTemplates = templates.filter((template) => {
@@ -266,7 +266,7 @@ const ProtocolTemplates = ({
   };
 
   useEffect(() => {
-    const handlers = [];
+    const handlers: Array<[Element, (event: any) => void]> = [];
 
     document.querySelectorAll('button[data-protocol-template-select="true"]').forEach((button) => {
       const templateId = button.getAttribute('data-template-id');

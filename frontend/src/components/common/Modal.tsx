@@ -10,7 +10,7 @@ const t18 = i18n.t as unknown as (key: string, options?: Record<string, unknown>
 
 // Контекст для модальных окон
 const ModalContext = createContext<any>(null);
-let openModalExternal = null;
+let openModalExternal: ((modal: unknown) => number) | null = null;
 
 const getFontSize = (size) => {
   // t accessed via closure or t18()
@@ -27,7 +27,7 @@ const getFontSize = (size) => {
  * Провайдер контекста модальных окон
  */
 export function ModalProvider({ children }) {
-  const [modals, setModals] = useState([]);
+  const [modals, setModals] = useState<ModalEntry[]>([]);
   const theme = useTheme();
 
   const openModal = useCallback((modal) => {

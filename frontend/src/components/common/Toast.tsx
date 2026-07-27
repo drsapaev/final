@@ -16,7 +16,7 @@ let addToastExternal: ((toast: unknown) => void) | null = null;
  */
 export function ToastProvider({ children }) {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
-  const [toasts, setToasts] = useState([]);
+  const [toasts, setToasts] = useState<Record<string, unknown>[]>([]);
   const theme = useTheme();
 
   const addToast = useCallback((toast) => {
@@ -231,8 +231,8 @@ function ToastItem({ toast, onRemove, theme }: { toast: Record<string, unknown>;
     <div style={getToastStyles(toast.type as string) as unknown as CSSProperties}>
       {getIcon(toast.type as string)}
       <div style={contentStyle as unknown as CSSProperties}>
-        {toast.title && <div style={titleStyle as unknown as CSSProperties}>{toast.title as string}</div>}
-        {toast.message && <div style={messageStyle}>{toast.message as string}</div>}
+        {Boolean(toast.title) && <div style={titleStyle as unknown as CSSProperties}>{toast.title as string}</div>}
+        {Boolean(toast.message) && <div style={messageStyle}>{toast.message as string}</div>}
       </div>
       <button
         style={closeButtonStyle}
