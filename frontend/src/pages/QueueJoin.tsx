@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, FormEvent, ChangeEvent, ReactNode } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Clock,
@@ -23,6 +23,50 @@ import {
   Input,
   Checkbox } from '../components/ui/macos';
 import { useTranslation } from '../i18n/useTranslation';
+import type { QueueSpecialist } from '../types/domain/queue';
+
+interface QueueJoinPageInfo {
+  is_clinic_wide?: boolean;
+  selectable_specialists?: QueueSpecialist[];
+  target_date?: string;
+  specialist_name?: string;
+  department?: string;
+  department_name?: string;
+  queue_name?: string;
+  minutes_until_open?: number;
+  start_time?: string;
+  queue_length?: number;
+  specialty?: string;
+  queue_active?: boolean;
+  allowed?: boolean;
+  message?: string;
+  status?: string;
+  valid?: boolean;
+  expired?: boolean;
+  [key: string]: unknown;
+}
+
+interface QueueJoinResultEntry {
+  id?: number | string;
+  icon?: ReactNode;
+  specialist_name?: string;
+  department?: string;
+  specialty?: string;
+  queue_time?: string;
+  queue_number?: number;
+  number?: number;
+  [key: string]: unknown;
+}
+
+interface QueueJoinResultLocal {
+  success?: boolean;
+  message?: string;
+  entries?: QueueJoinResultEntry[];
+  queue_number?: number;
+  estimated_wait_time?: number;
+  specialist_name?: string;
+  [key: string]: unknown;
+}
 
 const QueueJoin = () => {
   const { token: paramToken } = useParams();
@@ -31,7 +75,7 @@ const QueueJoin = () => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
 
-  const formatSpecialistLabel = (specialist) => {
+  const formatSpecialistLabel = (specialist: QueueSpecialist | null | undefined) => {
     const doctorName =
       specialist?.doctor_name ||
       specialist?.full_name ||
@@ -43,7 +87,7 @@ const QueueJoin = () => {
       specialist?.specialty_display ||
       specialist?.specialty ||
       '';
-    const cabinetLabel = specialist?.cabinet ? t('misc.qj_cabinet_label', { cabinet: specialist.cabinet }) : '';
+    const cabinetLabel = specialist?.cabinet != null ? t('misc.qj_cabinet_label', { cabinet: String(specialist.cabinet) }) : '';
 
     return [doctorName, specialtyLabel, cabinetLabel]
       .filter(Boolean)
@@ -72,30 +116,30 @@ const QueueJoin = () => {
   const formStorageKey = token ? `queue_join_form_${token}` : null;
 
   // Состояния
-  const [step, setStep] = useState('loading'); // loading, waiting, info, select-specialists, form, success, error
-  const [queueInfo, setQueueInfo] = useState(null);
-  const [sessionToken, setSessionToken] = useState(null);
-  const [formData, setFormData] = useState({
+  const [step, setStep] = useState<'loading' | 'waiting' | 'info' | 'select-specialists' | 'form' | 'success' | 'error'>('loading');
+  const [queueInfo, setQueueInfo] = useState<QueueJoinPageInfo | null>(null);
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
+  const [formData, setFormData] = useState<Record<string, unknown>>({
     patientName: '',
     phone: '',
     telegramId: ''
-  } as Record<string, unknown>);
-  const [selectedSpecialists, setSelectedSpecialists] = useState([]); // Выбранные специалисты для общего QR
-  const [availableSpecialists, setAvailableSpecialists] = useState([]); // Список доступных специалистов из API
+  });
+  const [selectedSpecialists, setSelectedSpecialists] = useState<Array<number | string>>([]); // Выбранные специалисты для общего QR
+  const [availableSpecialists, setAvailableSpecialists] = useState<QueueSpecialist[]>([]); // Список доступных специалистов из API
   const [isSpecialistsLoading, setIsSpecialistsLoading] = useState(true);
-  const [result, setResult] = useState(null);
-  const [error, setError] = useState(null);
+  const [result, setResult] = useState<QueueJoinResultLocal | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [countdown, setCountdown] = useState(null);
+  const [countdown, setCountdown] = useState<number | null>(null);
 
-  const getApiErrorMessage = useCallback((err, fallbackMessage) => {
-    const responseData = err?.response?.data;
+  const getApiErrorMessage = useCallback((err: unknown, fallbackMessage: string): string => {
+    const responseData = (err as { response?: { data?: { detail?: unknown; message?: unknown } } })?.response?.data;
     if (typeof responseData?.detail === 'string') {
       return responseData.detail;
     }
     if (Array.isArray(responseData?.detail)) {
       return responseData.detail
-        .map((item) => item?.msg || String(item))
+        .map((item: unknown) => (item && typeof item === 'object' && 'msg' in item ? String((item as { msg?: unknown }).msg ?? '') : String(item)))
         .join(', ');
     }
     if (typeof responseData?.message === 'string') {
@@ -139,11 +183,15 @@ const QueueJoin = () => {
 
   // ✅ Функции объявлены до использования в useEffect
   const startJoinSession = useCallback(async () => {
+    if (!token) {
+      setIsSpecialistsLoading(false);
+      return;
+    }
     setIsSpecialistsLoading(true);
     try {
       const sessionData = await startQueueJoinSession(token);
-      const nextQueueInfo = sessionData.queue_info || {};
-      const selectableSpecialists = Array.isArray(nextQueueInfo.selectable_specialists)
+      const nextQueueInfo: QueueJoinPageInfo = (sessionData.queue_info ?? {}) as QueueJoinPageInfo;
+      const selectableSpecialists: QueueSpecialist[] = Array.isArray(nextQueueInfo.selectable_specialists)
         ? nextQueueInfo.selectable_specialists
         : [];
 
@@ -178,13 +226,13 @@ const QueueJoin = () => {
     try {
       setStep('loading');
       setIsSpecialistsLoading(true);
-      const tokenInfo = await fetchQrTokenInfo(token);
+      const tokenInfoRaw = await fetchQrTokenInfo(token);
+      const tokenInfo = tokenInfoRaw as unknown as QueueJoinPageInfo;
       setQueueInfo(tokenInfo);
-      setAvailableSpecialists(
-        Array.isArray(tokenInfo.selectable_specialists)
-          ? tokenInfo.selectable_specialists
-          : []
-      );
+      const tokenSpecialists = Array.isArray(tokenInfo.selectable_specialists)
+        ? tokenInfo.selectable_specialists
+        : [];
+      setAvailableSpecialists(tokenSpecialists);
 
       if (tokenInfo.status === 'before_start_time') {
         setQueueInfo(tokenInfo);
@@ -232,14 +280,14 @@ const QueueJoin = () => {
 
   // Обратный отсчет до открытия очереди
   useEffect(() => {
-    let interval;
+    let interval: ReturnType<typeof setInterval> | undefined;
 
     if (step === 'waiting' && queueInfo?.minutes_until_open) {
       setCountdown(queueInfo.minutes_until_open * 60); // переводим в секунды
 
       interval = setInterval(() => {
         setCountdown(prev => {
-          if (prev <= 1) {
+          if (prev === null || prev <= 1) {
             // Время истекло, перезагружаем информацию
             loadTokenInfo();
             return 0;
@@ -256,7 +304,7 @@ const QueueJoin = () => {
     };
   }, [step, queueInfo?.minutes_until_open, loadTokenInfo]);
 
-  const handleFormSubmit = async (e) => {
+  const handleFormSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     if (!String(formData.patientName ?? '').trim() || !String(formData.phone ?? '').trim()) {
@@ -354,7 +402,7 @@ const QueueJoin = () => {
       }
 
       const joinResult = await completeQueueJoinSession(requestBody);
-      setResult(joinResult);
+      setResult(joinResult as unknown as QueueJoinResultLocal);
       // ✅ Очищаем session_token из localStorage после успешного присоединения
       localStorage.removeItem(`queue_session_${token}`);
       if (formStorageKey) {
@@ -364,14 +412,14 @@ const QueueJoin = () => {
       // ✅ Отправляем событие обновления очереди для автоматического обновления таблицы
       if (joinResult.success) {
         // Определяем specialty из результата (entries содержит department)
-        const firstEntry = joinResult.entries?.[0];
-        let specialty = firstEntry?.department ||
+        const firstEntry: QueueJoinResultEntry | undefined = (joinResult as unknown as QueueJoinResultLocal).entries?.[0];
+        let specialty: string | null = firstEntry?.department ||
           firstEntry?.specialty ||
           queueInfo?.specialty ||
           null;
 
         // Нормализуем specialty и определяем departmentKey для соответствия с RegistrarPanel
-        let departmentKey = null;
+        let departmentKey: string | null = null;
         if (specialty) {
           const normalized = specialty.toLowerCase();
           if (normalized === 'cardio' || normalized === 'cardiology') {
@@ -435,7 +483,7 @@ const QueueJoin = () => {
     }
   };
 
-  const handleInputChange = (field, value) => {
+  const handleInputChange = (field: string, value: unknown) => {
     if (error) {
       setError(null);
     }
@@ -446,7 +494,7 @@ const QueueJoin = () => {
   };
 
   // ✅ Функция форматирования узбекского номера телефона
-  const formatUzbekPhone = (value) => {
+  const formatUzbekPhone = (value: string): string => {
     // Удаляем все нецифровые символы
     const numbers = value.replace(/\D/g, '');
 
@@ -479,7 +527,7 @@ const QueueJoin = () => {
   };
 
   // ✅ Обработчик изменения телефона с форматированием
-  const handlePhoneChange = (e) => {
+  const handlePhoneChange = (e: ChangeEvent<HTMLInputElement>) => {
     const input = e.target.value;
     const formatted = formatUzbekPhone(input);
     if (error) {
@@ -493,7 +541,7 @@ const QueueJoin = () => {
     }));
   };
 
-  const formatWaitTime = (minutes) => {
+  const formatWaitTime = (minutes: number): string => {
     if (minutes < 60) {
       return t('misc.qj_wait_minutes', { minutes });
     }
@@ -502,7 +550,7 @@ const QueueJoin = () => {
     return t('misc.qj_wait_hours_minutes', { hours, mins });
   };
 
-  const formatCountdown = (seconds) => {
+  const formatCountdown = (seconds: number | null): string => {
     if (!seconds) return '00:00:00';
 
     const hours = Math.floor(seconds / 3600);
@@ -741,10 +789,10 @@ const QueueJoin = () => {
   // Компонент успешного присоединения - macOS стиль
   if (step === 'success') {
     // Проверяем, множественная ли регистрация
-    const isMultiple = result.entries && Array.isArray(result.entries) && result.entries.length > 1;
+    const isMultiple = !!(result?.entries && Array.isArray(result.entries) && result.entries.length > 1);
 
     // Определяем название вкладки для подсказки пользователю
-    const getDepartmentName = (specialty) => {
+    const getDepartmentName = (specialty: string | null | undefined): string => {
       const normalized = (specialty || '').toLowerCase();
       if (normalized === 'cardio' || normalized === 'cardiology') return t('misc.qj_dept_cardiology');
       if (normalized === 'derma' || normalized === 'dermatology') return t('misc.qj_dept_dermatology');
@@ -753,7 +801,8 @@ const QueueJoin = () => {
       return t('misc.qj_dept_default');
     };
 
-    const departmentName = getDepartmentName(result.entries?.[0]?.department || result.entries?.[0]?.specialty);
+    const firstSuccessEntry = result?.entries?.[0];
+    const departmentName = getDepartmentName(firstSuccessEntry?.department || firstSuccessEntry?.specialty);
 
     return (
       <main className="min-h-screen flex items-center justify-center p-4 qj-page-base" aria-labelledby="queue-join-success-title">
@@ -773,10 +822,10 @@ const QueueJoin = () => {
             <>
               <div className="qj-success-box">
                 <p className="qj-success-entries-title">
-                  {t('misc.qj_success_registered_in', { count: result.entries.length })}
+                  {t('misc.qj_success_registered_in', { count: result?.entries?.length ?? 0 })}
                 </p>
                 <div className="qj-success-entries-list">
-                  {result.entries.map((entry, idx) => (
+                  {(result?.entries ?? []).map((entry, idx) => (
                     <div
                       key={idx}
                       style={{
@@ -827,7 +876,7 @@ const QueueJoin = () => {
             <>
               <div className="qj-success-box-lg">
                 <div className="qj-success-number">
-                  №{result.queue_number}
+                  №{String(result?.queue_number ?? '')}
                 </div>
                 <p className="qj-success-label">{t('misc.qj_your_number')}</p>
               </div>
@@ -845,10 +894,10 @@ const QueueJoin = () => {
                     <Users style={{ width: '18px', height: '18px', color: 'var(--mac-text-tertiary)', marginRight: 'var(--mac-spacing-2)' }} />
                     <span className="qj-info-label">{t('misc.qj_ahead_of_you')}</span>
                   </div>
-                  <span className="qj-info-value">{t('misc.qj_count_short', { count: result.queue_number - 1 })}</span>
+                  <span className="qj-info-value">{t('misc.qj_count_short', { count: Number(result?.queue_number ?? 0) - 1 })}</span>
                 </div>
 
-                {result.estimated_wait_time && (
+                {result?.estimated_wait_time && (
                   <div style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -861,11 +910,11 @@ const QueueJoin = () => {
                       <Timer style={{ width: '18px', height: '18px', color: 'var(--mac-text-tertiary)', marginRight: 'var(--mac-spacing-2)' }} />
                       <span className="qj-info-label">{t('misc.qj_waiting_label')}</span>
                     </div>
-                    <span className="qj-info-value">{formatWaitTime(result.estimated_wait_time)}</span>
+                    <span className="qj-info-value">{formatWaitTime(Number(result?.estimated_wait_time ?? 0))}</span>
                   </div>
                 )}
 
-                {result.specialist_name && (
+                {result?.specialist_name && (
                   <div style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -878,7 +927,7 @@ const QueueJoin = () => {
                       <User style={{ width: '18px', height: '18px', color: 'var(--mac-text-tertiary)', marginRight: 'var(--mac-spacing-2)' }} />
                       <span className="qj-info-label">{t('misc.qj_label_specialist')}</span>
                     </div>
-                    <span className="qj-info-value">{result.specialist_name}</span>
+                    <span className="qj-info-value">{String(result?.specialist_name ?? '')}</span>
                   </div>
                 )}
               </div>
@@ -1056,9 +1105,9 @@ const QueueJoin = () => {
                         alignItems: 'center',
                         padding: 'var(--mac-spacing-4)',
                         borderRadius: 'var(--mac-radius-lg)',
-                        border: `2px solid ${isSelected ? specialist.color : 'var(--mac-border)'}`,
+                        border: `2px solid ${isSelected ? String(specialist.color ?? '') : 'var(--mac-border)'}`,
                         background: isSelected ?
-                          `color-mix(in srgb, ${specialist.color}, transparent 85%)` :
+                          `color-mix(in srgb, ${String(specialist.color ?? '')}, transparent 85%)` :
                           'var(--mac-card-bg)',
                         cursor: 'pointer',
                         transition: 'all 0.2s ease',
@@ -1079,15 +1128,15 @@ const QueueJoin = () => {
                           width: '24px',
                           height: '24px',
                           marginRight: 'var(--mac-spacing-3)',
-                          accentColor: specialist.color,
+                          accentColor: String(specialist.color ?? ''),
                           cursor: 'pointer'
                         }}
                       />
-                      <span style={{ fontSize: 'var(--mac-font-size-3xl)', marginRight: 'var(--mac-spacing-3)' }}>{specialist.icon}</span>
+                      <span style={{ fontSize: 'var(--mac-font-size-3xl)', marginRight: 'var(--mac-spacing-3)' }}>{(specialist.icon as ReactNode) ?? null}</span>
                       <span style={{
                         fontSize: 'var(--mac-font-size-xl)',
                         fontWeight: 'var(--mac-font-weight-semibold)',
-                        color: isSelected ? specialist.color : 'var(--mac-text-primary)'
+                        color: isSelected ? String(specialist.color ?? '') : 'var(--mac-text-primary)'
                       }}>
                         {formatSpecialistLabel(specialist)}
                       </span>

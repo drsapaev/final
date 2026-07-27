@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode, ChangeEvent } from "react";
 import PropTypes from 'prop-types';
 import {
   Bell,
@@ -28,6 +28,43 @@ import {
 import { getState as getAuthState } from '../../stores/auth';
 import { useTranslation } from '../../i18n/useTranslation';
 import logger from '../../utils/logger';
+
+interface PolicyControl {
+  desktop: boolean;
+}
+
+interface PolicyDnd {
+  enabled: boolean;
+  always_on: boolean;
+  start: string;
+  end: string;
+}
+
+interface PolicyDraft {
+  muted_until: string | null;
+  snooze_until: string | null;
+  dnd: PolicyDnd;
+  channel_controls: PolicyControl;
+  family_controls: Record<string, PolicyControl>;
+  event_controls: Record<string, PolicyControl>;
+}
+
+interface NotificationChannelCardProps {
+  accent: string;
+  description: string;
+  icon: React.ComponentType<{ size?: number }>;
+  title: string;
+  note?: string;
+  children?: ReactNode;
+}
+
+interface PreferenceRowProps {
+  checked?: boolean;
+  description: string;
+  disabled?: boolean;
+  label: string;
+  onChange: (checked: boolean, event: ChangeEvent<HTMLInputElement>) => void;
+}
 
 const accentGradients = {
   info: 'linear-gradient(135deg, var(--mac-accent), color-mix(in srgb, var(--mac-accent), white 18%))',
@@ -193,12 +230,12 @@ const policyEventFields = [
   },
 ];
 
-const defaultPolicyFamilies = policyFamilyFields.reduce((acc, item) => {
+const defaultPolicyFamilies: Record<string, PolicyControl> = policyFamilyFields.reduce<Record<string, PolicyControl>>((acc, item) => {
   acc[item.key] = { desktop: true };
   return acc;
 }, {});
 
-const defaultPolicyEvents = policyEventFields.reduce((acc, item) => {
+const defaultPolicyEvents: Record<string, PolicyControl> = policyEventFields.reduce<Record<string, PolicyControl>>((acc, item) => {
   acc[item.key] = { desktop: true };
   return acc;
 }, {});
@@ -206,14 +243,14 @@ const defaultPolicyEvents = policyEventFields.reduce((acc, item) => {
 // audit/phase-6, BS-62: use structuredClone with JSON fallback for older
 // environments. structuredClone preserves Date objects (JSON roundtrip
 // converts them to ISO strings), is faster, and is the platform-standard API.
-function cloneValue(value) {
+function cloneValue<T>(value: T): T {
   if (typeof structuredClone === 'function') {
     return structuredClone(value);
   }
-  return JSON.parse(JSON.stringify(value));
+  return JSON.parse(JSON.stringify(value)) as T;
 }
 
-function toDateTimeLocalValue(value) {
+function toDateTimeLocalValue(value: string | Date | null | undefined): string {
   if (!value) {
     return '';
   }
@@ -222,11 +259,11 @@ function toDateTimeLocalValue(value) {
     return '';
   }
 
-  const pad = (part) => String(part).padStart(2, '0');
+  const pad = (part: number) => String(part).padStart(2, '0');
   return `${parsed.getFullYear()}-${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())}T${pad(parsed.getHours())}:${pad(parsed.getMinutes())}`;
 }
 
-function normalizePolicyControl(control, fallback = true) {
+function normalizePolicyControl(control: unknown, fallback = true): PolicyControl {
   if (typeof control === 'boolean') {
     return { desktop: control };
   }
@@ -235,19 +272,20 @@ function normalizePolicyControl(control, fallback = true) {
     return { desktop: fallback };
   }
 
-  if (typeof control.desktop === 'boolean') {
-    return { desktop: control.desktop };
+  const ctrl = control as { desktop?: unknown; realtime_enabled?: unknown; enabled?: unknown; channels?: { desktop?: unknown } };
+  if (typeof ctrl.desktop === 'boolean') {
+    return { desktop: ctrl.desktop };
   }
 
-  if (typeof control.realtime_enabled === 'boolean') {
-    return { desktop: control.realtime_enabled };
+  if (typeof ctrl.realtime_enabled === 'boolean') {
+    return { desktop: ctrl.realtime_enabled };
   }
 
-  if (typeof control.enabled === 'boolean') {
-    return { desktop: control.enabled };
+  if (typeof ctrl.enabled === 'boolean') {
+    return { desktop: ctrl.enabled };
   }
 
-  const channelDesktop = control.channels?.desktop;
+  const channelDesktop = ctrl.channels?.desktop;
   if (typeof channelDesktop === 'boolean') {
     return { desktop: channelDesktop };
   }
@@ -255,7 +293,7 @@ function normalizePolicyControl(control, fallback = true) {
   return { desktop: fallback };
 }
 
-function createDefaultPolicyDraft() {
+function createDefaultPolicyDraft(): PolicyDraft {
   return {
     muted_until: null,
     snooze_until: null,
@@ -271,37 +309,45 @@ function createDefaultPolicyDraft() {
   };
 }
 
-function normalizePolicyDraft(policy) {
+function normalizePolicyDraft(policy: unknown): PolicyDraft {
   const next = createDefaultPolicyDraft();
   if (!policy || typeof policy !== 'object') {
     return next;
   }
 
-  if (typeof policy.muted_until === 'string' && policy.muted_until.trim()) {
-    next.muted_until = policy.muted_until;
+  const p = policy as {
+    muted_until?: unknown;
+    snooze_until?: unknown;
+    dnd?: { enabled?: unknown; always_on?: unknown; start?: unknown; end?: unknown };
+    channel_controls?: unknown;
+    family_controls?: Record<string, unknown>;
+    event_controls?: Record<string, unknown>;
+  };
+  if (typeof p.muted_until === 'string' && p.muted_until.trim()) {
+    next.muted_until = p.muted_until;
   }
-  if (typeof policy.snooze_until === 'string' && policy.snooze_until.trim()) {
-    next.snooze_until = policy.snooze_until;
-  }
-
-  if (policy.dnd && typeof policy.dnd === 'object') {
-    if (typeof policy.dnd.enabled === 'boolean') {
-      next.dnd.enabled = policy.dnd.enabled;
-    }
-    if (typeof policy.dnd.always_on === 'boolean') {
-      next.dnd.always_on = policy.dnd.always_on;
-    }
-    if (typeof policy.dnd.start === 'string' && policy.dnd.start) {
-      next.dnd.start = policy.dnd.start;
-    }
-    if (typeof policy.dnd.end === 'string' && policy.dnd.end) {
-      next.dnd.end = policy.dnd.end;
-    }
+  if (typeof p.snooze_until === 'string' && p.snooze_until.trim()) {
+    next.snooze_until = p.snooze_until;
   }
 
-  next.channel_controls = normalizePolicyControl(policy.channel_controls, true);
+  if (p.dnd && typeof p.dnd === 'object') {
+    if (typeof p.dnd.enabled === 'boolean') {
+      next.dnd.enabled = p.dnd.enabled;
+    }
+    if (typeof p.dnd.always_on === 'boolean') {
+      next.dnd.always_on = p.dnd.always_on;
+    }
+    if (typeof p.dnd.start === 'string' && p.dnd.start) {
+      next.dnd.start = p.dnd.start;
+    }
+    if (typeof p.dnd.end === 'string' && p.dnd.end) {
+      next.dnd.end = p.dnd.end;
+    }
+  }
 
-  const policyFamilyControls = policy.family_controls;
+  next.channel_controls = normalizePolicyControl(p.channel_controls, true);
+
+  const policyFamilyControls = p.family_controls;
   if (policyFamilyControls && typeof policyFamilyControls === 'object') {
     for (const [familyKey, familyControl] of Object.entries(policyFamilyControls)) {
       if (!Object.prototype.hasOwnProperty.call(defaultPolicyFamilies, familyKey)) {
@@ -314,7 +360,7 @@ function normalizePolicyDraft(policy) {
     }
   }
 
-  const policyEventControls = policy.event_controls;
+  const policyEventControls = p.event_controls;
   if (policyEventControls && typeof policyEventControls === 'object') {
     for (const [eventKey, eventControl] of Object.entries(policyEventControls)) {
       if (!Object.prototype.hasOwnProperty.call(defaultPolicyEvents, eventKey)) {
@@ -330,7 +376,7 @@ function normalizePolicyDraft(policy) {
   return next;
 }
 
-function buildPolicyPayload(policyDraft) {
+function buildPolicyPayload(policyDraft: PolicyDraft) {
   const normalized = normalizePolicyDraft(policyDraft);
   return {
     muted_until: normalized.muted_until,
@@ -345,15 +391,15 @@ function buildPolicyPayload(policyDraft) {
       desktop: Boolean(normalized.channel_controls?.desktop ?? true),
     },
     family_controls: Object.fromEntries(
-      Object.entries(normalized.family_controls || {}).map(([familyKey, familyControl]: [string, any]) => [
+      Object.entries(normalized.family_controls || {}).map(([familyKey, familyControl]) => [
         familyKey,
-        { desktop: Boolean(familyControl?.desktop ?? true) },
+        { desktop: Boolean((familyControl as PolicyControl)?.desktop ?? true) },
       ])
     ),
     event_controls: Object.fromEntries(
-      Object.entries(normalized.event_controls || {}).map(([eventKey, eventControl]: [string, any]) => [
+      Object.entries(normalized.event_controls || {}).map(([eventKey, eventControl]) => [
         eventKey,
-        { desktop: Boolean(eventControl?.desktop ?? true) },
+        { desktop: Boolean((eventControl as PolicyControl)?.desktop ?? true) },
       ])
     ),
   };
@@ -361,15 +407,15 @@ function buildPolicyPayload(policyDraft) {
 
 
 const NOTIFICATION_SETTINGS_CACHE_MS = 30_000;
-const notificationSettingsCache = new Map();
-const notificationSettingsRequests = new Map();
+const notificationSettingsCache = new Map<string | number, { data: Record<string, unknown>; cachedAt: number }>();
+const notificationSettingsRequests = new Map<string | number, Promise<Record<string, unknown>>>();
 
-function resolveCurrentUserId() {
+function resolveCurrentUserId(): string | number | null {
   const authState = getAuthState();
   return authState?.profile?.id || null;
 }
 
-function rememberNotificationSettings(userId, settings) {
+function rememberNotificationSettings(userId: string | number, settings: Record<string, unknown>): Record<string, unknown> {
   notificationSettingsCache.set(userId, {
     data: settings,
     cachedAt: Date.now(),
@@ -377,7 +423,7 @@ function rememberNotificationSettings(userId, settings) {
   return settings;
 }
 
-function getFreshNotificationSettings(userId) {
+function getFreshNotificationSettings(userId: string | number): Record<string, unknown> | null {
   const cached = notificationSettingsCache.get(userId);
   if (!cached) {
     return null;
@@ -391,13 +437,14 @@ function getFreshNotificationSettings(userId) {
   return cached.data;
 }
 
-function shouldFallbackToDirectApi(error) {
-  return !error?.response;
+function shouldFallbackToDirectApi(error: unknown): boolean {
+  const err = error as { response?: unknown };
+  return !err?.response;
 }
 
-async function requestNotificationSettings(userId) {
+async function requestNotificationSettings(userId: string | number): Promise<Record<string, unknown>> {
   try {
-    return await notificationsService.getSettings(userId);
+    return (await notificationsService.getSettings(userId)) as Record<string, unknown>;
   } catch (error) {
     if (!shouldFallbackToDirectApi(error)) {
       throw error;
@@ -407,9 +454,9 @@ async function requestNotificationSettings(userId) {
   }
 }
 
-async function persistNotificationSettings(userId, payload) {
+async function persistNotificationSettings(userId: string | number, payload: Record<string, unknown>): Promise<Record<string, unknown>> {
   try {
-    return await notificationsService.updateSettings(userId, payload);
+    return (await notificationsService.updateSettings(userId, payload)) as Record<string, unknown>;
   } catch (error) {
     if (!shouldFallbackToDirectApi(error)) {
       throw error;
@@ -445,7 +492,7 @@ async function persistNotificationPolicy(userId: string | number, payload: Recor
   }
 }
 
-async function fetchNotificationSettings(userId, { force = false } = {}) {
+async function fetchNotificationSettings(userId: string | number, { force = false }: { force?: boolean } = {}): Promise<Record<string, unknown>> {
   if (!force) {
     const cached = getFreshNotificationSettings(userId);
     if (cached) {
@@ -455,7 +502,10 @@ async function fetchNotificationSettings(userId, { force = false } = {}) {
   }
 
   if (notificationSettingsRequests.has(userId)) {
-    return notificationSettingsRequests.get(userId);
+    const pending = notificationSettingsRequests.get(userId);
+    if (pending) {
+      return pending;
+    }
   }
 
   const request = requestNotificationSettings(userId)
@@ -468,11 +518,11 @@ async function fetchNotificationSettings(userId, { force = false } = {}) {
   return request;
 }
 
-function getInitialDraft(settings) {
+function getInitialDraft(settings: Record<string, unknown> | null): Record<string, unknown> | null {
   return settings ? { ...settings } : null;
 }
 
-function formatSavedAt(value, t) {
+function formatSavedAt(value: Date | null, t: (key: string, options?: Record<string, unknown>) => string): string {
   if (!value) {
     return t('misc.np_not_saved_yet');
   }
@@ -484,7 +534,7 @@ function formatSavedAt(value, t) {
   return t('misc.np_saved_at', { time });
 }
 
-function NotificationChannelCard({ accent, description, icon: Icon, title, note, children }) {
+function NotificationChannelCard({ accent, description, icon: Icon, title, note, children }: NotificationChannelCardProps) {
   return (
     <Card shadow="default">
       <CardHeader style={{ paddingBottom: 12 }}>
@@ -534,7 +584,7 @@ NotificationChannelCard.propTypes = {
   title: PropTypes.string.isRequired,
 };
 
-function PreferenceRow({ checked, description, disabled, label, onChange }) {
+function PreferenceRow({ checked, description, disabled, label, onChange }: PreferenceRowProps) {
   return (
     <div
       className="theme-soft-surface"
@@ -579,15 +629,15 @@ export default function NotificationPreferences() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [lastSavedAt, setLastSavedAt] = useState(null);
-  const [userId, setUserId] = useState(null);
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const [userId, setUserId] = useState<string | number | null>(null);
   const [settings, setSettings] = useState<Record<string, unknown> | null>(null);
-  const [draft, setDraft] = useState(null);
+  const [draft, setDraft] = useState<Record<string, unknown> | null>(null);
   const [policyLoading, setPolicyLoading] = useState(false);
   const [policyError, setPolicyError] = useState('');
   const [policyLoaded, setPolicyLoaded] = useState(false);
-  const [policySettings, setPolicySettings] = useState<Record<string, unknown> | null>(null);
-  const [policyDraft, setPolicyDraft] = useState(null);
+  const [policySettings, setPolicySettings] = useState<PolicyDraft | null>(null);
+  const [policyDraft, setPolicyDraft] = useState<PolicyDraft | null>(null);
 
   useEffect(() => {
     void loadSettings();
@@ -606,7 +656,7 @@ export default function NotificationPreferences() {
   );
   const hasChanges = hasSettingsChanges || hasPolicyChanges;
 
-  async function loadSettings({ force = false } = {}) {
+  async function loadSettings({ force = false }: { force?: boolean } = {}) {
     try {
       setLoading(true);
       setError('');
@@ -628,15 +678,16 @@ export default function NotificationPreferences() {
       setDraft(getInitialDraft(nextSettings));
       setLastSavedAt(new Date());
       logger.info('[FIX:PROFILE] Loaded notification preferences', { userId: resolvedUserId });
-    } catch (err) {
+    } catch (err: unknown) {
       logger.error('Failed to load notification settings:', err);
-      setError(err?.response?.data?.detail || t('misc.np_load_error'));
+      const e = err as { response?: { data?: { detail?: string } } };
+      setError(e?.response?.data?.detail || t('misc.np_load_error'));
     } finally {
       setLoading(false);
     }
   }
 
-  function updateDraft(key, value) {
+  function updateDraft(key: string, value: unknown) {
     setDraft((prev) => ({
       ...(prev || {}),
       [key]: value,
@@ -644,7 +695,7 @@ export default function NotificationPreferences() {
     setSuccess('');
   }
 
-  function updatePolicyDraft(updater) {
+  function updatePolicyDraft(updater: (prev: PolicyDraft) => PolicyDraft) {
     setPolicyDraft((prev) => {
       const base = normalizePolicyDraft(prev || policySettings || createDefaultPolicyDraft());
       return updater(base);
@@ -653,7 +704,7 @@ export default function NotificationPreferences() {
     setPolicyError('');
   }
 
-  async function loadPolicy({ force = false } = {}) {
+  async function loadPolicy({ force = false }: { force?: boolean } = {}) {
     if (!userId) {
       return;
     }
@@ -676,10 +727,11 @@ export default function NotificationPreferences() {
       setPolicyDraft(cloneValue(normalizedPolicy));
       setPolicyLoaded(true);
       logger.info('[FIX:PROFILE] Loaded notification runtime policy', { userId });
-    } catch (err) {
+    } catch (err: unknown) {
       logger.warn('[FIX:PROFILE] Failed to load notification runtime policy', err);
+      const e = err as { response?: { data?: { detail?: string } } };
       setPolicyError(
-        err?.response?.data?.detail ||
+        e?.response?.data?.detail ||
           t('misc.np_load_policy_error')
       );
     } finally {
@@ -709,7 +761,7 @@ export default function NotificationPreferences() {
       return;
     }
 
-    const savedParts = [];
+    const savedParts: string[] = [];
 
     try {
       setSaving(true);
@@ -741,14 +793,15 @@ export default function NotificationPreferences() {
           : t('misc.np_saved_default')
       );
       logger.info('[FIX:PROFILE] Saved notification preferences', { userId });
-    } catch (err) {
+    } catch (err: unknown) {
       logger.error('Failed to save settings:', err);
       if (savedParts.length > 0) {
         setError(
           t('misc.np_partial_save_error', { parts: savedParts.join(' + ') })
         );
       } else {
-        setError(err?.response?.data?.detail || t('misc.np_save_error'));
+        const e = err as { response?: { data?: { detail?: string } } };
+        setError(e?.response?.data?.detail || t('misc.np_save_error'));
       }
     } finally {
       setSaving(false);
@@ -856,7 +909,7 @@ export default function NotificationPreferences() {
               description={t(field.hintKey)}
               disabled={saving}
               label={t(field.labelKey)}
-              onChange={(nextValue: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateDraft(field.key, nextValue)}
+              onChange={(nextValue: boolean) => updateDraft(field.key, nextValue)}
             />
           ))}
         </NotificationChannelCard>
@@ -915,7 +968,7 @@ export default function NotificationPreferences() {
                   type={field.type}
                   min={field.min}
                   step={field.step}
-                  value={draft[field.key] ?? ''}
+                  value={String(draft[field.key] ?? '')}
                   disabled={saving}
                   onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
                     if (field.type === 'number') {
@@ -940,7 +993,7 @@ export default function NotificationPreferences() {
             description={t('misc.np_weekend_hint')}
             disabled={saving}
             label={t('misc.np_weekend_label')}
-            onChange={(nextValue: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateDraft('weekend_notifications', nextValue)}
+            onChange={(nextValue: boolean) => updateDraft('weekend_notifications', nextValue)}
           />
         </CardContent>
       </Card>
@@ -1075,7 +1128,7 @@ export default function NotificationPreferences() {
                 description={t('misc.np_realtime_desktop_hint')}
                 disabled={saving}
                 label={t('misc.np_realtime_desktop_label')}
-                onChange={(nextValue: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+                onChange={(nextValue: boolean) =>
                   updatePolicyDraft((prev) => ({
                     ...prev,
                     channel_controls: {
@@ -1091,11 +1144,11 @@ export default function NotificationPreferences() {
                 description={t('misc.np_dnd_hint')}
                 disabled={saving}
                 label="Do Not Disturb"
-                onChange={(nextValue: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+                onChange={(nextValue: boolean) =>
                   updatePolicyDraft((prev) => ({
                     ...prev,
                     dnd: {
-                      ...(prev.dnd || {}),
+                      ...prev.dnd,
                       enabled: nextValue,
                     },
                   }))
@@ -1107,11 +1160,11 @@ export default function NotificationPreferences() {
                 description={t('misc.np_dnd_always_on_hint')}
                 disabled={saving || !policyDraft.dnd?.enabled}
                 label={t('misc.np_dnd_always_on_label')}
-                onChange={(nextValue: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+                onChange={(nextValue: boolean) =>
                   updatePolicyDraft((prev) => ({
                     ...prev,
                     dnd: {
-                      ...(prev.dnd || {}),
+                      ...prev.dnd,
                       always_on: nextValue,
                     },
                   }))
@@ -1145,7 +1198,7 @@ export default function NotificationPreferences() {
                       updatePolicyDraft((prev) => ({
                         ...prev,
                         dnd: {
-                          ...(prev.dnd || {}),
+                          ...prev.dnd,
                           start: event.target.value || '22:00',
                         },
                       }))
@@ -1159,7 +1212,7 @@ export default function NotificationPreferences() {
                       updatePolicyDraft((prev) => ({
                         ...prev,
                         dnd: {
-                          ...(prev.dnd || {}),
+                          ...prev.dnd,
                           end: event.target.value || '07:00',
                         },
                       }))
@@ -1175,7 +1228,7 @@ export default function NotificationPreferences() {
                   description={t(family.hintKey)}
                   disabled={saving}
                   label={`Realtime: ${t(family.labelKey)}`}
-                  onChange={(nextValue: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+                  onChange={(nextValue: boolean) =>
                     updatePolicyDraft((prev) => ({
                       ...prev,
                       family_controls: {
@@ -1197,7 +1250,7 @@ export default function NotificationPreferences() {
                   description={t(eventField.hintKey)}
                   disabled={saving}
                   label={`Realtime: ${t(eventField.labelKey)}`}
-                  onChange={(nextValue: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+                  onChange={(nextValue: boolean) =>
                     updatePolicyDraft((prev) => ({
                       ...prev,
                       event_controls: {

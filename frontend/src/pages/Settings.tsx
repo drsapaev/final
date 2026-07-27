@@ -1,6 +1,6 @@
 import { useTranslation } from '../i18n/useTranslation';
 import { useEffect, useMemo, useState } from 'react';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode, FormEvent, ChangeEvent } from 'react';
 import PropTypes from 'prop-types';
 import RoleGate from '../components/RoleGate';
 import { api } from '../api/client';
@@ -19,9 +19,73 @@ import './SettingsAnalytics.css';
 import { Input,
   Checkbox } from '../components/ui/macos';
 import { notify } from '../services/notify';
-function TabButton({ active, onClick, children }) {
+
+interface TabButtonProps {
+  active?: boolean;
+  onClick?: () => void;
+  children?: ReactNode;
+}
+
+interface KVItem {
+  key: string;
+  value: unknown;
+}
+
+interface RowProps {
+  k: ReactNode;
+  v: unknown;
+  onSave: (key: string, value: string) => void;
+}
+
+interface LicenseStatus {
+  ok?: boolean;
+  status?: string;
+  reason?: string;
+  key?: string;
+  machine_hash?: string;
+  expiry_date?: string;
+  [key: string]: unknown;
+}
+
+interface PaymentProvider {
+  id: number | string;
+  name?: string;
+  code?: string;
+  is_active?: boolean;
+  description?: string;
+  secret_key?: string;
+  webhook_url?: string;
+  api_url?: string;
+  [key: string]: unknown;
+}
+
+interface ProviderCardProps {
+  provider: PaymentProvider;
+  onEdit: () => void;
+  onDelete: () => void;
+}
+
+interface KVFieldProps {
+  label: string;
+  defKey: string;
+  items: KVItem[];
+  onSave: (key: string, value: string) => void;
+}
+
+interface RoleMapItemProps {
+  role: string;
+  items: KVItem[];
+  onSave: (key: string, value: string) => void;
+}
+
+interface RoleMapEditorProps {
+  items: KVItem[];
+  onSave: (key: string, value: string) => void;
+}
+
+function TabButton({ active, onClick, children }: TabButtonProps) {
   // Используем CSS переменные вместо хардкод стилей
-  const st = {
+  const st: CSSProperties = {
     padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
     borderRadius: 10,
     border: '1px solid var(--border-color)',
@@ -35,7 +99,7 @@ function TabButton({ active, onClick, children }) {
 
 }
 
-function Row({ k, v, onSave }) {
+function Row({ k, v, onSave }: RowProps) {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [val, setVal] = useState(String(v ?? ''));
@@ -43,8 +107,8 @@ function Row({ k, v, onSave }) {
   return (
     <div className="settings-row">
       <div className="settings-label-semibold">{k}</div>
-      <Input aria-label={`Setting value for ${k}`} value={val} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setVal(e.target.value)} className="settings-input" />
-      <button onClick={() => onSave(k, val)} className="settings-btn">{t('misc.save')}</button>
+      <Input aria-label={`Setting value for ${String(k)}`} value={val} onChange={(e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setVal(e.target.value)} className="settings-input" />
+      <button onClick={() => onSave(String(k), val)} className="settings-btn">{t('misc.save')}</button>
     </div>);
 
 }
@@ -66,21 +130,21 @@ export default function Settings() {void
   const [tab, setTab] = useState<'license' | 'printer' | 'online_queue' | 'display_board' | 'payment_providers' | 'notifications' | 'appearance' | 'security'>('license');
 
   // license tab
-  const [status, setStatus] = useState(null);
+  const [status, setStatus] = useState<LicenseStatus | null>(null);
   const [key, setKey] = useState('');
   const [busyAct, setBusyAct] = useState(false);
   const [errAct, setErrAct] = useState('');
 
   // payment providers tab
-  const [providers, setProviders] = useState([]);
+  const [providers, setProviders] = useState<PaymentProvider[]>([]);
   const [loadingProviders, setLoadingProviders] = useState(false);
   const [showAddProvider, setShowAddProvider] = useState(false);
-  const [editingProvider, setEditingProvider] = useState(null);
+  const [editingProvider, setEditingProvider] = useState<PaymentProvider | null>(null);
 
   async function loadStatus() {
     try {
       const st = (await api.get('/activation/status')) as import('axios').AxiosResponse<Record<string, unknown>>;
-      setStatus(st?.data ?? st ?? null);
+      setStatus((st?.data ?? st ?? null) as LicenseStatus | null);
     } catch {
       setStatus(null);
     }
@@ -96,8 +160,9 @@ export default function Settings() {void
         setErrAct(res?.reason || t('misc.settings_activation_failed'));
       }
       await loadStatus();
-    } catch (e) {
-      setErrAct(e?.data?.detail || e?.message || t('misc.settings_activation_error'));
+    } catch (e: unknown) {
+      const err = e as { data?: { detail?: string }; message?: string };
+      setErrAct(err?.data?.detail || err?.message || t('misc.settings_activation_error'));
     } finally {
       setBusyAct(false);
     }
@@ -107,8 +172,9 @@ export default function Settings() {void
   async function loadProviders() {
     setLoadingProviders(true);
     try {
-      const response = (await api.get('/admin/providers')) as import('axios').AxiosResponse<Record<string, unknown>>;
-      setProviders((response?.data as unknown as unknown[]) || []);
+      const response = (await api.get('/admin/providers')) as import('axios').AxiosResponse<unknown>;
+      const data = response?.data as unknown;
+      setProviders(Array.isArray(data) ? (data as PaymentProvider[]) : []);
     } catch (error) {
       logger.error('Ошибка загрузки провайдеров:', error);
     } finally {
@@ -116,7 +182,7 @@ export default function Settings() {void
     }
   }
 
-  async function createProvider(providerData) {
+  async function createProvider(providerData: Record<string, unknown>) {
     try {
       await api.post('/admin/providers', providerData);
       await loadProviders();
@@ -127,7 +193,7 @@ export default function Settings() {void
     }
   }
 
-  async function updateProvider(providerId, providerData) {
+  async function updateProvider(providerId: number | string, providerData: Record<string, unknown>) {
     try {
       await api.put(`/admin/providers/${providerId}`, providerData);
       await loadProviders();
@@ -138,7 +204,7 @@ export default function Settings() {void
     }
   }
 
-  async function deleteProvider(providerId) {
+  async function deleteProvider(providerId: number | string) {
     // P-013 fix: replaced native confirm() with shared useConfirm hook.
     const ok = await confirm({
       title: t('misc.settings_provider_delete_title'),
@@ -164,11 +230,11 @@ export default function Settings() {void
 
   // generic category settings (printer / online_queue)
   const [cat, setCat] = useState('printer');
-  const [items, setItems] = useState([]);
+  const [items, setItems] = useState<KVItem[]>([]);
   const [busyCat, setBusyCat] = useState(false);
   const [errCat, setErrCat] = useState('');
 
-  async function loadCat(category) {
+  async function loadCat(category: string) {
     setBusyCat(true);
     setErrCat('');
     try {
@@ -183,20 +249,22 @@ export default function Settings() {void
         arr = Object.entries(data).map(([k, v]) => ({ key: k, value: v }));
       }
       setItems(arr.map((x) => ({ key: (x as { key?: string }).key ?? (x as { name?: string }).name ?? '', value: (x as { value?: unknown }).value ?? '' })));
-    } catch (e) {
-      setErrCat(e?.data?.detail || e?.message || t('misc.settings_load_error'));
+    } catch (e: unknown) {
+      const err = e as { data?: { detail?: string }; message?: string };
+      setErrCat(err?.data?.detail || err?.message || t('misc.settings_load_error'));
       setItems([]);
     } finally {
       setBusyCat(false);
     }
   }
 
-  async function saveKV(category, key, value) {
+  async function saveKV(category: string, key: string, value: string) {
     try {
       await api.put('/settings', { category, key, value });
       await loadCat(category);
-    } catch (e) {
-      notify.error(e?.data?.detail || e?.message || t('misc.settings_save_error'));
+    } catch (e: unknown) {
+      const err = e as { data?: { detail?: string }; message?: string };
+      notify.error(err?.data?.detail || err?.message || t('misc.settings_save_error'));
     }
   }
 
@@ -297,7 +365,7 @@ export default function Settings() {void
                   placeholder={t('misc.settings_activation_key_placeholder')}
                   aria-label="Activation key"
                   value={key}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setKey(e.target.value)}
+                  onChange={(e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setKey(e.target.value)}
                   className="settings-input" />
                 
                   <button onClick={doActivate} disabled={busyAct || !key.trim()} className="settings-btn-primary">
@@ -405,7 +473,7 @@ export default function Settings() {void
               {showAddProvider &&
             <ProviderModal
               onClose={() => setShowAddProvider(false)}
-              onSave={createProvider}
+              onSave={(data) => createProvider(data as Record<string, unknown>)}
               title={t('misc.settings_add_provider_title')} />
 
             }
@@ -414,7 +482,7 @@ export default function Settings() {void
             <ProviderModal
               provider={editingProvider}
               onClose={() => setEditingProvider(null)}
-              onSave={(data) => updateProvider(editingProvider.id, data)}
+              onSave={(data) => updateProvider(editingProvider.id, data as Record<string, unknown>)}
               title={t('misc.settings_edit_provider_title')} />
 
             }
@@ -447,7 +515,7 @@ export default function Settings() {void
 }
 
 // Компонент карточки провайдера
-function ProviderCard({ provider, onEdit, onDelete }) {
+function ProviderCard({ provider, onEdit, onDelete }: ProviderCardProps) {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   return (
@@ -514,10 +582,10 @@ function ProviderModal({ provider, onClose, onSave, title }: { provider?: Record
     api_url: provider?.api_url || ''
   });
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     try {
-      await onSave(formData);
+      await onSave?.(formData);
     } catch (error) {
       notify.error(t('misc.settings_save_operation_error', { msg: (error instanceof Error ? error.message : String(error)) || t('misc.settings_unknown_error') }));
     }
@@ -569,7 +637,7 @@ function ProviderModal({ provider, onClose, onSave, title }: { provider?: Record
               type="text"
               aria-label="Provider name"
               value={formData.name as string}
-              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFormData({ ...formData, name: e.target.value })}
+              onChange={(e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFormData({ ...formData, name: e.target.value })}
               required
               style={{
                 width: '100%',
@@ -588,7 +656,7 @@ function ProviderModal({ provider, onClose, onSave, title }: { provider?: Record
               type="text"
               aria-label="Provider code"
               value={formData.code as string}
-              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFormData({ ...formData, code: e.target.value })}
+              onChange={(e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFormData({ ...formData, code: e.target.value })}
               required
               style={{
                 width: '100%',
@@ -606,7 +674,7 @@ function ProviderModal({ provider, onClose, onSave, title }: { provider?: Record
             <textarea
               aria-label="Provider description"
               value={formData.description as string}
-              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFormData({ ...formData, description: e.target.value })}
+              onChange={(e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFormData({ ...formData, description: e.target.value })}
               rows={3}
               style={{
                 width: '100%',
@@ -626,7 +694,7 @@ function ProviderModal({ provider, onClose, onSave, title }: { provider?: Record
               type="password"
               aria-label="Provider secret key"
               value={formData.secret_key as string}
-              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFormData({ ...formData, secret_key: e.target.value })}
+              onChange={(e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFormData({ ...formData, secret_key: e.target.value })}
               required
               style={{
                 width: '100%',
@@ -645,7 +713,7 @@ function ProviderModal({ provider, onClose, onSave, title }: { provider?: Record
               type="url"
               aria-label="Provider webhook URL"
               value={formData.webhook_url as string}
-              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFormData({ ...formData, webhook_url: e.target.value })}
+              onChange={(e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFormData({ ...formData, webhook_url: e.target.value })}
               style={{
                 width: '100%',
                 padding: 8,
@@ -663,7 +731,7 @@ function ProviderModal({ provider, onClose, onSave, title }: { provider?: Record
               type="url"
               aria-label="Provider API URL"
               value={formData.api_url as string}
-              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFormData({ ...formData, api_url: e.target.value })}
+              onChange={(e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFormData({ ...formData, api_url: e.target.value })}
               style={{
                 width: '100%',
                 padding: 8,
@@ -765,28 +833,28 @@ const errBox = {
   padding: 8
 };
 
-function KVField({ label, defKey, items, onSave }) {
+function KVField({ label, defKey, items, onSave }: KVFieldProps) {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const found = (items || []).find((x) => x.key === defKey);
-  const [val, setVal] = useState(found?.value || '');
-  useEffect(() => setVal(found?.value || ''), [found?.value]);
+  const [val, setVal] = useState(String(found?.value ?? ''));
+  useEffect(() => setVal(String(found?.value ?? '')), [found?.value]);
   return (
     <div className="settings-row">
       <div className="settings-label-semibold">{label}</div>
-      <Input aria-label={`${label} setting value`} value={val} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setVal(e.target.value)} className="settings-input" />
+      <Input aria-label={`${label} setting value`} value={val} onChange={(e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setVal(e.target.value)} className="settings-input" />
       <button onClick={() => onSave(defKey, val)} className="settings-btn">{t('misc.save')}</button>
     </div>);
 
 }
 
 // Отдельный компонент для роли чтобы избежать hooks в map
-function RoleMapItem({ role, items, onSave }) {
+function RoleMapItem({ role, items, onSave }: RoleMapItemProps) {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const found = (items || []).find((x) => x.key === role);
-  const [val, setVal] = useState(found?.value || '');
-  useEffect(() => setVal(found?.value || ''), [found?.value]);
+  const [val, setVal] = useState(String(found?.value ?? ''));
+  useEffect(() => setVal(String(found?.value ?? '')), [found?.value]);
 
   return (
     <div className="settings-row">
@@ -794,7 +862,7 @@ function RoleMapItem({ role, items, onSave }) {
       <Input
         aria-label={`Route target for ${role}`}
         value={val}
-        onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setVal(e.target.value)}
+        onChange={(e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setVal(e.target.value)}
         className="settings-input"
         placeholder={t('misc.settings_role_placeholder')} />
       
@@ -805,7 +873,7 @@ function RoleMapItem({ role, items, onSave }) {
 
 }
 
-function RoleMapEditor({ items, onSave }) {
+function RoleMapEditor({ items, onSave }: RoleMapEditorProps) {
   const roles = ['admin', 'registrar', 'doctor', 'cardio', 'derma', 'dentist', 'lab', 'procedures', 'cashier', 'patient'];
   return (
     <div className="settings-role-map-list">
