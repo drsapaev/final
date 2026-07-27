@@ -16,7 +16,7 @@ import '../styles/responsive.css';
 import { Input } from '../components/ui/macos';
 import { useTranslation } from '../i18n/useTranslation';
 
-const resolveTabFromPath = (path) => {
+const resolveTabFromPath = (path: string) => {
   if (path.includes('/patients')) return 'patients';
   if (path.includes('/appointments')) return 'appointments';
   if (path.includes('/staff-schedule')) return 'staff-schedule';
@@ -291,7 +291,7 @@ const MediLabDemo = () => {
   const getActionHoverShadow = (color, opacity = '38%') =>
     `0 4px 12px color-mix(in srgb, ${color}, transparent ${opacity})`;
 
-  const getActionHoverColor = (color) =>
+  const getActionHoverColor = (color: string) =>
     `color-mix(in srgb, ${color}, black 12%)`;
 
   // Рендер дашборда
