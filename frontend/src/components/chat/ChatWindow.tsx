@@ -32,6 +32,7 @@ import { sanitizeURL } from '../../utils/sanitizer';
 import './Chat.css';
 import { Input } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
+import type { ChatAvailableUser, ChatMessage } from '../../types/domain/chat';
 
 const groupReactions = (reactions: { reaction: string; user_id: number }[] | undefined | null): Record<string, number[]> => {
   if (!reactions) return {};
@@ -59,16 +60,16 @@ const COMPACT_CHAT_BREAKPOINT = 768;
 // === HELPER FUNCTIONS ===
 
 // Форматирование времени сообщения
-const formatMessageTime = (dateStr) => {
+const formatMessageTime = (dateStr: string | number | Date | undefined) => {
   if (!dateStr) return '';
-  let d = dateStr;
+  let d = String(dateStr);
   if (d.indexOf('Z') === -1 && d.indexOf('+') === -1) d += 'Z';
   return new Date(d).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' });
 };
 
 // Форматирование разделителя даты
-const formatDateSeparator = (dateStr, t) => {
-  const date = new Date(dateStr);
+const formatDateSeparator = (dateStr: string | number | Date | undefined, t: (key: string, options?: Record<string, unknown>) => string) => {
+  const date = new Date(dateStr as string);
   const today = new Date();
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
@@ -79,17 +80,18 @@ const formatDateSeparator = (dateStr, t) => {
 };
 
 // Группировка сообщений по датам
-const groupMessagesByDate = (msgs: Array<{ id?: string | number; created_at?: string | number | Date; [k: string]: unknown }>): Array<{ type: string; id?: string; date?: string | number | Date; [k: string]: unknown }> => {
+type GroupedMessage = { type: string; id?: string | number; date?: string | number | Date; [k: string]: unknown };
+const groupMessagesByDate = (msgs: Array<{ id?: string | number; created_at?: string | number | Date; [k: string]: unknown }>): GroupedMessage[] => {
   if (!msgs || msgs.length === 0) return [];
 
-  const groups = [];
-  let currentDate = null;
+  const groups: GroupedMessage[] = [];
+  let currentDate: string | null = null;
 
   // Сортируем от старых к новым для правильной группировки
   const sorted = [...msgs].reverse();
 
   sorted.forEach((msg) => {
-    const msgDate = new Date(msg.created_at).toDateString();
+    const msgDate = new Date(msg.created_at as string).toDateString();
     if (msgDate !== currentDate) {
       groups.push({ type: 'date-separator', date: msg.created_at, id: `sep-${msg.id}` });
       currentDate = msgDate;
@@ -100,7 +102,7 @@ const groupMessagesByDate = (msgs: Array<{ id?: string | number; created_at?: st
   return groups;
 };
 
-const ChatWindow = ({ isOpen, onClose }) => {
+const ChatWindow = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => {
   // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
   const [confirmRaw, confirmDialog] = useConfirm();
   const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
@@ -141,7 +143,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
   const [isSending, setIsSending] = useState(false);
   const [showNewChat, setShowNewChat] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
+  const [searchResults, setSearchResults] = useState<ChatAvailableUser[]>([]);
   const [isSearching, setIsSearching] = useState(false);
 
   // Drag and Resize State
@@ -157,18 +159,18 @@ const ChatWindow = ({ isOpen, onClose }) => {
   }));
 
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
-  const [reactionMenuMessageId, setReactionMenuMessageId] = useState(null);
-  const [contextMenu, setContextMenu] = useState(null); // { x, y, message }
+  const [reactionMenuMessageId, setReactionMenuMessageId] = useState<number | string | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; message: ChatMessage } | null>(null); // { x, y, message }
   // PR-69 / H-3: reply state for quote block
-  const [replyTo, setReplyTo] = useState(null); // { id, content, sender_name }
+  const [replyTo, setReplyTo] = useState<{ id: number; content: string; sender_name: string } | null>(null); // { id, content, sender_name }
 
   // Search & Filter State
   const [convSearchQuery, setConvSearchQuery] = useState('');
-  const [convFilter, setConvFilter] = useState('all'); // 'all' | 'unread'
+  const [convFilter, setConvFilter] = useState<'all' | 'unread'>('all'); // 'all' | 'unread'
   const [showMsgSearch, setShowMsgSearch] = useState(false);
   const [msgSearchQuery, setMsgSearchQuery] = useState('');
   // PR-71: new features — draft persistence, urgent flag
-  const [drafts, setDrafts] = useState({}); // { [conversationId]: text }
+  const [drafts, setDrafts] = useState<Record<number, string>>({}); // { [conversationId]: text }
   // mutedConversations comes from ChatContext now (for sound suppression)
   const [isUrgent, setIsUrgent] = useState(false);
   const [showQuickReplies, setShowQuickReplies] = useState(false);
@@ -184,14 +186,14 @@ const ChatWindow = ({ isOpen, onClose }) => {
   ];
 
   // Список всех пользователей для отображения по дефолту
-  const [allUsers, setAllUsers] = useState([]);
+  const [allUsers, setAllUsers] = useState<ChatAvailableUser[]>([]);
 
-  const messagesEndRef = useRef(null);
-  const messagesContainerRef = useRef(null);
-  const prevScrollHeightRef = useRef(null);
-  const inputRef = useRef(null);
-  const typingTimeoutRef = useRef(null);
-  const typingThrottleRef = useRef(null); // PR-70 / M-8: throttle typing events
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null);
+  const prevScrollHeightRef = useRef<number | null>(null);
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const typingThrottleRef = useRef<ReturnType<typeof setTimeout> | null>(null); // PR-70 / M-8: throttle typing events
 
   // Scroll to bottom button state
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
@@ -257,8 +259,8 @@ const ChatWindow = ({ isOpen, onClose }) => {
   // Скролл-позиция теперь обрабатывается через rowVirtualizer и эффект в начале компонента
 
 
-  const handleScroll = async (e) => {
-    const container = e.target;
+  const handleScroll = async (e: React.UIEvent<HTMLDivElement>) => {
+    const container = e.currentTarget;
 
     // Показать/скрыть кнопку "scroll to bottom"
     const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
@@ -270,10 +272,11 @@ const ChatWindow = ({ isOpen, onClose }) => {
       await loadMoreMessages();
       // PR-68 / P0-5: preserve scroll position after loading older messages
       // (was: prevScrollHeightRef set but never read — view jumped to top)
-      if (prevScrollHeightRef.current) {
+      const prevHeight = prevScrollHeightRef.current;
+      if (prevHeight !== null) {
         requestAnimationFrame(() => {
           const newScrollHeight = container.scrollHeight;
-          container.scrollTop = newScrollHeight - prevScrollHeightRef.current;
+          container.scrollTop = newScrollHeight - prevHeight;
           prevScrollHeightRef.current = null;
         });
       }
@@ -369,7 +372,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
 
   // Отправка голосового сообщения
   // PR-70 / L-10: accept duration argument (was dropped by parent)
-  const handleSendVoice = async (audioBlob, duration) => {
+  const handleSendVoice = async (audioBlob: Blob, duration: number) => {
 
 
     if (!activeConversation || isSending) {
@@ -407,7 +410,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
   };
 
   // Обработка ввода
-  const handleInputChange = (e) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
 
     // Ограничение длины
@@ -427,14 +430,14 @@ const ChatWindow = ({ isOpen, onClose }) => {
           typingThrottleRef.current = null;
         }, 500);
       }
-      clearTimeout(typingTimeoutRef.current);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       typingTimeoutRef.current = setTimeout(() => {
         sendTyping(activeConversation, false);
       }, 2000);
     }
   };
 
-  const handleMessageContextMenu = (e, message) => {
+  const handleMessageContextMenu = (e: React.MouseEvent<HTMLElement>, message: ChatMessage) => {
     e.preventDefault();
     setContextMenu({
       x: e.clientX,
@@ -443,10 +446,10 @@ const ChatWindow = ({ isOpen, onClose }) => {
     });
   };
 
-  const handleMenuAction = async (action, msg) => {
+  const handleMenuAction = async (action: string, msg: ChatMessage) => {
     if (action === 'copy') {
       try {
-        await navigator.clipboard.writeText(msg.content);
+        await navigator.clipboard.writeText(String(msg.content ?? ''));
         addToast({ type: 'success', message: t('chatCopied') });
       } catch (err) {
         logger.error('Failed to copy text:', err);
@@ -471,14 +474,14 @@ const ChatWindow = ({ isOpen, onClose }) => {
       }
     } else if (action === 'reply') {
       // PR-69 / H-3: real reply — set replyTo state for quote block display
-      setReplyTo({ id: msg.id, content: msg.content, sender_name: msg.sender_name });
+      setReplyTo({ id: msg.id, content: String(msg.content ?? ''), sender_name: String(msg.sender_name ?? '') });
       setInputValue('');
       inputRef.current?.focus();
     }
     // PR-69 / H-4: removed 'forward' stub (was showing 'в разработке' toast)
   };
 
-  const handleFileUpload = async (file) => {
+  const handleFileUpload = async (file: File) => {
     if (!activeConversation) return;
     setIsSending(true);
     try {
@@ -498,7 +501,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
   }, []);
 
   // Drag Logic
-  const handleMouseDown = (e) => {
+  const handleMouseDown = (e: React.MouseEvent<HTMLElement>) => {
     if (isCompactViewport) return;
     if ((e.target as HTMLElement).closest('.chat-header') && !(e.target as HTMLElement).closest('button')) {
       setIsDragging(true);
@@ -510,7 +513,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
   };
 
   // Resize Logic
-  const handleResizeStart = (e) => {
+  const handleResizeStart = (e: React.MouseEvent<HTMLElement>) => {
     if (isCompactViewport) return;
     e.preventDefault();
     e.stopPropagation();
@@ -522,7 +525,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
       h: size.height
     });
   };
-  const handleActivationKeyDown = (event, onActivate) => {
+  const handleActivationKeyDown = (event: React.KeyboardEvent<HTMLElement>, onActivate: () => void) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       event.stopPropagation();
@@ -531,7 +534,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
   };
 
   useEffect(() => {
-    const handleMouseMove = (e) => {
+    const handleMouseMove = (e: MouseEvent) => {
       if (isDragging) {
         setPosition({
           x: e.clientX - dragOffset.x,
@@ -565,7 +568,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
   }, [isDragging, isResizing, dragOffset, resizeStart]);
 
   // Enter для отправки
-  const handleKeyPress = (e) => {
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -573,7 +576,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
   };
 
   // Начать новую беседу
-  const startConversation = (userId) => {
+  const startConversation = (userId: number) => {
     setShowNewChat(false);
     setSearchQuery('');
     setSearchResults([]);
@@ -597,8 +600,8 @@ const ChatWindow = ({ isOpen, onClose }) => {
   };
 
   // Форматирование времени
-  const formatTime = (dateStr) => {
-    const date = new Date(dateStr);
+  const formatTime = (dateStr: string | number | Date | undefined) => {
+    const date = new Date(dateStr as string);
     const now = new Date();
     const diff = now.getTime() - date.getTime();
 
@@ -616,7 +619,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
   };
 
   // Filtered Conversations
-  const filteredConversations = conversations.filter((c: Record<string, unknown>) => {
+  const filteredConversations = conversations.filter((c) => {
     const matchesSearch = !convSearchQuery ||
     c.user_name && String(c.user_name ?? '').toLowerCase().includes(convSearchQuery.toLowerCase()) ||
     c.last_message && String(c.last_message ?? '').toLowerCase().includes(convSearchQuery.toLowerCase());
@@ -739,7 +742,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
 
               <span className="chat-header-name">
                                             {activeUser?.user_name as React.ReactNode}
-                                            {onlineUsers[activeConversation] &&
+                                            {activeConversation !== null && Boolean(onlineUsers[activeConversation]) &&
                 <span className="user-online-dot" title={t('misc.cw_online_title')} />
                 }
                                         </span> :
@@ -832,7 +835,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
                 
                                                 <div className="conv-avatar" style={{ position: 'relative' }}>
                                                     {(u.name?.[0] || '?').toUpperCase()}
-                                                    {u.is_online &&
+                                                    {Boolean(u.is_online) &&
                   <span style={{
                     position: 'absolute',
                     bottom: 0,
@@ -923,7 +926,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
                                             <div className="conv-avatar">
                                                 {(conv.user_name?.[0] || '?').toUpperCase()}
                                             </div>
-                                            {onlineUsers[conv.user_id] &&
+                                            {Boolean(onlineUsers[conv.user_id]) &&
                 <span className="avatar-online-indicator" />
                 }
                                         </div>
@@ -942,9 +945,9 @@ const ChatWindow = ({ isOpen, onClose }) => {
                                                   : conv.last_message?.startsWith('/api/') || conv.last_message?.includes('file') ? t('chatFile')
                                                   : conv.last_message || ''}
                                                 </div>
-                                                {conv.unread_count > 0 &&
+                                                {Number(conv.unread_count ?? 0) > 0 &&
                   <span className="unread-badge">
-                                                        {conv.unread_count > 99 ? '99+' : conv.unread_count}
+                                                        {Number(conv.unread_count ?? 0) > 99 ? '99+' : (conv.unread_count ?? 0)}
                                                     </span>
                   }
                                             </div>
@@ -1100,7 +1103,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
                         }
                                                             <div
                           className={`message ${item.sender_id === user?.id ? 'sent' : 'received'}`}
-                          onContextMenuCapture={(e) => handleMessageContextMenu(e, item)}>
+                          onContextMenuCapture={(e: React.MouseEvent<HTMLElement>) => handleMessageContextMenu(e, item as unknown as ChatMessage)}>
                           
                                                                 {item.message_type === 'voice' ?
                           <>
@@ -1198,7 +1201,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
                               }
 
                                                                             {item.message_type === 'text' && String(item.content ?? '') && String(item.content).match(/https?:\/\/[^\s]+/) &&
-                              <LinkPreview url={String(item.content).match(/https?:\/\/[^\s]+/)[0]} />
+                              <LinkPreview url={String(item.content).match(/https?:\/\/[^\s]+/)?.[0] ?? ''} />
                               }
                                                                         </div>
                                                                         <div className="message-meta">
@@ -1217,7 +1220,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
                                                                         {Object.entries(groupReactions(item.reactions)).map(([emoji, userIds]) =>
                             <span
                               key={emoji}
-                              className={`reaction-bubble ${userIds.includes(user?.id) ? 'active' : ''}`}
+                              className={`reaction-bubble ${(user?.id != null && userIds.includes(user.id)) ? 'active' : ''}`}
                               role="button"
                               tabIndex={0}
                               onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => handleActivationKeyDown(event, () => toggleReaction(Number(item.id), emoji))}
@@ -1234,7 +1237,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
                             aria-label={t('misc.cw_add_reaction_aria')}
                             onClick={(e: React.MouseEvent<HTMLElement>) => {
                               e.stopPropagation();
-                              setReactionMenuMessageId(reactionMenuMessageId === item.id ? null : item.id);
+                              setReactionMenuMessageId(reactionMenuMessageId === item.id ? null : (item.id ?? null));
                             }}>
                             
                                                                     <Smile size={14} />
@@ -1264,7 +1267,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
                 })}
 
                                         {/* Typing Indicator inside scroll area */}
-                                        {typingUsers[activeConversation] &&
+                                        {activeConversation !== null && Boolean(typingUsers[activeConversation]) &&
                 <div
                   className="typing-indicator-modern"
                   style={{

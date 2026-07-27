@@ -35,7 +35,12 @@ const DisplayContentManager = ({
   const t18 = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   void t;
   const [activeTab, setActiveTab] = useState('banners');
-  const [content, setContent] = useState({
+  const [content, setContent] = useState<{
+    banners: Array<Record<string, any>>;
+    announcements: Array<Record<string, any>>;
+    videos: Array<Record<string, any>>;
+    themes: Array<Record<string, any>>;
+  }>({
     banners: [],
     announcements: [],
     videos: [],

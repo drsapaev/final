@@ -38,24 +38,24 @@ const MedicalEquipmentManager = () => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [activeTab, setActiveTab] = useState('devices');
-  const [devices, setDevices] = useState([]);
-  const [measurements, setMeasurements] = useState([]);
+  const [devices, setDevices] = useState<Array<Record<string, any>>>([]);
+  const [measurements, setMeasurements] = useState<Array<Record<string, any>>>([]);
   const [loading, setLoading] = useState(false);
-  const [selectedDevice, setSelectedDevice] = useState<Record<string, unknown> | null>(null);
-  const [overview, setOverview] = useState<Record<string, unknown> | null>(null);
+  const [selectedDevice, setSelectedDevice] = useState<Record<string, any> | null>(null);
+  const [overview, setOverview] = useState<Record<string, any> | null>(null);
 
   // Состояние для измерения
   const [measurementForm, setMeasurementForm] = useState({
     device_id: '',
     patient_id: ''
-  } as Record<string, unknown>);
+  } as Record<string, any>);
 
   // Состояние для фильтров
   const [filters, setFilters] = useState({
     device_type: '',
     status: '',
     location: ''
-  } as Record<string, unknown>);
+  } as Record<string, any>);
 
   useEffect(() => {
     loadDevices();
@@ -66,7 +66,7 @@ const MedicalEquipmentManager = () => {
     setLoading(true);
     try {
       const response = await api.get('/medical-equipment/devices') as import('axios').AxiosResponse<Record<string, unknown>>;
-      setDevices((response.data.devices as unknown[]) || []);
+      setDevices((response.data.devices as Array<Record<string, any>>) || []);
     } catch (error) {
       // P0 fix: removed mock-device fallback. Was showing fabricated "Тонометр
       // Omron M3" / "Термометр Braun" devices on API failure — admin could act
@@ -105,7 +105,7 @@ const MedicalEquipmentManager = () => {
       if (filters.device_type) params.device_type = filters.device_type;
 
       const response = await api.get('/medical-equipment/measurements', { params }) as import('axios').AxiosResponse<Record<string, unknown>>;
-      setMeasurements((response.data.measurements as unknown[]) || []);
+      setMeasurements((response.data.measurements as Array<Record<string, any>>) || []);
     } catch (error) {
       // P0 fix: removed mock-measurements fallback. Was showing fabricated
       // blood-pressure/thermometer readings on API failure.
@@ -122,7 +122,7 @@ const MedicalEquipmentManager = () => {
     }
   }, [activeTab, loadMeasurements]);
 
-  const connectDevice = async (deviceId) => {
+  const connectDevice = async (deviceId: string | number) => {
     try {
       const response = (await api.post(`/medical-equipment/devices/${deviceId}/connect`)) as import('axios').AxiosResponse<Record<string, unknown>>;
       const data = response.data;
@@ -138,7 +138,7 @@ const MedicalEquipmentManager = () => {
     }
   };
 
-  const disconnectDevice = async (deviceId) => {
+  const disconnectDevice = async (deviceId: string | number) => {
     try {
       const response = (await api.post(`/medical-equipment/devices/${deviceId}/disconnect`)) as import('axios').AxiosResponse<Record<string, unknown>>;
       const data = response.data;
