@@ -23,15 +23,53 @@ import {
   Select,
 } from '../ui/macos';
 import { notify } from '../../services/notify';
+import type { ComponentType } from 'react';
 
-const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }) => {
+interface ServiceItem {
+  id: number | string;
+  [key: string]: unknown;
+}
+
+interface ServiceCategory {
+  id: number | string;
+  name_ru: string;
+  [key: string]: unknown;
+}
+
+interface BatchFailedService {
+  service_id: number | string;
+  error: string;
+}
+
+interface BatchUpdateResult {
+  updated_count: number;
+  failed_count: number;
+  failed_services: BatchFailedService[];
+}
+
+interface ServiceBatchField {
+  key: string;
+  label: string;
+  type: 'number' | 'select' | 'boolean';
+  options?: unknown[];
+  icon: ComponentType<{ size?: number | string; className?: string; style?: CSSProperties }>;
+}
+
+interface ServiceBatchEditProps {
+  selectedServices: ServiceItem[];
+  categories: ServiceCategory[];
+  onComplete: () => void;
+  onCancel: () => void;
+}
+
+const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }: ServiceBatchEditProps) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
-  const [updates, setUpdates] = useState({});
+  const [updates, setUpdates] = useState<Record<string, unknown>>({});
   const [comment, setComment] = useState('');
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState(null);
+  const [result, setResult] = useState<BatchUpdateResult | null>(null);
 
-  const availableFields = [
+  const availableFields: ServiceBatchField[] = [
     { key: 'price', label: t('admin2.sbe_field_price'), type: 'number', icon: DollarSign },
     { key: 'currency', label: t('admin2.sbe_field_currency'), type: 'select', options: ['UZS', 'USD'], icon: Tag },
     { key: 'duration_minutes', label: t('admin2.sbe_field_duration'), type: 'number', icon: Clock },
@@ -42,9 +80,9 @@ const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }
     { key: 'allow_doctor_price_override', label: t('admin2.sbe_field_price_override'), type: 'boolean', icon: CheckSquare }
   ];
 
-  const [selectedFields, setSelectedFields] = useState(new Set());
+  const [selectedFields, setSelectedFields] = useState<Set<string>>(new Set());
 
-  const toggleField = (fieldKey) => {
+  const toggleField = (fieldKey: string) => {
     const newSelected = new Set(selectedFields);
     if (newSelected.has(fieldKey)) {
       newSelected.delete(fieldKey);
@@ -57,7 +95,7 @@ const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }
     setSelectedFields(newSelected);
   };
 
-  const handleFieldChange = (fieldKey, value) => {
+  const handleFieldChange = (fieldKey: string, value: unknown) => {
     setUpdates(prev => ({ ...prev, [String(fieldKey)]: value }));
   };
 
@@ -70,14 +108,14 @@ const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }
     try {
       setLoading(true);
       const response = await api.post('/services/admin/batch-update', {
-        service_ids: selectedServices.map(s => s.id),
+        service_ids: selectedServices.map((s: ServiceItem) => s.id),
         updates,
         comment: comment || undefined
       });
 
-      setResult(response.data);
+      setResult(response.data as BatchUpdateResult);
 
-      if (response.data.failed_count === 0) {
+      if ((response.data as BatchUpdateResult).failed_count === 0) {
         setTimeout(() => {
           onComplete();
         }, 2000);
@@ -89,7 +127,6 @@ const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }
       setLoading(false);
     }
   };
-
   if (result) {
     return (
       <MacOSCard variant="default" className="admin-p-24">
@@ -169,7 +206,7 @@ const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }
                       : 'var(--mac-bg-primary)' } as CSSProperties}
                 >
                   <FieldIcon size={16} className="admin-col-dyn" style={{ '--admin-col0': selectedFields.has(field.key) ? 'var(--mac-accent)' : 'var(--mac-text-secondary)' } as CSSProperties} />
-                  {String((field as Record<string, unknown>).label)}
+                  {String(field.label)}
                 </button>
               );
             })}
@@ -186,15 +223,15 @@ const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }
                 const field = availableFields.find(f => f.key === fieldKey);
                 if (!field) return null;
 
-                if ((field as Record<string, unknown>).type === 'number') {
+                if (field.type === 'number') {
                   return (
                     <div key={String(fieldKey)}>
                       <label className="admin-d-block-fs-13-fw-500-primary-mb-6-2">
-                        {String((field as Record<string, unknown>).label)}
+                        {String(field.label)}
                       </label>
                       <Input
                         type="number"
-                        value={updates[String(fieldKey)] || ''}
+                        value={typeof updates[String(fieldKey)] === 'number' || typeof updates[String(fieldKey)] === 'string' ? updates[String(fieldKey)] as string | number : ''}
                         onChange={(e) => handleFieldChange(fieldKey, parseFloat(e.target.value) || 0)}
                         placeholder={t('admin2.sbe_input_placeholder', { label: field.label.toLowerCase() })}
                       />
@@ -202,18 +239,22 @@ const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }
                   );
                 }
 
-                if ((field as Record<string, unknown>).type === 'select') {
+                if (field.type === 'select') {
+                  const rawOptions = field.options || [];
                   const options = fieldKey === 'category_id'
-                    ? field.options.map(cat => ({ value: String(cat.id), label: cat.name_ru }))
-                    : field.options.map(opt => ({ value: opt, label: opt }));
+                    ? (rawOptions as ServiceCategory[]).map(cat => ({ value: String(cat.id), label: cat.name_ru }))
+                    : (rawOptions as string[]).map(opt => ({ value: opt, label: opt }));
+
+                  const currentValue = updates[String(fieldKey)];
+                  const selectValue = (typeof currentValue === 'string' || typeof currentValue === 'number') ? currentValue : '';
 
                   return (
                     <div key={String(fieldKey)}>
                       <label className="admin-d-block-fs-13-fw-500-primary-mb-6-1">
-                        {String((field as Record<string, unknown>).label)}
+                        {String(field.label)}
                       </label>
                       <Select
-                        value={updates[String(fieldKey)] || ''}
+                        value={selectValue}
                         onChange={(value) => handleFieldChange(fieldKey, value)}
                         options={[
                           { value: '', label: t('admin2.sbe_select_placeholder', { label: field.label.toLowerCase() }) },
@@ -225,14 +266,14 @@ const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }
                   );
                 }
 
-                if ((field as Record<string, unknown>).type === 'boolean') {
+                if (field.type === 'boolean') {
                   return (
                     <Checkbox
                       key={String(fieldKey)}
                       id={String(fieldKey)}
-                      checked={updates[String(fieldKey)] || false}
+                      checked={Boolean(updates[String(fieldKey)])}
                       onChange={(checked) => handleFieldChange(fieldKey, checked)}
-                      label={String((field as Record<string, unknown>).label)}
+                      label={String(field.label)}
                     />
                   );
                 }

@@ -43,48 +43,70 @@ export const getLocalISODate = () => {
 // CONTRACT / NORMALIZATION HELPERS
 // =====================================================================
 
-export const normalizeWizardContractValue = (value) => {
+export const normalizeWizardContractValue = (value: unknown): string => {
   if (value === null || value === undefined) return '';
   return String(value).trim().toLowerCase();
 };
 
-export const getWizardRecordKind = (record) =>
+export const getWizardRecordKind = (record: Record<string, unknown> | null | undefined): string =>
   normalizeWizardContractValue(record?.record_kind ?? record?.record_type ?? record?.type);
 
-export const getWizardSourceKind = (record) =>
+export const getWizardSourceKind = (record: Record<string, unknown> | null | undefined): string =>
   normalizeWizardContractValue(record?.source_kind ?? record?.source);
 
-export const hasQueueIdentityValue = (value) =>
+export const hasQueueIdentityValue = (value: unknown): boolean =>
   value !== null && value !== undefined && value !== '';
 
 // =====================================================================
 // QUEUE ENTRY ID RESOLUTION
 // =====================================================================
 
-export const resolveExplicitQueueEntryId = (record, { allowLegacyId = true } = {}) => {
+interface QueueRecordLike {
+  original_queue_id?: unknown;
+  queue_entry_id?: unknown;
+  doctor_queue_entry_id?: unknown;
+  queue_id?: unknown;
+  id?: unknown;
+  queue_numbers?: unknown;
+  record_kind?: unknown;
+  record_type?: unknown;
+  type?: unknown;
+  source_kind?: unknown;
+  source?: unknown;
+  [key: string]: unknown;
+}
+
+export const resolveExplicitQueueEntryId = (
+  record: QueueRecordLike | null | undefined,
+  { allowLegacyId = true }: { allowLegacyId?: boolean } = {}
+): string | number | null => {
   if (!record || typeof record !== 'object') return null;
 
   const explicitQueueEntryId =
     record.original_queue_id ?? record.queue_entry_id ?? record.doctor_queue_entry_id ?? null;
   if (hasQueueIdentityValue(explicitQueueEntryId)) {
-    return explicitQueueEntryId;
+    return (explicitQueueEntryId as string | number) ?? null;
   }
 
   if (!allowLegacyId || hasQueueIdentityValue(record.queue_id)) {
     return null;
   }
 
-  return hasQueueIdentityValue(record.id) ? record.id : null;
+  return hasQueueIdentityValue(record.id) ? ((record.id as string | number) ?? null) : null;
 };
 
-export const getFirstQueueNumberId = (record) => {
+export const getFirstQueueNumberId = (record: QueueRecordLike | null | undefined): string | number | null => {
   if (!Array.isArray(record?.queue_numbers) || record.queue_numbers.length === 0) {
     return null;
   }
-  return resolveExplicitQueueEntryId(record.queue_numbers[0]);
+  return resolveExplicitQueueEntryId(record.queue_numbers[0] as QueueRecordLike);
 };
 
-export const resolveOnlineQueueEntryId = (record, recordKind, effectiveSource) => {
+export const resolveOnlineQueueEntryId = (
+  record: QueueRecordLike | null | undefined,
+  recordKind: string,
+  effectiveSource: string
+): string | number | null => {
   if (!record || recordKind !== 'online_queue' || effectiveSource !== 'online') {
     return null;
   }
@@ -95,15 +117,29 @@ export const resolveOnlineQueueEntryId = (record, recordKind, effectiveSource) =
 // QUEUE CANCELLATION (when cart items removed)
 // =====================================================================
 
-export const getRemovedQueueEntryIds = (originalQueueIds, cartItems = []) => {
-  const currentQueueIds = new Set(
-    cartItems.map((item) => item.original_queue_id).filter((id) => id)
+interface CartItemLike {
+  original_queue_id?: string | number | null;
+  [key: string]: unknown;
+}
+
+export const getRemovedQueueEntryIds = (
+  originalQueueIds: Array<string | number> | null | undefined,
+  cartItems: CartItemLike[] = []
+): Array<string | number> => {
+  const currentQueueIds = new Set<string | number>(
+    cartItems
+      .map((item) => item.original_queue_id)
+      .filter((id): id is string | number => Boolean(id))
   );
 
   return Array.from(originalQueueIds || []).filter((id) => !currentQueueIds.has(id));
 };
 
-export const cancelRemovedQueueEntries = async (originalQueueIds, cartItems, contextLabel) => {
+export const cancelRemovedQueueEntries = async (
+  originalQueueIds: Array<string | number> | null | undefined,
+  cartItems: CartItemLike[],
+  contextLabel: string
+): Promise<void> => {
   const removedQueueIds = getRemovedQueueEntryIds(originalQueueIds, cartItems);
   if (removedQueueIds.length === 0) {
     logger.log(`[AppointmentWizardV2] no removed queue entries to cancel (${contextLabel})`);
@@ -119,7 +155,7 @@ export const cancelRemovedQueueEntries = async (originalQueueIds, cartItems, con
   const failedIds = results
     .map((result, index) => ({ result, id: removedQueueIds[index] }))
     .filter(({ result }) => result.status === 'rejected')
-    .map(({ id }) => id);
+    .map(({ id }) => id as string | number);
 
   if (failedIds.length > 0) {
     logger.error('[AppointmentWizardV2] failed to cancel removed queue entries', {
@@ -137,7 +173,9 @@ export const cancelRemovedQueueEntries = async (originalQueueIds, cartItems, con
 // SERVICE SELECTION NORMALIZATION
 // =====================================================================
 
-export const normalizeServiceSelectionValue = (serviceValue) => {
+type ServiceSelectionValue = string | number | bigint | Record<string, unknown> | null | undefined;
+
+export const normalizeServiceSelectionValue = (serviceValue: ServiceSelectionValue): string => {
   if (serviceValue == null) return '';
 
   if (
@@ -149,15 +187,16 @@ export const normalizeServiceSelectionValue = (serviceValue) => {
   }
 
   if (typeof serviceValue === 'object') {
+    const obj = serviceValue as Record<string, unknown>;
     const candidate =
-      serviceValue.service_code ||
-      serviceValue.code ||
-      serviceValue.name ||
-      serviceValue.label ||
-      serviceValue.title ||
-      serviceValue.service_name ||
-      serviceValue.value ||
-      serviceValue._temp_name ||
+      obj.service_code ||
+      obj.code ||
+      obj.name ||
+      obj.label ||
+      obj.title ||
+      obj.service_name ||
+      obj.value ||
+      obj._temp_name ||
       '';
     return String(candidate).trim();
   }
@@ -165,18 +204,19 @@ export const normalizeServiceSelectionValue = (serviceValue) => {
   return String(serviceValue).trim();
 };
 
-export const normalizeServiceSelectionName = (serviceValue) => {
+export const normalizeServiceSelectionName = (serviceValue: ServiceSelectionValue): string => {
   if (serviceValue == null) return '';
 
   if (typeof serviceValue === 'object') {
+    const obj = serviceValue as Record<string, unknown>;
     const candidate =
-      serviceValue.name ||
-      serviceValue.service_name ||
-      serviceValue.label ||
-      serviceValue.title ||
-      serviceValue.code ||
-      serviceValue.service_code ||
-      serviceValue.value ||
+      obj.name ||
+      obj.service_name ||
+      obj.label ||
+      obj.title ||
+      obj.code ||
+      obj.service_code ||
+      obj.value ||
       '';
     return String(candidate).trim();
   }
@@ -188,17 +228,17 @@ export const normalizeServiceSelectionName = (serviceValue) => {
 // GENDER / SEX NORMALIZATION
 // =====================================================================
 
-export const normalizeGenderForForm = (value) => {
+export const normalizeGenderForForm = (value: unknown): string => {
   const normalized = String(value || '').trim().toLowerCase();
   if (!normalized) return '';
   if (['m', 'male', 'man', 'men', '1', 'м', 'муж', 'мужской', 'мужчина', 'erkak'].includes(normalized))
     return 'male';
   if (['f', 'female', 'woman', 'women', '2', 'ж', 'жен', 'женский', 'женщина', 'ayol'].includes(normalized))
     return 'female';
-  return value;
+  return String(value);
 };
 
-export const firstNonEmpty = (...values) => {
+export const firstNonEmpty = (...values: Array<unknown>): unknown => {
   for (const value of values) {
     if (value !== null && value !== undefined && String(value).trim() !== '') {
       return value;
@@ -207,7 +247,16 @@ export const firstNonEmpty = (...values) => {
   return '';
 };
 
-export const resolvePatientGenderValue = (record) =>
+interface PatientGenderRecordLike {
+  patient_gender?: unknown;
+  patient_sex?: unknown;
+  gender?: unknown;
+  sex?: unknown;
+  patient?: { gender?: unknown; sex?: unknown } | null;
+  [key: string]: unknown;
+}
+
+export const resolvePatientGenderValue = (record: PatientGenderRecordLike | null | undefined): unknown =>
   firstNonEmpty(
     record?.patient_gender,
     record?.patient_sex,
@@ -217,7 +266,7 @@ export const resolvePatientGenderValue = (record) =>
     record?.patient?.sex
   );
 
-export const genderToPatientSexForApi = (value) => {
+export const genderToPatientSexForApi = (value: unknown): 'M' | 'F' | null => {
   const normalized = normalizeGenderForForm(value);
   if (normalized === 'male') return 'M';
   if (normalized === 'female') return 'F';
@@ -228,7 +277,13 @@ export const genderToPatientSexForApi = (value) => {
 // PATIENT ID RESOLUTION
 // =====================================================================
 
-export const resolveInitialPatientId = (initialData) =>
+interface InitialDataLike {
+  patient_id?: unknown;
+  patient?: { id?: unknown } | null;
+  [key: string]: unknown;
+}
+
+export const resolveInitialPatientId = (initialData: InitialDataLike | null | undefined): unknown =>
   initialData?.patient_id ?? initialData?.patient?.id ?? null;
 
 // =====================================================================
@@ -271,7 +326,16 @@ export const WIZARD_DEPARTMENT_FILTER_KEYS = WIZARD_DEPARTMENT_FILTER_KEYS_FALLB
  * @param {Array} [queueProfiles] - optional array of {key, queue_tags}
  * @returns {string[]} array of department_key strings to filter by
  */
-export const getWizardDepartmentFilterKeys = (value, queueProfiles = null) => {
+interface QueueProfileLike {
+  key?: unknown;
+  queue_tags?: unknown;
+  [key: string]: unknown;
+}
+
+export const getWizardDepartmentFilterKeys = (
+  value: unknown,
+  queueProfiles: QueueProfileLike[] | null = null
+): string[] => {
   const normalized = String(value || '').trim().toLowerCase();
 
   // PR-25: dynamic path — use queue_profiles if available
@@ -280,7 +344,7 @@ export const getWizardDepartmentFilterKeys = (value, queueProfiles = null) => {
       (p) => String(p.key || '').trim().toLowerCase() === normalized
     );
     if (profile && Array.isArray(profile.queue_tags) && profile.queue_tags.length > 0) {
-      return profile.queue_tags.map((t) => String(t).trim().toLowerCase());
+      return (profile.queue_tags as unknown[]).map((t) => String(t).trim().toLowerCase());
     }
     // If profile exists but has no queue_tags, use the key itself
     if (profile) {
@@ -292,7 +356,7 @@ export const getWizardDepartmentFilterKeys = (value, queueProfiles = null) => {
   return WIZARD_DEPARTMENT_FILTER_KEYS_FALLBACK[normalized] || [normalized];
 };
 
-export const serviceCodeToWizardCategory = (value) => {
+export const serviceCodeToWizardCategory = (value: unknown): 'laboratory' | 'procedures' | 'specialists' | null => {
   const prefix = String(value || '').trim().toUpperCase().charAt(0);
   if (prefix === 'L') return 'laboratory';
   if (prefix === 'P' || prefix === 'C') return 'procedures';
@@ -300,15 +364,26 @@ export const serviceCodeToWizardCategory = (value) => {
   return null;
 };
 
-export const activeTabToWizardCategory = (value) => {
+export const activeTabToWizardCategory = (value: unknown): 'laboratory' | 'procedures' | 'specialists' => {
   const normalized = String(value || '').trim().toLowerCase();
   if (['lab', 'laboratory'].includes(normalized)) return 'laboratory';
   if (['procedures', 'procedure'].includes(normalized)) return 'procedures';
   return 'specialists';
 };
 
-export const resolveInitialServiceCategory = (items = [], activeTabValue = '') => {
-  const firstItem = (Array.isArray(items) ? items : []).find(Boolean);
+interface ServiceItemLike {
+  service_code?: unknown;
+  code?: unknown;
+  _temp_name?: unknown;
+  service_name?: unknown;
+  [key: string]: unknown;
+}
+
+export const resolveInitialServiceCategory = (
+  items: ServiceItemLike[] = [],
+  activeTabValue: unknown = ''
+): 'laboratory' | 'procedures' | 'specialists' => {
+  const firstItem = (Array.isArray(items) ? items : []).find(Boolean) as ServiceItemLike | undefined;
   const itemCategory = serviceCodeToWizardCategory(
     firstItem?.service_code || firstItem?.code || firstItem?._temp_name || firstItem?.service_name
   );

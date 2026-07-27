@@ -23,25 +23,44 @@ import React from "react";
  * Компонент для красивого отображения клинических рекомендаций AI
  * Парсит форматированный текст и отображает его с правильной структурой
  */
-const AIClinicalText = ({ content, variant = 'info' }) => {
+
+interface AIClinicalItem {
+  type: 'diagnosis' | 'subheading' | 'list' | 'text' | 'break';
+  content: string;
+}
+
+interface AIClinicalSection {
+  type: 'heading' | 'subheading';
+  content: string;
+  items: AIClinicalItem[];
+}
+
+type AIClinicalVariant = 'success' | 'warning' | 'error' | 'info';
+
+interface AIClinicalTextProps {
+  content?: string | null;
+  variant?: AIClinicalVariant;
+}
+
+const AIClinicalText = ({ content, variant = 'info' }: AIClinicalTextProps) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   if (!content) return null;
 
   // Разбираем контент на секции
-  const parseContent = (text) => {
-    const sections = [];
-    let currentSection = null;
+  const parseContent = (text: string): AIClinicalSection[] => {
+    const sections: AIClinicalSection[] = [];
+    let currentSection: AIClinicalSection | null = null;
 
     const lines = text.split('\n');
 
-    lines.forEach((line) => {
+    lines.forEach((line: string) => {
       // Заголовки с ### или **
       if (line.match(/^###\s+(.+)$/)) {
         if (currentSection) sections.push(currentSection);
         currentSection = {
           type: 'heading',
           content: line.replace(/^###\s+/, '').replace(/\*\*/g, ''),
-          items: []
+          items: [] as AIClinicalItem[]
         };
       }
       // Диагнозы с >
@@ -64,7 +83,7 @@ const AIClinicalText = ({ content, variant = 'info' }) => {
       }
       // Эмодзи заголовки
       else if (line.match(/^(🩺|🧠|🧬|🧩|💡|📋)\s*\*\*(.+?)\*\*/)) {
-        if (currentSection) currentSection.items.push({ type: 'break' });
+        if (currentSection) currentSection.items.push({ type: 'break', content: '' });
         if (currentSection) {
           currentSection.items.push({
             type: 'subheading',
@@ -89,7 +108,7 @@ const AIClinicalText = ({ content, variant = 'info' }) => {
 
   const sections = parseContent(content);
 
-  const renderItem = (item, idx) => {
+  const renderItem = (item: AIClinicalItem, idx: number) => {
     switch (item.type) {
       case 'diagnosis':
         return (
@@ -175,12 +194,13 @@ const AIClinicalText = ({ content, variant = 'info' }) => {
   };
 
 
-  const variantBgColor = {
+  const variantBgColorMap: Record<AIClinicalVariant, string> = {
     'success': 'var(--mac-success)',
     'warning': 'var(--mac-warning)',
     'error': 'var(--mac-error)',
     'info': 'var(--mac-info)'
-  }[variant] || 'var(--mac-bg-primary)';
+  };
+  const variantBgColor = variantBgColorMap[variant] || 'var(--mac-bg-primary)';
 
   return (
     <Paper

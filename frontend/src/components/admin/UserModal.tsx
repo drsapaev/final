@@ -18,13 +18,32 @@ import React from "react";
  * UserModal - macOS-styled modal for creating/editing users
  * Phase 1 refactoring: migrated from native components to macOS design system
  */
+
+interface UserModalUser {
+  username?: string;
+  email?: string;
+  full_name?: string;
+  role?: string;
+  is_active?: boolean;
+  profile?: { full_name?: string } | null;
+  [key: string]: unknown;
+}
+
+interface UserModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  user?: UserModalUser | null;
+  onSave: (userData: Record<string, unknown>) => Promise<void> | void;
+  loading?: boolean;
+}
+
 const UserModal = ({
   isOpen,
   onClose,
   user = null,
   onSave,
   loading = false
-}) => {
+}: UserModalProps) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [formData, setFormData] = useState<Record<string, any>>({
     username: '',
@@ -114,7 +133,7 @@ const UserModal = ({
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     if (!validateForm()) return;
@@ -142,7 +161,7 @@ const UserModal = ({
     }
   };
 
-  const handleChange = (field, value) => {
+  const handleChange = (field: string, value: unknown) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: null }));
@@ -150,7 +169,7 @@ const UserModal = ({
   };
 
   // Error message component
-  const ErrorMessage = ({ message }) => (
+  const ErrorMessage = ({ message }: { message?: React.ReactNode }) => (
     <div className="admin-field-error-xs">
       <AlertCircle className="admin-icon-12" />
       {message}

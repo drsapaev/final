@@ -240,10 +240,10 @@ function getUserRoles(profile: Record<string, unknown>): string[] {
 }
 
 function getUserPermissions(profile: Record<string, unknown>): string[] {
-  const permissions = [];
+  const permissions: string[] = [];
 
   if (Array.isArray(profile.permissions)) {
-    permissions.push(...profile.permissions);
+    permissions.push(...(profile.permissions as string[]));
   }
 
   // Добавляем базовые разрешения на основе ролей

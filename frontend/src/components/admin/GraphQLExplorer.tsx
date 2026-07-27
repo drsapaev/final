@@ -26,17 +26,40 @@ import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 
+interface GraphQLSchemaField {
+  name: string;
+  description?: string | null;
+  type?: { name?: string | null } | null;
+}
+
+interface GraphQLSchemaType {
+  name: string;
+  description?: string | null;
+  fields?: GraphQLSchemaField[] | null;
+}
+
+interface GraphQLSchema {
+  types: GraphQLSchemaType[];
+}
+
+interface GraphQLResult {
+  data?: unknown;
+  errors?: Array<unknown>;
+  error?: string;
+  [key: string]: unknown;
+}
+
 const GraphQLExplorer = () => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [activeTab, setActiveTab] = useState('explorer');
   const [query, setQuery] = useState('');
   const [variables, setVariables] = useState('{}');
-  const [result, setResult] = useState(null);
+  const [result, setResult] = useState<GraphQLResult | null>(null);
   const [loading, setLoading] = useState(false);
-  const [schema, setSchema] = useState(null);
+  const [schema, setSchema] = useState<GraphQLSchema | null>(null);
   const [selectedExample, setSelectedExample] = useState('');
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Примеры GraphQL запросов
   const queryExamples = {
@@ -302,10 +325,10 @@ const GraphQLExplorer = () => {
         `
       });
       if (data?.data?.__schema) {
-        setSchema(data.data.__schema);
+        setSchema(data.data.__schema as GraphQLSchema);
       }
-    } catch (error) {
-      logger.error('Ошибка загрузки схемы GraphQL:', error);
+    } catch (err) {
+      logger.error('Ошибка загрузки схемы GraphQL:', err);
     }
   };
 
@@ -333,21 +356,21 @@ const GraphQLExplorer = () => {
         query,
         variables: parsedVariables
       });
-      setResult(data);
+      setResult(data as GraphQLResult);
 
-      if (data.errors) {
+      if ((data as GraphQLResult)?.errors) {
         setError(t('admin2.gql_error_graphql_errors'));
       }
-    } catch (error) {
-      logger.error('Ошибка выполнения GraphQL запроса:', error);
-      setError(t('admin2.gql_error_execution', { message: (error instanceof Error ? (error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)) : String(error)) }));
-      setResult({ error: error.message });
+    } catch (err) {
+      logger.error('Ошибка выполнения GraphQL запроса:', err);
+      setError(t('admin2.gql_error_execution', { message: (err instanceof Error ? err.message : String(err)) }));
+      setResult({ error: err instanceof Error ? err.message : String(err) });
     } finally {
       setLoading(false);
     }
   };
 
-  const loadExample = (exampleKey) => {
+  const loadExample = (exampleKey: string) => {
     const example = queryExamples[exampleKey];
     if (example) {
       setQuery(example.query);
@@ -379,7 +402,7 @@ const GraphQLExplorer = () => {
     toast.success(t('admin2.gql_toast_downloaded'));
   };
 
-  const formatJSON = (obj) => {
+  const formatJSON = (obj: unknown) => {
     return JSON.stringify(obj, null, 2);
   };
 
@@ -567,7 +590,7 @@ const GraphQLExplorer = () => {
                         </span>
                       </div>
             )}
-                    {type.fields?.length > 10 &&
+                    {type.fields && type.fields.length > 10 &&
             <div className="admin-p-4-ta-center-tertiary-fs-xs">
                         {t('admin2.gql_more_fields', { count: type.fields.length - 10 })}
                       </div>

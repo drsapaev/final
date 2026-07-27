@@ -20,6 +20,15 @@ import {
 import PropTypes from 'prop-types';
 import notify from '../../services/notify';
 
+interface DentalPhotoData {
+  id: number;
+  url: string | ArrayBuffer | null;
+  filename: string;
+  size: number;
+  type: string;
+  uploadedAt: string;
+}
+
 /**
  * Форма объективного осмотра для стоматологической ЭМК
  * Включает индексы гигиены, пародонт, фотофиксацию
@@ -68,17 +77,17 @@ const ExaminationForm = ({
 
     // Фото и рентген
     photos: {
-      before: [],
-      after: [],
-      intraoral: [],
-      extraoral: []
+      before: [] as DentalPhotoData[],
+      after: [] as DentalPhotoData[],
+      intraoral: [] as DentalPhotoData[],
+      extraoral: [] as DentalPhotoData[]
     },
 
     // Рентгенологические данные
     radiographs: {
       panoramic: '',
-      periapical: [],
-      bitewing: [],
+      periapical: [] as DentalPhotoData[],
+      bitewing: [] as DentalPhotoData[],
       cbct: ''
     },
 

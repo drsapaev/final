@@ -20,6 +20,33 @@ import notify from '../../services/notify';
 import React from "react";
 const t18 = i18n.t as unknown as (key: string, options?: Record<string, unknown>) => string;
 
+interface QueueProfile {
+  key: string;
+  queue_tags?: string[];
+  is_active?: boolean;
+  title_ru?: string;
+  title?: string;
+}
+
+interface ServiceRecord {
+  id?: string | number;
+  name?: string;
+  code?: string;
+  service_code?: string;
+  category_id?: string | number;
+  price?: string | number;
+  currency?: string;
+  duration_minutes?: number | string;
+  doctor_id?: string | number;
+  active?: boolean;
+  department_key?: string;
+  queue_tag?: string;
+  requires_doctor?: boolean;
+  is_consultation?: boolean;
+  allow_doctor_price_override?: boolean;
+  [k: string]: unknown;
+}
+
 // UX Audit Admin #4.1: shared constants extracted from ServiceCatalog.jsx.
 const SERVICE_GROUP_PREFIXES = {
   cardiology: 'K',
@@ -57,21 +84,32 @@ const resolveServiceGroup = ({ queueTag, departmentKey, categorySpecialty }) => 
   return null;
 };
 
-const getAllowedPrefixesForGroup = (groupKey) => SERVICE_GROUP_PREFIXES[groupKey] || [];
+const getAllowedPrefixesForGroup = (groupKey: string | null): string | string[] => {
+  if (!groupKey) return [];
+  return SERVICE_GROUP_PREFIXES[groupKey as keyof typeof SERVICE_GROUP_PREFIXES] || [];
+};
 
 
-const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMessage, onSave, onCancel }) => {
+const ServiceForm = ({ service, categories, doctors, queueProfiles = [] as QueueProfile[], setMessage, onSave, onCancel }: {
+  service?: ServiceRecord | null;
+  categories: Array<{ id: number; name_ru?: string; specialty?: string; [k: string]: unknown }>;
+  doctors: Array<{ id: string | number; specialty?: string; user?: { full_name?: string; [k: string]: unknown }; [k: string]: unknown }>;
+  queueProfiles?: QueueProfile[];
+  setMessage: (msg: { type: string; text: string }) => void;
+  onSave: (data: Record<string, unknown>) => void;
+  onCancel: () => void;
+}) => {
   // t accessed via closure or t18()
   const [activeTab, setActiveTab] = useState('basic'); // 'basic', 'queue', 'options'
   const [showPreview, setShowPreview] = useState(false); // ✅ PREVIEW: Show changes preview
   const [formData, setFormData] = useState({
     name: service?.name || '',
     code: service?.code || service?.service_code || '', // Unified: use code as primary
-    category_id: service?.category_id || '',
-    price: service?.price || '',
+    category_id: service?.category_id != null ? String(service.category_id) : '',
+    price: service?.price != null ? String(service.price) : '',
     currency: service?.currency || 'UZS',
-    duration_minutes: service?.duration_minutes || 30,
-    doctor_id: service?.doctor_id || '',
+    duration_minutes: service?.duration_minutes != null ? Number(service.duration_minutes) : 30,
+    doctor_id: service?.doctor_id != null ? String(service.doctor_id) : '',
     active: service?.active !== undefined ? service.active : true,
     department_key: service?.department_key || '',
     queue_tag: service?.queue_tag || '',
@@ -139,7 +177,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
       codePrefix &&
       !allowedPrefixes.includes(codePrefix)
     );
-  const expectedPrefixLabel = allowedPrefixes.length ? allowedPrefixes.join(' / ') : '';
+  const expectedPrefixLabel = allowedPrefixes.length ? (allowedPrefixes as string[]).join(' / ') : '';
   const selectedGroupLabel = selectedServiceGroup
     ? t18(`admin2.sf_group_${selectedServiceGroup}`, { defaultValue: selectedServiceGroup })
     : '';
@@ -183,12 +221,12 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
   const handleConfirmSave = () => {
     // Подготавливаем данные для API
     const canonicalCode = normalizedCode || null;
-    const apiData = {
+    const apiData: Record<string, unknown> = {
       ...formData,
       price: formData.price ? parseFloat(formData.price) : null,
       category_id: formData.category_id ? parseInt(formData.category_id) : null,
       doctor_id: formData.doctor_id ? parseInt(formData.doctor_id) : null,
-      duration_minutes: parseInt(formData.duration_minutes) || 30,
+      duration_minutes: parseInt(String(formData.duration_minutes)) || 30,
       code: canonicalCode,
       service_code: canonicalCode, // Sync for backwards compatibility
       category_code: derivedCategoryCode || null // Auto-derived from code
@@ -215,8 +253,8 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
 
     // ⭐ SSOT: Sync queue_tag with department_key
     if (field === 'queue_tag' && normalizedValue) {
-      const matchingProfile = queueProfiles.find((p) =>
-      (p.queue_tags || []).includes(normalizedValue) || p.key === normalizedValue
+      const matchingProfile = queueProfiles.find((p: QueueProfile) =>
+      (p.queue_tags || []).includes(normalizedValue as string) || p.key === normalizedValue
       );
 
       if (matchingProfile) {
@@ -416,8 +454,8 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
               options={[
               { value: '', label: t18('admin2.sf_no_queue_option') },
               ...queueProfiles.
-              filter((profile) => profile.is_active !== false).
-              map((profile) => ({
+              filter((profile: QueueProfile) => profile.is_active !== false).
+              map((profile: QueueProfile) => ({
                 value: profile.queue_tags?.[0] || profile.key,
                 label: profile.title_ru || profile.title
               }))]

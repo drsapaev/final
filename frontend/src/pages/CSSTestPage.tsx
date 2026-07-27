@@ -24,7 +24,7 @@ const CSSTestPage = () => {
 
   const runCSSTests = () => {
     logger.info('Running CSS tests');
-    const results = [];
+    const results: Array<{ test: string; passed: boolean; message: string }> = [];
     
     // Тест 1: ModernTabs без CSS конфликтов
     try {

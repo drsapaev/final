@@ -23,6 +23,14 @@ import {
 import IconButton from './IconButton';
 import logger from '../../utils/logger';
 import React from "react";
+import type { Doctor } from '../../types/domain/clinic';
+
+interface DepartmentOption {
+  key: string;
+  name_ru: string;
+}
+
+type TFunc = (key: string, options?: Record<string, unknown>) => string;
 
 // PR-19: departmentOptions now loaded dynamically from /admin/departments
 // (was hardcoded — new departments didn't appear in filter dropdown)
@@ -32,28 +40,28 @@ const STATUS_OPTION_KEYS = [
   { value: 'inactive', labelKey: 'admin2.ad_status_inactive' },
 ];
 
-const getStatusOptions = (t) =>
+const getStatusOptions = (t: TFunc) =>
   STATUS_OPTION_KEYS.map(({ value, labelKey }) => ({
     value,
     label: t(labelKey),
   }));
 
-const getDoctorName = (doctor, t) =>
-  doctor.user?.full_name || doctor.name || doctor.user?.username || t('admin2.ad_doctor_unknown');
+const getDoctorName = (doctor: Doctor, t: TFunc) =>
+  doctor.user?.full_name || doctor.name || (doctor.user as { username?: string } | undefined)?.username || t('admin2.ad_doctor_unknown');
 
-const getDoctorInitials = (doctor, t) =>
+const getDoctorInitials = (doctor: Doctor, t: TFunc) =>
   getDoctorName(doctor, t)
     .split(' ')
     .filter(Boolean)
-    .map((part) => part[0])
+    .map((part: string) => part[0])
     .join('')
     .toUpperCase()
     .slice(0, 2) || t('admin2.ad_doctor_initial');
 
 // PR-19: dynamic department label lookup (was hardcoded)
-const getDepartmentLabel = (department, deptList = [], t) => {
+const getDepartmentLabel = (department: string | undefined, deptList: DepartmentOption[] = [], t: TFunc) => {
   if (!department) return t('admin2.ad_not_specified');
-  const found = deptList.find((d) => d.key === department);
+  const found = deptList.find((d: DepartmentOption) => d.key === department);
   return found ? found.name_ru : department;
 };
 
@@ -83,12 +91,12 @@ const AdminDoctors = () => {
   const doctorModal = useModal();
 
   // PR-19: load departments dynamically (was hardcoded)
-  const [departments, setDepartments] = useState([]);
+  const [departments, setDepartments] = useState<DepartmentOption[]>([]);
 
   const loadDepartments = useCallback(async () => {
     try {
       const response = await api.get('/admin/departments');
-      setDepartments(response.data?.data || []);
+      setDepartments((response.data?.data || []) as DepartmentOption[]);
     } catch (err) {
       logger.error('Ошибка загрузки отделений:', err);
     }
@@ -101,7 +109,7 @@ const AdminDoctors = () => {
   // PR-19: build departmentOptions dynamically
   const departmentOptions = [
     { value: '', label: t('admin2.ad_department_all') },
-    ...departments.map((d) => ({ value: d.key, label: d.name_ru || d.key })),
+    ...departments.map((d: DepartmentOption) => ({ value: d.key, label: d.name_ru || d.key })),
   ];
 
   const statusOptions = getStatusOptions(t);
@@ -113,12 +121,12 @@ const AdminDoctors = () => {
     doctorModal.openModal(null);
   };
 
-  const handleEditDoctor = (doctor) => {
+  const handleEditDoctor = (doctor: Doctor) => {
     void refreshAvailableUsers(doctor?.id);
-    doctorModal.openModal(doctor);
+    doctorModal.openModal(doctor as unknown as null);
   };
 
-  const handleDeleteDoctor = async (doctor) => {
+  const handleDeleteDoctor = async (doctor: Doctor) => {
     const doctorName = getDoctorName(doctor, t);
     // P-013 fix: replaced window.confirm() with shared useConfirm hook.
     const confirmed = await (confirm as unknown as (opts: Record<string, unknown>) => Promise<boolean>)({
@@ -139,15 +147,16 @@ const AdminDoctors = () => {
       notify.success(t('admin2.ad_deactivate_success', { name: doctorName }));
     } catch (deleteError) {
       logger.error('Ошибка деактивации врача:', deleteError);
-      notify.error(t('admin2.ad_deactivate_error', { error: deleteError.message || t('admin2.ad_error_unknown') }));
+      notify.error(t('admin2.ad_deactivate_error', { error: (deleteError as { message?: string }).message || t('admin2.ad_error_unknown') }));
     }
   };
 
-  const handleSaveDoctor = async (doctorData) => {
+  const handleSaveDoctor = async (doctorData: Partial<Doctor>) => {
     doctorModal.setModalLoading(true);
     try {
-      if (doctorModal.selectedItem) {
-        await updateDoctor(doctorModal.selectedItem.id, doctorData);
+      const selectedItem = doctorModal.selectedItem as Doctor | null;
+      if (selectedItem) {
+        await updateDoctor(selectedItem.id, doctorData);
       } else {
         await createDoctor(doctorData);
       }
@@ -201,7 +210,7 @@ const AdminDoctors = () => {
             onChange={(v: unknown) => setFilterSpecialization(String(v))}
             options={[
               { value: '', label: t('admin2.ad_specialization_all') },
-              ...[...new Set(doctors.map((d) => d.specialty).filter(Boolean))].map((s) => ({ value: s, label: s })),
+              ...[...new Set(doctors.map((d: Doctor) => d.specialty).filter((s): s is string => Boolean(s)))].map((s: string) => ({ value: s, label: s })),
             ]}
             size="large"
             aria-label={t('admin2.ad_filter_specialization_aria')}
@@ -279,7 +288,7 @@ const AdminDoctors = () => {
                 </tr>
               </thead>
               <tbody>
-                {doctors.map((doctor) => (
+                {doctors.map((doctor: Doctor) => (
                   <tr
                     key={doctor.id}
                     className="admin-patients-tbody-row"
@@ -372,11 +381,11 @@ const AdminDoctors = () => {
       <DoctorModal
         isOpen={doctorModal.isOpen}
         onClose={doctorModal.closeModal}
-        doctor={doctorModal.selectedItem}
+        doctor={doctorModal.selectedItem as unknown as null}
         onSave={handleSaveDoctor}
-        availableUsers={availableUsers}
+        availableUsers={availableUsers as never[]}
         loading={doctorModal.loading}
-        departments={departmentOptions.filter((d) => d.value)}
+        departments={departmentOptions.filter((d) => d.value) as never[]}
       />
       {/* P-013 fix: portal-mounted ConfirmDialog rendered once per panel */}
       {confirmDialog as unknown as React.ReactNode}
