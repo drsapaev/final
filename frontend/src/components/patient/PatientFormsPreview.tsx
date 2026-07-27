@@ -14,6 +14,55 @@ import {
 import PanelEmptyState from './PanelEmptyState';
 import React from "react";
 
+interface PatientFormField {
+  key: string;
+  type: string;
+  label: string;
+  max_length?: number;
+}
+
+interface PatientFormSubmission {
+  answers?: Record<string, unknown>;
+  status?: string;
+  submitted_at?: string;
+  updated_at?: string;
+}
+
+interface PatientForm {
+  id: string | number;
+  title: string;
+  description?: string;
+  fields?: PatientFormField[];
+  submission?: PatientFormSubmission;
+}
+
+interface PatientFormsPreviewData {
+  forms?: PatientForm[];
+  policy?: { storage_enabled?: boolean };
+  scope?: { patient_id?: number | null };
+}
+
+type FormStatus = 'idle' | 'saving-draft' | 'submitting' | 'saved' | 'error';
+
+interface FormState {
+  answers: Record<string, boolean | string>;
+  status: FormStatus;
+  savedStatus: string;
+  error: string;
+  message: string;
+  submittedAt: string;
+  updatedAt: string;
+}
+
+type HandleSaveFn = (form: PatientForm, nextStatus: 'draft' | 'submitted') => Promise<void>;
+
+interface PatientFormsPreviewProps {
+  status: string;
+  preview?: PatientFormsPreviewData | null;
+  error?: string;
+  initData?: string;
+}
+
 /**
  * L-H-4 fix: PatientFormsPreview выделен в отдельный файл.
  * L-H-1 fix: все строки на русском.
@@ -26,15 +75,15 @@ import React from "react";
  * Protected patient forms: preview → save draft / submit.
  */
 
-const buildInitialFormAnswers = (form) => {
-  const answers = {};
+const buildInitialFormAnswers = (form: PatientForm): Record<string, boolean | string> => {
+  const answers: Record<string, boolean | string> = {};
   const fields = Array.isArray(form?.fields) ? form.fields : [];
   const savedAnswers = form?.submission?.answers && typeof form.submission.answers === 'object'
     ? form.submission.answers
     : {};
 
   fields.forEach((field) => {
-    const savedValue = savedAnswers[field.key];
+    const savedValue = (savedAnswers as Record<string, unknown>)[field.key];
     if (field.type === 'boolean') {
       answers[field.key] = typeof savedValue === 'boolean' ? savedValue : false;
       return;
@@ -45,7 +94,7 @@ const buildInitialFormAnswers = (form) => {
   return answers;
 };
 
-const buildInitialFormState = (form) => ({
+const buildInitialFormState = (form: PatientForm): FormState => ({
   answers: buildInitialFormAnswers(form),
   status: 'idle',
   savedStatus: form?.submission?.status || '',
@@ -55,13 +104,13 @@ const buildInitialFormState = (form) => ({
   updatedAt: form?.submission?.updated_at || '',
 });
 
-function PatientFormsPreview({ status, preview = null, error = '', initData = '' }) {
+function PatientFormsPreview({ status, preview = null, error = '', initData = '' }: PatientFormsPreviewProps) {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
-  const [formState, setFormState] = useState<Record<string, any>>({});
-  const [autoSaveTimestamps, setAutoSaveTimestamps] = useState<Record<string, any>>({});
-  const [autoSavingForms, setAutoSavingForms] = useState<Record<string, any>>({});
-  const autoSaveTimersRef = useRef({});
-  const handleSaveRef = useRef(null);
+  const [formState, setFormState] = useState<Record<string, FormState>>({});
+  const [autoSaveTimestamps, setAutoSaveTimestamps] = useState<Record<string, Date>>({});
+  const [autoSavingForms, setAutoSavingForms] = useState<Record<string, boolean>>({});
+  const autoSaveTimersRef = useRef<Record<string, ReturnType<typeof setTimeout> | null>>({});
+  const handleSaveRef = useRef<HandleSaveFn | null>(null);
 
   // L-M-9 fix: useConfirm для submit-confirmation
   const [confirm, confirmDialog] = useConfirm();
@@ -76,7 +125,7 @@ function PatientFormsPreview({ status, preview = null, error = '', initData = ''
   const patientId = preview?.scope?.patient_id || null;
 
   useEffect(() => {
-    const nextState = {};
+    const nextState: Record<string, FormState> = {};
     forms.forEach((form) => {
       nextState[form.id] = buildInitialFormState(form);
     });
@@ -84,7 +133,7 @@ function PatientFormsPreview({ status, preview = null, error = '', initData = ''
   }, [forms]);
 
   // ─── handleSave (defined before early returns — hooks rules) ────────────
-  const handleSave = useCallback(async (form, nextStatus) => {
+  const handleSave = useCallback(async (form: PatientForm, nextStatus: 'draft' | 'submitted') => {
     const currentForm = formState[form.id] || buildInitialFormState(form);
 
     // L-M-9 fix: confirmation dialog для submit (irreversible action).
@@ -107,7 +156,7 @@ function PatientFormsPreview({ status, preview = null, error = '', initData = ''
         status: nextStatus === 'draft' ? 'saving-draft' : 'submitting',
         error: '',
         message: '',
-      },
+      } as FormState,
     }));
 
     try {
@@ -134,7 +183,7 @@ function PatientFormsPreview({ status, preview = null, error = '', initData = ''
           message: submission.status === 'draft' ? t('patient.pat_forms_draft_saved') : t('patient.pat_forms_submitted'),
           submittedAt: submission.submitted_at || '',
           updatedAt: submission.updated_at || '',
-        },
+        } as FormState,
       }));
 
       if (nextStatus === 'draft') {
@@ -149,7 +198,7 @@ function PatientFormsPreview({ status, preview = null, error = '', initData = ''
           status: 'error',
           error: describePatientError('forms', reason),
           message: '',
-        },
+        } as FormState,
       }));
     }
   }, [formState, initData, patientId, confirm, t]);
@@ -168,7 +217,8 @@ function PatientFormsPreview({ status, preview = null, error = '', initData = ''
       if (currentFormState.savedStatus === 'submitted') return;
       if (currentFormState.status === 'saving-draft' || currentFormState.status === 'submitting') return;
 
-      if (timers[form.id]) clearTimeout(timers[form.id]);
+      const existingTimer = timers[form.id];
+      if (existingTimer) clearTimeout(existingTimer);
 
       timers[form.id] = setTimeout(async () => {
         if (handleSaveRef.current) {
@@ -185,7 +235,9 @@ function PatientFormsPreview({ status, preview = null, error = '', initData = ''
     });
 
     return () => {
-      Object.values(timers as unknown[]).forEach((t) => clearTimeout(t as unknown as ReturnType<typeof setTimeout>));
+      Object.values(timers).forEach((t) => {
+        if (t) clearTimeout(t);
+      });
     };
   }, [formState, forms, storageEnabled, initData]);
 
@@ -233,13 +285,13 @@ function PatientFormsPreview({ status, preview = null, error = '', initData = ''
   }
 
   // ─── Render ─────────────────────────────────────────────────────────────
-  const handleFieldChange = (formId, field, value) => {
+  const handleFieldChange = (formId: string | number, field: PatientFormField, value: string | boolean) => {
     setFormState((current) => ({
       ...current,
       [formId]: {
-        ...(current[formId] || {}),
+        ...(current[formId] || buildInitialFormState({ id: formId } as PatientForm)),
         answers: {
-          ...(current[formId]?.answers || {}),
+          ...((current[formId] as FormState | undefined)?.answers || {}),
           [field.key]: field.type === 'boolean' ? Boolean(value) : value,
         },
         error: '',

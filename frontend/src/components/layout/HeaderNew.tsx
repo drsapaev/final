@@ -163,7 +163,7 @@ export default function HeaderNew() {
 
   // Навигация по ролям (как в исходном хедере)
   const navItems = useMemo(() => {
-    const items = [];
+    const items: Array<{ to: string; label: string; icon: string }> = [];
     if (roleNormalized !== 'admin') {
       if (roleNormalized === 'registrar') items.push({ to: getRoleHomeRoute('cashier'), label: t('legacy.hn_nav_cashier_role'), icon: 'creditcard' });
       if (roleNormalized === 'cashier') items.push({ to: getRoleHomeRoute('cashier'), label: t('legacy.hn_nav_cashier_home'), icon: 'creditcard' });

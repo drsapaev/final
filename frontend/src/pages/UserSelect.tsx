@@ -8,10 +8,18 @@ import {
 } from '../components/ui/macos';
 import { useTranslation } from '../i18n/useTranslation';
 
+interface UserSelectItem {
+  id: string | number;
+  full_name?: string;
+  username?: string;
+  role?: string;
+  email?: string;
+}
+
 export default function UserSelect() {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
-  const [items, setItems] = useState([]);
+  const [items, setItems] = useState<UserSelectItem[]>([]);
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -25,7 +33,7 @@ export default function UserSelect() {
         const r = await api.get('/admin/users');
         if (r.status >= 400) throw new Error(`HTTP ${r.status}`);
         const data = r.data;
-        setItems(Array.isArray(data) ? data : []);
+        setItems(Array.isArray(data) ? (data as UserSelectItem[]) : []);
       } catch (e) {
         const err = e as { message?: string };
         setErr(err.message || t('misc.us_oshibka_zagruzki'));
@@ -70,7 +78,7 @@ export default function UserSelect() {
                 <div style={{ fontSize: 12, color: 'var(--mac-text-secondary)' }}>{u.role || '—'} · {u.email || '—'}</div>
               </div>
               <div>
-                <Button type="button" variant="outline" size="small" onClick={() => navigate(roleToRoute(u.role))}>
+                <Button type="button" variant="outline" size="small" onClick={() => navigate(roleToRoute(u.role || ''))}>
                   Перейти
                 </Button>
               </div>

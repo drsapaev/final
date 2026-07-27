@@ -65,9 +65,9 @@ export function DermatologySection({
   onChange,
   disabled = false
 }: DermatologySectionProps) {
-  const [selectedPhoto, setSelectedPhoto] = useState(null);
+  const [selectedPhoto, setSelectedPhoto] = useState<DermatologyPhoto | null>(null);
   const [analyzingPhoto, setAnalyzingPhoto] = useState(false);
-  const fileInputRef = useRef(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // AI для анализа кожи
   const {
@@ -77,7 +77,7 @@ export function DermatologySection({
   } = useEMRAI(true, MCP_PROVIDERS.DEEPSEEK);
 
   // Handlers
-  const handlePhotoUpload = useCallback(async (file) => {
+  const handlePhotoUpload = useCallback(async (file: File) => {
     if (!file) return;
 
     const newPhoto = {
@@ -114,32 +114,32 @@ export function DermatologySection({
     }
   }, [photos, onChange, analyzeSkinLesion]);
 
-  const handlePhotoDelete = useCallback((photoId) => {
+  const handlePhotoDelete = useCallback((photoId: string | number) => {
     const updatedPhotos = photos.filter((p) => p.id !== photoId);
     onChange?.('photos', updatedPhotos);
   }, [photos, onChange]);
 
-  const handleSkinTypeChange = useCallback((value) => {
+  const handleSkinTypeChange = useCallback((value: string) => {
     onChange?.('skin_type', value);
   }, [onChange]);
 
-  const handleConditionAdd = useCallback((condition) => {
+  const handleConditionAdd = useCallback((condition: unknown) => {
     if (!conditions.includes(condition)) {
       onChange?.('conditions', [...conditions, condition]);
     }
   }, [conditions, onChange]);
 
-  const handleConditionRemove = useCallback((condition) => {
+  const handleConditionRemove = useCallback((condition: unknown) => {
     onChange?.('conditions', conditions.filter((c) => c !== condition));
   }, [conditions, onChange]);
 
-  const handleFileSelect = useCallback((e) => {
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       handlePhotoUpload(file);
     }
   }, [handlePhotoUpload]);
-  const handleActivationKeyDown = (event, action) => {
+  const handleActivationKeyDown = (event: React.KeyboardEvent<HTMLElement>, action: () => void) => {
     // t accessed via closure or i18nT()
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
@@ -236,7 +236,7 @@ export function DermatologySection({
               onClick={() => setSelectedPhoto(photo)}
               onKeyDown={(event) => handleActivationKeyDown(event, () => setSelectedPhoto(photo))} />
             
-                                {photo.analysis &&
+                                {Boolean(photo.analysis) &&
             <div className="dermatology-photo-analysis">
                                         <Sparkles size={12} />
                                         <span>AI анализ</span>
@@ -263,7 +263,7 @@ export function DermatologySection({
                 <label className="dermatology-label">{i18nT('misc.ds_lokalizatsiya_porazheniy')}</label>
                 <EMRSmartFieldV2
           value={String(localization?.description ?? '')}
-          onChange={(value) => onChange?.('localization', {
+          onChange={(value: string) => onChange?.('localization', {
             ...localization,
             description: value
           })}
@@ -285,7 +285,7 @@ export function DermatologySection({
         
                     <div className="dermatology-photo-modal-content" onClickCapture={(e) => e.stopPropagation()}>
                         <img src={selectedPhoto.url} alt={i18nT('misc.ds_uvelichennoe_foto')} />
-                        {selectedPhoto.analysis &&
+                        {Boolean(selectedPhoto.analysis) &&
           <div className="dermatology-photo-analysis-detail">
                                 <h4>AI Анализ:</h4>
                                 <pre>{JSON.stringify(selectedPhoto.analysis, null, 2)}</pre>
