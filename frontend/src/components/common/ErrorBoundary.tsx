@@ -10,7 +10,7 @@ import { useTranslation } from '../../i18n/useTranslation';
 interface ErrorBoundaryProps {
   children: ReactNode;
   onError?: (error: Error, errorInfo: ErrorInfo) => void;
-  theme?: string;
+  theme?: Record<string, unknown> | null;
 }
 
 interface ErrorBoundaryState {
@@ -23,7 +23,7 @@ interface ErrorBoundaryState {
  * Error Boundary компонент для перехвата и обработки ошибок React
  */
 class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  constructor(props) {
+  constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = { hasError: false, error: null, errorInfo: null };
   }
@@ -33,7 +33,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
     return { hasError: true };
   }
 
-  componentDidCatch(error, errorInfo) {
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     // Логируем ошибку
     logger.error('ErrorBoundary caught an error:', error, errorInfo);
 
@@ -77,15 +77,24 @@ ErrorBoundary.propTypes = {
   theme: PropTypes.any,
 };
 
+interface ErrorFallbackProps {
+  error: Error | null;
+  errorInfo: ErrorInfo | null;
+  onRetry: () => void;
+  theme?: Record<string, unknown> | null;
+}
+
 /**
  * Fallback UI компонент
  */
-function ErrorFallback({ error, errorInfo, onRetry, theme }) {
+function ErrorFallback({ error, errorInfo, onRetry, theme }: ErrorFallbackProps) {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // Проверяем, что theme существует и имеет необходимые методы
-  const getColor = theme?.getColor || ((color) => color);
-  const getSpacing = theme?.getSpacing || ((size) => size);
-  const getFontSize = theme?.getFontSize || ((size) => size);
+  type ThemeFn = (...args: unknown[]) => string;
+  const themeObj = theme as Record<string, unknown> | null | undefined;
+  const getColor = ((themeObj?.getColor as ThemeFn | undefined) ?? ((color: string) => color)) as ThemeFn;
+  const getSpacing = ((themeObj?.getSpacing as ThemeFn | undefined) ?? ((size: string) => size)) as ThemeFn;
+  const getFontSize = ((themeObj?.getFontSize as ThemeFn | undefined) ?? ((size: string) => size)) as ThemeFn;
 
   const containerStyle = {
     display: 'flex',
@@ -193,8 +202,11 @@ ErrorFallback.propTypes = {
 /**
  * HOC для обертывания компонентов в Error Boundary
  */
-export function withErrorBoundary(WrappedComponent, errorBoundaryProps = {}) {
-  return function WithErrorBoundaryComponent(props) {
+export function withErrorBoundary<P extends Record<string, unknown>>(
+  WrappedComponent: React.ComponentType<P>,
+  errorBoundaryProps: Partial<ErrorBoundaryProps> = {}
+) {
+  return function WithErrorBoundaryComponent(props: P) {
     return (
       <ErrorBoundary {...errorBoundaryProps}>
         <WrappedComponent {...props} />
@@ -207,13 +219,13 @@ export function withErrorBoundary(WrappedComponent, errorBoundaryProps = {}) {
  * Хук для обработки ошибок в функциональных компонентах
  */
 export function useErrorHandler() {
-  const [error, setError] = React.useState(null);
+  const [error, setError] = React.useState<Error | null>(null);
 
   const resetError = React.useCallback(() => {
     setError(null);
   }, []);
 
-  const handleError = React.useCallback((error) => {
+  const handleError = React.useCallback((error: Error) => {
     logger.error('Error caught by useErrorHandler:', error);
     setError(error);
   }, []);

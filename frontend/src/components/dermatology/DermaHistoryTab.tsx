@@ -8,11 +8,33 @@ import { Calendar } from 'lucide-react';
 import { MacOSCard, Badge } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
 
+interface SkinExam {
+  id: string | number;
+  exam_date: string;
+  skin_type: string;
+  skin_condition: string;
+  diagnosis?: string;
+}
+
+interface CosmeticProcedure {
+  id: string | number;
+  procedure_date: string;
+  total_cost?: number | string;
+  procedure_type?: string;
+  area_treated?: string;
+}
+
+interface DermaHistoryTabProps {
+  skinExaminations?: SkinExam[];
+  cosmeticProcedures?: CosmeticProcedure[];
+  getSpacing?: (size: string) => string;
+}
+
 export function DermaHistoryTab({
   skinExaminations = [],
   cosmeticProcedures = [],
   getSpacing,
-}) {
+}: DermaHistoryTabProps) {
   return (
     <div className="derma-flex-col-24">
       <MacOSCard className="derma-p-8">

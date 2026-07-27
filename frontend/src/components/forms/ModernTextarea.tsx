@@ -11,6 +11,32 @@ import { useTheme } from '../../contexts/ThemeContext';
 import './ModernTextarea.css';
 import { useTranslation } from '../../i18n/useTranslation';
 
+interface ModernTextareaProps {
+  label?: React.ReactNode;
+  placeholder?: string;
+  value?: string;
+  onChange?: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  onBlur?: (e: React.FocusEvent<HTMLTextAreaElement>) => void;
+  onFocus?: (e: React.FocusEvent<HTMLTextAreaElement>) => void;
+  error?: React.ReactNode;
+  success?: React.ReactNode;
+  disabled?: boolean;
+  required?: boolean;
+  rows?: number;
+  maxRows?: number;
+  minRows?: number;
+  maxLength?: number;
+  minLength?: number;
+  autoResize?: boolean;
+  resizable?: boolean;
+  expandable?: boolean;
+  className?: string;
+  size?: string;
+  variant?: string;
+  id?: string;
+  [key: string]: unknown;
+}
+
 const ModernTextarea = ({
   label,
   placeholder,
@@ -34,7 +60,7 @@ const ModernTextarea = ({
   size = 'medium',
   variant = 'default',
   ...props
-}) => {
+}: ModernTextareaProps) => {
   const { getColor } = useTheme();
   const [focused, setFocused] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -63,17 +89,17 @@ const ModernTextarea = ({
   }, [value, autoResize, minRows, maxRows]);
 
   // Обработчики событий
-  const handleFocus = (e) => {
+  const handleFocus = (e: React.FocusEvent<HTMLTextAreaElement>) => {
     setFocused(true);
     onFocus?.(e);
   };
 
-  const handleBlur = (e) => {
+  const handleBlur = (e: React.FocusEvent<HTMLTextAreaElement>) => {
     setFocused(false);
     onBlur?.(e);
   };
 
-  const handleChange = (e) => {
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     onChange?.(e);
   };
 

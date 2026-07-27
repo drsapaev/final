@@ -27,7 +27,11 @@ const ACTION_ALIASES = {
   cancel: ['cancel', 'cancel_visit', 'cancel-visit']
 };
 
-const hasBackendAction = (row, action, flagName) => {
+const hasBackendAction = (
+  row: Record<string, unknown> | null | undefined,
+  action: string,
+  flagName: string
+) => {
   if (row && flagName && Object.prototype.hasOwnProperty.call(row, flagName)) {
     return Boolean(row[flagName]);
   }
@@ -36,10 +40,19 @@ const hasBackendAction = (row, action, flagName) => {
     return false;
   }
 
-  const actions = new Set(row.available_actions.map((item) => String(item).trim().toLowerCase()));
-  const aliases = ACTION_ALIASES[action] || [action];
-  return aliases.some((alias) => actions.has(alias));
+  const actions = new Set((row?.available_actions as unknown[]).map((item: unknown) => String(item).trim().toLowerCase()));
+  const aliases = ACTION_ALIASES[action as keyof typeof ACTION_ALIASES] || [action];
+  return aliases.some((alias: string) => actions.has(alias));
 };
+
+interface AppointmentContextMenuProps {
+  row: Record<string, unknown>;
+  position: { x: number; y: number };
+  onClose: () => void;
+  onAction?: (itemId: string, row: Record<string, unknown>) => void;
+  theme?: string;
+  isDoctorView?: boolean;
+}
 
 const AppointmentContextMenu = ({
   row,
@@ -48,7 +61,7 @@ const AppointmentContextMenu = ({
   onAction,
   theme = 'light',
   isDoctorView = false
-}) => {
+}: AppointmentContextMenuProps) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const menuRef = useRef<HTMLDivElement>(null);
   const [isVisible, setIsVisible] = useState(false);
@@ -69,13 +82,13 @@ const AppointmentContextMenu = ({
   useEffect(() => {
     setIsVisible(true);
 
-    const handleClickOutside = (event) => {
-      if (menuRef.current && !menuRef.current.contains(event.target)) {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         onClose();
       }
     };
 
-    const handleEscape = (event) => {
+    const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         onClose();
       }
@@ -214,7 +227,7 @@ const AppointmentContextMenu = ({
 
   const adjustedPosition = getAdjustedPosition();
 
-  const handleItemClick = (itemId) => {
+  const handleItemClick = (itemId: string) => {
     onAction?.(itemId, row);
     onClose?.();
   };
@@ -269,8 +282,8 @@ const AppointmentContextMenu = ({
 
           return (
             <button
-              key={item.id}
-              onClick={() => handleItemClick(item.id)}
+              key={item.id ?? `item-${index}`}
+              onClick={() => handleItemClick(item.id ?? '')}
               style={{
                 width: '100%',
                 padding: 'var(--mac-spacing-2) var(--mac-spacing-4)',

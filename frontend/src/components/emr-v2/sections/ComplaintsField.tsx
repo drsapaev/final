@@ -82,14 +82,14 @@ const ComplaintsField = ({
     placeholder = 'Введите жалобы пациента...'
 }: ComplaintsFieldProps) => {
     const complaintsFieldId = useId();
-    const textareaRef = useRef(null);
+    const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
     // Local state
     const [isFocused, setIsFocused] = useState(false);
-    const [aiSuggestions, setAiSuggestions] = useState([]); // Массив вариантов
+    const [aiSuggestions, setAiSuggestions] = useState<ComplaintsFieldSuggestion[]>([]); // Массив вариантов
     const [selectedIndex, setSelectedIndex] = useState(0);   // Выбранный вариант
     const [isLoadingAI, setIsLoadingAI] = useState(false);
-    const [lastSavedAt, setLastSavedAt] = useState(null);
+    const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
 
     // Debounced value for AI suggestions (1.5 sec delay)
     const debouncedValue = useDebounce(value, 1500);
@@ -142,7 +142,7 @@ const ComplaintsField = ({
     }, [value]);
 
     // Handlers
-    const handleChange = useCallback((e) => {
+    const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
         onChange?.(e.target.value);
         onFieldTouch?.('complaints');
     }, [onChange, onFieldTouch]);
@@ -157,7 +157,7 @@ const ComplaintsField = ({
         onBlur?.();
     }, [onBlur]);
 
-    const handleAcceptSuggestion = useCallback((suggestion) => {
+    const handleAcceptSuggestion = useCallback((suggestion: ComplaintsFieldSuggestion) => {
         if (!suggestion) return;
 
         // Append suggestion text with proper separator
@@ -178,7 +178,7 @@ const ComplaintsField = ({
         setAiSuggestions([]);
     }, []);
 
-    const handleKeyDown = useCallback((e) => {
+    const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
         if (aiSuggestions.length === 0) return;
 
         // Arrow Up/Down to navigate suggestions
@@ -288,10 +288,10 @@ const ComplaintsField = ({
                                     tabIndex={-1}
                                 >
                                     <span className="complaints-ai-item__number">{idx + 1}</span>
-                                    <span className="complaints-ai-item__text">{suggestion.text}</span>
-                                    {suggestion.source && (
-                                        <span className="complaints-ai-item__source">{suggestion.source}</span>
-                                    )}
+                                    <span className="complaints-ai-item__text">{suggestion.text ?? ''}</span>
+                                    {suggestion.source ? (
+                                        <span className="complaints-ai-item__source">{String(suggestion.source)}</span>
+                                    ) : null}
                                 </button>
                             ))}
                         </div>
