@@ -166,7 +166,7 @@ const DoctorServiceSelector = ({
         return {
           ...service,
           quantity: Math.max(1, quantity),
-          total: service.price * Math.max(1, quantity)
+          total: (service.price ?? 0) * Math.max(1, quantity)
         };
       }
       return service;
@@ -183,7 +183,7 @@ const DoctorServiceSelector = ({
         return {
           ...service,
           price: newPrice,
-          total: newPrice * service.quantity
+          total: newPrice * (service.quantity ?? 1)
         };
       }
       return service;
@@ -342,8 +342,8 @@ const DoctorServiceSelector = ({
                   variant="ghost"
                   title={`Decrease quantity for ${service.name}`}
                   aria-label={`Decrease quantity for ${service.name}`}
-                  onClick={() => handleQuantityChange(service.id, service.quantity - 1)}
-                  disabled={service.quantity <= 1}>
+                  onClick={() => handleQuantityChange(service.id, (service.quantity ?? 1) - 1)}
+                  disabled={(service.quantity ?? 1) <= 1}>
 
                       <Minus aria-hidden="true" size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
                     </Button>
@@ -359,7 +359,7 @@ const DoctorServiceSelector = ({
                   variant="ghost"
                   title={`Increase quantity for ${service.name}`}
                   aria-label={`Increase quantity for ${service.name}`}
-                  onClick={() => handleQuantityChange(service.id, service.quantity + 1)}>
+                  onClick={() => handleQuantityChange(service.id, (service.quantity ?? 1) + 1)}>
 
                       <Plus aria-hidden="true" size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
                     </Button>
