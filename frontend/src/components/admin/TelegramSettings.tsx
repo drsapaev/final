@@ -121,7 +121,7 @@ const TelegramSettings = () => {
       setMessage({ type: 'success', text: result.message });
     } catch (error) {
       logger.error('Ошибка тестирования бота:', error);
-      setMessage({ type: 'danger', text: (error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)) });
+      setMessage({ type: 'danger', text: (error instanceof Error ? (error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)) : String(error)) });
     }
   };
 
@@ -134,7 +134,7 @@ const TelegramSettings = () => {
       await loadData(); // Перезагружаем данные
     } catch (error) {
       logger.error('Ошибка установки webhook:', error);
-      setMessage({ type: 'danger', text: (error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)) });
+      setMessage({ type: 'danger', text: (error instanceof Error ? (error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)) : String(error)) });
     }
   };
 
@@ -152,7 +152,7 @@ const TelegramSettings = () => {
       setMessage({ type: 'success', text: result.message });
     } catch (error) {
       logger.error('Ошибка отправки:', error);
-      setMessage({ type: 'danger', text: (error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)) });
+      setMessage({ type: 'danger', text: (error instanceof Error ? (error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)) : String(error)) });
     }
   };
 
