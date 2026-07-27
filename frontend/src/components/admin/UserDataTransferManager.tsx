@@ -9,67 +9,116 @@ import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
 
-const toArray = (value, fallbackKeys = []) => {
+interface TransferUser {
+  id: string | number;
+  full_name?: string;
+  username?: string;
+  phone?: string;
+  email?: string;
+}
+
+interface DataTypeItem {
+  key: string;
+  name: string;
+  description: string;
+}
+
+interface DataCounts {
+  appointments: number;
+  visits: number;
+  queue_entries: number;
+  [k: string]: unknown;
+}
+
+interface DataSummary {
+  data_counts: DataCounts;
+  [k: string]: unknown;
+}
+
+interface TransferHistoryEntry {
+  source_user: string;
+  target_user: string;
+  transfer_date: string;
+  success: boolean;
+  [k: string]: unknown;
+}
+
+interface TransferStatistics {
+  total_transfers: number;
+  successful_transfers: number;
+  failed_transfers: number;
+  [k: string]: unknown;
+}
+
+const toArray = (value: unknown, fallbackKeys: string[] = []): unknown[] => {
   if (Array.isArray(value)) return value;
 
-  for (const key of fallbackKeys) {
-    if (Array.isArray(value?.[key])) {
-      return value[key];
+  if (value && typeof value === 'object') {
+    const obj = value as Record<string, unknown>;
+    for (const key of fallbackKeys) {
+      if (Array.isArray(obj[key])) {
+        return obj[key] as unknown[];
+      }
     }
   }
 
   return [];
 };
 
-const normalizeDataTypes = (payload) =>
-  toArray(payload, ['data_types', 'dataTypes', 'items', 'results']).map((item) => {
+const normalizeDataTypes = (payload: unknown): DataTypeItem[] =>
+  (toArray(payload, ['data_types', 'dataTypes', 'items', 'results']) as Array<Record<string, unknown> | string>).map((item): DataTypeItem | null => {
     if (typeof item === 'string') {
       return { key: item, name: item, description: '' };
     }
 
-    const key = item?.key || item?.value || item?.id || item?.name;
+    const key = (item?.key ?? item?.value ?? item?.id ?? item?.name) as string | undefined;
     if (!key) return null;
 
     return {
-      ...item,
       key,
-      name: item?.name || item?.label || key,
-      description: item?.description || ''
+      name: (item?.name ?? item?.label ?? key) as string,
+      description: (item?.description ?? '') as string
     };
-  }).filter(Boolean);
+  }).filter((item): item is DataTypeItem => item !== null);
 
-const normalizeDataSummary = (payload) => ({
-  ...(payload || {}),
-  data_counts: {
-    appointments: 0,
-    visits: 0,
-    queue_entries: 0,
-    ...(payload?.data_counts || {})
-  }
-});
+const normalizeDataSummary = (payload: unknown): DataSummary => {
+  const base = (payload && typeof payload === 'object' ? payload : {}) as Record<string, unknown>;
+  const counts = (base.data_counts && typeof base.data_counts === 'object' ? base.data_counts : {}) as Record<string, unknown>;
+  return {
+    ...base,
+    data_counts: {
+      appointments: Number(counts.appointments ?? 0),
+      visits: Number(counts.visits ?? 0),
+      queue_entries: Number(counts.queue_entries ?? 0)
+    }
+  };
+};
 
-const normalizeStatistics = (payload) => ({
-  total_transfers: 0,
-  successful_transfers: 0,
-  failed_transfers: 0,
-  ...(payload || {})
-});
+const normalizeStatistics = (payload: unknown): TransferStatistics => {
+  const base = (payload && typeof payload === 'object' ? payload : {}) as Record<string, unknown>;
+  return {
+    total_transfers: Number(base.total_transfers ?? 0),
+    successful_transfers: Number(base.successful_transfers ?? 0),
+    failed_transfers: Number(base.failed_transfers ?? 0),
+    ...base
+  };
+};
 
 const UserDataTransferManager = () => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
-  const [activeTab, setActiveTab] = useState('transfer');
-  const [sourceUser, setSourceUser] = useState(null);
-  const [targetUser, setTargetUser] = useState(null);
+  const [activeTab, setActiveTab] = useState<'transfer' | 'history' | 'statistics'>('transfer');
+  const [sourceUser, setSourceUser] = useState<TransferUser | null>(null);
+  const [targetUser, setTargetUser] = useState<TransferUser | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
+  const [searchResults, setSearchResults] = useState<TransferUser[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [selectedDataTypes, setSelectedDataTypes] = useState(['appointments', 'visits', 'queue_entries']);
-  const [availableDataTypes, setAvailableDataTypes] = useState([]);
+  const [selectedDataTypes, setSelectedDataTypes] = useState<string[]>(['appointments', 'visits', 'queue_entries']);
+  const [availableDataTypes, setAvailableDataTypes] = useState<DataTypeItem[]>([]);
   const [isTransferring, setIsTransferring] = useState(false);
-  const [transferHistory, setTransferHistory] = useState([]);
-  const [statistics, setStatistics] = useState(null);
-  const [userDataSummary, setUserDataSummary] = useState(null);
+  const [transferHistory, setTransferHistory] = useState<TransferHistoryEntry[]>([]);
+  const [statistics, setStatistics] = useState<TransferStatistics | null>(null);
+  const [userDataSummary, setUserDataSummary] = useState<DataSummary | null>(null);
 
   // Загрузка доступных типов данных
   useEffect(() => {
@@ -86,7 +135,7 @@ const UserDataTransferManager = () => {
     }
   };
 
-  const searchUsers = async (query) => {
+  const searchUsers = async (query: string) => {
     if (query.length < 2) {
       setSearchResults([]);
       return;
@@ -94,8 +143,8 @@ const UserDataTransferManager = () => {
 
     setIsSearching(true);
     try {
-      const response = await api.get(`/admin/user-data/users/search?query=${encodeURIComponent(query)}&limit=10`);
-      setSearchResults(toArray(response.data, ['users', 'items', 'results']));
+      const response = await api.get(`/admin/user-data/users/search?query=${encodeURIComponent(query)}&limit=10`) as import('axios').AxiosResponse<Record<string, unknown>>;
+      setSearchResults(toArray(response.data, ['users', 'items', 'results']) as TransferUser[]);
     } catch (error) {
       logger.error('Ошибка поиска пользователей:', error);
       toast.error(t('admin2.udtm_err_search_users'));
@@ -105,7 +154,7 @@ const UserDataTransferManager = () => {
     }
   };
 
-  const getUserDataSummary = async (userId) => {
+  const getUserDataSummary = async (userId: string | number) => {
     try {
       const response = (await api.get(`/admin/user-data/users/${userId}/data-summary`)) as import('axios').AxiosResponse<Record<string, unknown>>;
       setUserDataSummary(normalizeDataSummary(response.data));
@@ -115,6 +164,8 @@ const UserDataTransferManager = () => {
     }
   };
 
+
+
   const validateTransfer = async () => {
     if (!sourceUser || !targetUser) {
       toast.error(t('admin2.udtm_err_select_users'));
@@ -122,7 +173,7 @@ const UserDataTransferManager = () => {
     }
 
     try {
-      const response = (await api.post(`/admin/user-data/transfer/validate?source_user_id=${sourceUser.id}&target_user_id=${targetUser.id}`)) as import('axios').AxiosResponse<Record<string, unknown>>;
+      const response = (await api.post(`/admin/user-data/transfer/validate?source_user_id=${sourceUser!.id}&target_user_id=${targetUser!.id}`)) as import('axios').AxiosResponse<Record<string, unknown>>;
       const validation = (response.data as { valid?: boolean; message?: string; appointments?: unknown; visits?: unknown; queue_entries?: unknown; [k: string]: unknown }) || {};
 
       if (!validation.valid) {
@@ -146,8 +197,8 @@ const UserDataTransferManager = () => {
     setIsTransferring(true);
     try {
       const response = await api.post('/admin/user-data/transfer', {
-        source_user_id: sourceUser.id,
-        target_user_id: targetUser.id,
+        source_user_id: sourceUser!.id,
+        target_user_id: targetUser!.id,
         data_types: selectedDataTypes,
         confirmation_required: false
       }) as import('axios').AxiosResponse<Record<string, unknown>>;
@@ -195,7 +246,7 @@ const UserDataTransferManager = () => {
   const loadTransferHistory = async () => {
     try {
       const response = await api.get('/admin/user-data/transfer/history?limit=50') as import('axios').AxiosResponse<Record<string, unknown>>;
-      setTransferHistory(toArray(response.data, ['history', 'items', 'results']));
+      setTransferHistory(toArray(response.data, ['history', 'items', 'results']) as TransferHistoryEntry[]);
     } catch (error) {
       logger.error('Ошибка загрузки истории:', error);
       toast.error(t('admin2.udtm_err_load_history'));
@@ -212,13 +263,13 @@ const UserDataTransferManager = () => {
     }
   };
 
-  const handleSearchChange = (e) => {
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const query = e.target.value;
     setSearchQuery(query);
     searchUsers(query);
   };
 
-  const selectUser = (user, type) => {
+  const selectUser = (user: TransferUser, type: 'source' | 'target') => {
     if (type === 'source') {
       setSourceUser(user);
       getUserDataSummary(user.id);
@@ -573,7 +624,7 @@ const UserDataTransferManager = () => {
           aria-label={t('admin2.udtm_tabs_aria')}
           value={activeTab}
           onChange={(value: unknown) => {
-            const v = String(value);
+            const v = String(value) as 'transfer' | 'history' | 'statistics';
             setActiveTab(v);
             if (v === 'history') {
               loadTransferHistory();

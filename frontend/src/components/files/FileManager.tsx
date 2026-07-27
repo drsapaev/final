@@ -93,7 +93,32 @@ const iconButtonStyle: CSSProperties = {
   padding: 0
 };
 
-const fileTypeOptions = (t) => [
+type Translator = (key: string, options?: Record<string, unknown>) => string;
+
+type FileTypeKey = 'image' | 'video' | 'audio' | 'document' | 'archive' | 'xray' | 'other';
+
+interface FileItem {
+  id: string | number;
+  filename?: string;
+  original_filename?: string;
+  title?: string;
+  file_type?: string;
+  file_size?: number;
+  created_at?: string;
+  permission?: string;
+  [key: string]: unknown;
+}
+
+interface FileFilters {
+  fileType: string;
+  permission: string;
+  dateFrom: string;
+  dateTo: string;
+  sizeMin: string;
+  sizeMax: string;
+}
+
+const fileTypeOptions = (t: Translator) => [
   { value: '', label: t('misc.fm_filter_type_all') },
   { value: 'image', label: t('misc.fm_filter_type_images') },
   { value: 'video', label: t('misc.fm_filter_type_video') },
@@ -103,7 +128,7 @@ const fileTypeOptions = (t) => [
   { value: 'xray', label: t('misc.fm_filter_type_xray') }
 ];
 
-const permissionOptions = (t) => [
+const permissionOptions = (t: Translator) => [
   { value: '', label: t('misc.fm_filter_perm_all') },
   { value: 'public', label: t('misc.fm_filter_perm_public') },
   { value: 'private', label: t('misc.fm_filter_perm_private') },
@@ -129,7 +154,7 @@ interface FileManagerStats {
   [key: string]: unknown;
 }
 
-const fileTypeLabels = (t) => ({
+const fileTypeLabels = (t: Translator): Record<FileTypeKey, string> => ({
   image: t('misc.fm_label_image'),
   video: t('misc.fm_label_video'),
   audio: t('misc.fm_label_audio'),
@@ -139,7 +164,7 @@ const fileTypeLabels = (t) => ({
   other: t('misc.fm_label_other')
 });
 
-const fileTypeColors = {
+const fileTypeColors: Record<FileTypeKey, string> = {
   image: 'var(--mac-success)',
   video: 'var(--mac-accent-purple)',
   audio: 'var(--mac-accent-blue)',
@@ -157,12 +182,12 @@ const FileManager = () => {
   const [confirmRaw, confirmDialog] = useConfirm();
   const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
   const [loading, setLoading] = useState(false);
-  const [files, setFiles] = useState([]);
-  const [, setFolders] = useState([]);
-  const [selectedFiles, setSelectedFiles] = useState([]);
-  const [viewMode, setViewMode] = useState('grid');
+  const [files, setFiles] = useState<FileItem[]>([]);
+  const [, setFolders] = useState<unknown[]>([]);
+  const [selectedFiles, setSelectedFiles] = useState<Array<string | number>>([]);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [searchQuery, setSearchQuery] = useState('');
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useState<FileFilters>({
     fileType: '',
     permission: '',
     dateFrom: '',
@@ -170,14 +195,14 @@ const FileManager = () => {
     sizeMin: '',
     sizeMax: ''
   });
-  const [currentFolder] = useState(null);
+  const [currentFolder] = useState<string | null>(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showStatsModal, setShowStatsModal] = useState(false);
   const [stats, setStats] = useState<FileManagerStats | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploading, setUploading] = useState(false);
 
-  const fileInputRef = useRef(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadFolders = useCallback(async () => {
     try {
@@ -216,8 +241,8 @@ const FileManager = () => {
       const response = await fetch(`/files/${query ? `?${query}` : ''}`, {
         headers: { Authorization: `Bearer ${tokenManager.getAccessToken()}` }
       });
-      const data = await response.json();
-      setFiles(data.files || []);
+      const data = await response.json() as { files?: FileItem[] } | undefined;
+      setFiles(data?.files || []);
     } catch (error) {
       logger.error('Ошибка загрузки файлов:', error);
     } finally {
@@ -231,9 +256,9 @@ const FileManager = () => {
     loadStats();
   }, [loadFiles, loadFolders, loadStats]);
 
-  const getFileType = (file) => {
-    const ext = file.name.split('.').pop().toLowerCase();
-    const mimeType = file.type;
+  const getFileType = (file: File): FileTypeKey => {
+    const ext = (file.name.split('.').pop() || '').toLowerCase();
+    const mimeType = file.type || '';
 
     if (mimeType.startsWith('image/')) return 'image';
     if (mimeType.startsWith('video/')) return 'video';
@@ -245,8 +270,8 @@ const FileManager = () => {
     return 'other';
   };
 
-  const getFileIcon = (file, size = 24) => {
-    const color = fileTypeColors[file.file_type] || fileTypeColors.other;
+  const getFileIcon = (file: FileItem, size = 24) => {
+    const color = fileTypeColors[(file.file_type as FileTypeKey) || 'other'] || fileTypeColors.other;
     const iconProps = { size, style: { color } };
 
     switch (file.file_type) {
@@ -266,9 +291,9 @@ const FileManager = () => {
     }
   };
 
-  const getFileDisplayName = (file) => file.title || file.filename || file.original_filename || t('misc.fm_label_other');
+  const getFileDisplayName = (file: FileItem) => file.title || file.filename || file.original_filename || t('misc.fm_label_other');
 
-  const formatFileSize = (bytes) => {
+  const formatFileSize = (bytes: unknown) => {
     const size = Number(bytes) || 0;
     if (size === 0) return '0 Bytes';
 
@@ -278,9 +303,9 @@ const FileManager = () => {
     return `${parseFloat((size / Math.pow(k, index)).toFixed(2))} ${sizes[index]}`;
   };
 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: unknown) => {
     if (!dateString) return t('misc.fm_date_not_specified');
-    const date = new Date(dateString);
+    const date = new Date(String(dateString));
     if (Number.isNaN(date.getTime())) return t('misc.fm_date_not_specified');
 
     return date.toLocaleDateString('ru-RU', {
@@ -292,7 +317,7 @@ const FileManager = () => {
     });
   };
 
-  const handleFileUpload = async (event) => {
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const uploadFiles = Array.from(event.target.files || []) as File[];
     if (uploadFiles.length === 0) return;
 
@@ -334,7 +359,7 @@ const FileManager = () => {
     await loadStats();
   };
 
-  const handleDownload = async (fileId, filename) => {
+  const handleDownload = async (fileId: string | number, filename?: string) => {
     try {
       const response = await fetch(`/files/${fileId}/download`, {
         headers: { Authorization: `Bearer ${tokenManager.getAccessToken()}` }
@@ -356,7 +381,7 @@ const FileManager = () => {
     }
   };
 
-  const handlePreview = async (fileId) => {
+  const handlePreview = async (fileId: string | number) => {
     try {
       const response = await fetch(`/files/${fileId}/preview`, {
         headers: { Authorization: `Bearer ${tokenManager.getAccessToken()}` }
@@ -372,7 +397,7 @@ const FileManager = () => {
     }
   };
 
-  const handleDelete = async (fileId) => {
+  const handleDelete = async (fileId: string | number) => {
     // P-013 fix: replaced native confirm() with shared useConfirm hook.
     const ok = await confirm({
       title: t('misc.fm_delete_title'),
@@ -400,7 +425,7 @@ const FileManager = () => {
     }
   };
 
-  const handleFilterChange = (key, value) => {
+  const handleFilterChange = (key: keyof FileFilters, value: string) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
   };
 
@@ -416,13 +441,13 @@ const FileManager = () => {
     setSearchQuery('');
   };
 
-  const toggleFileSelection = (fileId) => {
+  const toggleFileSelection = (fileId: string | number) => {
     setSelectedFiles((prev) =>
       prev.includes(fileId) ? prev.filter((id) => id !== fileId) : [...prev, fileId]
     );
   };
 
-  const handleActivationKeyDown = (event, action) => {
+  const handleActivationKeyDown = (event: React.KeyboardEvent<HTMLElement>, action: () => void) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       action();
@@ -431,12 +456,12 @@ const FileManager = () => {
 
   const selectedCount = selectedFiles.length;
 
-  const renderFileActions = (file) => (
+  const renderFileActions = (file: FileItem) => (
     <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
       <Button
         variant="ghost"
         size="small"
-        onClick={(event) => {
+        onClick={(event: React.MouseEvent<HTMLElement>) => {
           event.stopPropagation();
           handlePreview(file.id);
         }}
@@ -449,7 +474,7 @@ const FileManager = () => {
       <Button
         variant="ghost"
         size="small"
-        onClick={(event) => {
+        onClick={(event: React.MouseEvent<HTMLElement>) => {
           event.stopPropagation();
           handleDownload(file.id, file.filename);
         }}
@@ -462,7 +487,7 @@ const FileManager = () => {
       <Button
         variant="ghost"
         size="small"
-        onClick={(event) => {
+        onClick={(event: React.MouseEvent<HTMLElement>) => {
           event.stopPropagation();
           handleDelete(file.id);
         }}
@@ -538,7 +563,7 @@ const FileManager = () => {
 
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--mac-spacing-2)' }}>
                 <Badge size="small" variant="outline">
-                  {fileTypeLabels(t)[file.file_type] || file.file_type || t('misc.fm_label_other')}
+                  {fileTypeLabels(t)[(file.file_type as FileTypeKey) || 'other'] || file.file_type || t('misc.fm_label_other')}
                 </Badge>
                 <span style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)' }}>
                   {formatDate(file.created_at)}
@@ -559,54 +584,60 @@ const FileManager = () => {
       title: (
         <Checkbox
           checked={files.length > 0 && selectedFiles.length === files.length}
-          onChange={(checked) => setSelectedFiles(checked ? files.map((file) => file.id) : [])}
+          onChange={(checked: boolean) => setSelectedFiles(checked ? files.map((file) => file.id) : [])}
           aria-label={files.length > 0 && selectedFiles.length === files.length ? t('misc.fm_aria_deselect_all') : t('misc.fm_aria_select_all')}
         />
       ),
-      render: (_value, file) => (
-        <Checkbox
-          checked={selectedFiles.includes(file.id)}
-          onChange={(checked) =>
-            setSelectedFiles((prev) => (checked ? [...prev, file.id] : prev.filter((id) => id !== file.id)))
-          }
-          aria-label={selectedFiles.includes(file.id) ? t('misc.fm_aria_deselect_file', { name: getFileDisplayName(file) }) : t('misc.fm_aria_select_file', { name: getFileDisplayName(file) })}
-        />
-      )
+      render: (_value: unknown, row: Record<string, unknown>) => {
+        const file = row as FileItem;
+        return (
+          <Checkbox
+            checked={selectedFiles.includes(file.id)}
+            onChange={(checked: boolean) =>
+              setSelectedFiles((prev) => (checked ? [...prev, file.id] : prev.filter((id) => id !== file.id)))
+            }
+            aria-label={selectedFiles.includes(file.id) ? t('misc.fm_aria_deselect_file', { name: getFileDisplayName(file) }) : t('misc.fm_aria_select_file', { name: getFileDisplayName(file) })}
+          />
+        );
+      }
     },
     {
       key: 'filename',
       title: t('misc.fm_col_filename'),
-      render: (_value, file) => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: '220px' }}>
-          {getFileIcon(file, 22)}
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>{getFileDisplayName(file)}</div>
-            {file.original_filename && (
-              <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary)' }}>{file.original_filename}</div>
-            )}
+      render: (_value: unknown, row: Record<string, unknown>) => {
+        const file = row as FileItem;
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: '220px' }}>
+            {getFileIcon(file, 22)}
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>{getFileDisplayName(file)}</div>
+              {file.original_filename && (
+                <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary)' }}>{file.original_filename}</div>
+              )}
+            </div>
           </div>
-        </div>
-      )
+        );
+      }
     },
     {
       key: 'file_type',
       title: t('misc.fm_col_type'),
-      render: (value) => <Badge size="small" variant="outline">{fileTypeLabels(t)[value] || value || t('misc.fm_label_other')}</Badge>
+      render: (value: unknown) => <Badge size="small" variant="outline">{fileTypeLabels(t)[(value as FileTypeKey) || 'other'] || String(value ?? '') || t('misc.fm_label_other')}</Badge>
     },
     {
       key: 'file_size',
       title: t('misc.fm_col_size'),
-      render: (value) => formatFileSize(value)
+      render: (value: unknown) => formatFileSize(value)
     },
     {
       key: 'created_at',
       title: t('misc.fm_col_created'),
-      render: (value) => formatDate(value)
+      render: (value: unknown) => formatDate(value)
     },
     {
       key: 'actions',
       title: t('misc.fm_col_actions'),
-      render: (_value, file) => renderFileActions(file)
+      render: (_value: unknown, row: Record<string, unknown>) => renderFileActions(row as FileItem)
     }
   ];
 
@@ -670,13 +701,13 @@ const FileManager = () => {
             <Select
               aria-label={t('misc.fm_aria_filter_type')}
               value={filters.fileType}
-              onChange={(value) => handleFilterChange('fileType', value)}
+              onChange={(value) => handleFilterChange('fileType', value.target.value)}
               options={fileTypeOptions(t)}
             />
             <Select
               aria-label={t('misc.fm_aria_filter_permission')}
               value={filters.permission}
-              onChange={(value) => handleFilterChange('permission', value)}
+              onChange={(value) => handleFilterChange('permission', value.target.value)}
               options={permissionOptions(t)}
             />
             <Button variant="secondary" onClick={clearFilters}>
@@ -690,7 +721,7 @@ const FileManager = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
           <SegmentedControl
             value={viewMode}
-            onChange={(v: unknown) => setViewMode(String(v))}
+            onChange={(v: unknown) => setViewMode(String(v) as 'grid' | 'list')}
             options={[
               { value: 'grid', label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}><Grid size={14} />{t('misc.fm_view_grid')}</span> },
               { value: 'list', label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}><ListIcon size={14} />{t('misc.fm_view_list')}</span> }
@@ -854,7 +885,7 @@ const FileManager = () => {
                   ) : (
                     Object.entries(stats?.files_by_type || {}).map(([type, count]) => (
                       <div key={type} style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--mac-spacing-3)' }}>
-                        <span style={{ color: 'var(--mac-text-secondary)' }}>{fileTypeLabels(t)[type] || type}</span>
+                        <span style={{ color: 'var(--mac-text-secondary)' }}>{fileTypeLabels(t)[type as FileTypeKey] || type}</span>
                         <strong>{count}</strong>
                       </div>
                     ))
