@@ -156,6 +156,8 @@ export function RoleBasedRender({
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function withRoleAuth(WrappedComponent: ComponentType<any>, authProps: Record<string, unknown> = {}) {
+  // TECH-DEBT(role-auth-hoc): props is `any` because this is a generic HOC
+  // that wraps any component. The props are passed through opaquely.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return function WithRoleAuthComponent(props: any) {
     return (
@@ -171,6 +173,8 @@ export function withRoleAuth(WrappedComponent: ComponentType<any>, authProps: Re
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function withRoleRender(WrappedComponent: ComponentType<any>, renderProps: Record<string, unknown> = {}) {
+  // TECH-DEBT(role-render-hoc): props is `any` because this is a generic HOC
+  // that wraps any component. The props are passed through opaquely.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return function WithRoleRenderComponent(props: any) {
     return (
