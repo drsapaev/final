@@ -14,7 +14,7 @@ import PropTypes from 'prop-types';
  * Главный провайдер для всех контекстов.
  * ThemeProvider находится уровнем выше, в App.jsx, чтобы не плодить независимые theme-state.
  */
-export function AppProviders({ children }) {
+export function AppProviders({ children }: { children: React.ReactNode }) {
   return (
     <TranslationProvider>
       <AppDataProvider>

@@ -46,7 +46,7 @@ export const STATUS_ICONS = {
   [APPOINTMENT_STATUS.NO_SHOW]: '🚫'
 };
 // Получение прогресса в потоке (0-100%)
-export const getProgress = (status) => {
+export const getProgress = (status: string) => {
   const index = STATUS_FLOW.indexOf(status);
   return index >= 0 ? (index / (STATUS_FLOW.length - 1)) * 100 : 0;
 };

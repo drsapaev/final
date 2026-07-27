@@ -47,7 +47,7 @@ export default function ChangePasswordRequired({ currentPassword }: { currentPas
     const isPasswordValid = passwordRequirements.every(req => req.test(formData.newPassword));
     const doPasswordsMatch = formData.newPassword === formData.confirmPassword && formData.newPassword !== '';
 
-    const handleSubmit = async (e) => {
+    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         setError('');
         setSuccess('');
@@ -151,7 +151,7 @@ export default function ChangePasswordRequired({ currentPassword }: { currentPas
         background: theme === 'light' ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.05)'
     };
 
-    const requirementItemStyle = (passed) => ({
+    const requirementItemStyle = (passed: boolean) => ({
         display: 'flex',
         alignItems: 'center',
         gap: 'var(--mac-spacing-2)',
