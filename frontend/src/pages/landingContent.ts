@@ -331,7 +331,10 @@ function deepMerge(base: Record<string, unknown>, override: Record<string, unkno
   if (base && typeof base === 'object' && override && typeof override === 'object') {
     const result = { ...base };
     for (const key of Object.keys(override)) {
-      result[key] = deepMerge(base[key], override[key]);
+      result[key] = deepMerge(
+        base[key] as Record<string, unknown>,
+        override[key] as Record<string, unknown>
+      );
     }
     return result;
   }
@@ -1309,7 +1312,7 @@ export const LANDING_COPY = {
   kk: deepMerge(BASE_COPY, KK_OVERRIDES)
 };
 
-export function buildGlassStyle(isDark, emphasis = 'default') {
+export function buildGlassStyle(isDark: boolean, emphasis = 'default') {
   const baseStyle = {
     border: isDark ? '1px solid rgba(255, 255, 255, 0.12)' : '1px solid rgba(15, 23, 42, 0.08)',
     boxShadow: isDark ? '0 24px 80px rgba(2, 6, 23, 0.42)' : '0 24px 80px rgba(15, 23, 42, 0.12)',

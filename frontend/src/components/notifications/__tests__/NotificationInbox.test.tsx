@@ -11,7 +11,7 @@ const {
   archiveNotification,
   markAllAsRead,
 } = vi.hoisted(() => {
-  const store = { notifications: [] };
+  const store = { notifications: [] as Array<ReturnType<typeof createNotification>> };
   return {
     store,
     getNotificationsByRole: vi.fn(() => store.notifications),

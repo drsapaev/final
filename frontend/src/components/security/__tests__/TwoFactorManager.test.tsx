@@ -40,7 +40,7 @@ const disabledStatus = {
   recovery_email: null,
   recovery_phone: null,
   trusted_devices_count: 0,
-  last_used: null,
+  last_used: null as string | null,
 };
 
 const enabledStatus = {
@@ -56,7 +56,7 @@ const enabledStatus = {
   last_used: '2026-03-03T10:00:00Z',
 };
 
-function mockApiGetState({ statusSequence = [disabledStatus], devices = [], logs = [], methods = [] } = {}) {
+function mockApiGetState({ statusSequence = [disabledStatus], devices = [] as Record<string, unknown>[], logs = [] as Record<string, unknown>[], methods = [] as Record<string, unknown>[] } = {}) {
   let statusCalls = 0;
 
   apiGet.mockImplementation((url) => {

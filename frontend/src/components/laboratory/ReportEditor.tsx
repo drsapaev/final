@@ -138,7 +138,7 @@ export default function ReportEditor({
                     {reportHistory.length > 1 && (() => {
                       const prevReport = reportHistory[1];
                       if (!prevReport?.sections) return null;
-                      let prevValue = null;
+                      let prevValue: string | null = null;
                       for (const sec of prevReport.sections) {
                         for (const f of (sec.fields || [])) {
                           if (f.field_key === field.field_key && f.value_text) {
