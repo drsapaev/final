@@ -19,6 +19,38 @@ import './ModernInput.css';
 import { Input } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
 
+type IconType = typeof Eye;
+type SuggestionItem = string | { label: string; [key: string]: unknown };
+
+interface ModernInputProps {
+  type?: string;
+  label?: React.ReactNode;
+  placeholder?: string;
+  value?: string | number;
+  onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onBlur?: (e: React.FocusEvent<HTMLInputElement>) => void;
+  onFocus?: (e: React.FocusEvent<HTMLInputElement>) => void;
+  error?: React.ReactNode;
+  success?: React.ReactNode;
+  disabled?: boolean;
+  required?: boolean;
+  icon?: React.ReactNode | IconType;
+  clearable?: boolean;
+  autoComplete?: string;
+  maxLength?: number;
+  minLength?: number;
+  pattern?: string;
+  validation?: (value: string | number) => boolean | string;
+  suggestions?: SuggestionItem[];
+  showSuggestions?: boolean;
+  onSuggestionSelect?: (suggestion: SuggestionItem) => void;
+  className?: string;
+  size?: 'small' | 'medium' | 'large';
+  variant?: 'default' | 'error' | 'success';
+  id?: string;
+  [key: string]: unknown;
+}
+
 const ModernInput = ({
   type = 'text',
   label,
@@ -38,14 +70,14 @@ const ModernInput = ({
   minLength,
   pattern,
   validation,
-  suggestions = [] as Array<string | { label: string; [key: string]: unknown }>,
+  suggestions = [] as SuggestionItem[],
   showSuggestions = false,
   onSuggestionSelect,
   className = '',
   size = 'medium',
   variant = 'default',
   ...props
-}) => {
+}: ModernInputProps) => {
   const { getColor } = useTheme();
   const [focused, setFocused] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -57,7 +89,7 @@ const ModernInput = ({
   useEffect(() => {
     if (validation && value) {
       const result = validation(value);
-      setLocalError(result === true ? '' : result);
+      setLocalError(result === true ? '' : String(result));
     } else {
       setLocalError('');
     }
@@ -77,7 +109,7 @@ const ModernInput = ({
     }
   };
 
-  const IconComponent = getTypeIcon();
+  const IconComponent = getTypeIcon() as React.ElementType;
   const hasError = error || localError;
   const hasSuccess = success && !hasError;
 
@@ -97,7 +129,7 @@ const ModernInput = ({
   };
 
   const handleClear = () => {
-    const event = { target: { value: '' } };
+    const event = { target: { value: '' } } as unknown as React.ChangeEvent<HTMLInputElement>;
     onChange?.(event);
     inputRef.current?.focus();
   };
@@ -278,7 +310,7 @@ const ModernInput = ({
         className="input-counter"
         style={{ color: getColor('textSecondary') }}>
         
-          {(value || '').length}/{maxLength}
+          {String(value ?? '').length}/{maxLength}
         </div>
       }
     </div>);
