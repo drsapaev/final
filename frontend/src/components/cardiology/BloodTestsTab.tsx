@@ -21,6 +21,56 @@ import { TestTube, Plus, Save } from 'lucide-react';
 import { Button, Textarea, Badge, MacOSCard } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
 
+interface BloodTest {
+  id?: string | number;
+  test_date?: string;
+  cholesterol_total?: number | string;
+  cholesterol_hdl?: number | string;
+  cholesterol_ldl?: number | string;
+  triglycerides?: number | string;
+  glucose?: number | string;
+  crp?: number | string;
+  troponin?: number | string;
+  interpretation?: string;
+  [key: string]: unknown;
+}
+
+interface BloodTestForm {
+  test_date?: string;
+  cholesterol_total?: number | string;
+  cholesterol_hdl?: number | string;
+  cholesterol_ldl?: number | string;
+  triglycerides?: number | string;
+  glucose?: number | string;
+  crp?: number | string;
+  troponin?: number | string;
+  interpretation?: string;
+  [key: string]: unknown;
+}
+
+interface FieldRangeWarning {
+  valid?: boolean;
+  message?: string;
+  [key: string]: unknown;
+}
+
+interface BloodTestsTabProps {
+  bloodTests?: BloodTest[];
+  bloodTestForm: BloodTestForm;
+  setBloodTestForm: (form: BloodTestForm) => void;
+  showFormOpen?: boolean;
+  onNewTest: () => void;
+  onCancelForm: () => void;
+  onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
+  getEmptyBloodTestForm: () => BloodTestForm;
+  getFieldRangeWarning: (field: string, value: unknown) => FieldRangeWarning | undefined;
+  isLdlCritical: (value: number | string | undefined) => boolean;
+  settings?: { ldlThreshold?: number; [key: string]: unknown };
+  getColor: (key: string, shade?: number) => string;
+  getFontSize: (key: string) => string;
+  getSpacing: (key: string) => string;
+}
+
 /**
  * @param {Object} props
  * @param {Array} props.bloodTests - Array of blood test records
@@ -53,12 +103,12 @@ export function BloodTestsTab({
   getColor,
   getFontSize,
   getSpacing,
-}) {
+}: BloodTestsTabProps) {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // Helper: compute average of a field across all blood tests
-  const avg = (key) => {
+  const avg = (key: string) => {
     const nums = bloodTests
-      .map((t) => Number(t[key]))
+      .map((bt) => Number((bt as Record<string, unknown>)[key]))
       .filter((v) => !Number.isNaN(v));
     if (nums.length === 0) return '—';
     const sum = nums.reduce((a, b) => a + b, 0);
@@ -73,7 +123,7 @@ export function BloodTestsTab({
   ];
 
   // Helper: render a form input with range validation
-  const renderField = (fieldName, label, placeholder, ariaLabel) => {
+  const renderField = (fieldName: string, label: string, placeholder: string, ariaLabel: string) => {
     const warning = getFieldRangeWarning(fieldName, bloodTestForm[fieldName]);
     const isError = warning?.valid === false;
     return (
@@ -82,7 +132,7 @@ export function BloodTestsTab({
         <input
           type="number"
           aria-label={ariaLabel}
-          value={bloodTestForm[fieldName]}
+          value={bloodTestForm[fieldName] as string | number}
           onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setBloodTestForm({ ...bloodTestForm, [fieldName]: e.target.value })}
           className="w-full rounded-md focus:outline-none focus:ring-2 dark:text-white cardio-input-themed"
           style={{

@@ -12,6 +12,51 @@ import {
 import PanelEmptyState from './PanelEmptyState';
 import { useTranslation } from '../../i18n/useTranslation';
 
+interface CabinetReport {
+  id: string | number;
+  name?: string;
+  ready_at?: string;
+  status?: string;
+}
+
+interface CabinetAppointment {
+  id: string | number;
+  date?: string;
+  time?: string;
+  department?: string;
+  status?: string;
+}
+
+interface CabinetVisit {
+  id: string | number;
+  date?: string;
+  status?: string;
+}
+
+interface CabinetQueueEntry {
+  number: number | string;
+  status?: string;
+  cabinet?: string;
+}
+
+interface CabinetPayments {
+  billed?: number | string;
+  paid?: number | string;
+  pending?: number | string;
+  debt?: number | string;
+  linked_visit_count?: number;
+  active_queue_count?: number;
+}
+
+interface CabinetSummary {
+  payments?: CabinetPayments;
+  appointments?: CabinetAppointment[];
+  visits?: CabinetVisit[];
+  queue?: CabinetQueueEntry[];
+  reports?: CabinetReport[];
+  patient?: { name?: string };
+}
+
 /**
  * L-H-4 fix: PatientCabinetSummary выделен в отдельный файл (~200 строк).
  *
@@ -29,10 +74,10 @@ import { useTranslation } from '../../i18n/useTranslation';
 function PatientCabinetSummary({ mode = 'cabinet' }) {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [cabinetStatus, setCabinetStatus] = useState('idle');
-  const [cabinetSummary, setCabinetSummary] = useState(null);
+  const [cabinetSummary, setCabinetSummary] = useState<CabinetSummary | null>(null);
   const [cabinetError, setCabinetError] = useState('');
   const [cabinetInitData, setCabinetInitData] = useState('');
-  const [reportDownloads, setReportDownloads] = useState({});
+  const [reportDownloads, setReportDownloads] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const initData = readTelegramMiniAppInitData();
@@ -101,14 +146,14 @@ function PatientCabinetSummary({ mode = 'cabinet' }) {
 
   const isPaymentsMode = mode === 'payments';
   const isReportsMode = mode === 'reports';
-  const payments = cabinetSummary?.payments || {};
-  const appointments = Array.isArray(cabinetSummary?.appointments) ? cabinetSummary.appointments : [];
-  const visits = Array.isArray(cabinetSummary?.visits) ? cabinetSummary.visits : [];
-  const queue = Array.isArray(cabinetSummary?.queue) ? cabinetSummary.queue : [];
-  const reports = Array.isArray(cabinetSummary?.reports) ? cabinetSummary.reports : [];
+  const payments: CabinetPayments = cabinetSummary?.payments || {};
+  const appointments = cabinetSummary && Array.isArray(cabinetSummary.appointments) ? cabinetSummary.appointments : [];
+  const visits = cabinetSummary && Array.isArray(cabinetSummary.visits) ? cabinetSummary.visits : [];
+  const queue = cabinetSummary && Array.isArray(cabinetSummary.queue) ? cabinetSummary.queue : [];
+  const reports = cabinetSummary && Array.isArray(cabinetSummary.reports) ? cabinetSummary.reports : [];
 
   // L-M-2 fix: retry для PDF-download при ошибке
-  const downloadReport = async (report) => {
+  const downloadReport = async (report: CabinetReport) => {
     setReportDownloads((current) => ({ ...current, [report.id]: 'loading' }));
 
     try {

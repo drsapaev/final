@@ -8,14 +8,59 @@
  *   - снижения когнитивной нагрузки при чтении основного компонента
  */
 
-export function extractFieldValue(field) {
+interface LabFieldInput {
+  field_key?: string | number;
+  key?: string | number;
+  id?: string | number;
+  label?: string | number;
+  name?: string;
+  value_numeric?: number | null;
+  value_text?: string;
+  reference_text?: string;
+  unit?: string;
+  resolved_flag?: string | null;
+  resolved_flag_severity?: number | null;
+  required?: boolean;
+  [key: string]: unknown;
+}
+
+interface LabSectionInput {
+  key?: string | number;
+  section_key?: string;
+  id?: string | number;
+  title?: string | number;
+  name?: string;
+  fields?: LabFieldInput[];
+  [key: string]: unknown;
+}
+
+interface NormalizedLabField {
+  field_key: string | number;
+  label: string | number;
+  value_numeric: number | null;
+  value_text: string;
+  reference_text: string;
+  unit: string;
+  resolved_flag: string | null;
+  resolved_flag_severity: number | null;
+  [key: string]: unknown;
+}
+
+interface NormalizedLabSection {
+  key: string | number;
+  title: string | number;
+  fields: NormalizedLabField[];
+  [key: string]: unknown;
+}
+
+export function extractFieldValue(field: LabFieldInput): string {
   if (field.value_numeric !== null && field.value_numeric !== undefined) {
     return formatDecimalInputValue(field.value_numeric);
   }
   return field.value_text || '';
 }
 
-export function formatDecimalInputValue(value) {
+export function formatDecimalInputValue(value: number | string | null | undefined): string {
   if (value === null || value === undefined || value === '') {
     return '';
   }
@@ -28,7 +73,10 @@ export function formatDecimalInputValue(value) {
   return trimmedDecimal ? `${integerPart}.${trimmedDecimal}` : integerPart;
 }
 
-export function formatFlagLabel(field) {
+export function formatFlagLabel(field: {
+  resolved_flag?: string | null;
+  resolved_flag_meta?: { direction?: string } | null;
+}): string {
   if (!field?.resolved_flag) {
     return 'норма';
   }
@@ -43,7 +91,9 @@ export function formatFlagLabel(field) {
   return direction ? `${label} ${direction}` : label;
 }
 
-export function formatThreshold(meta) {
+export function formatThreshold(meta?: {
+  matched_threshold?: { value?: number | string | null; operator?: string } | null;
+} | null): string {
   const matchedThreshold = meta?.matched_threshold;
   if (!matchedThreshold?.value) {
     return '';
@@ -53,11 +103,14 @@ export function formatThreshold(meta) {
     lte: '<=',
     gt: '>',
     gte: '>='
-  }[matchedThreshold.operator] || matchedThreshold.operator || '';
+  }[matchedThreshold.operator || ''] || matchedThreshold.operator || '';
   return `${operator} ${formatDecimalInputValue(matchedThreshold.value)}`.trim();
 }
 
-export function historySeverityState(item) {
+export function historySeverityState(item: {
+  critical_findings_count?: number | null;
+  max_flag_severity?: number | null;
+}): { label: string; variant: string; order: number } {
   if ((item.critical_findings_count || 0) > 0) {
     return { label: 'critical', variant: 'danger', order: 300 };
   }
@@ -70,7 +123,10 @@ export function historySeverityState(item) {
   return { label: 'clean', variant: 'success', order: 0 };
 }
 
-export function matchesHistoryFilter(item, filter) {
+export function matchesHistoryFilter(
+  item: { critical_findings_count?: number | null; max_flag_severity?: number | null },
+  filter: string
+): boolean {
   const severity = historySeverityState(item);
   if (filter === 'critical') {
     return severity.label === 'critical';
@@ -84,12 +140,15 @@ export function matchesHistoryFilter(item, filter) {
   return true;
 }
 
-export function getServiceContextItems(appointment) {
+export function getServiceContextItems(appointment?: {
+  service_details?: Array<{ id?: string; code?: string; name?: string }>;
+  service_codes?: string[];
+} | null): Array<{ key: string; label: string; code: string }> {
   const serviceDetails = appointment?.service_details || [];
   if (serviceDetails.length > 0) {
     return serviceDetails
       .map((item) => ({
-        key: item.id || item.code || item.name,
+        key: item.id || item.code || item.name || '',
         label: item.name || item.code || 'Услуга',
         code: item.code || ''
       }))
@@ -103,7 +162,7 @@ export function getServiceContextItems(appointment) {
   }));
 }
 
-export function normalizeLabSections(sections = []) {
+export function normalizeLabSections(sections: LabSectionInput[] = []): NormalizedLabSection[] {
   return sections.map((section, sectionIndex) => ({
     key: section.key || section.section_key || section.id || `section-${sectionIndex}`,
     title: section.title || section.name || section.key || `Раздел ${sectionIndex + 1}`,
@@ -120,7 +179,18 @@ export function normalizeLabSections(sections = []) {
   }));
 }
 
-export function flattenLabResults(sections = []) {
+export function flattenLabResults(sections: LabSectionInput[] = []): Array<{
+  section_key: string | number | undefined;
+  section_title: string | number | undefined;
+  field_key: string | number | undefined;
+  label: string | number | undefined;
+  value_numeric: number | null | undefined;
+  value_text: string | undefined;
+  reference_text: string | undefined;
+  unit: string | undefined;
+  resolved_flag: string | null | undefined;
+  resolved_flag_severity: number | null | undefined;
+}> {
   return sections.flatMap((section) =>
     (section.fields || []).map((field) => ({
       section_key: section.key,
@@ -137,11 +207,45 @@ export function flattenLabResults(sections = []) {
   );
 }
 
-export function buildLabPrintPayload(instance, appointment) {
+interface LabPrintInstance {
+  id?: string | number | null;
+  visit_id?: string | number | null;
+  patient_id?: string | number | null;
+  template_id?: string | number | null;
+  template_name?: string | null;
+  status?: string | null;
+  created_at?: string | null;
+  finalized_at?: string | null;
+  printed_at?: string | null;
+  updated_at?: string | null;
+  sections?: LabSectionInput[];
+  patient_snapshot?: Record<string, unknown>;
+  clinic?: Record<string, unknown>;
+  template?: { name?: string; subtitle?: string; footer_notes?: string; layout_mode?: string } | null;
+  signer_snapshot?: Record<string, unknown>;
+  footer_notes?: string;
+  critical_findings?: unknown[];
+  [key: string]: unknown;
+}
+
+interface LabPrintAppointment {
+  visit_id?: string | number | null;
+  patient_id?: string | number | null;
+  patient_fio?: string;
+  patient_name?: string;
+  patient_birth_year?: string;
+  patient_phone?: string;
+  address?: string;
+  sex?: string;
+  clinic?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+export function buildLabPrintPayload(instance: LabPrintInstance | null | undefined, appointment: LabPrintAppointment | null | undefined) {
   const sections = normalizeLabSections(instance?.sections || []);
-  const patientSnapshot = instance?.patient_snapshot || {};
+  const patientSnapshot = (instance?.patient_snapshot || {}) as Record<string, unknown>;
   const appointmentSnapshot = appointment || {};
-  const clinic = instance?.clinic || appointmentSnapshot?.clinic || {};
+  const clinic = (instance?.clinic || (appointmentSnapshot?.clinic as Record<string, unknown> | undefined) || {}) as Record<string, unknown>;
   const templateName = instance?.template?.name || instance?.template_name || 'Лабораторный бланк';
   const reportDate =
     instance?.printed_at

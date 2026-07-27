@@ -17,6 +17,44 @@ import ModernDialog from '../dialogs/ModernDialog';
 import logger from '../../utils/logger';
 import { printPanelTicketInBrowser } from '../../services/panelPrint';
 import notify from '../../services/notify';
+
+interface PaymentTicket {
+  queue_id: string | number;
+  patient_name?: string;
+  doctor_name?: string;
+  queue_number?: string | number;
+  department?: string;
+  specialty?: string;
+  queue_name?: string;
+  visit_date?: string;
+  visit_time?: string;
+  [key: string]: unknown;
+}
+
+interface ActionDef {
+  label?: string;
+  variant?: string;
+  onClick?: () => void;
+  disabled?: boolean;
+  loading?: boolean;
+  icon?: React.ReactNode;
+  className?: string;
+}
+
+type PaymentState = 'init' | 'processing' | 'polling' | 'success' | 'failed';
+
+interface PaymentProviderDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+  invoiceId: string | number;
+  totalAmount?: number | null;
+  currency?: string;
+  provider: string;
+  providerLabel: string;
+  cssClassName?: string;
+  onSuccess?: (data: Record<string, unknown>) => void;
+  onError?: (error: Error) => void;
+}
 /**
  * PaymentProviderDialog — unified hosted-payment provider dialog.
  *
@@ -44,24 +82,24 @@ const PaymentProviderDialog = ({
   cssClassName, // 'payment-click-dialog' | 'payment-payme-dialog'
   onSuccess,
   onError
-}) => {
+}: PaymentProviderDialogProps) => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const { executeAction, loading } = useAsyncAction();
 
-  const [paymentState, setPaymentState] = useState('init'); // init|processing|polling|success|failed
-  const [paymentUrl, setPaymentUrl] = useState(null);
-  const [, setProviderPaymentId] = useState(null);
-  const [error, setError] = useState(null);
+  const [paymentState, setPaymentState] = useState<PaymentState>('init'); // init|processing|polling|success|failed
+  const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
+  const [, setProviderPaymentId] = useState<string | number | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [pollingAttempts, setPollingAttempts] = useState(0);
-  const [printTickets, setPrintTickets] = useState([]);
+  const [printTickets, setPrintTickets] = useState<PaymentTicket[]>([]);
   const [showTicketPrinter, setShowTicketPrinter] = useState(false);
 
   const maxPollingAttempts = 60; // 5 минут при интервале 5 сек
   const pollingIntervalMs = 5000; // 5 секунд
 
   // Refs для управления polling
-  const pollingRef = useRef(null);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const attemptsRef = useRef(0);
 
   const clearPolling = () => {
@@ -115,7 +153,7 @@ const PaymentProviderDialog = ({
 
         if (data.success) {
           setPaymentUrl(String(data.payment_url));
-          setProviderPaymentId(data.provider_payment_id);
+          setProviderPaymentId(data.provider_payment_id as string | number);
           setPaymentState('processing');
 
           // Автоматически открываем ссылку на оплату
@@ -182,7 +220,7 @@ const PaymentProviderDialog = ({
         setPaymentState('success');
 
         // Получаем данные для печати талонов
-        const tickets = Array.isArray(data.print_tickets) ? data.print_tickets : [];
+        const tickets = (Array.isArray(data.print_tickets) ? data.print_tickets : []) as PaymentTicket[];
         setPrintTickets(tickets);
 
         notify.success(t('payment.payment_success'));
@@ -210,7 +248,7 @@ const PaymentProviderDialog = ({
 
   // ===================== ПЕЧАТЬ ТАЛОНОВ =====================
 
-  const printTicket = (ticket) => {
+  const printTicket = (ticket: PaymentTicket) => {
     const opened = printPanelTicketInBrowser({
       ...ticket,
       specialty_name: ticket.department || ticket.specialty || ticket.queue_name || t('payment.pay_dlg_queue'),
@@ -224,7 +262,7 @@ const PaymentProviderDialog = ({
   };
 
   const printAllTickets = () => {
-    printTickets.forEach((ticket) => {
+    printTickets.forEach((ticket: PaymentTicket) => {
       setTimeout(() => printTicket(ticket), 500); // Небольшая задержка между печатью
     });
   };
@@ -243,7 +281,7 @@ const PaymentProviderDialog = ({
 
   // ===================== ДЕЙСТВИЯ ДИАЛОГА =====================
 
-  const getActions = () => {
+  const getActions = (): ActionDef[] => {
     switch (paymentState) {
       case 'init':
         return [
@@ -270,7 +308,7 @@ const PaymentProviderDialog = ({
         },
         {
           label: t('payment.pay_dlg_reopen_link'),
-          onClick: () => paymentUrl && window.open(paymentUrl, '_blank'),
+          onClick: () => { if (paymentUrl) window.open(paymentUrl, '_blank'); },
           variant: 'primary',
           icon: <ExternalLink size={16} />,
           disabled: !paymentUrl
@@ -302,20 +340,23 @@ const PaymentProviderDialog = ({
         }];
 
 
-      case 'success':
-        return [
+      case 'success': {
+        const actions: ActionDef[] = [
         {
           label: t('payment.pay_dlg_close'),
           onClick: onClose,
           variant: 'secondary'
-        },
-        printTickets.length > 0 && {
-          label: t('payment.pay_dlg_print_tickets'),
-          onClick: printAllTickets,
-          variant: 'primary',
-          icon: <Printer size={16} />
-        }].
-        filter(Boolean);
+        }];
+        if (printTickets.length > 0) {
+          actions.push({
+            label: t('payment.pay_dlg_print_tickets'),
+            onClick: printAllTickets,
+            variant: 'primary',
+            icon: <Printer size={16} />
+          });
+        }
+        return actions;
+      }
 
       case 'failed':
         return [

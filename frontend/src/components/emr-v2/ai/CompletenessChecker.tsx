@@ -19,10 +19,44 @@ import { useState, useCallback } from 'react';
 import './CompletenessChecker.css';
 import { useTranslation } from '@/i18n/useTranslation';
 
+interface EmrData {
+  complaints?: string;
+  anamnesis_morbi?: string;
+  anamnesis_vitae?: string;
+  examination?: string;
+  diagnosis?: string;
+  icd10_code?: string;
+  treatment?: string;
+  recommendations?: string;
+  [key: string]: unknown;
+}
+
+interface MissingField {
+  field: string;
+  reason: string;
+}
+
+interface CompletenessSuggestion {
+  field: string;
+  message: string;
+}
+
+interface CompletenessResults {
+  missingFields: MissingField[];
+  suggestions: CompletenessSuggestion[];
+  isComplete: boolean;
+}
+
+interface CompletenessCheckerProps {
+  emrData?: EmrData | null;
+  specialty?: string;
+  onFieldClick?: (fieldName: string) => void;
+}
+
 /**
  * Field labels
  */
-const getFieldLabels = (t) => ({
+const getFieldLabels = (t: (key: string) => string): Record<string, string> => ({
   complaints: t('misc.cc_field_complaints'),
   anamnesis_morbi: t('misc.cc_field_anamnesis_morbi'),
   anamnesis_vitae: t('misc.cc_field_anamnesis_vitae'),
@@ -45,12 +79,12 @@ export function CompletenessChecker({
   emrData,
   specialty = 'general',
   onFieldClick
-}) {
+}: CompletenessCheckerProps) {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [results, setResults] = useState(null);
-  const [error, setError] = useState(null);
+  const [results, setResults] = useState<CompletenessResults | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Check completeness
   const checkCompleteness = useCallback(async () => {
@@ -61,8 +95,8 @@ export function CompletenessChecker({
 
     try {
       // Local check for now (can be replaced with AI call)
-      const missingFields = [];
-      const suggestions = [];
+      const missingFields: MissingField[] = [];
+      const suggestions: CompletenessSuggestion[] = [];
 
       // Check required fields
       if (!emrData.complaints?.trim()) {
@@ -120,7 +154,7 @@ export function CompletenessChecker({
   }, [isOpen, checkCompleteness]);
 
   // Handle field click
-  const handleFieldClick = useCallback((fieldName) => {
+  const handleFieldClick = useCallback((fieldName: string) => {
     onFieldClick?.(fieldName);
     // Scroll to field
     const element = document.getElementById(`emr-${fieldName}`);

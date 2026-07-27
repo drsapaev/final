@@ -10,6 +10,33 @@ import AIClinicalText from './AIClinicalText';
 import PropTypes from 'prop-types';
 import React from "react";
 
+interface ICD10Suggestion {
+  code?: string;
+  name?: string;
+  description?: string;
+  relevance?: string;
+  [key: string]: unknown;
+}
+
+interface GenericSuggestion {
+  label?: string;
+  name?: string;
+  [key: string]: unknown;
+}
+
+type Suggestion = ICD10Suggestion | GenericSuggestion | string;
+
+interface AISuggestionsProps {
+  suggestions?: Suggestion[];
+  type?: string;
+  onSelect?: (item: Suggestion) => void;
+  title?: string;
+  showConfidence?: boolean;
+  maxHeight?: number;
+  clinicalRecommendations?: string | null;
+  fallbackProvider?: string | null;
+}
+
 const AISuggestions = ({
   suggestions = [],
   type = 'icd10',
@@ -19,32 +46,35 @@ const AISuggestions = ({
   maxHeight = 400,
   clinicalRecommendations = null,
   fallbackProvider = null
-}) => {
+}: AISuggestionsProps) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   title = title || t('misc.as_ai_podskazki');
   const [expanded, setExpanded] = useState(true);
-  const [copiedId, setCopiedId] = useState(null);
+  const [copiedId, setCopiedId] = useState<number | null>(null);
 
-  const handleCopy = (text, id) => {
+  const handleCopy = (text: string, id: number) => {
     navigator.clipboard.writeText(text);
     setCopiedId(id);
     notify.info(t('final.copied_to_clipboard'));
     setTimeout(() => setCopiedId(null), 2000);
   };
-  const handleActivationKeyDown = (event, onActivate) => {
+  const handleActivationKeyDown = (event: React.KeyboardEvent<HTMLElement>, onActivate: () => void) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       onActivate();
     }
   };
 
-  const Pill = ({ children, color = 'default' }) => {
-    const colors = {
-      default: { border: 'var(--mac-border)', bg: 'transparent' },
-      primary: { border: 'var(--mac-accent-blue)', bg: 'rgba(0,122,255,0.08)' },
-      success: { border: 'rgba(52,199,89,0.45)', bg: 'rgba(52,199,89,0.08)' },
-      warning: { border: 'rgba(255,149,0,0.45)', bg: 'rgba(255,149,0,0.08)' }
-    }[color] || {};
+  const Pill = ({ children, color = 'default' }: { children: React.ReactNode; color?: string }) => {
+    const colors = ((): { border?: string; bg?: string } => {
+      const map: Record<string, { border: string; bg: string }> = {
+        default: { border: 'var(--mac-border)', bg: 'transparent' },
+        primary: { border: 'var(--mac-accent-blue)', bg: 'rgba(0,122,255,0.08)' },
+        success: { border: 'rgba(52,199,89,0.45)', bg: 'rgba(52,199,89,0.08)' },
+        warning: { border: 'rgba(255,149,0,0.45)', bg: 'rgba(255,149,0,0.08)' }
+      };
+      return map[color || 'default'] || {};
+    })();
     return (
       <span style={{
         display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -62,7 +92,7 @@ Pill.propTypes = {
     color: PropTypes.any,
   };
 
-  const getRelevanceVariant = (relevance) => {
+  const getRelevanceVariant = (relevance: string | undefined): string => {
     switch ((relevance || '').toLowerCase()) {
       case t('misc.as_vysokaya'):
       case 'high':
@@ -92,31 +122,34 @@ Pill.propTypes = {
         <Alert severity="info">{t('misc.as_net_podskazok_mkb_10')}</Alert> :
 
         <div style={{ maxHeight, overflow: 'auto' }}>
-            {suggestions.map((item, index) =>
-          <div key={index} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--mac-spacing-3) 0', borderBottom: '1px solid var(--mac-border)' }}>
+            {suggestions.map((item, index) => {
+              const icd = typeof item === 'object' ? item as ICD10Suggestion : null;
+              return (
+              <div key={index} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--mac-spacing-3) 0', borderBottom: '1px solid var(--mac-border)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <Hospital style={{ color: 'var(--mac-accent-blue)' }} />
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <Typography variant="body2" style={{ fontWeight: 'var(--mac-font-weight-semibold)' }}>{item.code}</Typography>
-                      <Typography variant="body2" color="textSecondary">{item.name || item.description}</Typography>
+                      <Typography variant="body2" style={{ fontWeight: 'var(--mac-font-weight-semibold)' }}>{icd?.code}</Typography>
+                      <Typography variant="body2" color="textSecondary">{icd?.name || icd?.description}</Typography>
                     </div>
-                    {showConfidence && item.relevance &&
+                    {showConfidence && icd?.relevance &&
                 <div style={{ marginTop: 4 }}>
-                        <Pill color={getRelevanceVariant(item.relevance)}>{item.relevance}</Pill>
+                        <Pill color={getRelevanceVariant(icd?.relevance)}>{icd?.relevance}</Pill>
                       </div>
                 }
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <Button variant="outline" onClick={() => onSelect && onSelect(item)}>{t('misc.as_vybrat')}</Button>
-                  <Button variant="outline" onClick={() => handleCopy(`${item.code} - ${item.name || item.description}`, index)}>
+                  <Button variant="outline" onClick={() => handleCopy(`${icd?.code} - ${icd?.name || icd?.description}`, index)}>
                     {copiedId === index ? <Check style={{ width: 14, height: 14, marginRight: 6 }} /> : <Copy style={{ width: 14, height: 14, marginRight: 6 }} />}
                     Копировать
                   </Button>
                 </div>
               </div>
-          )}
+              );
+            })}
           </div>
         }
       </div>);
@@ -129,7 +162,11 @@ Pill.propTypes = {
     }
     return (
       <div style={{ maxHeight, overflow: 'auto', padding: 8, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-        {suggestions.map((item, index) =>
+        {suggestions.map((item, index) => {
+          const text = typeof item === 'string'
+            ? item
+            : (item as GenericSuggestion).label || (item as GenericSuggestion).name || JSON.stringify(item);
+          return (
         <Pill key={index} color="primary">
             <span
               role="button"
@@ -137,16 +174,17 @@ Pill.propTypes = {
               onClick={() => onSelect && onSelect(item)}
               onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => handleActivationKeyDown(event, () => onSelect && onSelect(item))}
               style={{ cursor: 'pointer' }}>
-              {typeof item === 'string' ? item : item.label || item.name || JSON.stringify(item)}
+              {text}
             </span>
             <button
-              onClick={() => handleCopy(typeof item === 'string' ? item : item.label || item.name || JSON.stringify(item), index)}
+              onClick={() => handleCopy(text, index)}
               aria-label={t('misc.as_kopirovat_podskazku_ai')}
               style={{ marginLeft: 6, border: 'none', background: 'transparent', cursor: 'pointer' }}>
               {copiedId === index ? <Check style={{ width: 14, height: 14 }} /> : <Copy style={{ width: 14, height: 14 }} />}
             </button>
           </Pill>
-        )}
+          );
+        })}
       </div>);
 
   };

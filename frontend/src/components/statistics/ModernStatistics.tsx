@@ -47,6 +47,15 @@ const getAverageWaitTime = (appointments) => {
   return Math.round(waitTimes.reduce((sum, minutes) => sum + minutes, 0) / waitTimes.length);
 };
 
+interface ModernStatisticsProps {
+  appointments?: any[];
+  language?: string;
+  selectedDate?: string | null;
+  onExport?: () => void;
+  onRefresh?: () => void;
+  [key: string]: any;
+}
+
 const ModernStatistics = ({
   appointments = [],
   language = 'ru',
@@ -54,7 +63,7 @@ const ModernStatistics = ({
   onExport,
   onRefresh,
   ...props
-}) => {
+}: ModernStatisticsProps) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const { theme } = useTheme();
   const [animatedValues, setAnimatedValues] = useState<Record<string, any>>({});

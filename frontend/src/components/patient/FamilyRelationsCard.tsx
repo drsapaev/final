@@ -257,6 +257,39 @@ interface FamilyRelationsCardProps {
   [key: string]: unknown;
 }
 
+interface FamilyRelationPerson {
+  full_name?: string;
+  phone?: string;
+  [key: string]: unknown;
+}
+
+interface FamilyRelation {
+  relation_id?: string | number;
+  relation_type?: string;
+  is_primary_contact?: boolean;
+  description?: string;
+  patient?: FamilyRelationPerson;
+  related_patient?: FamilyRelationPerson;
+  [key: string]: unknown;
+}
+
+interface SearchedPatient {
+  id?: string | number;
+  last_name?: string;
+  first_name?: string;
+  middle_name?: string;
+  phone?: string;
+  [key: string]: unknown;
+}
+
+interface AddRelationDialogProps {
+  open: boolean;
+  onClose: () => void;
+  patientId?: string | number | null;
+  patientName?: string;
+  onSuccess: () => void;
+}
+
 export default function FamilyRelationsCard({
   patientId,
   patientName,
@@ -269,9 +302,9 @@ export default function FamilyRelationsCard({
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [family, setFamily] = useState([]);
-  const [isRelativeOf, setIsRelativeOf] = useState([]);
+  const [error, setError] = useState<string | null>(null);
+  const [family, setFamily] = useState<FamilyRelation[]>([]);
+  const [isRelativeOf, setIsRelativeOf] = useState<FamilyRelation[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
 
   const loadFamily = useCallback(async () => {
@@ -296,7 +329,7 @@ export default function FamilyRelationsCard({
     loadFamily();
   }, [loadFamily]);
 
-  const handleDeleteRelation = async (relationId) => {
+  const handleDeleteRelation = async (relationId: string | number) => {
     // P-013 fix: replaced window.confirm() with shared useConfirm hook.
     const ok = await confirm({
       title: t('patient.pat_fam_delete_title'),
@@ -318,9 +351,9 @@ export default function FamilyRelationsCard({
     }
   };
 
-  const renderRelation = (rel, showPatient = false) => {
+  const renderRelation = (rel: FamilyRelation, showPatient = false) => {
     const person = showPatient ? rel.patient : rel.related_patient;
-    const typeInfo = RELATION_TYPES[rel.relation_type] || RELATION_TYPES.other;
+    const typeInfo = (rel.relation_type && RELATION_TYPES[rel.relation_type]) || RELATION_TYPES.other;
     const TypeIcon = typeInfo.Icon;
 
     return (
@@ -354,7 +387,7 @@ export default function FamilyRelationsCard({
             type="button"
             aria-label="delete"
             style={styles.iconButton}
-            onClick={() => handleDeleteRelation(rel.relation_id)}
+            onClick={() => rel.relation_id !== undefined && handleDeleteRelation(rel.relation_id)}
           >
             <Trash2 size={15} aria-hidden="true" />
           </button>
@@ -440,17 +473,17 @@ FamilyRelationsCard.propTypes = {
   patientName: PropTypes.string
 };
 
-function AddRelationDialog({ open, onClose, patientId, patientName, onSuccess }) {
+function AddRelationDialog({ open, onClose, patientId, patientName, onSuccess }: AddRelationDialogProps) {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
-  const [selectedPatient, setSelectedPatient] = useState(null);
+  const [searchResults, setSearchResults] = useState<SearchedPatient[]>([]);
+  const [selectedPatient, setSelectedPatient] = useState<SearchedPatient | null>(null);
   const [relationType, setRelationType] = useState('parent');
   const [description, setDescription] = useState('');
   const [isPrimaryContact, setIsPrimaryContact] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
@@ -460,7 +493,7 @@ function AddRelationDialog({ open, onClose, patientId, patientName, onSuccess })
         params: { search: searchQuery, limit: 10 }
       });
       setSearchResults(
-        (response.data || []).filter((p) => p.id !== patientId)
+        ((response.data as SearchedPatient[]) || []).filter((p) => p.id !== patientId)
       );
     } catch (err) {
       logger.error('Search error:', err);
