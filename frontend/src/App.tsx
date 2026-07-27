@@ -36,7 +36,7 @@ import { sanitizeSpeedInsightsEvent } from './utils/speedInsightsPrivacy';
 
 bootstrapStoredColorScheme();
 
-const beforeSendSpeedInsights = (event) => sanitizeSpeedInsightsEvent(event, ROUTE_REGISTRY);
+const beforeSendSpeedInsights = (event: Record<string, unknown>) => sanitizeSpeedInsightsEvent(event, ROUTE_REGISTRY);
 
 const CashierPanel = lazy(() => import('./pages/CashierPanel'));
 const Settings = lazy(() => import('./pages/Settings'));
@@ -167,7 +167,7 @@ function LoadingScreen() {
   );
 }
 
-function AppShell({ children }) {
+function AppShell({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { theme } = useTheme();
@@ -195,7 +195,7 @@ function AppShell({ children }) {
 
   useEffect(() => auth.subscribe(setAuthState), []);
 
-  const handleSidebarClick = (item) => {
+  const handleSidebarClick = (item: Record<string, unknown>) => {
     if (chrome.sidebarPreset?.navigation === 'query') {
       const params = new URLSearchParams(location.search);
       params.set(String(chrome.sidebarPreset.queryParam), String(item.id));

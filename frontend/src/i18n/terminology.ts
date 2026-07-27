@@ -172,7 +172,7 @@ export const TERM = {
  * Get a canonical term in the specified language.
  * Falls back to Russian, then to the key itself.
  */
-export function getTerm(key, language) {
+export function getTerm(key: string, language: string) {
   const term = TERM[key];
   if (!term) return key;
   return term[language] || term.ru || key;

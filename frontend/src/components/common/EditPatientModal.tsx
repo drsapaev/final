@@ -77,7 +77,7 @@ const EditPatientModal = ({ isOpen, onClose, patient, onSave, loading = false, t
       // We carry a structured object here at runtime; the wizard does its own
       // null/undefined checks before reading fields, so the assertion is safe
       // and preserves runtime behavior.
-      initialData={initialData as Record<string, unknown> | null}
+      initialData={initialData as unknown as null | undefined}
       isProcessing={loading}
       setIsProcessing={() => { /* no-op: parent does not track processing state */ }}
       onClose={onClose}

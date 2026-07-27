@@ -10,7 +10,7 @@ import PropTypes from 'prop-types';
 
 const App = lazy(() => import('./App'));
 
-function PublicProviders({ children }) {
+function PublicProviders({ children }: { children: React.ReactNode }) {
   return (
     <MacOSThemeProvider>
       <ThemeProvider>

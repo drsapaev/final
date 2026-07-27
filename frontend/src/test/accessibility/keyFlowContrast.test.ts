@@ -10,7 +10,7 @@ function hexToRgb(hex) {
   };
 }
 
-function relativeLuminance(hex) {
+function relativeLuminance(hex: string) {
   const { r, g, b } = hexToRgb(hex);
   const normalize = (channel) => {
     const value = channel / 255;

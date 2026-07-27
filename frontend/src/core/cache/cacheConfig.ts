@@ -48,9 +48,9 @@ export const CACHE_KEYS = {
  * Теги для групповой инвалидации
  */
 export const CACHE_TAGS = {
-    visit: (visitId) => `visit:${visitId}`,
-    patient: (patientId) => `patient:${patientId}`,
-    doctor: (doctorId) => `doctor:${doctorId}`,
+    visit: (visitId: string | number) => `visit:${visitId}`,
+    patient: (patientId: string | number) => `patient:${patientId}`,
+    doctor: (doctorId: string | number) => `doctor:${doctorId}`,
     aiAnalysis: 'ai-analysis',
     referenceData: 'reference-data',
 };
