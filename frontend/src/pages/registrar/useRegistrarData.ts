@@ -215,7 +215,7 @@ export const useRegistrarData = ({
 
       // Обогащаем данными пациента
       if (apt.patient_id as string | number && (!hasBackendPatientDisplayContract(apt) || !hasBackendPatientGenderContract(apt))) {
-        const patient: Record<string, unknown> = await fetchPatientData(apt.patient_id as string | number);
+        const patient: Record<string, unknown> | null = await fetchPatientData(apt.patient_id as string | number);
         if (patient) {
           let patient_fio: string = '';
           if (String(patient.last_name ?? '') && String(patient.first_name ?? '')) {

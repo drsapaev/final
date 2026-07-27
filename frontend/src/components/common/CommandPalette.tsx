@@ -134,8 +134,8 @@ export function CommandPalette({ profile, navigate }) {
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [recent, setRecent] = useState(loadRecent);
-  const inputRef = useRef(null);
-  const listRef = useRef(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   // Build items from routes + quick actions
   const allItems = useMemo(() => {

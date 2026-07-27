@@ -75,10 +75,10 @@ const PatientCard = ({
     // Медицинский анамнез
     medicalHistory: {
       complaints: '',
-      somaticDiseases: [],
+      somaticDiseases: [] as string[],
       dentalHistory: '',
-      allergies: [],
-      currentMedications: [],
+      allergies: [] as string[],
+      currentMedications: [] as string[],
       bloodType: '',
       rhFactor: ''
     },

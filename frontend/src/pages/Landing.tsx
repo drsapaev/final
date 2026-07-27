@@ -174,7 +174,7 @@ function ContactRow({ icon: Icon, label, value, href }: { icon?: React.Component
   return (
     <div className="landing-contact-row">
       <div className="landing-contact-icon">
-        <Icon size={18} />
+        {Icon && <Icon size={18} />}
       </div>
       <div>
         <strong>{label}</strong>

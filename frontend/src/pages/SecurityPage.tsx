@@ -27,7 +27,7 @@ const SecurityPage = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [showSetupWizard, setShowSetupWizard] = useState(false);
   const [showSMSEmail, setShowSMSEmail] = useState(false);
-  const [smsEmailMethod] = useState('sms');
+  const [smsEmailMethod] = useState<'sms' | 'email'>('sms');
 
   const tabs = [
   { id: 'overview', label: t('misc.sp_tab_overview'), icon: Shield },

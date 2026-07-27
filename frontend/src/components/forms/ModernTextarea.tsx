@@ -39,7 +39,7 @@ const ModernTextarea = ({
   const [focused, setFocused] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [currentRows, setCurrentRows] = useState(rows);
-  const textareaRef = useRef(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Автоматическое изменение размера
   useEffect(() => {

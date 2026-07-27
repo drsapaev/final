@@ -39,7 +39,7 @@ import { useTranslation } from '../i18n/useTranslation';
 const SELF_PROFILE_CACHE_MS = 30_000;
 let selfProfileCache = null;
 let selfProfileCacheAt = 0;
-let selfProfilePromise = null;
+let selfProfilePromise: Promise<Record<string, unknown> | null> | null = null;
 
 const editableFields = [
   'full_name',

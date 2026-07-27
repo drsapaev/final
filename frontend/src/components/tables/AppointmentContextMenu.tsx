@@ -50,7 +50,7 @@ const AppointmentContextMenu = ({
   isDoctorView = false
 }) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
-  const menuRef = useRef(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const [isVisible, setIsVisible] = useState(false);
 
   const isDark = theme === 'dark';
@@ -265,7 +265,7 @@ const AppointmentContextMenu = ({
 
           }
 
-          const Icon = item.icon;
+          const Icon = item.icon as React.ComponentType<{ size?: number }>;
 
           return (
             <button
@@ -293,7 +293,7 @@ const AppointmentContextMenu = ({
               }}
               title={item.title}>
               
-              <Icon size={16} />
+              {Icon ? <Icon size={16} /> : null}
               <span>{item.label}</span>
             </button>);
 
