@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import PropTypes from 'prop-types';
 import { useTheme } from '../contexts/ThemeContext';
 import { api } from '../api/client';
@@ -32,7 +32,121 @@ import { useTranslation } from '../i18n/useTranslation';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-const TAB_DEFINITIONS = [
+type AnalyticsTab = 'overview' | 'appointments' | 'revenue' | 'providers' | 'visualization' | 'kpi' | 'predictive';
+type MetricFormat = 'count' | 'revenue' | 'percentage';
+
+interface MetricItem {
+  label: string;
+  value: number | string;
+  helper?: string;
+  accent?: string;
+  format?: MetricFormat;
+  icon?: ReactNode;
+}
+
+interface ComparisonItem {
+  label: string;
+  value: number | string;
+}
+
+interface AnalyticsStatCardProps {
+  icon?: ReactNode;
+  label: string;
+  value: number | string;
+  helper?: string;
+  accent?: string;
+  format?: MetricFormat;
+  compact?: boolean;
+}
+
+interface AnalyticsComparisonListProps {
+  items: ComparisonItem[];
+  format?: MetricFormat;
+  accent?: string;
+  t: (key: string, options?: Record<string, unknown>) => string;
+}
+
+interface AnalyticsLineTrendProps {
+  items: ComparisonItem[];
+  format?: MetricFormat;
+  accent?: string;
+  compact?: boolean;
+  t: (key: string, options?: Record<string, unknown>) => string;
+}
+
+interface AnalyticsEmptyStateProps {
+  title: string;
+  description: string;
+}
+
+interface OverviewData {
+  today?: {
+    visits?: { total_visits?: number };
+    revenue?: { total_revenue?: number };
+  };
+  month?: {
+    visits?: {
+      completion_rate?: number;
+      day_stats?: Record<string, number>;
+    };
+    revenue?: {
+      department_stats?: Record<string, { total_revenue?: number }>;
+    };
+    patients?: { total_patients?: number };
+  };
+}
+
+interface AppointmentsData {
+  summary?: {
+    total_appointments?: number;
+    paid_appointments?: number;
+    completed_appointments?: number;
+  };
+  status_distribution?: Record<string, number>;
+  conversion_rates?: {
+    overall_conversion?: number;
+    pending_to_paid?: number;
+    paid_to_completed?: number;
+  };
+}
+
+interface RevenueData {
+  total_revenue?: number;
+  total_transactions?: number;
+  average_transaction?: number;
+  daily_revenue?: Array<{ date: string; amount: number }>;
+  provider_breakdown?: Record<string, { total_amount?: number }>;
+}
+
+interface ProvidersData {
+  summary?: {
+    active_providers?: number;
+    total_transactions?: number;
+    total_revenue?: number;
+    total_commission?: number;
+  };
+  providers?: Record<string, { name?: string; total_amount?: number; success_rate?: number }>;
+}
+
+interface AnalyticsDataState {
+  overview: OverviewData | null;
+  appointments: AppointmentsData | null;
+  revenue: RevenueData | null;
+  providers: ProvidersData | null;
+  visualization: unknown;
+  kpi: unknown;
+  predictive: unknown;
+}
+
+interface TabDefinition {
+  id: AnalyticsTab;
+  labelKey?: string;
+  label?: string;
+  descriptionKey: string;
+  icon: React.ComponentType<{ size?: number }>;
+}
+
+const TAB_DEFINITIONS: TabDefinition[] = [
   { id: 'overview', labelKey: 'misc.an_tab_overview', descriptionKey: 'misc.an_tab_overview_desc', icon: Activity },
   { id: 'appointments', labelKey: 'misc.an_tab_appointments', descriptionKey: 'misc.an_tab_appointments_desc', icon: Calendar },
   { id: 'revenue', labelKey: 'misc.an_tab_revenue', descriptionKey: 'misc.an_tab_revenue_desc', icon: DollarSign },
@@ -50,7 +164,7 @@ const DEPARTMENT_OPTION_KEYS = [
   { value: 'Dentistry', labelKey: 'misc.an_dept_dentistry' }
 ];
 
-function buildRelativeDateRange(days) {
+function buildRelativeDateRange(days: number) {
   const end = new Date();
   const start = new Date(Date.now() - (days - 1) * DAY_MS);
   return {
@@ -59,7 +173,7 @@ function buildRelativeDateRange(days) {
   };
 }
 
-function formatMetricValue(value, format = 'count') {
+function formatMetricValue(value: number | string, format: MetricFormat = 'count') {
   const safeValue = Number.isFinite(Number(value)) ? Number(value) : 0;
   switch (format) {
     case 'revenue':
@@ -77,7 +191,7 @@ function formatMetricValue(value, format = 'count') {
   }
 }
 
-function getActivePreset(start, end) {
+function getActivePreset(start: string, end: string): number | null {
   const startDate = new Date(`${start}T00:00:00`);
   const endDate = new Date(`${end}T00:00:00`);
   const diff = Math.round((endDate.getTime() - startDate.getTime()) / DAY_MS) + 1;
@@ -87,11 +201,11 @@ function getActivePreset(start, end) {
   return null;
 }
 
-function normalizePairs(source, formatter) {
-  return Object.entries(source || {}).map(([key, value]) => formatter(key, value)).filter(Boolean);
+function normalizePairs(source: Record<string, unknown> | null | undefined, formatter: (key: string, value: unknown) => ComparisonItem | null): ComparisonItem[] {
+  return Object.entries(source || {}).map(([key, value]) => formatter(key, value)).filter((item): item is ComparisonItem => item !== null);
 }
 
-function clamp(value, min, max) {
+function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
@@ -152,7 +266,7 @@ AnalyticsSectionCard.propTypes = {
   compact: PropTypes.bool,
 };
 
-function AnalyticsStatCard({ icon, label, value, helper, accent = 'var(--mac-accent-blue, #2563eb)', format = 'count', compact = false }) {
+function AnalyticsStatCard({ icon, label, value, helper, accent = 'var(--mac-accent-blue, #2563eb)', format = 'count', compact = false }: AnalyticsStatCardProps) {
   return (
     <article style={{
       background: analyticsSurfaceStrong,
@@ -228,16 +342,16 @@ AnalyticsStatCard.propTypes = {
   compact: PropTypes.bool,
 };
 
-function AnalyticsComparisonList({ items, format = 'count', accent = 'var(--mac-accent-blue, #2563eb)', t }) {
+function AnalyticsComparisonList({ items, format = 'count', accent = 'var(--mac-accent-blue, #2563eb)', t }: AnalyticsComparisonListProps) {
   if (!items.length) {
     return <div style={{ color: analyticsTextSecondary }}>{t('misc.an_compare_empty')}</div>;
   }
 
-  const maxValue = Math.max(...items.map((item) => Number(item.value) || 0), 1);
+  const maxValue = Math.max(...items.map((item: ComparisonItem) => Number(item.value) || 0), 1);
 
   return (
     <div style={{ display: 'grid', gap: '14px' }}>
-      {items.map((item) =>
+      {items.map((item: ComparisonItem) =>
       <div key={item.label} style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
           <div style={{
           display: 'flex',
@@ -277,16 +391,16 @@ AnalyticsComparisonList.propTypes = {
   t: PropTypes.func,
 };
 
-function AnalyticsLineTrend({ items, format = 'count', accent = 'var(--mac-accent-blue, #2563eb)', compact = false, t }) {
+function AnalyticsLineTrend({ items, format = 'count', accent = 'var(--mac-accent-blue, #2563eb)', compact = false, t }: AnalyticsLineTrendProps) {
   if (!items.length) {
     return <div style={{ color: analyticsTextSecondary }}>{t('misc.an_trend_empty')}</div>;
   }
 
-  const values = items.map((item) => Number(item.value) || 0);
+  const values = items.map((item: ComparisonItem) => Number(item.value) || 0);
   const maxValue = Math.max(...values, 1);
   const minValue = Math.min(...values, 0);
   const range = Math.max(maxValue - minValue, 1);
-  const points = items.map((item, index) => {
+  const points = items.map((item: ComparisonItem, index: number) => {
     const x = items.length === 1 ? 0 : index / (items.length - 1) * 100;
     const y = 100 - (Number(item.value) - minValue) / range * 100;
     return `${x},${y}`;
@@ -317,7 +431,7 @@ function AnalyticsLineTrend({ items, format = 'count', accent = 'var(--mac-accen
         gridTemplateColumns: compact ? 'repeat(auto-fit, minmax(84px, 1fr))' : `repeat(${Math.min(items.length, 6)}, minmax(0, 1fr))`,
         gap: '10px'
       }}>
-        {items.slice(0, 6).map((item) =>
+        {items.slice(0, 6).map((item: ComparisonItem) =>
         <div key={item.label} style={{ background: analyticsInsetSurface, border: analyticsBorder, borderRadius: 'var(--mac-radius-lg)', padding: '10px 12px' }}>
             <div style={{ fontSize: 'var(--mac-font-size-xs)', color: analyticsTextSecondary, marginBottom: 'var(--mac-spacing-1)' }}>{item.label}</div>
             <div style={{ fontSize: 'var(--mac-font-size-base)', fontWeight: 'var(--mac-font-weight-bold)', color: analyticsTextPrimary }}>
@@ -337,7 +451,7 @@ AnalyticsLineTrend.propTypes = {
   t: PropTypes.func,
 };
 
-function AnalyticsEmptyState({ title, description }) {
+function AnalyticsEmptyState({ title, description }: AnalyticsEmptyStateProps) {
   return (
     <div style={{
       background: analyticsSurface,
@@ -364,9 +478,9 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(false);
   const [dateRange, setDateRange] = useState(buildRelativeDateRange(30));
   const [department, setDepartment] = useState('');
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState<AnalyticsTab>('overview');
   const [isCompactLayout, setIsCompactLayout] = useState(() => typeof window !== 'undefined' ? window.innerWidth < 900 : false);
-  const [data, setData] = useState({
+  const [data, setData] = useState<AnalyticsDataState>({
     overview: null,
     appointments: null,
     revenue: null,
@@ -376,7 +490,7 @@ export default function AnalyticsPage() {
     predictive: null
   });
   const activeTabMeta = TAB_DEFINITIONS.find((tab) => tab.id === activeTab) || TAB_DEFINITIONS[0];
-  const activeTabLabel = activeTabMeta.label !== undefined ? activeTabMeta.label : t(activeTabMeta.labelKey);
+  const activeTabLabel = activeTabMeta.label !== undefined ? activeTabMeta.label : t(activeTabMeta.labelKey ?? '');
   const activeTabDescription = t(activeTabMeta.descriptionKey);
   const departmentOptions = DEPARTMENT_OPTION_KEYS.map((opt) => ({ value: opt.value, label: t(opt.labelKey) }));
   const activePreset = getActivePreset(dateRange.start, dateRange.end);
@@ -391,7 +505,7 @@ export default function AnalyticsPage() {
     return () => window.removeEventListener('resize', updateLayoutMode);
   }, []);
 
-  const loadAnalytics = useCallback(async (tab = activeTab) => {
+  const loadAnalytics = useCallback(async (tab: AnalyticsTab = activeTab) => {
     setLoading(true);
     try {
       const params = new URLSearchParams({
@@ -442,14 +556,14 @@ export default function AnalyticsPage() {
     loadAnalytics();
   }, [loadAnalytics]);
 
-  const handleTabChange = (tab) => {
+  const handleTabChange = (tab: AnalyticsTab) => {
     setActiveTab(tab);
     if (!data[tab]) {
       loadAnalytics(tab);
     }
   };
 
-  const exportData = async (format = 'json') => {
+  const exportData = async (format: 'json' | 'csv' | 'pdf' = 'json') => {
     try {
       const params = new URLSearchParams({
         start_date: dateRange.start,
@@ -483,17 +597,17 @@ export default function AnalyticsPage() {
     }
   };
 
-  const setQuickRange = (days) => {
+  const setQuickRange = (days: number) => {
     setDateRange(buildRelativeDateRange(days));
   };
 
-  const renderMetricsRow = (metrics) =>
+  const renderMetricsRow = (metrics: MetricItem[]) =>
   <div style={{
     display: 'grid',
     gridTemplateColumns: isCompactLayout ? '1fr' : 'repeat(auto-fit, minmax(220px, 1fr))',
     gap: 'var(--mac-spacing-4)'
   }}>
-      {metrics.map((metric) =>
+      {metrics.map((metric: MetricItem) =>
     <AnalyticsStatCard
       key={metric.label}
       icon={metric.icon}
@@ -514,7 +628,7 @@ export default function AnalyticsPage() {
 
     const { today = {}, month = {} } = data.overview || {};
 
-    const metrics = [
+    const metrics: MetricItem[] = [
     {
       label: t('misc.an_overview_metric_visits_today'),
       value: today?.visits?.total_visits || 0,
@@ -546,13 +660,13 @@ export default function AnalyticsPage() {
       icon: <TrendingUp size={18} />
     }];
 
-    const visitTrend = normalizePairs(month?.visits?.day_stats, (day, count) => ({
+    const visitTrend = normalizePairs(month?.visits?.day_stats, (day: string, count: unknown) => ({
       label: day,
-      value: count
+      value: Number(count) || 0
     }));
-    const departmentRevenue = normalizePairs(month?.revenue?.department_stats, (departmentName, stats) => ({
+    const departmentRevenue = normalizePairs(month?.revenue?.department_stats, (departmentName: string, stats: unknown) => ({
       label: departmentName,
-      value: stats?.total_revenue || 0
+      value: (stats as { total_revenue?: number } | undefined)?.total_revenue || 0
     }));
 
     return (
@@ -593,7 +707,7 @@ export default function AnalyticsPage() {
       conversion_rates = {}
     } = data.appointments || {};
 
-    const metrics = [
+    const metrics: MetricItem[] = [
     {
       label: t('misc.an_appt_metric_total'),
       value: summary.total_appointments || 0,
@@ -624,9 +738,9 @@ export default function AnalyticsPage() {
       icon: <TrendingUp size={18} />
     }];
 
-    const statuses = normalizePairs(status_distribution, (status, count) => ({
+    const statuses = normalizePairs(status_distribution, (status: string, count: unknown) => ({
       label: status,
-      value: count
+      value: Number(count) || 0
     }));
     const funnel = [
     { label: t('misc.an_appt_funnel_book_to_paid'), value: conversion_rates.pending_to_paid || 0 },
@@ -674,7 +788,7 @@ export default function AnalyticsPage() {
       provider_breakdown = {}
     } = data.revenue || {};
 
-    const metrics = [
+    const metrics: MetricItem[] = [
     {
       label: t('misc.an_rev_metric_total'),
       value: total_revenue,
@@ -706,9 +820,9 @@ export default function AnalyticsPage() {
       }),
       value: item.amount
     }));
-    const providerRevenue = normalizePairs(provider_breakdown, (providerName, stats) => ({
+    const providerRevenue = normalizePairs(provider_breakdown, (providerName: string, stats: unknown) => ({
       label: providerName,
-      value: stats?.total_amount || 0
+      value: (stats as { total_amount?: number } | undefined)?.total_amount || 0
     }));
 
 
@@ -746,7 +860,7 @@ export default function AnalyticsPage() {
 
     const { summary = {}, providers = {} } = data.providers || {};
 
-    const metrics = [
+    const metrics: MetricItem[] = [
     {
       label: t('misc.an_prov_metric_active'),
       value: summary.active_providers || 0,
@@ -778,13 +892,13 @@ export default function AnalyticsPage() {
       icon: <Wallet size={18} />
     }];
 
-    const providerAmount = normalizePairs(providers, (_, stats) => ({
-      label: stats?.name || t('misc.an_prov_no_name'),
-      value: stats?.total_amount || 0
+    const providerAmount = normalizePairs(providers, (_: string, stats: unknown) => ({
+      label: (stats as { name?: string } | undefined)?.name || t('misc.an_prov_no_name'),
+      value: (stats as { total_amount?: number } | undefined)?.total_amount || 0
     }));
-    const providerSuccess = normalizePairs(providers, (_, stats) => ({
-      label: stats?.name || t('misc.an_prov_no_name'),
-      value: stats?.success_rate || 0
+    const providerSuccess = normalizePairs(providers, (_: string, stats: unknown) => ({
+      label: (stats as { name?: string } | undefined)?.name || t('misc.an_prov_no_name'),
+      value: (stats as { success_rate?: number } | undefined)?.success_rate || 0
     }));
 
 
@@ -829,7 +943,7 @@ export default function AnalyticsPage() {
         return (
           <AnalyticsSectionCard title={t('misc.an_viz_section_title')} subtitle={t('misc.an_viz_section_subtitle')} compact={isCompactLayout}>
             <AdvancedCharts
-              data={data.visualization}
+              data={data.visualization as Record<string, unknown> | null | undefined}
               loading={loading}
               onRefresh={() => loadAnalytics('visualization')}
               onExport={() => exportData('json')}
@@ -839,7 +953,7 @@ export default function AnalyticsPage() {
         return (
           <AnalyticsSectionCard title={t('misc.an_kpi_section_title')} subtitle={t('misc.an_kpi_section_subtitle')} compact={isCompactLayout}>
             <KPIMetrics
-              data={data.kpi}
+              data={data.kpi as { metrics?: Record<string, Record<string, unknown>>; summary?: Record<string, number> } | null | undefined}
               loading={loading}
               onRefresh={() => loadAnalytics('kpi')}
               onExport={() => exportData('json')} />
@@ -1083,7 +1197,7 @@ export default function AnalyticsPage() {
                   whiteSpace: 'nowrap',
                   flex: isCompactLayout ? '0 0 auto' : 'none'
                 }}>
-                {tab.label !== undefined ? tab.label : t(tab.labelKey)}
+                {tab.label !== undefined ? tab.label : t(tab.labelKey ?? '')}
               </Button>);
           })}
         </div>
