@@ -104,7 +104,7 @@ export default function LabPanel() {
   const loadMoreAbortControllerRef = useRef(null);
   const [templates, setTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
-  const [selectedAppointment, setSelectedAppointment] = useState(null);
+  const [selectedAppointment, setSelectedAppointment] = useState<Record<string, unknown> | null>(null);
   const [reportHistory, setReportHistory] = useState([]);
   const [recentReports, setRecentReports] = useState([]);
   const [activeInstance, setActiveInstance] = useState(null);

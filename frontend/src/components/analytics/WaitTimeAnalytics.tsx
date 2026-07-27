@@ -285,7 +285,7 @@ const WaitTimeAnalytics = () => {
 
             <MacOSStatCard
           title={t('misc.wta_stat_analyzed_entries')}
-          value={summary.total_analyzed_entries.toString()}
+          value={String(summary.total_analyzed_entries ?? 0)}
           icon={BarChart3}
           color="var(--mac-accent-purple)" />
         
@@ -334,7 +334,7 @@ const WaitTimeAnalytics = () => {
             </div>
           </div>
 
-          {Object.keys(realTimeEstimates.queues).length === 0 ?
+          {Object.keys(realTimeEstimates.queues || {}).length === 0 ?
       <MacOSEmptyState
         icon={Clock}
         title={t('misc.wta_empty_queues_title')}
@@ -342,7 +342,7 @@ const WaitTimeAnalytics = () => {
 
 
       <div className="wta-grid-gap">
-              {Object.values(realTimeEstimates.queues).map((queue: { queue_name?: string; estimated_wait?: number; patient_count?: number; queue_id?: string | number; department?: string; doctor_name?: string; estimated_wait_time_minutes?: number; confidence_level?: number; [k: string]: unknown }) =>
+              {Object.values(realTimeEstimates.queues || {}).map((queue: { queue_name?: string; estimated_wait?: number; patient_count?: number; queue_id?: string | number; department?: string; doctor_name?: string; estimated_wait_time_minutes?: number; confidence_level?: number; [k: string]: unknown }) =>
         <div
           key={queue.queue_id}
           className="wta-queue-card">
@@ -382,7 +382,7 @@ const WaitTimeAnalytics = () => {
             </div>
       }
 
-          {realTimeEstimates.summary && Object.keys(realTimeEstimates.queues).length > 0 &&
+          {realTimeEstimates.summary && Object.keys(realTimeEstimates.queues || {}).length > 0 &&
       <div className="wta-summary-box">
               <div className="wta-summary-row">
                 <span className="wta-recommendation-text-default">{t('misc.wta_min_wait')} <strong>{formatTime(realTimeEstimates.summary.shortest_wait)}</strong></span>
@@ -450,13 +450,13 @@ const WaitTimeAnalytics = () => {
           </MacOSCard>
 
           {/* Разбивка по отделениям */}
-          {Object.keys(analytics.department_breakdown).length > 0 &&
+          {Object.keys(analytics.department_breakdown || {}).length > 0 &&
       <MacOSCard className="wta-card-padded">
               <h3 className="wta-h3-mb16-no-icon">
                 {t('misc.wta_by_departments')}
               </h3>
               <div className="wta-grid-gap">
-                {Object.entries(analytics.department_breakdown).map(([dept, stats]: [string, WaitTimeStat]) =>
+                {Object.entries(analytics.department_breakdown || {}).map(([dept, stats]: [string, WaitTimeStat]) =>
           <div
             key={dept}
             className="wta-dept-card">
@@ -536,10 +536,10 @@ const WaitTimeAnalytics = () => {
     <MacOSCard className="wta-card-padded">
           <Skeleton height="300px" />
         </MacOSCard> :
-    serviceAnalytics && Object.keys(serviceAnalytics.service_analytics).length > 0 ?
+    serviceAnalytics && Object.keys(serviceAnalytics.service_analytics || {}).length > 0 ?
     <MacOSCard className="wta-card-padded">
           <div className="wta-grid-gap">
-            {Object.entries(serviceAnalytics.service_analytics).map(([serviceCode, data]: [string, WaitTimeStat]) =>
+            {Object.entries(serviceAnalytics.service_analytics || {}).map(([serviceCode, data]: [string, WaitTimeStat]) =>
         <div
           key={serviceCode}
           className="wta-service-card">
@@ -582,7 +582,7 @@ const WaitTimeAnalytics = () => {
 
                     <MacOSStatCard
               title={t('misc.wta_stat_analysis')}
-              value={data.analyzed_visits.toString()}
+              value={String(data.analyzed_visits ?? 0)}
               icon={BarChart3}
               color="var(--mac-accent-purple)"
               size="small" />

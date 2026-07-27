@@ -24,6 +24,17 @@ import { formatRegistrarDate } from '../../utils/dateUtils';
 /**
  * Компонент для указания цены стоматологом после лечения
  */
+interface DentalPriceOverride {
+  id: string | number;
+  status: string;
+  created_at: string;
+  original_price: number | string;
+  new_price: number | string;
+  reason: string;
+  details?: string | null;
+  [key: string]: unknown;
+}
+
 const DentalPriceManager = ({
   visitId,
   serviceId,
@@ -32,6 +43,15 @@ const DentalPriceManager = ({
   onPriceSet,
   isOpen,
   onClose
+}: {
+  visitId?: string | number;
+  serviceId?: string | number;
+  serviceName?: string;
+  originalPrice?: number | string;
+  onPriceSet?: (result: unknown) => void;
+  isOpen?: boolean;
+  onClose?: () => void;
+  [k: string]: unknown;
 }) => {
   useTheme();
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
@@ -39,7 +59,7 @@ const DentalPriceManager = ({
   const [reason, setReason] = useState('');
   const [details, setDetails] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [priceOverrides, setPriceOverrides] = useState([]);
+  const [priceOverrides, setPriceOverrides] = useState<DentalPriceOverride[]>([]);
   const [loadingOverrides, setLoadingOverrides] = useState(false);
 
   // Предустановленные причины для стоматологических процедур
@@ -59,7 +79,7 @@ const DentalPriceManager = ({
       const response = await api.get('/dental/price-overrides', {
         params: { visit_id: visitId }
       });
-      setPriceOverrides(Array.isArray(response.data) ? response.data : []);
+      setPriceOverrides(Array.isArray(response.data) ? response.data as DentalPriceOverride[] : []);
     } catch (error) {
       logger.error('Error loading price overrides:', error);
     } finally {

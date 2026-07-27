@@ -22,6 +22,16 @@ import { formatRegistrarDate } from '../../utils/dateUtils';
 /**
  * Компонент для управления изменениями цен дерматологом
  */
+interface PriceOverride {
+  id: string | number;
+  status: string;
+  created_at: string;
+  original_price: number | string;
+  new_price: number | string;
+  reason: string;
+  details?: string | null;
+}
+
 const PriceOverrideManager = ({
   visitId,
   serviceId,
@@ -38,7 +48,7 @@ const PriceOverrideManager = ({
   const [reason, setReason] = useState('');
   const [details, setDetails] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [priceOverrides, setPriceOverrides] = useState([]);
+  const [priceOverrides, setPriceOverrides] = useState<PriceOverride[]>([]);
   const [loadingOverrides, setLoadingOverrides] = useState(false);
 
   // Предустановленные причины для быстрого выбора
@@ -54,7 +64,7 @@ const PriceOverrideManager = ({
     try {
       const response = await api.get('/derma/price-overrides', {
         params: { visit_id: visitId }
-      }) as import('axios').AxiosResponse<Record<string, unknown>>;
+      }) as import('axios').AxiosResponse<PriceOverride[]>;
       setPriceOverrides(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       logger.error('Error loading price overrides:', error);

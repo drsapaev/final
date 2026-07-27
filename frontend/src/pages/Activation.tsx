@@ -9,13 +9,22 @@ import { getActivationStatus } from '../api';
 import { useTheme } from '../contexts/ThemeContext';
 import { useTranslation } from '../i18n/useTranslation';
 
+interface ActivationRow {
+  id?: string | number;
+  name?: string;
+  title?: string;
+  status?: string;
+  updated_at?: string;
+  [key: string]: unknown;
+}
+
 export default function Activation() {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   useTheme();
   const [loading, setLoading] = useState(true);
-  const [status, setStatus] = useState(null);
-  const [rows, setRows] = useState([]);
+  const [status, setStatus] = useState<unknown>(null);
+  const [rows, setRows] = useState<ActivationRow[]>([]);
   const [filterStatus, setFilterStatus] = useState('');
   const [err, setErr] = useState('');
   const statusFilterOptions = [
@@ -28,7 +37,7 @@ export default function Activation() {
   const filtered = useMemo(() => {
     if (!filterStatus) return rows;
     return (rows || []).filter(
-      (r) => String(r?.status || '').toLowerCase() === String(filterStatus).toLowerCase()
+      (r: ActivationRow) => String(r?.status || '').toLowerCase() === String(filterStatus).toLowerCase()
     );
   }, [rows, filterStatus]);
 
@@ -43,7 +52,7 @@ export default function Activation() {
       catch(() => ({ items: [] }))]
       );
       setStatus(st || null);
-      const listPayload = lst as { items?: unknown[] } | null;
+      const listPayload = lst as { items?: ActivationRow[] } | null;
       setRows((listPayload && listPayload.items) || []);
     } catch (e) {
       const err = e as { data?: { detail?: string }; message?: string };
@@ -143,7 +152,7 @@ export default function Activation() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filtered.map((r) =>
+                    {filtered.map((r: ActivationRow) =>
                   <tr key={r.id}>
                         <td className="px-3 py-2 border-b">{r.id}</td>
                         <td className="px-3 py-2 border-b">{r.name || r.title || '—'}</td>
