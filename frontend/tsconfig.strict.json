@@ -87,7 +87,8 @@
     "src/services/queue.ts",
     "src/pages/PaymentCancel.tsx",
     "src/pages/__tests__/Login.accessibility.test.tsx",
-    "src/pages/landingContent.ts"
+    "src/pages/landingContent.ts",
+    "src/components/VisitTimeline.tsx"
   ],
   "exclude": ["node_modules", "dist", "e2e"]
 }

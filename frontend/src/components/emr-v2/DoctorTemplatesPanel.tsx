@@ -90,7 +90,7 @@ export function DoctorTemplatesPanel({
     // Handle edit save
     const handleEditSave = useCallback(async (mode) => {
         if (!editingTemplate || !editText.trim()) return;
-        await updateTemplate(editingTemplate.id, editText, mode);
+        await updateTemplate(String((editingTemplate as { id: string | number }).id), editText, mode);
         setEditingTemplate(null);
         setEditText('');
     }, [editingTemplate, editText, updateTemplate]);
@@ -227,17 +227,17 @@ export function DoctorTemplatesPanel({
 
                                         {/* Badges */}
                                         <div className="doctor-templates-item-badges">
-                                            {template.is_stale && (
+                                            {Boolean(template.is_stale) && (
                                                 <span className="doctor-templates-badge doctor-templates-badge--stale">
                                                     Давно не использовал
                                                 </span>
                                             )}
-                                            {template.frequency_label && !template.is_stale && (
+                                            {Boolean(template.frequency_label) && !template.is_stale && (
                                                 <span className={t18('misc.dtp_doctor_templates_badge_docto', { rare: template.frequency_label === 'часто' ? 'frequent' : 'rare' })}>
                                                     {String(template.frequency_label)}
                                                 </span>
                                             )}
-                                            {template.icd10_code && (
+                                            {Boolean(template.icd10_code) && (
                                                 <span className="doctor-templates-badge doctor-templates-badge--icd">
                                                     {String(template.icd10_code)}
                                                 </span>
