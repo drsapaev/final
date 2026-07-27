@@ -84,7 +84,8 @@
     "src/components/mobile/QueuePositionCard.tsx",
     "src/components/patient/patientUtils.ts",
     "src/components/common/StateWrapper.tsx",
-    "src/services/queue.ts"
+    "src/services/queue.ts",
+    "src/pages/PaymentCancel.tsx"
   ],
   "exclude": ["node_modules", "dist", "e2e"]
 }

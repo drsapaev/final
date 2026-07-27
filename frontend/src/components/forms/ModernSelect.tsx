@@ -49,9 +49,9 @@ const ModernSelect = ({
   const [focused, setFocused] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
 
-  const selectRef = useRef(null);
-  const dropdownRef = useRef(null);
-  const searchInputRef = useRef(null);
+  const selectRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Закрытие при клике вне компонента
   useEffect(() => {

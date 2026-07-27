@@ -38,7 +38,7 @@ const ModernInput = ({
   minLength,
   pattern,
   validation,
-  suggestions = [],
+  suggestions = [] as Array<string | { label: string; [key: string]: unknown }>,
   showSuggestions = false,
   onSuggestionSelect,
   className = '',
@@ -50,8 +50,8 @@ const ModernInput = ({
   const [focused, setFocused] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [localError, setLocalError] = useState('');
-  const inputRef = useRef(null);
-  const suggestionsRef = useRef(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
 
   // Валидация
   useEffect(() => {

@@ -54,7 +54,7 @@ const getWeekStart = (date) => {
  * Генерирует массив дней недели
  */
 const getWeekDays = (startDate) => {
-  const days = [];
+  const days: Date[] = [];
   const start = new Date(startDate);
   for (let i = 0; i < 7; i++) {
     const day = new Date(start);
@@ -91,11 +91,11 @@ const DoctorCalendar = ({
 
   const [, setCurrentDate] = useState(new Date());
   const [weekStart, setWeekStart] = useState(getWeekStart(new Date()));
-  const [weekDays, setWeekDays] = useState([]);
+  const [weekDays, setWeekDays] = useState<Date[]>([]);
   const [schedule, setSchedule] = useState<Record<string, any>>({});
   useState([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   useState('week'); // 'week' | 'day' | 'month'
   const [, setSelectedDay] = useState(null);
 

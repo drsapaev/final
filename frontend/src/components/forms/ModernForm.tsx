@@ -25,7 +25,7 @@ const ModernForm = ({
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const formRef = useRef(null);
+  const formRef = useRef<HTMLFormElement>(null);
 
   // Обновление значения поля
   const updateValue = (name, value) => {
@@ -100,7 +100,7 @@ const ModernForm = ({
       // Фокус на первое поле с ошибкой
       const firstErrorField = Object.keys(errors)[0];
       if (firstErrorField) {
-        const field = formRef.current?.querySelector(`[name="${firstErrorField}"]`);
+        const field = formRef.current?.querySelector<HTMLElement>(`[name="${firstErrorField}"]`);
         field?.focus();
       }
       return;

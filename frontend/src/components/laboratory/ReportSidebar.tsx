@@ -71,7 +71,7 @@ export default function ReportSidebar({
       {showAI && (
         <LabReportAIAnalysis
           activeInstance={activeInstance}
-          notify={notify}
+          notify={notify as (severity: string, message: string) => void}
         />
       )}
       {showHistory && (

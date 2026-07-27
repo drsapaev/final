@@ -77,7 +77,7 @@ export const useRegistrarActions = ({ appointments, loadAppointments }) => {
     }
   }, [loadAppointments, runRegistrarRecordAction]);
 
-  const handlePayment = useCallback(async (appointment, paymentData = null) => {
+  const handlePayment = useCallback(async (appointment, paymentData: { amount?: number | null; method?: string | null } | null = null) => {
     try {
       const result = await runRegistrarRecordAction(appointment, 'mark_paid', {
         amount: paymentData?.amount ?? null,
