@@ -6,10 +6,16 @@ import { fileURLToPath } from 'node:url';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import LabReportWorkbench from '../LabReportWorkbench';
+import LabReportWorkbenchRaw from '../LabReportWorkbench';
 import { labReportingApi } from '@/api/labReporting';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { MacOSThemeProvider } from '@/theme/macosTheme';
+
+// The component under test still relies on PropTypes (no TS prop types yet),
+// so the inferred prop types collapse to `never`/`undefined` defaults under
+// strictNullChecks. Cast to a permissive ComponentType to keep the test
+// type-checking without changing runtime behavior.
+const LabReportWorkbench = LabReportWorkbenchRaw as unknown as React.ComponentType<Record<string, unknown>>;
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const workbenchPath = path.resolve(__dirname, '../LabReportWorkbench.tsx');
@@ -89,7 +95,7 @@ describe('LabReportWorkbench', () => {
     expect(screen.getByText('Недавние лабораторные отчёты')).toBeInTheDocument();
     expect(screen.getByText(/Тестовый Пациент Регистратура/i)).toBeInTheDocument();
 
-    const reportButton = screen.getByText('ОАК').closest('button');
+    const reportButton = screen.getByText('ОАК').closest('button') as HTMLButtonElement;
     expect(reportButton).not.toBeNull();
     fireEvent.click(reportButton);
 

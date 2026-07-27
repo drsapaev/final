@@ -13,14 +13,14 @@ import { notify } from '../../services/notify';
 const VoiceRecorder = ({ onSend, onCancel }) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
     const [isRecording, setIsRecording] = useState(false);
-    const [audioBlob, setAudioBlob] = useState(null);
+    const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
     const [duration, setDuration] = useState(0);
-    const [audioURL, setAudioURL] = useState(null);
+    const [audioURL, setAudioURL] = useState<string | null>(null);
 
-    const mediaRecorderRef = useRef(null);
-    const chunksRef = useRef([]);
-    const timerRef = useRef(null);
-    const streamRef = useRef(null);
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const chunksRef = useRef<Blob[]>([]);
+    const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const streamRef = useRef<MediaStream | null>(null);
 
     // Начать запись
     const startRecording = async () => {
@@ -86,7 +86,9 @@ const VoiceRecorder = ({ onSend, onCancel }) => {
         if (mediaRecorderRef.current && isRecording) {
             mediaRecorderRef.current.stop();
             setIsRecording(false);
-            clearInterval(timerRef.current);
+            if (timerRef.current !== null) {
+                clearInterval(timerRef.current);
+            }
         }
     };
 
@@ -113,7 +115,9 @@ const VoiceRecorder = ({ onSend, onCancel }) => {
         setAudioURL(null);
         setDuration(0);
         setIsRecording(false);
-        clearInterval(timerRef.current);
+        if (timerRef.current !== null) {
+            clearInterval(timerRef.current);
+        }
 
         // Остановить поток если активен
         if (streamRef.current) {
@@ -185,7 +189,7 @@ const VoiceRecorder = ({ onSend, onCancel }) => {
             ) : (
                 // Режим предпросмотра
                 <div className="recording-preview">
-                    <audio src={audioURL} controls className="audio-preview" aria-label={t('misc.vr_predprosmotr_golosovogo_soob')} />
+                    <audio src={audioURL ?? undefined} controls className="audio-preview" aria-label={t('misc.vr_predprosmotr_golosovogo_soob')} />
                     <span className="duration-label">{formatTime(duration)}</span>
 
                     <div className="preview-actions">

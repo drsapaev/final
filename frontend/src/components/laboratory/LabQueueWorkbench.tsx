@@ -124,6 +124,44 @@ function historySeverityBadge(item) {
   return { label: 'clean', variant: 'success' };
 }
 
+interface LabQueueWorkbenchAppointment {
+  id?: string | number;
+  patient_fio?: string;
+  patient_phone?: string;
+  patient_id?: string | number;
+  visit_id?: string | number;
+  appointment_time?: string;
+  status?: string;
+  service_details?: Array<{ name?: string; code?: string }>;
+  all_patient_services?: string[];
+  services?: string[];
+  [key: string]: unknown;
+}
+
+interface LabQueueWorkbenchReportHistoryItem {
+  id: string | number;
+  template?: { name?: string };
+  created_at: string;
+  status: string;
+  flagged_findings_count: number;
+  critical_findings_count: number;
+  max_flag_severity?: number;
+  [key: string]: unknown;
+}
+
+interface LabQueueWorkbenchProps {
+  appointments: LabQueueWorkbenchAppointment[];
+  loading?: boolean;
+  onRefresh?: () => void;
+  onOpenAppointment: (appointment: LabQueueWorkbenchAppointment) => void;
+  selectedAppointment?: LabQueueWorkbenchAppointment | null;
+  reportHistory?: LabQueueWorkbenchReportHistoryItem[];
+  onLoadMore?: () => void;
+  hasMore?: boolean;
+  loadingMore?: boolean;
+  queueTotal?: number;
+}
+
 export default function LabQueueWorkbench({
   appointments,
   loading = false,
@@ -138,7 +176,7 @@ export default function LabQueueWorkbench({
   hasMore = false,
   loadingMore = false,
   queueTotal = 0,
-}) {
+}: LabQueueWorkbenchProps) {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // QW-8 fix: локальный state поиска и фильтра статусов.
   const [searchQuery, setSearchQuery] = useState('');
@@ -162,10 +200,10 @@ export default function LabQueueWorkbench({
   const normalizedSearch = searchQuery.trim().toLowerCase();
   const filteredAppointments = appointments.filter((appointment) => {
     // Фильтр по статусу
-    if (statusFilter === 'active' && !activeQueueStatuses.has(appointment.status)) {
+    if (statusFilter === 'active' && !activeQueueStatuses.has(appointment.status || '')) {
       return false;
     }
-    if (statusFilter === 'completed' && !['completed', 'done'].includes(appointment.status)) {
+    if (statusFilter === 'completed' && !['completed', 'done'].includes(appointment.status || '')) {
       return false;
     }
     // Фильтр по поиску (ФИО, телефон, ID)
@@ -203,7 +241,7 @@ export default function LabQueueWorkbench({
           <div className="lqw-meta-row">
             <Badge variant="info">{t18('queue.total')}: {appointments.length}</Badge>
             <Badge variant="warning">
-              {t18('queue.in_progress')}: {appointments.filter((item) => activeQueueStatuses.has(item.status)).length}
+              {t18('queue.in_progress')}: {appointments.filter((item) => activeQueueStatuses.has(item.status || '')).length}
             </Badge>
             <Button variant="outline" onClick={onRefresh} disabled={loading}>
               <Icon name="arrow.clockwise" size={16 as unknown as "small" | "default" | "large" | "xlarge"} />

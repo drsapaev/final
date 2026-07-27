@@ -42,6 +42,16 @@ import {
  * Менеджер Telegram интеграции
  * Полное управление ботом, шаблонами и уведомлениями
  */
+interface TelegramUser {
+  id: string | number;
+  first_name?: string;
+  last_name?: string;
+  username?: string;
+  chat_id: string | number;
+  language_code?: string;
+  active?: boolean;
+}
+
 const TelegramManager = () => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
@@ -52,7 +62,7 @@ const TelegramManager = () => {
   const [botStatus, setBotStatus] = useState<Record<string, unknown> | null>(null);
   const [settings, setSettings] = useState<Record<string, unknown>>({});
   const [templates, setTemplates] = useState<Record<string, unknown>>({});
-  const [users, setUsers] = useState([]);
+  const [users, setUsers] = useState<TelegramUser[]>([]);
   const [stats, setStats] = useState<Record<string, unknown> | null>(null);
   const [showTestModal, setShowTestModal] = useState(false);
   const [testMessage, setTestMessage] = useState('');

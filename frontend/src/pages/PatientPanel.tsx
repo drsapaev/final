@@ -22,6 +22,27 @@ import PatientFormsPreview from '../components/patient/PatientFormsPreview';
 import './patient.css';
 import { useTranslation } from '../i18n/useTranslation';
 
+interface PatientAppointment {
+  id: string | number;
+  doctor: string;
+  date: string;
+  time: string;
+  status: string;
+}
+
+interface PatientResult {
+  id: string | number;
+  title: string;
+  date: string;
+}
+
+interface FormsPreview {
+  forms?: unknown[];
+  policy?: Record<string, unknown>;
+  scope?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
 /**
  * PatientPanel — корневой контейнер для patient-facing веб-панели.
  *
@@ -56,7 +77,7 @@ const PatientPanel = () => {
     return normalizeSection(searchParams.get('tab'));
   })();
 
-  const [formsPreview, setFormsPreview] = useState(null);
+  const [formsPreview, setFormsPreview] = useState<FormsPreview | null>(null);
   const [formsStatus, setFormsStatus] = useState('idle');
   const [formsError, setFormsError] = useState('');
   const [formsInitData, setFormsInitData] = useState('');
@@ -65,8 +86,8 @@ const PatientPanel = () => {
   // L-M-6 fix: добавлены loading + error states для graceful degradation.
   // Раньше sync exception (token expired) мог упасть вне try/catch.
   // Теперь loadPatientData оборачивает каждый API-вызов индивидуально.
-  const [appointments, setAppointments] = useState([]);
-  const [results, setResults] = useState([]);
+  const [appointments, setAppointments] = useState<PatientAppointment[]>([]);
+  const [results, setResults] = useState<PatientResult[]>([]);
   const [patientDataLoading, setPatientDataLoading] = useState(true);
   const [patientDataError, setPatientDataError] = useState('');
 
@@ -167,7 +188,7 @@ const PatientPanel = () => {
     const currentIndex = tabs.indexOf(currentSectionId);
     if (currentIndex === -1) return;
 
-    let nextIndex = null;
+    let nextIndex: number | null = null;
     if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
       nextIndex = (currentIndex + 1) % tabs.length;
     } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
@@ -262,7 +283,7 @@ const PatientPanel = () => {
                 {activeSection === 'forms' ? (
                   <PatientFormsPreview
                     status={formsStatus}
-                    preview={formsPreview}
+                    preview={formsPreview as unknown as null}
                     error={formsError}
                     initData={formsInitData}
                   />

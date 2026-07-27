@@ -466,16 +466,16 @@ const VisitHistory = ({ history, loading }: VisitHistoryProps) => {
             <Typography variant="body2" style={{ fontWeight: 500 }}>
               {String(v.date ?? v.created_at ?? '—')}
             </Typography>
-            {v.icd10_code && (
+            {Boolean(v.icd10_code) && (
               <Badge variant="primary" size="small">{t('dental.dental_dvs_icd10_label')}: {String(v.icd10_code)}</Badge>
             )}
           </div>
-          {v.diagnosis && (
+          {Boolean(v.diagnosis) && (
             <Typography variant="body2" color="textSecondary" style={{ marginTop: 4 }}>
               {String(v.diagnosis)}
             </Typography>
           )}
-          {v.complaints && (
+          {Boolean(v.complaints) && (
             <Typography variant="caption" color="textSecondary" style={{ marginTop: 2, display: 'block' }}>
               {t('dental.dental_dvs_history_complaints', { text: String(v.complaints) })}
             </Typography>
@@ -573,10 +573,10 @@ const DentalVisitScreen = ({
   const [rowVersion, setRowVersion] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [selectedTooth, setSelectedTooth] = useState(null);
+  const [selectedTooth, setSelectedTooth] = useState<{ number: string | number; data: Record<string, unknown> } | null>(null);
   const [toothModalOpen, setToothModalOpen] = useState(false);
   const [showAIDialog, setShowAIDialog] = useState(false);
-  const [history, setHistory] = useState([]);
+  const [history, setHistory] = useState<Array<Record<string, unknown>>>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
 
   const visitId = patient?.visit_id;
@@ -647,7 +647,7 @@ const DentalVisitScreen = ({
   }, [loadEMR, loadHistory]);
 
   // Auto-save EMR draft (debounced via 1.5s timeout on field changes)
-  const [saveTimer, setSaveTimer] = useState(null);
+  const [saveTimer, setSaveTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
   const scheduleAutosave = useCallback((nextData) => {
     if (saveTimer) clearTimeout(saveTimer);
     const timer = setTimeout(async () => {
@@ -721,8 +721,8 @@ const DentalVisitScreen = ({
     <div className="dental-flex-col dental-gap-24">
       <Card padding="default">
         <PatientHeader
-          patient={patient}
-          onCompleteVisit={onCompleteVisit}
+          patient={patient as Record<string, unknown> | null}
+          onCompleteVisit={onCompleteVisit || (() => {})}
           loading={saving || parentLoading}
         />
 

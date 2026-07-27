@@ -27,6 +27,30 @@ import { api } from '../../api/client';
 import logger from '../../utils/logger';
 // P-013 fix: shared ConfirmDialog hook replacing native confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
+
+interface UserExportFile {
+  filename: string;
+  size: number;
+  created_at: string;
+  [key: string]: unknown;
+}
+
+interface UserExportForm {
+  format: string;
+  fields: string[];
+  filters: {
+    username: string;
+    email: string;
+    role: string;
+    is_active: boolean | null;
+    created_from: string;
+    created_to: string;
+  };
+  include_profile: boolean;
+  include_preferences: boolean;
+  include_audit_logs: boolean;
+}
+
 const UserExportManager = () => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
@@ -36,10 +60,10 @@ const UserExportManager = () => {
   // Состояние
   const [activeTab, setActiveTab] = useState('export');
   const [loading, setLoading] = useState(false);
-  const [exportFiles, setExportFiles] = useState([]);
+  const [exportFiles, setExportFiles] = useState<UserExportFile[]>([]);
 
   // Форма экспорта
-  const [exportForm, setExportForm] = useState({
+  const [exportForm, setExportForm] = useState<UserExportForm>({
     format: 'csv',
     fields: [],
     filters: {
@@ -94,7 +118,7 @@ const UserExportManager = () => {
     setLoading(true);
     try {
       const response = (await api.get('/users/users/export/files')) as import('axios').AxiosResponse<Record<string, unknown>>;
-      setExportFiles((response.data.files as unknown[]) || []);
+      setExportFiles((response.data.files as UserExportFile[]) || []);
     } catch (error) {
       logger.error('Ошибка загрузки файлов экспорта:', error);
       toast.error(t('admin2.ue_load_error_toast'));

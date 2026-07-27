@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, RefObject } from 'react';
 
 /**
  * AISuggestionPopover - Inline popup for field-level AI suggestions
@@ -22,10 +22,30 @@ import { createPortal } from 'react-dom';
 import './AISuggestionPopover.css';
 import { useTranslation } from '@/i18n/useTranslation';
 
+interface AISuggestion {
+    id?: string | number;
+    content?: string;
+    explanation?: string;
+    source?: string;
+    confidence?: number;
+    [k: string]: unknown;
+}
+
+interface AISuggestionPopoverProps {
+    suggestions?: AISuggestion[];
+    onApply?: (suggestion: AISuggestion) => void;
+    onDismiss?: (suggestionId: string | number | undefined) => void;
+    disabled?: boolean;
+    position?: 'top' | 'bottom' | 'right';
+    isOpen?: boolean;
+    onClose?: () => void;
+    anchorRef?: RefObject<HTMLElement | null>;
+}
+
 /**
  * Format confidence as percentage with color
  */
-function getConfidenceInfo(confidence) {
+function getConfidenceInfo(confidence: unknown): { text: string; className: string } {
     if (typeof confidence !== 'number') return { text: '', className: '' };
 
     const percent = Math.round(confidence * 100);
@@ -58,16 +78,17 @@ export function AISuggestionPopover({
     isOpen = false,
     onClose,
     anchorRef,
-}) {
-    const popoverRef = useRef(null);
+}: AISuggestionPopoverProps) {
+    const popoverRef = useRef<HTMLDivElement | null>(null);
     const [selectedIndex, setSelectedIndex] = useState(0);
-    const [popoverStyle, setPopoverStyle] = useState({});
+    const [popoverStyle, setPopoverStyle] = useState<CSSProperties>({});
 
     // Calculate position based on anchor element
     useEffect(() => {
         if (!isOpen || !anchorRef?.current) return;
 
         const updatePosition = () => {
+            if (!anchorRef?.current) return;
             const anchorRect = anchorRef.current.getBoundingClientRect();
             const viewportHeight = window.innerHeight;
             const viewportWidth = window.innerWidth;
@@ -126,7 +147,7 @@ export function AISuggestionPopover({
     useEffect(() => {
         if (!isOpen || suggestions.length === 0) return;
 
-        const handleKeyDown = (e) => {
+        const handleKeyDown = (e: globalThis.KeyboardEvent) => {
             if (e.key === 'ArrowDown') {
                 e.preventDefault();
                 setSelectedIndex(prev => (prev + 1) % suggestions.length);
@@ -152,10 +173,10 @@ export function AISuggestionPopover({
     useEffect(() => {
         if (!isOpen) return;
 
-        const handleClickOutside = (e) => {
-            if (popoverRef.current && !popoverRef.current.contains(e.target)) {
+        const handleClickOutside = (e: globalThis.MouseEvent) => {
+            if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
                 // Also check if click was on the anchor
-                if (anchorRef?.current && !anchorRef.current.contains(e.target)) {
+                if (anchorRef?.current && !anchorRef.current.contains(e.target as Node)) {
                     onClose?.();
                 }
             }
@@ -195,7 +216,7 @@ export function AISuggestionPopover({
                             tabIndex={disabled ? -1 : 0}
                             aria-disabled={disabled}
                             onClick={() => !disabled && onApply?.(suggestion)}
-                            onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => {
+                            onKeyDown={(event: ReactKeyboardEvent<HTMLElement>) => {
                                 if ((event.key === 'Enter' || event.key === ' ') && !disabled) {
                                     event.preventDefault();
                                     onApply?.(suggestion);
@@ -224,7 +245,7 @@ export function AISuggestionPopover({
                                 )}
                                 <button
                                     className="ai-popover__apply"
-                                    onClick={(e: React.MouseEvent<HTMLElement>) => {
+                                    onClick={(e: ReactMouseEvent<HTMLElement>) => {
                                         e.stopPropagation();
                                         if (!disabled && onApply) onApply(suggestion);
                                     }}
@@ -234,7 +255,7 @@ export function AISuggestionPopover({
                                 </button>
                                 <button
                                     className="ai-popover__dismiss"
-                                    onClick={(e: React.MouseEvent<HTMLElement>) => {
+                                    onClick={(e: ReactMouseEvent<HTMLElement>) => {
                                         e.stopPropagation();
                                         onDismiss?.(suggestion.id);
                                     }}

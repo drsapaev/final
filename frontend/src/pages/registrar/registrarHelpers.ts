@@ -11,6 +11,38 @@
 import { getApiOrigin } from '../../api/runtime';
 
 /**
+ * Permissive shape for registrar record payloads received from the backend.
+ * All fields are optional because different endpoints return different subsets.
+ */
+interface RegistrarRecordLike {
+  record_kind?: string;
+  source_kind?: string;
+  record_type?: string;
+  type?: string;
+  record_id?: string | number;
+  recordId?: string | number;
+  canonical_record_id?: string | number;
+  visit_id?: string | number;
+  queue_entry_id?: string | number;
+  appointment_id?: string | number;
+  id?: string | number;
+  grouped_record_refs?: unknown[];
+  grouped_records?: Array<Record<string, unknown>>;
+  available_actions?: unknown[];
+  can_mark_paid?: boolean;
+  can_start_visit?: boolean;
+  can_print_ticket?: boolean;
+  can_complete?: boolean;
+  can_cancel?: boolean;
+  [k: string]: unknown;
+}
+
+interface RegistrarRecordRef {
+  record_kind: string;
+  record_id: number;
+}
+
+/**
  * Backend API base URL. Used by all fetch calls in registrar panel.
  */
 export const API_BASE = getApiOrigin();
@@ -72,11 +104,14 @@ export const normalizeRegistrarContractValue = (value: unknown) => {
   return String(value).trim().toLowerCase();
 };
 
-export const getRegistrarRecordKind = (record) => normalizeRegistrarContractValue(
+export const getRegistrarRecordKind = (record: RegistrarRecordLike | null | undefined) => normalizeRegistrarContractValue(
   record?.record_kind ?? record?.source_kind ?? record?.record_type ?? record?.type
 );
 
-export const getRegistrarRecordId = (record, recordKind = getRegistrarRecordKind(record)) => {
+export const getRegistrarRecordId = (
+  record: RegistrarRecordLike | null | undefined,
+  recordKind = getRegistrarRecordKind(record)
+) => {
   if (!record) return null;
   if (record.canonical_record_id !== undefined && record.canonical_record_id !== null) {
     return record.canonical_record_id;
@@ -93,17 +128,17 @@ export const getRegistrarRecordId = (record, recordKind = getRegistrarRecordKind
   return record.id ?? null;
 };
 
-export const getRegistrarRecordRefs = (record) => {
+export const getRegistrarRecordRefs = (record: RegistrarRecordLike | null | undefined): RegistrarRecordRef[] => {
   if (!record) return [];
 
-  const candidates = [];
+  const candidates: RegistrarRecordLike[] = [];
   if (Array.isArray(record.grouped_record_refs)) {
-    candidates.push(...record.grouped_record_refs);
+    candidates.push(...(record.grouped_record_refs as RegistrarRecordLike[]));
   }
   if (Array.isArray(record.grouped_records)) {
     record.grouped_records.forEach((groupedRecord) => {
       if (groupedRecord?.record_ref) {
-        candidates.push(groupedRecord.record_ref);
+        candidates.push(groupedRecord.record_ref as RegistrarRecordLike);
       }
     });
   }
@@ -114,8 +149,8 @@ export const getRegistrarRecordRefs = (record) => {
     candidates.push({ record_kind: recordKind, record_id: recordId });
   }
 
-  const seen = new Set();
-  return candidates.reduce((refs, candidate) => {
+  const seen = new Set<string>();
+  return candidates.reduce<RegistrarRecordRef[]>((refs, candidate) => {
     const kind = getRegistrarRecordKind(candidate);
     const id = candidate?.record_id ?? candidate?.recordId ?? getRegistrarRecordId(candidate, kind);
     const numericId = Number(id);
@@ -132,7 +167,7 @@ export const getRegistrarRecordRefs = (record) => {
   }, []);
 };
 
-export const getRegistrarSelectionKey = (record) => {
+export const getRegistrarSelectionKey = (record: RegistrarRecordLike | null | undefined): string | null => {
   const refs = getRegistrarRecordRefs(record);
   if (refs.length > 0) {
     return refs.map((ref) => `${ref.record_kind}:${ref.record_id}`).join('|');
@@ -140,7 +175,10 @@ export const getRegistrarSelectionKey = (record) => {
   return record?.id !== undefined && record?.id !== null ? `legacy:${record.id}` : null;
 };
 
-export const findRegistrarRecordBySelectionKey = (records, selectionKey) => {
+export const findRegistrarRecordBySelectionKey = (
+  records: RegistrarRecordLike[] | null | undefined,
+  selectionKey: string | null | undefined
+): RegistrarRecordLike | null => {
   if (!selectionKey) return null;
   return (records || []).find((record) => getRegistrarSelectionKey(record) === selectionKey) || null;
 };
@@ -149,9 +187,10 @@ export const findRegistrarRecordBySelectionKey = (records, selectionKey) => {
 // Backend action availability helpers
 // ───────────────────────────────────────────────────────────
 
-const hasOwn = (object, key) => Object.prototype.hasOwnProperty.call(object || {}, key);
+const hasOwn = (object: Record<string, unknown> | null | undefined, key: string) =>
+  Object.prototype.hasOwnProperty.call(object || {}, key);
 
-export const hasBackendAction = (record, action) => {
+export const hasBackendAction = (record: RegistrarRecordLike | null | undefined, action: unknown) => {
   if (!record) return false;
   const normalizedAction = String(action || '').trim();
   const equivalentActions = new Set([
@@ -161,7 +200,7 @@ export const hasBackendAction = (record, action) => {
   ]);
   if (Array.isArray(record.grouped_records) && record.grouped_records.length > 0) {
     return record.grouped_records.every((groupedRecord) =>
-      hasBackendAction(groupedRecord, normalizedAction)
+      hasBackendAction(groupedRecord as RegistrarRecordLike, normalizedAction)
     );
   }
   if (Array.isArray(record.available_actions)) {
@@ -170,7 +209,7 @@ export const hasBackendAction = (record, action) => {
     );
   }
 
-  const actionFlagByName = {
+  const actionFlagByName: Record<string, string> = {
     mark_paid: 'can_mark_paid',
     start_visit: 'can_start_visit',
     print_ticket: 'can_print_ticket',
@@ -185,7 +224,7 @@ export const hasBackendAction = (record, action) => {
   return false;
 };
 
-export const getRegistrarActionForStatus = (status) => {
+export const getRegistrarActionForStatus = (status: unknown): string | null => {
   const normalizedStatus = normalizeRegistrarContractValue(status).replace('-', '_');
   if (normalizedStatus === 'complete' || normalizedStatus === 'done') return 'complete';
   if (normalizedStatus === 'paid' || normalizedStatus === 'mark_paid') return 'mark_paid';
@@ -198,7 +237,7 @@ export const getRegistrarActionForStatus = (status) => {
 // Patient display contract helpers
 // ───────────────────────────────────────────────────────────
 
-export const hasBackendPatientDisplayContract = (record) => {
+export const hasBackendPatientDisplayContract = (record: RegistrarRecordLike | null | undefined) => {
   if (!record) return false;
   const hasName = Boolean(record.patient_fio || record.patient_name);
   const hasPhone = hasOwn(record, 'patient_phone') || hasOwn(record, 'phone');
@@ -207,7 +246,7 @@ export const hasBackendPatientDisplayContract = (record) => {
   return hasName && hasPhone && hasBirthYear && hasAddress;
 };
 
-export const normalizePatientGender = (record) => (
+export const normalizePatientGender = (record: RegistrarRecordLike | null | undefined) => (
   record?.patient_gender ??
   record?.patient_sex ??
   record?.gender ??
@@ -215,7 +254,7 @@ export const normalizePatientGender = (record) => (
   null
 );
 
-export const hasBackendPatientGenderContract = (record) => {
+export const hasBackendPatientGenderContract = (record: RegistrarRecordLike | null | undefined) => {
   const gender = normalizePatientGender(record);
   return gender !== null && gender !== undefined && String(gender).trim() !== '';
 };
@@ -240,7 +279,7 @@ export const formatPreviewList = (value: unknown) => {
 
 const hasQueueIdentityValue = (value: unknown) => value !== null && value !== undefined && value !== '';
 
-export const resolveWizardQueueEntryId = (assignment) => {
+export const resolveWizardQueueEntryId = (assignment: Record<string, unknown> | null | undefined) => {
   if (!assignment || typeof assignment !== 'object') return null;
   const explicitQueueEntryId = assignment.queue_entry_id ??
     assignment.original_queue_id ??
@@ -253,7 +292,10 @@ export const resolveWizardQueueEntryId = (assignment) => {
   return hasQueueIdentityValue(assignment.id) ? assignment.id : null;
 };
 
-export const normalizeWizardQueueAssignment = (assignment, visitId = null) => {
+export const normalizeWizardQueueAssignment = (
+  assignment: Record<string, unknown> | null | undefined,
+  visitId: string | number | null | undefined = null
+) => {
   if (!assignment || typeof assignment !== 'object') return null;
   const queueEntryId = resolveWizardQueueEntryId(assignment);
   const queueNumber = assignment.queue_number ??
@@ -273,21 +315,21 @@ export const normalizeWizardQueueAssignment = (assignment, visitId = null) => {
   };
 };
 
-export const flattenWizardQueueNumbers = (queueNumbers) => {
+export const flattenWizardQueueNumbers = (queueNumbers: unknown) => {
   if (!queueNumbers) return [];
 
   if (Array.isArray(queueNumbers)) {
     return queueNumbers
-      .map((assignment) => normalizeWizardQueueAssignment(assignment, assignment?.visit_id))
+      .map((assignment) => normalizeWizardQueueAssignment(assignment as Record<string, unknown>, (assignment as Record<string, unknown>)?.visit_id as string | number | null | undefined))
       .filter(Boolean);
   }
 
   if (typeof queueNumbers !== 'object') return [];
 
-  return Object.entries(queueNumbers).flatMap(([visitId, assignments]) => {
+  return Object.entries(queueNumbers as Record<string, unknown>).flatMap(([visitId, assignments]) => {
     const assignmentList = Array.isArray(assignments) ? assignments : [assignments];
     return assignmentList
-      .map((assignment) => normalizeWizardQueueAssignment(assignment, visitId))
+      .map((assignment) => normalizeWizardQueueAssignment(assignment as Record<string, unknown>, visitId))
       .filter(Boolean);
   });
 };
@@ -296,16 +338,16 @@ export const flattenWizardQueueNumbers = (queueNumbers) => {
 // Post-wizard payment row builder
 // ───────────────────────────────────────────────────────────
 
-export const buildPostWizardPaymentRow = (wizardResult) => {
+export const buildPostWizardPaymentRow = (wizardResult: Record<string, unknown> | null | undefined) => {
   if (!wizardResult?.success) return null;
 
-  const visitIds = Array.isArray(wizardResult.visit_ids) ? wizardResult.visit_ids.filter(Boolean) : [];
+  const visitIds = Array.isArray(wizardResult.visit_ids) ? (wizardResult.visit_ids as unknown[]).filter(Boolean) : [];
   if (visitIds.length === 0) return null;
 
-  const createdVisits = Array.isArray(wizardResult.created_visits) ? wizardResult.created_visits : [];
+  const createdVisits = Array.isArray(wizardResult.created_visits) ? (wizardResult.created_visits as Array<Record<string, unknown>>) : [];
   const firstVisit = createdVisits[0] || {};
   const services = createdVisits.flatMap((visit) =>
-    (Array.isArray(visit.services) ? visit.services : [])
+    (Array.isArray(visit.services) ? (visit.services as Array<Record<string, unknown>>) : [])
       .map((service) => service?.name || service?.code)
       .filter(Boolean)
   );
@@ -315,7 +357,7 @@ export const buildPostWizardPaymentRow = (wizardResult) => {
     queueItem?.queue_number !== undefined &&
     queueItem?.queue_number !== ''
   ));
-  const printTickets = (Array.isArray(wizardResult.print_tickets) ? wizardResult.print_tickets : [])
+  const printTickets = (Array.isArray(wizardResult.print_tickets) ? (wizardResult.print_tickets as Array<Record<string, unknown>>) : [])
     .map((ticket, index) => {
       if (!ticket || typeof ticket !== 'object') return null;
       const queueNumber = ticket.queue_number ??

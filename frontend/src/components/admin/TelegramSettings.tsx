@@ -29,7 +29,25 @@ import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
 
-const getLanguageOptions = (t) => [
+interface TelegramBotInfo {
+  username?: string;
+  first_name?: string;
+  id?: string | number;
+  can_join_groups?: boolean;
+  [key: string]: unknown;
+}
+
+interface TelegramWebhookInfo {
+  webhook_set?: boolean;
+  webhook_info?: {
+    url?: string;
+    pending_update_count?: number;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+}
+
+const getLanguageOptions = (t: (key: string, options?: Record<string, unknown>) => string) => [
   { value: 'ru', label: t('admin2.ts_lang_ru') },
   { value: 'uz', label: 'O\'zbekcha' },
   { value: 'en', label: 'English' }
@@ -50,8 +68,8 @@ const TelegramSettings = () => {
     default_language: 'ru',
     supported_languages: ['ru', 'uz', 'en']
   });
-  const [botInfo, setBotInfo] = useState(null);
-  const [webhookInfo, setWebhookInfo] = useState(null);
+  const [botInfo, setBotInfo] = useState<TelegramBotInfo | null>(null);
+  const [webhookInfo, setWebhookInfo] = useState<TelegramWebhookInfo | null>(null);
   const [stats, setStats] = useState<Record<string, any>>({});
   const [showToken, setShowToken] = useState(false);
   const [testChatId, setTestChatId] = useState('');

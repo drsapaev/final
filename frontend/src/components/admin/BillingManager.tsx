@@ -237,7 +237,7 @@ const BillingManager = () => {
         toast.error('Popup blocked. Allow popups for this site to view invoices.');
         return;
       }
-      newWindow.document.write(sanitizePrintableHtml(response.data.html));
+      newWindow.document.write(sanitizePrintableHtml(String(response.data.html ?? '')));
       newWindow.document.close();
     } catch (error) {
       logger.error('Ошибка получения HTML счета:', error);
@@ -331,20 +331,20 @@ const BillingManager = () => {
                     </h4>
                     {getStatusBadge(invoice.status)}
                     <Badge variant="outline">
-                      {invoiceTypeLabels[invoice.invoice_type] || invoice.invoice_type}
+                      {invoiceTypeLabels[invoice.invoice_type ?? ''] || invoice.invoice_type}
                     </Badge>
                   </div>
 
                   <div className="admin-d-grid-gtc-repeat-auto-fit-minm-gap-8-fs-sm-secondary-mb-8">
                     <div>{t('admin2.bill_patient_id')} {invoice.patient_id}</div>
-                    <div>{t('admin2.bill_date')} {new Date(invoice.issue_date).toLocaleDateString()}</div>
+                    <div>{t('admin2.bill_date')} {new Date(invoice.issue_date || '').toLocaleDateString()}</div>
                     <div>{t('admin2.bill_due_date')} {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : t('admin2.bill_not_specified')}</div>
-                    <div>{t('admin2.bill_amount')} {invoice.total_amount.toLocaleString()} {t('admin2.bill_currency')}</div>
+                    <div>{t('admin2.bill_amount')} {(invoice.total_amount ?? 0).toLocaleString()} {t('admin2.bill_currency')}</div>
                   </div>
 
-                  {invoice.balance > 0 &&
+                  {(invoice.balance ?? 0) > 0 &&
             <div className="admin-fs-sm-error">
-                      {t('admin2.bill_balance_due')} {invoice.balance.toLocaleString()} {t('admin2.bill_currency')}
+                      {t('admin2.bill_balance_due')} {(invoice.balance ?? 0).toLocaleString()} {t('admin2.bill_currency')}
                     </div>
             }
                 </div>
@@ -373,7 +373,7 @@ const BillingManager = () => {
                   <Button
               variant="outline"
               onClick={() => {
-                setPaymentForm({ ...paymentForm, invoice_id: invoice.id, amount: invoice.balance });
+                setPaymentForm({ ...paymentForm, invoice_id: invoice.id, amount: invoice.balance ?? 0 });
                 setShowRecordPayment(true);
               }}
               className="admin-p-6-minw-auto-w-32-h-32-d-flex-ai-center-jc-center-3"
@@ -665,10 +665,10 @@ const BillingManager = () => {
                 <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
                   <div>{t('admin2.bill_inv_id_short')} {payment.invoice_id}</div>
                   <div>{t('admin2.bill_patient_id')} {payment.patient_id}</div>
-                  <div>{t('admin2.bill_amount')} {payment.amount.toLocaleString()} {t('admin2.bill_currency')}</div>
-                  <div>{t('admin2.bill_method_short')} {paymentMethodLabels[payment.payment_method] || payment.payment_method}</div>
-                  <div>{t('admin2.bill_date')} {new Date(payment.payment_date).toLocaleDateString()}</div>
-                  {payment.reference_number &&
+                  <div>{t('admin2.bill_amount')} {(payment.amount ?? 0).toLocaleString()} {t('admin2.bill_currency')}</div>
+                  <div>{t('admin2.bill_method_short')} {paymentMethodLabels[payment.payment_method ?? ''] || payment.payment_method}</div>
+                  <div>{t('admin2.bill_date')} {new Date(payment.payment_date || '').toLocaleDateString()}</div>
+                  {Boolean(payment.reference_number) &&
               <div>{t('admin2.bill_ref_short')} {String(payment.reference_number ?? '')}</div>
               }
                 </div>
