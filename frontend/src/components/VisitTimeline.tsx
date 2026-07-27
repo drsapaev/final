@@ -117,7 +117,7 @@ const VisitTimeline = ({ appointment, emr, prescription }: VisitTimelineProps) =
     }
   };
 
-  const progress = getProgress(appointment?.status);
+  const progress = getProgress(appointment?.status ?? '');
 
   return (
     <Card className="p-6">

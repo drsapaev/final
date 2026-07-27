@@ -106,8 +106,8 @@ export function Table({
     if (!sortField || !sortable) return data;
     
     return [...data].sort((a, b) => {
-      const aValue = a[sortField];
-      const bValue = b[sortField];
+      const aValue = a[sortField] as string | number;
+      const bValue = b[sortField] as string | number;
       
       if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
       if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
