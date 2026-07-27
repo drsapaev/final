@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { CSSProperties } from "react";
+import type { CSSProperties, ComponentType, ReactNode } from "react";
 import PropTypes from 'prop-types';
 import {
   AlertTriangle,
@@ -59,7 +59,14 @@ const toneChipStyles = {
   },
 };
 
-function MetricCard({ accent, icon: Icon, label, value }) {
+interface MetricCardProps {
+  accent: string;
+  icon: ComponentType<{ size?: number; className?: string }>;
+  label: ReactNode;
+  value: ReactNode;
+}
+
+function MetricCard({ accent, icon: Icon, label, value }: MetricCardProps) {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   return (
@@ -131,7 +138,7 @@ SectionShell.propTypes = {
   title: PropTypes.string.isRequired,
 };
 
-function EmptyState({ icon: Icon, title, description, action }: { icon?: React.ComponentType<{ size?: number; className?: string }>; title?: React.ReactNode; description?: React.ReactNode; action?: React.ReactNode }) {
+function EmptyState({ icon: Icon, title, description, action }: { icon: ComponentType<{ size?: number; className?: string }>; title?: ReactNode; description?: ReactNode; action?: ReactNode }) {
   return (
     <div
       className="theme-empty-state"
@@ -173,18 +180,39 @@ EmptyState.propTypes = {
   title: PropTypes.string.isRequired,
 };
 
-function formatDate(dateString, t) {
+type TranslationFn = (key: string, options?: Record<string, unknown>) => string;
+
+function formatDate(dateString: string | undefined | null, t: TranslationFn): string {
   if (!dateString) return t('misc.tfm_date_not_specified');
   const parsed = new Date(dateString);
   if (Number.isNaN(parsed.getTime())) return t('misc.tfm_date_not_specified');
   return parsed.toLocaleString('ru-RU');
 }
 
-function resolveApiError(error, fallbackMessage) {
-  return error?.response?.data?.detail || fallbackMessage;
+interface ApiErrorResponse {
+  response?: { data?: { detail?: string } };
 }
 
-function DeviceCard({ badgeLabel, details, lastUsed, name, pending, onCancel, onConfirm, onToggle }) {
+function resolveApiError(error: unknown, fallbackMessage: string): string {
+  if (error && typeof error === 'object' && 'response' in error) {
+    const errResp = (error as ApiErrorResponse).response;
+    return errResp?.data?.detail || fallbackMessage;
+  }
+  return fallbackMessage;
+}
+
+interface DeviceCardProps {
+  badgeLabel: string;
+  details: string;
+  lastUsed: string;
+  name: string;
+  pending: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+  onToggle: () => void;
+}
+
+function DeviceCard({ badgeLabel, details, lastUsed, name, pending, onCancel, onConfirm, onToggle }: DeviceCardProps) {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   return (
@@ -257,22 +285,65 @@ DeviceCard.propTypes = {
 
 export default function TwoFactorManager() {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT as unknown as TranslationFn;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [status, setStatus] = useState(null);
-  const [setupData, setSetupData] = useState(null);
+
+  interface TwoFactorStatus {
+    enabled?: boolean;
+    recovery_email?: string;
+    recovery_phone?: string;
+    backup_codes_count?: number;
+    trusted_devices_count?: number;
+    last_used?: string;
+  }
+
+  interface TwoFactorSetupData {
+    qr_code_url?: string;
+    secret_key?: string;
+    backup_codes?: string[];
+  }
+
+  interface TrustedDevice {
+    id: string | number;
+    device_name?: string;
+    device_type?: string;
+    ip_address?: string;
+    user_agent?: string;
+    last_used?: string;
+    trusted?: boolean;
+    active?: boolean;
+  }
+
+  interface SecurityLog {
+    timestamp: string;
+    type?: 'success' | 'warning' | 'error' | string;
+    action?: string;
+    description?: string;
+    ip_address?: string;
+    user_agent?: string;
+  }
+
+  interface RecoveryMethod {
+    type: string;
+    value: string;
+    label?: string;
+    verified?: boolean;
+  }
+
+  const [status, setStatus] = useState<TwoFactorStatus | null>(null);
+  const [setupData, setSetupData] = useState<TwoFactorSetupData | null>(null);
   const [verificationCode, setVerificationCode] = useState('');
   const [disablePassword, setDisablePassword] = useState('');
   const [disableCode, setDisableCode] = useState('');
   const [showDisableForm, setShowDisableForm] = useState(false);
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
-  const [backupCodes, setBackupCodes] = useState([]);
-  const [devices, setDevices] = useState([]);
-  const [deviceToRevoke, setDeviceToRevoke] = useState(null);
-  const [securityLogs, setSecurityLogs] = useState([]);
-  const [recoveryMethods, setRecoveryMethods] = useState([]);
+  const [backupCodes, setBackupCodes] = useState<string[]>([]);
+  const [devices, setDevices] = useState<TrustedDevice[]>([]);
+  const [deviceToRevoke, setDeviceToRevoke] = useState<string | number | null>(null);
+  const [securityLogs, setSecurityLogs] = useState<SecurityLog[]>([]);
+  const [recoveryMethods, setRecoveryMethods] = useState<RecoveryMethod[]>([]);
 
   useEffect(() => {
     void (async () => {
@@ -311,7 +382,7 @@ export default function TwoFactorManager() {
   async function loadDevices() {
     try {
       const response = (await api.get('/2fa/devices')) as import('axios').AxiosResponse<Record<string, unknown>>;
-      setDevices((response.data?.devices as unknown[]) || []);
+      setDevices(((response.data?.devices as unknown[]) || []) as TrustedDevice[]);
     } catch (err) {
       logger.error('Error loading devices:', err);
     }
@@ -320,7 +391,7 @@ export default function TwoFactorManager() {
   async function loadSecurityLogs() {
     try {
       const response = (await api.get('/2fa/security-logs')) as import('axios').AxiosResponse<Record<string, unknown>>;
-      setSecurityLogs((response.data?.logs as unknown[]) || []);
+      setSecurityLogs(((response.data?.logs as unknown[]) || []) as SecurityLog[]);
     } catch (err) {
       logger.error('Error loading security logs:', err);
     }
@@ -329,7 +400,7 @@ export default function TwoFactorManager() {
   async function loadRecoveryMethods() {
     try {
       const response = (await api.get('/2fa/recovery-methods')) as import('axios').AxiosResponse<Record<string, unknown>>;
-      setRecoveryMethods((response.data?.methods as unknown[]) || []);
+      setRecoveryMethods(((response.data?.methods as unknown[]) || []) as RecoveryMethod[]);
     } catch (err) {
       logger.error('Error loading recovery methods:', err);
     }
@@ -345,7 +416,7 @@ export default function TwoFactorManager() {
       setLoading(true);
       setError('');
       const response = (await api.get('/2fa/backup-codes')) as import('axios').AxiosResponse<Record<string, unknown>>;
-      setBackupCodes((response.data?.backup_codes as unknown[]) || []);
+      setBackupCodes(((response.data?.backup_codes as unknown[]) || []) as string[]);
       logger.info('[FIX:2FA] Loaded backup codes for enabled 2FA');
     } catch (err) {
       logger.error('Error loading backup codes:', err);
@@ -366,8 +437,8 @@ export default function TwoFactorManager() {
         recovery_email: status?.recovery_email || '',
         recovery_phone: status?.recovery_phone || '',
       })) as import('axios').AxiosResponse<Record<string, unknown>>;
-      setSetupData(response.data);
-      setBackupCodes((response.data?.backup_codes as unknown[]) || []);
+      setSetupData(response.data as unknown as TwoFactorSetupData);
+      setBackupCodes(((response.data?.backup_codes as unknown[]) || []) as string[]);
       setVerificationCode('');
       setSuccess(t('misc.tfm_setup_qr_prompt'));
       logger.info('[FIX:2FA] 2FA setup created, waiting for verify-setup');
@@ -448,7 +519,7 @@ export default function TwoFactorManager() {
     try {
       logger.info('[FIX:2FA] Regenerating backup codes via supported endpoint');
       const response = (await api.post('/2fa/backup-codes/regenerate')) as import('axios').AxiosResponse<Record<string, unknown>>;
-      setBackupCodes((response.data?.backup_codes as unknown[]) || []);
+      setBackupCodes(((response.data?.backup_codes as unknown[]) || []) as string[]);
       setConfirmRegenerate(false);
       setSuccess(t('misc.tfm_regenerate_success'));
     } catch (err) {
@@ -458,7 +529,7 @@ export default function TwoFactorManager() {
     }
   }
 
-  async function handleRevokeDevice(deviceId) {
+  async function handleRevokeDevice(deviceId: string | number) {
     setLoading(true);
     setError('');
     setSuccess('');
@@ -475,7 +546,7 @@ export default function TwoFactorManager() {
     }
   }
 
-  async function copyToClipboard(text) {
+  async function copyToClipboard(text: string) {
     try {
       await navigator.clipboard.writeText(text);
       setSuccess(t('misc.tfm_copied_to_clipboard'));
@@ -719,7 +790,7 @@ export default function TwoFactorManager() {
                         <code style={{ fontSize: 12, wordBreak: 'break-all' }}>{setupData.secret_key}</code>
                         <Button
                           variant="ghost"
-                          onClick={() => copyToClipboard(setupData.secret_key)}
+                          onClick={() => copyToClipboard(setupData.secret_key ?? '')}
                           startIcon={<Copy size={16} />}
                         >
                           {t('misc.tfm_copy')}

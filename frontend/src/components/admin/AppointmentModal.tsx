@@ -166,6 +166,7 @@ const AppointmentModal = ({
     }
   };
 
+  // TECH-DEBT(appt-modal-value-any): value is `any` — multiple input types
   const handleChange = (field: string, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) {

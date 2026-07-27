@@ -5,19 +5,54 @@ import { Button } from './ui';
 import PropTypes from 'prop-types';
 import { Checkbox } from './ui/macos';
 
+export interface ResponsiveTableColumn {
+  key: string;
+  label?: React.ReactNode;
+  align?: 'left' | 'right' | 'center';
+  sortable?: boolean;
+  hidden?: boolean;
+  mobileHidden?: boolean;
+  fixed?: boolean;
+  minWidth?: string | number;
+  clickable?: boolean;
+  render?: (value: unknown, row: Record<string, unknown>, index: number) => React.ReactNode;
+  onClick?: (row: Record<string, unknown>) => void;
+}
+
+export interface ResponsiveTableAction {
+  className?: string;
+  style?: React.CSSProperties;
+  onClick: (row: Record<string, unknown>, index: number) => void;
+  title?: string;
+  icon?: React.ReactNode;
+  variant?: 'primary' | 'secondary' | 'ghost' | 'outline' | 'danger' | string;
+  visible?: (row: Record<string, unknown>) => boolean;
+}
+
+interface ResponsiveTableProps {
+  data?: Array<Record<string, unknown>>;
+  columns?: ResponsiveTableColumn[];
+  onRowClick?: (row: Record<string, unknown>, index: number) => void;
+  selectedRows?: Set<number>;
+  onRowSelect?: (index: number, checked: boolean) => void;
+  actions?: ResponsiveTableAction[];
+  className?: string;
+  style?: React.CSSProperties;
+}
+
 const ResponsiveTable = ({
   data = [],
   columns = [],
   onRowClick,
-  selectedRows = new Set(),
+  selectedRows = new Set<number>(),
   onRowSelect,
   actions = [],
   className = '',
   style = {}
-}) => {
+}: ResponsiveTableProps) => {
   const { isMobile } = useBreakpoint();
-  const [sortField, setSortField] = useState(null);
-  const [sortDirection, setSortDirection] = useState('asc');
+  const [sortField, setSortField] = useState<string | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   // Сортировка данных
   const sortedData = React.useMemo(() => {
@@ -27,13 +62,14 @@ const ResponsiveTable = ({
       const aVal = a[sortField];
       const bVal = b[sortField];
 
+      if (aVal === undefined || aVal === null || bVal === undefined || bVal === null) return 0;
       if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
       if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
       return 0;
     });
   }, [data, sortField, sortDirection]);
 
-  const handleSort = (field) => {
+  const handleSort = (field: string) => {
     if (sortField === field) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
@@ -41,7 +77,7 @@ const ResponsiveTable = ({
       setSortDirection('asc');
     }
   };
-  const handleActivationKeyDown = (event, onActivate) => {
+  const handleActivationKeyDown = (event: React.KeyboardEvent, onActivate: () => void) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       onActivate();
@@ -92,7 +128,7 @@ const ResponsiveTable = ({
               marginBottom: 'var(--mac-spacing-3)'
             }}>
                 <div style={{ fontWeight: 'var(--mac-font-weight-semibold)', fontSize: 'var(--mac-font-size-lg)' }}>
-                  {row.name || row.fio || `Запись ${index + 1}`}
+                  {String(row.name ?? row.fio ?? `Запись ${index + 1}`)}
                 </div>
                 {onRowSelect &&
               <Checkbox aria-label={`Select as SelectRaw ${row.name || row.fio || `record ${index + 1}`}`} checked={selectedRows.has(index)} onChange={(e) => onRowSelect(index, e)}
@@ -107,11 +143,11 @@ const ResponsiveTable = ({
               filter((col) => !col.mobileHidden && !col.hidden).
               map((column, colIndex) => {
                 // Получаем значение для отображения
-                let displayValue;
+                let displayValue: React.ReactNode;
                 if (column.render) {
                   displayValue = column.render(row[column.key], row, index);
                 } else {
-                  displayValue = row[column.key];
+                  displayValue = String(row[column.key] ?? '');
                 }
 
                 // Проверяем на NaN и другие некорректные значения
@@ -264,7 +300,7 @@ const ResponsiveTable = ({
                     minWidth: column.minWidth || '120px',
                     background: 'var(--mac-bg-secondary) !important',
                     position: column.fixed ? 'sticky' : 'relative',
-                    left: column.fixed ? leftOffsets[index] : 'auto',
+                    left: column.fixed ? (leftOffsets[index] ?? 'auto') : 'auto',
                     top: 0,
                     zIndex: column.fixed ? 12 : 11,
                     borderBottom: '2px solid var(--mac-border)',
@@ -338,12 +374,12 @@ const ResponsiveTable = ({
             }
               {visibleColumns.map((column, colIndex) => {
               // Получаем значение для отображения
-              let displayValue;
+              let displayValue: React.ReactNode;
               if (column.render) {
                 // Передаем три параметра: value, row, index
                 displayValue = column.render(row[column.key], row, index);
               } else {
-                displayValue = row[column.key];
+                displayValue = String(row[column.key] ?? '');
               }
 
               // Проверяем на NaN и другие некорректные значения
@@ -353,9 +389,9 @@ const ResponsiveTable = ({
 
               // Обработка кликабельных колонок
               const handleClick = column.clickable && column.onClick ?
-              (e) => {
-                (e as unknown as { stopPropagation: () => void }).stopPropagation();
-                column.onClick(row);
+              (e: React.MouseEvent) => {
+                e.stopPropagation();
+                column.onClick?.(row);
               } : undefined;
 
               return (
@@ -369,7 +405,7 @@ const ResponsiveTable = ({
                     cursor: column.clickable ? 'pointer' : 'inherit',
                     textDecoration: column.clickable ? 'underline' : 'none',
                     position: column.fixed ? 'sticky' : 'relative',
-                    left: column.fixed ? leftOffsets[colIndex] : 'auto',
+                    left: column.fixed ? (leftOffsets[colIndex] ?? 'auto') : 'auto',
                     background: column.fixed ? 'white' : 'inherit',
                     zIndex: column.fixed ? 1 : 'auto'
                   }}

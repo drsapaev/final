@@ -10,6 +10,7 @@ import {
   Table,
   MacOSEmptyState,
 } from '../ui/macos';
+import type { SelectChangeEvent } from '../ui/macos/Select';
 import {
   Brain,
   TrendingUp,
@@ -52,11 +53,91 @@ const AIAnalytics = () => {
   });
 
   // Данные аналитики
-  const [usageAnalytics, setUsageAnalytics] = useState(null);
-  const [learningInsights, setLearningInsights] = useState(null);
-  const [usageSummary, setUsageSummary] = useState(null);
-  const [costAnalysis, setCostAnalysis] = useState(null);
-  const [modelComparison, setModelComparison] = useState(null);
+  interface UsageAnalyticsData {
+    period_days?: number;
+    last_updated?: string;
+    total_requests?: number;
+    success_rate?: number;
+    average_response_time?: number;
+    total_cost_usd?: number;
+    cost_trend?: string;
+    most_used_function?: string;
+    recommendations?: string[];
+    period?: { start_date?: string; end_date?: string };
+    usage_statistics?: {
+      total_requests?: number;
+      success_rate?: number;
+      average_execution_time?: number;
+      total_tokens_used?: number;
+      total_cost_usd?: number;
+      [k: string]: unknown;
+    };
+    function_breakdown?: Record<string, {
+      requests?: number;
+      success_rate?: number;
+      average_time?: number;
+      total_cost?: number;
+      [k: string]: unknown;
+    }>;
+    medical_patterns?: {
+      common_symptoms?: string[];
+      diagnosis_frequency?: {
+        top_diagnoses?: Array<{ diagnosis?: string; count?: number; percentage?: number }>;
+        [k: string]: unknown;
+      };
+      [k: string]: unknown;
+    };
+    diagnostic_accuracy?: {
+      ai_vs_doctor_accuracy?: {
+        ai_accuracy?: number;
+        doctor_accuracy?: number;
+        agreement_rate?: number;
+        [k: string]: unknown;
+      };
+      [k: string]: unknown;
+    };
+    learning_recommendations?: string[];
+    [k: string]: unknown;
+  }
+
+  interface CostAnalysisData {
+    summary?: { total_cost_usd?: number; average_daily_cost?: number; [k: string]: unknown };
+    forecasts?: { monthly_usd?: number; [k: string]: unknown };
+    function_costs?: Record<string, {
+      requests?: number;
+      cost_percentage?: number;
+      total_cost?: number;
+      average_cost_per_request?: number;
+      [k: string]: unknown;
+    }>;
+    cost_optimization?: {
+      potential_savings?: { amount_usd?: number; percentage?: number; [k: string]: unknown };
+      recommendations?: string[];
+      [k: string]: unknown;
+    };
+    [k: string]: unknown;
+  }
+
+  interface ModelComparisonData {
+    function?: string;
+    models?: Record<string, {
+      accuracy?: number;
+      speed?: number;
+      cost_per_request?: number;
+      user_satisfaction?: number;
+      reliability?: number;
+      [k: string]: unknown;
+    }>;
+    recommendations?: Record<string, string>;
+    optimization_suggestions?: string[];
+    [k: string]: unknown;
+  }
+
+  const [usageAnalytics, setUsageAnalytics] = useState<UsageAnalyticsData | null>(null);
+  const [learningInsights, setLearningInsights] = useState<UsageAnalyticsData | null>(null);
+  const [usageSummary, setUsageSummary] = useState<UsageAnalyticsData | null>(null);
+  const [costAnalysis, setCostAnalysis] = useState<CostAnalysisData | null>(null);
+  const [modelComparison, setModelComparison] = useState<ModelComparisonData | null>(null);
 
   const loadUsageAnalytics = useCallback(async () => {
     setLoading(true);
@@ -162,7 +243,7 @@ const AIAnalytics = () => {
     }
   };
 
-  const generateTrainingDataset = async (dataType) => {
+  const generateTrainingDataset = async (dataType: string) => {
     setLoading(true);
     try {
       const response = await api.post('/analytics/ai/generate-training-dataset', {
@@ -181,7 +262,7 @@ const AIAnalytics = () => {
     }
   };
 
-  const formatCurrency = (amount) => {
+  const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
@@ -189,7 +270,7 @@ const AIAnalytics = () => {
     }).format(amount);
   };
 
-  const formatTime = (seconds) => {
+  const formatTime = (seconds: number) => {
     return t('misc.aia_seconds_short', { seconds: seconds.toFixed(2) });
   };
 
@@ -208,7 +289,7 @@ const AIAnalytics = () => {
               {t('misc.aia_overview_summary_title', { days: usageSummary.period_days })}
             </h3>
             <div className="ai-analytics-timestamp">
-              {t('misc.aia_updated')} {new Date(usageSummary.last_updated).toLocaleString()}
+              {t('misc.aia_updated')} {new Date(usageSummary.last_updated ?? Date.now()).toLocaleString()}
             </div>
           </div>
 
@@ -222,21 +303,21 @@ const AIAnalytics = () => {
 
             <div className="ai-analytics-stat-card ai-analytics-stat-card-success">
               <div className="ai-analytics-stat-value-3xl ai-analytics-stat-value-success">
-                {usageSummary.success_rate.toFixed(1)}%
+                {usageSummary.success_rate?.toFixed(1)}%
               </div>
               <div className="ai-analytics-stat-label">{t('misc.aia_success_rate')}</div>
             </div>
 
             <div className="ai-analytics-stat-card ai-analytics-stat-card-accent-purple">
               <div className="ai-analytics-stat-value-3xl ai-analytics-stat-value-accent-purple">
-                {formatTime(usageSummary.average_response_time)}
+                {formatTime(usageSummary.average_response_time ?? 0)}
               </div>
               <div className="ai-analytics-stat-label">{t('misc.aia_average_time')}</div>
             </div>
 
             <div className="ai-analytics-stat-card ai-analytics-stat-card-warning">
               <div className="ai-analytics-stat-value-3xl ai-analytics-stat-value-warning">
-                {formatCurrency(usageSummary.total_cost_usd)}
+                {formatCurrency(usageSummary.total_cost_usd ?? 0)}
               </div>
               <div className="ai-analytics-stat-label">{t('misc.aia_total_cost')}</div>
             </div>
@@ -335,37 +416,37 @@ const AIAnalytics = () => {
           <MacOSCard className="ai-analytics-card-padded">
             <h3 className="ai-analytics-h3-mb16">
               <BarChart3 style={{ width: '20px', height: '20px' }} />
-              {t('misc.aia_usage_stats_title', { start: usageAnalytics.period.start_date, end: usageAnalytics.period.end_date })}
+              {t('misc.aia_usage_stats_title', { start: usageAnalytics.period?.start_date, end: usageAnalytics.period?.end_date })}
             </h3>
 
             <div className="ai-analytics-stat-grid-sm">
               <div className="ai-analytics-stat-text-center">
                 <div className="ai-analytics-stat-value-xl ai-analytics-stat-value-info">
-                  {usageAnalytics.usage_statistics.total_requests}
+                  {usageAnalytics.usage_statistics?.total_requests}
                 </div>
                 <div className="ai-analytics-stat-label-xs">{t('misc.aia_total_requests')}</div>
               </div>
               <div className="ai-analytics-stat-text-center">
                 <div className="ai-analytics-stat-value-xl ai-analytics-stat-value-success">
-                  {usageAnalytics.usage_statistics.success_rate?.toFixed(1)}%
+                  {usageAnalytics.usage_statistics?.success_rate?.toFixed(1)}%
                 </div>
                 <div className="ai-analytics-stat-label-xs">{t('misc.aia_success_rate')}</div>
               </div>
               <div className="ai-analytics-stat-text-center">
                 <div className="ai-analytics-stat-value-xl ai-analytics-stat-value-accent-purple">
-                  {formatTime(usageAnalytics.usage_statistics.average_execution_time)}
+                  {formatTime(usageAnalytics.usage_statistics?.average_execution_time ?? 0)}
                 </div>
                 <div className="ai-analytics-stat-label-xs">{t('misc.aia_average_time')}</div>
               </div>
               <div className="ai-analytics-stat-text-center">
                 <div className="ai-analytics-stat-value-xl ai-analytics-stat-value-error">
-                  {usageAnalytics.usage_statistics.total_tokens_used}
+                  {usageAnalytics.usage_statistics?.total_tokens_used}
                 </div>
                 <div className="ai-analytics-stat-label-xs">{t('misc.aia_tokens')}</div>
               </div>
               <div className="ai-analytics-stat-text-center">
                 <div className="ai-analytics-stat-value-xl ai-analytics-stat-value-warning">
-                  {formatCurrency(usageAnalytics.usage_statistics.total_cost_usd)}
+                  {formatCurrency(usageAnalytics.usage_statistics?.total_cost_usd ?? 0)}
                 </div>
                 <div className="ai-analytics-stat-label-xs">{t('misc.aia_costs')}</div>
               </div>
@@ -373,13 +454,13 @@ const AIAnalytics = () => {
           </MacOSCard>
 
           {/* Разбивка по функциям */}
-          {Object.keys(usageAnalytics.function_breakdown).length > 0 &&
+          {Object.keys(usageAnalytics.function_breakdown ?? {}).length > 0 &&
       <MacOSCard className="ai-analytics-card-padded">
               <h3 className="ai-analytics-h3-mb16">
                 {t('misc.aia_by_ai_functions')}
               </h3>
               <div className="ai-analytics-grid-gap">
-                {Object.entries(usageAnalytics.function_breakdown).map(([func, stats]: [string, any]) =>
+                {Object.entries(usageAnalytics.function_breakdown ?? {}).map(([func, stats]) =>
           <div
             key={func}
             className="ai-analytics-function-card">
@@ -393,10 +474,10 @@ const AIAnalytics = () => {
                     </div>
                     <div className="ai-analytics-stat-text-right">
                       <div className="ai-analytics-stat-value-lg ai-analytics-stat-value-info">
-                        {formatTime(stats.average_time)}
+                        {formatTime(stats.average_time ?? 0)}
                       </div>
                       <div className="ai-analytics-timestamp">
-                        {formatCurrency(stats.total_cost)}
+                        {formatCurrency(stats.total_cost ?? 0)}
                       </div>
                     </div>
                   </div>
@@ -697,13 +778,13 @@ const AIAnalytics = () => {
           { key: 'satisfaction', label: t('misc.aia_col_satisfaction'), width: '15%', align: 'center' },
           { key: 'reliability', label: t('misc.aia_col_reliability'), width: '20%', align: 'center' }]
           }
-          data={Object.entries(modelComparison.models).map(([model, data]: [string, any]) => ({
+          data={Object.entries(modelComparison.models ?? {}).map(([model, data]) => ({
             model: <span className="ai-analytics-function-name">{model}</span>,
-            accuracy: `${data.accuracy}%`,
+            accuracy: `${data.accuracy ?? 0}%`,
             speed: data.speed,
-            cost: formatCurrency(data.cost_per_request),
-            satisfaction: `${data.user_satisfaction}/5`,
-            reliability: `${data.reliability}%`
+            cost: formatCurrency(data.cost_per_request ?? 0),
+            satisfaction: `${data.user_satisfaction ?? 0}/5`,
+            reliability: `${data.reliability ?? 0}%`
           }))}
           emptyState={
           <MacOSEmptyState
@@ -722,7 +803,7 @@ const AIAnalytics = () => {
             </h4>
 
             <div className="ai-analytics-stat-grid ai-analytics-mb-4">
-              {Object.entries(modelComparison.recommendations).map(([category, model]: [string, any]) =>
+              {Object.entries(modelComparison.recommendations ?? {}).map(([category, model]) =>
           <div
             key={category}
             className="ai-analytics-model-rec-card">
@@ -799,7 +880,7 @@ const AIAnalytics = () => {
             </label>
             <Select
               value={filters.aiFunction}
-              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setFilters({ ...filters, aiFunction: e.target.value })}
+              onChange={(e: SelectChangeEvent) => setFilters({ ...filters, aiFunction: e.target.value })}
               options={[
               { value: '', label: t('misc.aia_all_functions') },
               { value: 'diagnose_symptoms', label: t('misc.aia_func_diagnose') },

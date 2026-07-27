@@ -38,12 +38,26 @@ import {
   Skeleton,
   Modal,
 } from '../ui/macos';
+import type { SelectChangeEvent } from '../ui/macos/Select';
 import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
 // P-013 fix: shared ConfirmDialog hook replacing native confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
+
+interface ApiErrorResponse {
+  response?: { data?: { detail?: string } };
+}
+
+function resolveApiError(error: unknown, fallbackMessage: string): string {
+  if (error && typeof error === 'object' && 'response' in error) {
+    const errResp = (error as ApiErrorResponse).response;
+    return errResp?.data?.detail || fallbackMessage;
+  }
+  return fallbackMessage;
+}
+
 const WebhookManager = () => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
@@ -51,11 +65,39 @@ const WebhookManager = () => {
   const [confirmRaw, confirmDialog] = useConfirm();
   const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
   const [activeTab, setActiveTab] = useState('webhooks');
-  const [webhooks, setWebhooks] = useState([]);
-  const [calls, setCalls] = useState([]);
+
+  interface Webhook {
+    id: string | number;
+    name?: string;
+    url?: string;
+    description?: string;
+    status?: string;
+    is_active?: boolean;
+    total_calls?: number;
+    successful_calls?: number;
+    events?: string[];
+    [k: string]: unknown;
+  }
+
+  interface WebhookCall {
+    id: string | number;
+    webhook_id?: string | number;
+    event_type?: string;
+    status?: string;
+    response_status_code?: number;
+    created_at?: string;
+    duration_ms?: number;
+    attempt_number?: number;
+    max_attempts?: number;
+    error_message?: string;
+    [k: string]: unknown;
+  }
+
+  const [webhooks, setWebhooks] = useState<Webhook[]>([]);
+  const [calls, setCalls] = useState<WebhookCall[]>([]);
   const [stats, setStats] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedWebhook, setSelectedWebhook] = useState(null);
+  const [selectedWebhook, setSelectedWebhook] = useState<Webhook | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false); // P2 fix: restored value (was const [, setX] codemod artifact; UI not yet implemented — buttons set true but no modal renders)
   const [showTestModal, setShowTestModal] = useState(false); // P2 fix: restored value (same as above)
@@ -86,7 +128,7 @@ const WebhookManager = () => {
     }
   }, []);
 
-  const loadWebhookCalls = useCallback(async (webhookId) => {
+  const loadWebhookCalls = useCallback(async (webhookId: string | number) => {
     try {
       const { data } = await api.get(`/webhooks/${webhookId}/calls`);
       setCalls(data.items || data || []);
@@ -109,25 +151,25 @@ const WebhookManager = () => {
   }, [loadWebhooks, loadSystemStats]);
 
   // Действия с webhook'ами
-  const handleActivateWebhook = async (webhookId) => {
+  const handleActivateWebhook = async (webhookId: string | number) => {
     try {
       await api.post(`/webhooks/${webhookId}/activate`);
       toast.success(t('admin2.wh_activated'));
       loadWebhooks();
-    } catch (error) {
+    } catch (error: unknown) {
       logger.error('Ошибка активации:', error);
-      toast.error(error.response?.data?.detail || t('admin2.wh_activate_error'));
+      toast.error(resolveApiError(error, t('admin2.wh_activate_error')));
     }
   };
 
-  const handleDeactivateWebhook = async (webhookId) => {
+  const handleDeactivateWebhook = async (webhookId: string | number) => {
     try {
       await api.post(`/webhooks/${webhookId}/deactivate`);
       toast.success(t('admin2.wh_deactivated'));
       loadWebhooks();
-    } catch (error) {
+    } catch (error: unknown) {
       logger.error('Ошибка деактивации:', error);
-      toast.error(error.response?.data?.detail || t('admin2.wh_deactivate_error'));
+      toast.error(resolveApiError(error, t('admin2.wh_deactivate_error')));
     }
   };
 
@@ -150,7 +192,7 @@ const WebhookManager = () => {
 
 
 
-  const handleDeleteWebhook = async (webhookId) => {
+  const handleDeleteWebhook = async (webhookId: string | number) => {
     // P-013 fix: replaced native confirm() with shared useConfirm hook.
     const ok = await confirm({
       title: t('admin2.delete_webhook_title'),
@@ -168,14 +210,14 @@ const WebhookManager = () => {
       await api.delete(`/webhooks/${webhookId}`);
       toast.success(t('admin2.wh_deleted'));
       loadWebhooks();
-    } catch (error) {
+    } catch (error: unknown) {
       logger.error('Ошибка удаления:', error);
-      toast.error(error.response?.data?.detail || t('admin2.wh_delete_error'));
+      toast.error(resolveApiError(error, t('admin2.wh_delete_error')));
     }
   };
 
   // Фильтрация webhook'ов
-  const filteredWebhooks = webhooks.filter((webhook: Record<string, unknown>) => {
+  const filteredWebhooks = webhooks.filter((webhook) => {
     if (filters.status && String(webhook.status ?? '') !== filters.status) return false;
     if (filters.event_type && !(webhook.events as unknown[])?.includes(filters.event_type)) return false;
     if (filters.search && !String(webhook.name ?? '').toLowerCase().includes(String(filters.search ?? '').toLowerCase()) &&
@@ -184,7 +226,7 @@ const WebhookManager = () => {
   });
 
   // Получение статуса badge
-  const getStatusBadge = (status, isActive) => {
+  const getStatusBadge = (status: string | undefined, isActive: boolean | undefined) => {
     if (!isActive) {
       return <Badge variant="secondary">{t('admin2.wh_status_inactive')}</Badge>;
     }
@@ -201,7 +243,7 @@ const WebhookManager = () => {
     }
   };
 
-  const getCallStatusBadge = (status) => {
+  const getCallStatusBadge = (status: string | undefined) => {
     switch (status) {
       case 'success':
         return <Badge variant="success">{t('admin2.wh_call_status_success')}</Badge>;
@@ -386,12 +428,12 @@ const WebhookManager = () => {
                       </span>
                       <span className="flex items-center justify-center admin-gap-4">
                         <CheckCircle className="w-4 h-4" />
-                        {t('admin2.wh_success_rate', { rate: (webhook.successful_calls / webhook.total_calls * 100 || 0).toFixed(1) })}
+                        {t('admin2.wh_success_rate', { rate: ((webhook.successful_calls ?? 0) / (webhook.total_calls ?? 1) * 100 || 0).toFixed(1) })}
                       </span>
                     </div>
                     
                     <div className="admin-flex-wrap-gap-4">
-                      {webhook.events.map((event, index) =>
+                      {(webhook.events ?? []).map((event, index) =>
                   <Badge key={index} variant="outline" className="admin-xs">
                           {event}
                         </Badge>
@@ -533,9 +575,9 @@ const WebhookManager = () => {
                 </label>
                 <Select
                 value={selectedWebhook?.id ? String(selectedWebhook.id) : ''}
-                onChange={(value: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-                  const webhook = webhooks.find((w) => String(w.id) === String(value));
-                  setSelectedWebhook(webhook);
+                onChange={(value: SelectChangeEvent) => {
+                  const webhook = webhooks.find((w) => String(w.id) === String(value.target.value));
+                  setSelectedWebhook(webhook ?? null);
                   if (webhook) loadWebhookCalls(webhook.id);
                 }}
                 options={[
@@ -590,7 +632,7 @@ const WebhookManager = () => {
                     <div className="admin-flex-ai-center-gap-16-sm-tertiary">
                       <span className="flex items-center justify-center admin-gap-4">
                         <Clock className="w-4 h-4" />
-                        {new Date(call.created_at).toLocaleString()}
+                        {new Date(call.created_at ?? Date.now()).toLocaleString()}
                       </span>
                       {call.duration_ms &&
                   <span>{call.duration_ms}ms</span>
@@ -657,14 +699,14 @@ const WebhookManager = () => {
             
             <MacOSStatCard
             title={t('admin2.wh_stat_patient_events')}
-            value={webhooks.flatMap((w) => w.events).filter((e) => e.includes('patient')).length}
+            value={webhooks.flatMap((w) => w.events ?? []).filter((e) => e.includes('patient')).length}
             icon={Users}
             color="orange" />
 
             
             <MacOSStatCard
             title={t('admin2.wh_stat_payment_events')}
-            value={webhooks.flatMap((w) => w.events).filter((e) => e.includes('payment')).length}
+            value={webhooks.flatMap((w) => w.events ?? []).filter((e) => e.includes('payment')).length}
             icon={CreditCard}
             color="purple" />
 
@@ -736,7 +778,7 @@ const WebhookManager = () => {
             }].
             map((event) => {
               const IconComponent = event.icon;
-              const webhookCount = webhooks.filter((w) => w.events.includes(event.type)).length;
+              const webhookCount = webhooks.filter((w) => (w.events ?? []).includes(event.type)).length;
 
               return (
                 <div key={event.type} className="admin-p-16-bd-1solidvar-mac-border-radius-var--mac-radius-md-bg-bg-secondary">
