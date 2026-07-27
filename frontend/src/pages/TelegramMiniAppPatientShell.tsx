@@ -310,6 +310,7 @@ function emitMiniAppOnboardingStatusTelemetry(status: string, meta: Record<strin
   });
 }
 
+// TECH-DEBT(tma-error-any): error is `any` — error shape varies across fetch/axios/Error
 function getMiniAppApiErrorReason(error: any, fallback: string) {
   const detail = error?.response?.data?.detail;
   if (typeof detail === 'string') {
@@ -322,6 +323,7 @@ function getMiniAppApiErrorReason(error: any, fallback: string) {
   return typeof reason === 'string' ? reason : fallback;
 }
 
+// TECH-DEBT(tma-session-err-any): error is `any` — multiple error shapes
 function getMiniAppPatientSessionErrorMessage(error: any, languageCode: string) {
   const reason = getMiniAppApiErrorReason(error, 'session_not_confirmed');
   if (MINI_APP_EXPIRED_ENTRY_TOKEN_REASONS.has(reason)) {
@@ -374,7 +376,9 @@ function notifyTelegramMiniAppReady() {
   }
 }
 
+// TECH-DEBT(tma-forms-any): forms is `any[]` — backend shape not yet typed
 function getMiniAppFormsInitialAnswers(forms: any[] = []) {
+  // TECH-DEBT(tma-reduce-any): reduce accumulator/form are `any` — form shape varies
   return forms.reduce((acc: Record<string, any>, form: any) => {
     acc[form.id] = form.submission?.answers || {};
     return acc;
@@ -935,7 +939,8 @@ function TelegramMiniAppPatientShell() {
       });
   };
 
-  const handlePatientFormFieldChange = (formId: string, field: Record<string, any>) => (event: any) => {
+  // TECH-DEBT(tma-form-change-any): event is `any` — synthetic event from custom input
+const handlePatientFormFieldChange = (formId: string, field: Record<string, any>) => (event: any) => {
     const value = field.type === 'boolean' ? (event?.target?.checked ?? event) : (event?.target?.value ?? event);
     setFormAnswers((current) => ({
       ...current,

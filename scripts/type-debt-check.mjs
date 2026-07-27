@@ -34,7 +34,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const FRONTEND_DIR = resolve(__dirname, '..', 'frontend', 'src');
 
 const BASELINE = {
-  // 7 accepted `any` casts in source code (excluding .d.ts ambient declarations):
+  // 13 accepted `any` casts in source code (excluding .d.ts ambient declarations):
   //   - RoleGuard.tsx withRoleGuard HOC props (TECH-DEBT(role-guard-hoc))
   //   - RequireAuth.tsx withRoleAuth HOC props (TECH-DEBT(role-auth-hoc))
   //   - RequireAuth.tsx withRoleRender HOC props (TECH-DEBT(role-render-hoc))
@@ -42,8 +42,14 @@ const BASELINE = {
   //   - RoleGuard.tsx WrappedComponent: ComponentType<any> (no marker needed - generic HOC)
   //   - ModernStatistics.tsx appointments?: any[] (TECH-DEBT(modern-stats-appointments))
   //   - ModernStatistics.tsx [key: string]: any (TECH-DEBT(modern-stats-index-sig))
+  //   - TelegramMiniAppPatientShell.tsx getMiniAppApiErrorReason error: any (TECH-DEBT(tma-error-any))
+  //   - TelegramMiniAppPatientShell.tsx getMiniAppPatientSessionErrorMessage error: any (TECH-DEBT(tma-session-err-any))
+  //   - TelegramMiniAppPatientShell.tsx getMiniAppFormsInitialAnswers forms: any[] (TECH-DEBT(tma-forms-any))
+  //   - TelegramMiniAppPatientShell.tsx forms.reduce accumulator/form: any (TECH-DEBT(tma-reduce-any))
+  //   - TelegramMiniAppPatientShell.tsx handlePatientFormFieldChange event: any (TECH-DEBT(tma-form-change-any))
+  //   - AppointmentModal.tsx handleChange value: any (TECH-DEBT(appt-modal-value-any))
   // Note: .d.ts files are excluded from the scan entirely (see findUndocumentedCasts).
-  anyCasts: 7,
+  anyCasts: 13,
   tsIgnore: 0,
   tsNoCheck: 0,
   indexSignatureAny: 1,
