@@ -496,7 +496,7 @@ function AddRelationDialog({ open, onClose, patientId, patientName, onSuccess })
       onSuccess();
     } catch (err) {
       logger.error('Error creating relation:', err);
-      setError(err.response?.data?.detail || t('patient.pat_fam_create_error'));
+      setError((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('patient.pat_fam_create_error'));
     } finally {
       setLoading(false);
     }

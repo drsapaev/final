@@ -190,7 +190,7 @@ const BillingManager = () => {
       loadData();
     } catch (error) {
       logger.error('Ошибка создания счета:', error);
-      toast.error(error.response?.data?.detail || t('admin2.bill_inv_create_error'));
+      toast.error((error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('admin2.bill_inv_create_error'));
     }
   };
 
@@ -210,7 +210,7 @@ const BillingManager = () => {
       loadData();
     } catch (error) {
       logger.error('Ошибка записи платежа:', error);
-      toast.error(error.response?.data?.detail || t('admin2.bill_pay_record_error'));
+      toast.error((error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('admin2.bill_pay_record_error'));
     }
   };
 
@@ -220,7 +220,7 @@ const BillingManager = () => {
       toast.success(t('admin2.bill_inv_sent'));
     } catch (error) {
       logger.error('Ошибка отправки счета:', error);
-      toast.error(error.response?.data?.detail || t('admin2.bill_inv_send_error'));
+      toast.error((error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('admin2.bill_inv_send_error'));
     }
   };
 
@@ -241,7 +241,7 @@ const BillingManager = () => {
       newWindow.document.close();
     } catch (error) {
       logger.error('Ошибка получения HTML счета:', error);
-      toast.error(error.response?.data?.detail || t('admin2.bill_inv_html_error'));
+      toast.error((error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('admin2.bill_inv_html_error'));
     }
   };
 

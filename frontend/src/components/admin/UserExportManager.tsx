@@ -136,7 +136,7 @@ const UserExportManager = () => {
       }
     } catch (error) {
       logger.error('Ошибка экспорта:', error);
-      toast.error(error.response?.data?.detail || t('admin2.ue_export_error_fallback'));
+      toast.error((error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('admin2.ue_export_error_fallback'));
     } finally {
       setLoading(false);
     }
