@@ -45,7 +45,7 @@ const SHOWCASE_VISUALS = [BarChart3, Users, Activity, FileText, CreditCard];
 const SECURITY_VISUALS = [Shield, Users, Key, Activity];
 const INTEGRATION_VISUALS = [MessageSquare, CreditCard, CreditCard, CreditCard, Activity, FileText];
 
-function SurfaceLabel({ children }) {
+function SurfaceLabel({ children }: { children: React.ReactNode }) {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   return <span className="landing-surface-label">{children}</span>;
@@ -56,7 +56,12 @@ SurfaceLabel.propTypes = {
   children: PropTypes.node,
 };
 
-function SectionHeading({ eyebrow, title, description, align = 'left' }) {
+function SectionHeading({ eyebrow, title, description, align = 'left' }: {
+  eyebrow?: React.ReactNode;
+  title?: React.ReactNode;
+  description?: React.ReactNode;
+  align?: 'left' | 'center';
+}) {
   return (
     <div className={`landing-section-heading landing-section-heading--${align}`}>
       <SurfaceLabel>{eyebrow}</SurfaceLabel>
@@ -74,7 +79,12 @@ SectionHeading.propTypes = {
   title: PropTypes.string,
 };
 
-function MetricCard({ value, label, detail, style }) {
+function MetricCard({ value, label, detail, style }: {
+  value?: React.ReactNode;
+  label?: React.ReactNode;
+  detail?: React.ReactNode;
+  style?: React.CSSProperties;
+}) {
   return (
     <MacOSCard className="landing-metric-card" shadow="large" style={style}>
       <strong>{value}</strong>
@@ -92,11 +102,17 @@ MetricCard.propTypes = {
   value: PropTypes.node,
 };
 
-function FeatureCard({ accent, icon: Icon, badge, title, description }) {
+function FeatureCard({ accent, icon: Icon, badge, title, description }: {
+  accent?: string;
+  icon?: React.ComponentType<{ size?: number }>;
+  badge?: React.ReactNode;
+  title?: React.ReactNode;
+  description?: React.ReactNode;
+}) {
   return (
     <MacOSCard className="landing-feature-card" shadow="large" style={{ borderColor: `${accent}2f` }}>
       <div className="landing-feature-icon" style={{ background: `${accent}18`, color: accent }}>
-        <Icon size={20} />
+        {Icon && <Icon size={20} />}
       </div>
       <SurfaceLabel>{badge}</SurfaceLabel>
       <h3>{title}</h3>
@@ -114,12 +130,18 @@ FeatureCard.propTypes = {
   title: PropTypes.string,
 };
 
-function ShowcaseCard({ icon: Icon, label, title, description, style }) {
+function ShowcaseCard({ icon: Icon, label, title, description, style }: {
+  icon?: React.ComponentType<{ size?: number }>;
+  label?: React.ReactNode;
+  title?: React.ReactNode;
+  description?: React.ReactNode;
+  style?: React.CSSProperties;
+}) {
   return (
     <MacOSCard className="landing-showcase-card" shadow="large" style={style}>
       <div className="landing-showcase-head">
         <div className="landing-showcase-icon">
-          <Icon size={20} />
+          {Icon && <Icon size={20} />}
         </div>
         <SurfaceLabel>{label}</SurfaceLabel>
       </div>
@@ -143,7 +165,10 @@ ShowcaseCard.propTypes = {
   title: PropTypes.string,
 };
 
-function WorkflowStep({ title, description }) {
+function WorkflowStep({ title, description }: {
+  title?: React.ReactNode;
+  description?: React.ReactNode;
+}) {
   return (
     <div className="landing-workflow-step">
       <div className="landing-workflow-marker" aria-hidden="true" />
@@ -195,12 +220,12 @@ ContactRow.propTypes = {
   value: PropTypes.string,
 };
 
-function toTelegramUrl(handle) {
+function toTelegramUrl(handle: unknown) {
   const sanitizedHandle = String(handle || '').trim().replace(/^@/, '');
   return sanitizedHandle ? `https://t.me/${sanitizedHandle}` : undefined;
 }
 
-function toTelUrl(phone) {
+function toTelUrl(phone: unknown) {
   const sanitizedPhone = String(phone || '').replace(/[^\d+]/g, '');
   return sanitizedPhone ? `tel:${sanitizedPhone}` : undefined;
 }
@@ -212,7 +237,7 @@ export default function Landing() {
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // Map unified language codes to legacy LANDING_COPY keys ('uz-Latn' → 'uz')
   const landingCopyKey = language?.startsWith('uz') ? 'uz' : language?.split('-')[0];
-  const copy = LANDING_COPY[landingCopyKey] || LANDING_COPY.ru;
+  const copy = (LANDING_COPY[landingCopyKey as keyof typeof LANDING_COPY] || LANDING_COPY.ru) as typeof LANDING_COPY.ru;
   const cardStyle = useMemo(() => buildGlassStyle(isDark), [isDark]);
   const heroCardStyle = useMemo(() => buildGlassStyle(isDark, 'hero'), [isDark]);
   const accentCardStyle = useMemo(() => buildGlassStyle(isDark, 'accent'), [isDark]);
@@ -244,7 +269,7 @@ export default function Landing() {
 
   // UX Audit Stage 2 (Landing issue 1.2): заменили cycle на dropdown select.
   // handleLanguageCycle удалён, вместо него — handleLanguageSelect(code).
-  const handleLanguageSelect = (code) => {
+  const handleLanguageSelect = (code: string) => {
     if (!code) {
       return;
     }
@@ -261,18 +286,18 @@ export default function Landing() {
       return undefined;
     }
 
-    const handleClickOutside = (event) => {
+    const handleClickOutside = (event: MouseEvent) => {
       const trigger = document.getElementById('landing-lang-trigger');
       const dropdown = document.getElementById('landing-lang-dropdown');
       if (
-        trigger && !trigger.contains(event.target) &&
-        dropdown && !dropdown.contains(event.target)
+        trigger && !trigger.contains(event.target as Node) &&
+        dropdown && !dropdown.contains(event.target as Node)
       ) {
         setShowLangDropdown(false);
       }
     };
 
-    const handleEscape = (event) => {
+    const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setShowLangDropdown(false);
       }
@@ -286,7 +311,7 @@ export default function Landing() {
     };
   }, [showLangDropdown]);
 
-  const scrollToSection = (sectionId) => {
+  const scrollToSection = (sectionId: string) => {
     document.getElementById(sectionId)?.scrollIntoView({
       behavior: 'smooth',
       block: 'start'
@@ -297,7 +322,7 @@ export default function Landing() {
   // Раньше клик на якорь в футере (#product, #workflow и т.д.) делал резкий
   // browser-jump, потому что это были <a href="#..."> без обработчика.
   // Теперь перехватываем клик и используем тот же scrollToSection.
-  const handleFooterLinkClick = (event, href) => {
+  const handleFooterLinkClick = (event: React.MouseEvent<HTMLElement>, href: string) => {
     if (!href || !href.startsWith('#')) {
       return;
     }

@@ -9,6 +9,96 @@ import notify from '../../services/notify';
  * Протокол лечения по визитам для стоматологической ЭМК
  * Включает процедуры, материалы, анестезию, фото до/после
  */
+
+interface Procedure {
+  name?: string;
+  teeth?: string;
+  startTime?: string;
+  endTime?: string;
+  description?: string;
+  completed?: boolean;
+  complications?: boolean;
+  [key: string]: unknown;
+}
+
+interface Material {
+  name?: string;
+  quantity?: string;
+  batch?: string;
+  notes?: string;
+  [key: string]: unknown;
+}
+
+interface Anesthesia {
+  drug?: string;
+  dose?: string;
+  method?: string;
+  area?: string;
+  effective?: boolean;
+  complications?: boolean;
+  type?: string;
+  [key: string]: unknown;
+}
+
+interface Photo {
+  id: number;
+  url?: string | ArrayBuffer | null;
+  filename?: string;
+  size?: number;
+  type?: string;
+  uploadedAt?: string;
+  description?: string;
+  [key: string]: unknown;
+}
+
+interface Radiograph {
+  type?: string;
+  area?: string;
+  findings?: string;
+  [key: string]: unknown;
+}
+
+interface Prescription {
+  medication?: string;
+  dosage?: string;
+  instructions?: string;
+  [key: string]: unknown;
+}
+
+interface NextVisit {
+  date?: string;
+  time?: string;
+  purpose?: string;
+  [key: string]: unknown;
+}
+
+interface VisitProtocolFormData {
+  visitDate: string;
+  visitTime: string;
+  doctor: string;
+  assistant: string;
+  chiefComplaint: string;
+  historyOfPresentIllness: string;
+  procedures: Procedure[];
+  materials: Material[];
+  anesthesia: Anesthesia[];
+  photos: {
+    before: Photo[];
+    during: Photo[];
+    after: Photo[];
+  };
+  radiographs: Radiograph[];
+  prescriptions: Prescription[];
+  recommendations: string;
+  nextVisit: NextVisit;
+  createdAt: string;
+  updatedAt: string;
+  [key: string]: unknown;
+}
+
+type TabId = 'procedures' | 'materials' | 'anesthesia' | 'photos' | 'radiographs' | 'prescriptions';
+type PhotoCategory = 'before' | 'during' | 'after';
+
 const VisitProtocol = ({
   patientName,
   patientId,
@@ -20,7 +110,7 @@ const VisitProtocol = ({
 }: { patientName?: string; patientId?: string | number; visitId?: string | number; initialData?: Record<string, unknown> | null; onSave?: (data: unknown) => void; onClose?: () => void; onComplete?: () => void }) => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<VisitProtocolFormData>({
     // Основные данные визита
     visitDate: new Date().toISOString().split('T')[0],
     visitTime: new Date().toTimeString().slice(0, 5),
@@ -68,7 +158,7 @@ const VisitProtocol = ({
 
   const [isEditing, setIsEditing] = useState(true);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState('procedures');
+  const [activeTab, setActiveTab] = useState<TabId>('procedures');
 
   // Инициализация данных
   useEffect(() => {
@@ -82,13 +172,13 @@ const VisitProtocol = ({
   }, [initialData]);
 
   // Обработчики
-  const handleInputChange = (field, value) => {
+  const handleInputChange = (field: string, value: unknown) => {
     if (field.includes('.')) {
       const [parent, child] = field.split('.');
       setFormData((prev) => ({
         ...prev,
         [parent]: {
-          ...prev[parent],
+          ...((prev[parent as keyof VisitProtocolFormData] as Record<string, unknown> | undefined) ?? {}),
           [child]: value
         }
       }));
@@ -100,35 +190,47 @@ const VisitProtocol = ({
     }
   };
 
-  const handleArrayAdd = (field, item) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: [...prev[field], item]
-    }));
+  const handleArrayAdd = (field: string, item: Record<string, unknown>) => {
+    setFormData((prev) => {
+      const prevValue = prev[field as keyof VisitProtocolFormData];
+      const prevArray = Array.isArray(prevValue) ? prevValue : [];
+      return {
+        ...prev,
+        [field]: [...prevArray, item]
+      };
+    });
   };
 
-  const handleArrayRemove = (field, index) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: prev[field].filter((_, i) => i !== index)
-    }));
+  const handleArrayRemove = (field: string, index: number) => {
+    setFormData((prev) => {
+      const prevValue = prev[field as keyof VisitProtocolFormData];
+      const prevArray = Array.isArray(prevValue) ? prevValue : [];
+      return {
+        ...prev,
+        [field]: prevArray.filter((_, i) => i !== index)
+      };
+    });
   };
 
-  const handleArrayUpdate = (field, index, updates) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: prev[field].map((item, i) =>
-      i === index ? { ...item, ...updates } : item
-      )
-    }));
+  const handleArrayUpdate = (field: string, index: number, updates: Record<string, unknown>) => {
+    setFormData((prev) => {
+      const prevValue = prev[field as keyof VisitProtocolFormData];
+      const prevArray = Array.isArray(prevValue) ? prevValue : [];
+      return {
+        ...prev,
+        [field]: prevArray.map((item, i) =>
+          i === index ? { ...((item as Record<string, unknown>) ?? {}), ...updates } : item
+        )
+      };
+    });
   };
 
-  const handlePhotoUpload = (category, file) => {
+  const handlePhotoUpload = (category: PhotoCategory, file: File) => {
     const reader = new FileReader();
     reader.onload = (e) => {
-      const photoData = {
+      const photoData: Photo = {
         id: Date.now(),
-        url: e.target?.result,
+        url: e.target?.result ?? null,
         filename: file.name,
         size: file.size,
         type: file.type,
@@ -136,7 +238,7 @@ const VisitProtocol = ({
         description: ''
       };
 
-      handleArrayAdd(`photos.${category}`, photoData);
+      handleArrayAdd(`photos.${category}`, photoData as unknown as Record<string, unknown>);
     };
     reader.readAsDataURL(file);
   };
@@ -163,7 +265,7 @@ const VisitProtocol = ({
   };
 
   // Вкладки
-  const tabs = [
+  const tabs: Array<{ id: TabId; label: string; icon: React.ComponentType<{ className?: string }> }> = [
   { id: 'procedures', label: t('dental.dental_vp_tab_procedures'), icon: Scissors },
   { id: 'materials', label: t('dental.dental_vp_tab_materials'), icon: Pill },
   { id: 'anesthesia', label: t('dental.dental_vp_tab_anesthesia'), icon: Syringe },
@@ -592,7 +694,7 @@ const VisitProtocol = ({
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {['before', 'during', 'after'].map((category) =>
+        {(['before', 'during', 'after'] as PhotoCategory[]).map((category) =>
       <div key={category}>
             <h4 className="font-semibold mb-3 capitalize">
               {category === 'before' ? t('dental.dental_vp_photo_before') :
