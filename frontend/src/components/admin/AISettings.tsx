@@ -63,21 +63,79 @@ interface AIProviderFormData {
 
 import logger from '../../utils/logger';
 import { notify } from '../../services/notify';
+
+// Provider shape returned by GET /admin/ai/providers and stored in `providers` state.
+interface AIProvider {
+  id: string | number;
+  name: string;
+  display_name: string;
+  api_key?: string;
+  api_url?: string;
+  model?: string;
+  temperature?: number;
+  max_tokens?: number;
+  active: boolean;
+  is_default?: boolean;
+  capabilities?: string[];
+}
+
+// Test result shape stored in `testResults` state keyed by provider id.
+interface AITestResult {
+  testing?: boolean;
+  success?: boolean;
+  response_time_ms?: number;
+  tokens_used?: number;
+  error_message?: string;
+}
+
+// System-level settings shape (subset of fields the form reads/writes).
+interface AISystemSettings {
+  enabled?: boolean;
+  cache_enabled?: boolean;
+  require_consent_for_files?: boolean;
+  anonymize_data?: boolean;
+  [key: string]: unknown;
+}
+
+// Provider config preset shape (openai/gemini/deepseek/grok).
+interface AIProviderConfig {
+  displayName: string;
+  description: string;
+  defaultModel: string;
+  capabilities: string[];
+  color: string;
+  models: string[];
+}
+
+type AIProviderConfigs = Record<string, AIProviderConfig>;
+
+interface ProviderFormProps {
+  provider?: AIProvider | null;
+  providerConfigs: AIProviderConfigs;
+  onSave: (data: AIProviderFormData) => Promise<void> | void;
+  onCancel: () => void;
+}
+
+interface SystemSettingsFormProps {
+  settings: AISystemSettings;
+  onSave: (settings: AISystemSettings) => void;
+}
+
 const AISettings = () => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [loading, setLoading] = useState(true);
-  const [providers, setProviders] = useState([]);
-  const [systemSettings, setSystemSettings] = useState({});
+  const [providers, setProviders] = useState<AIProvider[]>([]);
+  const [systemSettings, setSystemSettings] = useState<AISystemSettings>({});
   const [stats, setStats] = useState<AIStats>({});
-  const [editingProvider, setEditingProvider] = useState(null);
+  const [editingProvider, setEditingProvider] = useState<AIProvider | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [showApiKeys, setShowApiKeys] = useState({});
-  const [testResults, setTestResults] = useState({});
-  const [message, setMessage] = useState({ type: '', text: '' });
+  const [showApiKeys, setShowApiKeys] = useState<Record<string, boolean>>({});
+  const [testResults, setTestResults] = useState<Record<string, AITestResult>>({});
+  const [message, setMessage] = useState<{ type: string; text: string }>({ type: '', text: '' });
 
   // Конфигурация провайдеров
-  const providerConfigs = {
+  const providerConfigs: AIProviderConfigs = {
     openai: {
       displayName: 'OpenAI GPT',
       description: t('admin2.ais_desc_openai'),
@@ -128,18 +186,18 @@ const AISettings = () => {
       );
 
       if (providersRes.status === 'fulfilled') {
-        setProviders(providersRes.value.data);
+        setProviders((providersRes.value as import('axios').AxiosResponse<AIProvider[]>).data);
       }
 
       if (settingsRes.status === 'fulfilled') {
-        setSystemSettings(settingsRes.value.data);
+        setSystemSettings((settingsRes.value as import('axios').AxiosResponse<AISystemSettings>).data);
       }
 
       if (statsRes.status === 'fulfilled') {
-        setStats(statsRes.value.data);
+        setStats((statsRes.value as import('axios').AxiosResponse<AIStats>).data);
       }
 
-    } catch (error) {
+    } catch (error: unknown) {
       logger.error('Ошибка загрузки AI данных:', error);
       setMessage({ type: 'error', text: t('admin2.ais_load_error') });
     } finally {
@@ -147,7 +205,7 @@ const AISettings = () => {
     }
   };
 
-  const handleSaveProvider = async (providerData) => {
+  const handleSaveProvider = async (providerData: AIProviderFormData) => {
     try {
       if (editingProvider) {
         await api.put(`/admin/ai/providers/${editingProvider.id}`, providerData);
@@ -162,13 +220,14 @@ const AISettings = () => {
       setEditingProvider(null);
       setShowAddForm(false);
       await loadData();
-    } catch (error) {
+    } catch (error: unknown) {
       logger.error('Ошибка сохранения:', error);
-      setMessage({ type: 'error', text: error.response?.data?.detail || (error instanceof Error ? error.message : String(error)) || t('admin2.ais_provider_save_error') });
+      const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setMessage({ type: 'error', text: detail || (error instanceof Error ? error.message : String(error)) || t('admin2.ais_provider_save_error') });
     }
   };
 
-  const handleTestProvider = async (providerId) => {
+  const handleTestProvider = async (providerId: string | number) => {
     try {
       setTestResults((prev) => ({ ...prev, [providerId]: { testing: true } }));
 
@@ -177,9 +236,9 @@ const AISettings = () => {
         task_type: 'text'
       });
 
-      setTestResults((prev) => ({ ...prev, [providerId]: response.data }));
+      setTestResults((prev) => ({ ...prev, [providerId]: (response as import('axios').AxiosResponse<AITestResult>).data }));
       setMessage({ type: 'success', text: t('admin2.ais_test_success') });
-    } catch (error) {
+    } catch (error: unknown) {
       logger.error('Ошибка тестирования:', error);
       setTestResults((prev) => ({
         ...prev,
@@ -192,7 +251,7 @@ const AISettings = () => {
     }
   };
 
-  const toggleApiKeyVisibility = (providerId) => {
+  const toggleApiKeyVisibility = (providerId: string | number) => {
     setShowApiKeys((prev) => ({
       ...prev,
       [providerId]: !prev[providerId]
@@ -272,7 +331,7 @@ const AISettings = () => {
           </MacOSCard>
           <MacOSCard className="admin-loading-p-24-center">
             <div className="admin-stat-number text-[var(--mac-warning)] mb-2">
-              {Math.round(stats.cache_hit_rate)}%
+              {Math.round(stats.cache_hit_rate ?? 0)}%
             </div>
             <div className="admin-text-sm-secondary">
               {t('admin2.ais_stat_cache')}
@@ -292,7 +351,7 @@ const AISettings = () => {
       {/* Провайдеры */}
       <div className="admin-grid-auto-400-24">
         {providers.map((provider) => {
-          const config = providerConfigs[provider.name] || {};
+          const config = providerConfigs[provider.name] || { displayName: '', description: '', defaultModel: '', capabilities: [], color: '', models: [] } as AIProviderConfig;
           const testResult = testResults[provider.id];
 
           return (
@@ -461,7 +520,7 @@ const AISettings = () => {
         
         <SystemSettingsForm
           settings={systemSettings}
-          onSave={(settings) => {
+          onSave={(settings: AISystemSettings) => {
             // Сохранение системных настроек
             logger.log('Сохранение системных настроек:', settings);
           }} />
@@ -485,7 +544,7 @@ const AISettings = () => {
 };
 
 // Компонент формы провайдера
-const ProviderForm = ({ provider, providerConfigs, onSave, onCancel }) => {
+const ProviderForm = ({ provider, providerConfigs, onSave, onCancel }: ProviderFormProps) => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [formData, setFormData] = useState<AIProviderFormData>({
@@ -501,7 +560,7 @@ const ProviderForm = ({ provider, providerConfigs, onSave, onCancel }) => {
     capabilities: provider?.capabilities || ['text']
   });
 
-  const handleSubmit = (e) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!formData.name || !formData.display_name) {
@@ -512,7 +571,7 @@ const ProviderForm = ({ provider, providerConfigs, onSave, onCancel }) => {
     onSave(formData);
   };
 
-  const handlePresetSelect = (presetName) => {
+  const handlePresetSelect = (presetName: string) => {
     const preset = providerConfigs[presetName];
     if (preset) {
       setFormData((prev) => ({
@@ -538,7 +597,7 @@ const ProviderForm = ({ provider, providerConfigs, onSave, onCancel }) => {
             {t('admin2.ais_quick_settings')}
           </label>
           <div className="admin-flex-gap-8-wrap">
-            {Object.entries(providerConfigs).map(([key, config]: [string, any]) =>
+            {Object.entries(providerConfigs).map(([key, config]: [string, AIProviderConfig]) =>
           <Button
             key={key}
             variant="outline"
@@ -675,10 +734,10 @@ const ProviderForm = ({ provider, providerConfigs, onSave, onCancel }) => {
 };
 
 // Компонент системных настроек
-const SystemSettingsForm = ({ settings, onSave }) => {
+const SystemSettingsForm = ({ settings, onSave }: SystemSettingsFormProps) => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
-  const [formData, setFormData] = useState(settings);
+  const [formData, setFormData] = useState<AISystemSettings>(settings);
 
   useEffect(() => {
     setFormData(settings);
@@ -691,7 +750,7 @@ const SystemSettingsForm = ({ settings, onSave }) => {
           <label className="flex items-center justify-center">
             <Checkbox
               checked={formData.enabled || false}
-              onChange={(checked) => setFormData((prev) => ({ ...prev, enabled: checked }))}
+              onChange={(checked: boolean) => setFormData((prev: AISystemSettings) => ({ ...prev, enabled: checked }))}
               className="mr-2" />
             
             <span className="admin-text-sm-med-primary">{t('admin2.ais_system_enabled')}</span>
@@ -702,7 +761,7 @@ const SystemSettingsForm = ({ settings, onSave }) => {
           <label className="flex items-center justify-center">
             <Checkbox
               checked={formData.cache_enabled || false}
-              onChange={(checked) => setFormData((prev) => ({ ...prev, cache_enabled: checked }))}
+              onChange={(checked: boolean) => setFormData((prev: AISystemSettings) => ({ ...prev, cache_enabled: checked }))}
               className="mr-2" />
             
             <span className="admin-text-sm-med-primary">{t('admin2.ais_cache_enabled')}</span>
@@ -713,7 +772,7 @@ const SystemSettingsForm = ({ settings, onSave }) => {
           <label className="flex items-center justify-center">
             <Checkbox
               checked={formData.require_consent_for_files || false}
-              onChange={(checked) => setFormData((prev) => ({ ...prev, require_consent_for_files: checked }))}
+              onChange={(checked: boolean) => setFormData((prev: AISystemSettings) => ({ ...prev, require_consent_for_files: checked }))}
               className="mr-2" />
             
             <span className="admin-text-sm-med-primary">{t('admin2.ais_require_consent_files')}</span>
@@ -724,7 +783,7 @@ const SystemSettingsForm = ({ settings, onSave }) => {
           <label className="flex items-center justify-center">
             <Checkbox
               checked={formData.anonymize_data || false}
-              onChange={(checked) => setFormData((prev) => ({ ...prev, anonymize_data: checked }))}
+              onChange={(checked: boolean) => setFormData((prev: AISystemSettings) => ({ ...prev, anonymize_data: checked }))}
               className="mr-2" />
             
             <span className="admin-text-sm-med-primary">{t('admin2.ais_anonymize_data')}</span>

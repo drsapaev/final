@@ -34,16 +34,58 @@ import notify from '../../services/notify';
  * Архив фото и рентгенов для стоматологической ЭМК
  * Включает привязку к зубам, датам, категориям и поиск
  */
+
+interface MediaFile {
+  id: number;
+  name: string;
+  type: string;
+  size: number;
+  url: string;
+  category: string;
+  tooth: string;
+  date: string;
+  description: string;
+  tags: string[];
+  uploadedAt: string;
+  isRadiograph: boolean;
+}
+
+interface PhotoArchiveFilters {
+  category: string;
+  tooth: string;
+  dateFrom: string;
+  dateTo: string;
+  tags: string[];
+}
+
+interface PhotoArchiveFormData {
+  patientId: string | number;
+  patientName: string;
+  mediaFiles: MediaFile[];
+  filters: PhotoArchiveFilters;
+  searchQuery: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface PhotoArchiveProps {
+  patientId: string | number;
+  patientName: string;
+  initialData?: Partial<PhotoArchiveFormData> | null;
+  onSave?: (data: PhotoArchiveFormData) => Promise<void> | void;
+  onClose?: () => void;
+}
+
 const PhotoArchive = ({
   patientId,
   patientName,
   initialData = null,
   onSave,
   onClose
-}) => {
+}: PhotoArchiveProps) => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<PhotoArchiveFormData>({
     // Основные данные
     patientId,
     patientName,
@@ -70,49 +112,53 @@ const PhotoArchive = ({
 
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [selectedFile, setSelectedFile] = useState(null);
+  const [selectedFile, setSelectedFile] = useState<MediaFile | null>(null);
   const [showImageViewer, setShowImageViewer] = useState(false);
-  const [viewMode, setViewMode] = useState('grid'); // grid, list, timeline
-  const [sortBy, setSortBy] = useState('date'); // date, tooth, category, name
+  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'timeline'>('grid'); // grid, list, timeline
+  const [sortBy, setSortBy] = useState<'date' | 'tooth' | 'category' | 'name'>('date'); // date, tooth, category, name
 
   // Инициализация данных
   useEffect(() => {
     if (initialData) {
       setFormData((prev) => ({
         ...prev,
-        ...initialData
+        ...(initialData as Partial<PhotoArchiveFormData>)
       }));
     }
   }, [initialData]);
 
   // Обработчики
-  const handleInputChange = (field, value) => {
+  const handleInputChange = (field: string, value: unknown) => {
     if (field.includes('.')) {
       const [parent, child] = field.split('.');
-      setFormData((prev) => ({
-        ...prev,
-        [parent]: {
-          ...prev[parent],
-          [child]: value
-        }
-      }));
+      setFormData((prev) => {
+        const parentValue = prev[parent as keyof PhotoArchiveFormData] as unknown as Record<string, unknown> | undefined;
+        return {
+          ...prev,
+          [parent]: {
+            ...(parentValue ?? {}),
+            [child]: value
+          }
+        } as PhotoArchiveFormData;
+      });
     } else {
       setFormData((prev) => ({
         ...prev,
         [field]: value
-      }));
+      } as PhotoArchiveFormData));
     }
   };
 
-  const handleFileUpload = (files: unknown) => {
-    Array.from(files as ArrayLike<unknown>).forEach((file: unknown) => {
+  const handleFileUpload = (files: FileList | null) => {
+    if (!files) return;
+    Array.from(files as ArrayLike<File>).forEach((file: File) => {
       const reader = new FileReader();
       reader.onload = (e: ProgressEvent<FileReader>) => {
-        const mediaFile = {
+        const mediaFile: MediaFile = {
           id: Date.now() + Math.random(),
-          name: (file as File).name,
-          type: (file as File).type,
-          size: (file as File).size,
+          name: file.name,
+          type: file.type,
+          size: file.size,
           url: (e.target as EventTarget & { result: string }).result,
           category: 'photo',
           tooth: '',
@@ -120,11 +166,11 @@ const PhotoArchive = ({
           description: '',
           tags: [],
           uploadedAt: new Date().toISOString(),
-          isRadiograph: (file as File).type.includes('image') && (
-          (file as File).name.toLowerCase().includes('xray') ||
-          (file as File).name.toLowerCase().includes('panoramic') ||
-          (file as File).name.toLowerCase().includes('cbct') ||
-          (file as File).name.toLowerCase().includes('periapical'))
+          isRadiograph: file.type.includes('image') && (
+          file.name.toLowerCase().includes('xray') ||
+          file.name.toLowerCase().includes('panoramic') ||
+          file.name.toLowerCase().includes('cbct') ||
+          file.name.toLowerCase().includes('periapical'))
 
         };
 
@@ -133,21 +179,21 @@ const PhotoArchive = ({
           mediaFiles: [...prev.mediaFiles, mediaFile]
         }));
       };
-      reader.readAsDataURL(file as Blob);
+      reader.readAsDataURL(file);
     });
   };
-  const openFileViewer = (file) => {
+  const openFileViewer = (file: MediaFile) => {
     setSelectedFile(file);
     setShowImageViewer(true);
   };
-  const handleActivationKeyDown = (event, action) => {
+  const handleActivationKeyDown = (event: React.KeyboardEvent, action: () => void) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       action();
     }
   };
 
-  const handleFileUpdate = (fileId, updates) => {
+  const handleFileUpdate = (fileId: number, updates: Partial<MediaFile>) => {
     setFormData((prev) => ({
       ...prev,
       mediaFiles: prev.mediaFiles.map((file) =>
@@ -156,7 +202,7 @@ const PhotoArchive = ({
     }));
   };
 
-  const handleFileDelete = (fileId) => {
+  const handleFileDelete = (fileId: number) => {
     setFormData((prev) => ({
       ...prev,
       mediaFiles: prev.mediaFiles.filter((file) => file.id !== fileId)
@@ -166,7 +212,7 @@ const PhotoArchive = ({
   const handleSave = async () => {
     setLoading(true);
     try {
-      const updatedData = {
+      const updatedData: PhotoArchiveFormData = {
         ...formData,
         updatedAt: new Date().toISOString()
       };
@@ -176,7 +222,7 @@ const PhotoArchive = ({
       }
 
       setIsEditing(false);
-    } catch (error) {
+    } catch (error: unknown) {
       logger.error('Ошибка сохранения:', error);
       notify.error(t('dental2.photo_load_failed'));
     } finally {
@@ -187,7 +233,7 @@ const PhotoArchive = ({
   // Фильтрация файлов
   const filteredFiles = formData.mediaFiles.filter((file) => {
     const matchesSearch = !formData.searchQuery ||
-    (file as File).name.toLowerCase().includes(formData.searchQuery.toLowerCase()) ||
+    file.name.toLowerCase().includes(formData.searchQuery.toLowerCase()) ||
     file.description.toLowerCase().includes(formData.searchQuery.toLowerCase());
 
     const matchesCategory = formData.filters.category === 'all' ||
@@ -248,16 +294,16 @@ const PhotoArchive = ({
         onClick={() => openFileViewer(file)}
         onKeyDown={(event) => handleActivationKeyDown(event, () => openFileViewer(file))}>
         
-            {(file as File).type.startsWith('image/') ?
+            {file.type.startsWith('image/') ?
         <img
           src={file.url}
-          alt={(file as File).name}
+          alt={file.name}
           className="w-full h-full object-cover" /> :
 
 
         <div className="text-center">
                 <FileImage className="h-12 w-12 text-gray-400 mx-auto mb-2" />
-                <span className="text-sm text-gray-600">{(file as File).name}</span>
+                <span className="text-sm text-gray-600">{file.name}</span>
               </div>
         }
             
@@ -273,7 +319,7 @@ const PhotoArchive = ({
           {/* Информация о файле */}
           <div className="p-3">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium truncate">{(file as File).name}</span>
+              <span className="text-sm font-medium truncate">{file.name}</span>
               <div className="flex items-center gap-1">
                 {file.category === 'photo' && <Camera className="h-3 w-3 text-blue-500" />}
                 {file.category === 'radiograph' && <FileText className="h-3 w-3 text-red-500" />}
@@ -305,14 +351,14 @@ const PhotoArchive = ({
         <div className="mt-2 flex gap-1">
                 <button
             onClick={() => handleFileUpdate(file.id, {})}
-            aria-label={t('dental.dental_pa_aria_edit_file', { name: (file as File).name })}
+            aria-label={t('dental.dental_pa_aria_edit_file', { name: file.name })}
             className="flex-1 px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200">
             
                   <Edit className="h-3 w-3 mx-auto" />
                 </button>
                 <button
             onClick={() => handleFileDelete(file.id)}
-            aria-label={t('dental.dental_pa_aria_delete_file', { name: (file as File).name })}
+            aria-label={t('dental.dental_pa_aria_delete_file', { name: file.name })}
             className="flex-1 px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200">
             
                   <Trash2 className="h-3 w-3 mx-auto" />
@@ -335,15 +381,15 @@ const PhotoArchive = ({
             <div
           className="w-16 h-16 bg-gray-100 rounded flex items-center justify-center cursor-pointer"
           role="button"
-          aria-label={t('dental.dental_pa_aria_open_file', { name: (file as File).name })}
+          aria-label={t('dental.dental_pa_aria_open_file', { name: file.name })}
           tabIndex={0}
           onClick={() => openFileViewer(file)}
           onKeyDown={(event) => handleActivationKeyDown(event, () => openFileViewer(file))}>
           
-              {(file as File).type.startsWith('image/') ?
+              {file.type.startsWith('image/') ?
           <img
             src={file.url}
-            alt={(file as File).name}
+            alt={file.name}
             className="w-full h-full object-cover rounded" /> :
 
 
@@ -354,7 +400,7 @@ const PhotoArchive = ({
             {/* Информация */}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
-                <span className="font-medium truncate">{(file as File).name}</span>
+                <span className="font-medium truncate">{file.name}</span>
                 <div className="flex items-center gap-1">
                   {file.category === 'photo' && <Camera className="h-4 w-4 text-blue-500" />}
                   {file.category === 'radiograph' && <FileText className="h-4 w-4 text-red-500" />}
@@ -376,7 +422,7 @@ const PhotoArchive = ({
                     </span>
               }
                   <span className="text-xs text-gray-500">
-                    {((file as File).size / 1024 / 1024).toFixed(2)} MB
+                    {((file.size) / 1024 / 1024).toFixed(2)} MB
                   </span>
                 </div>
                 
@@ -405,7 +451,7 @@ const PhotoArchive = ({
               setShowImageViewer(true);
             }}
             className="p-2 text-gray-500 hover:text-blue-600"
-            aria-label={t('dental.dental_pa_aria_view_file', { name: (file as File).name })}
+            aria-label={t('dental.dental_pa_aria_view_file', { name: file.name })}
             title={t('dental.dental_pa_title_view')}>
             
                 <Eye className="h-4 w-4" />
@@ -415,11 +461,11 @@ const PhotoArchive = ({
             onClick={() => {
               const link = document.createElement('a');
               link.href = file.url;
-              link.download = (file as File).name;
+              link.download = file.name;
               link.click();
             }}
             className="p-2 text-gray-500 hover:text-green-600"
-            aria-label={t('dental.dental_pa_aria_download_file', { name: (file as File).name })}
+            aria-label={t('dental.dental_pa_aria_download_file', { name: file.name })}
             title={t('dental.dental_pa_title_download')}>
             
                 <Download className="h-4 w-4" />
@@ -429,7 +475,7 @@ const PhotoArchive = ({
           <button
             onClick={() => handleFileDelete(file.id)}
             className="p-2 text-gray-500 hover:text-red-600"
-            aria-label={t('dental.dental_pa_aria_delete_file', { name: (file as File).name })}
+            aria-label={t('dental.dental_pa_aria_delete_file', { name: file.name })}
             title={t('dental.dental_pa_title_delete')}>
             
                   <Trash2 className="h-4 w-4" />
@@ -444,7 +490,7 @@ const PhotoArchive = ({
 
   // Рендер временной шкалы
   const renderTimelineView = () => {
-    const groupedFiles = sortedFiles.reduce((groups, file) => {
+    const groupedFiles = sortedFiles.reduce<Record<string, MediaFile[]>>((groups, file) => {
       const date = file.date;
       if (!groups[date]) {
         groups[date] = [];
@@ -455,7 +501,7 @@ const PhotoArchive = ({
 
     return (
       <div className="space-y-6">
-        {Object.entries(groupedFiles).map(([date, files]: [string, any]) =>
+        {Object.entries(groupedFiles).map(([date, files]) =>
         <div key={date}>
             <div className="flex items-center gap-4 mb-4">
               <div className="w-4 h-4 bg-blue-500 rounded-full"></div>
@@ -475,28 +521,28 @@ const PhotoArchive = ({
                   <div
                 className="aspect-video bg-gray-100 flex items-center justify-center cursor-pointer"
                 role="button"
-                aria-label={t('dental.dental_pa_aria_open_file', { name: (file as File).name })}
+                aria-label={t('dental.dental_pa_aria_open_file', { name: file.name })}
                 tabIndex={0}
                 onClick={() => openFileViewer(file)}
                 onKeyDown={(event) => handleActivationKeyDown(event, () => openFileViewer(file))}>
                 
-                    {(file as File).type.startsWith('image/') ?
+                    {file.type.startsWith('image/') ?
                 <img
                   src={file.url}
-                  alt={(file as File).name}
+                  alt={file.name}
                   className="w-full h-full object-cover" /> :
 
 
                 <div className="text-center">
                         <FileImage className="h-8 w-8 text-gray-400 mx-auto mb-1" />
-                        <span className="text-xs text-gray-600">{(file as File).name}</span>
+                        <span className="text-xs text-gray-600">{file.name}</span>
                       </div>
                 }
                   </div>
                   
                   <div className="p-3">
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-medium truncate">{(file as File).name}</span>
+                      <span className="text-sm font-medium truncate">{file.name}</span>
                       <div className="flex items-center gap-1">
                         {file.category === 'photo' && <Camera className="h-3 w-3 text-blue-500" />}
                         {file.category === 'radiograph' && <FileText className="h-3 w-3 text-red-500" />}
@@ -525,7 +571,7 @@ const PhotoArchive = ({
   };
 
   // Рендер просмотрщика изображений
-  const renderImageViewer = () => {
+  const renderImageViewer = (): React.ReactNode => {
     if (!selectedFile || !showImageViewer) return null;
 
     return (
@@ -710,7 +756,7 @@ const PhotoArchive = ({
             <div className="flex gap-2">
               <select
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
+                onChange={(e) => setSortBy(e.target.value as 'date' | 'tooth' | 'category' | 'name')}
                 className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                 
                 <option value="date">{t('dental.dental_pa_sort_date')}</option>

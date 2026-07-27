@@ -22,7 +22,7 @@ import {
   MoreVertical,
   Search,
   RefreshCw,
-  User,
+  User as UserIcon,
   CheckCircle,
   Ban } from
 
@@ -32,17 +32,36 @@ import UserModal from './UserModal';
 import { useRoles } from '../../hooks/useRoles';
 import { getProfile } from '../../stores/auth';
 
+// Local user shape returned by GET /users/users and stored in `users` state.
+// Mirrors UserModal's UserModalUser to allow direct interop.
+interface ManagedUser {
+  id: string | number;
+  username?: string;
+  email?: string;
+  full_name?: string;
+  role?: string;
+  is_active?: boolean;
+  phone?: string;
+  last_login?: string;
+  [key: string]: unknown;
+}
+
+interface ActionsMenuPosition {
+  top: number;
+  left: number;
+}
+
 const UserManagement = () => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
-  const [users, setUsers] = useState([]);
+  const [users, setUsers] = useState<ManagedUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const [selectedUser, setSelectedUser] = useState(null);
+  const [selectedUser, setSelectedUser] = useState<ManagedUser | null>(null);
   const [showUserModal, setShowUserModal] = useState(false);
   // PR-22: pagination state (was hardcoded per_page=100, no pagination UI)
   const [currentPage, setCurrentPage] = useState(1);
@@ -50,12 +69,12 @@ const UserManagement = () => {
   const [totalUsers, setTotalUsers] = useState(0);
   const perPage = 50;
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [currentProfile, setCurrentProfile] = useState(null);
-  const [deleteDialogMode, setDeleteDialogMode] = useState('confirm');
+  const [currentProfile, setCurrentProfile] = useState<{ id?: string | number | null; [key: string]: unknown } | null>(null);
+  const [deleteDialogMode, setDeleteDialogMode] = useState<'confirm' | 'deactivate' | 'blocked-self'>('confirm');
   const [deleteDialogMessage, setDeleteDialogMessage] = useState('');
-  const [actionsMenuUser, setActionsMenuUser] = useState(null);
-  const [actionsMenuPosition, setActionsMenuPosition] = useState(null);
-  const actionsMenuRef = useRef(null);
+  const [actionsMenuUser, setActionsMenuUser] = useState<ManagedUser | null>(null);
+  const [actionsMenuPosition, setActionsMenuPosition] = useState<ActionsMenuPosition | null>(null);
+  const actionsMenuRef = useRef<HTMLDivElement | null>(null);
 
   // Load roles from API (Phase 4: DB-driven roles)
   const { roleOptions: apiRoleOptions } = useRoles({ includeAll: true });
@@ -125,18 +144,19 @@ const UserManagement = () => {
       setActionsMenuPosition(null);
     };
 
-    const handleKeyDown = (event) => {
+    const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         closeMenu();
       }
     };
 
-    const handlePointerDown = (event) => {
-      if (actionsMenuRef.current?.contains(event.target)) {
+    const handlePointerDown = (event: MouseEvent) => {
+      if (actionsMenuRef.current?.contains(event.target as Node)) {
         return;
       }
 
-      if (event.target.closest?.('[data-user-actions-trigger="true"]')) {
+      const target = event.target as Element & { closest?: (sel: string) => Element | null };
+      if (target.closest?.('[data-user-actions-trigger="true"]')) {
         return;
       }
 
@@ -165,11 +185,12 @@ const UserManagement = () => {
       if (statusFilter) params.status = statusFilter;
       if (searchTerm) params.search = searchTerm;
       const response = (await api.get('/users/users', { params })) as import('axios').AxiosResponse<Record<string, unknown>>;
-      setUsers((response.data.users as unknown as unknown[]) || (response.data as unknown as unknown[]) || []);
+      const usersData = (response.data.users as unknown as ManagedUser[]) || (response.data as unknown as ManagedUser[]) || [];
+      setUsers(usersData);
       setTotalPages(Number(response.data.total_pages ?? 1));
       setTotalUsers(Number(response.data.total ?? 0));
       setError('');
-    } catch (err) {
+    } catch (err: unknown) {
       const errorMessage = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || (err as Error)?.message || t('admin2.um_error_connection');
       setError(errorMessage);
       logger.error('Ошибка загрузки пользователей:', err);
@@ -178,7 +199,7 @@ const UserManagement = () => {
     }
   };
 
-  const handleSaveUser = async (userData) => {
+  const handleSaveUser = async (userData: Record<string, unknown>) => {
     try {
       if (selectedUser) {
         await api.put(`/users/users/${selectedUser.id}`, userData);
@@ -191,7 +212,7 @@ const UserManagement = () => {
       loadUsers(currentPage);
       setShowUserModal(false);
       setSelectedUser(null);
-    } catch (err) {
+    } catch (err: unknown) {
       const errorMessage = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || (err as Error)?.message || t('admin2.um_error_save');
       setError(errorMessage);
       logger.error('Ошибка сохранения пользователя:', err);
@@ -219,7 +240,7 @@ const UserManagement = () => {
       loadUsers(currentPage);
       setShowDeleteDialog(false);
       setSelectedUser(null);
-    } catch (err) {
+    } catch (err: unknown) {
       const errorMessage = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || (err as Error)?.message || t('admin2.um_error_delete');
 
       if (errorMessage.includes('связанные данные') || errorMessage.includes('деактивировать')) {
@@ -256,14 +277,14 @@ const UserManagement = () => {
       setSelectedUser(null);
       setDeleteDialogMode('confirm');
       setDeleteDialogMessage('');
-    } catch (deactivateErr) {
-      const deactivateMessage = deactivateErr.response?.data?.detail || deactivateErr.message || t('admin2.um_error_deactivate');
+    } catch (deactivateErr: unknown) {
+      const deactivateMessage = (deactivateErr as { response?: { data?: { detail?: string } } })?.response?.data?.detail || (deactivateErr as Error)?.message || t('admin2.um_error_deactivate');
       setError(t('admin2.um_error_deactivate_detailed', { message: deactivateMessage }));
       logger.error('Ошибка деактивации пользователя:', deactivateErr);
     }
   };
 
-  const openDeleteDialog = (user) => {
+  const openDeleteDialog = (user: ManagedUser) => {
     setSelectedUser(user);
     setDeleteDialogMode('confirm');
     setDeleteDialogMessage('');
@@ -277,20 +298,20 @@ const UserManagement = () => {
     setSelectedUser(null);
   };
 
-  const handleToggleUserStatus = async (userId, isActive) => {
+  const handleToggleUserStatus = async (userId: string | number, isActive: boolean) => {
     try {
       await api.put(`/users/users/${userId}`, { is_active: !isActive });
       setSuccess(!isActive ? t('admin2.um_msg_activated') : t('admin2.um_msg_deactivated'));
       setError('');
       loadUsers(currentPage);
-    } catch (err) {
+    } catch (err: unknown) {
       const errorMessage = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || (err as Error)?.message || t('admin2.um_error_status_change');
       setError(errorMessage);
       logger.error('Ошибка изменения статуса пользователя:', err);
     }
   };
 
-  const openUserDialog = (user = null) => {
+  const openUserDialog = (user: ManagedUser | null = null) => {
     setSelectedUser(user);
     setShowUserModal(true);
   };
@@ -300,10 +321,10 @@ const UserManagement = () => {
     setActionsMenuPosition(null);
   };
 
-  const openActionsMenu = (event, user) => {
+  const openActionsMenu = (event: React.MouseEvent<HTMLElement>, user: ManagedUser) => {
     event.stopPropagation();
 
-    const rect = event.currentTarget.getBoundingClientRect();
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
     const menuWidth = 208;
     const left = Math.max(8, Math.min(rect.right - menuWidth, window.innerWidth - menuWidth - 8));
 
@@ -329,7 +350,7 @@ const UserManagement = () => {
       return;
     }
 
-    handleToggleUserStatus(actionsMenuUser.id, actionsMenuUser.is_active);
+    handleToggleUserStatus(actionsMenuUser.id, Boolean(actionsMenuUser.is_active));
     closeActionsMenu();
   };
 
@@ -342,8 +363,8 @@ const UserManagement = () => {
     closeActionsMenu();
   };
 
-  const getRoleBadgeVariant = (role) => {
-    const variants = {
+  const getRoleBadgeVariant = (role: unknown): string => {
+    const variants: Record<string, string> = {
       'Admin': 'error',
       'Doctor': 'primary',
       'Nurse': 'info',
@@ -352,12 +373,12 @@ const UserManagement = () => {
       'Cashier': 'success',
       'Patient': 'default'
     };
-    return variants[role] || 'default';
+    return variants[String(role ?? '')] || 'default';
   };
 
-  const getRoleLabel = (role) => {
+  const getRoleLabel = (role: unknown): string => {
     const roleData = roles.find((r) => r.value === role);
-    return roleData?.label || role;
+    return roleData?.label || String(role ?? '');
   };
 
   const filteredUsers = users.filter((user) => {
@@ -393,18 +414,18 @@ const UserManagement = () => {
   {
     key: 'user',
     title: t('admin2.col_user'),
-    render: (_, user) =>
+    render: (_value: unknown, user: Record<string, unknown>) =>
     <Box display="flex" alignItems="center" gap="12px">
           {/* Placeholder Avatar - can be replaced with MacOSAvatar if available */}
           <div className="admin-w-32-h-32-radius-50pct-bg-007AFF-d-flex-ai-center-jc-center-white">
-            <User size={16} />
+            <UserIcon size={16} />
           </div>
           <Box>
             <Typography className="admin-fw-500-fs-13">
-              {user.full_name || user.username}
+              {String(user.full_name ?? '') || String(user.username ?? '')}
             </Typography>
             <Typography className="admin-fs-12-secondary">
-              {user.username}
+              {String(user.username ?? '')}
             </Typography>
           </Box>
         </Box>
@@ -413,7 +434,7 @@ const UserManagement = () => {
   {
     key: 'role',
     title: t('admin2.col_role'),
-    render: (role) =>
+    render: (role: unknown) =>
     <Badge variant={getRoleBadgeVariant(role)}>
           {getRoleLabel(role)}
         </Badge>
@@ -422,17 +443,17 @@ const UserManagement = () => {
   {
     key: 'email',
     title: 'Email',
-    render: (email) => <span className="admin-fs-13-1">{email || '-'}</span>
+    render: (email: unknown) => <span className="admin-fs-13-1">{String(email ?? '') || '-'}</span>
   },
   {
     key: 'phone',
     title: t('admin2.col_phone'),
-    render: (phone) => <span className="admin-fs-13">{phone || '-'}</span>
+    render: (phone: unknown) => <span className="admin-fs-13">{String(phone ?? '') || '-'}</span>
   },
   {
     key: 'status',
     title: t('admin2.col_active'),
-    render: (_, user) =>
+    render: (_value: unknown, user: Record<string, unknown>) =>
     <Badge variant={user.is_active ? 'success' : 'default'} outline>
           {user.is_active ? t('admin2.um_status_active_singular') : t('admin2.um_status_inactive_singular')}
         </Badge>
@@ -441,25 +462,25 @@ const UserManagement = () => {
   {
     key: 'last_login',
     title: t('admin2.col_last_login'),
-    render: (last_login) =>
+    render: (last_login: unknown) =>
     <span className="admin-fs-13-secondary">
-          {last_login ? new Date(last_login).toLocaleDateString() : '-'}
+          {last_login ? new Date(String(last_login)).toLocaleDateString() : '-'}
         </span>
 
   },
   {
     key: 'actions',
     title: '',
-    render: (_, user) =>
+    render: (_value: unknown, user: Record<string, unknown>) =>
     <div className="admin-d-flex-jc-end">
           <Button
         data-user-actions-trigger="true"
-        aria-label={t('admin2.um_actions_aria', { name: user.full_name || user.username })}
+        aria-label={t('admin2.um_actions_aria', { name: String(user.full_name ?? '') || String(user.username ?? '') })}
         aria-haspopup="menu"
         aria-expanded={actionsMenuUser?.id === user.id}
         title={t('admin2.um_actions_button_title')}
         onClick={(e: React.MouseEvent<HTMLElement>) => {
-          openActionsMenu(e, user);
+          openActionsMenu(e, user as unknown as ManagedUser);
         }}
         variant="ghost"
         size="small"
@@ -643,7 +664,6 @@ const UserManagement = () => {
         user={selectedUser}
         onSave={handleSaveUser}
         loading={loading && showUserModal} />
-      
 
       {/* Delete Confirmation Dialog (Using Modal) */}
       <Modal
@@ -661,13 +681,13 @@ const UserManagement = () => {
         <div className="admin-p-0-0-24px-0">
           {deleteDialogMode === 'confirm' ? (
             <Typography>
-              {t('admin2.um_delete_confirm_question', { name: selectedUser?.username })}
+              {t('admin2.um_delete_confirm_question', { name: String(selectedUser?.username ?? '') })}
               <br />
               {t('admin2.um_delete_confirm_warning')}
             </Typography>
           ) : (
             <Typography>
-              <b>{selectedUser?.username}</b>
+              <b>{String(selectedUser?.username ?? '')}</b>
               <br />
               <br />
               {deleteDialogMessage}

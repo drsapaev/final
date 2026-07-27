@@ -54,12 +54,87 @@ const PRICING_RULE_TYPE_KEYS = {
   dynamic: 'dp_rule_type_dynamic'
 };
 
-const getRuleTypeLabel = (ruleType, t) => {
-  const key = PRICING_RULE_TYPE_KEYS[normalizePricingEnumValue(ruleType)];
-  return key ? t(`admin2.${key}`) : ruleType;
+type PricingRuleType = 'time_based' | 'volume_based' | 'seasonal' | 'loyalty' | 'package' | 'dynamic';
+type DiscountType = 'percentage' | 'fixed_amount' | 'buy_x_get_y' | 'tiered';
+type Translator = (key: string, options?: Record<string, unknown>) => string;
+
+interface Service {
+  id: string | number;
+  name: string;
+  price: string | number;
+}
+
+interface PricingRule {
+  id: string | number;
+  name?: string;
+  description?: string;
+  rule_type: PricingRuleType | string;
+  discount_type: DiscountType | string;
+  discount_value: number;
+  is_active: boolean;
+  current_uses?: number;
+  max_uses?: number | string;
+  priority: number;
+  start_time?: string;
+  end_time?: string;
+}
+
+interface ServicePackage {
+  id: string | number;
+  name?: string;
+  description?: string;
+  is_active: boolean;
+  package_price: number;
+  original_price?: number;
+  savings_percentage?: number;
+  current_purchases?: number;
+  max_purchases?: number | string;
+  valid_from?: string;
+  valid_to?: string;
+}
+
+interface RuleForm {
+  name: string;
+  description: string;
+  rule_type: string;
+  discount_type: string;
+  discount_value: number;
+  start_date: string;
+  end_date: string;
+  start_time: string;
+  end_time: string;
+  days_of_week: string;
+  min_quantity: number;
+  max_quantity: string;
+  min_amount: string;
+  priority: number;
+  max_uses: string;
+  service_ids: number[];
+}
+
+interface PackageForm {
+  name: string;
+  description: string;
+  service_ids: number[];
+  package_price: number;
+  valid_from: string;
+  valid_to: string;
+  max_purchases: string;
+  per_patient_limit: string;
+}
+
+interface ServiceChecklistProps {
+  services?: Service[];
+  value?: Array<string | number>;
+  onChange: (ids: number[]) => void;
+}
+
+const getRuleTypeLabel = (ruleType: unknown, t: Translator): string => {
+  const key = PRICING_RULE_TYPE_KEYS[normalizePricingEnumValue(ruleType) as keyof typeof PRICING_RULE_TYPE_KEYS];
+  return key ? t(`admin2.${key}`) : String(ruleType ?? '');
 };
 
-const getRuleTypeOptions = (t) =>
+const getRuleTypeOptions = (t: Translator) =>
   Object.entries(PRICING_RULE_TYPE_KEYS).map(([value, key]) => ({
     value,
     label: t(`admin2.${key}`)
@@ -74,23 +149,23 @@ const DISCOUNT_TYPE_KEYS = [
   { value: 'tiered', key: 'dp_discount_type_tiered' }
 ];
 
-const getDiscountTypeOptions = (t) =>
+const getDiscountTypeOptions = (t: Translator) =>
   DISCOUNT_TYPE_KEYS.map(({ value, key }) => ({
     value,
     label: t(`admin2.${key}`)
   }));
 
-const normalizePricingEnumValue = (value) =>
-  typeof value === 'string' ? value.toLowerCase() : value;
+const normalizePricingEnumValue = (value: unknown): string =>
+  typeof value === 'string' ? value.toLowerCase() : String(value ?? '');
 
-const normalizeServiceId = (value) => Number.parseInt(String(value), 10);
+const normalizeServiceId = (value: unknown): number => Number.parseInt(String(value), 10);
 
-const getSelectedServiceIds = (value) =>
+const getSelectedServiceIds = (value: unknown): number[] =>
   Array.isArray(value)
     ? value.map(normalizeServiceId).filter((id) => !Number.isNaN(id))
     : [];
 
-const toggleServiceId = (selectedIds, serviceId) => {
+const toggleServiceId = (selectedIds: unknown, serviceId: unknown): number[] => {
   const normalizedId = normalizeServiceId(serviceId);
   if (Number.isNaN(normalizedId)) {
     return getSelectedServiceIds(selectedIds);
@@ -106,7 +181,7 @@ const toggleServiceId = (selectedIds, serviceId) => {
   return Array.from(next);
 };
 
-const ServiceChecklist = ({ services = [], value = [], onChange }) => {
+const ServiceChecklist = ({ services = [], value = [], onChange }: ServiceChecklistProps) => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const selectedIds = getSelectedServiceIds(value);
@@ -163,7 +238,7 @@ ServiceChecklist.propTypes = {
   onChange: PropTypes.func.isRequired
 };
 
-const buildPricingRulePayload = (form) =>
+const buildPricingRulePayload = (form: RuleForm): Record<string, unknown> =>
   Object.fromEntries(
     Object.entries({
       ...form,
@@ -192,19 +267,19 @@ const DynamicPricingManager = () => {
   // P-013 fix: shared ConfirmDialog hook (replaces 2 native confirm() calls).
   const [confirmRaw, confirmDialog] = useConfirm();
   const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
-  const [activeTab, setActiveTab] = useState('rules');
-  const [pricingRules, setPricingRules] = useState([]);
-  const [servicePackages, setServicePackages] = useState([]);
-  const [services, setServices] = useState([]);
+  const [activeTab, setActiveTab] = useState<'rules' | 'packages' | 'analytics'>('rules');
+  const [pricingRules, setPricingRules] = useState<PricingRule[]>([]);
+  const [servicePackages, setServicePackages] = useState<ServicePackage[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
   const [analytics, setAnalytics] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(false);
   const [showCreateRule, setShowCreateRule] = useState(false);
   const [showCreatePackage, setShowCreatePackage] = useState(false);
-  const [editingRule, setEditingRule] = useState(null); // P2 fix: restored value (was const [, setX]; UI not yet implemented)
-  const [editingPackage, setEditingPackage] = useState(null); // P2 fix: restored value (same as above)
+  const [editingRule, setEditingRule] = useState<PricingRule | null>(null); // P2 fix: restored value (was const [, setX]; UI not yet implemented)
+  const [editingPackage, setEditingPackage] = useState<ServicePackage | null>(null); // P2 fix: restored value (same as above)
 
   // Форма для правила ценообразования
-  const [ruleForm, setRuleForm] = useState({
+  const [ruleForm, setRuleForm] = useState<RuleForm>({
     name: '',
     description: '',
     rule_type: 'time_based',
@@ -224,7 +299,7 @@ const DynamicPricingManager = () => {
   });
 
   // Форма для пакета услуг
-  const [packageForm, setPackageForm] = useState({
+  const [packageForm, setPackageForm] = useState<PackageForm>({
     name: '',
     description: '',
     service_ids: [],
@@ -241,8 +316,8 @@ const DynamicPricingManager = () => {
       // Загружаем услуги
       try {
         const response = (await api.get('/services')) as import('axios').AxiosResponse<Record<string, unknown>>;
-        setServices(Array.isArray(response.data) ? response.data : []);
-      } catch (e) {
+        setServices(Array.isArray(response.data) ? (response.data as Service[]) : []);
+      } catch (e: unknown) {
         logger.error('Failed to load services:', e);
         setServices([]);
       }
@@ -251,8 +326,8 @@ const DynamicPricingManager = () => {
         // Загружаем правила ценообразования
         try {
           const response = (await api.get('/dynamic-pricing/pricing-rules')) as import('axios').AxiosResponse<Record<string, unknown>>;
-          setPricingRules(Array.isArray(response.data) ? response.data : []);
-        } catch (e) {
+          setPricingRules(Array.isArray(response.data) ? (response.data as PricingRule[]) : []);
+        } catch (e: unknown) {
           logger.error('Failed to load pricing rules:', e);
           setPricingRules([]);
         }
@@ -260,8 +335,8 @@ const DynamicPricingManager = () => {
         // Загружаем пакеты услуг
         try {
           const response = (await api.get('/dynamic-pricing/service-packages')) as import('axios').AxiosResponse<Record<string, unknown>>;
-          setServicePackages(Array.isArray(response.data) ? response.data : []);
-        } catch (e) {
+          setServicePackages(Array.isArray(response.data) ? (response.data as ServicePackage[]) : []);
+        } catch (e: unknown) {
           logger.error('Failed to load packages:', e);
           setServicePackages([]);
         }
@@ -270,12 +345,12 @@ const DynamicPricingManager = () => {
         try {
           const response = (await api.get('/dynamic-pricing/pricing-analytics')) as import('axios').AxiosResponse<Record<string, unknown>>;
           setAnalytics(response.data);
-        } catch (e) {
+        } catch (e: unknown) {
           logger.error('Failed to load analytics:', e);
           setAnalytics(null);
         }
       }
-    } catch (error) {
+    } catch (error: unknown) {
       logger.error('Ошибка загрузки данных:', error);
       toast.error(t('admin2.dp_load_error'));
     } finally {
@@ -311,9 +386,10 @@ const DynamicPricingManager = () => {
         service_ids: []
       });
       loadData();
-    } catch (error) {
+    } catch (error: unknown) {
       logger.error('Ошибка создания правила:', error);
-      toast.error(error.response?.data?.detail || t('admin2.dp_rule_create_error'));
+      const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      toast.error(detail || t('admin2.dp_rule_create_error'));
     }
   };
 
@@ -333,24 +409,25 @@ const DynamicPricingManager = () => {
         per_patient_limit: ''
       });
       loadData();
-    } catch (error) {
+    } catch (error: unknown) {
       logger.error('Ошибка создания пакета:', error);
-      toast.error(error.response?.data?.detail || t('admin2.dp_package_create_error'));
+      const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      toast.error(detail || t('admin2.dp_package_create_error'));
     }
   };
 
-  const handleToggleRule = async (ruleId, isActive) => {
+  const handleToggleRule = async (ruleId: string | number, isActive: boolean) => {
     try {
       await api.put(`/dynamic-pricing/pricing-rules/${ruleId}`, { is_active: !isActive });
       toast.success(isActive ? t('admin2.dp_rule_deactivated') : t('admin2.dp_rule_activated'));
       loadData();
-    } catch (error) {
+    } catch (error: unknown) {
       logger.error('Ошибка изменения статуса правила:', error);
       toast.error(t('admin2.dp_rule_status_error'));
     }
   };
 
-  const handleDeleteRule = async (ruleId) => {
+  const handleDeleteRule = async (ruleId: string | number) => {
     // P-013 fix: replaced native confirm() with shared useConfirm hook.
     const ok = await confirm({
       title: t('admin2.delete_rule_title'),
@@ -366,13 +443,13 @@ const DynamicPricingManager = () => {
       await api.delete(`/dynamic-pricing/pricing-rules/${ruleId}`);
       toast.success(t('admin2.dp_rule_deleted'));
       loadData();
-    } catch (error) {
+    } catch (error: unknown) {
       logger.error('Ошибка удаления правила:', error);
       toast.error(t('admin2.dp_rule_delete_error'));
     }
   };
 
-  const handleDeletePackage = async (packageId) => {
+  const handleDeletePackage = async (packageId: string | number) => {
     // P-013 fix: replaced native confirm() with shared useConfirm hook.
     const ok = await confirm({
       title: t('admin2.delete_package_title'),
@@ -388,7 +465,7 @@ const DynamicPricingManager = () => {
       await api.delete(`/dynamic-pricing/service-packages/${packageId}`);
       toast.success(t('admin2.dp_package_deleted'));
       loadData();
-    } catch (error) {
+    } catch (error: unknown) {
       logger.error('Ошибка удаления пакета:', error);
       toast.error(t('admin2.dp_package_delete_error'));
     }
@@ -397,8 +474,9 @@ const DynamicPricingManager = () => {
   const handleUpdateDynamicPrices = async () => {
     try {
       const response = (await api.post('/dynamic-pricing/update-dynamic-prices')) as import('axios').AxiosResponse<Record<string, unknown>>;
-      toast.success(t('admin2.dp_prices_updated', { updated: response.data.updated_count, total: response.data.total_services }));
-    } catch (error) {
+      const data = response.data as { updated_count?: number; total_services?: number };
+      toast.success(t('admin2.dp_prices_updated', { updated: data.updated_count, total: data.total_services }));
+    } catch (error: unknown) {
       logger.error('Ошибка обновления цен:', error);
       toast.error(t('admin2.dp_prices_update_error'));
     }
@@ -659,7 +737,7 @@ const DynamicPricingManager = () => {
               <ServiceChecklist
             services={services}
             value={ruleForm.service_ids}
-            onChange={(serviceIds) => setRuleForm({ ...ruleForm, service_ids: serviceIds })}
+            onChange={(serviceIds: number[]) => setRuleForm({ ...ruleForm, service_ids: serviceIds })}
           ></ServiceChecklist>
             </div>
           </div>
@@ -870,7 +948,7 @@ const DynamicPricingManager = () => {
               <ServiceChecklist
             services={services}
             value={packageForm.service_ids}
-            onChange={(serviceIds) => setPackageForm({ ...packageForm, service_ids: serviceIds })}
+            onChange={(serviceIds: number[]) => setPackageForm({ ...packageForm, service_ids: serviceIds })}
           ></ServiceChecklist>
             </div>
           </div>
@@ -914,8 +992,8 @@ const DynamicPricingManager = () => {
             </div>
             <p className="admin-stats-label">
               {t('admin2.dp_analytics_period', {
-                start: (analytics.period as { start_date?: string })?.start_date ? new Date((analytics.period as { start_date?: string })?.start_date).toLocaleDateString() : '',
-                end: (analytics.period as { end_date?: string })?.end_date ? new Date((analytics.period as { end_date?: string })?.end_date).toLocaleDateString() : ''
+                start: (() => { const sd = (analytics.period as { start_date?: string })?.start_date; return sd ? new Date(sd).toLocaleDateString() : ''; })(),
+                end: (() => { const ed = (analytics.period as { end_date?: string })?.end_date; return ed ? new Date(ed).toLocaleDateString() : ''; })()
               })}
             </p>
           </MacOSCard>
@@ -958,7 +1036,7 @@ const DynamicPricingManager = () => {
 
     }
 
-      {analytics?.rules_statistics &&
+      {analytics?.rules_statistics ?
     <MacOSCard className="p-4">
           <h4 className="admin-rule-header mb-4">
             {t('admin2.dp_analytics_rules_stats')}
@@ -980,10 +1058,10 @@ const DynamicPricingManager = () => {
               </div>
         )}
           </div>
-        </MacOSCard>
+        </MacOSCard> : null
     }
 
-      {analytics?.packages_statistics &&
+      {analytics?.packages_statistics ?
     <MacOSCard className="p-4">
           <h4 className="admin-rule-header mb-4">
             {t('admin2.dp_analytics_packages_stats')}
@@ -1005,12 +1083,12 @@ const DynamicPricingManager = () => {
               </div>
         )}
           </div>
-        </MacOSCard>
+        </MacOSCard> : null
     }
     </div>;
 
 
-  const tabs = [
+  const tabs: Array<{ id: 'rules' | 'packages' | 'analytics'; label: string; icon: typeof Settings }> = [
   { id: 'rules', label: t('admin2.dp_tab_rules'), icon: Settings },
   { id: 'packages', label: t('admin2.dp_tab_packages'), icon: Package },
   { id: 'analytics', label: t('admin2.dp_tab_analytics'), icon: BarChart3 }];
