@@ -26,6 +26,41 @@ import notify from '../../services/notify';
  * Форма диагнозов и назначений для стоматологической ЭМК
  * Включает диагнозы по зубам, общие диагнозы, рецепты, направления
  */
+
+interface Prescription {
+  medication?: string;
+  dosage?: string;
+  administration?: string;
+  duration?: string;
+  notes?: string;
+}
+
+interface Referral {
+  specialty?: string;
+  specialist?: string;
+  priority?: string;
+  reason?: string;
+  notes?: string;
+}
+
+interface DiagnosisFormState {
+  diagnosisDate: string;
+  doctor: string;
+  toothDiagnoses: Record<string, string>;
+  generalDiagnoses: string[];
+  treatmentPlan: {
+    immediate: string[];
+    shortTerm: string[];
+    longTerm: string[];
+  };
+  prescriptions: Prescription[];
+  referrals: Referral[];
+  recommendations: string[];
+  createdAt: string;
+  updatedAt: string;
+  [key: string]: unknown;
+}
+
 const DiagnosisForm = ({
   patientName,
   initialData = null,
@@ -34,7 +69,7 @@ const DiagnosisForm = ({
 }: { patientId?: string | number; patientName?: string; initialData?: Record<string, unknown> | null; onSave?: (data: unknown) => void; onClose?: () => void }) => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<DiagnosisFormState>({
     // Основные данные
     diagnosisDate: new Date().toISOString().split('T')[0],
     doctor: '',
@@ -78,13 +113,13 @@ const DiagnosisForm = ({
   }, [initialData]);
 
   // Обработчики
-  const handleInputChange = (field, value) => {
+  const handleInputChange = (field: string, value: unknown) => {
     if (field.includes('.')) {
       const [parent, child] = field.split('.');
       setFormData((prev) => ({
         ...prev,
         [parent]: {
-          ...prev[parent],
+          ...(prev[parent] as Record<string, unknown>),
           [child]: value
         }
       }));
@@ -96,21 +131,21 @@ const DiagnosisForm = ({
     }
   };
 
-  const handleArrayAdd = (field, item) => {
+  const handleArrayAdd = (field: string, item: unknown) => {
     setFormData((prev) => ({
       ...prev,
-      [field]: [...prev[field], item]
+      [field]: [...((prev[field] as unknown[]) || []), item]
     }));
   };
 
-  const handleArrayRemove = (field, index) => {
+  const handleArrayRemove = (field: string, index: number) => {
     setFormData((prev) => ({
       ...prev,
-      [field]: prev[field].filter((_, i) => i !== index)
+      [field]: ((prev[field] as unknown[]) || []).filter((_, i) => i !== index)
     }));
   };
 
-  const handleToothDiagnosisChange = (toothId, diagnosis) => {
+  const handleToothDiagnosisChange = (toothId: number | string, diagnosis: string) => {
     setFormData((prev) => ({
       ...prev,
       toothDiagnoses: {
@@ -247,7 +282,7 @@ const DiagnosisForm = ({
       
       <div className="space-y-4">
         {formData.generalDiagnoses.map((diagnosis, index) =>
-      <div key={`dx-${index}-${diagnosis.text || ''}`} className="flex items-center gap-3 p-3 border rounded-lg">
+      <div key={`dx-${index}-${diagnosis || ''}`} className="flex items-center gap-3 p-3 border rounded-lg">
             <input
           type="text"
           aria-label={t('dental.dental_df_aria_general_diagnosis', { index: index + 1 })}
@@ -304,7 +339,7 @@ const DiagnosisForm = ({
         </h4>
         <div className="space-y-2">
           {formData.treatmentPlan.immediate.map((item, index) =>
-        <div key={`imm-${index}-${item.text || ''}`} className="flex items-center gap-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+        <div key={`imm-${index}-${item || ''}`} className="flex items-center gap-3 p-3 bg-red-50 border border-red-200 rounded-lg">
               <input
             type="text"
             aria-label={t('dental.dental_df_aria_immediate_item', { index: index + 1 })}
@@ -349,7 +384,7 @@ const DiagnosisForm = ({
         </h4>
         <div className="space-y-2">
           {formData.treatmentPlan.shortTerm.map((item, index) =>
-        <div key={`short-${index}-${item.text || ''}`} className="flex items-center gap-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+        <div key={`short-${index}-${item || ''}`} className="flex items-center gap-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
               <input
             type="text"
             aria-label={t('dental.dental_df_aria_short_term_item', { index: index + 1 })}
@@ -394,7 +429,7 @@ const DiagnosisForm = ({
         </h4>
         <div className="space-y-2">
           {formData.treatmentPlan.longTerm.map((item, index) =>
-        <div key={`long-${index}-${item.text || ''}`} className="flex items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+        <div key={`long-${index}-${item || ''}`} className="flex items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
               <input
             type="text"
             aria-label={t('dental.dental_df_aria_long_term_item', { index: index + 1 })}

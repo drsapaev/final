@@ -28,12 +28,31 @@ import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
 
-const ALL_FREE_ACTION_CAN_FIELD = {
+const ALL_FREE_ACTION_CAN_FIELD: Record<string, string> = {
   approve: 'can_approve',
   reject: 'can_reject'
 };
 
-const hasBackendAllFreeAction = (request, action) => {
+interface AllFreeRequest {
+  id: string | number;
+  approval_status?: string;
+  total_original_amount?: number | string;
+  created_at?: string;
+  patient_name?: string;
+  patient_phone?: string;
+  doctor_name?: string;
+  doctor_specialty?: string;
+  visit_date?: string;
+  visit_time?: string;
+  services?: string[];
+  notes?: string;
+  available_actions?: string[];
+  can_approve?: boolean;
+  can_reject?: boolean;
+  [key: string]: unknown;
+}
+
+const hasBackendAllFreeAction = (request: AllFreeRequest | null | undefined, action: unknown) => {
   const normalizedAction = String(action || '').trim().toLowerCase();
   if (!normalizedAction) {
     return false;
@@ -47,7 +66,7 @@ const hasBackendAllFreeAction = (request, action) => {
 
   const canField = ALL_FREE_ACTION_CAN_FIELD[normalizedAction];
   if (canField && Object.prototype.hasOwnProperty.call(request || {}, canField)) {
-    return Boolean(request[canField]);
+    return Boolean((request as Record<string, unknown>)?.[canField]);
   }
 
   return false;
@@ -58,11 +77,11 @@ const hasBackendAllFreeAction = (request, action) => {
 const AllFreeApproval = () => {
   useTheme();
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
-  const [allFreeRequests, setAllFreeRequests] = useState([]);
-  const [allRequestsForStats, setAllRequestsForStats] = useState([]); // ✅ Для статистики - все заявки
+  const [allFreeRequests, setAllFreeRequests] = useState<AllFreeRequest[]>([]);
+  const [allRequestsForStats, setAllRequestsForStats] = useState<AllFreeRequest[]>([]); // ✅ Для статистики - все заявки
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('pending');
-  const [selectedRequest, setSelectedRequest] = useState(null);
+  const [selectedRequest, setSelectedRequest] = useState<AllFreeRequest | null>(null);
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -101,7 +120,7 @@ const AllFreeApproval = () => {
     loadAllRequestsForStats();
   }, [loadAllFreeRequests, loadAllRequestsForStats]);
 
-  const handleApproval = async (visitId, action, rejectionReason = null) => {
+  const handleApproval = async (visitId: string | number, action: string, rejectionReason: string | null = null) => {
     setIsProcessing(true);
     try {
       const response = await api.post('/admin/all-free-approve', {
@@ -128,11 +147,11 @@ const AllFreeApproval = () => {
     }
   };
 
-  const formatPrice = (price) => {
+  const formatPrice = (price: number | string) => {
     return Number(price).toLocaleString('ru-RU') + ' UZS';
   };
 
-  const getStatusColor = (status) => {
+  const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending':return 'var(--mac-warning)';
       case 'approved':return 'var(--mac-success)';
@@ -141,7 +160,7 @@ const AllFreeApproval = () => {
     }
   };
 
-  const getStatusIcon = (status) => {
+  const getStatusIcon = (status: string) => {
     switch (status) {
       case 'pending':return <Clock size={16 as unknown as "small" | "default" | "large" | "xlarge"} />;
       case 'approved':return <CheckCircle size={16 as unknown as "small" | "default" | "large" | "xlarge"} />;
@@ -150,7 +169,7 @@ const AllFreeApproval = () => {
     }
   };
 
-  const getStatusText = (status) => {
+  const getStatusText = (status: string) => {
     switch (status) {
       case 'pending':return t('admin2.af_status_pending');
       case 'approved':return t('admin2.af_status_approved');
@@ -159,7 +178,7 @@ const AllFreeApproval = () => {
     }
   };
 
-  const getSpecialtyText = (specialty) => {
+  const getSpecialtyText = (specialty: string) => {
     switch (specialty) {
       case 'dermatology':return t('admin2.af_specialty_dermatology');
       case 'cosmetology':return t('admin2.af_specialty_cosmetology');
@@ -331,9 +350,9 @@ const AllFreeApproval = () => {
                 {/* Header карточки */}
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
-                    <Badge className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(request.approval_status)}`}>
-                      {getStatusIcon(request.approval_status)}
-                      <span className="ml-2">{getStatusText(request.approval_status)}</span>
+                    <Badge className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(request.approval_status || '')}`}>
+                      {getStatusIcon(request.approval_status || '')}
+                      <span className="ml-2">{getStatusText(request.approval_status || '')}</span>
                     </Badge>
                     
                     <span className="text-sm text-gray-500 dark:text-gray-400">
@@ -343,7 +362,7 @@ const AllFreeApproval = () => {
                   
                   <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
                     <Calendar size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
-                    {new Date(request.created_at).toLocaleDateString('ru-RU')}
+                    {new Date(request.created_at || '').toLocaleDateString('ru-RU')}
                   </div>
                 </div>
 
@@ -377,7 +396,7 @@ const AllFreeApproval = () => {
                         <div>
                           <div className="text-sm">{request.doctor_name}</div>
                           <div className="text-xs text-gray-500">
-                            {getSpecialtyText(request.doctor_specialty)}
+                            {getSpecialtyText(request.doctor_specialty || '')}
                           </div>
                         </div>
                       </div>
@@ -403,7 +422,7 @@ const AllFreeApproval = () => {
                   <div className="flex items-center gap-2 mb-2">
                     <Package size={16 as unknown as "small" | "default" | "large" | "xlarge"} className="text-gray-400" />
                     <div className="flex flex-wrap gap-2">
-                      {request.services.map((service, index) =>
+                      {(request.services || []).map((service, index) =>
                   <Badge key={index} variant="secondary" className="text-xs">
                           {service}
                         </Badge>
@@ -414,7 +433,7 @@ const AllFreeApproval = () => {
                   <div className="flex items-center gap-2">
                     <DollarSign size={16 as unknown as "small" | "default" | "large" | "xlarge"} className="text-orange-600" />
                     <span className="text-lg font-semibold text-orange-600">
-                      {formatPrice(request.total_original_amount)}
+                      {formatPrice(request.total_original_amount || 0)}
                     </span>
                     <span className="text-sm text-gray-500">{t('admin2.af_free')}</span>
                   </div>
@@ -481,7 +500,7 @@ const AllFreeApproval = () => {
                     {t('admin2.af_request_id', { id: selectedRequest.id })}
                   </p>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
-                    {t('admin2.af_modal_amount', { amount: formatPrice(selectedRequest.total_original_amount) })}
+                    {t('admin2.af_modal_amount', { amount: formatPrice(selectedRequest.total_original_amount || 0) })}
                   </p>
                 </div>
                 

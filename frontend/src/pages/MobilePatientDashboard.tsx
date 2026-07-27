@@ -29,11 +29,34 @@ import { useTranslation } from '../i18n/useTranslation';
 /**
  * Мобильная панель пациента для PWA
  */
+
+interface PatientData {
+  name?: string;
+  phone?: string;
+  total_spent?: number | string;
+  [key: string]: unknown;
+}
+
+interface PatientAppointment {
+  id: string | number;
+  appointment_date: string;
+  status: string;
+  queue_number?: string | number;
+  people_before?: number;
+  estimated_wait_time?: number | string;
+  doctor_name?: string;
+  specialty?: string;
+  cabinet?: string;
+  location?: string;
+  complaint?: string;
+  [key: string]: unknown;
+}
+
 const MobilePatientDashboard = () => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
-  const [patientData, setPatientData] = useState(null);
-  const [appointments, setAppointments] = useState([]);
+  const [patientData, setPatientData] = useState<PatientData | null>(null);
+  const [appointments, setAppointments] = useState<PatientAppointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
   usePWA();
@@ -71,7 +94,7 @@ const MobilePatientDashboard = () => {
 
   const getUpcomingAppointments = () => {
     const now = new Date();
-    return appointments.filter((apt) =>
+    return appointments.filter((apt: PatientAppointment) =>
     new Date(apt.appointment_date) > now && apt.status === 'scheduled'
     ).slice(0, 3);
   };
@@ -83,7 +106,7 @@ const MobilePatientDashboard = () => {
 
 
 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: string | number | Date) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('ru-RU', {
       day: 'numeric',
@@ -93,7 +116,7 @@ const MobilePatientDashboard = () => {
     });
   };
 
-  const getStatusColor = (status) => {
+  const getStatusColor = (status: string) => {
     switch (status) {
       case 'scheduled':return 'blue';
       case 'completed':return 'green';
@@ -102,7 +125,7 @@ const MobilePatientDashboard = () => {
     }
   };
 
-  const getStatusLabel = (status) => {
+  const getStatusLabel = (status: string) => {
     switch (status) {
       case 'scheduled':return t('misc.mpd_zaplanirovano');
       case 'completed':return t('misc.mpd_zaversheno');
@@ -112,7 +135,7 @@ const MobilePatientDashboard = () => {
   };
 
   // Найти первую активную запись в очереди (на сегодня)
-  const activeQueueEntry = appointments.find((a) =>
+  const activeQueueEntry = appointments.find((a: PatientAppointment) =>
   (a.status === 'waiting' || a.status === 'called') &&
   new Date(a.appointment_date).toDateString() === new Date().toDateString()
   );
@@ -188,7 +211,7 @@ const MobilePatientDashboard = () => {
                 number: activeQueueEntry.queue_number || activeQueueEntry.id,
                 status: activeQueueEntry.status,
                 peopleBefore: activeQueueEntry.people_before,
-                estimatedWaitTime: activeQueueEntry.estimated_wait_time,
+                estimatedWaitTime: Number(activeQueueEntry.estimated_wait_time) || 0,
                 doctorName: activeQueueEntry.doctor_name,
                 specialty: activeQueueEntry.specialty || t('misc.mpd_priyom_vracha'),
                 cabinet: activeQueueEntry.cabinet
@@ -248,7 +271,7 @@ const MobilePatientDashboard = () => {
               <div className="grid grid-cols-3 gap-4">
                 <div className="text-center">
                   <div className="text-2xl font-bold text-blue-600">
-                    {appointments.filter((a) => a.status === 'completed').length}
+                    {appointments.filter((a: PatientAppointment) => a.status === 'completed').length}
                   </div>
                   <div className="text-xs text-gray-600">{t('misc.mpd_vizitov')}</div>
                 </div>
