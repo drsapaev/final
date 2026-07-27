@@ -116,7 +116,7 @@ const PaymentTest = () => {
     currency: 'UZS',
     description: t('misc.pt_testovaya_oplata_meditsinski')
   });
-  const [result, setResult] = useState(null);
+  const [result, setResult] = useState<Record<string, unknown> | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   // Проверяем авторизацию при загрузке
@@ -133,7 +133,7 @@ const PaymentTest = () => {
     window.location.assign('/login');
   };
 
-  const handlePaymentSuccess = (paymentData) => {
+  const handlePaymentSuccess = (paymentData: Record<string, unknown>) => {
     logger.log('Payment Success:', paymentData);
     setResult({
       type: 'success',
@@ -143,7 +143,7 @@ const PaymentTest = () => {
     setShowWidget(false);
   };
 
-  const handlePaymentError = (errorMessage) => {
+  const handlePaymentError = (errorMessage: string) => {
     logger.error('Payment Error:', errorMessage);
     setResult({
       type: 'error',
@@ -301,7 +301,7 @@ const PaymentTest = () => {
                   role={result.type === 'error' ? 'alert' : 'status'}
                   style={{ marginBottom: 12 }}
                 >
-                  {result.message}
+                  {String(result.message || "")}
                 </Alert>
 
                 {result.data && (
