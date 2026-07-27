@@ -1759,7 +1759,7 @@ const MacOSCardiologistPanelUnified = () => {
                 bloodTestForm={{
                   ...bloodTestForm,
                   // Hint the doctor that this form is for ECG metadata entry
-                  interpretation: bloodTestForm?.interpretation || '',
+                  interpretation: String(bloodTestForm?.interpretation ?? ''),
                 }}
                 setBloodTestForm={setBloodTestForm}
                 showFormOpen

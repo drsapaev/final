@@ -33,6 +33,7 @@ interface LabReportField {
   reference_text?: string;
   resolved_flag_meta?: {
     matched_threshold?: { value: string; operator: string };
+    direction?: string;
   };
   resolved_flag_source?: string;
   resolved_flag?: string;

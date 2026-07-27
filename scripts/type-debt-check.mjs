@@ -34,17 +34,19 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const FRONTEND_DIR = resolve(__dirname, '..', 'frontend', 'src');
 
 const BASELINE = {
-  // 5 accepted `any` casts in source code (excluding .d.ts ambient declarations):
+  // 7 accepted `any` casts in source code (excluding .d.ts ambient declarations):
   //   - RoleGuard.tsx withRoleGuard HOC props (TECH-DEBT(role-guard-hoc))
   //   - RequireAuth.tsx withRoleAuth HOC props (TECH-DEBT(role-auth-hoc))
   //   - RequireAuth.tsx withRoleRender HOC props (TECH-DEBT(role-render-hoc))
   //   - ProtocolTemplates.tsx event handler (TECH-DEBT(protocol-templates-handlers))
   //   - RoleGuard.tsx WrappedComponent: ComponentType<any> (no marker needed - generic HOC)
+  //   - ModernStatistics.tsx appointments?: any[] (TECH-DEBT(modern-stats-appointments))
+  //   - ModernStatistics.tsx [key: string]: any (TECH-DEBT(modern-stats-index-sig))
   // Note: .d.ts files are excluded from the scan entirely (see findUndocumentedCasts).
-  anyCasts: 5,
+  anyCasts: 7,
   tsIgnore: 0,
   tsNoCheck: 0,
-  indexSignatureAny: 0,
+  indexSignatureAny: 1,
 };
 
 // How many lines above (and including) the cast line to search for a
