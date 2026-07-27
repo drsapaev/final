@@ -292,9 +292,9 @@ const WaitTimeAnalytics = () => {
 
             <MacOSStatCard
           title={t('misc.wta_stat_trend')}
-          value={`${Math.abs(summary.trend_change_percent)}%`}
-          icon={summary.trend_change_percent > 0 ? TrendingUp : TrendingDown}
-          color={summary.trend_change_percent > 0 ? 'var(--mac-error)' : 'var(--mac-success)'} />
+          value={`${Math.abs(summary.trend_change_percent ?? 0)}%`}
+          icon={(summary.trend_change_percent ?? 0) > 0 ? TrendingUp : TrendingDown}
+          color={(summary.trend_change_percent ?? 0) > 0 ? 'var(--mac-error)' : 'var(--mac-success)'} />
         
           </div>
 
@@ -366,15 +366,15 @@ const WaitTimeAnalytics = () => {
                     <div style={{
               fontSize: 'var(--mac-font-size-2xl)',
               fontWeight: 'var(--mac-font-weight-bold)',
-              color: queue.estimated_wait_time_minutes > 30 ? 'var(--mac-error)' : 'var(--mac-success)'
+              color: (queue.estimated_wait_time_minutes ?? 0) > 30 ? 'var(--mac-error)' : 'var(--mac-success)'
             }}>
-                      {formatTime(queue.estimated_wait_time_minutes)}
+                      {formatTime(queue.estimated_wait_time_minutes ?? 0)}
                     </div>
                     <div style={{
               fontSize: 'var(--mac-font-size-xs)',
               color: 'var(--mac-text-tertiary)'
             }}>
-                      {t('misc.wta_confidence', { pct: Math.round(queue.confidence_level * 100) })}
+                      {t('misc.wta_confidence', { pct: Math.round((queue.confidence_level ?? 0) * 100) })}
                     </div>
                   </div>
                 </div>
@@ -408,41 +408,41 @@ const WaitTimeAnalytics = () => {
           <MacOSCard className="wta-card-padded">
             <h3 className="wta-h3-mb16">
               <BarChart3 style={{ width: '20px', height: '20px' }} />
-              {t('misc.wta_detailed_stats_title', { start: analytics.period.start_date, end: analytics.period.end_date })}
+              {t('misc.wta_detailed_stats_title', { start: analytics.period?.start_date, end: analytics.period?.end_date })}
             </h3>
 
             <div className="wta-stat-grid-sm">
               <MacOSStatCard
             title={t('misc.wta_stat_average')}
-            value={formatTime(analytics.overall_stats.average_minutes)}
+            value={formatTime(analytics.overall_stats?.average_minutes)}
             icon={Clock}
             color="var(--mac-info)" />
           
 
               <MacOSStatCard
             title={t('misc.wta_stat_median')}
-            value={formatTime(analytics.overall_stats.median_minutes)}
+            value={formatTime(analytics.overall_stats?.median_minutes)}
             icon={Activity}
             color="var(--mac-success)" />
           
 
               <MacOSStatCard
             title={t('misc.wta_stat_min')}
-            value={formatTime(analytics.overall_stats.min_minutes)}
+            value={formatTime(analytics.overall_stats?.min_minutes)}
             icon={TrendingDown}
             color="var(--mac-warning)" />
           
 
               <MacOSStatCard
             title={t('misc.wta_stat_max')}
-            value={formatTime(analytics.overall_stats.max_minutes)}
+            value={formatTime(analytics.overall_stats?.max_minutes)}
             icon={TrendingUp}
             color="var(--mac-error)" />
           
 
               <MacOSStatCard
             title={t('misc.wta_stat_90th_percentile')}
-            value={formatTime(analytics.overall_stats.percentile_90)}
+            value={formatTime(analytics.overall_stats?.percentile_90)}
             icon={BarChart3}
             color="var(--mac-accent-purple)" />
           
@@ -555,9 +555,9 @@ const WaitTimeAnalytics = () => {
                   </div>
                   {data.service_efficiency &&
             <Badge
-              variant={data.service_efficiency.efficiency_score > 80 ? 'success' : 'warning'}>
+              variant={((data.service_efficiency?.efficiency_score ?? 0) > 80) ? 'success' : 'warning'}>
               
-                      {t('misc.wta_efficiency', { pct: data.service_efficiency.efficiency_score })}
+                      {t('misc.wta_efficiency', { pct: data.service_efficiency?.efficiency_score ?? 0 })}
                     </Badge>
             }
                 </div>
@@ -631,18 +631,18 @@ const WaitTimeAnalytics = () => {
               {t('misc.wta_wait_by_hour')}
             </h4>
             <div className="wta-dept-count">
-              {t('misc.wta_period', { start: heatmapData.period.start_date, end: heatmapData.period.end_date })}
+              {t('misc.wta_period', { start: heatmapData.period?.start_date, end: heatmapData.period?.end_date })}
             </div>
           </div>
 
           <div className="wta-heatmap-grid">
-            {heatmapData.heatmap_data.map((hourData: { hour?: number | string; day?: string; wait_time?: number; intensity?: number; hour_label?: string | number; [k: string]: unknown }) =>
+            {(heatmapData.heatmap_data || []).map((hourData: { hour?: number | string; day?: string; wait_time?: number; intensity?: number; hour_label?: string | number; [k: string]: unknown }) =>
         <div
           key={hourData.hour}
           style={{
             padding: 'var(--mac-spacing-2)',
-            backgroundColor: `rgba(59, 130, 246, ${hourData.intensity})`,
-            color: hourData.intensity > 0.5 ? 'white' : 'var(--mac-text-primary)',
+            backgroundColor: `rgba(59, 130, 246, ${hourData.intensity ?? 0})`,
+            color: (hourData.intensity ?? 0) > 0.5 ? 'white' : 'var(--mac-text-primary)',
             borderRadius: 'var(--mac-radius-sm)',
             textAlign: 'center',
             border: '1px solid var(--mac-border)'

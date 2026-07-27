@@ -306,7 +306,7 @@ const [activations, setActivations] = useState<Activation[]>([]);
       <div className="admin-grid-auto-200">
         <MacOSCard className="admin-card-p-24-center">
           <div className="admin-stat-num-2xl-bold-dynamic-mb-8 admin-stat-blue">
-            {Number(stats.total_activations ?? 0)}
+            {Number(stats?.total_activations ?? 0)}
           </div>
           <div className="admin-stat-label-sm-secondary-block-activation">
             {t('admin2.act_stat_total')}
@@ -314,7 +314,7 @@ const [activations, setActivations] = useState<Activation[]>([]);
         </MacOSCard>
         <MacOSCard className="admin-card-p-24-center">
           <div className="admin-stat-num-2xl-bold-dynamic-mb-8 admin-stat-success">
-            {Number(stats.active_activations ?? 0)}
+            {Number(stats?.active_activations ?? 0)}
           </div>
           <div className="admin-stat-label-sm-secondary-block-activation">
             {t('admin2.act_stat_active')}
@@ -322,7 +322,7 @@ const [activations, setActivations] = useState<Activation[]>([]);
         </MacOSCard>
         <MacOSCard className="admin-card-p-24-center">
           <div className="admin-stat-num-2xl-bold-dynamic-mb-8 admin-stat-warning">
-            {Number(stats.trial_activations ?? 0)}
+            {Number(stats?.trial_activations ?? 0)}
           </div>
           <div className="admin-stat-label-sm-secondary-block-activation">
             {t('admin2.act_stat_trial')}
@@ -330,7 +330,7 @@ const [activations, setActivations] = useState<Activation[]>([]);
         </MacOSCard>
         <MacOSCard className="admin-card-p-24-center">
           <div className="admin-stat-num-2xl-bold-dynamic-mb-8 admin-stat-error">
-            {Number(stats.expired_activations ?? 0)}
+            {Number(stats?.expired_activations ?? 0)}
           </div>
           <div className="admin-stat-label-sm-secondary-block-activation">
             {t('admin2.act_stat_expired')}
