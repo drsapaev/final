@@ -144,7 +144,7 @@ const ExaminationForm = ({
     reader.onload = (e) => {
       const photoData = {
         id: Date.now(),
-        url: e.target.result,
+        url: e.target?.result,
         filename: file.name,
         size: file.size,
         type: file.type,
@@ -602,8 +602,9 @@ const ExaminationForm = ({
               aria-label={t('dental.dental_ef_photo_aria_upload_before')}
               accept="image/*"
               onChange={(e) => {
-                if (e.target.files[0]) {
-                  handlePhotoUpload('before', e.target.files[0]);
+                const file = e.target.files?.[0];
+                if (file) {
+                  handlePhotoUpload('before', file);
                 }
               }}
               className="hidden" />
@@ -640,8 +641,9 @@ const ExaminationForm = ({
               aria-label={t('dental.dental_ef_photo_aria_upload_after')}
               accept="image/*"
               onChange={(e) => {
-                if (e.target.files[0]) {
-                  handlePhotoUpload('after', e.target.files[0]);
+                const file = e.target.files?.[0];
+                if (file) {
+                  handlePhotoUpload('after', file);
                 }
               }}
               className="hidden" />
@@ -678,8 +680,9 @@ const ExaminationForm = ({
               aria-label={t('dental.dental_ef_photo_aria_upload_intraoral')}
               accept="image/*"
               onChange={(e) => {
-                if (e.target.files[0]) {
-                  handlePhotoUpload('intraoral', e.target.files[0]);
+                const file = e.target.files?.[0];
+                if (file) {
+                  handlePhotoUpload('intraoral', file);
                 }
               }}
               className="hidden" />
@@ -716,8 +719,9 @@ const ExaminationForm = ({
               aria-label={t('dental.dental_ef_photo_aria_upload_extraoral')}
               accept="image/*"
               onChange={(e) => {
-                if (e.target.files[0]) {
-                  handlePhotoUpload('extraoral', e.target.files[0]);
+                const file = e.target.files?.[0];
+                if (file) {
+                  handlePhotoUpload('extraoral', file);
                 }
               }}
               className="hidden" />

@@ -128,7 +128,7 @@ const VisitProtocol = ({
     reader.onload = (e) => {
       const photoData = {
         id: Date.now(),
-        url: e.target.result,
+        url: e.target?.result,
         filename: file.name,
         size: file.size,
         type: file.type,
@@ -623,8 +623,9 @@ const VisitProtocol = ({
               aria-label={t('dental.dental_vp_photo_aria_upload', { category })}
               accept="image/*"
               onChange={(e) => {
-                if (e.target.files[0]) {
-                  handlePhotoUpload(category, e.target.files[0]);
+                const file = e.target.files?.[0];
+                if (file) {
+                  handlePhotoUpload(category, file);
                 }
               }}
               className="hidden" />

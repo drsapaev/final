@@ -263,7 +263,7 @@ const CartStepV2 = ({
       eligibility: repeatEligibilityByItemId?.[item.id] || null
     };
   }).
-  filter(Boolean),
+  filter((r): r is NonNullable<typeof r> => r !== null),
   [cart?.items, servicesData, normalizedDoctorsData, getServiceName, repeatEligibilityByItemId]);
 
   const getDoctorDisplayName = useCallback((doctor) => {
@@ -428,9 +428,9 @@ const CartStepV2 = ({
         {/* UX Audit Registrar #10: Группировка корзины по специалистам.
             Показывает сколько визитов будет создано, когда услуги у разных врачей.
             Раньше был плоский список без визуальной группировки. */}
-        {cart?.items?.length > 0 && (() => {
+        {(cart?.items?.length ?? 0) > 0 && (() => {
           const doctorGroups = new Map();
-          cart.items.forEach((item) => {
+          cart?.items?.forEach((item) => {
             const docId = item.doctor_id || 'no_doctor';
             const docName = item.doctor_name || (item.doctor_id ? t('misc.csv_vrach_item_doctor_id', { doctor_id: item.doctor_id }) : t('misc.csv_bez_vracha'));
             if (!doctorGroups.has(docId)) {
@@ -451,7 +451,7 @@ const CartStepV2 = ({
                 fontWeight: 'var(--mac-font-weight-semibold)',
                 color: 'var(--mac-accent-blue, #007aff)',
               }}>
-                Будет создано визитов: {groupCount} · Услуг: {cart.items.length}
+                Будет создано визитов: {groupCount} · Услуг: {cart?.items?.length ?? 0}
               </div>
             );
           }
@@ -459,14 +459,14 @@ const CartStepV2 = ({
         })()}
 
         {/* Горизонтальный скролл корзины */}
-        {cart?.items?.length > 0 ?
+        {(cart?.items?.length ?? 0) > 0 ?
         <div style={{
           display: 'flex',
           gap: 'var(--mac-spacing-2)',
           overflowX: 'auto',
           paddingBottom: '4px'
         }}>
-            {cart.items.map((item) => {
+            {(cart?.items || []).map((item) => {
             // ✅ SSOT: Используем единую функцию для получения названия услуги
             const displayName = String(getServiceName ? getServiceName(item) : item.service_name || t('misc.csv_neizvestnaya_usluga'));
             const service = servicesData?.find((s) => s.id === item.service_id);
@@ -587,7 +587,7 @@ const CartStepV2 = ({
         }
 
         {/* Ошибки валидации */}
-        {(errors.cart || errors.doctors || errors.repeat) &&
+        {((errors?.cart || errors?.doctors || errors?.repeat)) &&
         <div style={{
           padding: 'var(--mac-spacing-2)',
           background: 'color-mix(in srgb, var(--mac-error), transparent 82%)',
@@ -600,7 +600,7 @@ const CartStepV2 = ({
           gap: 'var(--mac-spacing-2)'
         }}>
             <AlertCircle size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
-            {String(errors.cart ?? errors.doctors ?? errors.repeat ?? '')}
+            {String(errors?.cart ?? errors?.doctors ?? errors?.repeat ?? '')}
           </div>
         }
       </div>
