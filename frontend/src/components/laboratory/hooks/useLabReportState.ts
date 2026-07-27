@@ -23,34 +23,91 @@ import { extractFieldValue, getServiceContextItems } from '../utils/labReportNor
  *
  * Возврат: объект со всем state и setters, чтобы компонент мог их деструктурировать.
  */
+
+interface LabReportTemplate {
+  id: string | number;
+  published_version_id?: string | number | null;
+  draft_version_id?: string | number | null;
+  [key: string]: unknown;
+}
+
+interface LabReportField {
+  field_key: string;
+  label?: string;
+  required?: boolean;
+  value_numeric?: number | null;
+  value_text?: string;
+  [key: string]: unknown;
+}
+
+interface LabReportSection {
+  fields: LabReportField[];
+  key?: string;
+  section_key?: string;
+  id?: string | number;
+  [key: string]: unknown;
+}
+
+interface LabReportInstance {
+  sections: LabReportSection[];
+  signer_snapshot?: Record<string, unknown>;
+  template_id?: string | number;
+  [key: string]: unknown;
+}
+
+interface LabReportAppointment {
+  service_details?: Array<{ id?: string; code?: string; name?: string }>;
+  service_codes?: string[];
+  [key: string]: unknown;
+}
+
+interface LabReportTemplateResolution {
+  allowed_templates?: LabReportTemplate[];
+  service_codes?: string[];
+  default_template?: { id?: string | number };
+  [key: string]: unknown;
+}
+
+interface UseLabReportStateParams {
+  selectedAppointment?: LabReportAppointment | null;
+  templates?: LabReportTemplate[];
+  templateResolution?: LabReportTemplateResolution | null;
+  activeInstance?: LabReportInstance | null;
+}
+
+interface PrintFeedback {
+  severity: string;
+  text: string;
+}
+
 export function useLabReportState({
   selectedAppointment = null,
   templates = [],
   templateResolution = null,
   activeInstance = null,
-}) {
+}: UseLabReportStateParams) {
   // ─── State ────────────────────────────────────────────────────────────────
-  const [selectedTemplateId, setSelectedTemplateId] = useState('');
-  const [draftValues, setDraftValues] = useState({});
-  const [signerSnapshot, setSignerSnapshot] = useState({});
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
+  const [draftValues, setDraftValues] = useState<Record<string, unknown>>({});
+  const [signerSnapshot, setSignerSnapshot] = useState<Record<string, unknown>>({});
   // PR-64 / Medium-16: collapsible sections in report editor
-  const [collapsedSections, setCollapsedSections] = useState(new Set());
-  const [saving, setSaving] = useState(false);
-  const [busyAction, setBusyAction] = useState('');
-  const [printFeedback, setPrintFeedback] = useState(null);
-  const [historySeverityFilter, setHistorySeverityFilter] = useState('all');
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+  const [saving, setSaving] = useState<boolean>(false);
+  const [busyAction, setBusyAction] = useState<string | null>('');
+  const [printFeedback, setPrintFeedback] = useState<PrintFeedback | null>(null);
+  const [historySeverityFilter, setHistorySeverityFilter] = useState<string>('all');
   // WF-11 fix: escape hatch для template resolution blocking gap.
-  const [escapeHatchActive, setEscapeHatchActive] = useState(false);
+  const [escapeHatchActive, setEscapeHatchActive] = useState<boolean>(false);
   // PR-58: autosave state
-  const [lastAutoSave, setLastAutoSave] = useState(null);
-  const [autoSaving, setAutoSaving] = useState(false);
+  const [lastAutoSave, setLastAutoSave] = useState<Date | null>(null);
+  const [autoSaving, setAutoSaving] = useState<boolean>(false);
 
   // Dirty state tracking: snapshot значений при загрузке instance.
-  const initialValuesRef = useRef({ values: {}, signer: {} });
-  const autoSaveTimerRef = useRef(null);
+  const initialValuesRef = useRef<{ values: Record<string, unknown>; signer: Record<string, unknown> }>({ values: {}, signer: {} });
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // L-L-4 fix: ref для handleSaveDraft, чтобы autosave/keydown могли
   // вызывать последнюю версию без пересоздания listener-ов.
-  const handleSaveDraftRef = useRef(null);
+  const handleSaveDraftRef = useRef<(() => void | Promise<void>) | null>(null);
 
   // ─── Derived: isDirty ────────────────────────────────────────────────────
   const isDirty = useMemo(() => {
@@ -100,7 +157,7 @@ export function useLabReportState({
   // ─── Derived: WF-10 missing required fields (inline-валидация) ───────────
   const missingRequiredFields = useMemo(() => {
     if (!activeInstance?.sections) return [];
-    const missing = [];
+    const missing: string[] = [];
     activeInstance.sections.forEach((section) => {
       (section.fields || []).forEach((field) => {
         if (field.required) {
@@ -128,7 +185,7 @@ export function useLabReportState({
     }
     // WF-12 fix: сбрасываем printFeedback при смене activeInstance.
     setPrintFeedback(null);
-    const values = {};
+    const values: Record<string, unknown> = {};
     activeInstance.sections.forEach((section) => {
       section.fields.forEach((field) => {
         values[field.field_key] = extractFieldValue(field);

@@ -8,12 +8,22 @@ import { tokenManager } from '../../utils/tokenManager';
 import logger from '../../utils/logger';
 import { notify } from '../../services/notify';
 
+interface NotificationItem {
+  id: string | number;
+  is_read?: boolean;
+  type?: string;
+  title?: string;
+  created_at?: string;
+  message?: string;
+  [key: string]: unknown;
+}
+
 /**
  * Компонент для управления мобильными уведомлениями
  */
 const MobileNotifications = () => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
-  const [notifications, setNotifications] = useState([]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [permission, setPermission] = useState('default');
   const [loading, setLoading] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -39,7 +49,7 @@ const MobileNotifications = () => {
     }
   }, []);
 
-  const handleServiceWorkerMessage = useCallback((event) => {
+  const handleServiceWorkerMessage = useCallback((event: MessageEvent) => {
     if (event.data && event.data.type === 'NOTIFICATION_RECEIVED') {
       // Обновляем список уведомлений
       loadNotifications();
@@ -113,7 +123,7 @@ const MobileNotifications = () => {
     }
   };
 
-  const markAsRead = async (notificationId) => {
+  const markAsRead = async (notificationId: string | number) => {
     try {
       await fetch(`/mobile/notifications/${notificationId}/read`, {
         method: 'POST',
@@ -152,8 +162,8 @@ const MobileNotifications = () => {
     }
   };
 
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
+  const formatDate = (dateString: string | undefined): string => {
+    const date = new Date(dateString as string);
     const now = new Date();
     const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
 
@@ -166,7 +176,7 @@ const MobileNotifications = () => {
     }
   };
 
-  const getNotificationIcon = (type) => {
+  const getNotificationIcon = (type: string | undefined): string => {
     switch (type) {
       case 'appointment':
         return '📅';

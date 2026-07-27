@@ -38,6 +38,33 @@ import { getReportEndpoint } from '../../utils/reportEndpoints';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
 
+interface AvailableReport {
+  type?: string;
+  name?: string;
+  [key: string]: unknown;
+}
+
+interface ReportFile {
+  filename?: string;
+  size?: number;
+  created_at?: string;
+  [key: string]: unknown;
+}
+
+interface DailySummary {
+  summary?: {
+    total_patients_served?: number;
+    total_revenue?: number | string;
+    new_patients?: number;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+}
+
+interface QuickReportsState {
+  daily: DailySummary | null;
+}
+
 const ReportsManager = () => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
@@ -46,10 +73,10 @@ const ReportsManager = () => {
   const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
   const [activeTab, setActiveTab] = useState('generate');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null); // Global error state
-  const [reports, setReports] = useState([]);
-  const [files, setFiles] = useState([]);
-  const [availableReports, setAvailableReports] = useState([]);
+  const [error, setError] = useState<string | null>(null); // Global error state
+  const [reports, setReports] = useState<Record<string, unknown>[]>([]);
+  const [files, setFiles] = useState<ReportFile[]>([]);
+  const [availableReports, setAvailableReports] = useState<AvailableReport[]>([]);
 
   // Состояние для генерации отчетов
   const [reportForm, setReportForm] = useState<{
@@ -67,7 +94,7 @@ const ReportsManager = () => {
   });
 
   // Состояние для быстрых отчетов
-  const [quickReports, setQuickReports] = useState({ daily: null });
+  const [quickReports, setQuickReports] = useState<QuickReportsState>({ daily: null });
 
   useEffect(() => {
     loadAvailableReports();
@@ -110,7 +137,7 @@ const ReportsManager = () => {
       // weekly/monthly KPI cards showed a perpetual loading spinner. Removed
       // those cards; this loader now only fetches daily.
       const response = (await api.get('/reports/daily-summary')) as import('axios').AxiosResponse<Record<string, unknown>>;
-      setQuickReports((prev) => ({ ...prev, daily: response.data }));
+      setQuickReports((prev) => ({ ...prev, daily: response.data as DailySummary }));
     } catch (error) {
       logger.error('Ошибка загрузки быстрых отчетов:', error);
       setError(t('admin2.rm_load_stats_error'));
@@ -242,7 +269,7 @@ const ReportsManager = () => {
             value={reportForm.type}
             onValueChange={(value) => setReportForm((prev) => ({ ...prev, type: String(value) }))}
             options={availableReports.map((report) => ({
-              value: (report as { type?: string }).type,
+              value: String(report.type ?? ''),
               label: report.name
             }))}
             size="large"
@@ -341,7 +368,7 @@ const ReportsManager = () => {
           header: t('admin2.rm_col_type'),
           render: (value: unknown) =>
           <span className="admin-text-med-primary">
-                    {availableReports.find((r) => r.type === value)?.name || value}
+                    {String(availableReports.find((r) => r.type === value)?.name || value || '')}
                   </span>
 
         },

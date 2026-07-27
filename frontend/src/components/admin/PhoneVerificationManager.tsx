@@ -29,10 +29,26 @@ import { toast } from 'react-toastify';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
+
+interface PhoneVerificationStatistics {
+  total_active_codes?: number;
+  verified_codes?: number;
+  pending_codes?: number;
+  expiring_soon?: number;
+  by_purpose?: Record<string, number>;
+  by_provider?: Record<string, number>;
+  settings?: {
+    code_length?: number;
+    ttl_minutes?: number;
+    max_attempts?: number;
+    rate_limit_minutes?: number;
+  };
+}
+
 const PhoneVerificationManager = () => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [loading, setLoading] = useState(false);
-  const [statistics, setStatistics] = useState(null);
+  const [statistics, setStatistics] = useState<PhoneVerificationStatistics | null>(null);
   const [activeTab, setActiveTab] = useState('overview');
   const [adminForm, setAdminForm] = useState<Record<string, any>>({
     phone: '',
@@ -99,7 +115,7 @@ const PhoneVerificationManager = () => {
     }
   };
 
-  const formatPhone = (value) => {
+  const formatPhone = (value: string) => {
     const digits = value.replace(/\D/g, '');
     if (digits.startsWith('9') && digits.length <= 9) {
       return `+998${digits}`;

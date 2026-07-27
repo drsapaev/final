@@ -11,17 +11,33 @@ import {
   normalizePaymentAmount,
   isValidPaymentAmount,
 } from '../../api/payments';
+import type { Invoice } from '../../types/domain/billing';
 import logger from '../../utils/logger';
 import './PaymentManager.css';
 import { Input } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
+
+interface PatientInfo {
+  fio?: string;
+  phone?: string;
+  [key: string]: unknown;
+}
+
+interface PaymentManagerProps {
+  isOpen: boolean;
+  onClose?: (result?: { success?: boolean; paymentData?: unknown }) => void;
+  invoiceId?: string | number | null;
+  initialAmount?: number | null;
+  patientInfo?: PatientInfo | null;
+}
 
 // UX Audit Stage 3 (Payment issue 8.1):
 // Удалён `const API_BASE = '/api/v1'` и `import { tokenManager }` —
 // все 3 raw fetch() заменены на централизованный payments API client
 // из api/payments.js, который использует axios-interceptor из api/client.js.
 
-const getInvoiceId = (invoice) => invoice?.invoice_id ?? invoice?.id ?? null;
+const getInvoiceId = (invoice: Invoice | null | undefined): string | number | null =>
+  (invoice?.invoice_id as string | number | undefined) ?? invoice?.id ?? null;
 
 // UX Audit Stage 3 (Payment issue 8.2):
 // Локализация статусов счетов для русского UI.
@@ -35,8 +51,9 @@ const INVOICE_STATUS_KEYS = {
   expired: 'payment.pay_mgr_status_expired',
 };
 
-function getInvoiceStatusLabel(status, t) {
-  const key = INVOICE_STATUS_KEYS[status];
+function getInvoiceStatusLabel(status: string | undefined, t: (key: string, options?: Record<string, unknown>) => string): string {
+  if (!status) return '';
+  const key = INVOICE_STATUS_KEYS[status as keyof typeof INVOICE_STATUS_KEYS];
   return key ? t(key) : status;
 }
 
@@ -46,14 +63,14 @@ const PaymentManager = ({
   invoiceId = null,
   initialAmount = null,
   patientInfo = null
-}) => {
+}: PaymentManagerProps) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // Состояние компонента
   const [selectedProvider, setSelectedProvider] = useState('click');
   const [paymentAmount, setPaymentAmount] = useState(initialAmount || 0);
-  const [invoices, setInvoices] = useState([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(false);
-  const [createdInvoiceId, setCreatedInvoiceId] = useState(invoiceId);
+  const [createdInvoiceId, setCreatedInvoiceId] = useState<string | number | null>(invoiceId);
 
   // Состояние диалогов оплаты
   const [showClickPayment, setShowClickPayment] = useState(false);
@@ -93,7 +110,7 @@ const PaymentManager = ({
   useEffect(() => {
     if (!isOpen) return undefined;
 
-    const handleEscape = (event) => {
+    const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && !showClickPayment && !showPayMePayment) {
         // Не закрываем основной модал, если открыт провайдер-диалог
         if (onClose) onClose({ success: false });
@@ -131,7 +148,7 @@ const PaymentManager = ({
           : t('payment.pay_mgr_description'),
         patient_info: patientInfo,
       });
-      setCreatedInvoiceId(result.invoice_id);
+      setCreatedInvoiceId(result.invoice_id as string | number);
 
       // Открываем соответствующий диалог оплаты
       if (selectedProvider === 'click') {
@@ -150,19 +167,19 @@ const PaymentManager = ({
   };
 
   // Инициация оплаты существующего счета
-  const payExistingInvoice = (invoice) => {
+  const payExistingInvoice = (invoice: Invoice) => {
     setCreatedInvoiceId(getInvoiceId(invoice));
-    setPaymentAmount(invoice.amount);
+    setPaymentAmount(invoice.amount ?? 0);
 
-    if (invoice.provider === 'click') {
+    if ((invoice.provider as string) === 'click') {
       setShowClickPayment(true);
-    } else if (invoice.provider === 'payme') {
+    } else if ((invoice.provider as string) === 'payme') {
       setShowPayMePayment(true);
     }
   };
 
   // Обработчики успешной оплаты
-  const handlePaymentSuccess = (paymentData) => {
+  const handlePaymentSuccess = (paymentData: unknown) => {
     toast.success(t('payment.pay_mgr_payment_success'));
     setShowClickPayment(false);
     setShowPayMePayment(false);
@@ -174,8 +191,9 @@ const PaymentManager = ({
     }
   };
 
-  const handlePaymentError = (error) => {
-    toast.error(t('payment.pay_mgr_payment_error', { error: error?.message || t('payment.unknown_error') }));
+  const handlePaymentError = (error: unknown) => {
+    const errMsg = (error as { message?: string })?.message || t('payment.unknown_error');
+    toast.error(t('payment.pay_mgr_payment_error', { error: errMsg }));
     setShowClickPayment(false);
     setShowPayMePayment(false);
   };
@@ -188,7 +206,7 @@ const PaymentManager = ({
   // UX Audit Stage 3 (Payment issue 8.2):
   // Click-outside для модального окна.
   // Клик по overlay (но не по содержимому) закрывает модал.
-  const handleOverlayClick = (event) => {
+  const handleOverlayClick = (event: React.MouseEvent<HTMLDivElement>) => {
     // Если клик был именно по overlay, а не по дочернему элементу
     if (event.target === event.currentTarget && !showClickPayment && !showPayMePayment) {
       if (onClose) onClose({ success: false });
@@ -198,7 +216,7 @@ const PaymentManager = ({
   // UX Audit Stage 3 (Payment issue 8.2):
   // Нормализация ввода суммы через normalizePaymentAmount.
   // Раньше было `Number(e.target.value)` — давало NaN при пустом/нечисловом вводе.
-  const handleAmountChange = (event) => {
+  const handleAmountChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setPaymentAmount(normalizePaymentAmount(event.target.value));
   };
 
@@ -336,19 +354,19 @@ const PaymentManager = ({
                         {/* UX Audit Stage 3 (Payment issue 8.2):
                             Заменён toLocaleString() без локали на formatUZS() с ru-RU. */}
                         <div className="invoice-amount">
-                          {formatUZS(invoice.amount)}
+                          {formatUZS(invoice.amount ?? 0)}
                         </div>
                         <div className="invoice-details">
-                          <span className="invoice-id">№{getInvoiceId(invoice)}</span>
-                          <span className="invoice-provider">{invoice.provider}</span>
+                          <span className="invoice-id">№{String(getInvoiceId(invoice) ?? '')}</span>
+                          <span className="invoice-provider">{String(invoice.provider ?? '')}</span>
                           {/* UX Audit Stage 3: локализация статуса */}
                           <span className="invoice-status">
-                            {getInvoiceStatusLabel(invoice.status, t)}
+                            {String(getInvoiceStatusLabel(invoice.status as string | undefined, t))}
                           </span>
                         </div>
-                        {invoice.description && (
+                        {Boolean(invoice.description) && (
                           <div className="invoice-description">
-                            {invoice.description}
+                            {String(invoice.description)}
                           </div>
                         )}
                       </div>
@@ -374,7 +392,7 @@ const PaymentManager = ({
       <PaymentClick
         isOpen={showClickPayment}
         onClose={handlePaymentClose}
-        invoiceId={createdInvoiceId}
+        invoiceId={createdInvoiceId as string | number}
         totalAmount={paymentAmount}
         currency="UZS"
         onSuccess={handlePaymentSuccess}
@@ -384,7 +402,7 @@ const PaymentManager = ({
       <PaymentPayMe
         isOpen={showPayMePayment}
         onClose={handlePaymentClose}
-        invoiceId={createdInvoiceId}
+        invoiceId={createdInvoiceId as string | number}
         totalAmount={paymentAmount}
         currency="UZS"
         onSuccess={handlePaymentSuccess}

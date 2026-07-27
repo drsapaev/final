@@ -1,11 +1,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
-import ModernQueueManager from './queue/ModernQueueManager';
+import ModernQueueManager, { type ModernQueueManagerDoctor } from './queue/ModernQueueManager';
 import React from 'react';
 import { fetchAvailableSpecialists } from '../api/queue';
 import auth from '../stores/auth';
 import logger from '../utils/logger';
+import type { QueueSpecialist } from '../types/domain/queue';
 
 const QUEUE_SPECIALTY_ALIASES = {
   cardiology: ['cardiology', 'cardio'],
@@ -47,7 +48,7 @@ const QueueIntegration = ({
   onPatientSelect,
   onStartVisit,
 }: QueueIntegrationProps) => {
-  const [availableSpecialists, setAvailableSpecialists] = useState([]);
+  const [availableSpecialists, setAvailableSpecialists] = useState<QueueSpecialist[]>([]);
   const [authProfile, setAuthProfile] = useState(auth.getState().profile);
 
   useEffect(() => {
@@ -109,7 +110,7 @@ const QueueIntegration = ({
     return availableSpecialists[0] || null;
   }, [availableSpecialists, authProfile?.doctor_id, authProfile?.specialist_id, specialistId, specialty]);
 
-  const queueDoctors = useMemo(() => (
+  const queueDoctors = useMemo<ModernQueueManagerDoctor[]>(() => (
     availableSpecialists.map((item) => ({
       id: item.id,
       specialty: item.specialty,
@@ -122,15 +123,16 @@ const QueueIntegration = ({
         full_name: item.doctor_name,
         is_active: true,
       },
-    }))
+    })) as unknown as ModernQueueManagerDoctor[]
   ), [availableSpecialists]);
 
   const handleQueueUpdate = useCallback(() => {
+    const nullPatient = null as unknown as Record<string, unknown>;
     if (onPatientSelect) {
-      onPatientSelect(null);
+      onPatientSelect(nullPatient);
     }
     if (onStartVisit) {
-      onStartVisit(null);
+      onStartVisit(nullPatient);
     }
   }, [onPatientSelect, onStartVisit]);
 
