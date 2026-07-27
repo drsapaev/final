@@ -107,14 +107,20 @@ const saveEMR = async (visitId: string | number, data: unknown, rowVersion: unkn
 // Sub-components
 // =============================================================================
 
-const PatientHeader = ({ patient, onCompleteVisit, loading }) => {
+interface PatientHeaderProps {
+  patient: Record<string, unknown> | null;
+  onCompleteVisit: () => void;
+  loading?: boolean;
+}
+
+const PatientHeader = ({ patient, onCompleteVisit, loading }: PatientHeaderProps) => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const patientName =
     patient?.patient_name ||
     patient?.name ||
     `№${patient?.number || '?'}`;
-  const patientInfo = patient?.patient?.phone || patient?.phone || '';
+  const patientInfo = (patient?.patient as Record<string, unknown> | undefined)?.phone || patient?.phone || '';
 
   return (
     <div
@@ -135,7 +141,7 @@ const PatientHeader = ({ patient, onCompleteVisit, loading }) => {
           </Typography>
           {patientInfo && (
             <Typography variant="body2" color="textSecondary" style={{ margin: 0 }}>
-              {patientInfo}
+              {String(patientInfo)}
             </Typography>
           )}
         </div>
@@ -158,7 +164,13 @@ PatientHeader.propTypes = {
   loading: PropTypes.bool,
 };
 
-const AnamnesisSection = ({ value, onChange, disabled }) => {
+interface AnamnesisSectionProps {
+  value: string;
+  onChange: (value: string) => void;
+  disabled?: boolean;
+}
+
+const AnamnesisSection = ({ value, onChange, disabled }: AnamnesisSectionProps) => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   return (
@@ -189,7 +201,11 @@ AnamnesisSection.propTypes = {
   disabled: PropTypes.bool,
 };
 
-const ToothSummary = ({ toothStatus }) => {
+interface ToothSummaryProps {
+  toothStatus?: Record<string, unknown> | null;
+}
+
+const ToothSummary = ({ toothStatus }: ToothSummaryProps) => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const teeth = Object.entries(toothStatus || {});
@@ -233,7 +249,16 @@ ToothSummary.propTypes = {
   toothStatus: PropTypes.object,
 };
 
-const DiagnosisSection = ({ diagnosis, icd10, onDiagnosisChange, onIcd10Change, onAISuggestion, disabled }) => {
+interface DiagnosisSectionProps {
+  diagnosis: string;
+  icd10: string;
+  onDiagnosisChange: (value: string) => void;
+  onIcd10Change: (value: string) => void;
+  onAISuggestion: () => void;
+  disabled?: boolean;
+}
+
+const DiagnosisSection = ({ diagnosis, icd10, onDiagnosisChange, onIcd10Change, onAISuggestion, disabled }: DiagnosisSectionProps) => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   return (
@@ -298,7 +323,13 @@ DiagnosisSection.propTypes = {
   disabled: PropTypes.bool,
 };
 
-const CollapsibleExtras = ({ hygieneIndices, onHygieneChange, disabled }) => {
+interface CollapsibleExtrasProps {
+  hygieneIndices: Record<string, unknown>;
+  onHygieneChange: (key: string, value: string | number) => void;
+  disabled?: boolean;
+}
+
+const CollapsibleExtras = ({ hygieneIndices, onHygieneChange, disabled }: CollapsibleExtrasProps) => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [open, setOpen] = useState(false);
@@ -338,7 +369,7 @@ const CollapsibleExtras = ({ hygieneIndices, onHygieneChange, disabled }) => {
                 id="dental-ohis"
                 type="number"
                 aria-label={t('dental.dental_dvs_aria_ohis')}
-                value={hygieneIndices?.ohis || ''}
+                value={String(hygieneIndices?.ohis ?? '')}
                 onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => onHygieneChange('ohis', e.target.value)}
                 placeholder="0.0 - 6.0"
                 disabled={disabled}
@@ -351,7 +382,7 @@ const CollapsibleExtras = ({ hygieneIndices, onHygieneChange, disabled }) => {
                 id="dental-pli"
                 type="number"
                 aria-label={t('dental.dental_dvs_aria_pli')}
-                value={hygieneIndices?.pli || ''}
+                value={String(hygieneIndices?.pli ?? '')}
                 onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => onHygieneChange('pli', e.target.value)}
                 placeholder="0.0 - 3.0"
                 disabled={disabled}
@@ -364,7 +395,7 @@ const CollapsibleExtras = ({ hygieneIndices, onHygieneChange, disabled }) => {
                 id="dental-cpi"
                 type="number"
                 aria-label={t('dental.dental_dvs_aria_cpi')}
-                value={hygieneIndices?.cpi || ''}
+                value={String(hygieneIndices?.cpi ?? '')}
                 onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => onHygieneChange('cpi', e.target.value)}
                 placeholder="0 - 4"
                 disabled={disabled}
@@ -377,7 +408,7 @@ const CollapsibleExtras = ({ hygieneIndices, onHygieneChange, disabled }) => {
                 id="dental-bleeding"
                 type="number"
                 aria-label={t('dental.dental_dvs_aria_bleeding')}
-                value={hygieneIndices?.bleeding || ''}
+                value={String(hygieneIndices?.bleeding ?? '')}
                 onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => onHygieneChange('bleeding', e.target.value)}
                 placeholder="0 - 100"
                 disabled={disabled}
@@ -400,7 +431,12 @@ CollapsibleExtras.propTypes = {
   disabled: PropTypes.bool,
 };
 
-const VisitHistory = ({ history, loading }) => {
+interface VisitHistoryProps {
+  history: Array<Record<string, unknown>>;
+  loading?: boolean;
+}
+
+const VisitHistory = ({ history, loading }: VisitHistoryProps) => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   if (loading) {
@@ -415,9 +451,11 @@ const VisitHistory = ({ history, loading }) => {
   }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      {history.map((visit, idx) => (
+      {history.map((visit, idx) => {
+        const v = visit as Record<string, unknown>;
+        return (
         <div
-          key={visit.id || idx}
+          key={String(v.id ?? idx)}
           style={{
             padding: '8px 12px',
             border: '1px solid var(--mac-border)',
@@ -426,24 +464,25 @@ const VisitHistory = ({ history, loading }) => {
           }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
             <Typography variant="body2" style={{ fontWeight: 500 }}>
-              {visit.date || visit.created_at || '—'}
+              {String(v.date ?? v.created_at ?? '—')}
             </Typography>
-            {visit.icd10_code && (
-              <Badge variant="primary" size="small">{t('dental.dental_dvs_icd10_label')}: {visit.icd10_code}</Badge>
+            {v.icd10_code && (
+              <Badge variant="primary" size="small">{t('dental.dental_dvs_icd10_label')}: {String(v.icd10_code)}</Badge>
             )}
           </div>
-          {visit.diagnosis && (
+          {v.diagnosis && (
             <Typography variant="body2" color="textSecondary" style={{ marginTop: 4 }}>
-              {visit.diagnosis}
+              {String(v.diagnosis)}
             </Typography>
           )}
-          {visit.complaints && (
+          {v.complaints && (
             <Typography variant="caption" color="textSecondary" style={{ marginTop: 2, display: 'block' }}>
-              {t('dental.dental_dvs_history_complaints', { text: visit.complaints })}
+              {t('dental.dental_dvs_history_complaints', { text: String(v.complaints) })}
             </Typography>
           )}
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 };
@@ -457,7 +496,14 @@ VisitHistory.propTypes = {
 // AI Suggestion Dialog (исправляет главную проблему: AI suggestions не попадали в EMR)
 // =============================================================================
 
-const AISuggestionDialog = ({ open, onClose, onApply, anamnesis }) => {
+interface AISuggestionDialogProps {
+  open: boolean;
+  onClose: () => void;
+  onApply: (suggestion: string) => void;
+  anamnesis: string;
+}
+
+const AISuggestionDialog = ({ open, onClose, onApply, anamnesis }: AISuggestionDialogProps) => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   return (
@@ -485,7 +531,7 @@ const AISuggestionDialog = ({ open, onClose, onApply, anamnesis }) => {
           }}
           onSuggestionSelect={(type, suggestion) => {
             if (type === 'icd10') {
-              onApply(suggestion);
+              onApply(String(suggestion));
               onClose();
             }
           }}
@@ -691,7 +737,7 @@ const DentalVisitScreen = ({
             {/* Anamnesis — 1-2 строки, всегда виден */}
             <AnamnesisSection
               value={emrData.anamnesis_morbi || emrData.complaints || ''}
-              onChange={(v: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateField('anamnesis_morbi', v)}
+              onChange={(v: string) => updateField('anamnesis_morbi', v)}
               disabled={saving}
             />
 

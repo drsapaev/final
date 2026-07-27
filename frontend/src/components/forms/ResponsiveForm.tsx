@@ -4,13 +4,19 @@ import { useBreakpoint } from '../../hooks/useEnhancedMediaQuery';
 import { Input } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
 
+interface ResponsiveFormProps {
+  children?: React.ReactNode;
+  onSubmit?: (e: React.FormEvent<HTMLFormElement>) => void;
+  className?: string;
+  style?: React.CSSProperties;
+}
 
 const ResponsiveForm = ({
   children,
   onSubmit,
   className = '',
   style = {}
-}) => {
+}: ResponsiveFormProps) => {
   const { isMobile } = useBreakpoint();
 
   return (
@@ -30,6 +36,15 @@ const ResponsiveForm = ({
 };
 
 // Компонент для группы полей
+interface FormGroupProps {
+  children?: React.ReactNode;
+  label?: React.ReactNode;
+  error?: React.ReactNode;
+  required?: boolean;
+  className?: string;
+  style?: React.CSSProperties;
+}
+
 const FormGroup = ({
   children,
   label,
@@ -37,7 +52,7 @@ const FormGroup = ({
   required = false,
   className = '',
   style = {}
-}) => {
+}: FormGroupProps) => {
   const { isMobile } = useBreakpoint();
 
   return (
@@ -78,6 +93,17 @@ const FormGroup = ({
 };
 
 // Компонент для поля ввода
+interface FormInputProps {
+  type?: string;
+  placeholder?: string;
+  value?: string | number;
+  onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  disabled?: boolean;
+  required?: boolean;
+  className?: string;
+  style?: React.CSSProperties;
+}
+
 const FormInput = ({
   type = 'text',
   placeholder,
@@ -87,7 +113,7 @@ const FormInput = ({
   required = false,
   className = '',
   style = {}
-}) => {
+}: FormInputProps) => {
   const { isMobile } = useBreakpoint();
 
   return (
@@ -123,6 +149,16 @@ const FormInput = ({
 };
 
 // Компонент для селекта
+interface FormSelectProps {
+  value?: string | number;
+  onChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  children?: React.ReactNode;
+  disabled?: boolean;
+  required?: boolean;
+  className?: string;
+  style?: React.CSSProperties;
+}
+
 const FormSelect = ({
   value,
   onChange,
@@ -131,7 +167,7 @@ const FormSelect = ({
   required = false,
   className = '',
   style = {}
-}) => {
+}: FormSelectProps) => {
   const { isMobile } = useBreakpoint();
 
   return (
@@ -167,6 +203,17 @@ const FormSelect = ({
 };
 
 // Компонент для textarea
+interface FormTextareaProps {
+  placeholder?: string;
+  value?: string | number;
+  onChange?: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  disabled?: boolean;
+  required?: boolean;
+  rows?: number;
+  className?: string;
+  style?: React.CSSProperties;
+}
+
 const FormTextarea = ({
   placeholder,
   value,
@@ -176,7 +223,7 @@ const FormTextarea = ({
   rows = 4,
   className = '',
   style = {}
-}) => {
+}: FormTextareaProps) => {
   const { isMobile } = useBreakpoint();
 
   return (
@@ -214,11 +261,17 @@ const FormTextarea = ({
 };
 
 // Компонент для кнопок формы
+interface FormActionsProps {
+  children?: React.ReactNode;
+  className?: string;
+  style?: React.CSSProperties;
+}
+
 const FormActions = ({
   children,
   className = '',
   style = {}
-}) => {
+}: FormActionsProps) => {
   const { isMobile } = useBreakpoint();
 
   return (
