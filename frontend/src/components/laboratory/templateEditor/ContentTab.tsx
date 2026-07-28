@@ -7,6 +7,58 @@ import { useConfirm } from '../../common/ConfirmDialog';
 import { fieldTypeOptions, referenceModeOptions } from './config';
 import ReferenceRuleEditor from './ReferenceRuleEditor';
 import { useTranslation } from '@/i18n/useTranslation';
+import React from 'react';
+
+interface ContentTabField {
+  field_key: string;
+  label?: string;
+  value_type: string;
+  unit?: string;
+  unit_code?: string;
+  analyte_code?: string;
+  reference_mode?: string;
+  reference_text?: string;
+  reference_rule_text?: string;
+  visibility_rule_text?: string;
+  highlight_rule_text?: string;
+  required?: boolean;
+  [key: string]: unknown;
+}
+
+interface ContentTabSection {
+  key: string;
+  title?: string;
+  fields: ContentTabField[];
+  [key: string]: unknown;
+}
+
+interface ContentTabDraftVersion {
+  sections: ContentTabSection[];
+  [key: string]: unknown;
+}
+
+type MoveDirection = 'up' | 'down';
+
+interface ContentTabProps {
+  draftVersion: ContentTabDraftVersion;
+  expandedSections: Set<number>;
+  expandedFields: Set<unknown>;
+  onToggleSection: (sectionIndex: number) => void;
+  onToggleField: (sectionIndex: number, fieldIndex: number) => void;
+  onAddSection: () => void;
+  onAddField: (sectionIndex: number) => void;
+  onRemoveSection: (sectionIndex: number) => void;
+  onRemoveField: (sectionIndex: number, fieldIndex: number) => void;
+  onDuplicateField: (sectionIndex: number, fieldIndex: number) => void;
+  onMoveField: (sectionIndex: number, fieldIndex: number, direction: MoveDirection) => void;
+  onMoveSection: (sectionIndex: number, direction: MoveDirection) => void;
+  onUpdateSection: (sectionIndex: number, key: string, value: string) => void;
+  onUpdateField: (sectionIndex: number, fieldIndex: number, key: string, value: unknown) => void;
+  onUpdateFieldCatalog: (sectionIndex: number, fieldIndex: number, key: string, value: string) => void;
+  onLoadCatalogReferenceRange: (sectionIndex: number, fieldIndex: number, analyteCode: string) => void;
+  analyteCatalogId?: string;
+  unitCatalogId?: string;
+}
 
 /**
  * L-H-6 fix: ContentTab выделен в отдельный файл (~250 строк).
@@ -52,7 +104,7 @@ function ContentTab({
   // Ранее были захардкожены как 'lab-analyte-catalog' / 'lab-unit-catalog'.
   analyteCatalogId = 'lab-analyte-catalog',
   unitCatalogId = 'lab-unit-catalog',
-}) {
+}: ContentTabProps) {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // UX-AUDIT-FIX4: useConfirm для деструктивных действий (удаление секции/поля).
   const [confirm] = useConfirm();
@@ -61,7 +113,7 @@ function ContentTab({
   // По умолчанию выключен — raw JSON скрыт из основного UI.
   const [developerMode, setDeveloperMode] = useState(false);
 
-  async function handleRemoveSection(sectionIndex, section) {
+  async function handleRemoveSection(sectionIndex: number, section: ContentTabSection) {
     // STRAT#11: строки мигрированы на t() / tInterpolate() из labTranslations.
     const sectionName = section?.title || section?.key || `${t('content.section_fallback')} #${sectionIndex + 1}`;
     const ok = await (confirm as unknown as (opts: Record<string, unknown>) => Promise<boolean>)({
@@ -75,7 +127,7 @@ function ContentTab({
     if (ok) onRemoveSection(sectionIndex);
   }
 
-  async function handleRemoveField(sectionIndex, fieldIndex, field) {
+  async function handleRemoveField(sectionIndex: number, fieldIndex: number, field: ContentTabField) {
     // STRAT#11: строки мигрированы на t() / tInterpolate() из labTranslations.
     const fieldName = field?.label || field?.field_key || `${t('content.field_fallback')} #${fieldIndex + 1}`;
     const ok = await (confirm as unknown as (opts: Record<string, unknown>) => Promise<boolean>)({
@@ -121,7 +173,7 @@ function ContentTab({
     <div className="ltw-grid">
       <div className="ltw-flex-between">
         <div className="ltw-fw-600">
-          {t('content.header')} ({draftVersion?.sections?.reduce((acc, s) => acc + (s.fields?.length || 0), 0) || 0} {t('content.header_fields')} {draftVersion?.sections?.length || 0} {t('content.header_sections')})
+          {t('content.header')} ({draftVersion?.sections?.reduce((acc: number, s: ContentTabSection) => acc + (s.fields?.length || 0), 0) || 0} {t('content.header_fields')} {draftVersion?.sections?.length || 0} {t('content.header_sections')})
         </div>
         <span className="ltw-flex-gap-4" style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
           {/* UX-AUDIT-FIX5: Developer mode toggle. По умолчанию выключен —
@@ -134,7 +186,7 @@ function ContentTab({
             <input
               type="checkbox"
               checked={developerMode}
-              onChange={(e: unknown) => setDeveloperMode(e as boolean)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDeveloperMode(e.target.checked)}
               aria-label={t('content.developer_mode_aria')}
             />
             {t('content.developer_mode')}
@@ -151,8 +203,8 @@ function ContentTab({
             variant="outline"
             size="small"
             onClick={handleBulkLoadCatalogReferenceRanges}
-            disabled={!draftVersion?.sections?.some((s) =>
-              (s.fields || []).some((f) =>
+            disabled={!draftVersion?.sections?.some((s: ContentTabSection) =>
+              (s.fields || []).some((f: ContentTabField) =>
                 f.reference_mode === 'catalog' && f.analyte_code
               )
             )}
@@ -164,7 +216,7 @@ function ContentTab({
         </span>
       </div>
 
-      {draftVersion.sections.map((section, sectionIndex) => {
+      {draftVersion.sections.map((section: ContentTabSection, sectionIndex: number) => {
         const isSectionExpanded = expandedSections.has(sectionIndex);
         return (
           <div key={`${section.key}-${sectionIndex}`} className="ltw-section-card">
@@ -181,13 +233,13 @@ function ContentTab({
                 <Badge variant="default">{section.fields.length} {t('content.section_fields_count')}</Badge>
               </div>
               <span className="ltw-flex-gap-4">
-                <Button variant="ghost" size="small" onClick={(e) => { e.stopPropagation(); onMoveSection(sectionIndex, 'up'); }} disabled={sectionIndex === 0} aria-label={t('content.move_section_up')}>
+                <Button variant="ghost" size="small" onClick={(e: React.MouseEvent<HTMLButtonElement>) => { e.stopPropagation(); onMoveSection(sectionIndex, 'up'); }} disabled={sectionIndex === 0} aria-label={t('content.move_section_up')}>
                   <Icon name="arrow.up" size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
                 </Button>
-                <Button variant="ghost" size="small" onClick={(e) => { e.stopPropagation(); onMoveSection(sectionIndex, 'down'); }} disabled={sectionIndex === draftVersion.sections.length - 1} aria-label={t('content.move_section_down')}>
+                <Button variant="ghost" size="small" onClick={(e: React.MouseEvent<HTMLButtonElement>) => { e.stopPropagation(); onMoveSection(sectionIndex, 'down'); }} disabled={sectionIndex === draftVersion.sections.length - 1} aria-label={t('content.move_section_down')}>
                   <Icon name="arrow.down" size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
                 </Button>
-                <Button variant="ghost" size="small" onClick={(e) => { e.stopPropagation(); handleRemoveSection(sectionIndex, section); }} aria-label={t('content.delete_section')}>
+                <Button variant="ghost" size="small" onClick={(e: React.MouseEvent<HTMLButtonElement>) => { e.stopPropagation(); handleRemoveSection(sectionIndex, section); }} aria-label={t('content.delete_section')}>
                   <Icon name="trash" size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
                 </Button>
               </span>
@@ -198,16 +250,16 @@ function ContentTab({
                 <div className="ltw-grid-2">
                   <label className="ltw-grid-6">
                     <span>{t('content.section_key')}</span>
-                    <input className="macos-input" aria-label={t('content.section_key')} value={section.key} onChange={(event) => onUpdateSection(sectionIndex, 'key', event.target.value)} />
+                    <input className="macos-input" aria-label={t('content.section_key')} value={section.key} onChange={(event: React.ChangeEvent<HTMLInputElement>) => onUpdateSection(sectionIndex, 'key', event.target.value)} />
                   </label>
                   <label className="ltw-grid-6">
                     <span>{t('content.section_title')}</span>
-                    <input className="macos-input" aria-label={t('content.section_title')} value={section.title || ''} onChange={(event) => onUpdateSection(sectionIndex, 'title', event.target.value)} />
+                    <input className="macos-input" aria-label={t('content.section_title')} value={section.title || ''} onChange={(event: React.ChangeEvent<HTMLInputElement>) => onUpdateSection(sectionIndex, 'title', event.target.value)} />
                   </label>
                 </div>
 
                 <div className="ltw-grid-8">
-                  {section.fields.map((field, fieldIndex) => {
+                  {section.fields.map((field: ContentTabField, fieldIndex: number) => {
                     const fieldKey = `${sectionIndex}-${fieldIndex}`;
                     const isFieldExpanded = expandedFields.has(fieldKey);
                     return (
@@ -226,16 +278,16 @@ function ContentTab({
                             {field.required && <Badge variant="warning">{t('content.field_required')}</Badge>}
                           </div>
                           <span className="ltw-flex-gap-4">
-                            <Button variant="ghost" size="small" onClick={(e) => { e.stopPropagation(); onMoveField(sectionIndex, fieldIndex, 'up'); }} disabled={fieldIndex === 0} aria-label={t('content.move_field_up')}>
+                            <Button variant="ghost" size="small" onClick={(e: React.MouseEvent<HTMLButtonElement>) => { e.stopPropagation(); onMoveField(sectionIndex, fieldIndex, 'up'); }} disabled={fieldIndex === 0} aria-label={t('content.move_field_up')}>
                               <Icon name="arrow.up" size={12 as unknown as "small" | "default" | "large" | "xlarge"} />
                             </Button>
-                            <Button variant="ghost" size="small" onClick={(e) => { e.stopPropagation(); onMoveField(sectionIndex, fieldIndex, 'down'); }} disabled={fieldIndex === section.fields.length - 1} aria-label={t('content.move_field_down')}>
+                            <Button variant="ghost" size="small" onClick={(e: React.MouseEvent<HTMLButtonElement>) => { e.stopPropagation(); onMoveField(sectionIndex, fieldIndex, 'down'); }} disabled={fieldIndex === section.fields.length - 1} aria-label={t('content.move_field_down')}>
                               <Icon name="arrow.down" size={12 as unknown as "small" | "default" | "large" | "xlarge"} />
                             </Button>
-                            <Button variant="ghost" size="small" onClick={(e) => { e.stopPropagation(); onDuplicateField(sectionIndex, fieldIndex); }} aria-label={t('content.duplicate_field')}>
+                            <Button variant="ghost" size="small" onClick={(e: React.MouseEvent<HTMLButtonElement>) => { e.stopPropagation(); onDuplicateField(sectionIndex, fieldIndex); }} aria-label={t('content.duplicate_field')}>
                               <Icon name="doc.on.doc" size={12 as unknown as "small" | "default" | "large" | "xlarge"} />
                             </Button>
-                            <Button variant="ghost" size="small" onClick={(e) => { e.stopPropagation(); handleRemoveField(sectionIndex, fieldIndex, field); }} aria-label={t('content.delete_field')}>
+                            <Button variant="ghost" size="small" onClick={(e: React.MouseEvent<HTMLButtonElement>) => { e.stopPropagation(); handleRemoveField(sectionIndex, fieldIndex, field); }} aria-label={t('content.delete_field')}>
                               <Icon name="trash" size={12 as unknown as "small" | "default" | "large" | "xlarge"} />
                             </Button>
                           </span>
@@ -246,15 +298,15 @@ function ContentTab({
                             <div className="ltw-grid-4">
                               <label className="ltw-grid-6">
                                 <span>{t('content.field_key')}</span>
-                                <input className="macos-input" aria-label={t('content.field_key')} value={field.field_key} onChange={(event) => onUpdateField(sectionIndex, fieldIndex, 'field_key', event.target.value)} />
+                                <input className="macos-input" aria-label={t('content.field_key')} value={field.field_key} onChange={(event: React.ChangeEvent<HTMLInputElement>) => onUpdateField(sectionIndex, fieldIndex, 'field_key', event.target.value)} />
                               </label>
                               <label className="ltw-grid-6">
                                 <span>{t('content.field_label')}</span>
-                                <input className="macos-input" aria-label={t('content.field_label')} value={field.label} onChange={(event) => onUpdateField(sectionIndex, fieldIndex, 'label', event.target.value)} />
+                                <input className="macos-input" aria-label={t('content.field_label')} value={field.label || ''} onChange={(event: React.ChangeEvent<HTMLInputElement>) => onUpdateField(sectionIndex, fieldIndex, 'label', event.target.value)} />
                               </label>
                               <label className="ltw-grid-6">
                                 <span>{t('content.value_type')}</span>
-                                <select className="macos-input" aria-label={t('content.value_type')} value={field.value_type} onChange={(event) => onUpdateField(sectionIndex, fieldIndex, 'value_type', event.target.value)}>
+                                <select className="macos-input" aria-label={t('content.value_type')} value={field.value_type} onChange={(event: React.ChangeEvent<HTMLSelectElement>) => onUpdateField(sectionIndex, fieldIndex, 'value_type', event.target.value)}>
                                   {fieldTypeOptions.map((option) => (
                                     <option key={option.value} value={option.value}>{option.label}</option>
                                   ))}
@@ -262,7 +314,7 @@ function ContentTab({
                               </label>
                               <label className="ltw-grid-6">
                                 <span>{t('content.unit')}</span>
-                                <input className="macos-input" aria-label={t('content.unit')} value={field.unit || ''} onChange={(event) => onUpdateField(sectionIndex, fieldIndex, 'unit', event.target.value)} />
+                                <input className="macos-input" aria-label={t('content.unit')} value={field.unit || ''} onChange={(event: React.ChangeEvent<HTMLInputElement>) => onUpdateField(sectionIndex, fieldIndex, 'unit', event.target.value)} />
                               </label>
                             </div>
 
@@ -274,7 +326,7 @@ function ContentTab({
                                   aria-label={t('content.analyte_code')}
                                   list={analyteCatalogId}
                                   value={field.analyte_code || ''}
-                                  onChange={(event) => onUpdateFieldCatalog(sectionIndex, fieldIndex, 'analyte_code', event.target.value)}
+                                  onChange={(event: React.ChangeEvent<HTMLInputElement>) => onUpdateFieldCatalog(sectionIndex, fieldIndex, 'analyte_code', event.target.value)}
                                 />
                               </label>
                               <label className="ltw-grid-6">
@@ -284,12 +336,12 @@ function ContentTab({
                                   aria-label={t('content.unit_code')}
                                   list={unitCatalogId}
                                   value={field.unit_code || ''}
-                                  onChange={(event) => onUpdateField(sectionIndex, fieldIndex, 'unit_code', event.target.value)}
+                                  onChange={(event: React.ChangeEvent<HTMLInputElement>) => onUpdateFieldCatalog(sectionIndex, fieldIndex, 'unit_code', event.target.value)}
                                 />
                               </label>
                               <label className="ltw-grid-6">
                                 <span>{t('content.reference_mode')}</span>
-                                <select className="macos-input" aria-label={t('content.reference_mode')} value={field.reference_mode} onChange={(event) => onUpdateField(sectionIndex, fieldIndex, 'reference_mode', event.target.value)}>
+                                <select className="macos-input" aria-label={t('content.reference_mode')} value={field.reference_mode || ''} onChange={(event: React.ChangeEvent<HTMLSelectElement>) => onUpdateField(sectionIndex, fieldIndex, 'reference_mode', event.target.value)}>
                                   {referenceModeOptions.map((option) => (
                                     <option key={option.value} value={option.value}>{option.label}</option>
                                   ))}
@@ -300,7 +352,7 @@ function ContentTab({
                                   <Button
                                     variant="outline"
                                     size="small"
-                                    onClick={() => onLoadCatalogReferenceRange(sectionIndex, fieldIndex, field.analyte_code)}
+                                    onClick={() => onLoadCatalogReferenceRange(sectionIndex, fieldIndex, field.analyte_code || '')}
                                   >
                                     <Icon name="square.and.arrow.down.on.square" size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
                                     {t('content.load_from_catalog')}
@@ -314,10 +366,10 @@ function ContentTab({
                               )}
                               <label className="ltw-grid-6">
                                 <span>{t('content.reference_text')}</span>
-                                <input className="macos-input" aria-label={t('content.reference_text')} value={field.reference_text || ''} onChange={(event) => onUpdateField(sectionIndex, fieldIndex, 'reference_text', event.target.value)} />
+                                <input className="macos-input" aria-label={t('content.reference_text')} value={field.reference_text || ''} onChange={(event: React.ChangeEvent<HTMLInputElement>) => onUpdateField(sectionIndex, fieldIndex, 'reference_text', event.target.value)} />
                               </label>
                               <label className="ltw-checkbox-label">
-                                <input type="checkbox" aria-label={t('content.required_aria')} checked={Boolean(field.required)} onChange={(event) => onUpdateField(sectionIndex, fieldIndex, 'required', event.target.checked)} />
+                                <input type="checkbox" aria-label={t('content.required_aria')} checked={Boolean(field.required)} onChange={(event: React.ChangeEvent<HTMLInputElement>) => onUpdateField(sectionIndex, fieldIndex, 'required', event.target.checked)} />
                                 {t('content.required_label')}
                               </label>
                             </div>
@@ -337,11 +389,11 @@ function ContentTab({
                                 <div className="ltw-raw-json-grid">
                                   <label className="ltw-grid-6">
                                     <span>JSON правил видимости</span>
-                                    <textarea className="macos-input" aria-label="JSON правил видимости" rows={3} value={field.visibility_rule_text || ''} onChange={(event) => onUpdateField(sectionIndex, fieldIndex, 'visibility_rule_text', event.target.value)} />
+                                    <textarea className="macos-input" aria-label="JSON правил видимости" rows={3} value={field.visibility_rule_text || ''} onChange={(event: React.ChangeEvent<HTMLTextAreaElement>) => onUpdateField(sectionIndex, fieldIndex, 'visibility_rule_text', event.target.value)} />
                                   </label>
                                   <label className="ltw-grid-6">
                                     <span>JSON правил подсветки</span>
-                                    <textarea className="macos-input" aria-label="JSON правил подсветки" rows={3} value={field.highlight_rule_text || ''} onChange={(event) => onUpdateField(sectionIndex, fieldIndex, 'highlight_rule_text', event.target.value)} />
+                                    <textarea className="macos-input" aria-label="JSON правил подсветки" rows={3} value={field.highlight_rule_text || ''} onChange={(event: React.ChangeEvent<HTMLTextAreaElement>) => onUpdateField(sectionIndex, fieldIndex, 'highlight_rule_text', event.target.value)} />
                                   </label>
                                 </div>
                               </details>

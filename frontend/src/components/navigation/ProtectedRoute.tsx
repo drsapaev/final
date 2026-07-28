@@ -1,8 +1,12 @@
 // Компонент для защищенных маршрутов с ролевыми ограничениями
 import PropTypes from 'prop-types';
-import { Routes, Route } from 'react-router-dom';
+import React, { type ReactNode } from 'react';
+import { Routes, Route, type PathRouteProps } from 'react-router-dom';
 import { RequireAuth, RequireRoles, RequirePermissions } from '../auth/RequireAuth';
 import { useRoleAccess } from '../common/RoleGuard';
+
+type RoleList = string[];
+type PermissionList = string[];
 
 /**
  * Компонент для создания защищенных маршрутов
@@ -15,6 +19,13 @@ export function ProtectedRoute({
   requireAuth = true,
   fallback = null,
   ...props
+}: Omit<PathRouteProps, 'path' | 'element' | 'children'> & {
+  path?: string;
+  element?: ReactNode;
+  roles?: RoleList;
+  permissions?: PermissionList;
+  requireAuth?: boolean;
+  fallback?: ReactNode;
 }) {
   if (!requireAuth) {
     return <Route path={path} element={element} {...props} />;
@@ -70,6 +81,12 @@ export function ProtectedRouteGroup({
   permissions = [],
   requireAuth = true,
   fallback = null
+}: {
+  children?: ReactNode;
+  roles?: RoleList;
+  permissions?: PermissionList;
+  requireAuth?: boolean;
+  fallback?: ReactNode;
 }) {
   if (!requireAuth) {
     return <>{children}</>;
@@ -105,6 +122,10 @@ export function ConditionalRoute({
   condition,
   children,
   fallback = null
+}: {
+  condition?: boolean;
+  children?: ReactNode;
+  fallback?: ReactNode;
 }) {
   return condition ? children : fallback;
 }
@@ -118,6 +139,12 @@ export function RoleBasedRoute({
   children,
   fallback = null,
   requireAll = false
+}: {
+  children?: ReactNode;
+  roles?: RoleList;
+  permissions?: PermissionList;
+  fallback?: ReactNode;
+  requireAll?: boolean;
 }) {
   const { profile, hasRole, hasPermission } = useRoleAccess();
 
@@ -144,12 +171,23 @@ export function RoleBasedRoute({
   return hasAccess ? children : fallback;
 }
 
+interface RoleBasedRouteItem {
+  path?: string;
+  element?: ReactNode;
+  roles?: RoleList;
+  permissions?: PermissionList;
+  props?: Record<string, unknown>;
+}
+
 /**
  * Компонент для создания маршрутов на основе ролей
  */
 export function RoleBasedRoutes({
   routes = [],
   fallback = null
+}: {
+  routes?: RoleBasedRouteItem[];
+  fallback?: ReactNode;
 }) {
   return (
     <Routes>
@@ -159,16 +197,22 @@ export function RoleBasedRoutes({
         roles={route.roles}
         permissions={route.permissions}
         fallback={fallback}>
-        
+
           <Route
           path={route.path}
           element={route.element}
-          {...route.props} />
-        
+          {...(route.props || {})} />
+
         </RoleBasedRoute>
       )}
     </Routes>);
 
+}
+
+interface RolePermissionItem {
+  roles?: RoleList;
+  permissions?: PermissionList;
+  [key: string]: unknown;
 }
 
 /**
@@ -177,6 +221,9 @@ export function RoleBasedRoutes({
 export function RoleBasedNavigation({
   items = [],
   fallback = null
+}: {
+  items?: RolePermissionItem[];
+  fallback?: ReactNode;
 }) {
   const { profile, hasRole, hasPermission } = useRoleAccess();
 
@@ -203,6 +250,9 @@ export function RoleBasedNavigation({
 export function RoleBasedSidebar({
   sections = [],
   fallback = null
+}: {
+  sections?: RolePermissionItem[];
+  fallback?: ReactNode;
 }) {
   const { profile, hasRole, hasPermission } = useRoleAccess();
 
@@ -229,6 +279,9 @@ export function RoleBasedSidebar({
 export function RoleBasedActions({
   actions = [],
   fallback = null
+}: {
+  actions?: RolePermissionItem[];
+  fallback?: ReactNode;
 }) {
   const { profile, hasRole, hasPermission } = useRoleAccess();
 
@@ -255,7 +308,7 @@ export function RoleBasedActions({
 export function useRoleBasedRoutes() {
   const { profile, hasRole, hasPermission } = useRoleAccess();
 
-  const createRoute = (route) => {
+  const createRoute = (route: RoleBasedRouteItem): RoleBasedRouteItem | null => {
     if (!profile) return null;
 
     if (route.roles && route.roles.length > 0) {
@@ -269,13 +322,13 @@ export function useRoleBasedRoutes() {
     return route;
   };
 
-  const createRoutes = (routes) => {
+  const createRoutes = (routes: RoleBasedRouteItem[]): RoleBasedRouteItem[] => {
     return routes.
     map(createRoute).
-    filter(Boolean);
+    filter((r): r is RoleBasedRouteItem => r !== null);
   };
 
-  const createNavigationItems = (items) => {
+  const createNavigationItems = (items: RolePermissionItem[]): RolePermissionItem[] => {
     return items.filter((item) => {
       if (item.roles && item.roles.length > 0) {
         return hasRole(item.roles);
