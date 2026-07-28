@@ -9,17 +9,27 @@ import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 
-const VoiceMessage = ({ message, fileUrl }) => {
+interface VoiceMessageData {
+  id?: string | number;
+  voice_duration?: number;
+}
+
+interface VoiceMessageProps {
+  message: VoiceMessageData;
+  fileUrl?: string | null;
+}
+
+const VoiceMessage = ({ message, fileUrl }: VoiceMessageProps) => {
   const { t } = useTranslation();
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(message.voice_duration || 0);
     const [isLoading, setIsLoading] = useState(false);
-    const [audioSrc, setAudioSrc] = useState(null);
+    const [audioSrc, setAudioSrc] = useState<string | null>(null);
     const [audioUnavailable, setAudioUnavailable] = useState(false);
 
-    const audioRef = useRef(null);
-    const objectUrlRef = useRef(null);
+    const audioRef = useRef<HTMLAudioElement | null>(null);
+    const objectUrlRef = useRef<string | null>(null);
 
     const loadAudio = async () => {
         if (!fileUrl || audioSrc || isLoading || audioUnavailable) {
@@ -63,7 +73,7 @@ const VoiceMessage = ({ message, fileUrl }) => {
             setAudioSrc(objectUrl);
             setAudioUnavailable(false);
             return objectUrl;
-        } catch (error) {
+        } catch (error: unknown) {
             logger.error('Failed to load audio:', error);
             setAudioUnavailable(true);
             return null;
@@ -103,7 +113,7 @@ const VoiceMessage = ({ message, fileUrl }) => {
             setIsLoading(false);
         };
         const handleCanPlay = () => setIsLoading(false);
-        const handleError = (e) => {
+        const handleError = (_e: Event) => {
             logger.warn('[FIX:VOICE] Audio playback failed', {
                 messageId: message?.id,
                 src: audio.src,
@@ -146,16 +156,16 @@ const VoiceMessage = ({ message, fileUrl }) => {
                 await audio.play();
                 setIsPlaying(true);
             }
-        } catch (error) {
+        } catch (error: unknown) {
             logger.warn('[FIX:VOICE] Playback error', {
                 messageId: message?.id,
-                error: error?.message || String(error),
+                error: error instanceof Error ? error.message : String(error),
             });
             setIsPlaying(false);
         }
     };
 
-    const handleSeek = (e) => {
+    const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
         const audio = audioRef.current;
         if (!audio || !duration) return;
 
@@ -167,7 +177,7 @@ const VoiceMessage = ({ message, fileUrl }) => {
         audio.currentTime = newTime;
         setCurrentTime(newTime);
     };
-    const handleSeekKeyDown = (e) => {
+    const handleSeekKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
         const audio = audioRef.current;
         if (!audio || !duration) return;
 
@@ -194,7 +204,7 @@ const VoiceMessage = ({ message, fileUrl }) => {
         setCurrentTime(nextTime);
     };
 
-    const formatTime = (seconds) => {
+    const formatTime = (seconds: number): string => {
         if (!seconds || isNaN(seconds)) return '0:00';
         const mins = Math.floor(seconds / 60);
         const secs = Math.floor(seconds % 60);

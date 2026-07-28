@@ -29,6 +29,7 @@ import {
   Select,
   Textarea,
 } from '../components/ui/macos';
+import type { SelectChangeEvent } from '../components/ui/macos/Select';
 import NotificationPreferences from '../components/settings/NotificationPreferences';
 import TwoFactorManager from '../components/security/TwoFactorManager';
 import { getState as getAuthState, setProfile as setAuthProfile } from '../stores/auth';
@@ -37,7 +38,7 @@ import logger from '../utils/logger';
 import { useTranslation } from '../i18n/useTranslation';
 
 const SELF_PROFILE_CACHE_MS = 30_000;
-let selfProfileCache = null;
+let selfProfileCache: Record<string, unknown> | null = null;
 let selfProfileCacheAt = 0;
 let selfProfilePromise: Promise<Record<string, unknown> | null> | null = null;
 
@@ -68,12 +69,29 @@ const timezoneOptions = [
   { value: 'UTC', label: 'UTC' },
 ];
 
-function formatDateTime(value, emptyLabel) {
+interface ProfileDraft {
+  full_name: string;
+  first_name: string;
+  last_name: string;
+  middle_name: string;
+  email: string;
+  phone: string;
+  date_of_birth: string;
+  gender: string;
+  nationality: string;
+  language: string;
+  timezone: string;
+  website: string;
+  bio: string;
+  avatar_url: string;
+}
+
+function formatDateTime(value: unknown, emptyLabel: string): string {
   if (!value) {
     return emptyLabel;
   }
 
-  const parsed = new Date(value);
+  const parsed = new Date(value as string | number | Date);
   if (Number.isNaN(parsed.getTime())) {
     return emptyLabel;
   }
@@ -81,12 +99,12 @@ function formatDateTime(value, emptyLabel) {
   return parsed.toLocaleString('ru-RU');
 }
 
-function toDateInputValue(value) {
+function toDateInputValue(value: unknown): string {
   if (!value) {
     return '';
   }
 
-  const parsed = new Date(value);
+  const parsed = new Date(value as string | number | Date);
   if (Number.isNaN(parsed.getTime())) {
     return '';
   }
@@ -94,30 +112,30 @@ function toDateInputValue(value) {
   return parsed.toISOString().slice(0, 10);
 }
 
-function normalizeProfileForDraft(profile) {
+function normalizeProfileForDraft(profile: Record<string, unknown> | null): ProfileDraft {
   return {
-    full_name: profile?.full_name || '',
-    first_name: profile?.first_name || '',
-    last_name: profile?.last_name || '',
-    middle_name: profile?.middle_name || '',
-    email: profile?.email || '',
-    phone: profile?.phone || '',
+    full_name: String(profile?.full_name ?? ''),
+    first_name: String(profile?.first_name ?? ''),
+    last_name: String(profile?.last_name ?? ''),
+    middle_name: String(profile?.middle_name ?? ''),
+    email: String(profile?.email ?? ''),
+    phone: String(profile?.phone ?? ''),
     date_of_birth: toDateInputValue(profile?.date_of_birth),
-    gender: profile?.gender || '',
-    nationality: profile?.nationality || '',
-    language: profile?.language || 'ru',
-    timezone: profile?.timezone || 'Asia/Tashkent',
-    website: profile?.website || '',
-    bio: profile?.bio || '',
-    avatar_url: profile?.avatar_url || '',
+    gender: String(profile?.gender ?? ''),
+    nationality: String(profile?.nationality ?? ''),
+    language: String(profile?.language ?? 'ru'),
+    timezone: String(profile?.timezone ?? 'Asia/Tashkent'),
+    website: String(profile?.website ?? ''),
+    bio: String(profile?.bio ?? ''),
+    avatar_url: String(profile?.avatar_url ?? ''),
   };
 }
 
-function buildProfilePayload(draft) {
-  const payload = {};
+function buildProfilePayload(draft: ProfileDraft): Record<string, unknown> {
+  const payload: Record<string, unknown> = {};
 
   for (const field of editableFields) {
-    const value = draft[field];
+    const value = draft[field as keyof ProfileDraft];
     if (field === 'date_of_birth') {
       payload[field] = value ? `${value}T00:00:00` : null;
       continue;
@@ -135,7 +153,7 @@ function buildProfilePayload(draft) {
   return payload;
 }
 
-function rememberSelfProfile(profile) {
+function rememberSelfProfile(profile: Record<string, unknown>): Record<string, unknown> {
   selfProfileCache = profile;
   selfProfileCacheAt = Date.now();
   return profile;
@@ -191,7 +209,14 @@ export function __resetSelfProfileCacheForTests() {
   selfProfilePromise = null;
 }
 
-function ProfileTabButton({ active, icon: Icon, label, onClick }) {
+interface ProfileTabButtonProps {
+  active: boolean;
+  icon: React.ElementType;
+  label: React.ReactNode;
+  onClick: () => void;
+}
+
+function ProfileTabButton({ active, icon: Icon, label, onClick }: ProfileTabButtonProps) {
   return (
     <button
       className={`theme-tab-button ${active ? 'theme-tab-button--active' : ''}`}
@@ -211,7 +236,14 @@ ProfileTabButton.propTypes = {
   onClick: PropTypes.func.isRequired,
 };
 
-function ProfileMetaCard({ icon: Icon, label, value, accent }) {
+interface ProfileMetaCardProps {
+  icon: React.ElementType;
+  label: React.ReactNode;
+  value: React.ReactNode;
+  accent: string;
+}
+
+function ProfileMetaCard({ icon: Icon, label, value, accent }: ProfileMetaCardProps) {
   return (
     <div
       className="theme-soft-surface"
@@ -251,7 +283,12 @@ ProfileMetaCard.propTypes = {
   value: PropTypes.string.isRequired,
 };
 
-function ProfileField({ label, children }) {
+interface ProfileFieldProps {
+  label: React.ReactNode;
+  children: React.ReactNode;
+}
+
+function ProfileField({ label, children }: ProfileFieldProps) {
   return (
     <div style={{ display: 'grid', gap: 8 }}>
       <label
@@ -291,7 +328,7 @@ export default function UserProfile() {
   ];
 
   const [profile, setProfile] = useState<Record<string, unknown> | null>(null);
-  const [draft, setDraft] = useState(() => normalizeProfileForDraft(null));
+  const [draft, setDraft] = useState<ProfileDraft>(() => normalizeProfileForDraft(null));
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('info');
@@ -369,8 +406,9 @@ export default function UserProfile() {
       const nextProfile = await fetchSelfProfile(force);
       setProfile(nextProfile);
       setDraft(normalizeProfileForDraft(nextProfile));
-    } catch (err) {
-      if (err?.response?.status === 429) {
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { status?: number } };
+      if (axiosErr?.response?.status === 429) {
         const fallbackProfile = getFallbackAuthProfile();
         if (fallbackProfile) {
           setProfile(fallbackProfile);
@@ -390,7 +428,7 @@ export default function UserProfile() {
     }
   }
 
-  function updateDraft(field, value) {
+  function updateDraft<K extends keyof ProfileDraft>(field: K, value: ProfileDraft[K]): void {
     setDraft((prev) => ({
       ...prev,
       [field]: value,
@@ -479,7 +517,7 @@ export default function UserProfile() {
                 boxShadow: '0 18px 36px color-mix(in srgb, var(--mac-accent), transparent 72%)',
               }}
             >
-              {profile.full_name?.[0]?.toUpperCase() || profile.username?.[0]?.toUpperCase() || 'U'}
+              {String(profile.full_name ?? '')[0]?.toUpperCase() || String(profile.username ?? '')[0]?.toUpperCase() || 'U'}
             </div>
 
             <div style={{ flex: '1 1 280px', minWidth: 240 }}>
@@ -498,7 +536,7 @@ export default function UserProfile() {
                       padding: '6px 10px',
                       fontSize: 12,
                       fontWeight: 'var(--mac-font-weight-semibold)',
-                      ...(toneChipStyles[badge.tone] || toneChipStyles.info),
+                      ...(toneChipStyles[badge.tone as keyof typeof toneChipStyles] || toneChipStyles.info),
                     }}
                   >
                     <BadgeCheck size={14} />
@@ -729,21 +767,21 @@ export default function UserProfile() {
                 <ProfileField label={t('misc.up_label_gender')}>
                   <Select
                     value={draft.gender}
-                    onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateDraft('gender', event.target.value)}
+                    onChange={(event: SelectChangeEvent) => updateDraft('gender', event.target.value)}
                     options={genderOptions}
                   />
                 </ProfileField>
                 <ProfileField label={t('misc.up_label_language')}>
                   <Select
                     value={draft.language}
-                    onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateDraft('language', event.target.value)}
+                    onChange={(event: SelectChangeEvent) => updateDraft('language', event.target.value)}
                     options={languageOptions}
                   />
                 </ProfileField>
                 <ProfileField label={t('misc.up_label_timezone')}>
                   <Select
                     value={draft.timezone}
-                    onChange={(event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => updateDraft('timezone', event.target.value)}
+                    onChange={(event: SelectChangeEvent) => updateDraft('timezone', event.target.value)}
                     options={timezoneOptions}
                   />
                 </ProfileField>
