@@ -31,6 +31,7 @@ import {
   Badge,
   Select,
   Checkbox } from '../ui/macos';
+import type { SelectChangeEvent } from '../ui/macos/Select';
 import './EnhancedAppointmentsTable.css';
 
 import { QueueActionButtons } from '../queue/QueueManagementCard';
@@ -71,9 +72,11 @@ const ACTION_ALIASES = {
   complete: ['complete', 'complete_visit', 'complete-visit'],
   view_emr: ['view_emr', 'view-emr'],
   schedule_next: ['schedule_next', 'schedule-next']
-};
+} as const;
 
-const getBackendActionAvailability = (row, action, flagName) => {
+type ActionAliasKey = keyof typeof ACTION_ALIASES;
+
+const getBackendActionAvailability = (row: Record<string, unknown> | null | undefined, action: string, flagName?: string) => {
   if (row && flagName && Object.prototype.hasOwnProperty.call(row, flagName)) {
     return Boolean(row[flagName]);
   }
@@ -82,8 +85,9 @@ const getBackendActionAvailability = (row, action, flagName) => {
     return null;
   }
 
-  const actions = new Set(row.available_actions.map((item) => String(item).trim().toLowerCase()));
-  const aliases = ACTION_ALIASES[action] || [action];
+  const actions = new Set(row.available_actions.map((item: unknown) => String(item).trim().toLowerCase()));
+  const aliasesRaw = ACTION_ALIASES[action as ActionAliasKey];
+  const aliases: string[] = aliasesRaw ? Array.from(aliasesRaw) : [action];
   return aliases.some((alias: string) => actions.has(alias));
 };
 
@@ -162,8 +166,8 @@ const EnhancedAppointmentsTable = ({
   showCheckboxes = true,
   view = 'registrar'
 }: EnhancedAppointmentsTableProps) => {
-  const containerRef = useRef(null);
-  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [sortConfig, setSortConfig] = useState<{ key: string | null; direction: string }>({ key: null, direction: 'asc' });
   const [filterConfig, setFilterConfig] = useState({
     search: '',
     status: '',
@@ -269,8 +273,9 @@ const EnhancedAppointmentsTable = ({
     if (!sortConfig.key) return data;
 
     return [...data].sort((a, b) => {
-      let aVal = a[sortConfig.key];
-      let bVal = b[sortConfig.key];
+      const sortKey = sortConfig.key;
+      let aVal: unknown = sortKey ? a[sortKey] : undefined;
+      let bVal: unknown = sortKey ? b[sortKey] : undefined;
 
       // Специальная обработка для стоимости
       if (sortConfig.key === 'cost') {
@@ -285,8 +290,10 @@ const EnhancedAppointmentsTable = ({
         bVal = b.queue_numbers && b.queue_numbers.length > 0 ? b.queue_numbers[0].number : 999999;
       }
 
-      if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
-      if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+      const aNum = Number(aVal);
+      const bNum = Number(bVal);
+      if (aNum < bNum) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (aNum > bNum) return sortConfig.direction === 'asc' ? 1 : -1;
       return 0;
     });
   }, [data, sortConfig]);
@@ -502,7 +509,7 @@ const EnhancedAppointmentsTable = ({
       }
     };
 
-    const config = statusConfig[status] || statusConfig.scheduled;
+    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.scheduled;
     config.icon;
 
     return (
@@ -533,23 +540,23 @@ const EnhancedAppointmentsTable = ({
   // maps so the per-row renderServices() can do O(1) lookups instead of
   // nested Object.values(services).find() — was O(rows × groups × group_size).
   const createServiceMapping = useCallback(() => {
-    const mapping = {};
-    const categoryMapping = {};
+    const mapping: Record<string, string> = {};
+    const categoryMapping: Record<string, string> = {};
     const nameToService: Record<string, Record<string, unknown>> = {};
     const codeToService: Record<string, Record<string, unknown>> = {};
 
     // Преобразуем структуру services в плоские маппинги
     Object.entries(services).forEach(([category, group]) => {
       if (Array.isArray(group)) {
-        group.forEach((service) => {
+        group.forEach((service: Record<string, unknown>) => {
           if (service.id && service.name) {
             const id = String(service.id);
-            mapping[id] = service.name;
+            mapping[id] = String(service.name);
             categoryMapping[id] = category;
 
             // Дополнительные алиасы для совместимости
             if (service.service_id) {
-              mapping[String(service.service_id)] = service.name;
+              mapping[String(service.service_id)] = String(service.name);
               categoryMapping[String(service.service_id)] = category;
             }
 
@@ -572,7 +579,7 @@ const EnhancedAppointmentsTable = ({
   }, [services]);
 
   // Рендер услуг с динамическим маппингом
-  const renderServices = useCallback((appointmentServices, allPatientServices = null) => {
+  const renderServices = useCallback((appointmentServices: unknown, allPatientServices: Array<unknown> | null = null) => {
     if (!appointmentServices) {
       return '—';
     }
@@ -580,9 +587,9 @@ const EnhancedAppointmentsTable = ({
     const { mapping: serviceMapping, nameToService, codeToService } = createServiceMapping();
 
     // Поддерживаем как массив строк, так и массив объектов
-    let servicesList = [];
+    let servicesList: unknown[] = [];
     if (Array.isArray(appointmentServices)) {
-      servicesList = appointmentServices.map((service) => {
+      servicesList = appointmentServices.map((service: unknown) => {
         // Обрабатываем строки-числа (ID услуг)
         if (typeof service === 'string' && /^\d+$/.test(service)) {
           return serviceMapping[service] || t('misc.eat_service_label', { service });
@@ -595,10 +602,10 @@ const EnhancedAppointmentsTable = ({
         if (typeof service === 'string') return service;
         // ⭐ ИСПРАВЛЕНО: Если объект имеет code - возвращаем код напрямую (не name!)
         // Это важно, чтобы K11 не превратился в K01 при поиске по name
-        if (typeof service === 'object' && service.code) {
-          return String(service.code).toUpperCase();
+        if (typeof service === 'object' && service !== null && (service as Record<string, unknown>).code) {
+          return String((service as Record<string, unknown>).code).toUpperCase();
         }
-        if (typeof service === 'object' && service.name) return service.name;
+        if (typeof service === 'object' && service !== null && (service as Record<string, unknown>).name) return String((service as Record<string, unknown>).name);
         return String(service);
       });
     } else if (typeof appointmentServices === 'string') {
@@ -625,9 +632,9 @@ const EnhancedAppointmentsTable = ({
     // ✅ ИСПОЛЬЗУЕМ НОВЫЕ КОДЫ ИЗ БАЗЫ ДАННЫХ
     // audit/phase-6, BS-61: use nameToService map (O(1)) instead of nested
     // Object.values(services).find() (O(groups × group_size) per service).
-    const compactCodes = servicesList.map((serviceName) => {
+    const compactCodes: string[] = servicesList.map((serviceName: unknown) => {
       // Если это уже код (K01, D02, D_PROC03, etc), возвращаем в верхнем регистре
-      if (isServiceCode(serviceName)) {
+      if (isServiceCode(String(serviceName))) {
         return String(serviceName).toUpperCase();
       }
 
@@ -645,13 +652,13 @@ const EnhancedAppointmentsTable = ({
       }
 
       // Если ничего не найдено и это не код, возвращаем как есть (название)
-      return serviceName;
+      return String(serviceName);
     });
 
     // ✅ Преобразуем коды обратно в названия для tooltip
     // ⭐ SSOT: Используем централизованную функцию getServiceDisplayName
     // audit/phase-6, BS-61: use codeToService map (O(1)) instead of nested find().
-    const serviceNamesForTooltip = compactCodes.map((code) => {
+    const serviceNamesForTooltip: string[] = compactCodes.map((code: string) => {
       // Если это код, ищем полное название через SSOT
       if (isServiceCode(code)) {
         // ⭐ SSOT: Сначала используем централизованный маппинг
@@ -663,7 +670,7 @@ const EnhancedAppointmentsTable = ({
         // Fallback: O(1) lookup in codeToService map (keyed by uppercase code)
         const foundService = codeToService[code.toUpperCase()];
         if (foundService) {
-          return foundService.name;
+          return String(foundService.name);
         }
 
         // Если не нашли название для кода, возвращаем код как есть
@@ -681,31 +688,31 @@ const EnhancedAppointmentsTable = ({
       // ✅ Преобразуем коды всех услуг в названия
       // audit/phase-6, BS-61: use codeToService map (O(1)) instead of two
       // nested find() loops per service.
-      const allPatientServiceNames = allPatientServices.map((service) => {
+      const allPatientServiceNames = allPatientServices.map((service: unknown) => {
         // Если это уже название (длинное, с пробелами), возвращаем как есть
         if (typeof service === 'string' && service.length > 20 && /\s/.test(service)) {
           return service;
         }
 
         // Если это код, ищем название через O(1) map lookup
-        if (isServiceCode(service)) {
+        if (isServiceCode(service as string)) {
           const foundService = codeToService[String(service).toUpperCase()];
           if (foundService) {
-            return foundService.name;
+            return String(foundService.name);
           }
 
           // Если не нашли, возвращаем код
-          return service;
+          return String(service);
         }
 
         // Иначе возвращаем как есть
-        return service;
+        return String(service);
       });
 
       // Показываем все услуги пациента из всех отделений
       tooltipText = `${t('misc.eat_all_services_tooltip', { count: allPatientServiceNames.length })}\n\n`;
-      allPatientServiceNames.forEach((service, idx) => {
-        tooltipText += `${idx + 1}. ${service}\n`;
+      allPatientServiceNames.forEach((service: unknown, idx: number) => {
+        tooltipText += `${idx + 1}. ${String(service)}\n`;
       });
 
       // Добавляем информацию о текущих услугах с полными названиями
@@ -718,7 +725,7 @@ const EnhancedAppointmentsTable = ({
     } else {
       // Fallback: показываем только текущие услуги с полными названиями
       tooltipText = serviceNamesForTooltip.length > 1 ?
-      `${t('misc.eat_services_tooltip')}\n${serviceNamesForTooltip.map((serviceName, idx) => `${idx + 1}. ${serviceName}`).join('\n')}` :
+      `${t('misc.eat_services_tooltip')}\n${serviceNamesForTooltip.map((serviceName: string, idx: number) => `${idx + 1}. ${serviceName}`).join('\n')}` :
       serviceNamesForTooltip[0] || '';
     }
 
@@ -727,7 +734,7 @@ const EnhancedAppointmentsTable = ({
         className="eat-service-code-wrap"
         title={tooltipText}>
 
-        {compactCodes.map((code, idx) =>
+        {compactCodes.map((code: string, idx: number) =>
         <span
           key={idx}
           style={{
@@ -758,7 +765,7 @@ const EnhancedAppointmentsTable = ({
     };
 
     const typeText = t(`misc.eat_${visitType}`, { defaultValue: visitType });
-    const color = typeColors[visitType] || 'var(--mac-text-secondary)';
+    const color = typeColors[visitType as keyof typeof typeColors] || 'var(--mac-text-secondary)';
 
     // ✅ ИСПРАВЛЕНО: Для allfree используем rgba напрямую, так как withOpacity работает только с CSS переменными
     const isAllFree = visitType === 'allfree';
@@ -826,10 +833,10 @@ const EnhancedAppointmentsTable = ({
       unknown_payment: t('misc.eat_unknown_payment'),
       mixed_payment: t('misc.eat_mixed_payment')
     };
-    const typeText = paymentLabels[paymentType] || t(`misc.eat_${paymentType}`, { defaultValue: paymentType });
-    const icon = paymentIcons[paymentType] || '💰';
-    const color = paymentColors[paymentType] || 'var(--mac-text-secondary)';void (
-    statusColors[paymentStatus] || 'var(--mac-text-secondary)');
+    const typeText = paymentLabels[paymentType as keyof typeof paymentLabels] || t(`misc.eat_${paymentType}`, { defaultValue: paymentType });
+    const icon = paymentIcons[paymentType as keyof typeof paymentIcons] || '💰';
+    const color = paymentColors[paymentType as keyof typeof paymentColors] || 'var(--mac-text-secondary)';void (
+    statusColors[paymentStatus as keyof typeof statusColors] || 'var(--mac-text-secondary)');
 
     // ✅ Упрощённый вид: вид оплаты + иконка статуса
     return (
@@ -917,19 +924,19 @@ const EnhancedAppointmentsTable = ({
       if (row.queue_number !== undefined && row.queue_number !== null) {
         // ✅ ИСПРАВЛЕНО: Используем статус из queue_number_status (соответствует текущей вкладке)
         // или ищем соответствующий queue_number в queue_numbers для получения его статуса
-        let queueStatus = row.queue_number_status;
+        let queueStatus: string | undefined = row.queue_number_status;
         if (!queueStatus && row.queue_numbers && Array.isArray(row.queue_numbers)) {
           // Ищем queue_number в queue_numbers и берём его статус
           const matchingQueue = row.queue_numbers.find((q: Record<string, unknown>) => q.number === row.queue_number);
           if (matchingQueue) {
-            queueStatus = matchingQueue.status;
+            queueStatus = matchingQueue.status as string | undefined;
           } else if (row.queue_numbers.length > 0) {
             // ✅ ИСПРАВЛЕНО: Если не нашли точное совпадение, используем статус из первого queue_number
             // вместо общего row.status, так как статусы отдельных очередей могут отличаться
-            queueStatus = row.queue_numbers[0].status;
+            queueStatus = row.queue_numbers[0].status as string | undefined;
           }
         }
-        queueStatus = queueStatus || null;
+        const queueStatusKey = queueStatus || 'unknown';
         const statusConfig = {
           waiting: {
             bg: 'var(--mac-warning, #ff9500)',
@@ -963,7 +970,7 @@ const EnhancedAppointmentsTable = ({
           }
         };
 
-        const config = statusConfig[queueStatus] || statusConfig.unknown;
+        const config = statusConfig[queueStatusKey as keyof typeof statusConfig] || statusConfig.unknown;
 
         return (
           <>
@@ -1011,7 +1018,7 @@ const EnhancedAppointmentsTable = ({
       // Fallback: Если есть номера очередей, но нет queue_number - показываем первый
       if (row.queue_numbers && Array.isArray(row.queue_numbers) && row.queue_numbers.length > 0) {
         const firstQueue = row.queue_numbers[0];
-        const queueStatus = firstQueue.status || null;
+        const queueStatusKey = firstQueue.status || 'unknown';
         const statusConfig = {
           waiting: {
             bg: 'var(--mac-warning, #ff9500)',
@@ -1045,7 +1052,7 @@ const EnhancedAppointmentsTable = ({
           }
         };
 
-        const config = statusConfig[queueStatus] || statusConfig.unknown;
+        const config = statusConfig[queueStatusKey as keyof typeof statusConfig] || statusConfig.unknown;
 
         return (
           <>
@@ -1167,7 +1174,7 @@ const EnhancedAppointmentsTable = ({
           {/* Фильтр по статусу */}
           <Select
             value={filterConfig.status}
-            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFilterConfig((prev) => ({ ...prev, status: e.target.value }))}
+            onChange={(e: SelectChangeEvent) => setFilterConfig((prev) => ({ ...prev, status: e.target.value }))}
             options={[
             { value: '', label: t('misc.eat_filter') },
             { value: 'scheduled', label: t('misc.eat_scheduled') },
@@ -1474,7 +1481,7 @@ const EnhancedAppointmentsTable = ({
 
             paginatedData.map((row: Appointment, index: number) => {
               // ⭐ SSOT: Get session color for visual grouping (presentation only)
-              const sessionColor = getSessionColor(row.session_id);
+              const sessionColor = getSessionColor(row.session_id ?? '');
               const backendCanPay = getBackendActionAvailability(row, 'payment', 'can_mark_paid');
               const backendCanCall = getBackendActionAvailability(row, 'call', 'can_start_visit');
               const backendCanPrint = getBackendActionAvailability(row, 'print', 'can_print_ticket');
@@ -1518,7 +1525,10 @@ const EnhancedAppointmentsTable = ({
                   }}
                   onMouseEnter={(e: React.MouseEvent<HTMLElement>) => {
                     if (!selectedRows.has(row.id)) {
-                      (e.target as HTMLElement).closest('tr').style.backgroundColor = 'var(--mac-bg-secondary)';
+                      const tr = (e.target as HTMLElement).closest('tr');
+                      if (tr) {
+                        tr.style.backgroundColor = 'var(--mac-bg-secondary)';
+                      }
                     }
                   }}
                   onMouseLeave={(e: React.MouseEvent<HTMLElement>) => {
@@ -1539,7 +1549,7 @@ const EnhancedAppointmentsTable = ({
                     className="eat-td-base"
                     aria-label={`${t('misc.eat_select_all')}: ${row.patient_fio || row.patient_name || row.id}`}>
                         <Checkbox aria-label={`${t('misc.eat_select_all')}: ${row.patient_fio || row.patient_name || row.id}`} checked={selectedRows.has(row.id)} onChange={(checked: boolean) => {
-                        handleRowSelect(row.id, checked);
+                        handleRowSelect(row.id ?? '', checked);
                       }}
                       />
 
@@ -1568,7 +1578,7 @@ const EnhancedAppointmentsTable = ({
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap'
                   }}
-                  title={isDoctorView ? `${row.patient_fio || '—'}\n📞 ${formatPhoneNumber(row.patient_phone)}\n🏠 ${row.address || '—'}` : undefined}>
+                  title={isDoctorView ? `${row.patient_fio || '—'}\n📞 ${formatPhoneNumber(row.patient_phone ?? '')}\n🏠 ${row.address || '—'}` : undefined}>
 
                       <div>
                         <div className="eat-td-flex">
@@ -1607,7 +1617,7 @@ const EnhancedAppointmentsTable = ({
                             </span>
                         }
                         </div>
-                        {row.patient_birth_year &&
+                        {typeof row.patient_birth_year === 'number' && row.patient_birth_year > 0 &&
                       <div className="eat-patient-age">
                             {t('misc.eat_years_old', { count: new Date().getFullYear() - row.patient_birth_year })}
                           </div>
@@ -1628,12 +1638,11 @@ const EnhancedAppointmentsTable = ({
                   }}>
                         <div className="eat-phone-cell">
                           <Phone size={18} className="eat-phone-icon" />
-                          {formatPhoneNumber(row.patient_phone)}
+                          {formatPhoneNumber(row.patient_phone ?? '')}
                         </div>
                       </td>
                   }
 
-                    {/* Год рождения */}
                     <td className="eat-td" style={{
                     padding: '12px 8px',
                     textAlign: 'center',
@@ -1642,8 +1651,8 @@ const EnhancedAppointmentsTable = ({
                     width: isDoctorView ? '50px' : '60px',
                     minWidth: isDoctorView ? '50px' : '60px',
                     maxWidth: isDoctorView ? '50px' : '60px'
-                  }}>
-                      {row.patient_birth_year || '—'}
+                  } as CSSProperties}>
+                      {String(row.patient_birth_year ?? '—')}
                     </td>
 
                     {/* Адрес - скрыт для doctor view */}
@@ -1722,7 +1731,7 @@ const EnhancedAppointmentsTable = ({
                         }
                         return row.services;
                       })(),
-                      row.all_patient_services
+                      (Array.isArray(row.all_patient_services) ? row.all_patient_services : null)
                     )}
                     </td>
 
@@ -1763,7 +1772,7 @@ const EnhancedAppointmentsTable = ({
                     </td>
 
                     {/* P1 fix: Lab results badge — shows if lab results are ready */}
-                    {row.latest_lab_report && (
+                    {Boolean(row.latest_lab_report) && (
                       <td className="eat-td" style={{
                         padding: '12px 8px',
                         textAlign: 'center',
@@ -1869,7 +1878,7 @@ const EnhancedAppointmentsTable = ({
                       {/* UX Audit R-4.4: показываем visit status + payment status.
                           Раньше: 15 статусов в одной колонке, включая paid_pending/payment_paid.
                           Теперь: visit status (основной) + payment badge (если есть). */}
-                      {renderStatus(row.status)}
+                      {renderStatus(row.status ?? '')}
                       {row.payment_status && row.payment_status !== 'paid' && (
                         <div style={{
                           display: 'inline-flex',

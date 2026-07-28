@@ -27,17 +27,67 @@ const patientSearchRouteByRole = {
 };
 const clinicalPickupPath = getCanonicalRouteById('clinical-pickup')?.path || '/clinical/pickup/:patientId';
 
-function routeWithQuery(path, params) {
-  const searchParams = new URLSearchParams(params);
+interface GlobalSearchBarProps {
+  className?: string;
+}
+
+interface PatientResult {
+  id: string | number;
+  last_name?: string;
+  first_name?: string;
+  middle_name?: string;
+  phone?: string;
+  patient_id?: string | number;
+  patient_name?: string;
+}
+
+interface VisitResult {
+  id: string | number;
+  patient_id?: string | number;
+  patient_name?: string;
+  planned_date?: string;
+  status?: string;
+  test_type?: string;
+}
+
+interface LabResult {
+  id: string | number;
+  patient_name?: string;
+  test_type?: string;
+  status?: string;
+}
+
+interface SearchResults {
+  patients: PatientResult[];
+  visits: VisitResult[];
+  labResults: LabResult[];
+}
+
+type SearchResultType = 'patient' | 'visit' | 'lab';
+
+type SearchItemData = PatientResult | VisitResult | LabResult;
+
+interface SearchItem {
+  type: SearchResultType;
+  data: SearchItemData;
+}
+
+function routeWithQuery(path: string, params: Record<string, string | number | undefined>) {
+  const searchParams = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) {
+      searchParams.append(key, String(value));
+    }
+  });
   return `${path}?${searchParams.toString()}`;
 }
 
-function patientPickupRoute(patientId) {
-  return generatePath(clinicalPickupPath, { patientId });
+function patientPickupRoute(patientId: string | number) {
+  return generatePath(clinicalPickupPath, { patientId: String(patientId) });
 }
 
 // Debounce hook
-function useDebounce(value, delay) {
+function useDebounce(value: string, delay: number) {
   const [debouncedValue, setDebouncedValue] = useState(value);
   useEffect(() => {
     const handler = setTimeout(() => setDebouncedValue(value), delay);
@@ -46,31 +96,31 @@ function useDebounce(value, delay) {
   return debouncedValue;
 }
 
-export default function GlobalSearchBar({ className = '' }) {
+export default function GlobalSearchBar({ className = '' }: GlobalSearchBarProps) {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const navigate = useNavigate();
-  const inputRef = useRef(null);
-  const containerRef = useRef(null);
-  const dropdownRef = useRef(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0, width: 0 });
 
   const [query, setQuery] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [results, setResults] = useState({ patients: [], visits: [], labResults: [] });
+  const [results, setResults] = useState<SearchResults>({ patients: [], visits: [], labResults: [] });
   const [selectedIndex, setSelectedIndex] = useState(-1);
 
   const debouncedQuery = useDebounce(query, 300);
 
   // Get user role for navigation
   const getUserRole = () => {
-    const st = auth.getState();
-    const profile = (st as Record<string, any>).profile || (st as Record<string, any>).user || {};
+    const st = auth.getState() as Record<string, unknown>;
+    const profile = (st.profile as Record<string, unknown> | undefined) || (st.user as Record<string, unknown> | undefined) || {};
     return String(profile?.role || profile?.role_name || '').toLowerCase();
   };
 
   // Search API call
-  const performSearch = useCallback(async (searchQuery) => {
+  const performSearch = useCallback(async (searchQuery: string) => {
     if (searchQuery.length < 2) {
       setResults({ patients: [], visits: [], labResults: [] });
       return;
@@ -79,7 +129,12 @@ export default function GlobalSearchBar({ className = '' }) {
     setIsLoading(true);
     try {
       const response = await api.get('/global-search', { params: { q: searchQuery, limit: 5 } });
-      setResults(response.data);
+      const data = (response.data ?? {}) as Partial<SearchResults>;
+      setResults({
+        patients: data.patients ?? [],
+        visits: data.visits ?? [],
+        labResults: data.labResults ?? [],
+      });
     } catch (error) {
       logger.error('Search error:', error);
       setResults({ patients: [], visits: [], labResults: [] });
@@ -101,7 +156,7 @@ export default function GlobalSearchBar({ className = '' }) {
 
   // Global keyboard shortcut (Ctrl+K / Cmd+K)
   useEffect(() => {
-    const handleKeyDown = (e) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault();
         inputRef.current?.focus();
@@ -114,9 +169,10 @@ export default function GlobalSearchBar({ className = '' }) {
 
   // Click outside to close
   useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (containerRef.current && !containerRef.current.contains(e.target) &&
-      dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as Node | null;
+      if (containerRef.current && !containerRef.current.contains(target) &&
+      dropdownRef.current && !dropdownRef.current.contains(target)) {
         setIsOpen(false);
       }
     };
@@ -137,8 +193,8 @@ export default function GlobalSearchBar({ className = '' }) {
   }, [isOpen]);
 
   // Get all items as flat list for keyboard navigation
-  const getAllItems = () => {
-    const items = [];
+  const getAllItems = (): SearchItem[] => {
+    const items: SearchItem[] = [];
     results.patients.forEach((p) => items.push({ type: 'patient', data: p }));
     results.visits.forEach((v) => items.push({ type: 'visit', data: v }));
     results.labResults.forEach((l) => items.push({ type: 'lab', data: l }));
@@ -146,7 +202,7 @@ export default function GlobalSearchBar({ className = '' }) {
   };
 
   // Handle keyboard navigation
-  const handleKeyDown = (e) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     const items = getAllItems();
 
     switch (e.key) {
@@ -183,17 +239,19 @@ export default function GlobalSearchBar({ className = '' }) {
 
 
   // Handle item click with role-based navigation
-  const handleItemClick = (type, item) => {
+  const handleItemClick = (type: SearchResultType, item: SearchItemData) => {
     const role = getUserRole();
+    const itemId = item.id;
+    const patientId = (item as { patient_id?: string | number }).patient_id;
 
     // Audit logging - log click event
     try {
       api.post('/global-search/log-click', {
         opened_type: type,
-        opened_id: item.id,
+        opened_id: itemId,
         query: query
       });
-    } catch (e) {
+    } catch (e: unknown) {
       // Don't block navigation if logging fails
       logger.error('Audit log error:', e);
     }
@@ -205,22 +263,22 @@ export default function GlobalSearchBar({ className = '' }) {
       case 'patient':
         // Role-based navigation for patients
         // All panels now support ?patientId parameter
-        if (patientSearchRouteByRole[role]) {
-          navigate(routeWithQuery(patientSearchRouteByRole[role], { patientId: item.id }));
+        if (patientSearchRouteByRole[role as keyof typeof patientSearchRouteByRole]) {
+          navigate(routeWithQuery(patientSearchRouteByRole[role as keyof typeof patientSearchRouteByRole], { patientId: itemId }));
         } else {
           // Fallback for any other role
-          navigate(patientPickupRoute(item.id));
+          navigate(patientPickupRoute(itemId));
         }
         break;
       case 'visit':
         if (role === 'doctor') {
-          navigate(routeWithQuery(patientSearchRouteByRole.doctor, { visitId: item.id }));
+          navigate(routeWithQuery(patientSearchRouteByRole.doctor, { visitId: itemId }));
         } else {
-          navigate(routeWithQuery(patientSearchRouteByRole.registrar, { visitId: item.id, patientId: item.patient_id }));
+          navigate(routeWithQuery(patientSearchRouteByRole.registrar, { visitId: itemId, patientId: patientId ?? '' }));
         }
         break;
       case 'lab':
-        navigate(routeWithQuery(patientPickupRoute(item.patient_id), { tab: 'lab', orderId: item.id }));
+        navigate(routeWithQuery(patientPickupRoute(patientId ?? itemId), { tab: 'lab', orderId: itemId }));
         break;
     }
   };
@@ -236,7 +294,7 @@ export default function GlobalSearchBar({ className = '' }) {
         ? t('misc.gsb_rezultaty_poiska_dostupny')
         : t('misc.gsb_nichego_ne_naydeno');
 
-  const handleResultItemKeyDown = (event, onActivate) => {
+  const handleResultItemKeyDown = (event: React.KeyboardEvent<HTMLElement>, onActivate: () => void) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       onActivate();

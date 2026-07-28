@@ -29,7 +29,98 @@ import { useTranslation } from '../i18n/useTranslation';
 
 const DEFAULT_BOARD_STATS = { last_ticket: 0, waiting: 0, serving: 0, done: 0 };
 
-const extractBoardStats = (source) => ({
+type BoardStats = typeof DEFAULT_BOARD_STATS;
+
+interface BoardState {
+  brand: string;
+  logo: string;
+  is_paused: boolean;
+  is_closed: boolean;
+  announcement: string;
+  announcement_ru: string;
+  announcement_uz: string;
+  announcement_en: string;
+  primary_color: string;
+  bg_color: string;
+  text_color: string;
+  contrast_default: boolean;
+  kiosk_default: boolean;
+  sound_default: boolean;
+}
+
+interface QueueEntry {
+  number: number | string;
+  patient_name?: string;
+  status: string;
+  called_at?: string;
+  created_at?: string;
+  source?: string;
+}
+
+interface CurrentCall {
+  queue_number?: number | string;
+  patient_name?: string;
+  doctor_name?: string;
+  cabinet?: string;
+}
+
+interface Announcement {
+  created_at?: string;
+  announcement_type?: string;
+  text?: string;
+}
+
+interface WindowItem {
+  window?: string | number;
+  ticket?: string | number;
+  label?: string;
+}
+
+interface BoardSettingsState {
+  theme: string;
+  showPatientNames: string;
+  soundEnabled: boolean;
+  voiceEnabled: boolean;
+  displayCount: number;
+  contrastMode: boolean;
+  kioskMode: boolean;
+  fontScale: number;
+  language: string;
+}
+
+interface WSMessageData {
+  number?: number | string;
+  cabinet?: string;
+  queue_entries?: QueueEntry[];
+  current_call?: CurrentCall | null;
+  announcements?: Announcement[];
+  created_at?: string;
+  voice_text?: string;
+  announcement_type?: string;
+  [key: string]: unknown;
+}
+
+interface WSMessage {
+  type: string;
+  data: WSMessageData;
+  event_type?: string;
+  voice_text?: string;
+}
+
+interface DisplayBoardUnifiedProps {
+  department?: string;
+  dateStr?: string;
+  refreshMs?: number;
+  announcement?: string;
+  lang?: string;
+  kiosk?: boolean;
+  soundInitial?: boolean;
+  contrast?: boolean;
+  fontScale?: number;
+  boardId?: string;
+}
+
+const extractBoardStats = (source: Record<string, unknown> | null | undefined): BoardStats => ({
   last_ticket: Number(source?.last_ticket || 0),
   waiting: Number(source?.waiting || 0),
   serving: Number(source?.serving || 0),
@@ -64,7 +155,7 @@ export default function DisplayBoardUnified({
   contrast = false,
   fontScale = 1,
   boardId = 'main_board'
-}) {void
+}: DisplayBoardUnifiedProps) {void
   useTheme();
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
@@ -80,17 +171,17 @@ export default function DisplayBoardUnified({
 
   // Состояние очереди (новое)
   const [connected, setConnected] = useState(false);
-  const [queueData, setQueueData] = useState([]);
-  const [currentCall, setCurrentCall] = useState(null);
-  const [announcements, setAnnouncements] = useState([]);
+  const [queueData, setQueueData] = useState<QueueEntry[]>([]);
+  const [currentCall, setCurrentCall] = useState<CurrentCall | null>(null);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
 
   // Состояние статистики (старое)
-  const [stats, setStats] = useState(DEFAULT_BOARD_STATS);
+  const [stats, setStats] = useState<BoardStats>(DEFAULT_BOARD_STATS);
   const [err, setErr] = useState('');
   const [nowStr, setNowStr] = useState(timeNow());
 
   // Состояние табло (старое)
-  const [board, setBoard] = useState({
+  const [board, setBoard] = useState<BoardState>({
     brand: 'Clinic',
     logo: '',
     is_paused: false,
@@ -108,10 +199,10 @@ export default function DisplayBoardUnified({
   });
 
   // Окна/кабинеты (старое)
-  const [windows, setWindows] = useState([]);
+  const [windows, setWindows] = useState<WindowItem[]>([]);
 
   // Настройки (объединенные)
-  const [boardSettings, setBoardSettings] = useState({
+  const [boardSettings, setBoardSettings] = useState<BoardSettingsState>({
     theme: 'light',
     showPatientNames: 'initials',
     soundEnabled: true,
@@ -124,11 +215,11 @@ export default function DisplayBoardUnified({
   });
 
   // Рефы
-  const wsRef = useRef(null);
+  const wsRef = useRef<(() => void) | null>(null);
   const legacyWindowsLookupWarnedRef = useRef(false);
-  const loadBoardStateRef = useRef(() => {});
-  const loadWindowsRef = useRef(() => {});
-  const connectWebSocketRef = useRef(() => {});
+  const loadBoardStateRef = useRef<() => void>(() => {});
+  const loadWindowsRef = useRef<() => void>(() => {});
+  const connectWebSocketRef = useRef<() => void>(() => {});
   const lastTicketRef = useRef(0);
   const [online, setOnline] = useState(true);
 
@@ -137,20 +228,20 @@ export default function DisplayBoardUnified({
   const isBoardView = window.location.pathname.startsWith('/queue-board') || window.location.pathname.startsWith('/display-board');
 
   // /board/state is a stats/settings snapshot; live rows/calls/announcements come from WebSocket initial_state.
-  async function loadBoardState() {setErr('');try {const st = (await api.get('/board/state', { params: { department: qs.department, date: qs.d } })).data;if (st && typeof st === 'object') {
+  async function loadBoardState() {setErr('');try {const st = (await api.get('/board/state', { params: { department: qs.department, date: qs.d } })).data as Record<string, unknown> | undefined;if (st && typeof st === 'object') {
         setStats(extractBoardStats(st));
         setBoard({
-          brand: st.brand || st.title || 'Clinic',
-          logo: st.logo || st.logo_url || '',
+          brand: String(st.brand ?? st.title ?? 'Clinic'),
+          logo: String(st.logo ?? st.logo_url ?? ''),
           is_paused: !!(st.is_paused || st.paused),
           is_closed: !!(st.is_closed || st.closed),
-          announcement: st.announcement || st.ticker || '',
-          announcement_ru: st.announcement_ru || '',
-          announcement_uz: st.announcement_uz || '',
-          announcement_en: st.announcement_en || '',
-          primary_color: st.primary_color || '',
-          bg_color: st.bg_color || '',
-          text_color: st.text_color || '',
+          announcement: String(st.announcement ?? st.ticker ?? ''),
+          announcement_ru: String(st.announcement_ru ?? ''),
+          announcement_uz: String(st.announcement_uz ?? ''),
+          announcement_en: String(st.announcement_en ?? ''),
+          primary_color: String(st.primary_color ?? ''),
+          bg_color: String(st.bg_color ?? ''),
+          text_color: String(st.text_color ?? ''),
           contrast_default: !!st.contrast_default,
           kiosk_default: !!st.kiosk_default,
           sound_default: st.sound_default !== false
@@ -167,21 +258,21 @@ export default function DisplayBoardUnified({
 
 
           // Игнорируем ошибки localStorage
-        }}} catch (e) {setErr(e?.message || t('misc.dbu_err_load')); // fallback из кэша
-      try {const raw = localStorage.getItem('board.state');if (raw) {const cached = JSON.parse(raw);if (cached && typeof cached === 'object') {
+        }}} catch (e: unknown) {setErr((e as { message?: string })?.message || t('misc.dbu_err_load')); // fallback из кэша
+      try {const raw = localStorage.getItem('board.state');if (raw) {const cached = JSON.parse(raw) as Record<string, unknown>;if (cached && typeof cached === 'object') {
             setStats(extractBoardStats(cached));
             setBoard({
-              brand: cached.brand || cached.title || 'Clinic',
-              logo: cached.logo || cached.logo_url || '',
+              brand: String(cached.brand ?? cached.title ?? 'Clinic'),
+              logo: String(cached.logo ?? cached.logo_url ?? ''),
               is_paused: !!(cached.is_paused || cached.paused),
               is_closed: !!(cached.is_closed || cached.closed),
-              announcement: cached.announcement || cached.ticker || '',
-              announcement_ru: cached.announcement_ru || '',
-              announcement_uz: cached.announcement_uz || '',
-              announcement_en: cached.announcement_en || '',
-              primary_color: cached.primary_color || '',
-              bg_color: cached.bg_color || '',
-              text_color: cached.text_color || '',
+              announcement: String(cached.announcement ?? cached.ticker ?? ''),
+              announcement_ru: String(cached.announcement_ru ?? ''),
+              announcement_uz: String(cached.announcement_uz ?? ''),
+              announcement_en: String(cached.announcement_en ?? ''),
+              primary_color: String(cached.primary_color ?? ''),
+              bg_color: String(cached.bg_color ?? ''),
+              text_color: String(cached.text_color ?? ''),
               contrast_default: !!cached.contrast_default,
               kiosk_default: !!cached.kiosk_default,
               sound_default: cached.sound_default !== false
@@ -234,15 +325,18 @@ export default function DisplayBoardUnified({
   };
 
   // Обработка WebSocket сообщений (новое)
-  const handleWebSocketMessage = (message) => {
+  const handleWebSocketMessage = (messageRaw: unknown) => {
+    const message = messageRaw as WSMessage;
     logger.log('Получено WebSocket сообщение:', message);
 
     switch (message.type) {
-      case 'initial_state':
-        setQueueData(message.data.queue_entries || []);
-        setCurrentCall(message.data.current_call || null);
-        setAnnouncements(message.data.announcements || []);
+      case 'initial_state': {
+        const data = message.data || {};
+        setQueueData(Array.isArray(data.queue_entries) ? data.queue_entries : []);
+        setCurrentCall(data.current_call ?? null);
+        setAnnouncements(Array.isArray(data.announcements) ? data.announcements : []);
         break;
+      }
 
       case 'patient_call':
         setCurrentCall(message.data);
@@ -255,27 +349,43 @@ export default function DisplayBoardUnified({
         setCurrentCall(null);
         break;
 
-      case 'queue_update':
+      case 'queue_update': {
+        const data = message.data || {};
         // Обновляем очередь при добавлении/изменении записей
         if (message.event_type === 'queue.created') {
           // Добавляем новую запись в очередь
-          setQueueData((prev) => [...prev, message.data]);
-          logger.log(`➕ Новая запись в очереди: №${message.data.number}`);
+          const newEntry: QueueEntry = {
+            number: Number(data.number ?? 0),
+            patient_name: typeof data.patient_name === 'string' ? data.patient_name : undefined,
+            status: typeof data.status === 'string' ? data.status : '',
+            called_at: typeof data.called_at === 'string' ? data.called_at : undefined,
+            created_at: typeof data.created_at === 'string' ? data.created_at : undefined,
+            source: typeof data.source === 'string' ? data.source : undefined,
+          };
+          setQueueData((prev) => [...prev, newEntry]);
+          logger.log(`➕ Новая запись в очереди: №${data.number ?? ''}`);
         } else {
           // Обновляем всю очередь
-          setQueueData(message.data.queue_entries || []);
+          setQueueData(Array.isArray(data.queue_entries) ? data.queue_entries : []);
         }
         break;
+      }
 
-      case 'announcement':
-        setAnnouncements((prev) => [message.data, ...prev.slice(0, 4)]);
+      case 'announcement': {
+        const newAnnouncement: Announcement = {
+          created_at: typeof message.data?.created_at === 'string' ? message.data.created_at : undefined,
+          announcement_type: typeof message.data?.announcement_type === 'string' ? message.data.announcement_type : undefined,
+          text: typeof message.data?.text === 'string' ? message.data.text : undefined,
+        };
+        setAnnouncements((prev) => [newAnnouncement, ...prev.slice(0, 4)]);
         if (boardSettings.soundEnabled) {
           playAnnouncementSound(message);
         }
         break;
+      }
 
       case 'announcement_removed':
-        setAnnouncements((prev) => prev.filter((a) => a.created_at !== message.data.created_at));
+        setAnnouncements((prev) => prev.filter((a) => a.created_at !== message.data?.created_at));
         break;
 
       default:
@@ -284,7 +394,7 @@ export default function DisplayBoardUnified({
   };
 
   // Звуковые эффекты (новое)
-  const playCallSound = (message) => {
+  const playCallSound = (message: WSMessage) => {
     if (!boardSettings.soundEnabled) return;
 
     try {
@@ -310,13 +420,13 @@ export default function DisplayBoardUnified({
       oscillator.start(audioContext.currentTime);
       oscillator.stop(audioContext.currentTime + 0.4);
 
-      logger.log(`🔊 Звуковой сигнал для пациента №${message.data.number}`);
+      logger.log(`🔊 Звуковой сигнал для пациента №${message.data?.number ?? ''}`);
 
       // Голосовое объявление
       if (boardSettings.voiceEnabled) {
         // QUEUE-AUDIT-28 P0-9: PHI removed — patient name no longer spoken aloud.
         // Раньше speechSynthesis произносил "Lastname F." в публичном зале ожидания.
-        const text = t('misc.dbu_voice_patient_call', { number: message.data.number, cabinet: message.data.cabinet || t('misc.dbu_voice_default_cabinet') });
+        const text = t('misc.dbu_voice_patient_call', { number: message.data?.number ?? '', cabinet: message.data?.cabinet || t('misc.dbu_voice_default_cabinet') });
         playVoiceAnnouncement(text);
       }
     } catch (error) {
@@ -324,15 +434,15 @@ export default function DisplayBoardUnified({
     }
   };
 
-  const playAnnouncementSound = (message) => {
+  const playAnnouncementSound = (message: WSMessage) => {
     if (!boardSettings.soundEnabled) return;
 
     try {
       let soundFile = '/sounds/announcement.mp3';
 
-      if (message.data.announcement_type === 'warning') {
+      if (message.data?.announcement_type === 'warning') {
         soundFile = '/sounds/warning-beep.mp3';
-      } else if (message.data.announcement_type === 'emergency') {
+      } else if (message.data?.announcement_type === 'emergency') {
         soundFile = '/sounds/emergency-beep.mp3';
       }
 
@@ -349,7 +459,7 @@ export default function DisplayBoardUnified({
     }
   };
 
-  const playVoiceAnnouncement = (text) => {
+  const playVoiceAnnouncement = (text: string) => {
     if (!boardSettings.voiceEnabled || !('speechSynthesis' in window)) return;
 
     try {
@@ -450,11 +560,11 @@ export default function DisplayBoardUnified({
   };
 
   // Получение объявления по языку (старое)
-  const getAnnouncement = (board, lang) => {
-    if (lang === 'ru') return board.announcement_ru || board.announcement || '';
-    if (lang === 'uz') return board.announcement_uz || board.announcement || '';
-    if (lang === 'en') return board.announcement_en || board.announcement || '';
-    return board.announcement || '';
+  const getAnnouncement = (boardState: BoardState, langCode: string) => {
+    if (langCode === 'ru') return boardState.announcement_ru || boardState.announcement || '';
+    if (langCode === 'uz') return boardState.announcement_uz || boardState.announcement || '';
+    if (langCode === 'en') return boardState.announcement_en || boardState.announcement || '';
+    return boardState.announcement || '';
   };
 
   // Получение следующего номера (старое)
@@ -482,7 +592,7 @@ export default function DisplayBoardUnified({
   // оставлена для возможных будущих потребителей и тестов.
 
   // Получение текста статуса (новое)
-  const getStatusText = (status) => {
+  const getStatusText = (status: string) => {
     const texts = {
       'waiting': t('misc.dbu_status_waiting'),
       'called': t('misc.dbu_status_called'),
@@ -490,11 +600,11 @@ export default function DisplayBoardUnified({
       'completed': t('misc.dbu_status_completed'),
       'cancelled': t('misc.dbu_status_cancelled')
     };
-    return texts[status] || status;
+    return texts[status as keyof typeof texts] || status;
   };
 
   // Форматирование времени (новое)
-  const formatTime = (dateString) => {
+  const formatTime = (dateString?: string) => {
     if (!dateString) return '';
     return formatRegistrarTime(dateString);
   };
@@ -524,7 +634,7 @@ export default function DisplayBoardUnified({
     }
   };
 
-  const currentTheme = themes[boardSettings.theme] || themes.light;
+  const currentTheme = themes[boardSettings.theme as keyof typeof themes] || themes.light;
 
   // Стили (объединенные) — см. displayboard.css. Тема инжектируется как
   // CSS custom properties на корневом контейнере, чтобы классы могли ссылаться
@@ -846,7 +956,7 @@ function timeNow() {
   String(d.getSeconds()).padStart(2, '0');
 }
 
-function tBoard(key, lang = 'ru') {
+function tBoard(key: string, lang: string = 'ru') {
   const translations = {
     ru: {
       'now_serving': 'Сейчас обслуживается',
@@ -868,5 +978,7 @@ function tBoard(key, lang = 'ru') {
     }
   };
 
-  return translations[lang] && translations[lang][key] || translations.ru[key] || key;
+  const langTranslations = translations[lang as keyof typeof translations];
+  const ruTranslations = translations.ru;
+  return (langTranslations && langTranslations[key as keyof typeof ruTranslations]) || ruTranslations[key as keyof typeof ruTranslations] || key;
 }

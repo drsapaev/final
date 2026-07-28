@@ -36,16 +36,77 @@ const QUEUE_ACTION_ALIASES = {
   call: ['call'],
   start_visit: ['start_visit', 'start', 'in_cabinet'],
   complete: ['complete']
-};
+} as const;
 
-const hasBackendQueueAction = (entry, action, flagName) => {
+type QueueActionKey = keyof typeof QUEUE_ACTION_ALIASES;
+
+interface QueueEntry {
+  id: number | string;
+  number: string | number;
+  patient_name?: string;
+  status: string;
+  available_actions?: string[];
+  can_call?: boolean;
+  can_start_visit?: boolean;
+  can_complete?: boolean;
+  source?: string;
+  phone?: string;
+  created_at?: string;
+  called_at?: string;
+  [key: string]: unknown;
+}
+
+interface QueueStats {
+  total?: number;
+  waiting?: number;
+  served?: number;
+  online_entries?: number;
+}
+
+interface QueueDoctor {
+  name?: string;
+  specialty?: string;
+  cabinet?: string;
+}
+
+interface QueueData {
+  queue_exists?: boolean;
+  opened_at?: string;
+  stats?: QueueStats;
+  doctor?: QueueDoctor;
+  entries?: QueueEntry[];
+}
+
+interface DoctorInfo {
+  id?: number | string;
+  name?: string;
+  specialty?: string;
+  department?: string;
+  queue_settings?: {
+    start_number?: string;
+    max_per_day?: number;
+    timezone?: string;
+  };
+  doctor?: {
+    cabinet?: string;
+  };
+}
+
+interface DoctorQueuePanelProps {
+  specialty?: string;
+  onPatientSelect?: (patient: Record<string, unknown>) => void;
+  className?: string;
+}
+
+const hasBackendQueueAction = (entry: QueueEntry | null | undefined, action: string, flagName?: string) => {
   if (flagName && entry?.[flagName] === true) {
     return true;
   }
 
   const actions = Array.isArray(entry?.available_actions) ? entry.available_actions : [];
-  const aliases = QUEUE_ACTION_ALIASES[action] || [action];
-  return aliases.some((alias) => actions.includes(alias));
+  const aliasesRaw = QUEUE_ACTION_ALIASES[action as QueueActionKey];
+  const aliases: string[] = aliasesRaw ? Array.from(aliasesRaw) : [action];
+  return aliases.some((alias: string) => actions.includes(alias));
 };
 
 /**
@@ -56,18 +117,18 @@ const DoctorQueuePanel = ({
   specialty = 'cardiology',
   onPatientSelect,
   className = ''
-}: { specialty?: string; onPatientSelect?: (patient: Record<string, unknown>) => void; className?: string }) => {
+}: DoctorQueuePanelProps) => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // Проверяем демо-режим в самом начале (в демо не скрываем компонент, а показываем моковые данные)
   const isDemoMode = import.meta.env.MODE === 'development' && window.location.hostname === 'localhost';
 
   const [loading, setLoading] = useState(true);
-  const [queueData, setQueueData] = useState(null);
-  const [doctorInfo, setDoctorInfo] = useState(null);
-  const [selectedPatient, setSelectedPatient] = useState(null);
-  const [message, setMessage] = useState({ type: '', text: '' });
-  const loadQueueDataRef = useRef(() => {});
+  const [queueData, setQueueData] = useState<QueueData | null>(null);
+  const [doctorInfo, setDoctorInfo] = useState<DoctorInfo | null>(null);
+  const [selectedPatient, setSelectedPatient] = useState<QueueEntry | null>(null);
+  const [message, setMessage] = useState<{ type: string; text: string }>({ type: '', text: '' });
+  const loadQueueDataRef = useRef<() => void>(() => {});
 
   // UX Audit Doctor H-31: unified status config from shared queueStatusConfig.js.
   // Previously: waiting=info, called=warning (different from DoctorPanel).
@@ -232,14 +293,14 @@ const DoctorQueuePanel = ({
   };
   loadQueueDataRef.current = loadQueueData;
 
-  const handleCallPatient = async (entryId) => {
+  const handleCallPatient = async (entryId: number | string) => {
     // В демо-режиме имитируем вызов
     if (isDemoMode) {
       setMessage({ type: 'success', text: t('misc.dqp_patsient_vyzvan_demo') });
-      setQueueData((prev) => ({
+      setQueueData((prev) => prev ? ({
         ...prev,
-        entries: prev.entries.map((e) => e.id === entryId ? { ...e, status: 'called', called_at: new Date().toISOString() } : e)
-      }));
+        entries: (prev.entries ?? []).map((e) => e.id === entryId ? { ...e, status: 'called', called_at: new Date().toISOString() } : e)
+      }) : prev);
       return;
     }
 
@@ -255,27 +316,27 @@ const DoctorQueuePanel = ({
       });
 
       if (response.ok) {
-        const result = await response.json();
-        setMessage({ type: 'success', text: result.message });
+        const result = await response.json() as { message?: string };
+        setMessage({ type: 'success', text: result.message || '' });
         await loadQueueData();
       } else {
-        const error = await response.json();
-        throw new Error(error.detail);
+        const error = await response.json() as { detail?: string };
+        throw new Error(error.detail || '');
       }
-    } catch (error) {
+    } catch (error: unknown) {
       logger.error('Ошибка вызова пациента:', error);
       setMessage({ type: 'error', text: (error instanceof Error ? error.message : String(error)) });
     }
   };
 
-  const handleStartVisit = async (entryId) => {
+  const handleStartVisit = async (entryId: number | string) => {
     // В демо-режиме имитируем старт приема
     if (isDemoMode) {
       setMessage({ type: 'success', text: t('misc.dqp_priem_nachat_demo') });
-      setQueueData((prev) => ({
+      setQueueData((prev) => prev ? ({
         ...prev,
-        entries: prev.entries.map((e) => e.id === entryId ? { ...e, status: 'in_progress' } : e)
-      }));
+        entries: (prev.entries ?? []).map((e) => e.id === entryId ? { ...e, status: 'in_progress' } : e)
+      }) : prev);
       return;
     }
 
@@ -291,28 +352,28 @@ const DoctorQueuePanel = ({
       });
 
       if (response.ok) {
-        const result = await response.json();
-        setMessage({ type: 'success', text: result.message });
+        const result = await response.json() as { message?: string };
+        setMessage({ type: 'success', text: result.message || '' });
         await loadQueueData();
       } else {
-        const error = await response.json();
-        throw new Error(error.detail);
+        const error = await response.json() as { detail?: string };
+        throw new Error(error.detail || '');
       }
-    } catch (error) {
+    } catch (error: unknown) {
       logger.error('Ошибка начала приема:', error);
       setMessage({ type: 'error', text: (error instanceof Error ? error.message : String(error)) });
     }
   };
 
-  const handleCompleteVisit = async (entryId) => {
+  const handleCompleteVisit = async (entryId: number | string) => {
     // В демо-режиме имитируем завершение приема
     if (isDemoMode) {
       setMessage({ type: 'success', text: t('misc.dqp_priem_zavershen_demo') });
-      setQueueData((prev) => ({
+      setQueueData((prev) => prev ? ({
         ...prev,
-        entries: prev.entries.map((e) => e.id === entryId ? { ...e, status: 'served' } : e),
+        entries: (prev.entries ?? []).map((e) => e.id === entryId ? { ...e, status: 'served' } : e),
         stats: { ...prev.stats, served: (prev.stats?.served || 0) + 1, waiting: Math.max(0, (prev.stats?.waiting || 1) - 1) }
-      }));
+      }) : prev);
       return;
     }
 
@@ -334,14 +395,14 @@ const DoctorQueuePanel = ({
         }) });
 
       if (response.ok) {
-        const result = await response.json();
-        setMessage({ type: 'success', text: result.message });
+        const result = await response.json() as { message?: string };
+        setMessage({ type: 'success', text: result.message || '' });
         await loadQueueData();
       } else {
-        const error = await response.json();
-        throw new Error(error.detail);
+        const error = await response.json() as { detail?: string };
+        throw new Error(error.detail || '');
       }
-    } catch (error) {
+    } catch (error: unknown) {
       logger.error('Ошибка завершения приема:', error);
       setMessage({ type: 'error', text: (error instanceof Error ? error.message : String(error)) });
     }
@@ -355,7 +416,7 @@ const DoctorQueuePanel = ({
 
   }
 
-  if (!queueData?.queue_exists) {
+  if (!queueData || !queueData.queue_exists) {
     return (
       <MacOSEmptyState
         type="users"
@@ -364,6 +425,10 @@ const DoctorQueuePanel = ({
 
 
   }
+
+  const queueDoctor = queueData.doctor ?? {};
+  const queueStats = queueData.stats ?? {};
+  const queueEntries = queueData.entries ?? [];
 
   return (
     <div className={className} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-4)' }}>
@@ -394,7 +459,7 @@ const DoctorQueuePanel = ({
                 fontSize: 'var(--mac-font-size-lg)',
                 fontWeight: 'var(--mac-font-weight-semibold)'
               }}>
-                {queueData.doctor.name}
+                {queueDoctor.name}
               </h3>
               <div style={{
                 display: 'flex',
@@ -404,11 +469,11 @@ const DoctorQueuePanel = ({
                 gap: 'var(--mac-spacing-4)',
                 marginTop: 'var(--mac-spacing-1)'
               }}>
-                <span>{queueData.doctor.specialty}</span>
-                {queueData.doctor.cabinet &&
+                <span>{queueDoctor.specialty}</span>
+                {queueDoctor.cabinet &&
                 <>
                     <MapPin size={14} />
-                    <span>Каб. {queueData.doctor.cabinet}</span>
+                    <span>Каб. {queueDoctor.cabinet}</span>
                   </>
                 }
               </div>
@@ -442,7 +507,7 @@ const DoctorQueuePanel = ({
               color: 'var(--mac-accent)',
               marginBottom: 'var(--mac-spacing-1)'
             }}>
-              {queueData.stats.total}
+              {queueStats.total}
             </div>
             <div style={{
               fontSize: 'var(--mac-font-size-sm)',
@@ -458,7 +523,7 @@ const DoctorQueuePanel = ({
               color: 'var(--mac-warning)',
               marginBottom: 'var(--mac-spacing-1)'
             }}>
-              {queueData.stats.waiting}
+              {queueStats.waiting}
             </div>
             <div style={{
               fontSize: 'var(--mac-font-size-sm)',
@@ -474,7 +539,7 @@ const DoctorQueuePanel = ({
               color: 'var(--mac-success)',
               marginBottom: 'var(--mac-spacing-1)'
             }}>
-              {queueData.stats.served}
+              {queueStats.served}
             </div>
             <div style={{
               fontSize: 'var(--mac-font-size-sm)',
@@ -490,7 +555,7 @@ const DoctorQueuePanel = ({
               color: 'var(--mac-info)',
               marginBottom: 'var(--mac-spacing-1)'
             }}>
-              {queueData.stats.online_entries}
+              {queueStats.online_entries}
             </div>
             <div style={{
               fontSize: 'var(--mac-font-size-sm)',
@@ -530,16 +595,16 @@ const DoctorQueuePanel = ({
         </div>
 
         <div style={{ borderTop: '1px solid var(--mac-border)' }}>
-          {queueData.entries.length === 0 ?
+          {queueEntries.length === 0 ?
           <MacOSEmptyState
             type="users"
             title={t('misc.dqp_patsientov_v_ocheredi_net')}
             description={t('misc.dqp_ozhidayte_postupleniya_novyh')} /> :
 
 
-          queueData.entries.map((entry) => {
-            const status = statusConfig[entry.status] || statusConfig.waiting;
-            const source = sourceConfig[entry.source] || sourceConfig.desk;
+          queueEntries.map((entry) => {
+            const status = statusConfig[entry.status as keyof typeof statusConfig] || statusConfig.waiting;
+            const source = sourceConfig[entry.source as keyof typeof sourceConfig] || sourceConfig.desk;
             const StatusIcon = status.icon;
             const canCall = hasBackendQueueAction(entry, 'call', 'can_call');
             const canStartVisit = hasBackendQueueAction(entry, 'start_visit', 'can_start_visit');
