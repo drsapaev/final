@@ -30,44 +30,114 @@ import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 
-const toArray = (value, fallbackKeys = []) => {
+interface User {
+  id: number | string;
+  username: string;
+  full_name?: string;
+  email?: string;
+  role?: string;
+  [key: string]: unknown;
+}
+
+interface Role {
+  id: number;
+  display_name: string;
+  name?: string;
+  [key: string]: unknown;
+}
+
+interface Group {
+  id: number | string;
+  name: string;
+  display_name?: string;
+  group_type?: string;
+  users_count?: number;
+  roles_count?: number;
+  [key: string]: unknown;
+}
+
+interface Permission {
+  codename: string;
+  name: string;
+  [key: string]: unknown;
+}
+
+interface UserPermissions {
+  roles: unknown[];
+  groups: unknown[];
+  permissions: unknown[];
+  permissions_count: number;
+  [key: string]: unknown;
+}
+
+interface GroupSummaryRole {
+  id: number;
+  display_name: string;
+  [key: string]: unknown;
+}
+
+interface GroupSummaryPermission {
+  codename: string;
+  name: string;
+  [key: string]: unknown;
+}
+
+interface GroupSummary {
+  roles: GroupSummaryRole[];
+  permissions_by_category: Record<string, GroupSummaryPermission[]>;
+  users_count: number;
+  permissions_count: number;
+  [key: string]: unknown;
+}
+
+interface CacheStats {
+  cache_ttl: number;
+  cache_size: number;
+  cached_users: unknown[];
+  [key: string]: unknown;
+}
+
+const toArray = (value: unknown, fallbackKeys: string[] = []): unknown[] => {
   if (Array.isArray(value)) return value;
 
   for (const key of fallbackKeys) {
-    if (Array.isArray(value?.[key])) {
-      return value[key];
+    if (value && typeof value === 'object' && Array.isArray((value as Record<string, unknown>)[key])) {
+      return (value as Record<string, unknown[]>)[key];
     }
   }
 
   return [];
 };
 
-const normalizeCacheStats = (payload) => ({
+const normalizeCacheStats = (payload: unknown): CacheStats => ({
   cache_ttl: 0,
   cache_size: 0,
-  ...(payload || {}),
-  cached_users: toArray(payload?.cached_users)
-});
+  ...((payload as Record<string, unknown>) || {}),
+  cached_users: toArray((payload as Record<string, unknown> | undefined)?.cached_users)
+} as CacheStats);
 
-const normalizeUserPermissions = (payload) => ({
-  ...(payload || {}),
-  roles: toArray(payload?.roles),
-  groups: toArray(payload?.groups),
-  permissions: toArray(payload?.permissions),
-  permissions_count: payload?.permissions_count ?? toArray(payload?.permissions).length
-});
+const normalizeUserPermissions = (payload: unknown): UserPermissions => ({
+  ...((payload as Record<string, unknown>) || {}),
+  roles: toArray((payload as Record<string, unknown> | undefined)?.roles),
+  groups: toArray((payload as Record<string, unknown> | undefined)?.groups),
+  permissions: toArray((payload as Record<string, unknown> | undefined)?.permissions),
+  permissions_count: (payload as Record<string, unknown> | undefined)?.permissions_count as number ?? toArray((payload as Record<string, unknown> | undefined)?.permissions).length
+} as UserPermissions);
 
-const normalizeGroupSummary = (payload) => ({
-  ...(payload || {}),
-  roles: toArray(payload?.roles),
-  permissions_by_category: payload?.permissions_by_category && typeof payload.permissions_by_category === 'object' ?
-    Object.fromEntries(
-      Object.entries(payload.permissions_by_category).map(([category, permissions]) => [category, toArray(permissions)])
-    ) :
-    {},
-  users_count: payload?.users_count ?? 0,
-  permissions_count: payload?.permissions_count ?? 0
-});
+const normalizeGroupSummary = (payload: unknown): GroupSummary => {
+  const p = (payload as Record<string, unknown>) || {};
+  return {
+    ...p,
+    roles: toArray(p.roles) as GroupSummaryRole[],
+    permissions_by_category: p.permissions_by_category && typeof p.permissions_by_category === 'object' ?
+      Object.fromEntries(
+        Object.entries(p.permissions_by_category as Record<string, unknown>).map(([category, permissions]) => [category, toArray(permissions)])
+      ) :
+      {},
+    users_count: (p.users_count as number) ?? 0,
+    permissions_count: (p.permissions_count as number) ?? 0
+  } as GroupSummary;
+};
 
 const GroupPermissionsManager = () => {
   const { t: rawT } = useTranslation();
@@ -76,19 +146,19 @@ const GroupPermissionsManager = () => {
   const [activeTab, setActiveTab] = useState('users');
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedUser, setSelectedUser] = useState(null);
-  const [selectedGroup, setSelectedGroup] = useState(null);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
   const [permissionToCheck, setPermissionToCheck] = useState('');
   const [roleToAssign, setRoleToAssign] = useState('');
 
   // Данные
-  const [users, setUsers] = useState([]);
-  const [groups, setGroups] = useState([]);
-  const [roles, setRoles] = useState([]);
-  const [permissions, setPermissions] = useState([]);
-  const [userPermissions, setUserPermissions] = useState(null);
-  const [groupSummary, setGroupSummary] = useState(null);
-  const [cacheStats, setCacheStats] = useState({
+  const [users, setUsers] = useState<User[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [permissions, setPermissions] = useState<Permission[]>([]);
+  const [userPermissions, setUserPermissions] = useState<UserPermissions | null>(null);
+  const [groupSummary, setGroupSummary] = useState<GroupSummary | null>(null);
+  const [cacheStats, setCacheStats] = useState<CacheStats>({
     cache_ttl: 0,
     cache_size: 0,
     cached_users: []
@@ -110,11 +180,11 @@ const GroupPermissionsManager = () => {
       api.get('/admin/permissions/cache/stats')]
       );
 
-      setUsers(toArray(usersRes.data, ['users', 'items', 'results']));
-      setGroups(toArray(groupsRes.data, ['groups', 'items', 'results']));
-      setRoles(toArray(rolesRes.data, ['roles', 'items', 'results']));
-      setPermissions(toArray(permissionsRes.data, ['permissions', 'items', 'results']));
-      setCacheStats(normalizeCacheStats(cacheRes.data?.cache_stats || cacheRes.data));
+      setUsers(toArray(usersRes.data, ['users', 'items', 'results']) as unknown as User[]);
+      setGroups(toArray(groupsRes.data, ['groups', 'items', 'results']) as unknown as Group[]);
+      setRoles(toArray(rolesRes.data, ['roles', 'items', 'results']) as unknown as Role[]);
+      setPermissions(toArray(permissionsRes.data, ['permissions', 'items', 'results']) as unknown as Permission[]);
+      setCacheStats(normalizeCacheStats((cacheRes.data as Record<string, unknown>)?.cache_stats || cacheRes.data));
     } catch (error) {
       logger.error('Ошибка загрузки данных:', error);
       toast.error(t('admin2.gpm_load_data_error'));
@@ -123,7 +193,7 @@ const GroupPermissionsManager = () => {
     }
   };
 
-  const loadUserPermissions = async (userId) => {
+  const loadUserPermissions = async (userId: number | string) => {
     if (!userId) return;
 
     setLoading(true);
@@ -138,7 +208,7 @@ const GroupPermissionsManager = () => {
     }
   };
 
-  const loadGroupSummary = async (groupId) => {
+  const loadGroupSummary = async (groupId: number | string) => {
     if (!groupId) return;
 
     setLoading(true);
@@ -152,14 +222,14 @@ const GroupPermissionsManager = () => {
       setLoading(false);
     }
   };
-  const handleActivationKeyDown = (event, action) => {
+  const handleActivationKeyDown = (event: React.KeyboardEvent<HTMLElement>, action: () => void) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       action();
     }
   };
 
-  const checkUserPermission = async (userId, permission) => {
+  const checkUserPermission = async (userId: number | string, permission: unknown) => {
     try {
       const response = (await api.get(`/admin/permissions/users/${userId}/permissions/check`, {
         params: { permission }
@@ -177,7 +247,7 @@ const GroupPermissionsManager = () => {
     }
   };
 
-  const assignRoleToGroup = async (groupId, roleId) => {
+  const assignRoleToGroup = async (groupId: number | string, roleId: number) => {
     try {
       const response = (await api.post(`/admin/permissions/groups/${groupId}/roles`, {
         role_id: roleId
@@ -187,11 +257,11 @@ const GroupPermissionsManager = () => {
       await loadGroupSummary(groupId);
     } catch (error) {
       logger.error('Ошибка назначения роли:', error);
-      toast.error(error.response?.data?.detail || t('admin2.gpm_assign_role_error'));
+      toast.error(String((error as Record<string, unknown> & { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('admin2.gpm_assign_role_error')));
     }
   };
 
-  const revokeRoleFromGroup = async (groupId, roleId) => {
+  const revokeRoleFromGroup = async (groupId: number | string, roleId: number) => {
     try {
       const response = (await api.delete(`/admin/permissions/groups/${groupId}/roles/${roleId}`)) as import('axios').AxiosResponse<Record<string, unknown>>;
 
@@ -199,7 +269,7 @@ const GroupPermissionsManager = () => {
       await loadGroupSummary(groupId);
     } catch (error) {
       logger.error('Ошибка отзыва роли:', error);
-      toast.error(error.response?.data?.detail || t('admin2.gpm_revoke_role_error'));
+      toast.error(String((error as Record<string, unknown> & { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('admin2.gpm_revoke_role_error')));
     }
   };
 
@@ -270,10 +340,10 @@ const GroupPermissionsManager = () => {
   );
 
   const filteredUsers = users.filter((user) =>
-  user.username?.toLowerCase().includes(normalizedSearchTerm) ||
-  user.full_name?.toLowerCase().includes(normalizedSearchTerm) ||
-  user.email?.toLowerCase().includes(normalizedSearchTerm) ||
-  user.role?.toLowerCase().includes(normalizedSearchTerm)
+  String(user.username || '').toLowerCase().includes(normalizedSearchTerm) ||
+  String(user.full_name || '').toLowerCase().includes(normalizedSearchTerm) ||
+  String(user.email || '').toLowerCase().includes(normalizedSearchTerm) ||
+  String(user.role || '').toLowerCase().includes(normalizedSearchTerm)
   );
 
   // Стили
@@ -397,8 +467,8 @@ const GroupPermissionsManager = () => {
                     {t('admin2.gpm_roles_section')}
                   </h4>
                   <div className="admin-flex-wrap-8">
-                    {userPermissions.roles.map((role) =>
-              <Badge key={role} variant="success">{role}</Badge>
+                    {userPermissions.roles.map((role: unknown, idx: number) =>
+              <Badge key={String(role) + '-' + idx} variant="success">{String(role)}</Badge>
               )}
                   </div>
                 </div>
@@ -408,8 +478,8 @@ const GroupPermissionsManager = () => {
                     {t('admin2.gpm_groups_section')}
                   </h4>
                   <div className="admin-flex-wrap-8">
-                    {userPermissions.groups.map((group) =>
-              <Badge key={group} variant="info">{group}</Badge>
+                    {userPermissions.groups.map((group: unknown, idx: number) =>
+              <Badge key={String(group) + '-' + idx} variant="info">{String(group)}</Badge>
               )}
                   </div>
                 </div>
@@ -419,11 +489,11 @@ const GroupPermissionsManager = () => {
                     {t('admin2.gpm_permissions_section')}
                   </h4>
                   <div className="admin-max-h-300-overflow admin-perms-grid">
-                    {userPermissions.permissions.map((permission) =>
-              <div key={permission} className="admin-perm-card">
+                    {userPermissions.permissions.map((permission: unknown, idx: number) =>
+              <div key={String(permission) + '-' + idx} className="admin-perm-card">
                 
                         <CheckCircle className="admin-icon-14-success" />
-                        {permission}
+                        {String(permission)}
                       </div>
               )}
                   </div>
@@ -446,7 +516,7 @@ const GroupPermissionsManager = () => {
                   }}
                   options={[
                   { value: '', label: t('admin2.gpm_select_permission_ph') },
-                  ...permissions.map((perm) => ({
+                  ...permissions.map((perm: Permission) => ({
                     value: perm.codename,
                     label: `${perm.name} (${perm.codename})`
                   }))]
@@ -601,8 +671,8 @@ const GroupPermissionsManager = () => {
                   }}
                   options={[
                   { value: '', label: t('admin2.gpm_select_role_ph') },
-                  ...roles.filter((role) => !groupSummary.roles.some((gr) => gr.id === role.id)).map((role) => ({
-                    value: role.id,
+                  ...roles.filter((role: Role) => !groupSummary.roles.some((gr: GroupSummaryRole) => gr.id === role.id)).map((role: Role) => ({
+                    value: String(role.id),
                     label: role.display_name
                   }))]
                   }
@@ -618,13 +688,13 @@ const GroupPermissionsManager = () => {
                     {t('admin2.gpm_permissions_by_category')}
                   </h4>
                   <div className="admin-max-h-300-overflow">
-                    {Object.entries(groupSummary.permissions_by_category).map(([category, perms]: [string, any]) =>
+                    {Object.entries(groupSummary.permissions_by_category).map(([category, perms]: [string, GroupSummaryPermission[]]) =>
               <div key={category} className="mb-4">
                         <h5 className="admin-perm-category-h5">
                           {category} ({perms.length})
                         </h5>
                         <div className="admin-perms-grid-200">
-                          {perms.map((perm) =>
+                          {perms.map((perm: GroupSummaryPermission) =>
                   <div key={perm.codename} className="admin-perm-card-static">
                     
                               <div className="admin-perm-name">
@@ -721,9 +791,9 @@ const GroupPermissionsManager = () => {
           {t('admin2.gpm_cached_users_section')}
         </h4>
         <div className="admin-cache-users-list">
-          {cacheStats?.cached_users.map((userId) =>
-        <Badge key={userId} variant="secondary">
-              ID: {userId}
+          {cacheStats?.cached_users.map((userId: unknown, idx: number) =>
+        <Badge key={String(userId) + '-' + idx} variant="secondary">
+              ID: {String(userId)}
             </Badge>
         )}
         </div>

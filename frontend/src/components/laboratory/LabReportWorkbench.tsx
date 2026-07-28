@@ -64,6 +64,21 @@ export default function LabReportWorkbench({
   onRefreshRecentReports = undefined,
   onQueueChanged = undefined,
   notify
+}: {
+  selectedAppointment?: Record<string, unknown> | null;
+  templates?: Array<Record<string, unknown>>;
+  templateResolution?: Record<string, unknown> | null;
+  templateResolutionLoading?: boolean;
+  reportHistory?: Array<Record<string, unknown>>;
+  recentReports?: Array<Record<string, unknown>>;
+  activeInstance?: Record<string, unknown> | null;
+  onInstanceChange?: (instance: Record<string, unknown>) => void;
+  onOpenInstance?: (instance: Record<string, unknown>) => void;
+  onRefreshHistory?: (patientId: string | number) => Promise<void>;
+  onRefreshRecentReports?: () => Promise<void>;
+  onQueueChanged?: () => Promise<void>;
+  notify?: (type: string, message: string) => void;
+  [k: string]: unknown;
 }) {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
@@ -74,7 +89,7 @@ export default function LabReportWorkbench({
   const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
 
   // STRAT#2: единый канал нотификаций.
-  const labToast = useLabToast(notify);
+  const labToast = useLabToast(notify as (type: string, message: string) => void);
 
   // STRAT#1: state declarations + derived memos + init effects
   // теперь в useLabReportState hook (hooks/useLabReportState.js).
@@ -123,10 +138,10 @@ export default function LabReportWorkbench({
     hasMissingRequired,
     canFinalizeWithValidation,
   } = useLabReportState({
-    selectedAppointment,
-    templates,
-    templateResolution,
-    activeInstance,
+    selectedAppointment: selectedAppointment as never,
+    templates: (templates as never) || [],
+    templateResolution: templateResolution as never,
+    activeInstance: activeInstance as never,
   });
 
   // Navigation guard: предотвращает потерю данных при refresh/close.
@@ -136,7 +151,7 @@ export default function LabReportWorkbench({
   // selectedAppointment/activeInstance в useState).
   useEffect(() => {
     if (!isDirty) return;
-    const handler = (event) => {
+    const handler = (event: BeforeUnloadEvent) => {
       event.preventDefault();
       event.returnValue = '';
     };
@@ -149,7 +164,7 @@ export default function LabReportWorkbench({
   // Доступно только когда canSaveDraft (editable state).
   useEffect(() => {
     if (!canSaveDraft) return;
-    const handler = (e) => {
+    const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
         if (!saving && handleSaveDraftRef.current) {
@@ -186,40 +201,40 @@ export default function LabReportWorkbench({
     };
   }, [isDirty, canSaveDraft, saving, draftValues]);
 
-  const handleCreateInstance = useCallback(async (templateIdOverride = null, options: Record<string, unknown> = {}) => {
+  const handleCreateInstance = useCallback(async (templateIdOverride: string | number | null = null, options: Record<string, unknown> = {}) => {
     const templateId = templateIdOverride || selectedTemplateId;
     if (!selectedAppointment?.patient_id || !templateId) {
-      notify('error', t('errors.select_patient_template'));
+      notify?.('error', t('errors.select_patient_template'));
       return;
     }
     if (resolutionHasBlockingGap) {
-      notify('error', t('errors.no_template_for_services'));
+      notify?.('error', t('errors.no_template_for_services'));
       return;
     }
     setSaving(true);
     setBusyAction('create');
     try {
       const instance = await labReportingApi.createInstance({
-        patient_id: selectedAppointment.patient_id,
-        appointment_id: selectedAppointment.appointment_id || null,
-        visit_id: templateResolution?.visit_id || selectedAppointment.visit_id || null,
+        patient_id: selectedAppointment.patient_id as string | number,
+        appointment_id: (selectedAppointment.appointment_id as string | number) || null,
+        visit_id: (templateResolution?.visit_id as string | number) || (selectedAppointment.visit_id as string | number) || null,
         template_id: Number(templateId),
         // WF-11 fix: при escape hatch не передаём service_codes —
         // бланк создаётся без привязки к услугам визита.
-        service_codes: escapeHatchActive ? [] : (templateResolution?.service_codes || selectedAppointment.service_codes || []),
-        service_items: escapeHatchActive ? [] : (selectedAppointment.service_details || []).map((item) => ({
+        service_codes: escapeHatchActive ? [] : ((templateResolution?.service_codes as string[]) || (selectedAppointment.service_codes as string[]) || []),
+        service_items: escapeHatchActive ? [] : ((selectedAppointment.service_details as Array<Record<string, unknown>>) || []).map((item: Record<string, unknown>) => ({
           service_id: item.id || null,
           code: item.code || null,
           name: item.name || null
         }))
       });
-      onInstanceChange(instance);
-      await onRefreshHistory(selectedAppointment.patient_id);
+      onInstanceChange?.(instance as Record<string, unknown>);
+      await onRefreshHistory?.(selectedAppointment.patient_id as string | number);
       await onRefreshRecentReports?.();
       await onQueueChanged?.();
-      notify('success', options.successMessage || t('success.report_created'));
+      notify?.('success', (options.successMessage as string) || t('success.report_created'));
     } catch (error) {
-      notify('error', (error instanceof Error ? error.message : String(error)));
+      notify?.('error', (error instanceof Error ? error.message : String(error)));
     } finally {
       setSaving(false);
       setBusyAction(null);
@@ -242,11 +257,11 @@ export default function LabReportWorkbench({
   // Здесь остались только handlers, которые зависят от notify/onInstanceChange
   // (их нельзя изолировать в хук без прокидания через args).
 
-  function updateField(fieldKey, value) {
+  function updateField(fieldKey: string, value: unknown) {
     setDraftValues((prev) => ({ ...prev, [fieldKey]: value }));
   }
 
-  async function persistDraft() {
+  async function persistDraft(): Promise<Record<string, unknown> | null> {
     if (!activeInstance) {
       return null;
     }
@@ -254,13 +269,13 @@ export default function LabReportWorkbench({
     // Если backend обнаружит, что бланк был изменён другим пользователем
     // после этого timestamp — вернёт 409, persistDraft выбросит exception.
     const expectedUpdatedAt = activeInstance.updated_at
-      ? new Date(activeInstance.updated_at).toISOString()
+      ? new Date(activeInstance.updated_at as string).toISOString()
       : null;
 
     const payload: Array<Record<string, unknown>> = [];
-    activeInstance.sections.forEach((section) => {
-      section.fields.forEach((field) => {
-        const currentValue = draftValues[field.field_key];
+    (activeInstance.sections as Array<Record<string, unknown>>).forEach((section: Record<string, unknown>) => {
+      ((section.fields as Array<Record<string, unknown>>) || []).forEach((field: Record<string, unknown>) => {
+        const currentValue = draftValues[field.field_key as string];
         if (currentValue === undefined) {
           return;
         }
@@ -269,28 +284,28 @@ export default function LabReportWorkbench({
           value_text: currentValue === '' ? null : currentValue,
           value_numeric: field.value_type === 'numeric' && currentValue !== '' ? currentValue : null,
           // PR-65 / Medium-15: per-field comment from draftValues
-          comment: draftValues[`${field.field_key}__comment`] || null
+          comment: draftValues[`${field.field_key as string}__comment`] || null
         });
       });
     });
 
-    let latestInstance = activeInstance;
+    let latestInstance: Record<string, unknown> | null = activeInstance;
     if (JSON.stringify(activeInstance.signer_snapshot || {}) !== JSON.stringify(signerSnapshot || {})) {
-      latestInstance = await labReportingApi.updateInstance(activeInstance.id, {
+      latestInstance = await labReportingApi.updateInstance(activeInstance.id as string | number, {
         signer_snapshot: signerSnapshot
-      }, expectedUpdatedAt);
+      }, expectedUpdatedAt) as Record<string, unknown>;
     }
     if (payload.length > 0) {
-      const response = (await labReportingApi.bulkSaveValues(activeInstance.id, payload, expectedUpdatedAt)) as Record<string, unknown>;
-      latestInstance = response.instance;
+      const response = (await labReportingApi.bulkSaveValues(activeInstance.id as string | number, payload, expectedUpdatedAt)) as Record<string, unknown>;
+      latestInstance = response.instance as Record<string, unknown>;
     }
-    onInstanceChange(latestInstance);
+    onInstanceChange?.(latestInstance as Record<string, unknown>);
     return latestInstance;
   }
 
   async function handleSaveDraft() {
     if (!activeInstance) {
-      notify('error', t('errors.open_or_create_first'));
+      notify?.('error', t('errors.open_or_create_first'));
       return;
     }
     // WF-07 fix: запоминаем статус до save, чтобы обнаружить auto-transition.
@@ -299,7 +314,7 @@ export default function LabReportWorkbench({
     setBusyAction('save');
     try {
       const latest = await persistDraft();
-      await onRefreshHistory(activeInstance.patient_id);
+      await onRefreshHistory?.(activeInstance.patient_id as string | number);
       // Dirty state: после успешного save сбрасываем dirty flag.
       initialValuesRef.current = {
         values: { ...draftValues },
@@ -307,12 +322,12 @@ export default function LabReportWorkbench({
       };
       const newStatus = latest?.status || previousStatus;
       if (previousStatus === 'DRAFT' && newStatus === 'IN_PROGRESS') {
-        notify('info', t('success.draft_saved_in_progress'));
+        notify?.('info', t('success.draft_saved_in_progress'));
       } else {
-        notify('success', t('success.draft_saved'));
+        notify?.('success', t('success.draft_saved'));
       }
     } catch (error) {
-      notify('error', (error instanceof Error ? error.message : String(error)));
+      notify?.('error', (error instanceof Error ? error.message : String(error)));
     } finally {
       setSaving(false);
       setBusyAction('');
@@ -348,14 +363,14 @@ export default function LabReportWorkbench({
     setBusyAction('finalize');
     try {
       const latest = await persistDraft();
-      const finalized = await labReportingApi.finalize((latest || activeInstance).id) as Record<string, unknown>;
-      onInstanceChange(finalized);
-      await onRefreshHistory(finalized.patient_id);
+      const finalized = await labReportingApi.finalize(((latest || activeInstance) as Record<string, unknown>).id as string | number) as Record<string, unknown>;
+      onInstanceChange?.(finalized);
+      await onRefreshHistory?.(finalized.patient_id as string | number);
       await onRefreshRecentReports?.();
       await onQueueChanged?.();
-      notify('success', t('success.finalized'));
+      notify?.('success', t('success.finalized'));
     } catch (error) {
-      notify('error', (error instanceof Error ? error.message : String(error)));
+      notify?.('error', (error instanceof Error ? error.message : String(error)));
     } finally {
       setSaving(false);
       setBusyAction('');
@@ -380,13 +395,13 @@ export default function LabReportWorkbench({
     setSaving(true);
     setBusyAction('revise');
     try {
-      const revised = (await labReportingApi.revise(activeInstance.id)) as Record<string, unknown>;
-      onInstanceChange(revised);
-      await onRefreshHistory(revised.patient_id);
+      const revised = (await labReportingApi.revise(activeInstance.id as string | number)) as Record<string, unknown>;
+      onInstanceChange?.(revised);
+      await onRefreshHistory?.(revised.patient_id as string | number);
       await onRefreshRecentReports?.();
-      notify('success', t('success.revised'));
+      notify?.('success', t('success.revised'));
     } catch (error) {
-      notify('error', (error instanceof Error ? error.message : String(error)));
+      notify?.('error', (error instanceof Error ? error.message : String(error)));
     } finally {
       setSaving(false);
       setBusyAction('');
@@ -410,9 +425,9 @@ export default function LabReportWorkbench({
       ) as Record<string, unknown>;
 
       if (printResult.success) {
-        const printed = (await labReportingApi.markPrinted(activeInstance.id)) as Record<string, unknown>;
-        onInstanceChange(printed);
-        await onRefreshHistory(printed.patient_id);
+        const printed = (await labReportingApi.markPrinted(activeInstance.id as string | number)) as Record<string, unknown>;
+        onInstanceChange?.(printed);
+        await onRefreshHistory?.(printed.patient_id as string | number);
         await onRefreshRecentReports?.();
         await onQueueChanged?.();
         setPrintFeedback({
@@ -432,16 +447,16 @@ export default function LabReportWorkbench({
       // L-M-9 fix: проверяем что blob-запрос успешен перед window.open.
       // Раньше если downloadPdf упадёт с 500, переменная blob будет undefined,
       // URL.createObjectURL(undefined) выбросит, и labourant увидит белый экран.
-      let blob;
+      let blob: Blob | unknown;
       try {
-        blob = await labReportingApi.downloadPdf(activeInstance.id);
+        blob = await labReportingApi.downloadPdf(activeInstance.id as string | number);
       } catch (downloadError) {
         logger.error('[LabReportWorkbench] PDF download failed', downloadError);
         setPrintFeedback({
           severity: 'error',
           text: t('workbench.print_pdf_failed')
         });
-        notify('error', downloadError.message || t('errors.print_failed'));
+        notify?.('error', (downloadError as Error)?.message || t('errors.print_failed'));
         return;
       }
       if (!blob || !(blob instanceof Blob)) {
@@ -456,9 +471,9 @@ export default function LabReportWorkbench({
       const popup = window.open(url, '_blank', 'noopener,noreferrer');
       // WF-05 fix: не помечаем как PRINTED при неудаче popup.
       if (popup) {
-        const printed = (await labReportingApi.markPrinted(activeInstance.id)) as Record<string, unknown>;
-        onInstanceChange(printed);
-        await onRefreshHistory(printed.patient_id);
+        const printed = (await labReportingApi.markPrinted(activeInstance.id as string | number)) as Record<string, unknown>;
+        onInstanceChange?.(printed);
+        await onRefreshHistory?.(printed.patient_id as string | number);
         await onRefreshRecentReports?.();
         await onQueueChanged?.();
         setPrintFeedback({
@@ -477,7 +492,7 @@ export default function LabReportWorkbench({
         severity: 'error',
         text: (error instanceof Error ? error.message : String(error))
       });
-      notify('error', error.message);
+      notify?.('error', (error as Error)?.message);
     } finally {
       setSaving(false);
       setBusyAction('');
@@ -511,10 +526,11 @@ export default function LabReportWorkbench({
         patient_id: patientId,
         instance_id: activeInstance.id,
       });
-      notify('success', t('success.notified'));
+      notify?.('success', t('success.notified'));
     } catch (error) {
-      const msg = error?.response?.data?.detail || error?.message || 'Не удалось отправить результаты пациенту.';
-      notify('error', typeof msg === 'string' ? msg : t('errors.notify_failed'));
+      const err = error as { response?: { data?: { detail?: string } }; message?: string };
+      const msg = err?.response?.data?.detail || err?.message || 'Не удалось отправить результаты пациенту.';
+      notify?.('error', typeof msg === 'string' ? msg : t('errors.notify_failed'));
     } finally {
       setSaving(false);
       setBusyAction('');
@@ -540,7 +556,7 @@ export default function LabReportWorkbench({
           ) : !activeInstance ? (
             <div style={{ display: 'grid', gap: 'var(--mac-spacing-3)' }}>
               <div style={{ color: 'var(--mac-text-secondary)' }}>
-                {t('workbench.patient_label')}: <strong style={{ color: 'var(--mac-text-primary)' }}>{selectedAppointment?.patient_fio}</strong>
+                {t('workbench.patient_label')}: <strong style={{ color: 'var(--mac-text-primary)' }}>{String(selectedAppointment?.patient_fio ?? '')}</strong>
               </div>
               {serviceContextItems.length > 0 && (
                 <div style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
@@ -560,14 +576,14 @@ export default function LabReportWorkbench({
               {templateResolutionLoading && (
                 <Alert severity="info">{t('workbench.resolving_templates')}</Alert>
               )}
-              {!templateResolutionLoading && templateResolution?.default_template && (
+              {!templateResolutionLoading && Boolean(templateResolution?.default_template) && (
                 <Alert severity="info">
-                  {t('workbench.recommended_report')}: <strong>{templateResolution.default_template.name}</strong>
+                  {t('workbench.recommended_report')}: <strong>{String(((templateResolution as Record<string, unknown> | null)?.default_template as Record<string, unknown> | undefined)?.name ?? '')}</strong>
                 </Alert>
               )}
-              {!templateResolutionLoading && templateResolution?.unmapped_service_codes?.length > 0 && (
+              {!templateResolutionLoading && ((templateResolution?.unmapped_service_codes as string[] | undefined)?.length ?? 0) > 0 && (
                 <Alert severity={resolvedTemplates.length > 0 ? 'warning' : 'error'}>
-                  {t('workbench.unmapped_services')}: {templateResolution.unmapped_service_codes.join(', ')}
+                  {t('workbench.unmapped_services')}: {(templateResolution?.unmapped_service_codes as string[]).join(', ')}
                 </Alert>
               )}
               {!templateResolutionLoading && resolutionHasBlockingGap && (
@@ -631,26 +647,26 @@ export default function LabReportWorkbench({
                 <div style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
                   <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)', alignItems: 'center', flexWrap: 'wrap' }}>
                     <div style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>
-                      {activeInstance.patient_snapshot?.full_name || `Пациент #${activeInstance.patient_id}`}
+                      {String((activeInstance.patient_snapshot as Record<string, unknown> | undefined)?.full_name ?? '') || `Пациент #${String(activeInstance.patient_id ?? '')}`}
                     </div>
-                    <Badge variant={getLabStatusVariant(activeInstance.status)}>{formatLabStatus(activeInstance.status)}</Badge>
-                    <Badge variant="info">{activeInstance.template?.name}</Badge>
+                    <Badge variant={getLabStatusVariant(activeInstance.status as string)}>{formatLabStatus(activeInstance.status as string)}</Badge>
+                    <Badge variant="info">{String((activeInstance.template as Record<string, unknown> | undefined)?.name ?? '')}</Badge>
                   </div>
                   <div style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-base)' }}>
-                    Визит: {activeInstance.visit_id || 'без визита'} | Отчёт #{activeInstance.id}
+                    Визит: {String(activeInstance.visit_id ?? '') || 'без визита'} | Отчёт #{String(activeInstance.id ?? '')}
                     {/* WF-04 fix: показываем supersedes relationship для audit trail.
                         Если этот отчёт — ревизия другого, лаборант видит связь.
                         Backend поле: supersedes_instance_id (см. lab_reporting_service.py:785). */}
                     {/* PR-60 / Low-31: supersedes link now clickable — navigates to original instance */}
-                    {activeInstance.supersedes_instance_id && (
+                    {Boolean(activeInstance.supersedes_instance_id) && (
                       <button
                         type="button"
                         onClick={() => {
                           // PR-60 / Low-31: navigate to the superseded instance
                           if (onInstanceChange && activeInstance.supersedes_instance_id) {
-                            labReportingApi.getInstance(activeInstance.supersedes_instance_id)
-                              .then((instance) => onInstanceChange(instance))
-                              .catch((e) => logger.warn('Failed to load superseded instance:', e));
+                            labReportingApi.getInstance(activeInstance.supersedes_instance_id as string | number)
+                              .then((instance: unknown) => onInstanceChange?.(instance as Record<string, unknown>))
+                              .catch((e: unknown) => logger.warn('Failed to load superseded instance:', e));
                           }
                         }}
                         style={{
@@ -664,27 +680,27 @@ export default function LabReportWorkbench({
                           padding: 0,
                         }}
                       >
-                        ← исправленная версия отчёта #{activeInstance.supersedes_instance_id}
+                        ← исправленная версия отчёта #{String(activeInstance.supersedes_instance_id ?? '')}
                       </button>
                     )}
                   </div>
                   {/* P-20 fix: визуальный stepper жизненного цикла бланка.
                       Показывает текущую фазу и будущие шаги. */}
-                  <LabStatusStepper status={activeInstance.status} />
+                  <LabStatusStepper status={activeInstance.status as string} />
                 </div>
 
                 {/* P-04 fix: панель действий вынесена в LabReportActionsBar */}
                 <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)', flexWrap: 'wrap', alignItems: 'center' }}>
                   <LabReportActionsBar
                     saving={saving}
-                    busyAction={busyAction}
+                    busyAction={busyAction ?? undefined}
                     canSaveDraft={canSaveDraft}
                     // WF-10 fix: Finalize disabled пока есть missing required fields.
                     canFinalize={canFinalizeWithValidation}
                     canRevise={canRevise}
                     canPrint={canPrint}
                     // P1 fix: Notify patient — only for finalized/printed reports.
-                    canNotify={activeInstance?.status === 'FINALIZED' || activeInstance?.status === 'PRINTED'}
+                    canNotify={String(activeInstance?.status ?? '') === 'FINALIZED' || String(activeInstance?.status ?? '') === 'PRINTED'}
                     onSaveDraft={handleSaveDraft}
                     onFinalize={handleFinalize}
                     onRevise={handleRevise}
@@ -769,7 +785,7 @@ export default function LabReportWorkbench({
                   )}
                 </summary>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 'var(--mac-spacing-3)', paddingTop: 'var(--mac-spacing-2)' }}>
-                  {['lab_technician_label', 'lab_technician_name', 'approver_label', 'approver_name'].map((key) => (
+                  {(['lab_technician_label', 'lab_technician_name', 'approver_label', 'approver_name'] as Array<keyof typeof signerFieldLabels>).map((key) => (
                     <label key={key} style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
                       <span>{signerFieldLabels[key] || key}</span>
                       <Input
@@ -790,13 +806,13 @@ export default function LabReportWorkbench({
                 <Alert severity={printFeedback.severity}>{printFeedback.text}</Alert>
               )}
 
-              {activeInstance.critical_findings?.length > 0 && (
+              {((activeInstance.critical_findings as Array<Record<string, unknown>> | undefined)?.length ?? 0) > 0 && (
                 <Alert severity="error" role="alert">  {/* PR-59: role=alert for screen readers */}
                   <div style={{ display: 'grid', gap: 'var(--mac-spacing-2)' }}>
                     <strong>Критические результаты</strong>
-                    {activeInstance.critical_findings.map((finding) => (
+                    {(activeInstance.critical_findings as Array<Record<string, unknown>>).map((finding: Record<string, unknown>) => (
                       <div
-                        key={`${finding.section_key}-${finding.field_key}`}
+                        key={`${String(finding.section_key ?? '')}-${String(finding.field_key ?? '')}`}
                         style={{
                           display: 'grid',
                           gridTemplateColumns: 'minmax(180px, 1.4fr) minmax(110px, 0.7fr) minmax(110px, 0.7fr) minmax(100px, 0.6fr)',
@@ -805,20 +821,20 @@ export default function LabReportWorkbench({
                         }}
                       >
                         <div style={{ display: 'grid', gap: 'var(--mac-spacing-1)' }}>
-                          <strong>{finding.label}</strong>
+                          <strong>{String(finding.label ?? '')}</strong>
                           <span style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary)' }}>
-                            {finding.section_title || finding.section_key}
+                            {String(finding.section_title ?? finding.section_key ?? '')}
                           </span>
                         </div>
                         <div>
-                          {finding.value_display}
-                          {finding.unit ? ` ${finding.unit}` : ''}
+                          {String(finding.value_display ?? '')}
+                          {finding.unit ? ` ${String(finding.unit)}` : ''}
                         </div>
                         <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary)' }}>
-                          {finding.threshold_display || finding.reference_text || '—'}
+                          {String(finding.threshold_display ?? finding.reference_text ?? '—')}
                         </div>
-                          <Badge variant={flagVariant(finding.resolved_flag, finding.resolved_flag_severity)}>
-                            {formatFlagLabel(finding)}
+                          <Badge variant={flagVariant(String(finding.resolved_flag ?? ''), (finding.resolved_flag_severity as number | null) ?? null)}>
+                            {formatFlagLabel(finding as Record<string, unknown>)}
                           </Badge>
                       </div>
                     ))}
@@ -828,10 +844,10 @@ export default function LabReportWorkbench({
 
               {/* STRAT#24: sections/fields editor extracted to ReportEditor component */}
               <ReportEditor
-                activeInstance={activeInstance}
+                activeInstance={activeInstance as never}
                 draftValues={draftValues as Record<string, string>}
                 collapsedSections={collapsedSections}
-                onToggleSection={(sectionKey) => {
+                onToggleSection={(sectionKey: string) => {
                   setCollapsedSections((prev) => {
                     const next = new Set(prev);
                     if (next.has(sectionKey)) next.delete(sectionKey);
@@ -851,14 +867,14 @@ export default function LabReportWorkbench({
 
       {/* STRAT#25: supplementary content (AI analysis + history) grouped in ReportSidebar */}
       <ReportSidebar
-        activeInstance={activeInstance}
-        notify={notify}
+        activeInstance={activeInstance as never}
+        notify={notify as (type: string, message: string) => void}
         showRecentReportsBrowser={showRecentReportsBrowser}
-        recentReports={recentReports}
-        reportHistory={reportHistory}
+        recentReports={recentReports as never}
+        reportHistory={reportHistory as never}
         historySeverityFilter={historySeverityFilter}
         onSeverityFilterChange={setHistorySeverityFilter}
-        onOpenInstance={onOpenInstance}
+        onOpenInstance={onOpenInstance as unknown as (instanceId: string | number) => void}
       />
       {/* WF-08 fix: portal-mounted ConfirmDialog для irreversible actions */}
       {confirmDialog as unknown as React.ReactNode}

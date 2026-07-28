@@ -49,14 +49,36 @@ import {
 import { useConfirm } from '../common/ConfirmDialog';
 import { notify } from '../../services/notify';
 
-const getStatusFilterOptions = (t) => [
+interface QueueProfile {
+    key: string;
+    title?: string;
+    title_ru?: string;
+    queue_tags?: string[];
+    department_key?: string;
+    icon?: string;
+    color?: string;
+    order?: number | string;
+    display_order?: number | string;
+    is_active?: boolean;
+    show_on_qr_page?: boolean;
+    name?: string;
+    [key: string]: unknown;
+}
+
+interface Department {
+    key?: string;
+    name_ru?: string;
+    [key: string]: unknown;
+}
+
+const getStatusFilterOptions = (t: (key: string, options?: Record<string, unknown>) => string) => [
     { value: 'all', label: t('admin2.qp_filter_all') },
     { value: 'active', label: t('admin2.qp_filter_active') },
     { value: 'inactive', label: t('admin2.qp_filter_hidden') },
 ];
 
 // Available icons for selection
-const getAvailableIcons = (t) => [
+const getAvailableIcons = (t: (key: string, options?: Record<string, unknown>) => string) => [
     { name: 'Heart', component: Heart, label: t('admin2.qp_icon_heart') },
     { name: 'Activity', component: Activity, label: t('admin2.qp_icon_activity') },
     { name: 'Sparkles', component: Sparkles, label: t('admin2.qp_icon_sparkles') },
@@ -79,7 +101,7 @@ const PRESET_COLORS = [
     'var(--mac-text-secondary)', // Dark gray
 ];
 
-const QueueProfilesManager = ({ theme = 'light' }) => {
+const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' }) => {
     const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
     const statusFilterOptions = getStatusFilterOptions(t);
@@ -87,21 +109,21 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
     // P-013 fix: shared ConfirmDialog hook (replaces 2 window.confirm() calls).
     const [confirmRaw, confirmDialog] = useConfirm();
   const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
-    const [profiles, setProfiles] = useState([]);
+    const [profiles, setProfiles] = useState<QueueProfile[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
-    const [error, setError] = useState(null);
-    const [editingProfile, setEditingProfile] = useState(null);
+    const [error, setError] = useState<string | null>(null);
+    const [editingProfile, setEditingProfile] = useState<QueueProfile | null>(null);
     const [showCreateForm, setShowCreateForm] = useState(false);
     // PR-21: load departments for department_key Select in ProfileForm
-    const [departments, setDepartments] = useState([]);
+    const [departments, setDepartments] = useState<Department[]>([]);
 
     // ⭐ New: Search and filter
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'active', 'inactive'
 
     // ⭐ New: Bulk selection
-    const [selectedProfiles, setSelectedProfiles] = useState([]);
+    const [selectedProfiles, setSelectedProfiles] = useState<string[]>([]);
 
     const isDark = theme === 'dark';
 
@@ -111,7 +133,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
             setLoading(true);
             setError(null);
             const response = (await api.get('/queues/profiles?active_only=false')) as import('axios').AxiosResponse<Record<string, unknown>>;
-            setProfiles((response.data.profiles as unknown[]) || []);
+            setProfiles(((response.data.profiles as unknown[]) || []) as unknown as QueueProfile[]);
             setSelectedProfiles([]); // Clear selection on reload
             logger.info(`Loaded ${(response.data?.profiles as unknown[])?.length || 0} queue profiles`);
         } catch (err) {
@@ -126,19 +148,19 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
         loadProfiles();
         // PR-21: load departments for department_key Select
         api.get('/admin/departments').then((res: import('axios').AxiosResponse<Record<string, unknown>>) => {
-            setDepartments((res.data?.data as unknown[]) || []);
+            setDepartments(((res.data?.data as unknown[]) || []) as unknown as Department[]);
         }).catch(err => logger.error('Failed to load departments:', err));
     }, [loadProfiles]);
 
     // ⭐ New: Filtered profiles
     const filteredProfiles = useMemo(() => {
-        return profiles.filter(profile => {
+        return profiles.filter((profile: QueueProfile) => {
             // Search filter
             const matchesSearch = searchTerm === '' ||
                 profile.key?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 profile.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 profile.title_ru?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                (profile.queue_tags || []).some(tag =>
+                (profile.queue_tags || []).some((tag: string) =>
                     tag.toLowerCase().includes(searchTerm.toLowerCase())
                 );
 
@@ -154,13 +176,13 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
     // ⭐ New: Statistics
     const stats = useMemo(() => ({
         total: profiles.length,
-        active: profiles.filter(p => p.is_active !== false).length,
-        inactive: profiles.filter(p => p.is_active === false).length,
-        totalTags: profiles.reduce((sum, p) => sum + (p.queue_tags?.length || 0), 0),
+        active: profiles.filter((p: QueueProfile) => p.is_active !== false).length,
+        inactive: profiles.filter((p: QueueProfile) => p.is_active === false).length,
+        totalTags: profiles.reduce((sum: number, p: QueueProfile) => sum + (p.queue_tags?.length || 0), 0),
     }), [profiles]);
 
     // Create new profile
-    const handleCreate = async (profileData) => {
+    const handleCreate = async (profileData: Record<string, unknown>) => {
         try {
             setSaving(true);
             setError(null);
@@ -170,14 +192,14 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
             window.dispatchEvent(new CustomEvent('queue-profiles:updated'));
         } catch (err) {
             logger.error('Error creating profile:', err);
-            setError(err.response?.data?.detail || t('admin2.qp_create_error'));
+            setError(String((err as Record<string, unknown> & { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('admin2.qp_create_error')));
         } finally {
             setSaving(false);
         }
     };
 
     // Update existing profile
-    const handleUpdate = async (profileKey, profileData) => {
+    const handleUpdate = async (profileKey: string, profileData: Record<string, unknown>) => {
         try {
             setSaving(true);
             setError(null);
@@ -187,14 +209,14 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
             window.dispatchEvent(new CustomEvent('queue-profiles:updated'));
         } catch (err) {
             logger.error('Error updating profile:', err);
-            setError(err.response?.data?.detail || t('admin2.qp_update_error'));
+            setError(String((err as Record<string, unknown> & { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('admin2.qp_update_error')));
         } finally {
             setSaving(false);
         }
     };
 
     // Delete profile
-    const handleDelete = async (profileKey) => {
+    const handleDelete = async (profileKey: string) => {
         // P-013 fix: replaced window.confirm() with shared useConfirm hook.
         const ok = await confirm({
             title: t('admin2.delete_queue_tab_title'),
@@ -216,31 +238,31 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
             window.dispatchEvent(new CustomEvent('queue-profiles:updated'));
         } catch (err) {
             logger.error('Error deleting profile:', err);
-            setError(err.response?.data?.detail || t('admin2.qp_delete_error'));
+            setError(String((err as Record<string, unknown> & { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('admin2.qp_delete_error')));
         } finally {
             setSaving(false);
         }
     };
 
     // Toggle active status
-    const handleToggleActive = async (profile) => {
+    const handleToggleActive = async (profile: QueueProfile) => {
         await handleUpdate(profile.key, { is_active: !profile.is_active });
     };
 
     // ⭐ New: Bulk selection handlers
-    const handleSelectAll = (checked) => {
+    const handleSelectAll = (checked: boolean) => {
         if (checked) {
-            setSelectedProfiles(filteredProfiles.map(p => p.key));
+            setSelectedProfiles(filteredProfiles.map((p: QueueProfile) => p.key));
         } else {
             setSelectedProfiles([]);
         }
     };
 
-    const handleSelectProfile = (profileKey, checked) => {
+    const handleSelectProfile = (profileKey: string, checked: boolean) => {
         if (checked) {
             setSelectedProfiles(prev => [...prev, profileKey]);
         } else {
-            setSelectedProfiles(prev => prev.filter(k => k !== profileKey));
+            setSelectedProfiles(prev => prev.filter((k: string) => k !== profileKey));
         }
     };
 
@@ -273,14 +295,14 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
             window.dispatchEvent(new CustomEvent('queue-profiles:updated'));
         } catch (err) {
             logger.error('Error bulk deleting profiles:', err);
-            setError(err.response?.data?.detail || t('admin2.qp_bulk_delete_error'));
+            setError(String((err as Record<string, unknown> & { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('admin2.qp_bulk_delete_error')));
         } finally {
             setSaving(false);
         }
     };
 
     // ⭐ New: Bulk activate/deactivate
-    const handleBulkActivate = async (activate) => {
+    const handleBulkActivate = async (activate: boolean) => {
         if (selectedProfiles.length === 0) return;
 
         try {
@@ -295,7 +317,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
             window.dispatchEvent(new CustomEvent('queue-profiles:updated'));
         } catch (err) {
             logger.error('Error bulk updating profiles:', err);
-            setError(err.response?.data?.detail || t('admin2.qp_bulk_update_error'));
+            setError(String((err as Record<string, unknown> & { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('admin2.qp_bulk_update_error')));
         } finally {
             setSaving(false);
         }
@@ -307,7 +329,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
             const headers = ['key', 'title', 'title_ru', 'queue_tags', 'icon', 'color', 'display_order', 'is_active'];
             const csvContent = [
                 headers.join(','),
-                ...profiles.map(p => [
+                ...profiles.map((p: QueueProfile) => [
                     `"${(p.key || '').replace(/"/g, '""')}"`,
                     `"${(p.title || '').replace(/"/g, '""')}"`,
                     `"${(p.title_ru || '').replace(/"/g, '""')}"`,
@@ -333,24 +355,24 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
     };
 
     // ⭐ New: Import from CSV
-    const handleImport = async (event) => {
+    const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file) return;
 
         try {
             const text = await file.text();
-            const lines = text.split('\n').filter(line => line.trim());
+            const lines = text.split('\n').filter((line: string) => line.trim());
 
             if (lines.length < 2) {
                 setError(t('admin2.qp_import_csv_invalid'));
                 return;
             }
 
-            const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim());
-            const importedProfiles = [];
+            const headers = lines[0].split(',').map((h: string) => h.replace(/"/g, '').trim());
+            const importedProfiles: Record<string, unknown>[] = [];
 
             for (let i = 1; i < lines.length; i++) {
-                const values = lines[i].split(',').map(v => v.replace(/^"|"$/g, '').replace(/""/g, '"'));
+                const values = lines[i].split(',').map((v: string) => v.replace(/^"|"$/g, '').replace(/""/g, '"'));
                 const profile: Record<string, unknown> = {};
 
                 headers.forEach((header: unknown, index: number) => {
@@ -386,7 +408,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
 
             for (const profile of importedProfiles) {
                 try {
-                    const existing = profiles.find(p => p.key === profile.key);
+                    const existing = profiles.find((p: QueueProfile) => p.key === profile.key);
                     if (existing) {
                         await api.put(`/queues/profiles/${profile.key}`, profile);
                         updated++;
@@ -426,7 +448,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
     }
 
     const isAllSelected = filteredProfiles.length > 0 &&
-        filteredProfiles.every(p => selectedProfiles.includes(p.key));
+        filteredProfiles.every((p: QueueProfile) => selectedProfiles.includes(p.key));
 
     return (
         <div className="admin-qp-container">
@@ -602,7 +624,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                         </tr>
                     </thead>
                     <tbody>
-                        {filteredProfiles.map((profile) => (
+                        {filteredProfiles.map((profile: QueueProfile) => (
                             <tr key={profile.key}>
                                 <td className="admin-qp-td">
                                     <button
@@ -639,7 +661,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                                 </td>
                                 <td className="admin-qp-td">
                                     <div className="admin-d-flex-fw-wrap-gap-4">
-                                        {(profile.queue_tags || []).map((tag, idx) => (
+                                        {(profile.queue_tags || []).map((tag: string, idx: number) => (
                                             <span
                                                 key={idx}
                                                 className="admin-d-inline-flex-ai-center-gap-4-p-2px-8px-radius-12-fs-11-fw-500-bgc-rgba-59-130-246-0-1-3B82F6"
@@ -722,7 +744,7 @@ const QueueProfilesManager = ({ theme = 'light' }) => {
                 {editingProfile && (
                     <ProfileForm
                         profile={editingProfile}
-                        onSubmit={(data: React.FormEvent<HTMLFormElement>) => handleUpdate(editingProfile.key, data)}
+                        onSubmit={(data: React.FormEvent<HTMLFormElement>) => handleUpdate(editingProfile.key, data as unknown as Record<string, unknown>)}
                         onCancel={() => setEditingProfile(null)}
                         saving={saving}
                         isDark={isDark}
@@ -754,18 +776,20 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
         color: profile?.color || '#718096',
     });
 
-    const handleSubmit = (e) => {
+    const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
-        onSubmit({
-            ...formData,
-            queue_tags: String(formData.queue_tags || '').split(',').map(t => t.trim()).filter(Boolean),
-            display_order: parseInt(String(formData.display_order), 10) || 0,
-        });
+        if (onSubmit) {
+            onSubmit({
+                ...formData,
+                queue_tags: String(formData.queue_tags || '').split(',').map((t: string) => t.trim()).filter(Boolean),
+                display_order: parseInt(String(formData.display_order), 10) || 0,
+            });
+        }
     };
-    const handleActivationKeyDown = (event, action) => {
+    const handleActivationKeyDown = (event: React.KeyboardEvent<HTMLElement>, action?: () => void) => {
         if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault();
-            action();
+            if (action) action();
         }
     };
 

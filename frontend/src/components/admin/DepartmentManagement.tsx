@@ -93,7 +93,7 @@ const DEFAULT_INTEGRATION_OPTIONS = {
   service_currency: 'UZS'
 };
 
-const getCategoryOptions = (t) => [
+const getCategoryOptions = (t: (key: string, options?: Record<string, unknown>) => string) => [
 { value: '', label: t('admin2.dept_cat_auto') },
 { value: 'K', label: t('admin2.dept_cat_cardio') },
 { value: 'D', label: t('admin2.dept_cat_derm') },
@@ -108,12 +108,12 @@ const getCategoryOptions = (t) => [
 
 
 
-const getStatusFilterOptions = (t) => [
+const getStatusFilterOptions = (t: (key: string, options?: Record<string, unknown>) => string) => [
 { value: 'all', label: t('admin2.dept_filter_all') },
 { value: 'active', label: t('admin2.dept_filter_active') },
 { value: 'inactive', label: t('admin2.dept_filter_inactive') }];
 
-const getSortOptions = (t) => [
+const getSortOptions = (t: (key: string, options?: Record<string, unknown>) => string) => [
 { value: 'name', label: t('admin2.dept_sort_name') },
 { value: 'key', label: t('admin2.dept_sort_key') },
 { value: 'order', label: t('admin2.dept_sort_order') }];
@@ -135,7 +135,7 @@ const DepartmentManagement = () => {
   const categoryOptions = getCategoryOptions(t);
   const statusFilterOptions = getStatusFilterOptions(t);
   const sortOptions = getSortOptions(t);
-  const [departments, setDepartments] = useState([]);
+  const [departments, setDepartments] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
   const [, setError] = useState<string | null>(null);
 
@@ -154,9 +154,9 @@ const DepartmentManagement = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
-  const [selectedDepartments, setSelectedDepartments] = useState([]);
+  const [selectedDepartments, setSelectedDepartments] = useState<Array<string | number>>([]);
   const [selectAll, setSelectAll] = useState(false);
-  const [, setTotals] = useState(DEFAULT_TOTALS);
+  const [, setTotals] = useState<Record<string, number>>(DEFAULT_TOTALS);
 
   const broadcastDepartmentsUpdate = useCallback(() => {
     window.dispatchEvent(
@@ -164,9 +164,9 @@ const DepartmentManagement = () => {
     );
   }, []);
 
-  const sanitizeIntegrationPayload = useCallback((payload) => {
+  const sanitizeIntegrationPayload = useCallback((payload: Record<string, unknown> | null | undefined) => {
     if (!payload) return undefined;
-    const sanitized = {};
+    const sanitized: Record<string, unknown> = {};
     Object.entries(payload).forEach(([key, value]) => {
       if (value === '' || value === null || value === undefined) return;
       if (['start_number', 'max_daily_queue'].includes(key)) {
@@ -199,24 +199,24 @@ const DepartmentManagement = () => {
 
       const list = listResponse.data?.data ?? [];
       const overview = overviewResponse.data?.data ?? {};
-      const statsMap = {};
-      (overview.departments || []).forEach((item) => {
-        statsMap[item.key] = item;
+      const statsMap: Record<string, Record<string, unknown>> = {};
+      ((overview.departments as Record<string, unknown>[]) || []).forEach((item: Record<string, unknown>) => {
+        statsMap[String(item.key)] = item;
       });
 
-      const enriched = list.map((dept) => {
-        const stats = statsMap[dept.key] || {};
+      const enriched = (list as Record<string, unknown>[]).map((dept: Record<string, unknown>) => {
+        const stats = statsMap[String(dept.key)] || {};
         return {
           ...dept,
-          stats: stats.stats || DEFAULT_STATS,
-          integrations: stats.integrations || {}
+          stats: (stats as Record<string, unknown>).stats || DEFAULT_STATS,
+          integrations: (stats as Record<string, unknown>).integrations || {}
         };
       });
 
       setDepartments(enriched);
       setTotals({
         ...DEFAULT_TOTALS,
-        ...(overview.totals || {})
+        ...((overview.totals as Record<string, number>) || {})
       });
     } catch (err) {
       logger.error('Ошибка загрузки отделений:', err);
@@ -246,7 +246,7 @@ const DepartmentManagement = () => {
       if (!data.key || String(data.key ?? '').trim().length < 2) {
         errors.key = t('admin2.dept_err_key_required');
       } else {
-        const duplicate = departments.find((dept) => dept.key === data.key && dept.id !== currentId);
+        const duplicate = departments.find((dept: Record<string, unknown>) => dept.key === data.key && dept.id !== currentId);
         if (duplicate) {
           errors.key = t('admin2.dept_err_key_duplicate');
         }
@@ -293,22 +293,23 @@ const DepartmentManagement = () => {
       broadcastDepartmentsUpdate();
     } catch (err) {
       logger.error('Ошибка создания отделения:', err);
-      toast.error(err.response?.data?.detail || t('admin2.dept_create_failed'));
+      toast.error((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('admin2.dept_create_failed'));
     }
   };
 
 
-  const openEditModal = (dept) => {
+  const openEditModal = (dept: Record<string, unknown>) => {
     setEditingDepartment(dept);
     setFormData({
-      name_ru: dept.name_ru || '',
-      name_uz: dept.name_uz || '',
-      key: dept.key || '',
-      description: dept.description || '',
-      color: dept.color || 'var(--mac-accent-blue)',
-      icon: dept.icon || '🏥',
-      display_order: dept.display_order || 999,
-      active: dept.active ?? true
+      ...DEFAULT_FORM,
+      name_ru: String(dept.name_ru ?? ''),
+      name_uz: String(dept.name_uz ?? ''),
+      key: String(dept.key ?? ''),
+      description: String(dept.description ?? ''),
+      color: String(dept.color ?? 'var(--mac-accent-blue)'),
+      icon: String(dept.icon ?? '🏥'),
+      display_order: Number(dept.display_order ?? 999),
+      active: Boolean(dept.active ?? true)
     });
     setValidationErrors({});
     setShowEditModal(true);
@@ -323,7 +324,7 @@ const DepartmentManagement = () => {
       return;
     }
     try {
-      await api.put(`/admin/departments/${editingDepartment.id}`, formData);
+      await api.put(`/admin/departments/${String(editingDepartment.id ?? "")}`, formData);
       toast.success(t('admin2.dept_updated'));
 
       // PR-20: Removed frontend POST /services call (same as create handler).
@@ -336,12 +337,12 @@ const DepartmentManagement = () => {
       broadcastDepartmentsUpdate();
     } catch (err) {
       logger.error('Ошибка обновления отделения:', err);
-      toast.error(err.response?.data?.detail || t('admin2.dept_update_failed'));
+      toast.error((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('admin2.dept_update_failed'));
     }
   };
 
   // ✅ НОВОЕ: Быстрое переключение статуса отделения
-  const handleToggleActive = async (dept, newActive) => {
+  const handleToggleActive = async (dept: Record<string, unknown>, newActive: boolean) => {
     try {
       await api.put(`/admin/departments/${String(dept.id ?? "")}`, { active: newActive });
       toast.success(newActive ? t('admin2.dept_activated') : t('admin2.dept_deactivated'));
@@ -349,23 +350,23 @@ const DepartmentManagement = () => {
       broadcastDepartmentsUpdate();
     } catch (err) {
       logger.error('Ошибка обновления статуса:', err);
-      toast.error(err.response?.data?.detail || t('admin2.dept_status_update_failed'));
+      toast.error((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('admin2.dept_status_update_failed'));
     }
   };
 
   // ✅ НОВОЕ: Быстрое обновление порядка
-  const handleUpdateOrder = async (dept, newOrder) => {
+  const handleUpdateOrder = async (dept: Record<string, unknown>, newOrder: number) => {
     try {
       await api.put(`/admin/departments/${String(dept.id ?? "")}`, { display_order: newOrder });
       await loadDepartments();
       broadcastDepartmentsUpdate();
     } catch (err) {
       logger.error('Ошибка обновления порядка:', err);
-      toast.error(err.response?.data?.detail || t('admin2.dept_order_update_failed'));
+      toast.error((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('admin2.dept_order_update_failed'));
     }
   };
 
-  const handleDeleteDepartment = async (id) => {
+  const handleDeleteDepartment = async (id: string | number) => {
     // P-013 fix: replaced window.confirm() with shared useConfirm hook.
     const ok = await confirm({
       title: t('admin2.delete_department_title'),
@@ -383,7 +384,7 @@ const DepartmentManagement = () => {
       broadcastDepartmentsUpdate();
     } catch (err) {
       logger.error('Ошибка удаления отделения:', err);
-      toast.error(err.response?.data?.detail || t('admin2.dept_delete_failed'));
+      toast.error((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('admin2.dept_delete_failed'));
     }
   };
 
@@ -410,11 +411,11 @@ const DepartmentManagement = () => {
   // Фильтрация и сортировка отделений
   // ✅ ИСПРАВЛЕНО: Сортировка по display_order по умолчанию
   const filteredDepartments = departments.
-  filter((dept) => {
+  filter((dept: Record<string, unknown>) => {
     const matchesSearch = searchTerm === '' ||
-    dept.name_ru?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    dept.name_uz?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    dept.key?.toLowerCase().includes(searchTerm.toLowerCase());
+    String(dept.name_ru ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    String(dept.name_uz ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    String(dept.key ?? '').toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesStatus = statusFilter === 'all' ||
     statusFilter === 'active' && dept.active !== false ||
@@ -422,22 +423,22 @@ const DepartmentManagement = () => {
 
     return matchesSearch && matchesStatus;
   }).
-  sort((a, b) => {
-    let aValue, bValue;
+  sort((a: Record<string, unknown>, b: Record<string, unknown>) => {
+    let aValue: string | number, bValue: string | number;
 
     switch (sortBy) {
       case 'name':
-        aValue = a.name_ru || a.name || '';
-        bValue = b.name_ru || b.name || '';
+        aValue = String(a.name_ru ?? a.name ?? '');
+        bValue = String(b.name_ru ?? b.name ?? '');
         break;
       case 'key':
-        aValue = a.key || a.code || '';
-        bValue = b.key || b.code || '';
+        aValue = String(a.key ?? a.code ?? '');
+        bValue = String(b.key ?? b.code ?? '');
         break;
       case 'order':
       default: // ✅ По умолчанию сортируем по display_order
-        aValue = a.display_order || 999;
-        bValue = b.display_order || 999;
+        aValue = Number(a.display_order ?? 999);
+        bValue = Number(b.display_order ?? 999);
         break;
     }
 
@@ -466,14 +467,14 @@ const DepartmentManagement = () => {
       const headers = ['name_ru', 'name_uz', 'key', 'description', 'color', 'icon', 'display_order', 'active'];
       const csvContent = [
       headers.join(','),
-      ...departments.map((dept) => [
-      `"${(dept.name_ru || '').replace(/"/g, '""')}"`,
-      `"${(dept.name_uz || '').replace(/"/g, '""')}"`,
-      `"${(dept.key || '').replace(/"/g, '""')}"`,
-      `"${(dept.description || '').replace(/"/g, '""')}"`,
-      `"${(dept.color || 'var(--mac-accent-blue)').replace(/"/g, '""')}"`,
-      `"${(dept.icon || '🏥').replace(/"/g, '""')}"`,
-      dept.display_order || 999,
+      ...departments.map((dept: Record<string, unknown>) => [
+      `"${String(dept.name_ru ?? '').replace(/"/g, '""')}"`,
+      `"${String(dept.name_uz ?? '').replace(/"/g, '""')}"`,
+      `"${String(dept.key ?? '').replace(/"/g, '""')}"`,
+      `"${String(dept.description ?? '').replace(/"/g, '""')}"`,
+      `"${String(dept.color ?? 'var(--mac-accent-blue)').replace(/"/g, '""')}"`,
+      `"${String(dept.icon ?? '🏥').replace(/"/g, '""')}"`,
+      Number(dept.display_order ?? 999),
       dept.active !== false ? 'true' : 'false'].
       join(','))].
       join('\n');
@@ -496,38 +497,38 @@ const DepartmentManagement = () => {
   };
 
   // Функция импорта отделений из CSV
-  const handleImport = async (event) => {
-    const file = event.target.files[0];
+  const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
     if (!file) return;
 
     try {
       const text = await file.text();
-      const lines = text.split('\n').filter((line) => line.trim());
+      const lines = text.split('\n').filter((line: string) => line.trim());
 
       if (lines.length < 2) {
         toast.error(t('admin2.dept_csv_empty'));
         return;
       }
 
-      const headers = lines[0].split(',').map((h) => h.replace(/"/g, '').trim());
+      const headers = lines[0].split(',').map((h: string) => h.replace(/"/g, '').trim());
       const requiredHeaders = ['name_ru', 'key'];
 
       // Проверка обязательных заголовков
-      const missingHeaders = requiredHeaders.filter((h) => !headers.includes(h));
+      const missingHeaders = requiredHeaders.filter((h: string) => !headers.includes(h));
       if (missingHeaders.length > 0) {
         toast.error(t('admin2.dept_csv_missing_cols', { cols: missingHeaders.join(', ') }));
         return;
       }
 
-      const importedDepartments = [];
-      const errors = [];
+      const importedDepartments: Record<string, unknown>[] = [];
+      const errors: string[] = [];
 
       for (let i = 1; i < lines.length; i++) {
         try {
-          const values = lines[i].split(',').map((v) => v.replace(/^"|"$/g, '').replace(/""/g, '"'));
-          const dept = {};
+          const values = lines[i].split(',').map((v: string) => v.replace(/^"|"$/g, '').replace(/""/g, '"'));
+          const dept: Record<string, unknown> = {};
 
-          headers.forEach((header, index) => {
+          headers.forEach((header: string, index: number) => {
             const value = values[index];
             switch (header) {
               case 'display_order':
@@ -594,20 +595,20 @@ const DepartmentManagement = () => {
   };
 
   // Функции массовых операций
-  const handleSelectAll = (checked) => {
+  const handleSelectAll = (checked: boolean) => {
     setSelectAll(checked);
     if (checked) {
-      setSelectedDepartments(paginatedDepartments.map((dept) => dept.id));
+      setSelectedDepartments(paginatedDepartments.map((dept: Record<string, unknown>) => dept.id as string | number));
     } else {
       setSelectedDepartments([]);
     }
   };
 
-  const handleSelectDepartment = (deptId, checked) => {
+  const handleSelectDepartment = (deptId: string | number, checked: boolean) => {
     if (checked) {
       setSelectedDepartments((prev) => [...prev, deptId]);
     } else {
-      setSelectedDepartments((prev) => prev.filter((id) => id !== deptId));
+      setSelectedDepartments((prev) => prev.filter((id: string | number) => id !== deptId));
       setSelectAll(false);
     }
   };
@@ -657,7 +658,7 @@ const DepartmentManagement = () => {
     }
   };
 
-  const handleBulkActivate = async (activate) => {
+  const handleBulkActivate = async (activate: boolean) => {
     if (selectedDepartments.length === 0) {
       toast.warning(t('admin2.dept_select_departments'));
       return;
@@ -696,10 +697,10 @@ const DepartmentManagement = () => {
   // Расчет статистики отделений
   const departmentStats = {
     total: departments.length,
-    active: departments.filter((dept) => dept.active !== false).length,
-    inactive: departments.filter((dept) => dept.active === false).length,
-    withDoctors: departments.filter((dept) => (dept.doctor_count || 0) > 0).length,
-    withoutDoctors: departments.filter((dept) => (dept.doctor_count || 0) === 0).length
+    active: departments.filter((dept: Record<string, unknown>) => dept.active !== false).length,
+    inactive: departments.filter((dept: Record<string, unknown>) => dept.active === false).length,
+    withDoctors: departments.filter((dept: Record<string, unknown>) => Number(dept.doctor_count ?? 0) > 0).length,
+    withoutDoctors: departments.filter((dept: Record<string, unknown>) => Number(dept.doctor_count ?? 0) === 0).length
   };
 
   if (loading) {
@@ -1100,34 +1101,35 @@ const DepartmentManagement = () => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {paginatedDepartments.map((dept) => {
-                  const IconComponent = null; // IconSelector.jsx removed (Step 1); icon picker is a plain text Input. Icon rendering in table rows disabled until a icon-map helper is re-added.
+                                {paginatedDepartments.map((dept: Record<string, unknown>) => {
+                  const IconComponent = null as unknown as React.ComponentType<{ size?: number }> | null; // IconSelector.jsx removed (Step 1); icon picker is a plain text Input. Icon rendering in table rows disabled until a icon-map helper is re-added.
                   return (
                     <tr
                       key={String(dept.id ?? "")}
                       className="admin-tr-hover">
-                      
+
                                             <td className="admin-td-padded">
                                                 <Checkbox
-                          checked={selectedDepartments.includes(dept.id)}
-                          onChange={(checked: boolean) => handleSelectDepartment(dept.id, checked)} />
-                        
+                          checked={selectedDepartments.includes(dept.id as string | number)}
+                          onChange={(checked: boolean) => handleSelectDepartment(dept.id as string | number, checked)} />
+
                                             </td>
                                             <td className="admin-td-padded">
-                                                <div className="admin-icon-cell-40" style={{ '--admin-icon-bg': dept.color || 'var(--mac-accent-blue)' } as CSSProperties}>
+                                                <div className="admin-icon-cell-40" style={{ '--admin-icon-bg': String(dept.color ?? 'var(--mac-accent-blue)') } as CSSProperties}>
                                                     {IconComponent ?
                           <IconComponent size={20} /> :
 
-                          <span className="admin-icon-fallback-20">{dept.icon || '🏥'}</span>
+                          <span className="admin-icon-fallback-20">{String(dept.icon ?? '🏥')}</span>
                           }
+                                                {/* IconComponent placeholder: icon picker is a plain text Input above */}
                                                 </div>
                                             </td>
                                             <td className="admin-td-padded">
                                                 <div>
                                                     <div className="admin-cell-name">
-                                                        {dept.name_ru || dept.name}
+                                                        {String(dept.name_ru ?? dept.name ?? '')}
                                                     </div>
-                                                    {dept.description &&
+                                                    {Boolean(dept.description) &&
                           <div className="admin-cell-desc-truncate">
                                                             {String(dept.description ?? "")}
                                                         </div>
@@ -1135,43 +1137,43 @@ const DepartmentManagement = () => {
                                                 </div>
                                             </td>
                                             <td className="admin-td-padded">
-                                                <Badge variant="secondary">{dept.key || dept.code}</Badge>
+                                                <Badge variant="secondary">{String(dept.key ?? dept.code ?? '')}</Badge>
                                             </td>
                                             <td className="admin-td-padded">
                                                 <Input
                           type="number"
-                          value={dept.display_order || 999}
+                          value={Number(dept.display_order ?? 999)}
                           onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                             const newOrder = parseInt(e.target.value) || 999;
                             handleUpdateOrder(dept, newOrder);
                           }}
                           className="admin-input-mini-80" />
-                        
+
                                             </td>
                                             <td className="admin-td-center">
                                                 <Switch
                           checked={dept.active !== false}
-                          onChange={(checked) => handleToggleActive(dept, checked)} />
-                        
+                          onChange={(checked: boolean) => handleToggleActive(dept, checked)} />
+
                                             </td>
                                             <td className="admin-td-right">
                                                 <div className="admin-flex-end-center-8">
                                                     <Button
                             size="small"
                             variant="secondary"
-                            aria-label={`Edit department ${dept.name_ru || dept.name || dept.key}`}
+                            aria-label={`Edit department ${String(dept.name_ru ?? dept.name ?? dept.key ?? '')}`}
                             onClick={() => openEditModal(dept)}
                             title={t('admin2.dept_edit_title')}>
-                            
+
                                                         <Edit2 size={16} />
                                                     </Button>
                                                     <Button
                             size="small"
                             variant="danger"
-                            aria-label={`Delete department ${dept.name_ru || dept.name || dept.key}`}
-                            onClick={() => handleDeleteDepartment(dept.id)}
+                            aria-label={`Delete department ${String(dept.name_ru ?? dept.name ?? dept.key ?? '')}`}
+                            onClick={() => handleDeleteDepartment(dept.id as string | number)}
                             title={t('admin2.dept_delete_action_title')}>
-                            
+
                                                         <Trash2 size={16} />
                                                     </Button>
                                                 </div>

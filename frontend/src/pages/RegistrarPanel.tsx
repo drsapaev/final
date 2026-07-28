@@ -107,6 +107,15 @@ interface ErrorWithExtras extends Error {
   code?: string | number;
 }
 
+interface QueueProfileItem {
+  key?: string;
+  title?: string;
+  title_ru?: string;
+  queue_tags?: string[];
+  is_active?: boolean;
+  [key: string]: unknown;
+}
+
 const RegistrarPanel = () => {
   // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
   const [confirmRaw, confirmDialog] = useConfirm();
@@ -206,24 +215,24 @@ const RegistrarPanel = () => {
   }, [patientIdFromUrl, setSearchParams]);
 
   // ✅ ДИНАМИЧЕСКИЕ ОТДЕЛЕНИЯ: состояние для хранения отделений из БД
-  const [dynamicDepartments, setDynamicDepartments] = useState([]);
+  const [dynamicDepartments, setDynamicDepartments] = useState<unknown[]>([]);
 
   // ⭐ SSOT: Queue profiles loaded from API (via ModernTabs)
   // Used for filtering entries by queue_tags instead of hardcoded mapping
-  const [queueProfiles, setQueueProfiles] = useState([]);
+  const [queueProfiles, setQueueProfiles] = useState<QueueProfileItem[]>([]);
 
   // Состояния для печати
-  const [printDialog, setPrintDialog] = useState({ open: false, type: 'ticket', data: null });
+  const [printDialog, setPrintDialog] = useState<{ open: boolean; type: string; data: Record<string, unknown> | null }>({ open: false, type: 'ticket', data: null });
   const [cancelDialog, setCancelDialog] = useState<{ open: boolean; row: Appointment | null; reason: string }>({ open: false, row: null, reason: '' });
   const [paymentDialog, setPaymentDialog] = useState<{ open: boolean; row: Appointment | null; paid: boolean; source: string | null }>({ open: false, row: null, paid: false, source: null });
-  const [recordPreviewDialog, setRecordPreviewDialog] = useState({ open: false, row: null });
+  const [recordPreviewDialog, setRecordPreviewDialog] = useState<{ open: boolean; row: Appointment | null }>({ open: false, row: null });
   // ✅ State for rescheduling
   const [rescheduleData, setRescheduleData] = useState<Record<string, unknown> | null>(null);
 
   // ✅ State for Force Majeure modal
-  const [forceMajeureModal, setForceMajeureModal] = useState({ open: false, specialistId: null, specialistName: '' });
+  const [forceMajeureModal, setForceMajeureModal] = useState<{ open: boolean; specialistId: string | number | null; specialistName: string }>({ open: false, specialistId: null, specialistName: '' });
 
-  const [contextMenu, setContextMenu] = useState({ open: false, row: null, position: { x: 0, y: 0 } });
+  const [contextMenu, setContextMenu] = useState<{ open: boolean; row: Record<string, unknown> | null; position: { x: number; y: number } }>({ open: false, row: null, position: { x: 0, y: 0 } });
 
   // Состояния для пагинации
   const [paginationInfo, setPaginationInfo] = useState({ total: 0, hasMore: false, loadingMore: false });
@@ -232,7 +241,7 @@ const RegistrarPanel = () => {
   // are used for tests; error states show proper error UI instead.
 
   // Состояния для управления данными
-  const [appointments, setAppointments] = useState([]);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
   // ⭐ SSOT FIX: Сырые данные (flat list) до агрегации — для Tooltip
   const [dataSource, setDataSource] = useState('loading'); // 'loading' | 'api' | 'error' (QW-03: 'demo' removed)
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
@@ -287,7 +296,7 @@ const RegistrarPanel = () => {
     if (key.includes('.')) return tI18n(key);
     return tI18n('registrarPanel.' + key);
   };
-  const currentWorklistLabel = tI18n('registrarPanel.' + (REGISTRAR_TAB_LABEL_KEYS[activeTab] || 'tabs_appointments'));
+  const currentWorklistLabel = tI18n('registrarPanel.' + (REGISTRAR_TAB_LABEL_KEYS[activeTab || ''] || 'tabs_appointments'));
   const statusFilterLabel = statusFilter ? tI18n('registrarPanel.' + (REGISTRAR_STATUS_LABEL_KEYS[statusFilter] || statusFilter)) : null;
   const { theme, getSpacing, getFontSize, getColor } = useTheme();
   // Адаптивные цвета из централизованной системы темизации
@@ -371,7 +380,7 @@ const RegistrarPanel = () => {
       const data = response.data;
 
       // Новый формат: данные сгруппированы по специальностям
-      let appointmentsData = [];
+      let appointmentsData: Record<string, unknown>[] = [];
 
       if (data && typeof data === 'object') {
         // Обрабатываем формат от эндпоинта registrar_integration.py
@@ -811,7 +820,7 @@ const RegistrarPanel = () => {
   // QW-01 fix: handleBulkAction removed along with bulk-action UI.
 
   // ✅ ИСПОЛЬЗУЕМ useRef для хранения filteredAppointments, чтобы избежать ошибки "Cannot access before initialization"
-  const filteredAppointmentsRef = useRef([]);
+  const filteredAppointmentsRef = useRef<Appointment[]>([]);
 
   // Горячие клавиши — extracted to useRegistrarHotkeys hook (Decomp 2)
   // Phase 2: navigate replaces setSearchParams for canonical routes
@@ -836,17 +845,21 @@ const RegistrarPanel = () => {
     ['cardiology', 'ecg', 'dermatology', 'stomatology', 'lab', 'procedures']; // Fallback
 
     // Get queue_tags for each profile for accurate matching
-    const profileTagsMap = {};
+    const profileTagsMap: Record<string, string[]> = {};
     queueProfiles.forEach((p) => {
-      profileTagsMap[p.key] = p.queue_tags || [p.key];
+      const profileKey = p.key || '';
+      if (profileKey) {
+        profileTagsMap[profileKey] = p.queue_tags || [profileKey];
+      }
     });
 
     profileKeys.forEach((profileKey) => {
       // ⭐ SSOT: Match entries by queue_tags from profile
-      const possibleTags = profileTagsMap[profileKey] || [profileKey];
+      const safeProfileKey = String(profileKey || '');
+      const possibleTags = profileTagsMap[safeProfileKey] || [safeProfileKey];
 
       const profileAppointments = appointments.filter((a) => {
-        const entryTag = (a.queue_tag || a.specialty || '').toLowerCase().trim();
+        const entryTag = String(a.queue_tag || a.specialty || '').toLowerCase().trim();
         return possibleTags.some((tag: string) => tag.toLowerCase() === entryTag);
       });
 
@@ -855,11 +868,11 @@ const RegistrarPanel = () => {
         return appointmentDate === todayStr;
       });
 
-      stats[profileKey] = {
+      stats[safeProfileKey] = {
         todayCount: todayAppointments.length,
         hasActiveQueue: profileAppointments.some((a) =>
         a.queue_numbers && a.queue_numbers.length > 0 &&
-        ['waiting', 'called', 'in_service'].includes(a.status)
+        ['waiting', 'called', 'in_service'].includes(String(a.status || ''))
         ),
         hasPendingPayments: profileAppointments.some((a) =>
         a.status === 'paid_pending' || a.payment_status === 'pending'
@@ -981,8 +994,8 @@ const RegistrarPanel = () => {
         }
 
         // Fallback: только если services пустой, генерируем из queue_numbers
-        const allCodes = [];
-        const seenCodes = new Set();
+        const allCodes: string[] = [];
+        const seenCodes = new Set<string>();
 
         appointment.queue_numbers.forEach((qn: Record<string, unknown>) => {
           // Приоритет 1: service_name
@@ -1186,7 +1199,7 @@ const RegistrarPanel = () => {
         if (searchQuery) {
           const inFio = (entry.patient_fio || entry.patient_name || '').toLowerCase().includes(searchQuery);
           const inId = String(entry.id).includes(searchQuery);
-          const phoneDigits = (entry.patient_phone || entry.phone || '').replace(/\D/g, '');
+          const phoneDigits = String(entry.patient_phone || entry.phone || '').replace(/\D/g, '');
           const searchDigits = searchQuery.replace(/\D/g, '');
           const inPhone = phoneDigits.includes(searchDigits);
           if (!inFio && !inId && !inPhone) return false;
@@ -1286,7 +1299,7 @@ const RegistrarPanel = () => {
   }, [appointments, activeTab, statusFilter, searchQuery, aggregatePatientsForAllDepartments, filterServicesByDepartment, queueProfiles]);
 
   // ✅ Сохраняем filteredAppointments в ref для использования в handleKeyDown
-  filteredAppointmentsRef.current = filteredAppointments;
+  filteredAppointmentsRef.current = filteredAppointments as Appointment[];
 
   // Мемоизированный компонент индикатора источника данных (для всех вкладок)
   // UX Audit Registrar #14: DataSourceIndicator, generateCSV, downloadCSV
@@ -1469,7 +1482,7 @@ const RegistrarPanel = () => {
           <ModernTabs
           activeTab={activeTab}
           onTabChange={setActiveTab}
-          onProfilesLoaded={setQueueProfiles} // ⭐ SSOT: Store profiles for filtering
+          onProfilesLoaded={(profiles: unknown[]) => setQueueProfiles(profiles as QueueProfileItem[])} // ⭐ SSOT: Store profiles for filtering
           departmentStats={departmentStats}
           theme={theme}
           language={legacyLanguage}
@@ -1805,7 +1818,7 @@ const RegistrarPanel = () => {
               [tI18n('registrarPanel.rp_field_patient'), recordPreviewDialog.row.patient_fio || recordPreviewDialog.row.patient_name],
               [tI18n('registrarPanel.rp_field_phone'), recordPreviewDialog.row.patient_phone || recordPreviewDialog.row.phone],
               [tI18n('registrarPanel.rp_field_birth_year'), recordPreviewDialog.row.patient_birth_year || recordPreviewDialog.row.birth_year],
-              [tI18n('registrarPanel.rp_field_gender'), normalizePatientGender(recordPreviewDialog.row)],
+              [tI18n('registrarPanel.rp_field_gender'), normalizePatientGender(recordPreviewDialog.row as unknown as Parameters<typeof normalizePatientGender>[0])],
               [tI18n('registrarPanel.rp_field_department'), recordPreviewDialog.row.queue_name || recordPreviewDialog.row.department || recordPreviewDialog.row.specialty],
               [tI18n('registrarPanel.rp_field_services'), formatPreviewList(recordPreviewDialog.row.services || recordPreviewDialog.row.service_details)],
               [tI18n('registrarPanel.rp_field_queue'), formatPreviewList(recordPreviewDialog.row.queue_numbers)],
@@ -1814,9 +1827,9 @@ const RegistrarPanel = () => {
               [tI18n('registrarPanel.rp_field_amount'), recordPreviewDialog.row.cost]
             ].filter(([, value]) => value !== null && value !== undefined && value !== '').map(([label, value]) => (
               <div
-                key={label}
+                key={String(label)}
                 className="registrar-surface registrar-preview-row">
-                <span className="registrar-preview-label" style={{ color: 'var(--mac-text-secondary)' }}>{label}</span>
+                <span className="registrar-preview-label" style={{ color: 'var(--mac-text-secondary)' }}>{String(label)}</span>
                 <span className="registrar-preview-value">
                   {String(value)}
                 </span>
@@ -1862,7 +1875,7 @@ const RegistrarPanel = () => {
           // ✅ ИСПРАВЛЕНО: используем реальный API вызов через handlePayment
           const appointment = paymentDialog.row;
           if (appointment) {
-            const updated = await handlePayment(appointment, paymentData);
+            const updated = await handlePayment(appointment, paymentData as { amount?: number | null; method?: string | null } | null);
             if (updated) {
               // Canonical state is refreshed by handlePayment via loadAppointments.
               logger.info('PaymentDialog: Оплата успешна, данные обновлены:', updated);
@@ -1907,14 +1920,14 @@ const RegistrarPanel = () => {
         onClose={() => setPrintDialog({ open: false, type: 'ticket', data: null })}
         documentType={printDialog.type || 'ticket'}
         documentData={printDialog.data}
-        onPrint={async (printerName, docType, docData) => {
-          logger.info('Printing:', { printerName, docType, docData });
+        onPrint={async (data, printerId) => {
+          logger.info('Printing:', { printerId, documentType: printDialog.type, data });
 
-          if (docType !== 'ticket') {
-            throw new Error(tI18n('registrarPanel.rp_err_unsupported_doc_type', { docType }));
+          if (printDialog.type !== 'ticket') {
+            throw new Error(tI18n('registrarPanel.rp_err_unsupported_doc_type', { docType: printDialog.type }));
           }
 
-          const result = await printPanelTicketInBrowserAsync(docData);
+          const result = await printPanelTicketInBrowserAsync((data ?? {}) as Record<string, unknown>);
           if (result?.opened && result?.success) {
             return;
           }
@@ -1931,8 +1944,8 @@ const RegistrarPanel = () => {
       <AppointmentWizardV2
         isOpen={showWizard}
         editMode={wizardEditMode} // ✨ НОВОЕ: Передаем режим
-        initialData={wizardInitialData} // ✨ НОВОЕ: Передаем данные
-        activeTab={activeTab} // ✅ ПЕРЕДАЕМ activeTab для фильтрации услуг
+        initialData={wizardInitialData as unknown as null} // ✨ НОВОЕ: Передаем данные
+        activeTab={activeTab as unknown as null} // ✅ ПЕРЕДАЕМ activeTab для фильтрации услуг
         onClose={() => {
           logger.info('AppointmentWizardV2 closing');
           setShowWizard(false);
@@ -1968,7 +1981,7 @@ const RegistrarPanel = () => {
             // Open payment/print dialog immediately — user can act while data refreshes
             if (postWizardPaymentRow) {
               if (Number(postWizardPaymentRow.cost || 0) > 0) {
-                setPaymentDialog({ open: true, row: postWizardPaymentRow as Appointment | null, paid: false, source: wasEditMode ? 'wizard-edit' : 'wizard-create' });
+                setPaymentDialog({ open: true, row: postWizardPaymentRow as unknown as Appointment | null, paid: false, source: wasEditMode ? 'wizard-edit' : 'wizard-create' });
               } else {
                 setPrintDialog({ open: true, type: 'ticket', data: postWizardPaymentRow });
               }
@@ -2175,7 +2188,7 @@ const RegistrarPanel = () => {
       </ModernDialog>
 
       {/* Контекстное меню */}
-      {contextMenu.open &&
+      {contextMenu.open && contextMenu.row &&
       <AppointmentContextMenu
         row={contextMenu.row}
         position={contextMenu.position}

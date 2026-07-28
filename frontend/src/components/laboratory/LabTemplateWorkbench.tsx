@@ -69,14 +69,14 @@ export default function LabTemplateWorkbench({
   const [templateSearch, setTemplateSearch] = useState('');
   const [draftVersion, setDraftVersion] = useState(hydrateVersion(null));
   const [saving, setSaving] = useState(false);
-  const [catalogUnits, setCatalogUnits] = useState([]);
-  const [catalogAnalytes, setCatalogAnalytes] = useState([]);
+  const [catalogUnits, setCatalogUnits] = useState<Array<Record<string, unknown>>>([]);
+  const [catalogAnalytes, setCatalogAnalytes] = useState<Array<Record<string, unknown>>>([]);
 
   // Phase 4+ Phase 2: collapsible sections + field cards + duplicate + reorder.
-  const [expandedSections, setExpandedSections] = useState(new Set([0]));
-  const [expandedFields, setExpandedFields] = useState(new Set());
+  const [expandedSections, setExpandedSections] = useState<Set<number>>(new Set([0]));
+  const [expandedFields, setExpandedFields] = useState<Set<string>>(new Set());
 
-  const toggleSection = (sectionIndex) => {
+  const toggleSection = (sectionIndex: number) => {
     setExpandedSections((prev) => {
       const next = new Set(prev);
       if (next.has(sectionIndex)) {
@@ -88,7 +88,7 @@ export default function LabTemplateWorkbench({
     });
   };
 
-  const toggleField = (sectionIndex, fieldIndex) => {
+  const toggleField = (sectionIndex: number, fieldIndex: number) => {
     const key = `${sectionIndex}-${fieldIndex}`;
     setExpandedFields((prev) => {
       const next = new Set(prev);
@@ -105,9 +105,12 @@ export default function LabTemplateWorkbench({
     if (!selectedTemplate) {
       return null;
     }
-    return (selectedTemplate as { versions?: unknown[] })?.versions.find((version: Record<string, unknown>) => (version as Record<string, unknown>)?.id === (selectedTemplate as { draft_version_id?: string | number })?.draft_version_id)
-      || (selectedTemplate as { versions?: unknown[] })?.versions.find((version: Record<string, unknown>) => (version as Record<string, unknown>)?.id === (selectedTemplate as { published_version_id?: string | number })?.published_version_id)
-      || (selectedTemplate as { versions?: unknown[] })?.versions[(selectedTemplate as { versions?: unknown[] })?.versions.length - 1]
+    const versions = ((selectedTemplate as { versions?: unknown[] })?.versions || []) as Record<string, unknown>[];
+    const draftId = (selectedTemplate as { draft_version_id?: string | number })?.draft_version_id;
+    const publishedId = (selectedTemplate as { published_version_id?: string | number })?.published_version_id;
+    return versions.find((version) => version?.id === draftId)
+      || versions.find((version) => version?.id === publishedId)
+      || versions[versions.length - 1]
       || null;
   }, [selectedTemplate]);
 
@@ -123,14 +126,14 @@ export default function LabTemplateWorkbench({
         const [units, analytes] = await Promise.all([
           labReportingApi.listCatalogUnits(),
           labReportingApi.listCatalogAnalytes()
-        ]) as [any[], any[]];
+        ]) as [Record<string, unknown>[], Record<string, unknown>[]];
         if (cancelled) {
           return;
         }
         setCatalogUnits(units);
         setCatalogAnalytes(analytes);
       } catch (error) {
-        if (!cancelled) {
+        if (!cancelled && notify) {
           notify('error', (error as Error)?.message || t('errors.catalog_load_failed'));
         }
       }
@@ -142,9 +145,9 @@ export default function LabTemplateWorkbench({
     };
   }, [notify]);
 
-  async function handleCreateTemplate(formData) {
+  async function handleCreateTemplate(formData: Record<string, unknown>) {
     if (!formData.code || !formData.name) {
-      notify('error', t('errors.template_code_name_required'));
+      notify?.('error', t('errors.template_code_name_required'));
       return;
     }
     setSaving(true);
@@ -153,11 +156,11 @@ export default function LabTemplateWorkbench({
         ...formData,
         initial_version: blankVersion
       });
-      notify('success', t('success.template_created'));
+      notify?.('success', t('success.template_created'));
       setShowNewTemplateDialog(false);
-      await onTemplatesChanged();
+      await onTemplatesChanged?.();
     } catch (error) {
-      notify('error', (error as Error)?.message);
+      notify?.('error', (error as Error)?.message);
     } finally {
       setSaving(false);
     }
@@ -173,29 +176,29 @@ export default function LabTemplateWorkbench({
     if (!hasTemplateVersionAction(activeVersion, 'create_draft')) {
       throw new Error(t('misc.ltw_server_ne_razreshil_sozdat_c'));
     }
-    const version = (await labReportingApi.createTemplateVersion((selectedTemplate as { id?: string | number })?.id as string | number, (activeVersion as Record<string, unknown>)?.id as string | number | null)) as Record<string, unknown>;
-    await onTemplatesChanged();
+    const version = (await labReportingApi.createTemplateVersion((selectedTemplate as { id?: string | number })?.id as string | number, ((activeVersion as Record<string, unknown>)?.id as string | number) ?? null)) as Record<string, unknown>;
+    await onTemplatesChanged?.();
     return (version as Record<string, unknown>)?.id as string | number;
   }
 
   // PR-57: validate reference ranges (low < high) before save/publish
   function validateReferenceRanges() {
-    if (!draftVersion?.sections) return [];
-    const errors = [];
-    draftVersion.sections.forEach((section, sIdx) => {
-      (section.fields || []).forEach((field) => {
-        const rule = field.reference_rule;
+    if (!draftVersion?.sections) return [] as string[];
+    const errors: string[] = [];
+    draftVersion.sections.forEach((section: Record<string, unknown>, sIdx: number) => {
+      ((section.fields as Record<string, unknown>[]) || []).forEach((field: Record<string, unknown>) => {
+        const rule = field.reference_rule as Record<string, unknown> | null;
         if (!rule) return;
-        const def = rule.default;
+        const def = rule.default as Record<string, unknown> | undefined;
         if (def && def.low != null && def.high != null && def.low !== '' && def.high !== '') {
-          if (parseFloat(def.low) >= parseFloat(def.high)) {
-            errors.push(t('misc.ltw_sektsiya_section_title_sidx_', { sIdx: section.title || sIdx + 1, field_key: field.label || field.field_key, low: def.low, high: def.high }));
+          if (parseFloat(String(def.low)) >= parseFloat(String(def.high))) {
+            errors.push(t('misc.ltw_sektsiya_section_title_sidx_', { sIdx: (section.title as string) || sIdx + 1, field_key: (field.label as string) || (field.field_key as string), low: def.low, high: def.high }));
           }
         }
-        (rule.cases || []).forEach((c, cIdx) => {
+        ((rule.cases as Record<string, unknown>[]) || []).forEach((c: Record<string, unknown>, cIdx: number) => {
           if (c.low != null && c.high != null && c.low !== '' && c.high !== '') {
-            if (parseFloat(c.low) >= parseFloat(c.high)) {
-              errors.push(t('misc.ltw_sektsiya_section_title_sidx__2', { sIdx: section.title || sIdx + 1, field_key: field.label || field.field_key, cIdx: cIdx + 1, low: c.low, high: c.high }));
+            if (parseFloat(String(c.low)) >= parseFloat(String(c.high))) {
+              errors.push(t('misc.ltw_sektsiya_section_title_sidx__2', { sIdx: (section.title as string) || sIdx + 1, field_key: (field.label as string) || (field.field_key as string), cIdx: cIdx + 1, low: c.low, high: c.high }));
             }
           }
         });
@@ -206,15 +209,15 @@ export default function LabTemplateWorkbench({
 
   // PR-57: validate field_key uniqueness before save/publish
   function validateFieldKeyUniqueness() {
-    if (!draftVersion?.sections) return [];
-    const errors = [];
-    const seenKeys = new Set();
-    draftVersion.sections.forEach((section, sIdx) => {
-      (section.fields || []).forEach((field) => {
-        const key = field.field_key;
+    if (!draftVersion?.sections) return [] as string[];
+    const errors: string[] = [];
+    const seenKeys = new Set<string>();
+    draftVersion.sections.forEach((section: Record<string, unknown>, sIdx: number) => {
+      ((section.fields as Record<string, unknown>[]) || []).forEach((field: Record<string, unknown>) => {
+        const key = field.field_key as string;
         if (!key) return;
         if (seenKeys.has(key)) {
-          errors.push(t('misc.ltw_dublikat_field_key_key_v_sek', { key: key, sIdx: section.title || sIdx + 1 }));
+          errors.push(t('misc.ltw_dublikat_field_key_key_v_sek', { key: key, sIdx: (section.title as string) || sIdx + 1 }));
         }
         seenKeys.add(key);
       });
@@ -224,14 +227,14 @@ export default function LabTemplateWorkbench({
 
   async function handleSaveTemplate() {
     if (!selectedTemplate) {
-      notify('error', t('errors.select_template_first'));
+      notify?.('error', t('errors.select_template_first'));
       return;
     }
     const rangeErrors = validateReferenceRanges();
     const keyErrors = validateFieldKeyUniqueness();
     if (rangeErrors.length > 0 || keyErrors.length > 0) {
       const allErrors = [...rangeErrors, ...keyErrors];
-      notify('error', `${t('errors.validation_errors')} (${allErrors.length}):\n${allErrors.slice(0, 5).join('\n')}${allErrors.length > 5 ? '\n...' : ''}`);
+      notify?.('error', `${t('errors.validation_errors')} (${allErrors.length}):\n${allErrors.slice(0, 5).join('\n')}${allErrors.length > 5 ? '\n...' : ''}`);
       return;
     }
     setSaving(true);
@@ -239,10 +242,10 @@ export default function LabTemplateWorkbench({
       const versionId = await ensureDraftVersion();
       const payload = buildVersionPayload(draftVersion);
       await labReportingApi.updateTemplateVersion(versionId, payload);
-      notify('success', t('success.template_draft_saved'));
-      await onTemplatesChanged();
+      notify?.('success', t('success.template_draft_saved'));
+      await onTemplatesChanged?.();
     } catch (error) {
-      notify('error', (error as Error)?.message);
+      notify?.('error', (error as Error)?.message);
     } finally {
       setSaving(false);
     }
@@ -250,14 +253,14 @@ export default function LabTemplateWorkbench({
 
   async function handlePublishVersion() {
     if (!selectedTemplate) {
-      notify('error', t('errors.select_template'));
+      notify?.('error', t('errors.select_template'));
       return;
     }
     const rangeErrors = validateReferenceRanges();
     const keyErrors = validateFieldKeyUniqueness();
     if (rangeErrors.length > 0 || keyErrors.length > 0) {
       const allErrors = [...rangeErrors, ...keyErrors];
-      notify('error', `${t('errors.validation_errors')} (${allErrors.length}):\n${allErrors.slice(0, 5).join('\n')}${allErrors.length > 5 ? '\n...' : ''}`);
+      notify?.('error', `${t('errors.validation_errors')} (${allErrors.length}):\n${allErrors.slice(0, 5).join('\n')}${allErrors.length > 5 ? '\n...' : ''}`);
       return;
     }
     setSaving(true);
@@ -265,10 +268,10 @@ export default function LabTemplateWorkbench({
       const versionId = await ensureDraftVersion();
       await labReportingApi.updateTemplateVersion(versionId, buildVersionPayload(draftVersion));
       await labReportingApi.publishTemplateVersion(versionId);
-      notify('success', t('success.template_published'));
-      await onTemplatesChanged();
+      notify?.('success', t('success.template_published'));
+      await onTemplatesChanged?.();
     } catch (error) {
-      notify('error', (error as Error)?.message);
+      notify?.('error', (error as Error)?.message);
     } finally {
       setSaving(false);
     }
@@ -279,7 +282,7 @@ export default function LabTemplateWorkbench({
   // portal-dialog с focus-trap, Esc-to-cancel, явным описанием последствий.
   async function handleArchiveTemplate() {
     if (!selectedTemplate || !activeVersion) {
-      notify('error', t('errors.select_version_for_archive'));
+      notify?.('error', t('errors.select_version_for_archive'));
       return;
     }
     const ok = await confirm({
@@ -294,10 +297,10 @@ export default function LabTemplateWorkbench({
     setSaving(true);
     try {
       await labReportingApi.archiveTemplateVersion((activeVersion as Record<string, unknown>)?.id as string | number);
-      notify('success', t('success.template_archived'));
-      await onTemplatesChanged();
+      notify?.('success', t('success.template_archived'));
+      await onTemplatesChanged?.();
     } catch (error) {
-      notify('error', (error as Error)?.message);
+      notify?.('error', (error as Error)?.message);
     } finally {
       setSaving(false);
     }
@@ -305,17 +308,17 @@ export default function LabTemplateWorkbench({
 
   async function handleCloneTemplate() {
     if (!selectedTemplate) {
-      notify('error', t('errors.select_template_for_copy'));
+      notify?.('error', t('errors.select_template_for_copy'));
       return;
     }
     setSaving(true);
     try {
-      const cloned = (await labReportingApi.cloneTemplate((selectedTemplate as { id?: string | number })?.id)) as Record<string, unknown>;
-      notify('success', t('success.template_cloned'));
-      await onTemplatesChanged();
+      const cloned = (await labReportingApi.cloneTemplate((selectedTemplate as { id?: string | number })?.id as string | number)) as Record<string, unknown>;
+      notify?.('success', t('success.template_cloned'));
+      await onTemplatesChanged?.();
     } catch (error) {
       const err = error as { message?: string };
-      notify('error', err?.message || '');
+      notify?.('error', err?.message || '');
     } finally {
       setSaving(false);
     }
@@ -323,37 +326,37 @@ export default function LabTemplateWorkbench({
 
   // ─── Field/Section mutation helpers (used by ContentTab) ───
 
-  function updateBranding(key, value) {
+  function updateBranding(key: string, value: unknown) {
     setDraftVersion((prev) => ({
       ...prev,
       branding_overrides: { ...prev.branding_overrides, [key]: value }
     }));
   }
 
-  function updateSigner(key, value) {
+  function updateSigner(key: string, value: unknown) {
     setDraftVersion((prev) => ({
       ...prev,
       signer_defaults: { ...prev.signer_defaults, [key]: value }
     }));
   }
 
-  function updateSection(sectionIndex, key, value) {
+  function updateSection(sectionIndex: number, key: string, value: unknown) {
     setDraftVersion((prev) => ({
       ...prev,
-      sections: prev.sections.map((section, index) => (
+      sections: prev.sections.map((section: Record<string, unknown>, index: number) => (
         index === sectionIndex ? { ...section, [key]: value } : section
       ))
     }));
   }
 
-  function updateField(sectionIndex, fieldIndex, key, value) {
+  function updateField(sectionIndex: number, fieldIndex: number, key: string, value: unknown) {
     setDraftVersion((prev) => ({
       ...prev,
-      sections: prev.sections.map((section, index) => {
+      sections: prev.sections.map((section: Record<string, unknown>, index: number) => {
         if (index !== sectionIndex) return section;
         return {
           ...section,
-          fields: section.fields.map((field, nestedIndex) => (
+          fields: (section.fields as Record<string, unknown>[]).map((field: Record<string, unknown>, nestedIndex: number) => (
             nestedIndex === fieldIndex ? { ...field, [key]: value } : field
           ))
         };
@@ -361,19 +364,19 @@ export default function LabTemplateWorkbench({
     }));
   }
 
-  function updateFieldCatalog(sectionIndex, fieldIndex, key, value) {
+  function updateFieldCatalog(sectionIndex: number, fieldIndex: number, key: string, value: unknown) {
     if (key !== 'analyte_code') {
       updateField(sectionIndex, fieldIndex, key, value);
       return;
     }
-    const analyte = catalogAnalytes.find((item) => item.code === value);
+    const analyte = catalogAnalytes.find((item: Record<string, unknown>) => item.code === value);
     setDraftVersion((prev) => ({
       ...prev,
-      sections: prev.sections.map((section, index) => {
+      sections: prev.sections.map((section: Record<string, unknown>, index: number) => {
         if (index !== sectionIndex) return section;
         return {
           ...section,
-          fields: section.fields.map((field, nestedIndex) => {
+          fields: (section.fields as Record<string, unknown>[]).map((field: Record<string, unknown>, nestedIndex: number) => {
             if (nestedIndex !== fieldIndex) return field;
             return {
               ...field,
@@ -386,21 +389,21 @@ export default function LabTemplateWorkbench({
     }));
   }
 
-  async function loadCatalogReferenceRange(sectionIndex, fieldIndex, analyteCode) {
+  async function loadCatalogReferenceRange(sectionIndex: number, fieldIndex: number, analyteCode: string) {
     try {
-      const ranges = await labReportingApi.listCatalogReferenceRanges(analyteCode) as unknown as Array<{ text?: string; low?: number; high?: number }>;
+      const ranges = await labReportingApi.listCatalogReferenceRanges(analyteCode as unknown as null) as unknown as Array<{ text?: string; low?: number; high?: number }>;
       if (ranges && ranges.length > 0) {
         const range = ranges[0];
         updateField(sectionIndex, fieldIndex, 'reference_text',
           range.text || `${range.low || ''}–${range.high || ''}`);
-        if (range.low != null) updateField(sectionIndex, fieldIndex, 'reference_low', range.low);
-        if (range.high != null) updateField(sectionIndex, fieldIndex, 'reference_high', range.high);
-        notify('success', `${t('success.norm_loaded_from_catalog')}: ${range.text || ''}`);
+        if (range.low != null) updateField(sectionIndex, fieldIndex, 'reference_low', range.low as number);
+        if (range.high != null) updateField(sectionIndex, fieldIndex, 'reference_high', range.high as number);
+        notify?.('success', `${t('success.norm_loaded_from_catalog')}: ${range.text || ''}`);
       } else {
-        notify('info', t('errors.no_norm_in_catalog'));
+        notify?.('info', t('errors.no_norm_in_catalog'));
       }
     } catch (e) {
-      notify('error', `${t('errors.catalog_load_error')}: ${e.message}`);
+      notify?.('error', `${t('errors.catalog_load_error')}: ${(e as Error).message}`);
     }
   }
 
@@ -411,60 +414,61 @@ export default function LabTemplateWorkbench({
     }));
   }
 
-  function addField(sectionIndex) {
+  function addField(sectionIndex: number) {
     setDraftVersion((prev) => ({
       ...prev,
-      sections: prev.sections.map((section, index) => (
+      sections: prev.sections.map((section: Record<string, unknown>, index: number) => (
         index === sectionIndex
-          ? { ...section, fields: [...section.fields, blankField()] }
+          ? { ...section, fields: [...((section.fields as Record<string, unknown>[]) || []), blankField()] }
           : section
       ))
     }));
   }
 
-  function removeField(sectionIndex, fieldIndex) {
+  function removeField(sectionIndex: number, fieldIndex: number) {
     setDraftVersion((prev) => ({
       ...prev,
-      sections: prev.sections.map((section, index) => (
+      sections: prev.sections.map((section: Record<string, unknown>, index: number) => (
         index === sectionIndex
-          ? { ...section, fields: section.fields.filter((_, nestedIndex) => nestedIndex !== fieldIndex) }
+          ? { ...section, fields: (section.fields as Record<string, unknown>[]).filter((_, nestedIndex: number) => nestedIndex !== fieldIndex) }
           : section
       ))
     }));
   }
 
-  function removeSection(sectionIndex) {
+  function removeSection(sectionIndex: number) {
     setDraftVersion((prev) => ({
       ...prev,
-      sections: prev.sections.filter((_, index) => index !== sectionIndex)
+      sections: prev.sections.filter((_: Record<string, unknown>, index: number) => index !== sectionIndex)
     }));
   }
 
-  function duplicateField(sectionIndex, fieldIndex) {
+  function duplicateField(sectionIndex: number, fieldIndex: number) {
     setDraftVersion((prev) => ({
       ...prev,
-      sections: prev.sections.map((section, index) => {
+      sections: prev.sections.map((section: Record<string, unknown>, index: number) => {
         if (index !== sectionIndex) return section;
-        const fieldToClone = section.fields[fieldIndex];
+        const fields = section.fields as Record<string, unknown>[];
+        const fieldToClone = fields[fieldIndex];
         if (!fieldToClone) return section;
         const cloned = {
           ...fieldToClone,
           field_key: `${fieldToClone.field_key || 'field'}_copy_${Date.now()}`,
-          label: t('misc.ltw_fieldtoclone_label_pole_kopi', { label: fieldToClone.label || 'Поле' }),
+          label: t('misc.ltw_fieldtoclone_label_pole_kopi', { label: (fieldToClone.label as string) || 'Поле' }),
         };
-        const newFields = [...section.fields];
+        const newFields = [...fields];
         newFields.splice(fieldIndex + 1, 0, cloned);
         return { ...section, fields: newFields };
       })
     }));
   }
 
-  function moveField(sectionIndex, fieldIndex, direction) {
+  function moveField(sectionIndex: number, fieldIndex: number, direction: 'up' | 'down') {
     setDraftVersion((prev) => ({
       ...prev,
-      sections: prev.sections.map((section, index) => {
+      sections: prev.sections.map((section: Record<string, unknown>, index: number) => {
         if (index !== sectionIndex) return section;
-        const newFields = [...section.fields];
+        const newFields = [...(section.fields as Record<string, unknown>[])];
         const targetIndex = direction === 'up' ? fieldIndex - 1 : fieldIndex + 1;
         if (targetIndex < 0 || targetIndex >= newFields.length) return section;
         [newFields[fieldIndex], newFields[targetIndex]] = [newFields[targetIndex], newFields[fieldIndex]];
@@ -473,7 +477,7 @@ export default function LabTemplateWorkbench({
     }));
   }
 
-  function moveSection(sectionIndex, direction) {
+  function moveSection(sectionIndex: number, direction: 'up' | 'down') {
     setDraftVersion((prev) => {
       const newSections = [...prev.sections];
       const targetIndex = direction === 'up' ? sectionIndex - 1 : sectionIndex + 1;
@@ -526,7 +530,7 @@ export default function LabTemplateWorkbench({
           </div>
 
           <div className="ltw-grid-8">
-            {templates
+            {((templates as unknown as Record<string, unknown>[]) || [])
               .filter((t: Record<string, unknown>) => {
                 if (!templateSearch.trim()) return true;
                 const q = templateSearch.trim().toLowerCase();
@@ -536,14 +540,14 @@ export default function LabTemplateWorkbench({
               <button
                 key={String(template.id ?? "")}
                 type="button"
-                onClick={() => onSelectTemplate(template as Record<string, unknown>)}
+                onClick={() => onSelectTemplate?.(template as Record<string, unknown>)}
                 className={`ltw-template-btn ${String(selectedTemplate?.id ?? "") === String(template.id ?? "") ? 'ltw-template-btn-selected' : ''}`}
               >
                 <div className="ltw-fw-600">{String(template.name ?? "")}</div>
                 <div className="ltw-text-13 ltw-text-secondary">{String(template.code ?? "")} • {String(template.family ?? "")}</div>
                 <div className="ltw-flex-gap-6">
-                  {template.published_version_id && <Badge variant="success">{t('misc.ltw_opublikovan')}</Badge>}
-                  {template.draft_version_id && <Badge variant="warning">{t('misc.ltw_chernovik')}</Badge>}
+                  {Boolean(template.published_version_id) && <Badge variant="success">{t('misc.ltw_opublikovan')}</Badge>}
+                  {Boolean(template.draft_version_id) && <Badge variant="warning">{t('misc.ltw_chernovik')}</Badge>}
                 </div>
               </button>
             ))}
@@ -584,7 +588,7 @@ export default function LabTemplateWorkbench({
                     });
                     if (!ok) return;
                     setDraftVersion(hydrateVersion(activeVersion));
-                    notify('success', t('misc.ltw_chernovik_vosstanovlen_iz_se'));
+                    notify?.('success', t('misc.ltw_chernovik_vosstanovlen_iz_se'));
                   }}
                   disabled={saving || !activeVersion}
                   title={t('misc.ltw_otmenit_izmeneniya_i_vosstan')}
@@ -616,14 +620,14 @@ export default function LabTemplateWorkbench({
               <div className="ltw-badges-row">
                 <Badge variant="info">{String(selectedTemplate.code ?? "")}</Badge>
                 <Badge variant="primary">{String(selectedTemplate.family ?? "")}</Badge>
-                {(activeVersion as Record<string, unknown>)?.status && <Badge variant={(activeVersion as Record<string, unknown>)?.status === 'PUBLISHED' ? 'success' : 'warning'}>{formatVersionStatus(String((activeVersion as Record<string, unknown>)?.status))}</Badge>}
+                {Boolean((activeVersion as Record<string, unknown>)?.status) && <Badge variant={(activeVersion as Record<string, unknown>)?.status === 'PUBLISHED' ? 'success' : 'warning'}>{formatVersionStatus(String((activeVersion as Record<string, unknown>)?.status))}</Badge>}
               </div>
 
               {/* L-M-7 fix: заменён aria-pressed на role=tablist + role=tab + aria-selected.
                   Согласованность с LabPanel.jsx (там тоже role=tablist).
                   Keyboard-навигация: стрелки вправо/лево, Home, End. */}
               <div className="ltw-tab-bar ltw-tablist" role="tablist" aria-label={t('misc.ltw_redaktor_shablona')}>
-                {EDITOR_TABS.map((tab) => {
+                {EDITOR_TABS.map((tab: { id: string; label: string }) => {
                   const isActive = editorTab === tab.id;
                   return (
                     <button
@@ -636,8 +640,8 @@ export default function LabTemplateWorkbench({
                       tabIndex={isActive ? 0 : -1}
                       onClick={() => setEditorTab(tab.id)}
                       onKeyDown={(e: React.KeyboardEvent<HTMLElement>) => {
-                        const idx = EDITOR_TABS.findIndex((t) => t.id === tab.id);
-                        let nextIdx = null;
+                        const idx = EDITOR_TABS.findIndex((tt) => tt.id === tab.id);
+                        let nextIdx: number | null = null;
                         if (e.key === 'ArrowRight' || e.key === 'ArrowDown') nextIdx = (idx + 1) % EDITOR_TABS.length;
                         else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') nextIdx = (idx - 1 + EDITOR_TABS.length) % EDITOR_TABS.length;
                         else if (e.key === 'Home') nextIdx = 0;
@@ -721,16 +725,16 @@ export default function LabTemplateWorkbench({
 
       {/* UX-AUDIT-FIX14: ID datalist теперь уникальны per-instance (useId) */}
       <datalist id={analyteCatalogId}>
-        {catalogAnalytes.map((analyte) => (
-          <option key={analyte.code} value={analyte.code}>
-            {analyte.name}
+        {catalogAnalytes.map((analyte: Record<string, unknown>) => (
+          <option key={String(analyte.code ?? '')} value={String(analyte.code ?? '')}>
+            {String(analyte.name ?? '')}
           </option>
         ))}
       </datalist>
       <datalist id={unitCatalogId}>
-        {catalogUnits.map((unit) => (
-          <option key={unit.code} value={unit.code}>
-            {unit.symbol}
+        {catalogUnits.map((unit: Record<string, unknown>) => (
+          <option key={String(unit.code ?? '')} value={String(unit.code ?? '')}>
+            {String(unit.symbol ?? '')}
           </option>
         ))}
       </datalist>
