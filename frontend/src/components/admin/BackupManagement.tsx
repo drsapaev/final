@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import type { CSSProperties } from 'react';
 import {
   HardDrive,
@@ -29,20 +29,41 @@ import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 
-const emptyBackupStats = {
+interface BackupRecord {
+  id?: string | number;
+  name?: string;
+  description?: string | null;
+  notes?: string | null;
+  backup_type?: string;
+  status?: string;
+  file_path?: string | null;
+  file_size?: number | string | null;
+  retention_days?: number | string;
+  created_at?: string | number | Date | null;
+  [key: string]: unknown;
+}
+
+interface BackupStats {
+  total_backups: number;
+  completed_backups: number;
+  failed_backups: number;
+  total_size: number;
+}
+
+const emptyBackupStats: BackupStats = {
   total_backups: 0,
   completed_backups: 0,
   failed_backups: 0,
   total_size: 0
 };
 
-const deriveBackupStats = (backupList) => {
-  const nextBackups = Array.isArray(backupList) ? backupList : [];
+const deriveBackupStats = (backupList: unknown): BackupStats => {
+  const nextBackups = (Array.isArray(backupList) ? backupList : []) as BackupRecord[];
   return {
     total_backups: nextBackups.length,
     completed_backups: nextBackups.filter((backup) => backup.status === 'completed').length,
     failed_backups: nextBackups.filter((backup) => backup.status === 'failed').length,
-    total_size: nextBackups.reduce((sum, backup) => sum + (backup.file_size || 0), 0)
+    total_size: nextBackups.reduce((sum, backup) => sum + Number(backup.file_size || 0), 0)
   };
 };
 
@@ -63,14 +84,14 @@ const defaultBackupForm: Record<string, unknown> = {
 const BackupManagement = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [backups, setBackups] = useState([]);
+  const [backups, setBackups] = useState<BackupRecord[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
   const [showAddForm, setShowAddForm] = useState(false);
-  const [editingBackup, setEditingBackup] = useState(null);
-  const [message, setMessage] = useState({ type: '', text: '' });
-  const [stats, setStats] = useState(null);
+  const [editingBackup, setEditingBackup] = useState<BackupRecord | null>(null);
+  const [message, setMessage] = useState<{ type: string; text: string }>({ type: '', text: '' });
+  const [stats, setStats] = useState<BackupStats | null>(null);
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
 
@@ -104,12 +125,12 @@ const BackupManagement = () => {
     try {
       setLoading(true);
       const response = (await api.get('/clinic/backups')) as import('axios').AxiosResponse<Record<string, unknown>>;
-      const nextBackups = Array.isArray(response.data)
-        ? (response.data as unknown[])
-        : (response.data?.backups as unknown[]) || [];
+      const nextBackups: BackupRecord[] = Array.isArray(response.data)
+        ? (response.data as BackupRecord[])
+        : ((response.data?.backups as BackupRecord[]) || []);
       setBackups(nextBackups);
       setStats(deriveBackupStats(nextBackups));
-    } catch (error) {
+    } catch (error: unknown) {
       logger.error('Ошибка загрузки резервных копий:', error);
       setBackups([]);
       setStats(emptyBackupStats);
@@ -122,7 +143,7 @@ const BackupManagement = () => {
     loadBackups();
   }, [loadBackups]);
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     try {
       setSaving(true);
@@ -146,7 +167,7 @@ const BackupManagement = () => {
     }
   };
 
-  const handleEdit = (backup) => {
+  const handleEdit = (backup: BackupRecord) => {
     setFormData({
       ...defaultBackupForm,
       ...backup,
@@ -156,7 +177,7 @@ const BackupManagement = () => {
     setShowAddForm(true);
   };
 
-  const handleDelete = async (backupId) => {
+  const handleDelete = async (backupId: string | number) => {
     try {
       await api.delete(`/clinic/backups/${backupId}`);
       setMessage({ type: 'success', text: t('admin2.bk_msg_deleted') });
@@ -192,31 +213,33 @@ const BackupManagement = () => {
     });
   };
 
-  const getStatusColor = (status) => {
+  const getStatusColor = (status: string): string => {
     const statusOption = statusOptions.find((s) => s.value === status);
     return statusOption ? statusOption.color : 'gray';
   };
 
-  const getStatusLabel = (status) => {
+  const getStatusLabel = (status: string): string => {
     const statusOption = statusOptions.find((s) => s.value === status);
     return statusOption ? statusOption.label : status;
   };
 
-  const getTypeLabel = (type) => {
+  const getTypeLabel = (type: string): string => {
     const typeOption = typeOptions.find((t) => t.value === type);
     return typeOption ? typeOption.label : type;
   };
 
-  const formatFileSize = (bytes) => {
-    if (!bytes || bytes <= 0) return '0 Bytes';
+  const formatFileSize = (bytes: number | string | null | undefined): string => {
+    const numericBytes = Number(bytes || 0);
+    if (!numericBytes || numericBytes <= 0) return '0 Bytes';
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    const i = Math.floor(Math.log(numericBytes) / Math.log(k));
+    const safeIndex = Math.min(i, sizes.length - 1);
+    return parseFloat((numericBytes / Math.pow(k, safeIndex)).toFixed(2)) + ' ' + sizes[safeIndex];
   };
 
   const filteredBackups = backups.filter((backup) => {
-    const matchesSearch = backup.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const matchesSearch = (backup.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     backup.description?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || backup.status === statusFilter;
     const matchesType = typeFilter === 'all' || backup.backup_type === typeFilter;
@@ -506,12 +529,12 @@ const BackupManagement = () => {
                     {backup.name}
                   </h3>
                   <p className="admin-fs-sm-secondary-m-0-2">
-                    {getTypeLabel(backup.backup_type)} • {t('admin2.bk_retention_inline', { days: backup.retention_days })}
+                    {getTypeLabel(backup.backup_type || '')} • {t('admin2.bk_retention_inline', { days: backup.retention_days })}
                   </p>
                 </div>
                 <Badge
-              variant={getStatusColor(backup.status)}
-              text={getStatusLabel(backup.status)} />
+              variant={getStatusColor(backup.status || '')}
+              text={getStatusLabel(backup.status || '')} />
             
               </div>
 
@@ -522,7 +545,7 @@ const BackupManagement = () => {
                 </div>
                 <div className="admin-d-flex-ai-center-gap-8-fs-sm-secondary-10">
                   <Calendar aria-hidden="true" className="w-4 h-4" />
-                  <span>{new Date(backup.created_at).toLocaleString()}</span>
+                  <span>{new Date(backup.created_at ?? Date.now()).toLocaleString()}</span>
                 </div>
                 <div className="admin-d-flex-ai-center-gap-8-fs-sm-secondary-9">
                   <Clock aria-hidden="true" className="w-4 h-4" />
@@ -557,7 +580,7 @@ const BackupManagement = () => {
               type="button"
               variant="outline"
               aria-label={t('admin2.bk_row_delete_aria', { name: backup.name })}
-              onClick={() => handleDelete(backup.id)}
+              onClick={() => handleDelete(backup.id ?? '')}
               className="admin-p-6px-12px-error-bd-c-error-2">
               
                   <Trash2 aria-hidden="true" className="w-4 h-4" />

@@ -45,27 +45,63 @@ import {
 import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
+import type { SelectChangeEvent } from '../ui/macos/Select';
+
+interface ProcedureMaterial {
+  name: string;
+  unit: string;
+  quantity: number | string;
+}
+
+interface ProcedureTemplate {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+  duration: number;
+  price: number | string;
+  materials: ProcedureMaterial[];
+  steps: string[];
+  contraindications: string[];
+  aftercare: string;
+}
+
+interface TemplateForm {
+  name: string;
+  category: string;
+  description: string;
+  duration: number;
+  price: string;
+  materials: ProcedureMaterial[];
+  steps: string[];
+  contraindications: string[];
+  aftercare: string;
+}
+
+const createEmptyForm = (): TemplateForm => ({
+  name: '',
+  category: 'injection',
+  description: '',
+  duration: 30,
+  price: '',
+  materials: [],
+  steps: [],
+  contraindications: [],
+  aftercare: ''
+});
+
 const ProcedureTemplates = ({ onSelectProcedure, visitId }: { onSelectProcedure?: (procedure: unknown) => void; visitId?: string | number }) => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
-  const [templates, setTemplates] = useState([]);
-  const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const [templates, setTemplates] = useState<ProcedureTemplate[]>([]);
+  const [selectedTemplate, setSelectedTemplate] = useState<ProcedureTemplate | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [expandedCategory, setExpandedCategory] = useState('all');
 
   // Форма для создания/редактирования шаблона
-  const [templateForm, setTemplateForm] = useState({
-    name: '',
-    category: 'injection',
-    description: '',
-    duration: 30,
-    price: '',
-    materials: [],
-    steps: [],
-    contraindications: [],
-    aftercare: ''
-  });
+  const [templateForm, setTemplateForm] = useState<TemplateForm>(createEmptyForm());
+  void visitId;
 
   // Категории процедур
   const categories = [
@@ -172,7 +208,7 @@ const ProcedureTemplates = ({ onSelectProcedure, visitId }: { onSelectProcedure?
 
       // Для демо используем предустановленные
       setTemplates(defaultTemplatesRef.current);
-    } catch (error) {
+    } catch (error: unknown) {
       logger.error('Ошибка загрузки шаблонов:', error);
     }
   }, []);
@@ -185,10 +221,10 @@ const ProcedureTemplates = ({ onSelectProcedure, visitId }: { onSelectProcedure?
   // Фильтрация шаблонов по категории
   const filteredTemplates = expandedCategory === 'all' ?
   templates :
-  templates.filter((t) => t.category === expandedCategory);
+  templates.filter((tpl) => tpl.category === expandedCategory);
 
   // Выбор шаблона
-  const handleSelectTemplate = (template) => {
+  const handleSelectTemplate = (template: ProcedureTemplate) => {
     setSelectedTemplate(template);
     if (onSelectProcedure) {
       onSelectProcedure({
@@ -205,24 +241,24 @@ const ProcedureTemplates = ({ onSelectProcedure, visitId }: { onSelectProcedure?
   // Открыть диалог создания
   const handleCreateNew = () => {
     setEditMode(false);
-    setTemplateForm({
-      name: '',
-      category: 'injection',
-      description: '',
-      duration: 30,
-      price: '',
-      materials: [],
-      steps: [],
-      contraindications: [],
-      aftercare: ''
-    });
+    setTemplateForm(createEmptyForm());
     setDialogOpen(true);
   };
 
   // Редактировать шаблон
-  const handleEdit = (template) => {
+  const handleEdit = (template: ProcedureTemplate) => {
     setEditMode(true);
-    setTemplateForm(template);
+    setTemplateForm({
+      name: template.name,
+      category: template.category,
+      description: template.description,
+      duration: template.duration,
+      price: String(template.price ?? ''),
+      materials: template.materials,
+      steps: template.steps,
+      contraindications: template.contraindications,
+      aftercare: template.aftercare
+    });
     setDialogOpen(true);
   };
 
@@ -261,7 +297,7 @@ const ProcedureTemplates = ({ onSelectProcedure, visitId }: { onSelectProcedure?
   };
 
   // Иконка категории
-  const getCategoryIcon = (category) => {
+  const getCategoryIcon = (category: string) => {
     switch (category) {
       case 'injection':return <Sparkles />;
       case 'hardware':return <Sparkles />;
@@ -347,7 +383,7 @@ const ProcedureTemplates = ({ onSelectProcedure, visitId }: { onSelectProcedure?
                         </Badge>
                         <Badge variant="success">
                           <DollarSign style={{ width: 12, height: 12, marginRight: 4 }} />
-                          {t('derma.derma_proc_price_display', { price: (template.price / 1000).toFixed(0) })}
+                          {t('derma.derma_proc_price_display', { price: (Number(template.price || 0) / 1000).toFixed(0) })}
                         </Badge>
                       </div>
                     </div>
@@ -478,7 +514,7 @@ const ProcedureTemplates = ({ onSelectProcedure, visitId }: { onSelectProcedure?
               <div style={{ fontSize: 12, color: 'var(--mac-text-secondary)', marginBottom: 6 }}>{t('derma.derma_proc_field_category')}</div>
               <Select
                 value={templateForm.category}
-                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setTemplateForm({ ...templateForm, category: e.target.value })}>
+                onChange={(e: SelectChangeEvent) => setTemplateForm({ ...templateForm, category: e.target.value })}>
                 
                 <Option value="injection">{t('derma.derma_proc_category_injection')}</Option>
                 <Option value="hardware">{t('derma.derma_proc_category_hardware')}</Option>
