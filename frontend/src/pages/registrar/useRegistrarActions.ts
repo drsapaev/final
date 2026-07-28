@@ -112,7 +112,7 @@ export const useRegistrarActions = ({ appointments, loadAppointments }) => {
     }
   }, [loadAppointments, runRegistrarRecordAction]);
 
-  const updateAppointmentStatus = useCallback(async (recordSelectionKey, status, reason = '', sourceRecord = null) => {
+  const updateAppointmentStatus = useCallback(async (recordSelectionKey: unknown, status: string, reason = '', sourceRecord: Record<string, unknown> | null = null) => {
     try {
       const record = sourceRecord || findRegistrarRecordBySelectionKey(appointments, recordSelectionKey);
       const requiredBackendAction = getRegistrarActionForStatus(status);

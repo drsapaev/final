@@ -46,7 +46,7 @@ import {
   isValidServiceCode } from '../../utils/serviceCodeUtils';
 import { notify } from '../../services/notify';
 
-const SERVICE_GROUP_PREFIXES = {
+const SERVICE_GROUP_PREFIXES: Record<string, string[]> = {
   cardiology: ['K'],
   ecg: ['K'],
   dermatology: ['D'],
@@ -55,7 +55,7 @@ const SERVICE_GROUP_PREFIXES = {
   procedures: ['C', 'P', 'O']
 };
 
-const SERVICE_GROUP_LABELS = {
+const SERVICE_GROUP_LABELS: Record<string, string> = {
   cardiology: 'sc_group_cardiology',
   ecg: 'sc_group_ecg',
   dermatology: 'sc_group_dermatology',
@@ -64,13 +64,68 @@ const SERVICE_GROUP_LABELS = {
   procedures: 'sc_group_procedures'
 };
 
-const getServiceGroupLabel = (groupKey, t) => {
+interface ServiceItem {
+  id: string | number;
+  name?: string;
+  category_id?: string | number;
+  specialty?: string;
+  department_key?: string;
+  service_code?: string;
+  code?: string;
+  price?: number | string;
+  currency?: string;
+  duration_minutes?: number | string;
+  doctor_id?: string | number;
+  active?: boolean;
+  queue_tag?: string;
+  requires_doctor?: boolean;
+  is_consultation?: boolean;
+  allow_doctor_price_override?: boolean;
+  [key: string]: unknown;
+}
+
+interface CategoryItem {
+  id: string | number;
+  name_ru: string;
+  specialty?: string;
+  [key: string]: unknown;
+}
+
+interface DoctorItem {
+  id: string | number;
+  user?: { id?: string | number; full_name?: string };
+  specialty?: string;
+  full_name?: string;
+  [key: string]: unknown;
+}
+
+interface DepartmentItem {
+  key: string;
+  name_ru?: string;
+  [key: string]: unknown;
+}
+
+interface QueueProfileItem {
+  key?: string;
+  queue_tags?: string[];
+  title_ru?: string;
+  title?: string;
+  is_active?: boolean;
+  [key: string]: unknown;
+}
+
+interface HistoryTarget {
+  serviceId: string | number;
+  serviceName: string;
+}
+
+const getServiceGroupLabel = (groupKey: string | null | undefined, t: (key: string) => string) => {
   if (!groupKey) return '';
   const labelKey = SERVICE_GROUP_LABELS[groupKey];
   return labelKey ? t(`admin2.${labelKey}`) : groupKey;
 };
 
-const SERVICE_GROUP_ALIASES = {
+const SERVICE_GROUP_ALIASES: Record<string, string> = {
   cardio: 'cardiology',
   cardiology: 'cardiology',
   derma: 'dermatology',
@@ -89,7 +144,7 @@ const SERVICE_GROUP_ALIASES = {
   cosmetology: 'procedures'
 };
 
-const resolveServiceGroup = ({ queueTag, departmentKey, categorySpecialty }) => {
+const resolveServiceGroup = ({ queueTag, departmentKey, categorySpecialty }: { queueTag?: unknown; departmentKey?: unknown; categorySpecialty?: unknown }) => {
   for (const rawValue of [queueTag, departmentKey, categorySpecialty]) {
     if (!rawValue) continue;
     const normalized = String(rawValue).trim().toLowerCase();
@@ -103,7 +158,7 @@ const resolveServiceGroup = ({ queueTag, departmentKey, categorySpecialty }) => 
   return null;
 };
 
-const getAllowedPrefixesForGroup = (groupKey) => SERVICE_GROUP_PREFIXES[groupKey] || [];
+const getAllowedPrefixesForGroup = (groupKey: string | null | undefined): string[] => SERVICE_GROUP_PREFIXES[groupKey || ''] || [];
 
 const ServiceCatalog = () => {
   // P-013 fix: shared ConfirmDialog hook (replaces native confirm()).
@@ -112,21 +167,21 @@ const ServiceCatalog = () => {
   const [confirmRaw, confirmDialog] = useConfirm();
   const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
   const [loading, setLoading] = useState(true);
-  const [services, setServices] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [doctors, setDoctors] = useState([]);
-  const [departments, setDepartments] = useState([]);
+  const [services, setServices] = useState<ServiceItem[]>([]);
+  const [categories, setCategories] = useState<CategoryItem[]>([]);
+  const [doctors, setDoctors] = useState<DoctorItem[]>([]);
+  const [departments, setDepartments] = useState<DepartmentItem[]>([]);
   // ⭐ SSOT: Queue profiles for dynamic queue_tag selection
-  const [queueProfiles, setQueueProfiles] = useState([]);
+  const [queueProfiles, setQueueProfiles] = useState<QueueProfileItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedSpecialty, setSelectedSpecialty] = useState('all');
   const [selectedDepartment, setSelectedDepartment] = useState('all');
-  const [editingService, setEditingService] = useState(null);
+  const [editingService, setEditingService] = useState<ServiceItem | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [showHistory, setShowHistory] = useState(null); // { serviceId, serviceName }
+  const [showHistory, setShowHistory] = useState<HistoryTarget | null>(null); // { serviceId, serviceName }
   const [showBatchEdit, setShowBatchEdit] = useState(false);
-  const [selectedServiceIds, setSelectedServiceIds] = useState(new Set());
+  const [selectedServiceIds, setSelectedServiceIds] = useState<Set<string | number>>(new Set());
   const [message, setMessage] = useState({ type: '', text: '' });
 
   // Иконки специальностей
@@ -208,7 +263,7 @@ const ServiceCatalog = () => {
   };
 
   const filteredServices = services.filter((service) => {
-    const matchesSearch = service.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = (service.name || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === 'all' || service.category_id === parseInt(selectedCategory);
     const matchesSpecialty = selectedSpecialty === 'all' ||
     categories.find((cat) => cat.id === service.category_id)?.specialty === selectedSpecialty;
@@ -217,25 +272,26 @@ const ServiceCatalog = () => {
     return matchesSearch && matchesCategory && matchesSpecialty && matchesDepartment;
   });
 
-  const handleSaveService = async (serviceData) => {
+  const handleSaveService = async (serviceData: Record<string, unknown>) => {
     try {
       logger.log('🔄 Отправляем данные услуги:', serviceData);
 
-      let savedService;
+      let savedService: Record<string, unknown>;
       if (editingService) {
         // ✅ ОПТИМИСТИЧНОЕ ОБНОВЛЕНИЕ: Обновляем UI сразу
-        const optimisticService = { ...editingService, ...serviceData };
+        const optimisticService: ServiceItem = { ...editingService, ...serviceData } as ServiceItem;
         setServices(prevServices =>
           prevServices.map(s => s.id === editingService.id ? optimisticService : s)
         );
 
         try {
           const response = (await api.put(`/services/${editingService.id}`, serviceData)) as import('axios').AxiosResponse<Record<string, unknown>>;
-          savedService = response.data;
+          savedService = response.data as Record<string, unknown>;
+          const savedServiceId = savedService.id as string | number;
 
           // Обновляем с реальными данными от сервера
           setServices(prevServices =>
-            prevServices.map(s => s.id === savedService.id ? savedService : s)
+            prevServices.map(s => s.id === savedServiceId ? { ...s, ...savedService } as ServiceItem : s)
           );
         } catch (error) {
           // ❌ ОТКАТ: Возвращаем старое состояние при ошибке
@@ -246,10 +302,11 @@ const ServiceCatalog = () => {
         }
       } else {
         const response = (await api.post('/services', serviceData)) as import('axios').AxiosResponse<Record<string, unknown>>;
-        savedService = response.data;
+        savedService = response.data as Record<string, unknown>;
+        const savedServiceItem = savedService as unknown as ServiceItem;
 
         // ✅ ОПТИМИСТИЧНОЕ ДОБАВЛЕНИЕ: Добавляем в список сразу
-        setServices(prevServices => [savedService, ...prevServices]);
+        setServices(prevServices => [savedServiceItem, ...prevServices]);
       }
 
       setMessage({
@@ -263,34 +320,37 @@ const ServiceCatalog = () => {
 
       // ✅ ПАРСИНГ ДЕТАЛЬНЫХ ОШИБОК ОТ BACKEND
       let errorMessage = t('admin2.sc_save_error_default');
-      const errorData = error.response?.data || {};
+      const errAny = error as Record<string, unknown> & { message?: string };
+      const errResponse = errAny?.response as Record<string, unknown> | undefined;
+      const errorData = (errResponse?.data as Record<string, unknown>) || {};
 
       if (errorData.detail) {
         if (typeof errorData.detail === 'string') {
           errorMessage = errorData.detail;
         } else if (Array.isArray(errorData.detail)) {
           // Pydantic validation errors
-          const errors = errorData.detail.map((err) => {
-            const field = err.loc ? err.loc.join('.') : 'unknown';
+          const errors = errorData.detail.map((err: Record<string, unknown>) => {
+            const loc = err.loc as unknown[] | undefined;
+            const field = loc ? loc.join('.') : 'unknown';
             return `${field}: ${err.msg}`;
           }).join('; ');
           errorMessage = t('admin2.sc_validation_error', { errors });
-        } else if (errorData.detail.message) {
-          errorMessage = errorData.detail.message;
+        } else if ((errorData.detail as { message?: string }).message) {
+          errorMessage = (errorData.detail as { message: string }).message;
         }
-      } else if (error.response?.status === 409) {
+      } else if (errResponse?.status === 409) {
         errorMessage = t('admin2.sc_code_conflict');
-      } else if (error.response?.status === 422) {
+      } else if (errResponse?.status === 422) {
         errorMessage = t('admin2.sc_invalid_format');
-      } else if (error.message) {
-        errorMessage = error.message;
+      } else if (errAny.message) {
+        errorMessage = errAny.message;
       }
 
       setMessage({ type: 'error', text: errorMessage });
     }
   };
 
-  const handleDeleteService = async (serviceId) => {
+  const handleDeleteService = async (serviceId: string | number) => {
     // P-013 fix: replaced native confirm() with shared useConfirm hook.
     const ok = await confirm({
       title: t('admin2.delete_service_title'),
@@ -313,41 +373,45 @@ const ServiceCatalog = () => {
       );
 
       const response = (await api.delete(`/services/${serviceId}`)) as import('axios').AxiosResponse<Record<string, unknown>>;
+      const responseData = response.data as Record<string, unknown>;
 
       // Обновляем с реальными данными от сервера
-      if (response.data.active === false) {
+      if (responseData.active === false) {
         setServices(prevServices =>
           prevServices.map(s => s.id === serviceId ? { ...s, active: false } : s)
         );
       }
 
-      setMessage({ type: 'success', text: String(response.data.message || t('admin2.sc_service_deleted')) });
+      setMessage({ type: 'success', text: String(responseData.message || t('admin2.sc_service_deleted')) });
     } catch (error) {
       // ❌ ОТКАТ: Возвращаем старое состояние при ошибке
       setServices(oldServices);
 
       logger.error('Ошибка удаления:', error);
-      setMessage({ type: 'error', text: error.response?.data?.detail || t('admin2.sc_delete_error_default') });
+      const errAny = error as Record<string, unknown> & { response?: { data?: { detail?: string } } };
+      setMessage({ type: 'error', text: errAny?.response?.data?.detail || t('admin2.sc_delete_error_default') });
     }
   };
 
-  const getCategoryName = (categoryId) => {
+  const getCategoryName = (categoryId: string | number | undefined) => {
+    if (categoryId === undefined) return t('admin2.sc_no_category');
     const category = categories.find((cat) => cat.id === categoryId);
     return category?.name_ru || t('admin2.sc_no_category');
   };
 
-  const getCategorySpecialty = (categoryId) => {
+  const getCategorySpecialty = (categoryId: string | number | undefined) => {
+    if (categoryId === undefined) return undefined;
     const category = categories.find((cat) => cat.id === categoryId);
     return category?.specialty;
   };
 
-  const getSpecialtyIcon = (specialty) => {
-    const IconComponent = specialtyIcons[specialty] || Package;
+  const getSpecialtyIcon = (specialty: string | undefined) => {
+    const IconComponent = specialtyIcons[specialty || ''] || Package;
     return IconComponent;
   };
 
-  const toggleServiceSelection = (serviceId) => {
-    const newSelected = new Set(selectedServiceIds);
+  const toggleServiceSelection = (serviceId: string | number) => {
+    const newSelected = new Set<string | number>(selectedServiceIds);
     if (newSelected.has(serviceId)) {
       newSelected.delete(serviceId);
     } else {
@@ -473,7 +537,7 @@ const ServiceCatalog = () => {
               onChange={(value: unknown) => setSelectedCategory(String(value))}
               options={[
               { value: 'all', label: t('admin2.sc_filter_category_all') },
-              ...categories.map((category: { id?: string | number; name_ru?: string; specialty?: string }) => ({
+              ...categories.map((category) => ({
                 value: category.id,
                 label: category.name_ru
               }))]
@@ -600,7 +664,7 @@ const ServiceCatalog = () => {
                   <SpecialtyIcon
                   size={20}
                   className="admin-specialty-icon-20"
-                  style={{ '--admin-icon-color': specialtyColors[specialty] || 'var(--mac-text-tertiary)' } as CSSProperties} />
+                  style={{ '--admin-icon-color': specialtyColors[specialty || ''] || 'var(--mac-text-tertiary)' } as CSSProperties} />
 
                   <div>
                     <div className="admin-service-name">
@@ -651,7 +715,7 @@ const ServiceCatalog = () => {
                   size="small"
                   variant="outline"
                   aria-label={`View change history for ${service.name}`}
-                  onClick={() => setShowHistory({ serviceId: service.id, serviceName: service.name })}
+                  onClick={() => setShowHistory({ serviceId: service.id, serviceName: service.name || String(service.id) })}
                   className="admin-icon-square-btn"
                   title={t('admin2.sc_action_history_title')}>
                     <History aria-hidden="true" size={14} />
@@ -761,7 +825,7 @@ const ServiceCatalog = () => {
 
 // Компонент формы услуги с вкладками
 // ⭐ SSOT: Redesigned with tabs for better UX, removed duplicate fields
-const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMessage, onSave, onCancel, departments }: { service?: Record<string, unknown>; categories?: unknown[]; doctors?: unknown[]; queueProfiles?: unknown[]; setMessage?: (msg: { type: string; text: string }) => void; onSave?: (serviceData: Record<string, unknown>) => Promise<void>; onCancel?: () => void; departments?: unknown[] }) => {
+const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMessage, onSave, onCancel, departments }: { service?: Record<string, unknown> | null; categories: CategoryItem[]; doctors: DoctorItem[]; queueProfiles: QueueProfileItem[]; setMessage: (msg: { type: string; text: string }) => void; onSave: (serviceData: Record<string, unknown>) => Promise<void> | void; onCancel: () => void; departments: DepartmentItem[] }) => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [activeTab, setActiveTab] = useState('basic'); // 'basic', 'queue', 'options'
@@ -823,8 +887,8 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
   }, [formData.code, service?.id, t]);
 
   const selectedFormCategory = categories.find(
-    (category: unknown) => (category as { id?: number })?.id === parseInt(String(formData.category_id), 10)
-  ) as { specialty?: string } | undefined;
+    (category) => category.id === parseInt(String(formData.category_id), 10)
+  );
   const selectedServiceGroup = resolveServiceGroup({
     queueTag: formData.queue_tag,
     departmentKey: formData.department_key,
@@ -1038,7 +1102,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
               onChange={(value: unknown) => handleChange('category_id', String(value))}
               options={[
               { value: '', label: t('admin2.sc_form_category_ph') },
-              ...categories.map((category: { id?: string | number; name_ru?: string; specialty?: string }) => ({
+              ...categories.map((category) => ({
                 value: category.id,
                 label: `${category.name_ru} (${category.specialty})`
               }))]
@@ -1090,7 +1154,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
               onChange={(value: unknown) => handleChange('doctor_id', String(value))}
               options={[
               { value: '', label: t('admin2.sc_form_doctor_all') },
-              ...doctors.map((doctor: { id?: string | number; user?: { id?: string | number; full_name?: string }; specialty?: string; full_name?: string }) => ({
+              ...doctors.map((doctor) => ({
                 value: doctor.id,
                 label: `${doctor.user?.full_name || t('admin2.sc_cell_doctor_default', { id: doctor.id })} (${doctor.specialty})`
               }))]
@@ -1118,15 +1182,15 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
               options={[
               { value: '', label: t('admin2.sc_form_queue_no_queue') },
               ...queueProfiles.
-              filter((profile: { is_active?: boolean; queue_tags?: string[]; key?: string; title_ru?: string; title?: string }) => profile.is_active !== false).
-              map((profile: { is_active?: boolean; queue_tags?: string[]; key?: string; title_ru?: string; title?: string }) => ({
-                value: profile.queue_tags?.[0] || profile.key,
-                label: profile.title_ru || profile.title
+              filter((profile) => profile.is_active !== false).
+              map((profile) => ({
+                value: profile.queue_tags?.[0] || profile.key || '',
+                label: profile.title_ru || profile.title || ''
               }))]
               } />
             </div>
 
-            {formData.queue_tag &&
+            {Boolean(formData.queue_tag) &&
           <div className="admin-success-banner-catalog">
                 <p className="admin-p-14-success-m0">
                   {t('admin2.sc_form_queue_active_hint_prefix')} <strong>{String(formData.queue_tag ?? '')}</strong>

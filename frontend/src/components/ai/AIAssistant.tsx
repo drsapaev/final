@@ -121,8 +121,8 @@ const AIAssistant = ({
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState(null);
-  const [error, setError] = useState(null);
+  const [result, setResult] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
   const [provider, setProvider] = useState('deepseek');
   const [retryCount, setRetryCount] = useState(0);
   const [isOpen, setIsOpen] = useState(expanded);
@@ -138,6 +138,7 @@ const AIAssistant = ({
   } : undefined);
 
   const analyzeData = async (manualRetry = false) => {
+    if (!data) return;
     setLoading(true);
     setError(null);
     if (!manualRetry) {
