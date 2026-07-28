@@ -11,9 +11,58 @@ import {
   Modal,
   Select,
 } from '../ui/macos';
+import type { SelectChangeEvent } from '../ui/macos/Select';
 import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
+
+interface DoctorUser {
+  id: string | number;
+  full_name?: string;
+  username?: string;
+  email?: string;
+  phone?: string;
+  role?: string;
+  is_active?: boolean;
+  linked_doctor_id?: string | number | null;
+}
+
+interface Doctor {
+  id?: string | number;
+  user_id?: string | number | null;
+  specialty?: string;
+  cabinet?: string;
+  price_default?: number | null;
+  start_number_online?: number | null;
+  max_online_per_day?: number | null;
+  active?: boolean;
+  user?: DoctorUser | null;
+}
+
+interface Department {
+  value: string;
+  label: string;
+}
+
+interface DoctorModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  doctor?: Doctor | null;
+  onSave: (data: Record<string, unknown>) => Promise<void> | void;
+  loading?: boolean;
+  availableUsers?: DoctorUser[];
+  departments?: Department[];
+}
+
+interface DoctorFormState {
+  userId: string;
+  specialty: string;
+  cabinet: string;
+  priceDefault: string;
+  startNumberOnline: string;
+  maxOnlinePerDay: string;
+  active: boolean;
+}
 
 const DoctorModal = ({
   isOpen,
@@ -23,9 +72,9 @@ const DoctorModal = ({
   loading = false,
   availableUsers = [],
   departments = [],
-}) => {
+}: DoctorModalProps) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
-  const [formData, setFormData] = useState<Record<string, any>>({
+  const [formData, setFormData] = useState<DoctorFormState>({
     userId: '',
     specialty: '',
     cabinet: '',
@@ -34,7 +83,7 @@ const DoctorModal = ({
     maxOnlinePerDay: '15',
     active: true,
   });
-  const [errors, setErrors] = useState<Record<string, any>>({});
+  const [errors, setErrors] = useState<Record<string, string | null>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -43,19 +92,19 @@ const DoctorModal = ({
     }
 
     setFormData({
-      userId: doctor?.user_id ? String(doctor.user_id) : '',
+      userId: doctor?.user_id != null ? String(doctor.user_id) : '',
       specialty: doctor?.specialty || '',
       cabinet: doctor?.cabinet || '',
       priceDefault:
-        doctor?.price_default === null || doctor?.price_default === undefined
+        doctor?.price_default == null
           ? ''
           : String(doctor.price_default),
       startNumberOnline:
-        doctor?.start_number_online === null || doctor?.start_number_online === undefined
+        doctor?.start_number_online == null
           ? '1'
           : String(doctor.start_number_online),
       maxOnlinePerDay:
-        doctor?.max_online_per_day === null || doctor?.max_online_per_day === undefined
+        doctor?.max_online_per_day == null
           ? '15'
           : String(doctor.max_online_per_day),
       active: doctor?.active !== false,
@@ -64,15 +113,15 @@ const DoctorModal = ({
     setSubmitError(null);
   }, [doctor, isOpen]);
 
-  const selectedUser = useMemo(() => {
+  const selectedUser = useMemo<DoctorUser | null>(() => {
     const fallbackUser = doctor?.user || null;
     const fromList = availableUsers.find(
       (item) => String(item.id) === String(formData.userId)
     );
-    return fromList || fallbackUser;
+    return fromList || fallbackUser || null;
   }, [availableUsers, doctor?.user, formData.userId]);
 
-  const selectedUserStatus = useMemo(() => {
+  const selectedUserStatus = useMemo<{ variant: string; label: string }>(() => {
     if (!selectedUser) return { variant: 'warning', label: t('admin2.dmdl_user_not_selected') };
     if (selectedUser.is_active === false) {
       return { variant: 'warning', label: t('admin2.dmdl_user_account_inactive') };
@@ -81,21 +130,21 @@ const DoctorModal = ({
       return { variant: 'warning', label: t('admin2.dmdl_user_already_linked', { id: selectedUser.linked_doctor_id }) };
     }
     return { variant: 'success', label: t('admin2.dmdl_user_link_active') };
-  }, [doctor?.id, selectedUser]);
+  }, [doctor?.id, selectedUser, t]);
 
   const userOptions = useMemo(
     () => [
       { value: '', label: t('admin2.dmdl_user_select_placeholder') },
       ...availableUsers.map((user) => ({
         value: String(user.id),
-        label: `${user.full_name || user.username} • ${user.role}${user.is_active ? '' : t('admin2.dmdl_user_inactive_suffix')}`,
+        label: `${user.full_name || user.username || ''} • ${user.role || ''}${user.is_active ? '' : t('admin2.dmdl_user_inactive_suffix')}`,
       })),
     ],
-    [availableUsers]
+    [availableUsers, t]
   );
 
   const validateForm = () => {
-    const nextErrors: Record<string, string> = {};
+    const nextErrors: Record<string, string | null> = {};
     if (!formData.userId) {
       nextErrors.userId = t('admin2.dmdl_err_user_required');
     }
@@ -119,14 +168,14 @@ const DoctorModal = ({
     return Object.keys(nextErrors).length === 0;
   };
 
-  const handleChange = (field, value) => {
+  const handleChange = <K extends keyof DoctorFormState>(field: K, value: DoctorFormState[K]) => {
     setFormData((current) => ({ ...current, [field]: value }));
     if (errors[field]) {
       setErrors((current) => ({ ...current, [field]: null }));
     }
   };
 
-  const handleSubmit = async (event) => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     event.stopPropagation();
 
@@ -145,12 +194,12 @@ const DoctorModal = ({
         active: formData.active,
       });
       onClose();
-    } catch (error) {
-      setSubmitError((error instanceof Error ? (error instanceof Error ? error.message : String(error)) : String(error)) || t('admin2.dmdl_err_save_fallback'));
+    } catch (error: unknown) {
+      setSubmitError((error instanceof Error ? error.message : String(error)) || t('admin2.dmdl_err_save_fallback'));
     }
   };
 
-  const renderFieldError = (field) =>
+  const renderFieldError = (field: keyof DoctorFormState) =>
     errors[field] ? (
       <div
         className="admin-field-error"
@@ -183,7 +232,7 @@ const DoctorModal = ({
           </Label>
           <Select
             value={formData.userId}
-            onChange={(value) => handleChange('userId', value)}
+            onChange={(e: SelectChangeEvent) => handleChange('userId', e.target.value)}
             options={userOptions}
             disabled={loading}
             size="large"
@@ -213,7 +262,7 @@ const DoctorModal = ({
         </div>
 
         <div className="admin-flex-wrap-8">
-          <Badge variant={selectedUserStatus.variant as unknown as "default" | "primary" | "secondary" | "success" | "warning" | "danger" | "info" | "outline"}>
+          <Badge variant={selectedUserStatus.variant}>
             {selectedUserStatus.label}
           </Badge>
           <Badge variant={formData.cabinet ? 'info' : 'warning'}>
@@ -231,7 +280,7 @@ const DoctorModal = ({
             {departments.length > 0 ? (
               <Select
                 value={formData.specialty}
-                onChange={(value) => handleChange('specialty', value)}
+                onChange={(e: SelectChangeEvent) => handleChange('specialty', e.target.value)}
                 options={[
                   { value: '', label: t('admin2.dmdl_select_department_placeholder') },
                   ...departments.map((d) => ({ value: d.value, label: d.label })),
@@ -304,7 +353,7 @@ const DoctorModal = ({
         <div>
           <Checkbox
             checked={formData.active}
-            onChange={(checked) => handleChange('active', checked)}
+            onChange={(checked: boolean) => handleChange('active', checked)}
             label={t('admin2.dmdl_active_label')}
             description={t('admin2.dmdl_active_description')}
           />

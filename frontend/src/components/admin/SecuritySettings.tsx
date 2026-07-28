@@ -26,17 +26,47 @@ import {
   SegmentedControl,
   MacOSCard,
 } from '../ui/macos';
+import type { SelectChangeEvent } from '../ui/macos/Select';
 import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
+import React from 'react';
+
+type SessionStatus = 'success' | 'failed' | 'blocked';
+type PasswordFieldKey = 'current' | 'new' | 'confirm';
+
+interface SecuritySettingsProps {
+  settings?: Record<string, unknown>;
+  onSave?: (formData: Record<string, unknown>, activeTab: string) => Promise<void> | void;
+  loading?: boolean;
+}
+
+interface ActiveSession {
+  id: string | number;
+  device: string;
+  current?: boolean;
+  location: string;
+  ip: string;
+  lastActive: string;
+}
+
+interface SecurityLog {
+  id: string | number;
+  status: SessionStatus | string;
+  action: string;
+  user: string;
+  ip: string;
+  timestamp: string;
+  details: string;
+}
 
 const SecuritySettings = ({
   settings = {},
   onSave,
   loading = false
-}) => {
+}: SecuritySettingsProps) => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<Record<string, unknown>>({
     // Пароль
     currentPassword: '',
     newPassword: '',
@@ -74,19 +104,19 @@ const SecuritySettings = ({
     backupFrequency: 'daily', // daily, weekly, monthly
     backupRetention: 30, // дни
     encryptBackups: true
-  } as Record<string, unknown>);
+  });
 
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [errors, setErrors] = useState<Record<string, string | null>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState('password');
-  const [showPasswords, setShowPasswords] = useState({
+  const [showPasswords, setShowPasswords] = useState<Record<PasswordFieldKey, boolean>>({
     current: false,
     new: false,
     confirm: false
   });
 
-  const [activeSessions] = useState([]);
-  const [securityLogs] = useState([]);
+  const [activeSessions] = useState<ActiveSession[]>([]);
+  const [securityLogs] = useState<SecurityLog[]>([]);
 
   // Инициализация формы
   useEffect(() => {
@@ -96,7 +126,7 @@ const SecuritySettings = ({
   }, [settings]);
 
   const validatePasswordForm = () => {
-    const newErrors: Record<string, string> = {};
+    const newErrors: Record<string, string | null> = {};
 
     if (!formData.currentPassword) {
       newErrors.currentPassword = t('admin2.ss_err_current_required');
@@ -122,7 +152,7 @@ const SecuritySettings = ({
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     if (activeTab === 'password' && !validatePasswordForm()) return;
@@ -136,25 +166,25 @@ const SecuritySettings = ({
     setIsSubmitting(true);
     try {
       await onSave(formData, activeTab);
-    } catch (error) {
+    } catch (error: unknown) {
       logger.error('Ошибка сохранения настроек безопасности:', error);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleChange = (field, value) => {
+  const handleChange = (field: string, value: unknown) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: null }));
     }
   };
 
-  const togglePasswordVisibility = (field) => {
+  const togglePasswordVisibility = (field: PasswordFieldKey) => {
     setShowPasswords((prev) => ({ ...prev, [field]: !prev[field] }));
   };
 
-  const terminateSession = (sessionId) => {
+  const terminateSession = (sessionId: string | number) => {
     // Логика завершения сессии
     logger.log('Terminating session:', sessionId);
   };
@@ -164,34 +194,34 @@ const SecuritySettings = ({
     logger.log('Terminating all other sessions');
   };
 
-  const getStatusIcon = (status) => {
+  const getStatusIcon = (status: string) => {
     const iconMap = {
       success: CheckCircle,
       failed: AlertCircle,
       blocked: Ban
     };
-    return iconMap[status] || AlertCircle;
+    return iconMap[status as keyof typeof iconMap] || AlertCircle;
   };
 
-  const getStatusColor = (status) => {
+  const getStatusColor = (status: string) => {
     const colorMap = {
       success: 'var(--mac-success)',
       failed: 'var(--mac-danger)',
       blocked: 'var(--mac-warning)'
     };
-    return colorMap[status] || 'var(--mac-text-secondary)';
+    return colorMap[status as keyof typeof colorMap] || 'var(--mac-text-secondary)';
   };
 
-  const getStatusLabel = (status) => {
+  const getStatusLabel = (status: string) => {
     const labelMap = {
       success: t('admin2.ss_status_success'),
       failed: t('admin2.ss_status_failed'),
       blocked: t('admin2.ss_status_blocked')
     };
-    return labelMap[status] || status;
+    return labelMap[status as keyof typeof labelMap] || status;
   };
 
-  const formatDateTime = (dateString) => {
+  const formatDateTime = (dateString: string | number | Date) => {
     return new Date(dateString).toLocaleString('ru-RU');
   };
 
@@ -344,18 +374,18 @@ const SecuritySettings = ({
                 </div>
                 <Checkbox
                 checked={Boolean(formData.twoFactorEnabled ?? false)}
-                onChange={(checked) => handleChange('twoFactorEnabled', checked)} />
+                onChange={(checked: boolean) => handleChange('twoFactorEnabled', checked)} />
               
               </div>
 
-              {formData.twoFactorEnabled &&
+              {Boolean(formData.twoFactorEnabled) &&
             <div>
                   <label className="admin-block-sm-med-mb-8-primary">
                     {t('admin2.ss_label_2fa_method')}
                   </label>
                   <Select
                 value={String(formData.twoFactorMethod ?? '')}
-                onChange={(value) => handleChange('twoFactorMethod', value)}
+                onChange={(e: SelectChangeEvent) => handleChange('twoFactorMethod', e.target.value)}
                 options={[
                 { value: 'sms', label: 'SMS' },
                 { value: 'email', label: 'Email' },
@@ -496,25 +526,25 @@ const SecuritySettings = ({
             <div className="flex flex-col gap-4">
               <Checkbox
               checked={Boolean(formData.passwordRequireUppercase ?? false)}
-              onChange={(checked) => handleChange('passwordRequireUppercase', checked)}
+              onChange={(checked: boolean) => handleChange('passwordRequireUppercase', checked)}
               label={t('admin2.ss_label_require_uppercase')} />
             
 
               <Checkbox
               checked={Boolean(formData.passwordRequireNumbers ?? false)}
-              onChange={(checked) => handleChange('passwordRequireNumbers', checked)}
+              onChange={(checked: boolean) => handleChange('passwordRequireNumbers', checked)}
               label={t('admin2.ss_label_require_numbers')} />
             
 
               <Checkbox
               checked={Boolean(formData.passwordRequireSymbols ?? false)}
-              onChange={(checked) => handleChange('passwordRequireSymbols', checked)}
+              onChange={(checked: boolean) => handleChange('passwordRequireSymbols', checked)}
               label={t('admin2.ss_label_require_symbols')} />
             
 
               <Checkbox
               checked={Boolean(formData.blockSuspiciousIPs ?? false)}
-              onChange={(checked) => handleChange('blockSuspiciousIPs', checked)}
+              onChange={(checked: boolean) => handleChange('blockSuspiciousIPs', checked)}
               label={t('admin2.ss_label_block_suspicious_ips')} />
             
             </div>
@@ -539,7 +569,7 @@ const SecuritySettings = ({
               return (
                 <div key={log.id} className="admin-flex-ai-center-jc-between-p-16-radius-var--mac-radius-md-bd-1solidvar-mac--d38da58b">
                     <div className="admin-flex-ai-center-gap-16">
-                      <StatusIcon className="admin-w-20-h-20" style={{ '--admin-color': getStatusColor(log.status) }} />
+                      <StatusIcon className="admin-w-20-h-20" style={{ '--admin-color': getStatusColor(log.status) } as React.CSSProperties} />
                       <div>
                         <p className="admin-base-med-primary-m-0">
                           {log.action}
