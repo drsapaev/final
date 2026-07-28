@@ -32,10 +32,13 @@ const apiMock = api as unknown as {
   delete: ReturnType<typeof vi.fn>;
 };
 
-// localStorage spies so .mockImplementation and toHaveBeenCalledWith work.
-const localStorageGetItem = vi.spyOn(Storage.prototype, 'getItem');
-const localStorageSetItem = vi.spyOn(Storage.prototype, 'setItem');
-const localStorageRemoveItem = vi.spyOn(Storage.prototype, 'removeItem');
+// localStorage refs so .mockImplementation and toHaveBeenCalledWith work.
+// The global test setup (src/test/setup.ts) replaces window.localStorage
+// with a store-backed vi.fn() mock, so we reference those mock functions
+// directly instead of spying on Storage.prototype.
+const localStorageGetItem = localStorage.getItem as unknown as ReturnType<typeof vi.fn>;
+const localStorageSetItem = localStorage.setItem as unknown as ReturnType<typeof vi.fn>;
+const localStorageRemoveItem = localStorage.removeItem as unknown as ReturnType<typeof vi.fn>;
 
 interface FinanceTransaction {
   id: number;
@@ -266,9 +269,11 @@ describe('useFinance', () => {
     });
 
     expect(result.current.allTransactions).toHaveLength(0);
+    // BS-36: deletedIds are now stored as { id, deletedAt } entries (not bare numbers)
+    // so the persisted cache contains an entry with id:777.
     expect(localStorageSetItem).toHaveBeenCalledWith(
       CACHE_KEY,
-      expect.stringContaining('"deletedIds":[777]')
+      expect.stringContaining('"id":777')
     );
 
     unmount();
