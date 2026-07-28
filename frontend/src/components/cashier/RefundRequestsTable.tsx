@@ -30,7 +30,7 @@ import PropTypes from 'prop-types';
 // UX Audit #3.4: inline-стили перенесены в CSS-классы.
 import './RefundRequestsTable.css';
 
-const getRefundFilterOptions = (t) => [
+const getRefundFilterOptions = (t: RefundTranslationFn) => [
   { value: 'all', label: t('misc.rrt_filter_all') },
   { value: 'pending', label: t('misc.rrt_filter_pending') },
   { value: 'approved', label: t('misc.rrt_filter_approved') },
@@ -42,13 +42,40 @@ const getRefundFilterOptions = (t) => [
 // Раньше было 8 объектов style={...}, что не консистентно с остальным UI
 // и усложняло поддержку тёмной темы.
 
+// Minimal translation fn signature accepted by the helpers below. Mirrors the
+// `useTranslation` adapter shape without coupling this file to its concrete type.
+export type RefundTranslationFn = (key: string, options?: Record<string, unknown>) => string;
+
+// Shape of a refund request row surfaced by `/force-majeure/refund-requests`.
+// All fields are optional because the backend may omit context fields depending
+// on the request status and the caller's permissions.
+export interface RefundRequest {
+  id?: string | number;
+  patient_id?: string | number;
+  patient_name?: string;
+  amount?: number | string;
+  refund_type?: string;
+  reason?: string;
+  status?: string;
+  created_at?: string;
+  available_actions?: unknown[];
+  can_approve?: boolean;
+  can_reject?: boolean;
+  can_complete?: boolean;
+  [key: string]: unknown;
+}
+
+export interface RefundRequestsTableProps {
+  onRefresh?: () => void;
+}
+
 const REFUND_ACTION_CAN_FIELD = {
   approve: 'can_approve',
   reject: 'can_reject',
   complete: 'can_complete'
 };
 
-const hasBackendRefundAction = (request, action) => {
+const hasBackendRefundAction = (request: RefundRequest | null | undefined, action: string): boolean => {
   const normalizedAction = String(action || '').trim().toLowerCase();
   if (!normalizedAction) {
     return false;
@@ -56,24 +83,24 @@ const hasBackendRefundAction = (request, action) => {
 
   if (Array.isArray(request?.available_actions)) {
     return request.available_actions.some(
-      (availableAction) => String(availableAction || '').trim().toLowerCase() === normalizedAction
+      (availableAction: unknown) => String(availableAction || '').trim().toLowerCase() === normalizedAction
     );
   }
 
-  const canField = REFUND_ACTION_CAN_FIELD[normalizedAction];
-  if (canField && Object.prototype.hasOwnProperty.call(request || {}, canField)) {
+  const canField = REFUND_ACTION_CAN_FIELD[normalizedAction as keyof typeof REFUND_ACTION_CAN_FIELD];
+  if (canField && request && Object.prototype.hasOwnProperty.call(request, canField)) {
     return Boolean(request[canField]);
   }
 
   return false;
 };
 
-const RefundRequestsTable = ({ onRefresh }) => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
-  const [requests, setRequests] = useState([]);
+const RefundRequestsTable = ({ onRefresh }: RefundRequestsTableProps) => {
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as RefundTranslationFn;
+  const [requests, setRequests] = useState<RefundRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [processingId, setProcessingId] = useState(null);
+  const [processingId, setProcessingId] = useState<string | number | null>(null);
   const [filter, setFilter] = useState('all'); // 'all' | 'pending' | 'approved' | 'rejected' | 'completed'
 
   const getAuthToken = () => {
@@ -100,7 +127,7 @@ const RefundRequestsTable = ({ onRefresh }) => {
       });
 
       if (response.ok) {
-        const data = await response.json();
+        const data = await response.json() as RefundRequest[] | { requests?: RefundRequest[] };
         setRequests(Array.isArray(data) ? data : data.requests || []);
       } else {
         throw new Error('Failed to load refund requests');
@@ -117,7 +144,11 @@ const RefundRequestsTable = ({ onRefresh }) => {
     loadRequests();
   }, [loadRequests]);
 
-  const processRefundRequest = async (requestId, action, extraPayload = {}) => {
+  const processRefundRequest = async (
+    requestId: string | number,
+    action: string,
+    extraPayload: Record<string, unknown> = {}
+  ) => {
     setProcessingId(requestId);
     try {
       const token = getAuthToken();
@@ -147,21 +178,24 @@ const RefundRequestsTable = ({ onRefresh }) => {
   };
 
   // Approve request
-  const handleApprove = async (requestId) => {
+  const handleApprove = async (requestId: string | number | undefined) => {
+    if (requestId === undefined) return;
     await processRefundRequest(requestId, 'approve');
   };
 
   // Reject request
-  const handleReject = async (requestId, reason = t('misc.rrt_otkloneno_kassirom')) => {
+  const handleReject = async (requestId: string | number | undefined, reason: string = t('misc.rrt_otkloneno_kassirom')) => {
+    if (requestId === undefined) return;
     await processRefundRequest(requestId, 'reject', { rejection_reason: reason });
   };
 
   // Complete request (mark as refunded)
-  const handleComplete = async (requestId) => {
+  const handleComplete = async (requestId: string | number | undefined) => {
+    if (requestId === undefined) return;
     await processRefundRequest(requestId, 'complete');
   };
 
-  const getStatusBadge = (status) => {
+  const getStatusBadge = (status: unknown) => {
     const statusConfig = {
       pending: { variant: 'warning', label: t('misc.rrt_ozhidaet'), icon: Clock },
       approved: { variant: 'info', label: t('misc.rrt_odobreno'), icon: Check },
@@ -169,7 +203,9 @@ const RefundRequestsTable = ({ onRefresh }) => {
       completed: { variant: 'success', label: t('misc.rrt_vozvrascheno'), icon: CheckCircle }
     };
 
-    const config = statusConfig[status] || { variant: 'default', label: status, icon: Clock };
+    const config = (typeof status === 'string' && status in statusConfig
+      ? statusConfig[status as keyof typeof statusConfig]
+      : null) || { variant: 'default', label: String(status ?? ''), icon: Clock };
     const IconComponent = config.icon;
 
     return (
@@ -180,7 +216,7 @@ const RefundRequestsTable = ({ onRefresh }) => {
     );
   };
 
-  const getRefundTypeBadge = (type) => {
+  const getRefundTypeBadge = (type: unknown) => {
     return type === 'deposit' ? (
       <Badge variant="primary">{t('misc.rrt_na_depozit')}</Badge>
     ) : (
@@ -188,9 +224,9 @@ const RefundRequestsTable = ({ onRefresh }) => {
     );
   };
 
-  const formatDate = (dateStr) => {
+  const formatDate = (dateStr: unknown) => {
     if (!dateStr) return '—';
-    return new Date(dateStr).toLocaleDateString('ru-RU', {
+    return new Date(String(dateStr)).toLocaleDateString('ru-RU', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
@@ -200,9 +236,9 @@ const RefundRequestsTable = ({ onRefresh }) => {
   };
 
   // UX Audit #2.3: используем единый formatUZS из utils/formatCurrency.js.
-  const formatAmount = (amount) => amount ? formatUZS(amount) : '—';
+  const formatAmount = (amount: unknown) => amount ? formatUZS(amount as number | string) : '—';
 
-  const renderActions = (request) => {
+  const renderActions = (request: RefundRequest) => {
     if (processingId === request.id) {
       return (
         <span role="status" aria-live="polite" className="refund-inline-cluster">
@@ -263,12 +299,12 @@ const RefundRequestsTable = ({ onRefresh }) => {
     {
       key: 'id',
       title: 'ID',
-      render: (id) => <span className="refund-cell-text">#{id}</span>
+      render: (id: unknown) => <span className="refund-cell-text">#{String(id ?? '')}</span>
     },
     {
       key: 'patient_name',
       title: t('payment.col_patient'),
-      render: (_value, request) => (
+      render: (_value: unknown, request: RefundRequest) => (
         <span className="refund-inline-cluster">
           <User size={16 as unknown as "small" | "default" | "large" | "xlarge"} color="var(--mac-text-secondary)" aria-hidden="true" />
           <span>{request.patient_name || t('misc.rrt_patsient_request_patient_id', { patient_id: request.patient_id })}</span>
@@ -278,36 +314,36 @@ const RefundRequestsTable = ({ onRefresh }) => {
     {
       key: 'amount',
       title: t('payment.col_amount'),
-      render: (amount) => <span className="refund-cell-amount">{formatAmount(amount)}</span>
+      render: (amount: unknown) => <span className="refund-cell-amount">{formatAmount(amount)}</span>
     },
     {
       key: 'refund_type',
       title: t('payment.col_type'),
-      render: (type) => getRefundTypeBadge(type)
+      render: (type: unknown) => getRefundTypeBadge(type)
     },
     {
       key: 'reason',
       title: t('payment.col_reason'),
-      render: (reason) => (
-        <span className="refund-cell-reason" title={reason}>
-          {reason || '—'}
+      render: (reason: unknown) => (
+        <span className="refund-cell-reason" title={String(reason ?? '')}>
+          {reason ? String(reason) : '—'}
         </span>
       )
     },
     {
       key: 'status',
       title: t('payment.col_status'),
-      render: (status) => getStatusBadge(status)
+      render: (status: unknown) => getStatusBadge(status)
     },
     {
       key: 'created_at',
       title: t('payment.col_date'),
-      render: (createdAt) => <span className="refund-cell-muted">{formatDate(createdAt)}</span>
+      render: (createdAt: unknown) => <span className="refund-cell-muted">{formatDate(createdAt)}</span>
     },
     {
       key: 'actions',
       title: t('payment.col_actions'),
-      render: (_value, request) => renderActions(request)
+      render: (_value: unknown, request: RefundRequest) => renderActions(request)
     }
   ];
 

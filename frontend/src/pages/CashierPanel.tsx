@@ -67,10 +67,62 @@ const getLocalDateString = (date = new Date()) => {
   return `${year}-${month}-${day}`;
 };
 
+// STRAT#31 i18n: minimal translation fn signature accepted by the helpers below.
+// The real `t` from useTranslation accepts (key, params?) and returns string;
+// this loose signature keeps the helpers decoupled from the i18n adapter.
+export type CashierTranslationFn = (key: string, params?: Record<string, unknown>) => string;
+
+// Shape of a payment row surfaced by the cashier/payments endpoints.
+// All fields are optional because the backend returns different shapes for
+// grouped vs. direct payments, and the panel must tolerate both.
+export interface CashierPaymentRow {
+  id?: string | number;
+  payment_id?: string | number;
+  grouped_payments?: unknown[];
+  paid_at?: string;
+  created_at?: string;
+  date?: string;
+  time?: string;
+  currency?: string;
+  services_names?: unknown[];
+  services?: unknown[];
+  service?: unknown;
+  total_amount?: number | string;
+  amount?: number | string;
+  method?: string;
+  change_due?: number;
+  change?: number;
+  received_amount?: number;
+  receipt_no?: string;
+  status?: string;
+  patient?: unknown;
+  patient_name?: unknown;
+  patient_phone?: string;
+  patient_id?: string | number;
+  refunded_amount?: number;
+  available_actions?: unknown[];
+  can_cancel?: boolean;
+  can_refund?: boolean;
+  can_print_receipt?: boolean;
+  can_confirm?: boolean;
+  [key: string]: unknown;
+}
+
+// A payment identifier may be passed either as a primitive or as the row object.
+// `null` / `undefined` are permitted so helpers can be called from optional chains.
+export type CashierPaymentRowOrId = string | number | CashierPaymentRow | null | undefined;
+
+// Payment payload sent from PaymentWidget/CashPaymentModal to the panel handlers.
+export interface CashierPaymentData {
+  amount: number | string;
+  method: string;
+  note?: string;
+}
+
 // UX Audit #1.4: Quick date presets for typical financial reporting ranges.
 // Replaces single "Сегодня" button with a 4-option segmented control.
 // Saves cashier clicks when reconciling shifts (typical: «Вчера» / «Неделя»).
-const shiftDay = (days) => {
+const shiftDay = (days: number) => {
   const d = new Date();
   d.setDate(d.getDate() + days);
   return getLocalDateString(d);
@@ -88,27 +140,31 @@ const DATE_PRESETS = [
 // Вспомогательная функция для создания прозрачного цвета была удалена (MEDIUM #14 dead code cleanup)
 // STRAT#31 i18n: PAYMENT_METHOD_LABELS converted to a factory that takes `t` (the unified
 // useTranslation t function) so that cash/card labels are reactive to language changes.
-const buildPaymentMethodLabels = (t) => ({
+const buildPaymentMethodLabels = (t: CashierTranslationFn) => ({
   cash: t('cashier.method_cash'),
   card: t('cashier.method_card'),
   payme: 'PayMe',
   click: 'Click',
 });
 
-const resolvePaymentId = (paymentRowOrId) => {
+const resolvePaymentId = (paymentRowOrId: CashierPaymentRowOrId): string | number | null => {
   if (typeof paymentRowOrId === 'number' || typeof paymentRowOrId === 'string') {
     return paymentRowOrId;
+  }
+
+  const fromArray = paymentRowOrId?.grouped_payments?.[0];
+  if (typeof fromArray === 'string' || typeof fromArray === 'number') {
+    return fromArray;
   }
 
   return (
     paymentRowOrId?.id ||
     paymentRowOrId?.payment_id ||
-    paymentRowOrId?.grouped_payments?.[0] ||
     null
   );
 };
 
-const resolvePaymentMethodCode = (method: string) => {
+const resolvePaymentMethodCode = (method: string | undefined) => {
   const normalizedMethod = String(method || '').trim().toLowerCase();
 
   if (!normalizedMethod) return 'cash';
@@ -118,12 +174,12 @@ const resolvePaymentMethodCode = (method: string) => {
   return normalizedMethod;
 };
 
-const resolvePaymentMethodLabel = (method, labels) => {
-  const methodCode = resolvePaymentMethodCode(method);
+const resolvePaymentMethodLabel = (method: unknown, labels: Record<string, string>): string => {
+  const methodCode = resolvePaymentMethodCode(String(method ?? ''));
   return labels[methodCode] || String(method || labels.cash);
 };
 
-const extractReceiptDateTime = (paymentRow) => {
+const extractReceiptDateTime = (paymentRow: CashierPaymentRow | null | undefined) => {
   const sourceTimestamp = paymentRow?.paid_at || paymentRow?.created_at || null;
   const parsedDate = sourceTimestamp ? parseRegistrarTimestamp(sourceTimestamp) : null;
   const hasValidDate = parsedDate && !Number.isNaN(parsedDate.getTime());
@@ -138,15 +194,18 @@ const extractReceiptDateTime = (paymentRow) => {
   };
 };
 
-const buildReceiptServices = (paymentRow, totalAmount) => {
+const buildReceiptServices = (
+  paymentRow: CashierPaymentRow | null | undefined,
+  totalAmount: number
+): Array<{ name: string; quantity: number; price: number; total: number; currency: string }> => {
   const currency = String(paymentRow?.currency || 'UZS');
   const namedServices = Array.isArray(paymentRow?.services_names) ? paymentRow.services_names : [];
 
   if (namedServices.length > 0) {
     return namedServices
       .filter(Boolean)
-      .map((serviceName) => ({
-      name: serviceName,
+      .map((serviceName: unknown) => ({
+      name: String(serviceName ?? ''),
       quantity: 1,
       price: totalAmount,
       total: totalAmount,
@@ -155,20 +214,21 @@ const buildReceiptServices = (paymentRow, totalAmount) => {
   }
 
   if (Array.isArray(paymentRow?.services) && paymentRow.services.length > 0) {
-    return paymentRow.services.flatMap((serviceItem) => {
+    return paymentRow.services.flatMap((serviceItem: unknown) => {
       if (typeof serviceItem === 'object' && serviceItem !== null) {
-        const displayName = serviceItem.name || serviceItem.code || null;
+        const svc = serviceItem as { name?: string; code?: string; quantity?: number; price?: number; total?: number; currency?: string };
+        const displayName = svc.name || svc.code || null;
         if (!displayName) {
           return [];
         }
-        const quantity = Number(serviceItem.quantity || 1);
-        const price = Number(serviceItem.price || totalAmount);
+        const quantity = Number(svc.quantity || 1);
+        const price = Number(svc.price || totalAmount);
         return {
           name: displayName,
           quantity,
           price,
-          total: Number(serviceItem.total || price * quantity),
-          currency: serviceItem.currency || currency
+          total: Number(svc.total || price * quantity),
+          currency: svc.currency || currency
         };
       }
 
@@ -189,7 +249,11 @@ const buildReceiptServices = (paymentRow, totalAmount) => {
   return [];
 };
 
-const buildReceiptPrintPayload = (paymentRow, labels, defaultPatientLabel) => {
+const buildReceiptPrintPayload = (
+  paymentRow: CashierPaymentRow | null | undefined,
+  labels: Record<string, string>,
+  defaultPatientLabel: string
+) => {
   const paymentId = resolvePaymentId(paymentRow);
   const totalAmount = Number(paymentRow?.total_amount || paymentRow?.amount || 0);
   const services = buildReceiptServices(paymentRow, totalAmount);
@@ -223,7 +287,7 @@ const buildReceiptPrintPayload = (paymentRow, labels, defaultPatientLabel) => {
   };
 };
 
-const getPaymentStatusMeta = (status, t) => {
+const getPaymentStatusMeta = (status: unknown, t: CashierTranslationFn) => {
   const normalizedStatus = String(status || '').trim().toLowerCase();
   const statusMap = {
     paid: { variant: 'success', ariaLabel: t('cashier.status_paid_aria') },
@@ -234,10 +298,10 @@ const getPaymentStatusMeta = (status, t) => {
     unknown: { variant: 'secondary', ariaLabel: t('cashier.status_unknown_aria') },
   };
 
-  return statusMap[normalizedStatus] || statusMap.unknown;
+  return statusMap[normalizedStatus as keyof typeof statusMap] || statusMap.unknown;
 };
 
-const getPaymentStatusLabel = (status, t) => {
+const getPaymentStatusLabel = (status: unknown, t: CashierTranslationFn): string => {
   const normalizedStatus = String(status || '').trim().toLowerCase();
   const statusMap = {
     paid: t('cashier.status_paid'),
@@ -248,7 +312,7 @@ const getPaymentStatusLabel = (status, t) => {
     unknown: t('cashier.status_unknown'),
   };
 
-  return statusMap[normalizedStatus] || statusMap.unknown;
+  return statusMap[normalizedStatus as keyof typeof statusMap] || statusMap.unknown;
 };
 
 // P-018 fix: getPaymentActionContext / getAppointmentPaymentActionContext helpers
@@ -297,7 +361,7 @@ const canCreateDirectCashierPayment = (appointment: Appointment) => {
 const canCreateCashierPayment = (appointment: Appointment) =>
   canCreateDirectCashierPayment(appointment) || appointment?.can_create_grouped_payment === true;
 
-const createGroupedCashierPayment = async (appointment, paymentData) => {
+const createGroupedCashierPayment = async (appointment: Appointment, paymentData: CashierPaymentData) => {
   // PR-53: migrated from raw fetch() to axios client
   const token = tokenManager.getAccessToken();
   if (!token) {
@@ -327,7 +391,7 @@ const PAYMENT_ACTION_CAN_FIELD = {
   confirm: 'can_confirm'
 };
 
-const hasBackendPaymentAction = (paymentRow, action) => {
+const hasBackendPaymentAction = (paymentRow: CashierPaymentRow | null | undefined, action: string): boolean => {
   const normalizedAction = String(action || '').trim().toLowerCase();
   if (!normalizedAction) {
     return false;
@@ -335,12 +399,12 @@ const hasBackendPaymentAction = (paymentRow, action) => {
 
   if (Array.isArray(paymentRow?.available_actions)) {
     return paymentRow.available_actions.some(
-      (availableAction) => String(availableAction || '').trim().toLowerCase() === normalizedAction
+      (availableAction: unknown) => String(availableAction || '').trim().toLowerCase() === normalizedAction
     );
   }
 
-  const canField = PAYMENT_ACTION_CAN_FIELD[normalizedAction];
-  if (canField && Object.prototype.hasOwnProperty.call(paymentRow || {}, canField)) {
+  const canField = PAYMENT_ACTION_CAN_FIELD[normalizedAction as keyof typeof PAYMENT_ACTION_CAN_FIELD];
+  if (canField && paymentRow && Object.prototype.hasOwnProperty.call(paymentRow, canField)) {
     return Boolean(paymentRow[canField]);
   }
 
@@ -689,14 +753,14 @@ const CashierPanel = () => {
   const format = formatUZS;
 
   // ✅ УЛУЧШЕНИЕ: Обработчики с универсальными хуками
-  const handlePaymentSuccess = (paymentData) => {
-    setPaymentSuccess(paymentData);
+  const handlePaymentSuccess = (paymentData: unknown) => {
+    setPaymentSuccess(paymentData as Record<string, unknown>);
     paymentWidget.closeModal();
     // Force reload to get fresh data after successful payment.
     triggerDataReload();
   };
 
-  const handlePaymentError = (error) => {
+  const handlePaymentError = (error: unknown) => {
     const message = getErrorMessage(error, tI18n('cashier.payment_process_failed'));
     setPaymentError(message);
     logger.error('Ошибка платежа:', error);
@@ -720,23 +784,27 @@ const CashierPanel = () => {
 
   // ✅ УЛУЧШЕНИЕ: Функции для работы с оплатами через SSOT hook
   // Теперь appointment содержит сгруппированные данные пациента (все его неоплаченные визиты)
-  const processPayment = async (appointment, paymentData) => {
+  const processPayment = async (appointment: unknown, paymentData: unknown) => {
+    // CashPaymentModal declares `onProcessPayment?: (...args: unknown[]) => Promise<void>`
+    // so the args arrive as `unknown`. Narrow to domain types for the body.
+    const appt = appointment as Appointment;
+    const pData = paymentData as CashierPaymentData;
     try {
-      const groupedPayment = isBackendGroupedCashierPayment(appointment);
-      const visitId = resolveSingleCashierVisitId(appointment);
+      const groupedPayment = isBackendGroupedCashierPayment(appt);
+      const visitId = resolveSingleCashierVisitId(appt);
 
       if (!groupedPayment && !visitId) {
         throw new Error('Cannot process payment: backend must provide exactly one visit_id or a backend-owned allocation contract.');
       }
 
       if (groupedPayment) {
-        await createGroupedCashierPayment(appointment, paymentData);
+        await createGroupedCashierPayment(appt, pData);
       } else {
         const result = await paymentsHook.createPayment({
           visit_id: visitId,
-          amount: paymentData.amount,
-          method: paymentData.method,
-          note: paymentData.note || tI18n('cashier.payment_note_default')
+          amount: pData.amount,
+          method: pData.method,
+          note: pData.note || tI18n('cashier.payment_note_default')
         });
 
         if (!(result as { success?: boolean }).success) {
@@ -744,7 +812,7 @@ const CashierPanel = () => {
         }
       }
 
-      notify.success(tI18n('cashier.payment_success', { amount: format(paymentData.amount) }));
+      notify.success(tI18n('cashier.payment_success', { amount: format(pData.amount) }));
       paymentModal.closeModal();
       setPendingPage(1);
       setRefreshKey((prev) => prev + 1); // Принудительное обновление списка
@@ -758,7 +826,11 @@ const CashierPanel = () => {
   };
 
   // ✅ УЛУЧШЕНИЕ: Функции для работы с кнопками в истории платежей
-  const confirmPayment = async (paymentId) => {
+  const confirmPayment = async (paymentId: string | number | undefined) => {
+    if (paymentId === undefined) {
+      notify.error(tI18n('cashier.no_payment_for_receipt'));
+      return;
+    }
     // P-013 fix: replaced window.confirm() with shared useConfirm hook.
     // The new dialog names the specific action and uses primary intent
     // (Confirm is a constructive action, not destructive).
@@ -787,17 +859,18 @@ const CashierPanel = () => {
     }
   };
 
-  const openCancelDialog = (payment) => {
+  const openCancelDialog = (payment: CashierPaymentRowOrId) => {
     // UX Audit #2.1: принимаем объект payment целиком, чтобы показать контекст.
     // Раньше принимали только paymentId, и в диалоге было видно только #{id}.
-    const paymentId = typeof payment === 'object' && payment !== null
-      ? (payment.id || payment.payment_id)
-      : payment;
-    const patient = typeof payment === 'object' && payment !== null
-      ? (payment.patient || payment.patient_name || tI18n('cashier.patient_with_id', { id: payment.patient_id }))
+    const paymentRow = typeof payment === 'object' && payment !== null ? payment : null;
+    const paymentId: string | number | undefined = paymentRow
+      ? (paymentRow.id || paymentRow.payment_id)
+      : (typeof payment === 'string' || typeof payment === 'number' ? payment : undefined);
+    const patient = paymentRow
+      ? (paymentRow.patient || paymentRow.patient_name || tI18n('cashier.patient_with_id', { id: paymentRow.patient_id }))
       : null;
-    const amount = typeof payment === 'object' && payment !== null
-      ? Number(payment.total_amount || payment.amount || 0)
+    const amount = paymentRow
+      ? Number(paymentRow.total_amount || paymentRow.amount || 0)
       : 0;
     setCancelPaymentContext({ id: paymentId, patient, amount });
     setCancelDialogOpen(true);
@@ -868,10 +941,10 @@ const CashierPanel = () => {
   const [refundReason, setRefundReason] = useState('');
 
   // ✅ v2.0: Обработчик открытия диалога возврата
-  const openRefundDialog = (payment) => {
-    setRefundPaymentId(payment.id);
-    setRefundPaymentAmount(payment.amount);
-    setRefundAmount(String(payment.amount - (payment.refunded_amount || 0)));
+  const openRefundDialog = (payment: CashierPaymentRow) => {
+    setRefundPaymentId(payment.id ?? null);
+    setRefundPaymentAmount(Number(payment.amount ?? 0));
+    setRefundAmount(String(Number(payment.amount ?? 0) - Number(payment.refunded_amount ?? 0)));
     setRefundReason('');
     setRefundDialogOpen(true);
   };
@@ -907,7 +980,7 @@ const CashierPanel = () => {
   };
 
   // ✅ v2.0: Обработчик печати чека
-  const handlePrintReceipt = async (paymentRowOrId) => {
+  const handlePrintReceipt = async (paymentRowOrId: CashierPaymentRowOrId) => {
     const paymentId = resolvePaymentId(paymentRowOrId);
 
     if (!paymentId) {
@@ -1033,7 +1106,7 @@ const CashierPanel = () => {
   // ✅ ГРУППИРОВКА: Объединяем платежи одного пациента, созданных в одно время
   // NOTE: Server pagination makes grouping across pages impossible. 
   // We only group within the current page.
-  const groupPaymentsByPatientAndTime = (paymentsList: unknown) => {
+  const groupPaymentsByPatientAndTime = (paymentsList: unknown): CashierPaymentRow[] => {
     if (!paymentsList) return [];
 
     // Convert backend specific date/time format if needed
@@ -1995,7 +2068,7 @@ const CashierPanel = () => {
                         labelFormatter={(h) => `${h}:00`}
                         formatter={(value, name) => {
                           if (name === 'count') return [value, tI18n('cashier.hourly_stats_count_label')];
-                          if (name === 'amount') return [formatUZS(value), tI18n('cashier.hourly_stats_amount_label')];
+                          if (name === 'amount') return [formatUZS(typeof value === 'number' || typeof value === 'string' ? value : 0), tI18n('cashier.hourly_stats_amount_label')];
                           return [value, name];
                         }}
                       />
