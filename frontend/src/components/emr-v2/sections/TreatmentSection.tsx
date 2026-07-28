@@ -22,6 +22,7 @@ import { TreatmentTemplatesButton, TreatmentTemplatesPanel } from '../templates'
 import PrescriptionEditor from './PrescriptionEditor';
 import { useDoctorPhrases } from '@/hooks/useDoctorPhrases';
 import { useDoctorTreatmentTemplates } from '@/hooks/useDoctorTreatmentTemplates';
+import type { TreatmentTemplate } from '@/hooks/useDoctorTreatmentTemplates';
 import logger from '@/utils/logger';
 import { useTranslation } from '@/i18n/useTranslation';
 import React from "react";
@@ -83,7 +84,7 @@ export function TreatmentSection({
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [showTemplates, setShowTemplates] = useState(false);
   const [showMyExperience, setShowMyExperience] = useState(false);
-  const [editingTemplate, setEditingTemplate] = useState(null);
+  const [editingTemplate, setEditingTemplate] = useState<TreatmentTemplate | null>(null);
   const [editText, setEditText] = useState('');
 
   // 📜 Doctor's personal treatment patterns by ICD-10
@@ -101,7 +102,7 @@ export function TreatmentSection({
 
   // 🧠 Connect Doctor History (phrase-level)
   const { suggestions: doctorSuggestions, loading: historyLoading } = useDoctorPhrases({
-    doctorId,
+    doctorId: doctorId ?? undefined,
     field: 'treatment',
     specialty,
     currentText: value,
@@ -214,7 +215,7 @@ export function TreatmentSection({
         aiLoading={aiLoading || historyLoading}
         onApplySuggestion={onApplySuggestion}
         onDismissSuggestion={onDismissSuggestion}
-        onRequestAI={aiEnabled ? handleRequestAI : null}
+        onRequestAI={aiEnabled ? handleRequestAI : undefined}
         showAIButton={aiEnabled}
         experimentalGhostMode={experimentalGhostMode}
         onTelemetry={onTelemetry} />
@@ -385,7 +386,7 @@ export function TreatmentSection({
                                                     </span>
                   }
                                                 <span>
-                                                    {new Date(tmpl.last_used_at).toLocaleDateString()}
+                                                    {new Date(tmpl.last_used_at ?? '').toLocaleDateString()}
                                                 </span>
                                             </div>
                                         </button>
@@ -475,7 +476,7 @@ export function TreatmentSection({
                             <button
               type="button"
               onClick={async () => {
-                await updateTemplate(editingTemplate.id, editText, 'replace');
+                await updateTemplate(String(editingTemplate.id), editText, 'replace');
                 setEditingTemplate(null);
               }}
               style={{
@@ -493,7 +494,7 @@ export function TreatmentSection({
                             <button
               type="button"
               onClick={async () => {
-                await updateTemplate(editingTemplate.id, editText, 'save_as_new');
+                await updateTemplate(String(editingTemplate.id), editText, 'save_as_new');
                 setEditingTemplate(null);
               }}
               style={{

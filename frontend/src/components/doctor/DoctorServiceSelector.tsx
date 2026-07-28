@@ -62,7 +62,7 @@ export interface DoctorServiceSelectorProps {
  */
 const DoctorServiceSelector = ({
   specialty = 'cardiology',
-  selectedServices = [],
+  selectedServices = [] as DoctorServiceItem[],
   onServicesChange,
   canEditPrices = true,
   className = ''
@@ -142,7 +142,7 @@ const DoctorServiceSelector = ({
     if (existingIndex >= 0) {
       // Убираем услугу
       const newServices = selectedServices.filter((_, index) => index !== existingIndex);
-      onServicesChange(newServices);
+      onServicesChange?.(newServices);
     } else {
       // Добавляем услугу
       const newService = {
@@ -156,7 +156,7 @@ const DoctorServiceSelector = ({
         total: service.price
       };
 
-      onServicesChange([...selectedServices, newService]);
+      onServicesChange?.([...selectedServices, newService]);
     }
   };
 
@@ -172,7 +172,7 @@ const DoctorServiceSelector = ({
       return service;
     });
 
-    onServicesChange(newServices);
+    onServicesChange?.(newServices);
   };
 
   const handlePriceChange = (serviceId, newPrice) => {
@@ -189,7 +189,7 @@ const DoctorServiceSelector = ({
       return service;
     });
 
-    onServicesChange(newServices);
+    onServicesChange?.(newServices);
   };
 
   const isServiceSelected = (serviceId) => {
