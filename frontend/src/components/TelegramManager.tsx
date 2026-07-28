@@ -221,7 +221,12 @@ const TelegramManager = () => {
   const [onboardingAnalytics, setOnboardingAnalytics] = useState<{ dashboard?: { pendingRequests?: number; overdueRequests?: number; todaySubmitted?: number; linkedOrCreatedToday?: number; averageReviewTimeMinutes?: number; conversionRate?: number; [k: string]: unknown }; [k: string]: unknown } | null>(null);
   const [onboardingStatusFilter, setOnboardingStatusFilter] = useState('all');
   const [onboardingSort, setOnboardingSort] = useState('newest');
-  const [onboardingDialog, setOnboardingDialog] = useState({
+  const [onboardingDialog, setOnboardingDialog] = useState<{
+    open: boolean;
+    action: string;
+    requestId: string | null;
+    candidateId: string;
+  }>({
     open: false,
     action: '',
     requestId: null,
@@ -409,7 +414,7 @@ const TelegramManager = () => {
   };
 
   // PR-41 / High-16: wrap handler in useCallback to avoid re-creating on every render
-  const updateOnboardingReviewForm = useCallback((requestId, field, value) => {
+  const updateOnboardingReviewForm = useCallback((requestId: string, field: string, value: unknown) => {
     setOnboardingReviewForms((current) => ({
       ...current,
       [requestId]: {
@@ -428,7 +433,7 @@ const TelegramManager = () => {
     });
   };
 
-  const openOnboardingActionDialog = (requestId, action, candidateId = '') => {
+  const openOnboardingActionDialog = (requestId: string, action: string, candidateId: string = '') => {
     setOnboardingDialog({
       open: true,
       action,
@@ -437,7 +442,7 @@ const TelegramManager = () => {
     });
   };
 
-  const refreshOnboardingCandidates = async (requestId) => {
+  const refreshOnboardingCandidates = async (requestId: string) => {
     const request = onboardingRequests.find((item) => item.id === requestId);
     if (!request) {
       return;
@@ -461,7 +466,7 @@ const TelegramManager = () => {
     }
   };
 
-  const handleOnboardingReviewAction = async (requestId, action, options = {}) => {
+  const handleOnboardingReviewAction = async (requestId: string, action: string, options: Record<string, unknown> = {}) => {
     const request = onboardingRequests.find((item) => item.id === requestId) || ({} as OnboardingRequest);
     const form: Record<string, unknown> = onboardingReviewForms[requestId] || {};
     const safeNote = String(form.safeNote || '').trim();
@@ -779,9 +784,10 @@ const TelegramManager = () => {
   const staffRoleMenuEnablementItemCount = typeof staffRoleMenuEnablementContract.menu_item_count === 'number' ?
   staffRoleMenuEnablementContract.menu_item_count :
   staffMenuItemCount;
-  const patientCommandLabel = (commandName, fallback) => {
+  const patientCommandLabel = (commandName: string, fallback: string): string => {
     const command = patientBotCommands.find((item) => item?.command === commandName);
-    return command?.label || fallback;
+    const label = command?.label;
+    return (typeof label === 'string' && label) ? label : fallback;
   };
   const patientLanguageSummary = patientBotLanguages.length ?
   patientBotLanguages.map((item) => (typeof item === 'string' ? item : (item.label ?? item.code ?? ''))).join(', ') :
@@ -939,7 +945,7 @@ const TelegramManager = () => {
     const value = request?.[camelKey] ?? request?.[snakeKey] ?? fallback;
     return typeof value === 'string' ? value : (value == null ? fallback : String(value));
   }
-  const splitOnboardingContactName = (value) => {
+  const splitOnboardingContactName = (value: unknown) => {
     const parts = String(value || '').trim().split(/\s+/).filter(Boolean);
     return {
       lastName: parts[0] || '',
@@ -947,15 +953,15 @@ const TelegramManager = () => {
       middleName: parts.slice(2).join(' ')
     };
   };
-  const formatOnboardingDate = (value) => {
+  const formatOnboardingDate = (value: unknown) => {
     if (!value) return 'not selected';
-    const date = new Date(value);
+    const date = new Date(value as string);
     if (Number.isNaN(date.getTime())) return String(value);
     return date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
   };
-  const formatOnboardingCreatedAt = (value) => {
+  const formatOnboardingCreatedAt = (value: unknown) => {
     if (!value) return 'new';
-    const date = new Date(value);
+    const date = new Date(value as string);
     if (Number.isNaN(date.getTime())) return 'new';
     return date.toLocaleString('ru-RU', {
       day: '2-digit',
@@ -964,16 +970,16 @@ const TelegramManager = () => {
       minute: '2-digit'
     });
   };
-  const onboardingStatusVariant = (status) => {
+  const onboardingStatusVariant = (status: string | undefined | null) => {
     if (status === 'pending_review') return 'warning';
     if (status === 'linked_existing' || status === 'created_patient') return 'success';
     if (status === 'needs_more_info') return 'primary';
     if (status === 'rejected' || status === 'expired') return 'danger';
     return 'default';
   };
-  const getOnboardingAgeBadge = (value) => {
+  const getOnboardingAgeBadge = (value: unknown) => {
     if (!value) return { label: 'New', variant: 'primary' };
-    const ageMs = Date.now() - new Date(value).getTime();
+    const ageMs = Date.now() - new Date(value as string).getTime();
     if (Number.isNaN(ageMs) || ageMs < 0) return { label: 'New', variant: 'primary' };
     const ageMinutes = ageMs / (1000 * 60);
     if (ageMinutes >= 240) return { label: 'Overdue', variant: 'danger' };
@@ -984,38 +990,40 @@ const TelegramManager = () => {
     const value = candidate?.[camelKey] ?? candidate?.[snakeKey] ?? fallback;
     return (value == null ? fallback : value) as T;
   }
-  const getCandidateTopScore = (request) => {
+  const getCandidateTopScore = (request: OnboardingRequest): number => {
     const duplicateCandidates = Array.isArray(request?.duplicateCandidates) ? request.duplicateCandidates : [];
     const snapshotCandidates = Array.isArray(request?.duplicateReviewSnapshot?.topCandidates) ? request.duplicateReviewSnapshot.topCandidates : [];
     const candidates = duplicateCandidates.length ? duplicateCandidates : snapshotCandidates;
     if (!candidates.length) return 0;
-    return Number(getCandidateValue(candidates[0], 'matchScore', 'match_score', '0')) || 0;
+    return Number(getCandidateValue(candidates[0] as Record<string, unknown>, 'matchScore', 'match_score', '0')) || 0;
   };
-  const getVisibleDuplicateCandidates = (request) => {
+  const getVisibleDuplicateCandidates = (request: OnboardingRequest): Record<string, unknown>[] => {
     if (Array.isArray(request?.duplicateCandidates) && request.duplicateCandidates.length) {
-      return request.duplicateCandidates;
+      return request.duplicateCandidates as Record<string, unknown>[];
     }
-    return Array.isArray(request?.duplicateReviewSnapshot?.topCandidates) ? request.duplicateReviewSnapshot.topCandidates : [];
+    return Array.isArray(request?.duplicateReviewSnapshot?.topCandidates) ? (request.duplicateReviewSnapshot.topCandidates as Record<string, unknown>[]) : [];
   };
-  const getReasonOptionsForAction = (action) => {
+  const getReasonOptionsForAction = (action: string) => {
     if (action === 'request-more-info') return ONBOARDING_NEEDS_MORE_INFO_REASONS;
     if (action === 'reject') return ONBOARDING_REJECT_REASONS;
     if (action === 'create-patient') return ONBOARDING_OVERRIDE_REASONS;
     return ONBOARDING_NEEDS_MORE_INFO_REASONS;
   };
-  const getStatusLabel = (status) => ONBOARDING_STATUS_LABELS[status] || status || 'Unknown';
-  const getReasonLabel = (reasonCode) => ONBOARDING_REASON_LABELS[reasonCode] || reasonCode || 'Not specified';
-  const getRiskVariant = (riskLevel) => {
+  const getStatusLabel = (status: string | undefined | null): string =>
+    ONBOARDING_STATUS_LABELS[status as keyof typeof ONBOARDING_STATUS_LABELS] || status || 'Unknown';
+  const getReasonLabel = (reasonCode: string | undefined | null): string =>
+    ONBOARDING_REASON_LABELS[reasonCode as keyof typeof ONBOARDING_REASON_LABELS] || reasonCode || 'Not specified';
+  const getRiskVariant = (riskLevel: string | undefined | null) => {
     if (riskLevel === 'high') return 'danger';
     if (riskLevel === 'medium') return 'warning';
     return 'primary';
   };
-  const getRiskLabel = (riskLevel) => {
+  const getRiskLabel = (riskLevel: string | undefined | null) => {
     if (riskLevel === 'high') return 'High risk';
     if (riskLevel === 'medium') return 'Medium risk';
     return 'Low risk';
   };
-  const formatCandidateReasons = (candidate) => {
+  const formatCandidateReasons = (candidate: Record<string, unknown>): string => {
     const reasons: string[] = [];
     const matchReasons = getCandidateValue<Record<string, unknown>>(candidate, 'matchReasons', 'match_reasons', {});
     if (matchReasons?.phone_match || matchReasons?.phoneMatch) reasons.push('Phone match');
@@ -1025,14 +1033,14 @@ const TelegramManager = () => {
     if (matchReasons?.recent_visit_match || matchReasons?.recentVisitMatch) reasons.push('Recent visit/contact match');
     return reasons.length ? reasons.join(' · ') : 'Manual review only';
   };
-  const getOnboardingActionTitle = (action) => {
+  const getOnboardingActionTitle = (action: string) => {
     if (action === 'link-existing') return 'Link existing patient';
     if (action === 'create-patient') return 'Create new patient';
     if (action === 'request-more-info') return 'Request more info';
     if (action === 'reject') return 'Reject request';
     return 'Review request';
   };
-  const getOnboardingActionDescription = (action) => {
+  const getOnboardingActionDescription = (action: string) => {
     if (action === 'link-existing') {
       return 'You are linking this Telegram user and onboarding request to an existing patient. This action will be audit logged.';
     }
@@ -1047,18 +1055,17 @@ const TelegramManager = () => {
     }
     return '';
   };
-  const getOnboardingActionButtonLabel = (action, busy) => {
+  const getOnboardingActionButtonLabel = (action: string, busy: boolean | string) => {
     if (busy && action === 'link-existing') return 'Linking...';
     if (busy && action === 'create-patient') return 'Creating...';
     if (busy && action === 'request-more-info') return 'Sending...';
     if (busy && action === 'reject') return 'Rejecting...';
     return getOnboardingActionTitle(action);
   };
-  const getDialogCandidateId = (form, dialogState) =>
-  form?.selectedCandidateId ||
-  dialogState?.candidateId ||
-  '';
-  const isReviewableStatus = (status) => ['pending_review', 'needs_more_info'].includes(status);
+  const getDialogCandidateId = (form: Record<string, unknown> | undefined, dialogState: Record<string, unknown> | undefined): string =>
+    String(form?.selectedCandidateId ?? dialogState?.candidateId ?? '');
+  const isReviewableStatus = (status: string | undefined | null): boolean =>
+    ['pending_review', 'needs_more_info'].includes(status || '');
   const visibleOnboardingRequests = [...onboardingRequests].
   filter((request) => onboardingStatusFilter === 'all' ? true : request.status === onboardingStatusFilter).
   sort((left, right) => {
@@ -2290,7 +2297,7 @@ const TelegramManager = () => {
                       value: getCandidateValue(candidate, 'candidateId', 'candidate_id', ''),
                       label: `${getCandidateValue(candidate, 'maskedName', 'masked_name', 'Masked patient')} - ${Math.round((Number(getCandidateValue<number>(candidate, 'matchScore', 'match_score', 0)) || 0) * 100)}%`
                     }))}
-                    onChange={(value) => updateOnboardingReviewForm(onboardingDialog.requestId, 'selectedCandidateId', value)}
+                    onChange={(value) => updateOnboardingReviewForm(onboardingDialog.requestId ?? '', 'selectedCandidateId', value)}
                     style={{ width: '100%' }} />
                 ) : (
                   <Alert severity="warning">
@@ -2338,7 +2345,7 @@ const TelegramManager = () => {
                         label: `${getCandidateValue(candidate, 'maskedName', 'masked_name', 'Masked patient')} - ${Math.round((Number(getCandidateValue<number>(candidate, 'matchScore', 'match_score', 0)) || 0) * 100)}%`
                       }))
                     ]}
-                    onChange={(value) => updateOnboardingReviewForm(onboardingDialog.requestId, 'selectedCandidateId', value)}
+                    onChange={(value) => updateOnboardingReviewForm(onboardingDialog.requestId ?? '', 'selectedCandidateId', value)}
                     style={{ width: '100%' }} />
                 ) : null}
                 <Box
@@ -2350,24 +2357,24 @@ const TelegramManager = () => {
                   <Input
                     label="Last name"
                     value={(dialogForm.lastName as string | undefined) ?? dialogNameParts.lastName}
-                    onChange={(event) => updateOnboardingReviewForm(onboardingDialog.requestId, 'lastName', event.target.value)}
+                    onChange={(event) => updateOnboardingReviewForm(onboardingDialog.requestId ?? '', 'lastName', event.target.value)}
                     placeholder="Last name"
                     required />
                   <Input
                     label="First name"
                     value={(dialogForm.firstName as string | undefined) ?? dialogNameParts.firstName}
-                    onChange={(event) => updateOnboardingReviewForm(onboardingDialog.requestId, 'firstName', event.target.value)}
+                    onChange={(event) => updateOnboardingReviewForm(onboardingDialog.requestId ?? '', 'firstName', event.target.value)}
                     placeholder="First name"
                     required />
                   <Input
                     label="Middle name"
                     value={(dialogForm.middleName as string | undefined) ?? dialogNameParts.middleName}
-                    onChange={(event) => updateOnboardingReviewForm(onboardingDialog.requestId, 'middleName', event.target.value)}
+                    onChange={(event) => updateOnboardingReviewForm(onboardingDialog.requestId ?? '', 'middleName', event.target.value)}
                     placeholder="Middle name" />
                   <Input
                     label="Phone"
                     value={(dialogForm.phone as string | undefined) ?? dialogContactPhone}
-                    onChange={(event) => updateOnboardingReviewForm(onboardingDialog.requestId, 'phone', event.target.value)}
+                    onChange={(event) => updateOnboardingReviewForm(onboardingDialog.requestId ?? '', 'phone', event.target.value)}
                     placeholder="+998..." />
                 </Box>
                 {dialogHighConfidenceDuplicateExists ? (
@@ -2376,11 +2383,11 @@ const TelegramManager = () => {
                       label="Override reason"
                       value={(dialogForm.reasonCode as string) || ''}
                       options={dialogReasonOptions}
-                      onChange={(value) => updateOnboardingReviewForm(onboardingDialog.requestId, 'reasonCode', value)}
+                      onChange={(value) => updateOnboardingReviewForm(onboardingDialog.requestId ?? '', 'reasonCode', value)}
                       style={{ width: '100%' }} />
                     <Switch
                       checked={Boolean(dialogForm.confirmCreateDespiteDuplicates as boolean)}
-                      onChange={(checked) => updateOnboardingReviewForm(onboardingDialog.requestId, 'confirmCreateDespiteDuplicates', checked)}
+                      onChange={(checked) => updateOnboardingReviewForm(onboardingDialog.requestId ?? '', 'confirmCreateDespiteDuplicates', checked)}
                       label="I reviewed duplicates and still want to create a new patient" />
                   </>
                 ) : null}
@@ -2392,7 +2399,7 @@ const TelegramManager = () => {
                 label="Reason code"
                 value={(dialogForm.reasonCode as string) || ''}
                 options={dialogReasonOptions}
-                onChange={(value) => updateOnboardingReviewForm(onboardingDialog.requestId, 'reasonCode', value)}
+                onChange={(value) => updateOnboardingReviewForm(onboardingDialog.requestId ?? '', 'reasonCode', value)}
                 style={{ width: '100%' }} />
             ) : null}
 
@@ -2403,7 +2410,7 @@ const TelegramManager = () => {
                 maxLength={512}
                 minRows={3}
                 maxRows={5}
-                onChange={(event) => updateOnboardingReviewForm(onboardingDialog.requestId, 'safeNote', event.target.value)}
+                onChange={(event) => updateOnboardingReviewForm(onboardingDialog.requestId ?? '', 'safeNote', event.target.value)}
                 placeholder="Use safe operational wording only. Do not include diagnosis, lab details, raw IDs, or tokens."
                 style={{ width: '100%' }} />
             ) : null}
@@ -2422,7 +2429,7 @@ const TelegramManager = () => {
               (['request-more-info', 'reject'].includes(onboardingDialog.action) && !dialogForm.reasonCode)
             }
             onClick={() => handleOnboardingReviewAction(
-              onboardingDialog.requestId,
+              onboardingDialog.requestId ?? '',
               onboardingDialog.action,
               { candidateId: dialogSelectedCandidateId }
             )}>

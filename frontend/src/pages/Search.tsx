@@ -14,6 +14,16 @@ import { useTranslation } from '../i18n/useTranslation';
 
 const registrarHomeRoute = getRoleHomeRoute('registrar');
 
+interface Visit {
+  id: string | number;
+  patient_id?: string | number | null;
+  status?: string | null;
+  created_at?: string | null;
+  planned_date?: string | null;
+  notes?: string | null;
+  [key: string]: unknown;
+}
+
 // Modern Search Page with Full Functionality
 export default function Search() {
   const { t: rawT } = useTranslation();
@@ -21,14 +31,14 @@ export default function Search() {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [patients, setPatients] = useState<Patient[]>([]);
-  const [visits, setVisits] = useState([]);
+  const [visits, setVisits] = useState<Visit[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('all'); // all, patients, visits
   const [searchPerformed, setSearchPerformed] = useState(false);
 
   // Debounced search
-  const performSearch = useCallback(async (searchQuery) => {
+  const performSearch = useCallback(async (searchQuery: string) => {
     if (!searchQuery || searchQuery.trim().length < 2) {
       setPatients([]);
       setVisits([]);
@@ -46,7 +56,7 @@ export default function Search() {
       setPatients(patientsData);
 
       // Search visits - try multiple strategies
-      let visitsData = [];
+      let visitsData: Visit[] = [];
 
       // Strategy 1: If query is a number, try to find visit by ID or patient_id
       if (/^\d+$/.test(searchQuery.trim())) {
@@ -56,12 +66,12 @@ export default function Search() {
         try {
           const visitRes = await getVisit(visitId);
           if (visitRes?.visit) {
-            visitsData = [visitRes.visit];
+            visitsData = [visitRes.visit as unknown as Visit];
           }
-        } catch (err) {
+        } catch (err: unknown) {
           // PR-38 / Medium-23: log the error instead of silently swallowing.
           // Visit not found by ID — we'll try by patient_id next.
-          logger.warn('Search: getVisit failed, will try by patient_id', err?.message);
+          logger.warn('Search: getVisit failed, will try by patient_id', (err as Error)?.message);
         }
 
         // Also get visits for patient with this ID
@@ -70,15 +80,16 @@ export default function Search() {
           if (Array.isArray(patientVisitsRes.data)) {
             // Merge without duplicates
             const existingIds = new Set(visitsData.map(v => v.id));
-            patientVisitsRes.data.forEach(v => {
-              if (!existingIds.has(v.id)) {
-                visitsData.push(v);
+            (patientVisitsRes.data as unknown[]).forEach(v => {
+              const visit = v as Visit;
+              if (!existingIds.has(visit.id)) {
+                visitsData.push(visit);
               }
             });
           }
-        } catch (err) {
+        } catch (err: unknown) {
           // PR-38 / Medium-23: log instead of silent catch.
-          logger.warn('Search: patient visits fetch failed', err?.message);
+          logger.warn('Search: patient visits fetch failed', (err as Error)?.message);
         }
       }
 
@@ -94,9 +105,10 @@ export default function Search() {
         const existingIds = new Set(visitsData.map(v => v.id));
         for (const result of visitResults) {
           if (result.status === 'fulfilled' && Array.isArray(result.value.data)) {
-            result.value.data.forEach(v => {
-              if (!existingIds.has(v.id)) {
-                visitsData.push(v);
+            (result.value.data as unknown[]).forEach(v => {
+              const visit = v as Visit;
+              if (!existingIds.has(visit.id)) {
+                visitsData.push(visit);
               }
             });
           }
@@ -104,9 +116,9 @@ export default function Search() {
       }
 
       setVisits(visitsData);
-    } catch (err) {
+    } catch (err: unknown) {
       // PR-38 / Medium-23: log instead of silent catch.
-      logger.error('Search: query failed', err?.message);
+      logger.error('Search: query failed', (err as Error)?.message);
       setError(t('misc.srch_error_search_failed'));
     } finally {
       setLoading(false);
@@ -114,23 +126,23 @@ export default function Search() {
   }, []);
 
   // Handle search submit
-  const handleSearch = (e) => {
+  const handleSearch = (e: React.FormEvent<HTMLFormElement> | undefined) => {
     e?.preventDefault();
     performSearch(query);
   };
 
   // Navigate to patient - open registrar panel with wizard for this patient
-  const goToPatient = (patient) => {
+  const goToPatient = (patient: Patient) => {
     // Open registrar panel with the patient pre-selected for new appointment
     const patientName = `${patient.last_name || ''} ${patient.first_name || ''} ${patient.middle_name || ''}`.trim();
     navigate(`${registrarHomeRoute}?action=new&patientId=${patient.id}&patientName=${encodeURIComponent(patientName)}`);
   };
 
   // Navigate to visit details in registrar panel
-  const goToVisit = (visit) => {
-    navigate(`${registrarHomeRoute}?visitId=${visit.id}&patientId=${visit.patient_id}`);
+  const goToVisit = (visit: Visit) => {
+    navigate(`${registrarHomeRoute}?visitId=${visit.id}&patientId=${visit.patient_id ?? ''}`);
   };
-  const handleActivationKeyDown = (event, onActivate) => {
+  const handleActivationKeyDown = (event: React.KeyboardEvent, onActivate: () => void) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       onActivate();
@@ -138,7 +150,7 @@ export default function Search() {
   };
 
   // Get status badge color
-  const getStatusColor = (status) => {
+  const getStatusColor = (status: string | undefined | null) => {
     const colors = {
       open: { bg: 'var(--mac-accent-bg)', color: 'var(--mac-accent)', label: t('misc.srch_status_open') },
       waiting: { bg: 'var(--mac-warning-bg)', color: 'var(--mac-warning)', label: t('misc.srch_status_waiting') },
@@ -149,24 +161,24 @@ export default function Search() {
       canceled: { bg: 'var(--mac-error-bg)', color: 'var(--mac-error)', label: t('misc.srch_status_canceled') },
       paid: { bg: 'var(--mac-success-bg)', color: 'var(--mac-success)', label: t('misc.srch_status_paid') },
     };
-    return colors[status] || { bg: 'var(--mac-bg-secondary)', color: 'var(--mac-text-secondary)', label: status || '—' };
+    return colors[status as keyof typeof colors] || { bg: 'var(--mac-bg-secondary)', color: 'var(--mac-text-secondary)', label: status || '—' };
   };
 
   // Format date
-  const formatDate = (dateStr) => {
+  const formatDate = (dateStr: string | undefined | null): string => {
     if (!dateStr) return '—';
     try {
       const d = new Date(dateStr);
       return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
-    } catch (err) {
+    } catch (err: unknown) {
       // PR-38 / Medium-23: log instead of silent catch.
-      logger.warn('Search: formatDate failed', err?.message);
+      logger.warn('Search: formatDate failed', (err as Error)?.message);
       return dateStr;
     }
   };
 
   // Get patient name from visits (we need to fetch it)
-  const [patientNames, setPatientNames] = useState({});
+  const [patientNames, setPatientNames] = useState<Record<string, string>>({});
 
   useEffect(() => {
     // Fetch patient names for visits
@@ -174,10 +186,10 @@ export default function Search() {
     // (up to N sequential HTTP round-trips where N = unique patient count)
     // with Promise.allSettled batched in parallel.
     const fetchPatientNames = async () => {
-      const uniquePatientIds = [...new Set(visits.map(v => v.patient_id).filter(Boolean))];
-      const namesMap = { ...patientNames };
+      const uniquePatientIds = [...new Set(visits.map(v => v.patient_id).filter((pid): pid is string | number => pid != null))];
+      const namesMap: Record<string, string> = { ...patientNames };
       // Filter to IDs we haven't fetched yet
-      const idsToFetch = uniquePatientIds.filter(pid => !namesMap[pid]);
+      const idsToFetch = uniquePatientIds.filter(pid => !namesMap[String(pid)]);
       if (idsToFetch.length === 0) return;
 
       const results = await Promise.allSettled(
@@ -187,14 +199,14 @@ export default function Search() {
       for (const result of results) {
         if (result.status === 'fulfilled' && result.value.data) {
           const { pid, data } = result.value;
-          namesMap[pid] = `${data.last_name || ''} ${data.first_name || ''} ${data.middle_name || ''}`.trim();
+          namesMap[String(pid)] = `${data.last_name || ''} ${data.first_name || ''} ${data.middle_name || ''}`.trim();
           hasUpdates = true;
         } else if (result.status === 'rejected') {
           // Extract pid from the rejected promise's input — we know it was
           // one of idsToFetch. Use index to find which one failed.
           const idx = results.indexOf(result);
           const failedPid = idsToFetch[idx];
-          namesMap[failedPid] = t('misc.srch_patient_fallback', { id: failedPid });
+          namesMap[String(failedPid)] = t('misc.srch_patient_fallback', { id: String(failedPid) });
           hasUpdates = true;
         }
       }
@@ -392,7 +404,7 @@ export default function Search() {
             <div style={styles.grid}>
               {visits.map(visit => {
                 const statusInfo = getStatusColor(visit.status);
-                const visitPatientName = patientNames[visit.patient_id] || t('misc.srch_visit_patient_fallback', { patientId: visit.patient_id });
+                const visitPatientName = patientNames[String(visit.patient_id ?? '')] || t('misc.srch_visit_patient_fallback', { patientId: visit.patient_id });
                 return (
                   <div
                     key={visit.id}

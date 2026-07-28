@@ -19,6 +19,36 @@ import {
 import { notify } from '../services/notify';
 import { useTranslation } from '../i18n/useTranslation';
 
+interface PickupVisit {
+  id: string | number;
+  status?: string;
+  visit_date?: string;
+  date?: string;
+  doctor_name?: string;
+  doctor?: string;
+  value?: string;
+  services?: Array<Record<string, unknown>>;
+  total_amount?: number;
+  created_at?: string;
+  visit_time?: string;
+  [key: string]: unknown;
+}
+
+interface PickupLabResult {
+  id: string | number;
+  status?: string;
+  value?: string;
+  available_actions?: string[];
+  can_print?: boolean;
+  template?: { name?: string; code?: string; [k: string]: unknown };
+  service_name?: string;
+  service_code?: string;
+  name?: string;
+  test_name?: string;
+  test_code?: string;
+  [key: string]: unknown;
+}
+
 // Get user role for role-based UI
 const getUserRole = () => {
   const st = auth.getState() as { profile?: Record<string, unknown> };
@@ -56,10 +86,10 @@ export default function PatientPickupView() {
   };
 
   const [patient, setPatient] = useState<Patient | null>(null);
-  const [labResults, setLabResults] = useState([]);
-  const [visits, setVisits] = useState([]);
+  const [labResults, setLabResults] = useState<PickupLabResult[]>([]);
+  const [visits, setVisits] = useState<PickupVisit[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Load patient, lab data, and visit history
   const loadData = useCallback(async () => {
@@ -76,7 +106,7 @@ export default function PatientPickupView() {
       // Load lab results
       try {
         const labReportInstances = (await labReportingApi.listInstances({ patient_id: patientId, limit: 100 })) as unknown[];
-        setLabResults(labReportInstances || []);
+        setLabResults((labReportInstances || []) as PickupLabResult[]);
       } catch {
         setLabResults([]);
       }
@@ -84,11 +114,11 @@ export default function PatientPickupView() {
       // Load visit history
       try {
         const visitsRes = (await api.get('/registrar/visits', { params: { patient_id: patientId } })) as import('axios').AxiosResponse<Record<string, unknown>>;
-        setVisits((visitsRes.data as unknown as unknown[]) || []);
+        setVisits(((visitsRes.data as unknown as unknown[]) || []) as PickupVisit[]);
       } catch {
         setVisits([]);
       }
-    } catch (err) {
+    } catch (err: unknown) {
       logger.error('Error loading patient:', err);
       setError(t('misc.ppu_load_error'));
     } finally {
@@ -101,7 +131,7 @@ export default function PatientPickupView() {
   }, [loadData]);
 
   // Format date
-  const formatDate = (dateStr) => {
+  const formatDate = (dateStr: string | undefined | null): string => {
     if (!dateStr) return '—';
     try {
       return new Date(dateStr).toLocaleDateString('ru-RU');
@@ -111,7 +141,7 @@ export default function PatientPickupView() {
   };
 
   // Get status badge for lab results
-  const getStatusBadge = (status) => {
+  const getStatusBadge = (status: string | undefined | null) => {
     const config = {
       done: { icon: '🟢', label: t('misc.ppu_status_done'), bg: 'var(--mac-success-bg)', color: 'var(--mac-success)' },
       in_progress: { icon: '🟡', label: t('misc.ppu_status_in_progress'), bg: 'var(--mac-warning-bg)', color: 'var(--mac-warning)' },
@@ -122,24 +152,24 @@ export default function PatientPickupView() {
     if (['FINALIZED', 'PRINTED'].includes(normalizedStatus)) return config.done;
     if (['IN_PROGRESS', 'READY'].includes(normalizedStatus)) return config.in_progress;
     if (normalizedStatus === 'DRAFT') return config.ordered;
-    return config[status] || config.ordered;
+    return config[status as keyof typeof config] || config.ordered;
   };
 
-  const hasLabReportAction = (labResult, action) => {
+  const hasLabReportAction = (labResult: PickupLabResult, action: string): boolean => {
     const actions = Array.isArray(labResult?.available_actions) ? labResult.available_actions : [];
     if (actions.includes(action)) return true;
     if (action === 'print') return labResult?.can_print === true;
     return false;
   };
 
-  const getLabDisplayName = (labResult) =>
-    labResult?.template?.name || labResult?.service_name || labResult?.name || labResult?.test_name || `Lab #${labResult?.id}`;
+  const getLabDisplayName = (labResult: PickupLabResult): string =>
+    String(labResult?.template?.name || labResult?.service_name || labResult?.name || labResult?.test_name || `Lab #${labResult?.id}`);
 
-  const getLabDisplayCode = (labResult) =>
-    labResult?.template?.code || labResult?.service_code || labResult?.test_code || '-';
+  const getLabDisplayCode = (labResult: PickupLabResult): string =>
+    String(labResult?.template?.code || labResult?.service_code || labResult?.test_code || '-');
 
   // Get status badge for visits
-  const getVisitStatusBadge = (status) => {
+  const getVisitStatusBadge = (status: string | undefined | null) => {
     const config = {
       scheduled: { icon: '📅', label: t('misc.ppu_visit_status_scheduled'), bg: 'var(--mac-accent-bg)', color: 'var(--mac-accent)' },
       in_queue: { icon: '⏳', label: t('misc.ppu_visit_status_in_queue'), bg: 'var(--mac-warning-bg)', color: 'var(--mac-warning)' },
@@ -149,7 +179,7 @@ export default function PatientPickupView() {
       cancelled: { icon: '🔴', label: t('misc.ppu_visit_status_cancelled'), bg: 'var(--mac-error-bg)', color: 'var(--mac-error)' },
       no_show: { icon: '❌', label: t('misc.ppu_visit_status_no_show'), bg: 'var(--mac-error-bg)', color: 'var(--mac-error)' }
     };
-    return config[status] || { icon: '⚪', label: status || t('misc.ppu_visit_status_unknown'), bg: 'var(--mac-bg-secondary)', color: 'var(--mac-text-secondary)' };
+    return config[status as keyof typeof config] || { icon: '⚪', label: status || t('misc.ppu_visit_status_unknown'), bg: 'var(--mac-bg-secondary)', color: 'var(--mac-text-secondary)' };
   };
 
   // Handle print
@@ -199,7 +229,7 @@ export default function PatientPickupView() {
           <div class="meta">
             <div><strong>${t('misc.ppu_print_patient')}</strong> ${patient?.full_name || patient?.name || '—'}</div>
             <div><strong>${t('misc.ppu_print_id')}</strong> ${patientId || '—'}</div>
-            <div><strong>${t('misc.ppu_print_birth_date')}</strong> ${formatDate(patient?.birth_date || patient?.birthDate)}</div>
+            <div><strong>${t('misc.ppu_print_birth_date')}</strong> ${formatDate(String((patient?.birth_date || patient?.birthDate) ?? ''))}</div>
             <div><strong>${t('misc.ppu_print_phone')}</strong> ${patient?.phone || '—'}</div>
           </div>
 
@@ -233,7 +263,7 @@ export default function PatientPickupView() {
   };
 
   // Handle download PDF
-  const handleDownloadPDF = async (labResult) => {
+  const handleDownloadPDF = async (labResult: PickupLabResult) => {
     try {
       const blob = await labReportingApi.downloadPdf(labResult.id);
       const url = window.URL.createObjectURL(blob);
@@ -593,11 +623,15 @@ export default function PatientPickupView() {
                 const servicesText = services.length > 0 ?
                 typeof services[0] === 'string' ?
                 services.join(', ') :
-                services.map((s) => s.name || s).join(', ') :
+                services.map((s) => String(s.name || s)).join(', ') :
                 '—';
                 // Считаем сумму из visit или из services
-                const totalAmount = visit.total_amount || services.reduce((sum, s) =>
-                sum + (parseFloat(typeof s === 'object' ? s.price : 0) || 0) * ((typeof s === 'object' ? s.qty : 1) || 1), 0);
+                const totalAmount = visit.total_amount || services.reduce((sum, s) => {
+                  const isObj = typeof s === 'object' && s !== null;
+                  const price = isObj ? Number(s.price ?? 0) : 0;
+                  const qty = isObj ? Number(s.qty ?? 1) : 1;
+                  return sum + (price || 0) * (qty || 1);
+                }, 0);
 
                 return (
                   <tr key={visit.id} style={{
