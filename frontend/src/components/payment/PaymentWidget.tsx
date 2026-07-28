@@ -372,12 +372,12 @@ const PaymentWidget = ({
   // двойное подтверждение убрано. initializePayment() вызывается напрямую.
 
   // Форматирование суммы
-  const formatAmount = (amountValue, currencyCode) => {
+  const formatAmount = (amountValue: string | number | undefined, currencyCode: string) => {
     return new Intl.NumberFormat('ru-RU', {
       style: 'currency',
       currency: currencyCode === 'UZS' ? 'UZS' : currencyCode === 'KZT' ? 'KZT' : 'USD',
       minimumFractionDigits: 0
-    }).format(amountValue);
+    }).format(Number(amountValue ?? 0));
   };
 
   // Рендер статуса платежа
@@ -534,7 +534,7 @@ const PaymentWidget = ({
             value: provider.code,
             label: (
               <span className="pw-provider-option">
-                {providerIcons[provider.code]}
+                {providerIcons[provider.code as keyof typeof providerIcons]}
                 <span className="pw-provider-name">
                   {provider.name}
                 </span>
@@ -543,8 +543,8 @@ const PaymentWidget = ({
                   variant="outline"
                   style={{
                     marginLeft: 'auto',
-                    backgroundColor: providerColors[provider.code] + '20',
-                    color: providerColors[provider.code]
+                    backgroundColor: providerColors[provider.code as keyof typeof providerColors] + '20',
+                    color: providerColors[provider.code as keyof typeof providerColors]
                   }}
                 >
                   {provider.supported_currencies.join(', ')}

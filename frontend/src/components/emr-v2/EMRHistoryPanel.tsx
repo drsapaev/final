@@ -51,6 +51,15 @@ interface HistoryRevision {
     edited_by?: number;
 }
 
+export interface EMRHistoryPanelProps {
+    visitId?: string | number;
+    currentVersion?: string | number;
+    selectedVersion?: string | number;
+    onSelectVersion?: (version: string | number | undefined) => void;
+    isOpen?: boolean;
+    onClose?: () => void;
+}
+
 /**
  * Get action label in Russian
  */
@@ -81,7 +90,7 @@ function getActionIcon(changeType: ChangeType | undefined): ReactNode {
         migrated: GitBranch,
     };
     const Icon = changeType ? icons[changeType] : undefined;
-    return (Icon ?? null) as unknown as ReactNode;
+    return Icon ? <Icon size={14} /> : null;
 }
 
 /**
@@ -102,7 +111,7 @@ export function EMRHistoryPanel({
     onSelectVersion,
     isOpen = true,
     onClose,
-}) {
+}: EMRHistoryPanelProps) {
     const { t: rawT } = useTranslation(); const t = rawT as unknown as TranslateFn;
     const [history, setHistory] = useState<HistoryRevision[]>([]);
     const [loading, setLoading] = useState(false);
