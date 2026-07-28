@@ -36,6 +36,52 @@ import {
   Textarea,
 } from '../ui/macos';
 
+type TranslationFn = (key: string, options?: Record<string, unknown>) => string;
+
+interface EmailTemplate {
+  name: string;
+  title: string;
+  description?: string;
+  variables?: string[];
+}
+
+interface EmailSMSStatistics {
+  emails_sent?: number;
+  email_success_rate?: number;
+  sms_sent?: number;
+  sms_success_rate?: number;
+  emails_failed?: number;
+  sms_failed?: number;
+}
+
+interface TestResult {
+  type: 'email' | 'sms' | 'bulk';
+  success?: boolean;
+  message?: string;
+  [key: string]: unknown;
+}
+
+interface TabLabelProps {
+  icon: import('lucide-react').LucideIcon;
+  text: React.ReactNode;
+}
+
+interface ActionCardProps {
+  icon: import('lucide-react').LucideIcon;
+  title: string;
+  description: string;
+  actionLabel: string;
+  onAction: () => void;
+  variant: string;
+}
+
+interface TemplateColumnProps {
+  title: string;
+  icon: import('lucide-react').LucideIcon;
+  templates: EmailTemplate[];
+  tone: string;
+}
+
 const pageStyles: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
@@ -76,7 +122,7 @@ const iconButtonStyle = {
   padding: 0
 };
 
-const priorityOptions = (t) => [
+const priorityOptions = (t: TranslationFn) => [
   { value: 'normal', label: t('misc.esm_priority_normal') },
   { value: 'high', label: t('misc.esm_priority_high') }
 ];
@@ -86,10 +132,10 @@ const bulkTypeOptions = [
   { value: 'sms', label: 'SMS' }
 ];
 
-const parseRecipients = (value) =>
+const parseRecipients = (value: string) =>
   value
     .split(/[\n,;]+/)
-    .map((recipient) => recipient.trim())
+    .map((recipient: string) => recipient.trim())
     .filter(Boolean);
 
 const EmailSMSManager = () => {
@@ -98,9 +144,9 @@ const EmailSMSManager = () => {
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(false);
-  const [statistics, setStatistics] = useState(null);
-  const [templates, setTemplates] = useState({ email: [], sms: [] });
-  const [testResults, setTestResults] = useState(null);
+  const [statistics, setStatistics] = useState<EmailSMSStatistics | null>(null);
+  const [templates, setTemplates] = useState<{ email: EmailTemplate[]; sms: EmailTemplate[] }>({ email: [], sms: [] });
+  const [testResults, setTestResults] = useState<TestResult | null>(null);
 
   const [emailForm, setEmailForm] = useState({
     to: '',
@@ -118,7 +164,16 @@ const EmailSMSManager = () => {
     priority: 'normal'
   });
 
-  const [bulkForm, setBulkForm] = useState({
+  const [bulkForm, setBulkForm] = useState<{
+    type: string;
+    recipients: string[];
+    recipientsText: string;
+    subject: string;
+    template: string;
+    message: string;
+    batchSize: number;
+    delay: number;
+  }>({
     type: 'email',
     recipients: [],
     recipientsText: '',
@@ -282,7 +337,7 @@ const EmailSMSManager = () => {
 
   const currentBulkTemplates = bulkForm.type === 'email' ? emailTemplateOptions : smsTemplateOptions;
 
-  const updateBulkRecipients = (value) => {
+  const updateBulkRecipients = (value: string) => {
     setBulkForm((prev) => ({
       ...prev,
       recipientsText: value,
@@ -741,7 +796,7 @@ const EmailSMSManager = () => {
   );
 };
 
-const TabLabel = ({ icon: Icon, text }) => (
+const TabLabel = ({ icon: Icon, text }: TabLabelProps) => (
   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
     <Icon size={14} />
     {text}
@@ -753,7 +808,7 @@ TabLabel.propTypes = {
   text: PropTypes.string.isRequired
 };
 
-const ActionCard = ({ icon: Icon, title, description, actionLabel, onAction, variant }) => (
+const ActionCard = ({ icon: Icon, title, description, actionLabel, onAction, variant }: ActionCardProps) => (
   <Card padding="default" shadow="small">
     <CardContent style={{ display: 'grid', gap: 'var(--mac-spacing-3)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -777,18 +832,18 @@ ActionCard.propTypes = {
   variant: PropTypes.string.isRequired
 };
 
-const TemplateColumn = ({ title, icon: Icon, templates, tone }) => {
+const TemplateColumn = ({ title, icon: Icon, templates, tone }: TemplateColumnProps) => {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT as unknown as TranslationFn;
   const columns = [
     {
       key: 'title',
       title: t('final.col_template'),
-      render: (_value, template) => (
+      render: (_value: unknown, template: Record<string, unknown>) => (
         <div style={{ minWidth: '180px' }}>
-          <strong>{template.title}</strong>
+          <strong>{String(template.title ?? '')}</strong>
           <p style={{ margin: '4px 0 0', color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-xs)' }}>
-            {template.description}
+            {String(template.description ?? '')}
           </p>
         </div>
       )
@@ -796,11 +851,11 @@ const TemplateColumn = ({ title, icon: Icon, templates, tone }) => {
     {
       key: 'variables',
       title: t('final.col_variables'),
-      render: (_value, template) => (
+      render: (_value: unknown, template: Record<string, unknown>) => (
         <div style={{ display: 'flex', gap: 'var(--mac-spacing-1)', flexWrap: 'wrap' }}>
-          {(template.variables || []).map((variable) => (
-            <Badge key={variable} size="small" variant="outline">
-              {variable}
+          {(Array.isArray(template.variables) ? template.variables : []).map((variable: unknown, index: number) => (
+            <Badge key={`var-${index}-${String(variable ?? '')}`} size="small" variant="outline">
+              {String(variable ?? '')}
             </Badge>
           ))}
         </div>
@@ -809,12 +864,12 @@ const TemplateColumn = ({ title, icon: Icon, templates, tone }) => {
     {
       key: 'actions',
       title: t('misc.esm_col_actions'),
-      render: (_value, template) => (
+      render: (_value: unknown, template: Record<string, unknown>) => (
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--mac-spacing-2)' }}>
-          <Button variant="ghost" size="small" aria-label={`View template ${template.title}`} style={iconButtonStyle}>
+          <Button variant="ghost" size="small" aria-label={`View template ${String(template.title ?? '')}`} style={iconButtonStyle}>
             <Eye size={16} />
           </Button>
-          <Button variant="ghost" size="small" aria-label={`Edit template ${template.title}`} style={iconButtonStyle}>
+          <Button variant="ghost" size="small" aria-label={`Edit template ${String(template.title ?? '')}`} style={iconButtonStyle}>
             <Edit size={16} />
           </Button>
         </div>
@@ -834,7 +889,7 @@ const TemplateColumn = ({ title, icon: Icon, templates, tone }) => {
         {templates.length === 0 ? (
           <AppEmpty title={t('misc.esm_templates_empty_title')} description={t('misc.esm_templates_empty_desc')} />
         ) : (
-          <Table columns={columns} data={templates} sortable={false} />
+          <Table columns={columns} data={templates as unknown as Array<Record<string, unknown>>} sortable={false} />
         )}
       </CardContent>
     </Card>

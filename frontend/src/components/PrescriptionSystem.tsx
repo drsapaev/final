@@ -7,7 +7,50 @@ import { Card, Button, Badge,
 import logger from '../utils/logger';
 import { useTranslation } from '../i18n/useTranslation';
 import React from "react";
-const createEmptyPrescription = () => ({
+
+interface Medication {
+  id: number;
+  name: string;
+  dosage: string;
+  frequency: string;
+  duration: string;
+  instructions: string;
+  quantity: number;
+}
+
+interface Prescription {
+  medications: Medication[];
+  instructions: string;
+  doctorNotes: string;
+  isDraft: boolean;
+  createdAt: string | null;
+  printedAt: string | null;
+}
+
+interface AppointmentRef {
+  id?: string | number;
+  doctor_id?: string | number;
+  patient_name?: string;
+  specialist?: string;
+  prescription?: Prescription;
+  [key: string]: unknown;
+}
+
+interface EMRRef {
+  isDraft?: boolean;
+  [key: string]: unknown;
+}
+
+interface PrescriptionSystemProps {
+  appointment: AppointmentRef;
+  emr?: EMRRef | null;
+  prescription?: Prescription | Record<string, unknown> | null;
+  canCreatePrescription?: boolean;
+  onSave: (prescription: Prescription) => void | Promise<void>;
+  onPrint?: ((prescription: Prescription) => void | Promise<void>) | null;
+}
+
+const createEmptyPrescription = (): Prescription => ({
   medications: [], // Список препаратов
   instructions: '', // Общие инструкции
   doctorNotes: '', // Заметки врача
@@ -23,16 +66,17 @@ const PrescriptionSystem = ({
   canCreatePrescription,
   onSave,
   onPrint
-}) => {
+}: PrescriptionSystemProps) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
-  const [prescription, setPrescription] = useState(() => createEmptyPrescription());
+  const [prescription, setPrescription] = useState<Prescription>(() => createEmptyPrescription());
 
   const [isSaving, setIsSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   useEffect(() => {
     // Загрузка существующего рецепта
-    const sourcePrescription = initialPrescription || appointment?.prescription;
+    const rawSource = initialPrescription || appointment?.prescription;
+    const sourcePrescription = rawSource as Prescription | null | undefined;
 
     if (sourcePrescription) {
       setPrescription({
@@ -48,7 +92,7 @@ const PrescriptionSystem = ({
   }, [appointment, initialPrescription]);
 
   const handleMedicationAdd = () => {
-    const newMedication = {
+    const newMedication: Medication = {
       id: Date.now(),
       name: '', // Название препарата
       dosage: '', // Дозировка
@@ -65,7 +109,7 @@ const PrescriptionSystem = ({
     setHasUnsavedChanges(true);
   };
 
-  const handleMedicationRemove = (id) => {
+  const handleMedicationRemove = (id: number) => {
     setPrescription((prev) => ({
       ...prev,
       medications: prev.medications.filter((m) => m.id !== id)
@@ -73,7 +117,7 @@ const PrescriptionSystem = ({
     setHasUnsavedChanges(true);
   };
 
-  const handleMedicationChange = (id, field, value) => {
+  const handleMedicationChange = <K extends keyof Medication>(id: number, field: K, value: Medication[K]) => {
     setPrescription((prev) => ({
       ...prev,
       medications: prev.medications.map((m) =>
@@ -83,7 +127,7 @@ const PrescriptionSystem = ({
     setHasUnsavedChanges(true);
   };
 
-  const handleFieldChange = (field, value) => {
+  const handleFieldChange = <K extends keyof Prescription>(field: K, value: Prescription[K]) => {
     setPrescription((prev) => ({
       ...prev,
       [field]: value
@@ -94,15 +138,23 @@ const PrescriptionSystem = ({
   const handleSavePrescription = async () => {
     setIsSaving(true);
     try {
-      const prescriptionToSave = {
+      const prescriptionToSave: Prescription = {
         ...prescription,
         isDraft: false,
+        createdAt: prescription.createdAt ?? new Date().toISOString(),
+        printedAt: prescription.printedAt
+      };
+
+      // Note: savedAt/appointmentId/doctorId are passed via closure to onSave.
+      // They are not part of the Prescription type but are appended here for the parent.
+      const payload = {
+        ...prescriptionToSave,
         savedAt: new Date().toISOString(),
         appointmentId: appointment.id,
         doctorId: appointment.doctor_id
       };
 
-      await onSave(prescriptionToSave);
+      await onSave(payload);
       setPrescription((prev) => ({ ...prev, isDraft: false }));
       setHasUnsavedChanges(false);
     } catch (error) {
@@ -174,7 +226,7 @@ const PrescriptionSystem = ({
             <div>
               <h2 className="text-xl font-semibold">{t('misc.ps_title')}</h2>
               <p className="text-gray-500">
-                {appointment?.patient_name} • {appointment?.specialist}
+                {String(appointment?.patient_name ?? '')} • {String(appointment?.specialist ?? '')}
               </p>
               <p className="text-sm text-gray-500 mt-1">
                 {prescriptionEligibilityLabel}
@@ -361,9 +413,9 @@ const PrescriptionSystem = ({
           <div className="text-center space-y-4">
             <div className="font-bold text-lg">{t('misc.ps_rx_title')}</div>
             <div className="text-sm">
-              <div>{t('misc.ps_patient')}: {appointment?.patient_name}</div>
+              <div>{t('misc.ps_patient')}: {String(appointment?.patient_name ?? '')}</div>
               <div>{t('misc.ps_date')}: {new Date().toLocaleDateString('ru-RU')}</div>
-              <div>{t('misc.ps_doctor')}: {appointment?.specialist}</div>
+              <div>{t('misc.ps_doctor')}: {String(appointment?.specialist ?? '')}</div>
             </div>
 
             <div className="border-t pt-4">

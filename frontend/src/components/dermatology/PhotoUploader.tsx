@@ -22,6 +22,7 @@ import {
   DialogContent,
   DialogActions,
 } from '../ui/macos';
+import type { SelectChangeEvent } from '../ui/macos/Select';
 import {
   Camera,
   Upload,
@@ -42,28 +43,61 @@ import logger from '../../utils/logger';
 import notify from '../../services/notify';
 import { convertHEICToJPEG, isHEICFile } from '../../utils/heicConverter';
 import PropTypes from 'prop-types';
-const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
+
+interface PhotoMetadata {
+  zone: string;
+  angle: string;
+  lighting: string;
+  flash: boolean;
+}
+
+interface Photo {
+  id: string | number;
+  url?: string;
+  preview: string;
+  name: string;
+  size: number;
+  uploadedAt: string;
+  metadata: PhotoMetadata;
+}
+
+interface PhotosState {
+  before: Photo[];
+  after: Photo[];
+}
+
+interface PhotoUploaderProps {
+  patientId?: string | number;
+  visitId?: string | number;
+  onDataUpdate?: (photos: PhotosState) => void;
+}
+
+interface WebcamLike {
+  getScreenshot: () => string | null;
+}
+
+const PhotoUploader = ({ patientId, visitId, onDataUpdate }: PhotoUploaderProps) => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
-  const [photos, setPhotos] = useState({
+  const [photos, setPhotos] = useState<PhotosState>({
     before: [],
     after: []
   });
-  const [selectedPhoto, setSelectedPhoto] = useState(null);
+  const [selectedPhoto, setSelectedPhoto] = useState<(Photo & { type: 'before' | 'after' }) | null>(null);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [compareMode, setCompareMode] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [converting, setConverting] = useState(false);
-  const [metadata, setMetadata] = useState({
+  const [metadata, setMetadata] = useState<PhotoMetadata>({
     zone: '',
     angle: 'front',
     lighting: 'natural',
     flash: false
   });
 
-  const webcamRef = useRef(null);
+  const webcamRef = useRef<WebcamLike | null>(null);
   const [cameraOpen, setCameraOpen] = useState(false);
-  const [cameraType, setCameraType] = useState('before');
+  const [cameraType, setCameraType] = useState<'before' | 'after'>('before');
 
   // Поддерживаемые форматы
   const acceptedFormats = {
@@ -75,7 +109,7 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
   };
 
   // Конвертация HEIC в JPEG
-  const convertHEICtoJPEG = async (file) => {
+  const convertHEICtoJPEG = async (file: File): Promise<File | Blob> => {
     setConverting(true);
     try {
       return await convertHEICToJPEG(file, 0.9);
@@ -89,7 +123,7 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
   };
 
   // Обработка загрузки файлов
-  const handleFileDrop = useCallback(async (acceptedFiles, fileType) => {
+  const handleFileDrop = useCallback(async (acceptedFiles: File[], fileType: 'before' | 'after') => {
     // D-001 fix: validate patientId/visitId BEFORE starting FileReader.
     // Previously this check was inside reader.onload (async callback),
     // causing an unhandled promise rejection that crashed silently.
@@ -103,7 +137,7 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
 
       try {
         // Проверяем и конвертируем HEIC
-        let processedFile = file;
+        let processedFile: File | Blob = file;
         if (isHEICFile(file)) {
           processedFile = await convertHEICtoJPEG(file);
         }
@@ -111,38 +145,40 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
         // Создаем превью
         const reader = new FileReader();
         reader.onload = async (e) => {
-          const preview = e.target.result;
+          const target = e.target;
+          const preview = target && typeof target.result === 'string' ? target.result : '';
 
           // Загружаем на сервер
           const formData = new FormData();
           formData.append('file', processedFile);
           formData.append('file_type', 'image');
-          formData.append('title', processedFile.name);
+          formData.append('title', file.name);
           formData.append('tags', `dermatology,photo,${fileType}`);
           if (patientId) {
-            formData.append('patient_id', patientId);
+            formData.append('patient_id', String(patientId));
           }
           if (visitId) {
-            formData.append('visit_id', visitId);
+            formData.append('visit_id', String(visitId));
           }
 
           try {
             const response = await api.post('/files/upload', formData, {
               headers: { 'Content-Type': 'multipart/form-data' },
-              onUploadProgress: (progressEvent) => {
+              onUploadProgress: (progressEvent: { loaded: number; total?: number }) => {
                 const percentCompleted = Math.round(
-                  progressEvent.loaded * 100 / progressEvent.total
+                  progressEvent.loaded * 100 / (progressEvent.total ?? 0)
                 );
                 setUploadProgress(percentCompleted);
               }
             });
 
-            const newPhoto = {
-              id: response.data.id,
-              url: response.data.url || (response.data.id ? `/api/v1/files/${response.data.id}/download` : preview),
+            const responseData = response.data as { id?: string | number; url?: string };
+            const newPhoto: Photo = {
+              id: responseData.id ?? Date.now(),
+              url: responseData.url || (responseData.id ? `/api/v1/files/${responseData.id}/download` : preview),
               preview: preview,
-              name: processedFile.name,
-              size: processedFile.size,
+              name: file.name,
+              size: file.size,
               uploadedAt: new Date().toISOString(),
               metadata: metadata
             };
@@ -173,14 +209,14 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
           setUploadProgress(0);
         };
 
-        reader.readAsDataURL(processedFile);
+        reader.readAsDataURL(processedFile as Blob);
 
       } catch (error) {
         logger.error('Ошибка загрузки фото:', error);
         setUploadProgress(0);
       }
     }
-  }, [visitId, metadata, onDataUpdate]);
+  }, [patientId, visitId, metadata, onDataUpdate]);
 
   // Dropzone для фото "До"
   const {
@@ -208,6 +244,9 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
   const capturePhoto = async () => {
     if (webcamRef.current) {
       const imageSrc = webcamRef.current.getScreenshot();
+      if (!imageSrc) {
+        return;
+      }
 
       // Конвертируем base64 в blob
       const response = await fetch(imageSrc);
@@ -220,7 +259,7 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
   };
 
   // Удаление фото
-  const deletePhoto = async (photoId, type) => {
+  const deletePhoto = async (photoId: string | number, type: 'before' | 'after') => {
     try {
       await api.delete(`/files/${photoId}`);
       // D-001 fix: compute updated photos inside setPhotos callback
@@ -242,7 +281,7 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
   };
 
   // Открыть просмотрщик
-  const openViewer = (photo, type) => {
+  const openViewer = (photo: Photo, type: 'before' | 'after') => {
     setSelectedPhoto({ ...photo, type });
     setViewerOpen(true);
     setCompareMode(false);
@@ -286,8 +325,8 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
               <Select
                 label={t('derma.derma_photo_angle')}
                 value={metadata.angle}
-                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setMetadata({ ...metadata, angle: e.target.value })}>
-                
+                onChange={(e: SelectChangeEvent) => setMetadata({ ...metadata, angle: e.target.value })}>
+
                 <Option value="front">{t('derma.derma_photo_angle_front')}</Option>
                 <Option value="side">{t('derma.derma_photo_angle_side')}</Option>
                 <Option value="back">{t('derma.derma_photo_angle_back')}</Option>
@@ -299,8 +338,8 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
               <Select
                 label={t('derma.derma_photo_lighting')}
                 value={metadata.lighting}
-                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setMetadata({ ...metadata, lighting: e.target.value })}>
-                
+                onChange={(e: SelectChangeEvent) => setMetadata({ ...metadata, lighting: e.target.value })}>
+
                 <Option value="natural">{t('derma.derma_photo_lighting_natural')}</Option>
                 <Option value="artificial">{t('derma.derma_photo_lighting_artificial')}</Option>
                 <Option value="mixed">{t('derma.derma_photo_lighting_mixed')}</Option>
@@ -311,8 +350,8 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }) => {
               <Select
                 label={t('derma.derma_photo_flash')}
                 value={metadata.flash ? 'yes' : 'no'}
-                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setMetadata({ ...metadata, flash: e.target.value === 'yes' })}>
-                
+                onChange={(e: SelectChangeEvent) => setMetadata({ ...metadata, flash: e.target.value === 'yes' })}>
+
                 <Option value="no">{t('derma.derma_photo_flash_no')}</Option>
                 <Option value="yes">{t('derma.derma_photo_flash_yes')}</Option>
               </Select>

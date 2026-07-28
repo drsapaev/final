@@ -29,14 +29,46 @@ import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 
-const emptyBranchStats = {
+interface Branch {
+  id?: string | number;
+  name: string;
+  code: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  status?: string;
+  capacity?: number;
+  services_available?: string[];
+  [key: string]: unknown;
+}
+
+interface BranchStats {
+  total_branches: number;
+  active_branches: number;
+  inactive_branches: number;
+  maintenance_branches: number;
+}
+
+interface BranchFormData {
+  name: string;
+  code: string;
+  address: string;
+  phone: string;
+  email: string;
+  status: string;
+  capacity: number;
+  services_available: string[];
+  [key: string]: unknown;
+}
+
+const emptyBranchStats: BranchStats = {
   total_branches: 0,
   active_branches: 0,
   inactive_branches: 0,
   maintenance_branches: 0
 };
 
-const deriveBranchStats = (branchList) => {
+const deriveBranchStats = (branchList: Branch[]): BranchStats => {
   const nextBranches = Array.isArray(branchList) ? branchList : [];
   return {
     total_branches: nextBranches.length,
@@ -49,17 +81,17 @@ const deriveBranchStats = (branchList) => {
 const BranchManagement = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [branches, setBranches] = useState([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [showAddForm, setShowAddForm] = useState(false);
-  const [editingBranch, setEditingBranch] = useState(null);
+  const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
   const [message, setMessage] = useState({ type: '', text: '' });
-  const [stats, setStats] = useState(null);
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [stats, setStats] = useState<BranchStats | null>(null);
+  const [formErrors, setFormErrors] = useState<Record<string, string | null>>({});
 
   // Форма филиала
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<BranchFormData>({
     name: '',
     code: '',
     address: '',
@@ -68,7 +100,7 @@ const BranchManagement = () => {
     status: 'active',
     capacity: 50,
     services_available: ['cardiology', 'dermatology', 'stomatology']
-  } as Record<string, unknown>);
+  });
 
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
@@ -90,7 +122,7 @@ const BranchManagement = () => {
   { value: 'urology', label: t('admin2.br_specialty_urology') }];
 
 
-  const normalizeBranchPhone = (value) => {
+  const normalizeBranchPhone = (value: string): string | null => {
     if (!value) {
       return '';
     }
@@ -115,7 +147,7 @@ const BranchManagement = () => {
     return null;
   };
 
-  const formatBranchPhone = (value) => {
+  const formatBranchPhone = (value: string): string => {
     const normalized = normalizeBranchPhone(value);
     const canonical = normalized || value?.trim() || '';
     const digits = canonical.replace(/\D/g, '');
@@ -131,9 +163,9 @@ const BranchManagement = () => {
     try {
       setLoading(true);
       const response = (await api.get('/clinic/branches')) as import('axios').AxiosResponse<Record<string, unknown>>;
-      const nextBranches = Array.isArray(response.data)
-        ? (response.data as unknown[])
-        : (response.data?.branches as unknown[]) || [];
+      const nextBranches: Branch[] = Array.isArray(response.data)
+        ? (response.data as Branch[])
+        : (((response.data?.branches as unknown[]) || []) as Branch[]);
       setBranches(nextBranches);
       setStats(deriveBranchStats(nextBranches));
     } catch (error) {
@@ -149,13 +181,13 @@ const BranchManagement = () => {
     loadBranches();
   }, [loadBranches]);
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     try {
       setSaving(true);
       setFormErrors({});
 
-      const normalizedPhone = normalizeBranchPhone(formData.phone);
+      const normalizedPhone = normalizeBranchPhone(String(formData.phone ?? ''));
       if (String(formData.phone ?? '').trim() && normalizedPhone === null) {
         setFormErrors({ phone: t('admin2.br_phone_format_error') });
         setMessage({
@@ -189,9 +221,13 @@ const BranchManagement = () => {
     }
   };
 
-  const handleEdit = (branch) => {
+  const handleEdit = (branch: Branch) => {
     setFormData({
       ...branch,
+      address: branch.address || '',
+      email: branch.email || '',
+      status: branch.status || 'active',
+      capacity: branch.capacity ?? 50,
       phone: formatBranchPhone(branch.phone || ''),
       services_available: branch.services_available || []
     });
@@ -199,7 +235,8 @@ const BranchManagement = () => {
     setShowAddForm(true);
   };
 
-  const handleDelete = async (branchId) => {
+  const handleDelete = async (branchId: string | number | undefined) => {
+    if (branchId === undefined) return;
     try {
       await api.delete(`/clinic/branches/${branchId}`);
       setMessage({ type: 'success', text: t('admin2.br_delete_success') });
@@ -223,12 +260,12 @@ const BranchManagement = () => {
     setFormErrors({});
   };
 
-  const getStatusColor = (status) => {
+  const getStatusColor = (status: string): string => {
     const statusOption = statusOptions.find((s) => s.value === status);
     return statusOption ? statusOption.color : 'gray';
   };
 
-  const getStatusLabel = (status) => {
+  const getStatusLabel = (status: string): string => {
     const statusOption = statusOptions.find((s) => s.value === status);
     return statusOption ? statusOption.label : status;
   };
@@ -398,7 +435,7 @@ const BranchManagement = () => {
                   }
                 }}
                 placeholder="+998 71 123 45 67"
-                error={formErrors.phone} />
+                error={formErrors.phone ?? undefined} />
               <p className="admin-m-4px-0-0-0-fs-xs-secondary">
                 {t('admin2.br_phone_format_hint')}
               </p>
@@ -447,17 +484,17 @@ const BranchManagement = () => {
                 {specialtyOptions.map((specialty) =>
               <label key={specialty.value} className="admin-d-flex-ai-center-gap-8-fs-sm-primary">
                     <Checkbox
-                  checked={(formData.services_available as unknown[]).includes(specialty.value)}
+                  checked={formData.services_available.includes(specialty.value)}
                   onChange={(checked) => {
                     if (checked) {
                       setFormData({
                         ...formData,
-                        services_available: [...(formData.services_available as unknown[]), specialty.value]
+                        services_available: [...formData.services_available, specialty.value]
                       });
                     } else {
                       setFormData({
                         ...formData,
-                        services_available: (formData.services_available as unknown[]).filter((s) => s !== specialty.value)
+                        services_available: formData.services_available.filter((s) => s !== specialty.value)
                       });
                     }
                   }} />
@@ -539,8 +576,8 @@ const BranchManagement = () => {
                   </p>
                 </div>
                 <Badge
-              variant={getStatusColor(branch.status)}
-              text={getStatusLabel(branch.status)} />
+              variant={getStatusColor(branch.status ?? '')}
+              text={getStatusLabel(branch.status ?? '')} />
             
               </div>
 
@@ -575,7 +612,7 @@ const BranchManagement = () => {
                     {t('admin2.br_services_label')}
                   </p>
                   <div className="admin-d-flex-fw-wrap-gap-4">
-                    {branch.services_available.map((service) => {
+                    {branch.services_available.map((service: string) => {
                 const specialty = specialtyOptions.find((s) => s.value === service);
                 return specialty ?
                 <Badge
