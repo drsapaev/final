@@ -7,23 +7,85 @@ import { MacOSCard, Button,
 import {
   Select,
 } from '../ui/macos';
+import type { SelectChangeEvent } from '../ui/macos/Select';
 
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 
-const getTransactionTypeOptions = (t) => [
+type TranslationFn = (key: string, options?: Record<string, unknown>) => string;
+
+interface Patient {
+  id: number | string;
+  lastName?: string;
+  firstName?: string;
+  middleName?: string;
+  fullName?: string;
+  name?: string;
+}
+
+interface Doctor {
+  id: number | string;
+  user?: {
+    full_name?: string;
+    username?: string;
+  };
+  fullName?: string;
+  name?: string;
+  specialty?: string;
+  specialization?: string;
+}
+
+interface FinanceTransaction {
+  type?: string;
+  category?: string;
+  amount?: string | number;
+  description?: string;
+  patientId?: string | number;
+  doctorId?: string | number;
+  paymentMethod?: string;
+  status?: string;
+  transactionDate?: string;
+  notes?: string;
+  reference?: string;
+}
+
+interface TransactionPayload {
+  type: string;
+  category: string;
+  amount: number;
+  description: string;
+  patientId: number | null;
+  doctorId: number | null;
+  paymentMethod: string;
+  status: string;
+  transactionDate: string;
+  notes: string | null;
+  reference: string | null;
+}
+
+interface FinanceModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  transaction?: FinanceTransaction | Record<string, unknown> | null;
+  onSave: (data: TransactionPayload) => Promise<void> | void;
+  loading?: boolean;
+  patients?: Patient[];
+  doctors?: Doctor[];
+}
+
+const getTransactionTypeOptions = (t: TranslationFn) => [
   { value: 'income', label: t('admin2.fm_type_income') },
   { value: 'expense', label: t('admin2.fm_type_expense') }
 ];
 
-const getPaymentMethodOptions = (t) => [
+const getPaymentMethodOptions = (t: TranslationFn) => [
   { value: 'cash', label: t('admin2.fm_payment_cash') },
   { value: 'card', label: t('admin2.fm_payment_card') },
   { value: 'transfer', label: t('admin2.fm_payment_transfer') },
   { value: 'mobile', label: t('admin2.fm_payment_mobile') }
 ];
 
-const getStatusOptions = (t) => [
+const getStatusOptions = (t: TranslationFn) => [
   { value: '', label: t('admin2.fm_status_not_set') },
   { value: 'pending', label: t('admin2.fm_status_pending') },
   { value: 'completed', label: t('admin2.fm_status_completed') },
@@ -31,7 +93,7 @@ const getStatusOptions = (t) => [
   { value: 'refunded', label: t('admin2.fm_status_refunded') }
 ];
 
-const getIncomeCategories = (t) => [
+const getIncomeCategories = (t: TranslationFn) => [
   t('admin2.fm_cat_income_consultation'),
   t('admin2.fm_cat_income_diagnostics'),
   t('admin2.fm_cat_income_treatment'),
@@ -42,7 +104,7 @@ const getIncomeCategories = (t) => [
   t('admin2.fm_cat_income_other')
 ];
 
-const getExpenseCategories = (t) => [
+const getExpenseCategories = (t: TranslationFn) => [
   t('admin2.fm_cat_expense_salary'),
   t('admin2.fm_cat_expense_rent'),
   t('admin2.fm_cat_expense_utilities'),
@@ -56,13 +118,13 @@ const getExpenseCategories = (t) => [
 const FinanceModal = ({
   isOpen,
   onClose,
-  transaction = null as Record<string, unknown> | null,
+  transaction = null as FinanceTransaction | Record<string, unknown> | null,
   onSave,
   loading = false,
-  patients = [],
-  doctors = []
-}) => {
-  const [formData, setFormData] = useState({
+  patients = [] as Patient[],
+  doctors = [] as Doctor[]
+}: FinanceModalProps) => {
+  const [formData, setFormData] = useState<Record<string, unknown>>({
     type: 'income',
     category: '',
     amount: '',
@@ -74,28 +136,29 @@ const FinanceModal = ({
     transactionDate: '',
     notes: '',
     reference: ''
-  } as Record<string, unknown>);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  });
+  const [errors, setErrors] = useState<Record<string, string | null>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT as unknown as TranslationFn;
 
   // Инициализация формы при открытии
   useEffect(() => {
     if (isOpen) {
-      if (transaction) {
+      const txn = (transaction ?? null) as FinanceTransaction | null;
+      if (txn) {
         setFormData({
-          type: (transaction as Record<string, unknown> | null)?.type || 'income',
-          category: (transaction as Record<string, unknown> | null)?.category || '',
-          amount: (transaction as Record<string, unknown> | null)?.amount || '',
-          description: (transaction as Record<string, unknown> | null)?.description || '',
-          patientId: (transaction as Record<string, unknown> | null)?.patientId || '',
-          doctorId: (transaction as Record<string, unknown> | null)?.doctorId || '',
-          paymentMethod: (transaction as Record<string, unknown> | null)?.paymentMethod || 'cash',
-          status: (transaction as Record<string, unknown> | null)?.status ?? '',
-          transactionDate: (transaction as Record<string, unknown> | null)?.transactionDate || '',
-          notes: (transaction as Record<string, unknown> | null)?.notes || '',
-          reference: (transaction as Record<string, unknown> | null)?.reference || ''
+          type: txn.type || 'income',
+          category: txn.category || '',
+          amount: txn.amount ?? '',
+          description: txn.description || '',
+          patientId: txn.patientId ?? '',
+          doctorId: txn.doctorId ?? '',
+          paymentMethod: txn.paymentMethod || 'cash',
+          status: txn.status ?? '',
+          transactionDate: txn.transactionDate || '',
+          notes: txn.notes || '',
+          reference: txn.reference || ''
         });
       } else {
         // Устанавливаем сегодняшний день по умолчанию
@@ -150,7 +213,7 @@ const FinanceModal = ({
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     if (!validateForm()) {
@@ -194,15 +257,15 @@ const FinanceModal = ({
     }
   };
 
-  const handleChange = (field, value) => {
+  const handleChange = (field: string, value: unknown) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: null }));
     }
   };
 
-  const getPatientName = (patientId) => {
-    const patient = patients.find((p) => p.id === parseInt(patientId, 10));
+  const getPatientName = (patientId: unknown): string => {
+    const patient = patients.find((p) => String(p.id) === String(patientId));
     if (!patient) return '';
 
     const fullName = [patient.lastName, patient.firstName, patient.middleName]
@@ -211,8 +274,8 @@ const FinanceModal = ({
     return fullName || patient.fullName || patient.name || '';
   };
 
-  const getDoctorName = (doctorId) => {
-    const doctor = doctors.find((d) => d.id === parseInt(doctorId, 10));
+  const getDoctorName = (doctorId: unknown): string => {
+    const doctor = doctors.find((d) => String(d.id) === String(doctorId));
     if (!doctor) return '';
 
     const doctorName =
@@ -265,7 +328,7 @@ const FinanceModal = ({
                   </label>
                   <Select
                     value={String(formData.type ?? '')}
-                    onChange={(value: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('type', value)}
+                    onChange={(event: SelectChangeEvent) => handleChange('type', event.target.value)}
                     options={getTransactionTypeOptions(t)}
                     size="large"
                     className="admin-w-full" />
@@ -284,7 +347,7 @@ const FinanceModal = ({
                   </label>
                   <Select
                     value={String(formData.category ?? '')}
-                    onChange={(value: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('category', value)}
+                    onChange={(event: SelectChangeEvent) => handleChange('category', event.target.value)}
                     options={[
                       { value: '', label: t('admin2.fm_placeholder_category') },
                       ...(String(formData.type ?? '') === 'income' ? getIncomeCategories(t) : getExpenseCategories(t)).map((category) => ({
@@ -403,7 +466,7 @@ const FinanceModal = ({
                   </label>
                   <Select
                     value={String(formData.patientId ?? '') === '' ? '' : String(formData.patientId)}
-                    onChange={(value: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('patientId', value)}
+                    onChange={(event: SelectChangeEvent) => handleChange('patientId', event.target.value)}
                     options={[
                       { value: '', label: t('admin2.fm_placeholder_patient') },
                       ...patients.map((patient) => ({
@@ -424,7 +487,7 @@ const FinanceModal = ({
                   </label>
                   <Select
                     value={String(formData.doctorId ?? '') === '' ? '' : String(formData.doctorId)}
-                    onChange={(value: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('doctorId', value)}
+                    onChange={(event: SelectChangeEvent) => handleChange('doctorId', event.target.value)}
                     options={[
                       { value: '', label: t('admin2.fm_placeholder_doctor') },
                       ...doctors.map((doctor) => ({
@@ -451,7 +514,7 @@ const FinanceModal = ({
                   </label>
                   <Select
                     value={String(formData.paymentMethod ?? '')}
-                    onChange={(value: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('paymentMethod', value)}
+                    onChange={(event: SelectChangeEvent) => handleChange('paymentMethod', event.target.value)}
                     options={getPaymentMethodOptions(t)}
                     size="large"
                     className="admin-w-full" />
@@ -464,7 +527,7 @@ const FinanceModal = ({
                   </label>
                   <Select
                     value={String(formData.status ?? '')}
-                    onChange={(value: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('status', value)}
+                    onChange={(event: SelectChangeEvent) => handleChange('status', event.target.value)}
                     options={getStatusOptions(t)}
                     size="large"
                     className="admin-w-full" />
@@ -522,7 +585,7 @@ const FinanceModal = ({
             </div>
 
             {/* Предварительный просмотр */}
-            {(formData.amount && formData.description) && (
+            {(Boolean(formData.amount) && Boolean(formData.description)) && (
               <div className="space-y-4">
                 <h3 className="text-lg font-medium admin-text-primary">
                   {t('admin2.fm_section_preview')}
@@ -544,16 +607,16 @@ const FinanceModal = ({
                     <p className="text-sm admin-text-secondary">
                       <strong>{t('admin2.fm_preview_date')}</strong> {String(formData.transactionDate ?? '')}
                     </p>
-                    {formData.patientId && (
+                    {formData.patientId ? (
                       <p className="text-sm admin-text-secondary">
                         <strong>{t('admin2.fm_preview_patient')}</strong> {getPatientName(formData.patientId)}
                       </p>
-                    )}
-                    {formData.doctorId && (
+                    ) : null}
+                    {formData.doctorId ? (
                       <p className="text-sm admin-text-secondary">
                         <strong>{t('admin2.fm_preview_doctor')}</strong> {getDoctorName(formData.doctorId)}
                       </p>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               </div>

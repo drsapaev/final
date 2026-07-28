@@ -26,18 +26,94 @@ import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 
-const PROVIDER_LABELS = {
+type TranslationFn = (key: string, options?: Record<string, unknown>) => string;
+
+type ProviderName = 'microsoft' | 'google' | 'local' | 'mock' | string;
+type PrinterStatus = 'online' | 'busy' | 'offline' | 'error' | string;
+type StatusBadgeVariant = 'success' | 'warning' | 'secondary' | 'destructive';
+
+interface PrinterCapabilities {
+  printer_type?: string;
+  device_path?: string | null;
+  paper_width?: number | string | null;
+  paper_height?: number | string | null;
+  encoding?: string;
+  [key: string]: unknown;
+}
+
+interface Printer {
+  id: string | number;
+  name: string;
+  description?: string;
+  provider: ProviderName;
+  status: PrinterStatus;
+  location?: string;
+  printer_type?: string;
+  connection_type?: string;
+  is_default?: boolean;
+  capabilities?: PrinterCapabilities;
+  display_name?: string;
+  device_path?: string;
+  paper_width?: number | string | null;
+  paper_height?: number | string | null;
+  encoding?: string;
+  source?: string;
+}
+
+interface PrinterStatistics {
+  total_printers?: number;
+  online_printers?: number;
+  offline_printers?: number;
+  providers_count?: number;
+}
+
+interface PrintFormState {
+  provider_name: string;
+  printer_id: string;
+  title: string;
+  content: string;
+  format: string;
+  copies: number;
+  color: boolean;
+  duplex: boolean;
+}
+
+interface PatientData {
+  patient_name: string;
+  age: string;
+  phone: string;
+}
+
+interface TemplateData {
+  diagnosis: string;
+  prescription_text: string;
+  doctor_name: string;
+  queue_number: string;
+  cabinet: string;
+  examination_results: string;
+  conclusion: string;
+}
+
+interface MedicalFormState {
+  provider_name: string;
+  printer_id: string;
+  document_type: string;
+  patient_data: PatientData;
+  template_data: TemplateData;
+}
+
+const PROVIDER_LABELS: Record<string, string> = {
   microsoft: 'Microsoft Universal Print',
   google: 'Google Cloud Print',
   local: 'Local Print Gateway'
 };
 
-const getProviderLabel = (provider, t) => {
+const getProviderLabel = (provider: ProviderName, t: TranslationFn): string => {
   if (provider === 'mock') return `Mock (${t('admin2.cp_provider_mock')})`;
-  return PROVIDER_LABELS[provider] || provider;
+  return PROVIDER_LABELS[provider as keyof typeof PROVIDER_LABELS] || provider;
 };
 
-const getStatusText = (status, t) => {
+const getStatusText = (status: PrinterStatus, t: TranslationFn): string => {
   switch (status) {
     case 'online': return t('admin2.cp_status_online');
     case 'busy': return t('admin2.cp_status_busy');
@@ -47,13 +123,13 @@ const getStatusText = (status, t) => {
   }
 };
 
-const getProviderOptions = (providers = [], t) =>
+const getProviderOptions = (providers: ProviderName[] = [], t: TranslationFn) =>
   providers.map((provider) => ({
     value: provider,
     label: getProviderLabel(provider, t)
   }));
 
-const getPrinterOptions = (printers = [], providerName = '', t) =>
+const getPrinterOptions = (printers: Printer[] = [], providerName: string = '', t: TranslationFn) =>
   printers
     .filter((printer) => printer.provider === providerName)
     .map((printer) => ({
@@ -61,9 +137,9 @@ const getPrinterOptions = (printers = [], providerName = '', t) =>
       label: `${printer.name} (${getStatusText(printer.status, t)})`
     }));
 
-const normalizeLocalPrinter = (printer, t) => ({
-  id: printer.name || String(printer.id),
-  name: printer.display_name || printer.name || t('admin2.cp_local_printer'),
+const normalizeLocalPrinter = (printer: Record<string, unknown>, t: TranslationFn): Printer => ({
+  id: (printer.name as string) || String(printer.id ?? ''),
+  name: (printer.display_name as string) || (printer.name as string) || t('admin2.cp_local_printer'),
   description:
     [
       printer.printer_type ? `${printer.printer_type}` : null,
@@ -71,35 +147,35 @@ const normalizeLocalPrinter = (printer, t) => ({
     ]
       .filter(Boolean)
       .join(' • ') || t('admin2.cp_local_system_printer'),
-  status: printer.status || null,
-  location: printer.device_path || printer.location || t('admin2.cp_local_computer'),
+  status: (printer.status as PrinterStatus) || '',
+  location: (printer.device_path as string) || (printer.location as string) || t('admin2.cp_local_computer'),
   capabilities: {
-    printer_type: printer.printer_type || 'unknown',
-    device_path: printer.device_path || null,
-    paper_width: printer.paper_width || null,
-    paper_height: printer.paper_height || null,
-    encoding: printer.encoding || 'utf-8'
+    printer_type: (printer.printer_type as string) || 'unknown',
+    device_path: (printer.device_path as string) || null,
+    paper_width: (printer.paper_width as number | string | null) || null,
+    paper_height: (printer.paper_height as number | string | null) || null,
+    encoding: (printer.encoding as string) || 'utf-8'
   },
   provider: 'local',
-  printer_type: printer.printer_type || 'unknown',
-  connection_type: printer.connection_type || 'local',
+  printer_type: (printer.printer_type as string) || 'unknown',
+  connection_type: (printer.connection_type as string) || 'local',
   is_default: Boolean(printer.is_default),
   source: 'system'
 });
 
 const CloudPrintingManager = () => {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT as unknown as TranslationFn;
   const [activeTab, setActiveTab] = useState('printers');
-  const [printers, setPrinters] = useState([]);
-  const [localPrinters, setLocalPrinters] = useState([]);
-  const [providers, setProviders] = useState([]);
+  const [printers, setPrinters] = useState<Printer[]>([]);
+  const [localPrinters, setLocalPrinters] = useState<Printer[]>([]);
+  const [providers, setProviders] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
-  const [selectedPrinter, setSelectedPrinter] = useState(null);
-  const [statistics, setStatistics] = useState(null);
+  const [selectedPrinter, setSelectedPrinter] = useState<Printer | null>(null);
+  const [statistics, setStatistics] = useState<PrinterStatistics | null>(null);
 
   // Состояние для печати документа
-  const [printForm, setPrintForm] = useState({
+  const [printForm, setPrintForm] = useState<PrintFormState>({
     provider_name: '',
     printer_id: '',
     title: '',
@@ -111,7 +187,7 @@ const CloudPrintingManager = () => {
   });
 
   // Состояние для медицинского документа
-  const [medicalForm, setMedicalForm] = useState({
+  const [medicalForm, setMedicalForm] = useState<MedicalFormState>({
     provider_name: '',
     printer_id: '',
     document_type: 'prescription',
@@ -161,9 +237,9 @@ const CloudPrintingManager = () => {
         api.get('/cloud-printing/printers'),
         api.get('/print/printers')
       ]);
-      const printersData = cloudResponse.data?.printers || [];
-      const providersData = cloudResponse.data?.providers || [];
-      const localPrintersData = (localResponse.data?.printers || []).map(
+      const printersData = (cloudResponse.data?.printers ?? []) as Printer[];
+      const providersData = (cloudResponse.data?.providers ?? []) as string[];
+      const localPrintersData = ((localResponse.data?.printers ?? []) as Array<Record<string, unknown>>).map(
         (printer) => normalizeLocalPrinter(printer, t)
       );
 
@@ -189,17 +265,17 @@ const CloudPrintingManager = () => {
   const loadStatistics = async () => {
     try {
       const response = (await api.get('/cloud-printing/statistics')) as import('axios').AxiosResponse<Record<string, unknown>>;
-      setStatistics(response.data?.statistics);
+      setStatistics((response.data?.statistics ?? null) as PrinterStatistics | null);
     } catch (error) {
       logger.error('Ошибка загрузки статистики:', error);
       setStatistics(null);
     }
   };
 
-  const testPrinter = async (providerName, printerId) => {
+  const testPrinter = async (providerName: string, printerId: string | number) => {
     try {
       const response = providerName === 'local'
-        ? await api.post(`/print/printers/${encodeURIComponent(printerId)}/test`)
+        ? await api.post(`/print/printers/${encodeURIComponent(String(printerId))}/test`)
         : await api.post(`/cloud-printing/test/${providerName}/${printerId}`);
 
       if (response.data?.success || response.data?.status === 'printed' || String(response.data?.message ?? '')) {
@@ -207,9 +283,10 @@ const CloudPrintingManager = () => {
       } else {
         toast.error(String(response.data?.message ?? '') || t('admin2.cp_test_print_error'));
       }
-    } catch (error) {
+    } catch (error: unknown) {
       logger.error('Ошибка тестовой печати:', error);
-      toast.error(error.response?.data?.detail || t('admin2.cp_test_print_error'));
+      const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      toast.error(detail || t('admin2.cp_test_print_error'));
     }
   };
 
@@ -231,9 +308,10 @@ const CloudPrintingManager = () => {
       } else {
         toast.error(String(response.data?.message ?? '') || t('admin2.cp_print_error'));
       }
-    } catch (error) {
+    } catch (error: unknown) {
       logger.error('Ошибка печати:', error);
-      toast.error(error.response?.data?.detail || t('admin2.cp_medical_print_error'));
+      const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      toast.error(detail || t('admin2.cp_medical_print_error'));
     }
   };
 
@@ -256,7 +334,7 @@ const CloudPrintingManager = () => {
     }
   };
 
-  const getStatusBadgeVariant = (status) => {
+  const getStatusBadgeVariant = (status: PrinterStatus): StatusBadgeVariant => {
     switch (status) {
       case 'online':return 'success';
       case 'busy':return 'warning';
@@ -266,7 +344,7 @@ const CloudPrintingManager = () => {
     }
   };
 
-  const renderPrinterGrid = (list, emptyTitle) =>
+  const renderPrinterGrid = (list: Printer[], emptyTitle: string) =>
     <>
       <div className="admin-grid-auto-300">
         {list.map((printer) =>

@@ -1,6 +1,6 @@
 import { useTranslation } from '../../i18n/useTranslation';
 import { useCallback, useEffect, useState } from 'react';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import PropTypes from 'prop-types';
 import {
   Key,
@@ -26,6 +26,7 @@ import {
 import {
   AppError, AppLoading, MacOSCard, Button, Badge, Input, Table, Checkbox, Select,
 } from '../ui/macos';
+import type { SelectChangeEvent } from '../ui/macos/Select';
 // UX Audit: ModernDialog для extend-activation диалога (вместо window.prompt).
 import ModernDialog from '../dialogs/ModernDialog';
 
@@ -34,18 +35,72 @@ import api from '../../api/client';
 // P-013 fix: shared ConfirmDialog hook replacing native confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
 
-const buildStats = (items = []) => ({
+type TranslationFn = (key: string, options?: Record<string, unknown>) => string;
+
+interface Activation {
+  key?: string;
+  machine_hash?: string;
+  status?: string;
+  expiry_date?: string;
+  meta?: Record<string, unknown> | string;
+  issued_at?: string;
+  activated_at?: string;
+  revoked_at?: string;
+  created_at?: string;
+  [k: string]: unknown;
+}
+
+interface ActivationStats {
+  total_activations: number;
+  active_activations: number;
+  trial_activations: number;
+  expired_activations: number;
+}
+
+interface ServerStatus {
+  ok?: boolean;
+  key?: string;
+  reason?: string;
+  [k: string]: unknown;
+}
+
+interface ExtendDialogState {
+  key: string;
+  days: string;
+  error: string;
+}
+
+interface KeyFormData {
+  key_type: string;
+  duration_days: number;
+  max_devices: number;
+  description: string;
+  features: {
+    full_access: boolean;
+    ai_features: boolean;
+    telegram_integration: boolean;
+    print_system: boolean;
+    [k: string]: boolean;
+  };
+}
+
+interface ActivationKeyFormProps {
+  onSave: (data: KeyFormData) => Promise<unknown> | unknown;
+  onCancel: () => void;
+}
+
+const buildStats = (items: Activation[] = []): ActivationStats => ({
   total_activations: items.length,
   active_activations: items.filter((item) => item.status === 'active').length,
   trial_activations: items.filter((item) => item.status === 'trial').length,
   expired_activations: items.filter((item) => item.status === 'expired').length
 });
 
-const parseMeta = (meta) => {
+const parseMeta = (meta: unknown): Record<string, unknown> => {
   if (!meta) return {};
-  if (typeof meta === 'object') return meta;
+  if (typeof meta === 'object') return meta as Record<string, unknown>;
   try {
-    return JSON.parse(meta);
+    return JSON.parse(String(meta)) as Record<string, unknown>;
   } catch {
     return {};
   }
@@ -53,31 +108,19 @@ const parseMeta = (meta) => {
 
 const ActivationSystem = () => {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const t = rawT as unknown as TranslationFn;
   // P-013 fix: shared ConfirmDialog hook (replaces 1 native confirm() call).
   const [confirmRaw, confirmDialog] = useConfirm();
   const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
   const [loading, setLoading] = useState(true);
-  
-interface Activation {
-  key?: string;
-  machine_hash?: string;
-  status?: string;
-  expiry_date?: string;
-  meta?: Record<string, unknown>;
-  issued_at?: string;
-  activated_at?: string;
-  revoked_at?: string;
-  [k: string]: unknown;
-}
 
 const [activations, setActivations] = useState<Activation[]>([]);
-  const [stats, setStats] = useState<Record<string, unknown> | null>(null);
-  const [serverStatus, setServerStatus] = useState(null);
+  const [stats, setStats] = useState<ActivationStats | null>(null);
+  const [serverStatus, setServerStatus] = useState<ServerStatus | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [message, setMessage] = useState({ type: '', text: '' });
+  const [message, setMessage] = useState<{ type: string; text: string }>({ type: '', text: '' });
   const [loadError, setLoadError] = useState('');
 
   // Статусы активации
@@ -99,10 +142,10 @@ const [activations, setActivations] = useState<Activation[]>([]);
         api.get('/activation/status')
       ]);
 
-      const activationsData = activationsRes.data?.items || [];
+      const activationsData = (activationsRes.data?.items ?? []) as Activation[];
       setActivations(activationsData);
       setStats(buildStats(activationsData));
-      setServerStatus(statusRes.data || null);
+      setServerStatus((statusRes.data ?? null) as ServerStatus | null);
 
     } catch (error) {
       logger.error('Ошибка загрузки данных активации:', error);
@@ -118,7 +161,7 @@ const [activations, setActivations] = useState<Activation[]>([]);
     loadData();
   }, [loadData]);
 
-  const generateActivationKey = async (keyData) => {
+  const generateActivationKey = async (keyData: KeyFormData) => {
     try {
       const payload = {
         days: Number(keyData.duration_days) || 365,
@@ -138,13 +181,13 @@ const [activations, setActivations] = useState<Activation[]>([]);
       setShowCreateForm(false);
       await loadData();
       return result;
-    } catch (error) {
+    } catch (error: unknown) {
       logger.error('Ошибка создания ключа:', error);
       setMessage({ type: 'error', text: (error instanceof Error ? error.message : String(error)) });
     }
   };
 
-  const revokeActivation = async (activationKey) => {
+  const revokeActivation = async (activationKey: string | undefined) => {
     // P-013 fix: replaced native confirm() with shared useConfirm hook.
     const ok = await confirm({
       title: t('admin2.revoke_activation_title'),
@@ -168,21 +211,21 @@ const [activations, setActivations] = useState<Activation[]>([]);
 
   // UX Audit: window.prompt() → модальный диалог с input полем.
   // state для extend dialog: { key, days } | null.
-  const [extendDialog, setExtendDialog] = useState(null);
+  const [extendDialog, setExtendDialog] = useState<ExtendDialogState | null>(null);
 
-  const openExtendDialog = (activationKey) => {
-    setExtendDialog({ key: activationKey, days: '30', error: '' });
+  const openExtendDialog = (activationKey: string | undefined) => {
+    setExtendDialog({ key: activationKey ?? '', days: '30', error: '' });
   };
 
-  const handleExtendDaysChange = (e) => {
-    setExtendDialog((prev) => ({ ...prev, days: e.target.value, error: '' }));
+  const handleExtendDaysChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setExtendDialog((prev) => prev ? ({ ...prev, days: e.target.value, error: '' }) : prev);
   };
 
   const submitExtendActivation = async () => {
     if (!extendDialog) return;
     const days = Number.parseInt(extendDialog.days, 10);
     if (!Number.isFinite(days) || days <= 0) {
-      setExtendDialog((prev) => ({ ...prev, error: t('admin2.act_invalid_days') }));
+      setExtendDialog((prev) => prev ? ({ ...prev, error: t('admin2.act_invalid_days') }) : prev);
       return;
     }
 
@@ -198,12 +241,12 @@ const [activations, setActivations] = useState<Activation[]>([]);
     }
   };
 
-  const extendActivation = (activationKey) => {
+  const extendActivation = (activationKey: string | undefined) => {
     openExtendDialog(activationKey);
   };
 
-  const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text);
+  const copyToClipboard = (text: string | undefined) => {
+    navigator.clipboard.writeText(text ?? '');
     setMessage({ type: 'success', text: t('admin2.act_copied') });
   };
 
@@ -361,7 +404,7 @@ const [activations, setActivations] = useState<Activation[]>([]);
             </label>
             <Select
               value={statusFilter}
-              onChange={(value: unknown) => setStatusFilter(String(value))}
+              onChange={(event: SelectChangeEvent) => setStatusFilter(event.target.value)}
               options={[
               { value: 'all', label: t('admin2.act_filter_all') },
               { value: 'issued', label: t('admin2.act_filter_issued') },
@@ -384,109 +427,121 @@ const [activations, setActivations] = useState<Activation[]>([]);
             {
               key: 'key',
               title: t('admin2.col_activation_key'),
-              render: (activation: Activation) =>
-              <div className="flex items-center justify-center">
+              render: (_value: unknown, row: Record<string, unknown>): ReactNode => {
+                const activation = row as Activation;
+                return (
+                <div className="flex items-center justify-center">
                     <Key className="admin-icon-16-mr-8-blue" />
                     <div>
                       <div className="admin-key-field">
-                        {(activation || {}).key?.slice(0, 8)}...{(activation || {}).key?.slice(-4)}
+                        {activation.key?.slice(0, 8)}...{activation.key?.slice(-4)}
                       </div>
                       <Button
                     size="small"
                     variant="ghost"
-                    onClick={() => copyToClipboard((activation || {}).key)}
+                    onClick={() => copyToClipboard(activation.key)}
                     className="admin-btn-ghost-xs-mt-4">
                         <Copy className="admin-icon-12-mr-4" />
                         {t('admin2.act_copy_btn')}
                       </Button>
                     </div>
                   </div>
-
+                );
+              }
             },
             {
               key: 'device',
               title: t('admin2.col_device'),
-              render: (activation: Activation) =>
-              <div className="flex items-center justify-center">
+              render: (_value: unknown, row: Record<string, unknown>): ReactNode => {
+                const activation = row as Activation;
+                return (
+                <div className="flex items-center justify-center">
                     <Smartphone className="admin-icon-16-mr-8-tertiary" />
                     <div>
                       <div className="admin-device-title">
-                        {(activation || {}).machine_hash ? `${(activation || {}).machine_hash.slice(0, 12)}...` : t('admin2.act_not_linked')}
+                        {activation.machine_hash ? `${activation.machine_hash.slice(0, 12)}...` : t('admin2.act_not_linked')}
                       </div>
                       <div className="admin-device-sub">
-                        {parseMeta((activation || {}).meta).description || parseMeta((activation || {}).meta).key_type || t('admin2.act_no_description')}
+                        {String(parseMeta(activation.meta).description ?? '') || String(parseMeta(activation.meta).key_type ?? '') || t('admin2.act_no_description')}
                       </div>
                     </div>
                   </div>
-
+                );
+              }
             },
             {
               key: 'status',
               title: t('admin2.col_active'),
-              render: (activation: Activation) => {
-                const row = activation || {};
-                const status = statusLabels[row.status] || { label: row.status, color: 'secondary' };
-                return <Badge variant={status.color}>{status.label}</Badge>;
+              render: (_value: unknown, row: Record<string, unknown>): ReactNode => {
+                const activation = row as Activation;
+                const statusKey = (activation.status ?? '') as keyof typeof statusLabels;
+                const status = statusLabels[statusKey] || { label: activation.status ?? '', color: 'secondary' as const };
+                return <Badge variant={status.color as 'success' | 'warning' | 'error' | 'info' | 'secondary'}>{status.label}</Badge>;
               }
             },
             {
               key: 'expiry',
               title: t('admin2.col_expiry'),
-              render: (activation: Activation) => {
-                const row = activation || {};
-                const isExpired = row.expiry_date ? new Date(row.expiry_date) < new Date() : false;
+              render: (_value: unknown, row: Record<string, unknown>): ReactNode => {
+                const activation = row as Activation;
+                const isExpired = activation.expiry_date ? new Date(activation.expiry_date) < new Date() : false;
                 return (
                   <div>
                       <div className="admin-expiry-date">
-                        {row.expiry_date ? new Date(row.expiry_date).toLocaleDateString('ru-RU') : '—'}
+                        {activation.expiry_date ? new Date(activation.expiry_date).toLocaleDateString('ru-RU') : '—'}
                       </div>
-                      {isExpired &&
+                      {isExpired && activation.expiry_date &&
                     <div className="admin-expiry-expired">
-                          {t('admin2.act_expired_ago', { days: Math.floor((new Date().getTime() - new Date(row.expiry_date).getTime()) / (1000 * 60 * 60 * 24)) })}
+                          {t('admin2.act_expired_ago', { days: Math.floor((new Date().getTime() - new Date(activation.expiry_date).getTime()) / (1000 * 60 * 60 * 24)) })}
                         </div>
                     }
                     </div>);
-
               }
             },
             {
               key: 'created',
               title: t('admin2.col_created'),
-              render: (activation: Activation) =>
-              <div className="admin-created-date">
-                    {(activation || {}).created_at ? new Date(String((activation || {}).created_at)).toLocaleDateString('ru-RU') : '—'}
+              render: (_value: unknown, row: Record<string, unknown>): ReactNode => {
+                const activation = row as Activation;
+                return (
+                <div className="admin-created-date">
+                    {activation.created_at ? new Date(String(activation.created_at)).toLocaleDateString('ru-RU') : '—'}
                   </div>
-
+                );
+              }
             },
             {
               key: 'actions',
               title: t('admin2.col_actions'),
-              render: (_actionValue, activation) =>
-              <div className="admin-form-row-gap-8">
+              render: (_value: unknown, row: Record<string, unknown>): ReactNode => {
+                const activation = row as Activation;
+                return (
+                <div className="admin-form-row-gap-8">
                     <Button
                   size="small"
                   variant="outline"
-                  onClick={() => extendActivation((activation || {}).key)}
-                  disabled={(activation || {}).status === 'revoked'}
+                  onClick={() => extendActivation(activation.key)}
+                  disabled={activation.status === 'revoked'}
                   type="button"
                   title={t('admin2.act_extend_title')}
-                  aria-label={t('admin2.act_extend_aria', { key: (activation || {}).key || '' }).trim()}>
-                  
+                  aria-label={t('admin2.act_extend_aria', { key: activation.key ?? '' }).trim()}>
+                    
                       <Calendar aria-hidden="true" className="w-3.5 h-3.5" />
                     </Button>
                     <Button
                   size="small"
                   variant="outline"
-                  onClick={() => revokeActivation((activation || {}).key)}
-                  disabled={(activation || {}).status === 'revoked'}
+                  onClick={() => revokeActivation(activation.key)}
+                  disabled={activation.status === 'revoked'}
                   type="button"
                   title={t('admin2.act_revoke_title')}
-                  aria-label={t('admin2.act_revoke_aria', { key: (activation || {}).key || '' }).trim()}>
-                  
+                  aria-label={t('admin2.act_revoke_aria', { key: activation.key ?? '' }).trim()}>
+                    
                       <Shield aria-hidden="true" className="w-3.5 h-3.5" />
                     </Button>
                   </div>
-
+                );
+              }
             }]
             }
             data={filteredActivations}
@@ -567,10 +622,10 @@ const [activations, setActivations] = useState<Activation[]>([]);
 };
 
 // Компонент формы создания ключа
-const ActivationKeyForm = ({ onSave, onCancel }) => {
+const ActivationKeyForm = ({ onSave, onCancel }: ActivationKeyFormProps) => {
   const { t: rawT } = useTranslation();
-  const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
-  const [formData, setFormData] = useState({
+  const t = rawT as unknown as TranslationFn;
+  const [formData, setFormData] = useState<KeyFormData>({
     key_type: 'full',
     duration_days: 365,
     max_devices: 1,
@@ -583,16 +638,16 @@ const ActivationKeyForm = ({ onSave, onCancel }) => {
     }
   });
 
-  const handleSubmit = (e) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     onSave(formData);
   };
 
-  const handleChange = (field, value) => {
+  const handleChange = (field: string, value: unknown) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleFeatureChange = (feature, enabled) => {
+  const handleFeatureChange = (feature: string, enabled: boolean) => {
     setFormData((prev) => ({
       ...prev,
       features: { ...prev.features, [feature]: enabled }
@@ -613,7 +668,7 @@ const ActivationKeyForm = ({ onSave, onCancel }) => {
             </label>
             <Select
               value={formData.key_type}
-              onChange={(value: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('key_type', value)}
+              onChange={(event: SelectChangeEvent) => handleChange('key_type', event.target.value)}
               options={[
               { value: 'trial', label: t('admin2.act_form_type_trial') },
               { value: 'full', label: t('admin2.act_form_type_full') },
