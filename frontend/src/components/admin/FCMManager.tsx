@@ -31,9 +31,28 @@ import { toast } from 'react-toastify';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
-const formatFcmTokenStatus = (user, t) => {
+
+interface FcmStatus {
+  active?: boolean;
+  server_key_configured?: boolean;
+  [key: string]: unknown;
+}
+
+interface FcmUser {
+  user_id: string | number;
+  full_name?: string;
+  username?: string;
+  push_enabled?: boolean;
+  device_type?: string;
+  fcm_token?: string;
+  fcm_token_length?: number;
+  last_login?: string;
+  [key: string]: unknown;
+}
+
+const formatFcmTokenStatus = (user: FcmUser, t: (key: string, options?: Record<string, unknown>) => string) => {
   const fallbackLength = typeof user.fcm_token === 'string' ? user.fcm_token.length : 0;
-  const tokenLength = Number.isFinite(user.fcm_token_length) ? user.fcm_token_length : fallbackLength;
+  const tokenLength = Number.isFinite(user.fcm_token_length) ? (user.fcm_token_length as number) : fallbackLength;
 
   return tokenLength > 0 ? t('admin2.fcm_token_hidden', { count: tokenLength }) : t('admin2.fcm_token_not_registered');
 };
@@ -41,14 +60,14 @@ const formatFcmTokenStatus = (user, t) => {
 const FCMManager = () => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [loading, setLoading] = useState(false);
-  const [fcmStatus, setFcmStatus] = useState(null);
-  const [usersWithTokens, setUsersWithTokens] = useState([]);
+  const [fcmStatus, setFcmStatus] = useState<FcmStatus | null>(null);
+  const [usersWithTokens, setUsersWithTokens] = useState<FcmUser[]>([]);
   const [activeTab, setActiveTab] = useState('overview');
   const [notificationForm, setNotificationForm] = useState<Record<string, any>>({
     title: '',
     body: '',
-    user_ids: [],
-    data: {},
+    user_ids: [] as unknown[],
+    data: {} as Record<string, unknown>,
     image: '',
     sound: 'default'
   });
@@ -56,7 +75,7 @@ const FCMManager = () => {
   const loadFCMStatus = useCallback(async () => {
     try {
       const response = await api.get('/fcm/status');
-      setFcmStatus(response.data.fcm_service);
+      setFcmStatus(response.data.fcm_service as FcmStatus);
     } catch (error) {
       logger.error('Error loading FCM status:', error);
     }
@@ -65,7 +84,7 @@ const FCMManager = () => {
   const loadUsersWithTokens = useCallback(async () => {
     try {
       const response = await api.get('/fcm/user-tokens');
-      setUsersWithTokens(response.data.users || []);
+      setUsersWithTokens((response.data.users as FcmUser[]) || []);
     } catch (error) {
       logger.error('Error loading users with tokens:', error);
     }
@@ -98,7 +117,7 @@ const FCMManager = () => {
       if (response.data.success) {
         toast.success(t('admin2.fcm_toast_test_sent'));
       } else {
-        toast.error(t('admin2.fcm_err_with_message', { message: response.data.message }));
+        toast.error(t('admin2.fcm_err_with_message', { message: String(response.data.message) }));
       }
     } catch (error) {
       logger.error('Error testing FCM:', error);
@@ -141,7 +160,7 @@ const FCMManager = () => {
       const response = await api.post('/fcm/send-notification', payload);
 
       if (response.data.success) {
-        toast.success(t('admin2.fcm_toast_sent', { message: response.data.message }));
+        toast.success(t('admin2.fcm_toast_sent', { message: String(response.data.message) }));
         setNotificationForm({
           title: '',
           body: '',
@@ -151,7 +170,7 @@ const FCMManager = () => {
           sound: 'default'
         });
       } else {
-        toast.error(t('admin2.fcm_err_send', { message: response.data.message }));
+        toast.error(t('admin2.fcm_err_send', { message: String(response.data.message) }));
       }
     } catch (error) {
       logger.error('Error sending FCM notification:', error);
@@ -311,7 +330,7 @@ const FCMManager = () => {
             </label>
             <Select
             value={notificationForm.sound}
-            onChange={(value) => setNotificationForm((prev) => ({ ...prev, sound: value }))}
+            onChange={(value: unknown) => setNotificationForm((prev) => ({ ...prev, sound: value }))}
             options={[
             { value: 'default', label: t('admin2.fcm_sound_default') },
             { value: 'notification', label: t('admin2.fcm_sound_notification') },
@@ -333,7 +352,7 @@ const FCMManager = () => {
               </p>
               
               <div className="admin-maxh-160-ovy-auto-bd-1px-solid-var-mac-bo-radius-var-mac-radius-md-p-8-bgc-bg-secondary">
-                {usersWithTokens.map((user) =>
+                {usersWithTokens.map((user: FcmUser) =>
               <label key={user.user_id} className="admin-d-flex-ai-center-gap-8-p-8-radius-var-mac-radius-sm-cur-pointer-tr-background-color-var"
               onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)'}
               onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
@@ -349,7 +368,7 @@ const FCMManager = () => {
                     } else {
                       setNotificationForm((prev) => ({
                         ...prev,
-                        user_ids: prev.user_ids.filter((id) => id !== user.user_id)
+                        user_ids: prev.user_ids.filter((id: unknown) => id !== user.user_id)
                       }));
                     }
                   }} />
@@ -386,7 +405,7 @@ const FCMManager = () => {
           {t('admin2.fcm_heading_users', { count: usersWithTokens.length })}
         </h3>
         <div className="admin-flex-col-16">
-          {usersWithTokens.map((user) =>
+          {usersWithTokens.map((user: FcmUser) =>
         <div key={user.user_id} className="admin-d-flex-ai-center-jc-between-p-16-bd-1px-solid-var-mac-bo-radius-var-mac-radius-md-bgc-bg-secondary-tr-all-var-mac-duration"
         onPointerEnter={(e) => {
           e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)';

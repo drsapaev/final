@@ -39,14 +39,36 @@ import ClinicSettings from './ClinicSettings';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
+
+interface SystemHealthData {
+  status?: string;
+  warnings?: string[];
+  overall_status?: string;
+  db?: string;
+  security?: string;
+  [key: string]: unknown;
+}
+
+interface ClinicStats {
+  total_branches?: number;
+  active_branches?: number;
+  total_equipment?: number;
+  active_equipment?: number;
+  total_licenses?: number;
+  active_licenses?: number;
+  total_backups?: number;
+  recent_backups?: number;
+  [key: string]: unknown;
+}
+
 const ClinicManagement = () => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [activeTab, setActiveTab] = useState('overview');
-  const [systemHealth, setSystemHealth] = useState(null);
-  const [stats, setStats] = useState(null);
+  const [systemHealth, setSystemHealth] = useState<SystemHealthData | null>(null);
+  const [stats, setStats] = useState<ClinicStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState({ type: '', text: '' });
-  const [error] = useState(null);
+  const [error] = useState<string | null>(null);
   // UX Audit Admin #3.1: showConfirmModal + pendingAction removed — dead code.
   // setShowConfirmModal(true) was never called anywhere in the file.
   // Other admin components use useConfirm() hook (P-013 fix).

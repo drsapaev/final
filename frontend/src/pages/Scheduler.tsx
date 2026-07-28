@@ -4,6 +4,19 @@ import { api } from '../api/client';
 import { Input } from '../components/ui/macos';
 import { useTranslation } from '../i18n/useTranslation';
 
+interface ScheduleRow {
+  id?: string | number;
+  doctor_name?: string;
+  doctor?: string;
+  room?: string;
+  status?: string;
+  time?: string;
+  slot?: string;
+  start_time?: string;
+  end_time?: string;
+  [key: string]: unknown;
+}
+
 function todayStr() {
   const d = new Date();
   const y = d.getFullYear();
@@ -20,7 +33,7 @@ export default function Scheduler() {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [date, setDate] = useState(todayStr());
-  const [rows, setRows] = useState([]);
+  const [rows, setRows] = useState<ScheduleRow[]>([]);
   const [q, setQ] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
@@ -34,7 +47,7 @@ export default function Scheduler() {
       if (!res || !Array.isArray(res) && !Array.isArray(res?.data?.items)) {
         res = await api.get('/schedule', { params: { d: date, limit: 200 } });
       }
-      const items = Array.isArray(res?.data?.items) ? (res.data.items as unknown[]) : Array.isArray(res?.data) ? (res.data as unknown[]) : [];
+      const items = (Array.isArray(res?.data?.items) ? res.data.items : Array.isArray(res?.data) ? res.data : []) as ScheduleRow[];
       setRows(items);
     } catch (e) {
       const err = e as { data?: { detail?: string }; message?: string };

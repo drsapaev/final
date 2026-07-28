@@ -130,7 +130,7 @@ function extractXMLText(xmlDoc, tagName) {
 
 // Извлечение данных отведений
 function extractLeads(xmlDoc) {
-  const leads = [];
+  const leads: { name: string | null; data: string | null }[] = [];
   const leadElements = xmlDoc.querySelectorAll('lead');
 
   leadElements.forEach((lead) => {
@@ -169,8 +169,8 @@ export const parseECGFile = async (file) => {
 
 // Анализ параметров ЭКГ
 export const analyzeECGParameters = (parameters) => {
-  const findings = [];
-  const alerts = [];
+  const findings: string[] = [];
+  const alerts: string[] = [];
 
   if (!parameters) return { findings, alerts };
 

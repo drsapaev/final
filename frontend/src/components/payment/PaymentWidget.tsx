@@ -37,6 +37,22 @@ import { useTranslation } from '../../i18n/useTranslation';
 // UX Audit #4 regression fix: dividerStyle, providerOptionStyle, providerNameStyle
 // вынесены в CSS-классы .pw-divider, .pw-provider-option, .pw-provider-name.
 
+interface PaymentProvider {
+  code: string;
+  name: string;
+  is_active?: boolean;
+  supported_currencies: string[];
+}
+
+interface PaymentData {
+  payment_id?: string | number;
+  payment_url?: string;
+  provider?: string;
+  status?: string;
+  success?: boolean;
+  [key: string]: unknown;
+}
+
 const PaymentWidget = ({
   visitId,
   amount,
@@ -45,6 +61,14 @@ const PaymentWidget = ({
   onSuccess,
   onError,
   onCancel
+}: {
+  visitId?: string | number;
+  amount?: string | number;
+  currency?: string;
+  description?: string;
+  onSuccess?: (data: unknown) => void;
+  onError?: (message: string) => void;
+  onCancel?: () => void;
 }) => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
@@ -65,12 +89,12 @@ const PaymentWidget = ({
     window.location.hostname === '127.0.0.1';
 
   // Состояния
-  const [providers, setProviders] = useState([]);
+  const [providers, setProviders] = useState<PaymentProvider[]>([]);
   const [selectedProvider, setSelectedProvider] = useState('');
   const [loading, setLoading] = useState(false);
   const [providersLoading, setProvidersLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [paymentData, setPaymentData] = useState(null);
+  const [error, setError] = useState<string | null>(null);
+  const [paymentData, setPaymentData] = useState<PaymentData | null>(null);
   const [paymentStatus, setPaymentStatus] = useState('pending');
 
   // HIGH #7 fix: auto-polling for online payment status.
@@ -79,7 +103,7 @@ const PaymentWidget = ({
   // matching the behavior of PaymentClick/PaymentPayMe.
   const MAX_POLLING_ATTEMPTS = 60;
   const POLLING_INTERVAL_MS = 5000;
-  const pollingRef = useRef(null);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const attemptsRef = useRef(0);
   const [pollingAttempts, setPollingAttempts] = useState(0);
 
@@ -105,7 +129,7 @@ const PaymentWidget = ({
       if (response.data?.providers) {
         // Фильтруем активные провайдеры по валюте
         const availableProviders = response.data.providers.filter(
-          (provider) => provider.is_active &&
+          (provider: PaymentProvider) => provider.is_active &&
           provider.supported_currencies.includes(currency)
         );
         setProviders(availableProviders);
@@ -214,7 +238,7 @@ const PaymentWidget = ({
       const paymentRequest = {
         visit_id: visitId,
         provider: selectedProvider,
-        amount: parseFloat(amount),
+        amount: parseFloat(String(amount)),
         currency: currency,
         description: effectiveDescription,
         return_url: `${window.location.origin}/payment/success`,
@@ -237,8 +261,8 @@ const PaymentWidget = ({
       const response = await apiClient.post(endpoint, paymentRequest);
 
       if (response.data?.success) {
-        const nextPaymentData = {
-          ...response.data,
+        const nextPaymentData: PaymentData = {
+          ...(response.data as Record<string, unknown>),
           provider: selectedProvider
         };
         setPaymentData(nextPaymentData);
@@ -256,12 +280,12 @@ const PaymentWidget = ({
               `/cashier/payments/${response.data.payment_id}/confirm`
             );
 
-            const confirmedPaymentData = {
+            const confirmedPaymentData: PaymentData = {
               ...nextPaymentData,
-              ...confirmResponse.data,
+              ...(confirmResponse.data as Record<string, unknown>),
               payment_id: response.data.payment_id,
               provider: selectedProvider,
-              status: confirmResponse.data?.status ?? null,
+              status: (confirmResponse.data?.status as string) ?? null,
               confirmed: true
             };
 
@@ -322,7 +346,7 @@ const PaymentWidget = ({
         if (nextStatus === 'paid' && onSuccess) {
           onSuccess({
             ...paymentData,
-            ...response.data,
+            ...(response.data as Record<string, unknown>),
             status: response.data.status
           });
         }
@@ -503,10 +527,10 @@ const PaymentWidget = ({
           id="payment-provider"
           label={t('payment.pay_widg_method_label')}
           value={selectedProvider}
-          onValueChange={(value) => setSelectedProvider(String(value))}
+          onValueChange={(value: unknown) => setSelectedProvider(String(value))}
           disabled={loading}
           className="pw-select-margin"
-          options={providers.map((provider) => ({
+          options={providers.map((provider: PaymentProvider) => ({
             value: provider.code,
             label: (
               <span className="pw-provider-option">

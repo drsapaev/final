@@ -48,12 +48,23 @@ const iconMap = {
 
 const defaultTabColor = 'var(--mac-accent)';
 
-const toGradient = (color) =>
+const toGradient = (color: string) =>
   `linear-gradient(135deg, ${color}, color-mix(in srgb, ${color}, white 14%))`;
 
+type IconComponent = React.ComponentType<{ size?: number | string; className?: string }>;
+
+interface TabItem {
+  key: string;
+  label: string;
+  queue_tags: string[];
+  icon: IconComponent;
+  color: string;
+  gradient: string;
+}
+
 interface ModernTabsProps {
-  activeTab?: string;
-  onTabChange?: (tab: string) => void;
+  activeTab?: string | null;
+  onTabChange?: (tab: string | null) => void;
   onProfilesLoaded?: (profiles: unknown[]) => void;
   departmentStats?: Record<string, unknown>;
   language?: string;
@@ -72,9 +83,9 @@ const ModernTabs = ({
 }: ModernTabsProps) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [indicatorStyle, setIndicatorStyle] = useState<Record<string, any>>({});
-  const [tabs, setTabs] = useState([]);
+  const [tabs, setTabs] = useState<TabItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const tabsRef = useRef(null);
+  const tabsRef = useRef<HTMLDivElement | null>(null);
 
   // ⭐ SSOT: Загрузка профилей очередей (вкладок) из БД через API
   // Tabs определяются в backend, frontend только отображает
@@ -87,19 +98,19 @@ const ModernTabs = ({
       const response = await api.get('/queues/profiles?active_only=true');
 
       // Backend returns {success: true, profiles: [...], source: 'database'|'fallback'}
-      const profiles = response.data.profiles || [];
+      const profiles = (response.data?.profiles as Record<string, any>[]) || [];
 
       if (profiles.length === 0) {
         throw new Error('No profiles returned from API');
       }
 
       // Преобразуем данные из API в формат для вкладок
-      const profilesData = profiles.map((profile) => ({
-        key: profile.key,
+      const profilesData: TabItem[] = profiles.map((profile) => ({
+        key: String(profile.key),
         label: language === 'uz' ? profile.title || profile.title_ru : profile.title_ru || profile.title,
         // ⭐ SSOT: queue_tags используются для фильтрации записей на вкладке
         queue_tags: profile.queue_tags || [profile.key],
-        icon: iconMap[profile.icon] || Package, // Fallback на Package если иконка не найдена
+        icon: (iconMap[profile.icon as keyof typeof iconMap] as IconComponent) || Package, // Fallback на Package если иконка не найдена
         color: profile.color || defaultTabColor,
         gradient: profile.gradient || toGradient(profile.color || defaultTabColor)
       }));
@@ -177,8 +188,8 @@ const ModernTabs = ({
 
   // Слушаем обновления профилей очередей
   useEffect(() => {
-    const handleProfilesUpdate = (event) => {
-      logger.log('ModernTabs: Получено обновление профилей очередей', event.detail);
+    const handleProfilesUpdate = (event: Event) => {
+      logger.log('ModernTabs: Получено обновление профилей очередей', (event as CustomEvent).detail);
       loadQueueProfiles();
     };
 
@@ -216,22 +227,22 @@ const ModernTabs = ({
     } else {
       setIndicatorStyle({ opacity: 0 });
     }
-  }, [activeTab]);
+  }, [activeTab, tabs]);
 
   // Получение статистики для отдела
-  const getStats = (tabKey) => {
+  const getStats = (tabKey: string) => {
     const stats = (departmentStats[tabKey] || {}) as Record<string, unknown>;
     return {
-      todayCount: stats.todayCount || 0,
-      hasActiveQueue: stats.hasActiveQueue || false,
-      hasPendingPayments: stats.hasPendingPayments || false
+      todayCount: Number(stats.todayCount ?? 0),
+      hasActiveQueue: Boolean(stats.hasActiveQueue),
+      hasPendingPayments: Boolean(stats.hasPendingPayments)
     };
   };
 
   // Рендер индикаторов статуса
-  const renderStatusIndicators = (tabKey) => {
+  const renderStatusIndicators = (tabKey: string) => {
     const stats = getStats(tabKey);
-    const indicators = [];
+    const indicators: React.ReactNode[] = [];
 
     if (stats.hasActiveQueue) {
       indicators.push(
@@ -317,7 +328,7 @@ const ModernTabs = ({
         {/* Кнопка t('misc.mt_vse_otdeleniya') */}
         <button
           className={`tab-button all-departments ${!activeTab ? 'active' : ''}`}
-          onClick={() => onTabChange(null)}
+          onClick={() => onTabChange?.(null)}
           style={{
             color: !activeTab ? 'var(--mac-accent)' : colors.text
           }}>
@@ -341,7 +352,7 @@ const ModernTabs = ({
             className="tab-indicator"
             style={{
               ...indicatorStyle,
-              background: activeTab ? tabs.find((t) => t.key === activeTab)?.gradient : 'transparent'
+              background: activeTab ? tabs.find((tb) => tb.key === activeTab)?.gradient : 'transparent'
             }} />
 
 
@@ -355,7 +366,7 @@ const ModernTabs = ({
                 key={tab.key}
                 data-tab={tab.key}
                 className={`tab-button department ${isActive ? 'active' : ''}`}
-                onClick={() => onTabChange(isActive ? null : tab.key)}
+                onClick={() => onTabChange?.(isActive ? null : tab.key)}
                 style={{
                   color: isActive ? 'var(--mac-text-primary)' : colors.text,
                   backgroundColor: isActive ? 'color-mix(in srgb, var(--mac-nav-item-active), transparent 70%)' : 'transparent',

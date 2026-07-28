@@ -19,6 +19,25 @@ import {
   Copy } from
 'lucide-react';
 
+interface TwoFactorStatus {
+  enabled?: boolean;
+  totp_verified?: boolean;
+  backup_codes_count?: number;
+  recovery_enabled?: boolean;
+  trusted_devices_count?: number;
+  last_used?: string | null;
+  [key: string]: unknown;
+}
+
+interface TwoFactorDevice {
+  id: string | number;
+  device_name?: string;
+  device_type?: string;
+  ip_address?: string;
+  last_used?: string | null;
+  [key: string]: unknown;
+}
+
 const TwoFactorSettings = () => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
@@ -28,11 +47,11 @@ const TwoFactorSettings = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [status, setStatus] = useState(null);
+  const [status, setStatus] = useState<TwoFactorStatus | null>(null);
   const [showBackupCodes, setShowBackupCodes] = useState(false);
-  const [backupCodes, setBackupCodes] = useState([]);
-  const [devices, setDevices] = useState([]);
-  const [copiedCode, setCopiedCode] = useState('');
+  const [backupCodes, setBackupCodes] = useState<string[]>([]);
+  const [devices, setDevices] = useState<TwoFactorDevice[]>([]);
+  const [copiedCode, setCopiedCode] = useState<string | number>('');
 
   useEffect(() => {
     loadStatus();
@@ -42,7 +61,7 @@ const TwoFactorSettings = () => {
   const loadStatus = async () => {
     try {
       const response = (await api.get('/2fa/status')) as import('axios').AxiosResponse<Record<string, unknown>>;
-      setStatus(response);
+      setStatus(response.data as TwoFactorStatus);
     } catch {
       setError(t('misc.tfs_load_status_error'));
     }
@@ -51,7 +70,7 @@ const TwoFactorSettings = () => {
   const loadDevices = async () => {
     try {
       const response = (await api.get('/2fa/devices')) as import('axios').AxiosResponse<Record<string, unknown>>;
-      setDevices((response.data?.devices as unknown[]) || []);
+      setDevices(((response.data?.devices as unknown[]) || []) as TwoFactorDevice[]);
     } catch (err) {
       logger.error('Error loading devices:', err);
     }
@@ -60,7 +79,7 @@ const TwoFactorSettings = () => {
   const loadBackupCodes = async () => {
     try {
       const response = (await api.get('/2fa/backup-codes')) as import('axios').AxiosResponse<Record<string, unknown>>;
-      setBackupCodes((response.data?.backup_codes as unknown[]) || []);
+      setBackupCodes(((response.data?.backup_codes as unknown[]) || []) as string[]);
       setShowBackupCodes(true);
     } catch {
       setError(t('misc.tfs_load_backup_codes_error'));
@@ -115,7 +134,7 @@ const TwoFactorSettings = () => {
 
     try {
       const response = (await api.post('/2fa/backup-codes/regenerate')) as import('axios').AxiosResponse<Record<string, unknown>>;
-      setBackupCodes((response.data?.backup_codes as unknown[]) || []);
+      setBackupCodes(((response.data?.backup_codes as unknown[]) || []) as string[]);
       setShowBackupCodes(true);
       setSuccess(t('misc.tfs_regenerate_success'));
     } catch (err) {
@@ -125,7 +144,7 @@ const TwoFactorSettings = () => {
     }
   };
 
-  const handleUntrustDevice = async (deviceId) => {
+  const handleUntrustDevice = async (deviceId: string | number) => {
     // P-013 fix: replaced native confirm() with shared useConfirm hook.
     const ok = await confirm({
       title: t('misc.tfs_untrust_title'),
@@ -148,7 +167,7 @@ const TwoFactorSettings = () => {
     }
   };
 
-  const copyToClipboard = (text, code) => {
+  const copyToClipboard = (text: string, code: string | number) => {
     navigator.clipboard.writeText(text);
     setCopiedCode(code);
     setTimeout(() => setCopiedCode(''), 2000);
@@ -277,7 +296,7 @@ const TwoFactorSettings = () => {
               {t('misc.tfs_backup_codes_label')}
             </div>
             <div style={{ color: 'var(--text-primary)', fontWeight: 'var(--mac-font-weight-medium)' }}>
-              {t('misc.tfs_backup_codes_remaining', { count: status.backup_codes_count })}
+              {t('misc.tfs_backup_codes_remaining', { count: status.backup_codes_count as number })}
             </div>
           </div>
           <div>
@@ -300,7 +319,7 @@ const TwoFactorSettings = () => {
 
         {status.last_used &&
         <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--mac-font-size-xs)' }}>
-            {t('misc.tfs_last_used', { date: new Date(status.last_used).toLocaleString() })}
+            {t('misc.tfs_last_used', { date: new Date(status.last_used as string).toLocaleString() })}
           </div>
         }
       </div>
@@ -371,7 +390,7 @@ const TwoFactorSettings = () => {
             gap: 'var(--mac-spacing-2)',
             marginBottom: 'var(--mac-spacing-4)'
           }}>
-                {backupCodes.map((code, index) =>
+                {backupCodes.map((code: string, index: number) =>
             <div
               key={index}
               style={{
@@ -468,7 +487,7 @@ const TwoFactorSettings = () => {
           </h3>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-3)' }}>
-            {devices.map((device) =>
+            {devices.map((device: TwoFactorDevice) =>
           <div
             key={device.id}
             style={{
@@ -501,7 +520,7 @@ const TwoFactorSettings = () => {
                 color: 'var(--text-secondary)'
               }}>
                     {device.last_used ?
-                t('misc.tfs_device_last_used', { date: new Date(device.last_used).toLocaleString() }) :
+                t('misc.tfs_device_last_used', { date: new Date(device.last_used as string).toLocaleString() }) :
                 t('misc.tfs_device_never_used')
                 }
                   </div>
