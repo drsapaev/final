@@ -18,6 +18,7 @@ type TFunc = (key: string, options?: Record<string, unknown>) => string;
 interface PhotoData {
   before?: Array<{ url?: string } | string>;
   after?: Array<{ url?: string } | string>;
+  [key: string]: unknown;
 }
 
 interface CurrentAppointment {
@@ -76,7 +77,7 @@ export function DermaPhotosTab({
           {t('derma.derma_photos_ai_title')}
         </h3>
         <SkinAnalysis
-          photos={photoData}
+          photos={photoData as unknown as Record<string, unknown>}
           visitId={currentAppointment?.visit_id}
           patientId={currentAppointment?.patient_id || selectedPatient?.patient_id || selectedPatient?.patient?.id}
           onAnalysisComplete={(result: unknown) => {

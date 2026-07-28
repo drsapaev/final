@@ -14,19 +14,47 @@ import PropTypes from 'prop-types';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
 
+interface PatientRecord {
+  firstName?: string;
+  lastName?: string;
+  middleName?: string;
+  email?: string;
+  phone?: string;
+  birthDate?: string;
+  gender?: string;
+  address?: string;
+  passport?: string;
+  insuranceNumber?: string;
+  emergencyContact?: string;
+  emergencyPhone?: string;
+  bloodType?: string;
+  allergies?: string;
+  chronicDiseases?: string;
+  notes?: string;
+  [key: string]: unknown;
+}
+
+interface PatientModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  patient?: PatientRecord | null;
+  onSave?: (data: Record<string, unknown>) => void | Promise<void>;
+  loading?: boolean;
+}
+
 const PatientModal = ({
   isOpen,
   onClose,
   patient = null,
   onSave,
   loading = false
-}) => {
+}: PatientModalProps) => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
   const [confirmRaw, confirmDialog] = useConfirm();
   const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<Record<string, unknown>>({
     firstName: '',
     lastName: '',
     middleName: '',
@@ -43,11 +71,11 @@ const PatientModal = ({
     allergies: '',
     chronicDiseases: '',
     notes: ''
-  } as Record<string, unknown>);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  });
+  const [errors, setErrors] = useState<Record<string, string | null>>({});
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [isDirty, setIsDirty] = useState(false);
 
   // Инициализация формы при открытии
@@ -143,7 +171,7 @@ const PatientModal = ({
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     if (!validateForm()) return;
@@ -169,17 +197,18 @@ const PatientModal = ({
         notes: String(formData.notes ?? '').trim() || null
       };
 
-      await onSave(patientData);
+      await onSave?.(patientData);
       onClose();
     } catch (error) {
       logger.error('Ошибка сохранения пациента:', error);
-      setSubmitError(error?.response?.data?.detail || error?.message || t('admin2.pm_err_save'));
+      const err = error as { response?: { data?: { detail?: string } }; message?: string };
+      setSubmitError(err?.response?.data?.detail || err?.message || t('admin2.pm_err_save'));
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleChange = (field, value) => {
+  const handleChange = (field: string, value: unknown) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     setIsDirty(true);
     if (errors[field]) {
@@ -206,7 +235,7 @@ const PatientModal = ({
     }
   };
 
-  const formatPhone = (value) => {
+  const formatPhone = (value: string) => {
     const cleaned = value.replace(/\D/g, '');
     if (cleaned.startsWith('998')) {
       const match = cleaned.match(/^998(\d{2})(\d{3})(\d{2})(\d{2})$/);
@@ -217,7 +246,7 @@ const PatientModal = ({
     return value;
   };
 
-  const handlePhoneChange = (e) => {
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const formatted = formatPhone(e.target.value);
     handleChange('phone', formatted);
   };
@@ -253,7 +282,7 @@ const PatientModal = ({
                 value={String(formData.lastName ?? '')}
                 onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('lastName', e.target.value)}
                 placeholder={t('admin2.pm_ph_last_name')}
-                error={errors.lastName}
+                error={errors.lastName || undefined}
                 icon={User} />
 
               {errors.lastName &&
@@ -274,7 +303,7 @@ const PatientModal = ({
                 value={String(formData.firstName ?? '')}
                 onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('firstName', e.target.value)}
                 placeholder={t('admin2.pm_ph_first_name')}
-                error={errors.firstName} />
+                error={errors.firstName || undefined} />
 
               {errors.firstName &&
               <p className="admin-fs-xs-error-mt-4-d-flex-ai-center-gap-4-11">
@@ -308,10 +337,10 @@ const PatientModal = ({
                 type="date"
                 value={String(formData.birthDate ?? '')}
                 onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('birthDate', e.target.value)}
-                error={errors.birthDate}
+                error={errors.birthDate || undefined}
                 icon={Calendar} />
 
-              {formData.birthDate &&
+              {formData.birthDate != null && String(formData.birthDate) &&
               <p className="admin-fs-xs-secondary-mt-4-ml-2">
                   {t('admin2.pm_age_text', { age: new Date().getFullYear() - new Date(String(formData.birthDate)).getFullYear() })}
                 </p>
@@ -331,13 +360,13 @@ const PatientModal = ({
               </label>
               <Select
                 value={String(formData.gender ?? '')}
-                onChange={(value: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('gender', value)}
+                onChange={(value) => handleChange('gender', value.target.value)}
                 options={[
                 { value: '', label: t('admin2.pm_gender_placeholder') },
                 { value: 'male', label: t('admin2.pm_gender_male') },
                 { value: 'female', label: t('admin2.pm_gender_female') }]
                 }
-                error={errors.gender}
+                error={errors.gender || undefined}
                 size="large" />
 
               {errors.gender &&
@@ -366,7 +395,7 @@ const PatientModal = ({
                 value={String(formData.phone ?? '')}
                 onChange={handlePhoneChange}
                 placeholder="+998 90 123 45 67"
-                error={errors.phone}
+                error={errors.phone || undefined}
                 icon={Phone} />
 
               {errors.phone &&
@@ -387,7 +416,7 @@ const PatientModal = ({
                 value={String(formData.email ?? '')}
                 onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('email', e.target.value)}
                 placeholder="ivan@example.com"
-                error={errors.email}
+                error={errors.email || undefined}
                 icon={Mail} />
 
               {errors.email &&
@@ -430,7 +459,7 @@ const PatientModal = ({
                 value={String(formData.passport ?? '')}
                 onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('passport', e.target.value)}
                 placeholder="AA1234567"
-                error={errors.passport}
+                error={errors.passport || undefined}
                 icon={IdCard} />
 
               {errors.passport &&
@@ -505,7 +534,7 @@ const PatientModal = ({
               </label>
               <Select
                 value={String(formData.bloodType ?? '')}
-                onChange={(value: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('bloodType', value)}
+                onChange={(value) => handleChange('bloodType', value.target.value)}
                 options={[
                 { value: '', label: t('admin2.pm_blood_type_not_specified') },
                 { value: 'A+', label: 'A+' },

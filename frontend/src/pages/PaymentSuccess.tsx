@@ -114,9 +114,9 @@ const PaymentSuccess = () => {
 
   // Состояния
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [paymentData, setPaymentData] = useState(null);
-  const [receiptUrl, setReceiptUrl] = useState(null);
+  const [error, setError] = useState<string | null>(null);
+  const [paymentData, setPaymentData] = useState<Record<string, unknown> | null>(null);
+  const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
 
   // Получаем параметры из URL
   const paymentId = searchParams.get('payment_id');
@@ -192,12 +192,12 @@ const PaymentSuccess = () => {
 ===================
 
 Номер платежа: ${paymentId}
-Дата: ${new Date(paymentData.created_at).toLocaleString('ru-RU')}
+Дата: ${new Date(String(paymentData.created_at ?? '')).toLocaleString('ru-RU')}
 Сумма: ${formatAmount(paymentData.amount, paymentData.currency)}
 Провайдер: ${getProviderName(paymentData.provider)}
 Статус: ${getStatusText(paymentData.status)}
 
-Описание: ${paymentData.description || t('misc.ps_oplata_meditsinskih_uslug')}
+Описание: ${String(paymentData.description || '') || t('misc.ps_oplata_meditsinskih_uslug')}
 
 Спасибо за использование наших услуг!
     `.trim();
@@ -221,7 +221,7 @@ const PaymentSuccess = () => {
           <h1>{t('misc.ps_kvitantsiya_ob_oplate')}</h1>
           <div class="meta">
             <div><strong>{t('misc.ps_platezh')}</strong> ${paymentId}</div>
-            <div><strong>{t('misc.ps_status')}</strong> ${getStatusText(paymentData.status)}</div>
+            <div><strong>{t('misc.ps_status')}</strong> ${getStatusText(paymentData?.status)}</div>
           </div>
           <pre>${receiptContent}</pre>
         </body>
@@ -248,8 +248,8 @@ const PaymentSuccess = () => {
     }
   };
 
-  const formatAmount = (amount, currency) => {
-    const numAmount = parseFloat(amount);
+  const formatAmount = (amount: unknown, currency: unknown) => {
+    const numAmount = parseFloat(String(amount));
     if (currency === 'UZS') {
       return t('misc.ps_numamount_100_tolocalestring', { RU: (numAmount / 100).toLocaleString('ru-RU') });
     } else if (currency === 'KZT') {
@@ -259,17 +259,17 @@ const PaymentSuccess = () => {
     }
   };
 
-  const getProviderName = (provider) => {
-    const names = {
+  const getProviderName = (provider: unknown) => {
+    const names: Record<string, string> = {
       click: 'Click',
       payme: 'Payme',
       kaspi: 'Kaspi Pay'
     };
-    return names[provider] || provider;
+    return names[String(provider)] || String(provider);
   };
 
-  const getStatusText = (status) => {
-    const texts = {
+  const getStatusText = (status: unknown) => {
+    const texts: Record<string, string> = {
       pending: t('misc.ps_ozhidaet'),
       processing: t('misc.ps_obrabotka'),
       paid: t('misc.ps_oplachen'),
@@ -278,11 +278,11 @@ const PaymentSuccess = () => {
       refunded: t('misc.ps_vozvraschen'),
       void: t('misc.ps_annulirovan')
     };
-    return texts[status] || status;
+    return texts[String(status)] || String(status);
   };
 
-  const getStatusColor = (status) => {
-    const colors = {
+  const getStatusColor = (status: unknown) => {
+    const colors: Record<string, string> = {
       pending: 'warning',
       processing: 'info',
       paid: 'success',
@@ -291,7 +291,7 @@ const PaymentSuccess = () => {
       refunded: 'warning',
       void: 'default'
     };
-    return colors[status] || 'default';
+    return colors[String(status)] || 'default';
   };
 
   if (loading) {
@@ -433,15 +433,15 @@ const PaymentSuccess = () => {
               <div style={{ ...detailItemStyle, gridColumn: '1 / -1' }}>
                 <p style={detailLabelStyle}>{t('misc.ps_data_i_vremya')}</p>
                 <p style={{ ...detailValueStyle, fontWeight: 'var(--mac-font-weight-medium)' }}>
-                  {new Date(paymentData.created_at).toLocaleString('ru-RU')}
+                  {new Date(String(paymentData.created_at ?? '')).toLocaleString('ru-RU')}
                 </p>
               </div>
 
-              {paymentData.description && (
+              {paymentData.description != null && (
                 <div style={{ ...detailItemStyle, gridColumn: '1 / -1' }}>
                   <p style={detailLabelStyle}>{t('misc.ps_opisanie')}</p>
                   <p style={{ ...detailValueStyle, fontWeight: 'var(--mac-font-weight-medium)' }}>
-                    {paymentData.description}
+                    {String(paymentData.description)}
                   </p>
                 </div>
               )}
