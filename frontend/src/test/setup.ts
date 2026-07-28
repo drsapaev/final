@@ -23,12 +23,16 @@ if (typeof window !== 'undefined') {
     })),
   });
 
-  // Mock localStorage
+  // Mock localStorage — store-backed so tests that write then read
+  // (e.g. useFinance cache persistence) work without per-test spy setup.
+  // `vi.fn()` wrappers preserve `.mockImplementation` override capability
+  // for tests that need to control the return value explicitly.
+  const _localStorageStore: Record<string, string> = {};
   const localStorageMock = {
-    getItem: vi.fn(),
-    setItem: vi.fn(),
-    removeItem: vi.fn(),
-    clear: vi.fn(),
+    getItem: vi.fn((key: string) => _localStorageStore[key] ?? null),
+    setItem: vi.fn((key: string, value: string) => { _localStorageStore[key] = String(value); }),
+    removeItem: vi.fn((key: string) => { delete _localStorageStore[key]; }),
+    clear: vi.fn(() => { for (const k of Object.keys(_localStorageStore)) delete _localStorageStore[k]; }),
   };
   Object.defineProperty(window, 'localStorage', {
     value: localStorageMock,
