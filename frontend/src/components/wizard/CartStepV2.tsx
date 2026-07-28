@@ -205,7 +205,7 @@ const CartStepV2 = ({
 
   // PR-23 P0 #2: clicking a service that's already in cart increments quantity
   // instead of toggling it off. Remove is via the X button in the cart mini-card.
-  const handleServiceToggle = (service) => {
+  const handleServiceToggle = (service: CartService) => {
     const existingItem = cart?.items?.find((item) => item.service_id === service.id);
 
     if (existingItem) {
@@ -219,8 +219,9 @@ const CartStepV2 = ({
   // Общая сумма корзины
   const cartTotal = useMemo(() => {
     if (!Array.isArray(cart?.items)) return 0;
+    const items = cart.items as CartItem[];
     let total = 0;
-    cart.items.forEach((item) => {
+    items.forEach((item) => {
       let itemPrice = (item.service_price || 0) * (item.quantity || 1);
       const service = servicesData?.find((s) => s.id === item.service_id);
       if (service && service.is_consultation) {
@@ -260,17 +261,17 @@ const CartStepV2 = ({
       itemId: item.id,
       serviceName: getServiceName ? getServiceName(item) : service.name,
       doctorName: doctor?.name || doctor?.full_name || null,
-      eligibility: repeatEligibilityByItemId?.[item.id] || null
+      eligibility: repeatEligibilityByItemId?.[item.id ?? ''] || null
     };
   }).
   filter((r): r is NonNullable<typeof r> => r !== null),
   [cart?.items, servicesData, normalizedDoctorsData, getServiceName, repeatEligibilityByItemId]);
 
-  const getDoctorDisplayName = useCallback((doctor) => {
+  const getDoctorDisplayName = useCallback((doctor: Record<string, unknown>) => {
     if (!doctor) return '';
     return (
-      doctor.user?.full_name ||
-      doctor.user?.username ||
+      (doctor.user as Record<string, unknown>)?.full_name ||
+      (doctor.user as Record<string, unknown>)?.username ||
       doctor.full_name ||
       doctor.name ||
       t('misc.csv_vrach_doctor_id', { id: doctor.id })
@@ -295,21 +296,18 @@ const CartStepV2 = ({
         <div className="cart-step-v2__services-grid">
           {displayedServices.map((service) => {
             // ✅ ИСПРАВЛЕНО: Проверяем также по service_code для edit режима (когда service_id еще null)
-            const isInCart = cart?.items?.some((item) => {
+            const isInCart = Array.isArray(cart?.items) ? cart.items.some((item) => {
               if (item.service_id === service.id) return true;
-              // Если service_id еще не разрешен, проверяем по коду (включая варианты с нулями: p09, P09, P9)
               if (!item.service_id && service.service_code) {
                 const itemCode = String(item.service_name || item._temp_name || '').toUpperCase().trim();
                 const serviceCode = String(service.service_code).toUpperCase().trim();
-                // Прямое сравнение
                 if (itemCode === serviceCode) return true;
-                // Сравнение без ведущих нулей (p09 = p9)
                 const itemCodeNoZero = itemCode.replace(/^([A-Z])0+(\d+)$/, '$1$2');
                 const serviceCodeNoZero = serviceCode.replace(/^([A-Z])0+(\d+)$/, '$1$2');
                 if (itemCodeNoZero === serviceCodeNoZero) return true;
               }
               return false;
-            });
+            }) : false;
             return (
               <label
                 key={service.id}
@@ -367,7 +365,7 @@ const CartStepV2 = ({
               </Button>
             </div>
 
-            {repeatSuggestionSummary?.hasMixed &&
+            {Boolean(repeatSuggestionSummary?.hasMixed) &&
           <div className="cart-step-v2__mixed-warning">
                 {MIXED_REPEAT_WARNING}
               </div>
@@ -428,45 +426,45 @@ const CartStepV2 = ({
         {/* UX Audit Registrar #10: Группировка корзины по специалистам.
             Показывает сколько визитов будет создано, когда услуги у разных врачей.
             Раньше был плоский список без визуальной группировки. */}
-        {(cart?.items?.length ?? 0) > 0 && (() => {
-          const doctorGroups = new Map();
-          cart?.items?.forEach((item) => {
+        {(() => {
+          const items: CartItem[] = Array.isArray(cart?.items) ? cart.items as CartItem[] : [];
+          if (items.length === 0) return null as React.ReactNode;
+          const doctorGroups = new Map<string | number, { id: string | number; name: string; items: CartItem[] }>();
+          items.forEach((item) => {
             const docId = item.doctor_id || 'no_doctor';
             const docName = item.doctor_name || (item.doctor_id ? t('misc.csv_vrach_item_doctor_id', { doctor_id: item.doctor_id }) : t('misc.csv_bez_vracha'));
             if (!doctorGroups.has(docId)) {
-              doctorGroups.set(docId, { id: docId, name: docName, items: [] });
+              doctorGroups.set(docId, { id: docId, name: docName, items: [] as CartItem[] });
             }
-            doctorGroups.get(docId).items.push(item);
+            doctorGroups.get(docId)?.items.push(item);
           });
           const groupCount = doctorGroups.size;
-          if (groupCount > 1) {
-            return (
-              <div style={{
-                marginBottom: 'var(--mac-spacing-2)',
-                padding: '6px 10px',
-                background: 'color-mix(in srgb, var(--mac-accent-blue, #007aff), transparent 88%)',
-                border: '1px solid color-mix(in srgb, var(--mac-accent-blue, #007aff), transparent 75%)',
-                borderRadius: 'var(--mac-radius-sm)',
-                fontSize: 'var(--mac-font-size-xs)',
-                fontWeight: 'var(--mac-font-weight-semibold)',
-                color: 'var(--mac-accent-blue, #007aff)',
-              }}>
-                Будет создано визитов: {groupCount} · Услуг: {cart?.items?.length ?? 0}
-              </div>
-            );
-          }
-          return null;
-        })()}
+          if (groupCount <= 1) return null as React.ReactNode;
+          return (
+            <div style={{
+              marginBottom: 'var(--mac-spacing-2)',
+              padding: '6px 10px',
+              background: 'color-mix(in srgb, var(--mac-accent-blue, #007aff), transparent 88%)',
+              border: '1px solid color-mix(in srgb, var(--mac-accent-blue, #007aff), transparent 75%)',
+              borderRadius: 'var(--mac-radius-sm)',
+              fontSize: 'var(--mac-font-size-xs)',
+              fontWeight: 'var(--mac-font-weight-semibold)',
+              color: 'var(--mac-accent-blue, #007aff)',
+            }}>
+              Будет создано визитов: {groupCount} · Услуг: {items.length}
+            </div>
+          );
+        })() as React.JSX.Element | null}
 
         {/* Горизонтальный скролл корзины */}
-        {(cart?.items?.length ?? 0) > 0 ?
+        {(() => { const ci = cart?.items; return Boolean(Array.isArray(ci) && ci.length > 0) as boolean; })() ? (
         <div style={{
           display: 'flex',
           gap: 'var(--mac-spacing-2)',
           overflowX: 'auto',
           paddingBottom: '4px'
         }}>
-            {(cart?.items || []).map((item) => {
+            {((cart?.items || []) as CartItem[]).map((item) => {
             // ✅ SSOT: Используем единую функцию для получения названия услуги
             const displayName = String(getServiceName ? getServiceName(item) : item.service_name || t('misc.csv_neizvestnaya_usluga'));
             const service = servicesData?.find((s) => s.id === item.service_id);
@@ -566,7 +564,7 @@ const CartStepV2 = ({
                         <option value="">{t('misc.csv_vyberite_vracha')}</option>
                         {doctorOptions.map((doctor, index) =>
                     <option key={`${doctor.id ?? 'doctor'}-${doctor.specialty ?? ''}-${index}`} value={doctor.id}>
-                            {getDoctorDisplayName(doctor)}{doctor.specialty ? ` · ${doctor.specialty}` : t('misc.csv_doctor_cabinet_kab_doctor_ca')}
+                            {String(getDoctorDisplayName(doctor))}{doctor.specialty ? ` · ${doctor.specialty}` : t('misc.csv_doctor_cabinet_kab_doctor_ca')}
                           </option>)}
                       </select>
                       {filteredDoctors.length === 0 && normalizedDoctorsData.length > 0 && (
@@ -579,15 +577,15 @@ const CartStepV2 = ({
                 </div>);
 
           })}
-          </div> :
+          </div>) : (
 
         <div className="cart-step-v2__footer-hint">
             Корзина пуста
           </div>
-        }
+        )}
 
         {/* Ошибки валидации */}
-        {((errors?.cart || errors?.doctors || errors?.repeat)) &&
+        {Boolean(errors?.cart || errors?.doctors || errors?.repeat) &&
         <div style={{
           padding: 'var(--mac-spacing-2)',
           background: 'color-mix(in srgb, var(--mac-error), transparent 82%)',
