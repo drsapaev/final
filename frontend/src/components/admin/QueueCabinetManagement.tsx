@@ -32,10 +32,45 @@ const INITIAL_FILTERS = {
   cabinetNumber: '',
 };
 
-const formatDate = (value, t) => {
+interface QueueRow {
+  day?: string;
+  specialist_name?: string;
+  specialist_id?: string | number;
+  queue_tag?: string;
+  effective_cabinet?: string;
+  cabinet_number?: string | number;
+  doctor_cabinet?: string | number;
+  cabinet_floor?: string | number;
+  cabinet_building?: string | number;
+  entries_count?: number;
+  active?: boolean;
+  sync_status?: string;
+  linked_doctor_found?: boolean;
+  doctor_has_cabinet?: boolean;
+  integrity_warnings?: string[];
+}
+
+interface QueueStats {
+  total_queues?: number;
+  queues_with_cabinet?: number;
+  cabinets?: unknown[];
+}
+
+interface StatsSummary {
+  totalQueues: number;
+  queuesWithCabinet: number;
+  uniqueCabinets: number;
+  activeQueues: number;
+  totalEntries: number;
+}
+
+const formatDate = (
+  value: unknown,
+  _t: (key: string, options?: Record<string, unknown>) => string,
+): string => {
   if (!value) return '—';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
+  const date = new Date(value as string | number | Date);
+  if (Number.isNaN(date.getTime())) return String(value);
   return new Intl.DateTimeFormat('ru-RU', {
     day: '2-digit',
     month: '2-digit',
@@ -43,21 +78,24 @@ const formatDate = (value, t) => {
   }).format(date);
 };
 
-const toOptionalNumber = (value) => {
+const toOptionalNumber = (value: unknown): number | null => {
   if (value === '' || value === null || value === undefined) return null;
   const parsed = Number(value);
   return Number.isNaN(parsed) ? null : parsed;
 };
 
-const toOptionalString = (value) => {
+const toOptionalString = (value: unknown): string | null => {
   if (value === null || value === undefined) return null;
   const normalized = String(value).trim();
   return normalized.length ? normalized : null;
 };
 
-const buildStatsSummary = (stats, queues) => {
+const buildStatsSummary = (
+  stats: QueueStats | null,
+  queues: QueueRow[],
+): StatsSummary => {
   const safeQueues = Array.isArray(queues) ? queues : [];
-  const cabinets = new Set();
+  const cabinets = new Set<string | number>();
   let totalEntries = 0;
   let activeQueues = 0;
 
@@ -80,8 +118,8 @@ const QueueCabinetManagement = () => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [filters, setFilters] = useState(INITIAL_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState(INITIAL_FILTERS);
-  const [queues, setQueues] = useState([]);
-  const [statistics, setStatistics] = useState<Record<string, any> | null>(null);
+  const [queues, setQueues] = useState<QueueRow[]>([]);
+  const [statistics, setStatistics] = useState<QueueStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
 
@@ -104,15 +142,15 @@ const QueueCabinetManagement = () => {
       ]);
 
       if (queuesResult.status === 'fulfilled') {
-        setQueues(Array.isArray(queuesResult.value) ? queuesResult.value : []);
+        setQueues(Array.isArray(queuesResult.value) ? (queuesResult.value as QueueRow[]) : []);
       } else {
         logger.warn('API /api/v1/admin/queues/cabinet-info недоступен', queuesResult.reason);
         setQueues([]);
       }
 
       if (statisticsResult.status === 'fulfilled') {
-        const payload = (statisticsResult.value || {}) as Record<string, any>;
-        setStatistics(payload.statistics || payload);
+        const payload = (statisticsResult.value || {}) as Record<string, unknown>;
+        setStatistics((payload.statistics || payload) as QueueStats | null);
       } else {
         logger.warn(
           'API /api/v1/admin/queues/cabinet-statistics недоступен',
@@ -120,7 +158,7 @@ const QueueCabinetManagement = () => {
         );
         setStatistics(null);
       }
-    } catch (error) {
+    } catch (error: unknown) {
       logger.error('Ошибка загрузки информации о кабинетах:', error);
       toast.error(t('admin2.qcm_load_error'));
       setQueues([]);
@@ -166,11 +204,21 @@ const QueueCabinetManagement = () => {
         params,
       });
 
-      toast.success((result as Record<string, any>)?.message || t('admin2.qcm_sync_success'));
+      const resultMessage = (result as Record<string, unknown> | null | undefined)?.message;
+      toast.success(
+        typeof resultMessage === 'string' && resultMessage
+          ? resultMessage
+          : t('admin2.qcm_sync_success'),
+      );
       await loadData(appliedFilters);
-    } catch (error) {
+    } catch (error: unknown) {
       logger.error('Ошибка синхронизации кабинетов:', error);
-      toast.error((error as Record<string, any>)?.message || t('admin2.qcm_sync_error'));
+      const errorMessage = (error as Record<string, unknown> | null | undefined)?.message;
+      toast.error(
+        typeof errorMessage === 'string' && errorMessage
+          ? errorMessage
+          : t('admin2.qcm_sync_error'),
+      );
     } finally {
       setSyncing(false);
     }

@@ -39,10 +39,34 @@ import { useTranslation } from '@/i18n/useTranslation';
 // UX-AUDIT-FIX10: STATUS_LABELS и STATUS_VARIANTS удалены —
 // используются formatLabStatus() и getLabStatusVariant() из labUiLabels.js.
 
-function formatDate(dateStr) {
+interface LabReportInstance {
+  id: string | number;
+  template_name?: string;
+  template_code?: string;
+  finalized_at?: string;
+  updated_at?: string;
+  flagged_findings_count?: number;
+  status?: string;
+}
+
+interface LabTemplate {
+  id: string | number;
+  name?: string;
+  code?: string;
+  family?: string;
+  published_version_id?: string | number | null;
+}
+
+interface LabResultsSectionProps {
+  patientId?: string | number | null;
+  visitId?: string | number | null;
+  disabled?: boolean;
+}
+
+function formatDate(dateStr: unknown): string {
   if (!dateStr) return '—';
   try {
-    return new Date(dateStr).toLocaleDateString('ru-RU', {
+    return new Date(dateStr as string | number | Date).toLocaleDateString('ru-RU', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
@@ -52,13 +76,13 @@ function formatDate(dateStr) {
   }
 }
 
-export function LabResultsSection({ patientId, visitId, disabled = false }) {
+export function LabResultsSection({ patientId, visitId, disabled = false }: LabResultsSectionProps) {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
-  const [instances, setInstances] = useState([]);
+  const [instances, setInstances] = useState<LabReportInstance[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   const [showOrderModal, setShowOrderModal] = useState(false);
-  const [templates, setTemplates] = useState([]);
+  const [templates, setTemplates] = useState<LabTemplate[]>([]);
   const [templatesLoading, setTemplatesLoading] = useState(false);
   const [ordering, setOrdering] = useState(false);
 
@@ -85,9 +109,10 @@ export function LabResultsSection({ patientId, visitId, disabled = false }) {
       const result = await labReportingApi.listInstances(params);
       const list = Array.isArray(result) ? result : ((result as Record<string, unknown>)?.items || []);
       // Only show finalized/printed — drafts are lab-internal.
-      setInstances((list as Array<Record<string, unknown>>).filter((r) => r.status === 'FINALIZED' || r.status === 'PRINTED'));
-    } catch (err) {
-      logger.warn('[LabResultsSection] Failed to load lab instances', { error: err?.message });
+      setInstances((list as LabReportInstance[]).filter((r) => r.status === 'FINALIZED' || r.status === 'PRINTED'));
+    } catch (err: unknown) {
+      const errShape = err as { message?: string };
+      logger.warn('[LabResultsSection] Failed to load lab instances', { error: errShape?.message });
       setError('Не удалось загрузить результаты анализов.');
       setInstances([]);
     } finally {
@@ -99,14 +124,15 @@ export function LabResultsSection({ patientId, visitId, disabled = false }) {
     loadInstances();
   }, [loadInstances]);
 
-  const handleDownload = async (instanceId) => {
+  const handleDownload = async (instanceId: string | number) => {
     try {
       const blob = await labReportingApi.downloadPdf(instanceId);
       const url = URL.createObjectURL(blob);
       window.open(url, '_blank');
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
-    } catch (err) {
-      logger.error('[LabResultsSection] PDF download failed', { error: err?.message });
+    } catch (err: unknown) {
+      const errShape = err as { message?: string };
+      logger.error('[LabResultsSection] PDF download failed', { error: errShape?.message });
     }
   };
 
@@ -118,16 +144,17 @@ export function LabResultsSection({ patientId, visitId, disabled = false }) {
       const result = await labReportingApi.listTemplates();
       const list = Array.isArray(result) ? result : ((result as Record<string, unknown>)?.items || []);
       // Only show templates that have a published version.
-      setTemplates((list as Array<Record<string, unknown>>).filter((t) => t.published_version_id));
-    } catch (err) {
-      logger.warn('[LabResultsSection] Failed to load templates', { error: err?.message });
+      setTemplates((list as LabTemplate[]).filter((tpl) => tpl.published_version_id));
+    } catch (err: unknown) {
+      const errShape = err as { message?: string };
+      logger.warn('[LabResultsSection] Failed to load templates', { error: errShape?.message });
       setTemplates([]);
     } finally {
       setTemplatesLoading(false);
     }
   };
 
-  const handleOrder = async (templateId, templateName) => {
+  const handleOrder = async (templateId: string | number, templateName: string) => {
     // UX-AUDIT-FIX9: подтверждение перед созданием заказа.
     // STRAT#12: строки мигрированы на t() / tInterpolate() из labTranslations.
     const ok = await (confirm as unknown as (opts: Record<string, unknown>) => Promise<boolean>)({
@@ -148,8 +175,9 @@ export function LabResultsSection({ patientId, visitId, disabled = false }) {
       });
       notify.success(`Заказ «${templateName}» создан. Лаборатория увидит его в очереди.`);
       setShowOrderModal(false);
-    } catch (err) {
-      const msg = err?.response?.data?.detail || err?.message || 'Не удалось создать заказ.';
+    } catch (err: unknown) {
+      const errShape = err as { response?: { data?: { detail?: unknown } }; message?: string };
+      const msg = errShape?.response?.data?.detail || errShape?.message || 'Не удалось создать заказ.';
       notify.error(typeof msg === 'string' ? msg : 'Не удалось создать заказ.');
     } finally {
       setOrdering(false);
@@ -196,17 +224,17 @@ export function LabResultsSection({ patientId, visitId, disabled = false }) {
                 </div>
                 <div style={{ fontSize: '12px', color: 'var(--mac-text-secondary)' }}>
                   {formatDate(instance.finalized_at || instance.updated_at)}
-                  {instance.flagged_findings_count > 0 && (
+                  {(instance.flagged_findings_count ?? 0) > 0 && (
                     <span style={{ marginLeft: '8px', color: 'var(--mac-warning)' }}>
-                      ⚠ {instance.flagged_findings_count} отклонений
+                      ⚠ {instance.flagged_findings_count ?? 0} отклонений
                     </span>
                   )}
                 </div>
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-              <Badge variant={getLabStatusVariant(instance.status) || 'default'} size="small">
-                {formatLabStatus(instance.status) || instance.status}
+              <Badge variant={getLabStatusVariant(instance.status || '') || 'default'} size="small">
+                {formatLabStatus(instance.status || '') || instance.status}
               </Badge>
               {!disabled && (
                 <Button
@@ -259,7 +287,7 @@ export function LabResultsSection({ patientId, visitId, disabled = false }) {
                   <button
                     key={template.id}
                     type="button"
-                    onClick={() => handleOrder(template.id, template.name)}
+                    onClick={() => handleOrder(template.id, template.name || '')}
                     disabled={ordering}
                     style={{
                       display: 'flex',
