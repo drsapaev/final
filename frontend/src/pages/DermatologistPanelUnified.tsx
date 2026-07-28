@@ -265,7 +265,7 @@ const DermatologistPanelUnified = () => {
   const [skinExaminations, setSkinExaminations] = useState([]);
   const [cosmeticProcedures, setCosmeticProcedures] = useState([]);
   // D-001 fix: photoData now receives state from PhotoUploader via onDataUpdate callback
-  const [photoData, setPhotoData] = useState({ before: [], after: [] });
+  const [photoData, setPhotoData] = useState<{ before: unknown[]; after: unknown[] }>({ before: [], after: [] });
 
   // Дополнительные состояния из старого файла
   const [patients, setPatients] = useState([]);
@@ -1604,7 +1604,7 @@ const DermatologistPanelUnified = () => {
               selectedPatient={selectedPatient}
               photoData={photoData}
               onPhotoUpdate={(updatedPhotos) => {
-                if (updatedPhotos) setPhotoData(updatedPhotos);
+                if (updatedPhotos) setPhotoData(updatedPhotos as { before: unknown[]; after: unknown[] });
                 loadPatientData();
               }}
               onGoToAppointments={() => handleTabChange('patients')}

@@ -1237,7 +1237,7 @@ const RegistrarPanel = () => {
       logger.info(`🔍 QR-записей в фильтре: ${qrInFiltered.length}`);
       qrInFiltered.forEach((a) => {
         // UX Audit R-3.6: убрано логирование patient_fio (PII leak).
-        logger.info(`  - appointment_id=${a.id}: ${a.queue_numbers?.length || 0} queue_numbers`);
+        logger.info(`  - appointment_id=${a.id}: ${(a.queue_numbers as unknown[] | undefined)?.length || 0} queue_numbers`);
       });
 
       const aggregatedPatients = aggregatePatientsForAllDepartments(filtered);
@@ -1644,7 +1644,7 @@ const RegistrarPanel = () => {
                 </div> :
 
             <EnhancedAppointmentsTable
-              data={filteredAppointments}
+              data={filteredAppointments as unknown as NonNullable<Parameters<typeof EnhancedAppointmentsTable>[0]['data']>}
               loading={appointmentsLoading}
               theme={theme}
               language={legacyLanguage}

@@ -276,16 +276,16 @@ export function TreatmentSection({
                             </p> :
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-2)' }}>
-                                {myExperienceTemplates.map((t) =>
+                                {myExperienceTemplates.map((tmpl) =>
             <div
-              key={t.id}
+              key={tmpl.id}
               style={{
                 display: 'flex',
                 alignItems: 'stretch',
                 gap: 'var(--mac-spacing-2)',
                 padding: 'var(--mac-spacing-2)',
-                background: t.is_pinned ? 'var(--mac-bg-primary)8e1' : '#f9f9f9',
-                border: t.is_pinned ? '2px solid #ffb300' : '1px solid #e0e0e0',
+                background: tmpl.is_pinned ? 'var(--mac-bg-primary)8e1' : '#f9f9f9',
+                border: tmpl.is_pinned ? '2px solid #ffb300' : '1px solid #e0e0e0',
                 borderRadius: 'var(--mac-radius-sm)'
               }}>
               
@@ -294,19 +294,19 @@ export function TreatmentSection({
                 type="button"
                 onClick={(e: React.MouseEvent<HTMLElement>) => {
                   e.stopPropagation();
-                  t.is_pinned ?
-                  unpinTemplate(t.id) :
-                  pinTemplate(t.id);
+                  tmpl.is_pinned ?
+                  unpinTemplate(String(tmpl.id)) :
+                  pinTemplate(String(tmpl.id));
                 }}
-                aria-label={t('misc.ts_t_is_pinned_otkrepit_zakrepi', { is_pinned: t.is_pinned ? 'Открепить' : 'Закрепить' })}
-                title={t.is_pinned ? t('misc.ts_otkrepit') : t('misc.ts_zakrepit_maks_3')}
+                aria-label={t('misc.ts_t_is_pinned_otkrepit_zakrepi', { is_pinned: tmpl.is_pinned ? 'Открепить' : 'Закрепить' })}
+                title={tmpl.is_pinned ? t('misc.ts_otkrepit') : t('misc.ts_zakrepit_maks_3')}
                 style={{
                   padding: 'var(--mac-spacing-1) var(--mac-spacing-2)',
                   background: 'transparent',
                   border: 'none',
                   cursor: 'pointer',
-                  opacity: t.is_pinned ? 1 : 0.4,
-                  color: t.is_pinned ? 'var(--accent-warning, #f59e0b)' : 'var(--text-muted, #6b7280)'
+                  opacity: tmpl.is_pinned ? 1 : 0.4,
+                  color: tmpl.is_pinned ? 'var(--accent-warning, #f59e0b)' : 'var(--text-muted, #6b7280)'
                 }}>
                 
                                             <Pin size={16 as unknown as "small" | "default" | "large" | "xlarge"} />
@@ -317,8 +317,8 @@ export function TreatmentSection({
                 type="button"
                 onClick={(e: React.MouseEvent<HTMLElement>) => {
                   e.stopPropagation();
-                  setEditingTemplate(t);
-                  setEditText(t.treatment_text);
+                  setEditingTemplate(tmpl);
+                  setEditText(tmpl.treatment_text);
                 }}
                 aria-label={t('misc.ts_redaktirovat_shablon_lecheni')}
                 title={t('misc.ts_redaktirovat')}
@@ -337,7 +337,7 @@ export function TreatmentSection({
                                         {/* Template content - clickable */}
                                         <button
                 type="button"
-                onClick={() => handleApplyMyExperience(t)}
+                onClick={() => handleApplyMyExperience(tmpl)}
                 style={{
                   flex: 1,
                   textAlign: 'left',
@@ -348,12 +348,12 @@ export function TreatmentSection({
                 }}>
                 
                                             <div style={{ fontSize: 'var(--mac-font-size-base)', marginBottom: 'var(--mac-spacing-1)', color: 'var(--text-primary, #f0f1f4)' }}>
-                                                {t.treatment_text.substring(0, 150)}
-                                                {t.treatment_text.length > 150 && '...'}
+                                                {tmpl.treatment_text.substring(0, 150)}
+                                                {tmpl.treatment_text.length > 150 && '...'}
                                             </div>
                                             <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--text-muted, #6b7280)', display: 'flex', gap: 'var(--mac-spacing-2)', alignItems: 'center', flexWrap: 'wrap' }}>
                                                 {/* Stale warning - soft, not aggressive */}
-                                                {t.is_stale &&
+                                                {tmpl.is_stale &&
                   <span className="badge badge--stale" style={{
                     padding: '2px 6px',
                     borderRadius: 'var(--radius-full, 9999px)',
@@ -366,26 +366,26 @@ export function TreatmentSection({
                                                     </span>
                   }
                                                 {/* Frequency badge - no aggressive numbers */}
-                                                {t.frequency_label && !t.is_stale &&
+                                                {tmpl.frequency_label && !tmpl.is_stale &&
                   <span
-                    className={t('misc.ts_badge_t_frequency_label_chas', { rare: t.frequency_label === 'часто' ? 'badge--frequent' : 'badge--rare' })}
+                    className={t('misc.ts_badge_t_frequency_label_chas', { rare: tmpl.frequency_label === 'часто' ? 'badge--frequent' : 'badge--rare' })}
                     style={{
                       padding: '2px 6px',
                       borderRadius: 'var(--radius-full, 9999px)',
                       fontSize: 'var(--mac-font-size-xs)',
-                      background: t.frequency_label === t('misc.ts_chasto') ?
+                      background: tmpl.frequency_label === t('misc.ts_chasto') ?
                       'var(--accent-success-muted, rgba(34, 197, 94, 0.15))' :
                       'var(--surface-input, #252540)',
-                      color: t.frequency_label === t('misc.ts_chasto') ?
+                      color: tmpl.frequency_label === t('misc.ts_chasto') ?
                       'var(--accent-success, #22c55e)' :
                       'var(--text-muted, #6b7280)'
                     }}>
                     
-                                                        {t.frequency_label === t('misc.ts_chasto') ? t('misc.ts_chasto') : t('misc.ts_redko')}
+                                                        {tmpl.frequency_label === t('misc.ts_chasto') ? t('misc.ts_chasto') : t('misc.ts_redko')}
                                                     </span>
                   }
                                                 <span>
-                                                    {new Date(t.last_used_at).toLocaleDateString()}
+                                                    {new Date(tmpl.last_used_at).toLocaleDateString()}
                                                 </span>
                                             </div>
                                         </button>

@@ -12,6 +12,8 @@
  * @module utils/doctorPanelShared
  */
 
+import type { Dispatch, SetStateAction } from 'react';
+
 /**
  * Canonical specialty keys used to call the doctor queue service.
  *
@@ -179,15 +181,15 @@ export function getAllPatientServices(patientId: number | string | null | undefi
  * @returns {(row: {appointment_id?: *, visit_id?: *, id: *}) => Promise<number|null>}
  */
 export function makeEnsureCanonicalVisitId(
-  setAppointments: ((updater: (prev: unknown) => unknown) => void) | null | undefined,
-  resolveCanonicalVisitId: ((appointmentId: number | string) => Promise<number | null>) | null | undefined
-): (row: Record<string, unknown>) => Promise<number | null> {
-  return async function ensureCanonicalVisitId(row: Record<string, unknown>): Promise<number | null> {
+  setAppointments: Dispatch<SetStateAction<any[]>> | null | undefined,
+  resolveCanonicalVisitId: ((appointmentId: number | string) => Promise<number | string | null>) | null | undefined
+): (row: Record<string, unknown>) => Promise<number | string | null> {
+  return async function ensureCanonicalVisitId(row: Record<string, unknown>): Promise<number | string | null> {
     const appointmentId = (row?.appointment_id as number | string | undefined) || null;
     const visitId = (row?.visit_id as number | null) || (appointmentId && typeof resolveCanonicalVisitId === 'function' ? await resolveCanonicalVisitId(appointmentId) : null);
 
     if (visitId && typeof setAppointments === 'function') {
-      setAppointments((prev: unknown) => (Array.isArray(prev) ? (prev as Array<Record<string, unknown>>).map((appointment) =>
+      setAppointments((prev: any) => (Array.isArray(prev) ? (prev as Array<Record<string, unknown>>).map((appointment) =>
         appointment && appointment.id === row.id ? { ...appointment, visit_id: visitId } : appointment
       ) : prev));
     }

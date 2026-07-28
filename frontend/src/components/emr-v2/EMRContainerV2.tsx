@@ -565,7 +565,7 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
 
                     <div className="emr-v2-header__right">
                         <EMRStatusIndicator
-                            status={status}
+                            status={status as 'idle' | 'saving' | 'conflict' | 'error'}
                             isDirty={isDirty}
                             isSigned={isSigned}
                             isAmended={isAmended}

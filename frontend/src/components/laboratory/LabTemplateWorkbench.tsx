@@ -616,7 +616,7 @@ export default function LabTemplateWorkbench({
               <div className="ltw-badges-row">
                 <Badge variant="info">{String(selectedTemplate.code ?? "")}</Badge>
                 <Badge variant="primary">{String(selectedTemplate.family ?? "")}</Badge>
-                {(activeVersion as Record<string, unknown>)?.status && <Badge variant={(activeVersion as Record<string, unknown>)?.status === 'PUBLISHED' ? 'success' : 'warning'}>{formatVersionStatus((activeVersion as Record<string, unknown>)?.status)}</Badge>}
+                {(activeVersion as Record<string, unknown>)?.status && <Badge variant={(activeVersion as Record<string, unknown>)?.status === 'PUBLISHED' ? 'success' : 'warning'}>{formatVersionStatus(String((activeVersion as Record<string, unknown>)?.status))}</Badge>}
               </div>
 
               {/* L-M-7 fix: заменён aria-pressed на role=tablist + role=tab + aria-selected.
@@ -716,7 +716,7 @@ export default function LabTemplateWorkbench({
         onClose={() => setShowNewTemplateDialog(false)}
         onCreate={handleCreateTemplate}
         saving={saving}
-        existingTemplates={templates}
+        existingTemplates={templates as unknown as Parameters<typeof NewTemplateDialog>[0]['existingTemplates']}
       />
 
       {/* UX-AUDIT-FIX14: ID datalist теперь уникальны per-instance (useId) */}

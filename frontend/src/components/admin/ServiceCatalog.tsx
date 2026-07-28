@@ -793,7 +793,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
       return;
     }
 
-    const normalizedCode = normalizeServiceCode(formData.code);
+    const normalizedCode = normalizeServiceCode(String(formData.code ?? ''));
     if (!isValidServiceCode(normalizedCode)) {
       setCodeWarning('');
       return;
