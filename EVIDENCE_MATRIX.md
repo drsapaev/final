@@ -29,8 +29,8 @@ Each row is a **falsifiable claim** about the codebase at the commit above.
 
 | # | Claim | Mechanism | Verified | Evidence | How to reproduce |
 |---|-------|-----------|----------|----------|------------------|
-| 1 | CancelDialog accepts `Appointment \| null`, not arbitrary objects | Compiler | ❌ **False** | `CancelDialog.tsx:11` imports `Appointment` from `domain/clinic.ts` BUT the props interface at line 17 still declares `appointment: Record<string, unknown> \| null`. The import is dead code; type narrowing was reverted in self-review commit `0d2f95e3` because applying `Appointment \| null` cascaded into ~20 caller errors in `RegistrarPanel.tsx`. Documented as `TECH-DEBT(g2d-dialogs-001)` at `CancelDialog.tsx:11-15`. | `rg "appointment:" src/components/dialogs/CancelDialog.tsx` |
-| 2 | PaymentDialog accepts `Appointment \| null` | Compiler | ❌ **False** | Same as #1. `PaymentDialog.tsx:13` has the dead `Appointment` import with `TECH-DEBT(g2d-dialogs-001)` reference; props interface at line 19 still uses `Record<string, unknown> \| null`. | `rg "appointment:" src/components/dialogs/PaymentDialog.tsx` |
+| 1 | CancelDialog accepts `Appointment \| null`, not arbitrary objects | Compiler | ✅ Verified | `CancelDialog.tsx:11` imports `Appointment` from `domain/clinic.ts` and the props interface uses `appointment: Appointment \| null`. The previous `TECH-DEBT(g2d-dialogs-001)` markers are removed (issue #2547). Boundary coercion `appointment.services as string[]` replaced with explicit `.map((s) => ...)` per-item rendering since `Appointment.services` is typed as `Array<{ name?: string; code?: string }>`. | `rg "appointment:" src/components/dialogs/CancelDialog.tsx` |
+| 2 | PaymentDialog accepts `Appointment \| null` | Compiler | ✅ Verified | Same as #1. `PaymentDialog.tsx:13` has the live `Appointment` import; props interface uses `Appointment \| null`. `TECH-DEBT(g2d-dialogs-001)` removed. | `rg "appointment:" src/components/dialogs/PaymentDialog.tsx` |
 | 3 | `colors.primary` typed as `Record<number, string>`, not `string` | Compiler | ✅ | `LoginFormStyled.tsx:362` — `(colors.primary as Record<number, string>)[500]`. Previous `as string[500]` (500th character) replaced. | `rg "as Record<number, string>" src/components/auth/LoginFormStyled.tsx` |
 | 4 | Post-2FA catch block logs error instead of silent swallow | Observation | ✅ | `LoginFormStyled.tsx:288` — `logger.warn('[AUTH] Post-2FA navigation error...', post2FAError)` | `rg "Post-2FA" src/components/auth/LoginFormStyled.tsx` |
 | 5 | `ui/macos/` contains zero `import PropTypes` | Observation | ✅ | `rg -l "PropTypes" src/components/ui/macos/` returns 0 files. All 45 files use TypeScript Props interfaces. **No automated enforcement** — PropTypes import can be re-added without error. | `rg -l "PropTypes" src/components/ui/macos/` |
@@ -60,11 +60,12 @@ Each row is a **falsifiable claim** about the codebase at the commit above.
 
 ### Claims that were weaker than originally stated
 
-**Claims 1-2 (Appointment in dialogs) — REVISED to FALSE:**
+**Claims 1-2 (Appointment in dialogs) — RESOLVED to TRUE:**
 - Original claim (commit `7b2f13c6`): "CancelDialog/PaymentDialog accept `Appointment | null`"
-- Reality (commit `41bf93da`): The `import type { Appointment }` was added in commit `675a1858` (B2 fix) but the prop type narrowing was REVERTED in commit `0d2f95e3` (self-review). The import became dead code. The actual prop type at HEAD is still `Record<string, unknown> | null`.
-- Documented at: `TECH-DEBT(g2d-dialogs-001)` comment in `CancelDialog.tsx:11-15` and `PaymentDialog.tsx:13-14`.
-- Fix needed: Apply `appointment: Appointment | null` AND fix the ~20 cascading caller errors in `RegistrarPanel.tsx` (lines 290, 312, 470, 480, 486, 502, 526, 674, 835, 841, 849, 854, etc.). This is a separate migration pass, not in scope for PR #2497.
+- Was reverted (commit `0d2f95e3`) because applying `Appointment | null` cascaded into ~20 caller errors.
+- **Now fixed (issue #2547)**: Both dialogs use `appointment: Appointment | null`. The cascading errors were resolved by (a) typing `cancelDialog` and `paymentDialog` state in `RegistrarPanel.tsx` with `Appointment | null` rows, and (b) casting the wizard-built row (`postWizardPaymentRow`) at its single call site since its builder returns `Record<string, unknown>`.
+- `TECH-DEBT(g2d-dialogs-001)` markers removed.
+- `tsc --noEmit` baseline: 72 errors → 72 errors (0 new).
 
 **Claim 6 (ActionButton requires entry):**
 - Original claim: "impossible to call ActionButton without onClick"

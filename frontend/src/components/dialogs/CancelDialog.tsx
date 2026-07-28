@@ -8,16 +8,12 @@ import './CancelDialog.css';
 
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
-// TECH-DEBT(g2d-dialogs-001): Appointment type narrowing for CancelDialog and
-// PaymentDialog is deferred — applying `appointment: Appointment | null`
-// cascades into ~20 caller errors in RegistrarPanel.tsx that need a separate
-// migration pass. For now, dialogs accept Record<string, unknown> | null and
-// coerce fields at the boundary (Number(appointment.cost ?? 0), String(...)).
+import type { Appointment } from '../../types/domain/clinic';
 
 interface CancelDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  appointment: Record<string, unknown> | null;
+  appointment: Appointment | null;
   onCancel: (appointmentId: unknown, reason: string) => Promise<void>;
 }
 
@@ -144,7 +140,9 @@ const CancelDialog = ({ isOpen, onClose, appointment, onCancel }: CancelDialogPr
                 </span>
                 <span className="cancel-info-value--right">
                   {Array.isArray(appointment.services)
-                    ? (appointment.services as string[]).join(', ')
+                    ? appointment.services
+                        .map((s) => (typeof s === 'string' ? s : s?.name || s?.code || JSON.stringify(s)))
+                        .join(', ')
                     : String(appointment.services)}
                 </span>
               </div>
