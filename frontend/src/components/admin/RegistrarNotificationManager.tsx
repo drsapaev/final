@@ -27,12 +27,36 @@ import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
+
+interface Registrar {
+  id?: string | number;
+  full_name?: string;
+  username?: string;
+  email?: string;
+  phone?: string;
+  telegram_id?: string | number;
+  is_active?: boolean;
+}
+
+interface ChannelsStats {
+  telegram?: number;
+  email?: number;
+  sms?: number;
+}
+
+interface NotificationStats {
+  total_sent?: number;
+  successful_deliveries?: number;
+  failed_deliveries?: number;
+  channels_stats?: ChannelsStats;
+}
+
 const RegistrarNotificationManager = () => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [activeTab, setActiveTab] = useState('send');
   const [loading, setLoading] = useState(false);
-  const [registrars, setRegistrars] = useState([]);
-  const [stats, setStats] = useState(null);
+  const [registrars, setRegistrars] = useState<Registrar[]>([]);
+  const [stats, setStats] = useState<NotificationStats | null>(null);
 
   // Состояние для отправки уведомлений
   const [notificationForm, setNotificationForm] = useState({
@@ -285,7 +309,7 @@ const RegistrarNotificationManager = () => {
       </div>
 
       <div className="admin-grid-gap-16">
-        {registrars.map((registrar) =>
+        {registrars.map((registrar: Registrar) =>
       <div
         key={registrar.id}
         className="admin-p-16-bd-1solidvar-mac-border-radius-var--mac-radius-md-flex-jc-between-ai-center">

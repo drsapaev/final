@@ -10,6 +10,21 @@ import { api } from '../api/client';
 import logger from '../utils/logger';
 import { useTranslation } from '../i18n/useTranslation';
 import type { CSSProperties } from 'react';
+
+interface AppointmentRow {
+  id?: string | number;
+  patient_name?: string;
+  patient?: { full_name?: string; [key: string]: unknown } | null;
+  doctor_name?: string;
+  doctor?: string;
+  time?: string;
+  slot?: string;
+  start_time?: string;
+  end_time?: string;
+  status?: string;
+  [key: string]: unknown;
+}
+
 function todayStr() {
   const d = new Date();
   const y = d.getFullYear();
@@ -27,12 +42,12 @@ export default function Appointments() {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [date, setDate] = useState(todayStr());
-  const [rows, setRows] = useState([]);
+  const [rows, setRows] = useState<AppointmentRow[]>([]);
   const [q, setQ] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [useAdvancedTable, setUseAdvancedTable] = useState(false);
-  const [selectedAppointments, setSelectedAppointments] = useState(new Set());
+  const [selectedAppointments, setSelectedAppointments] = useState<Set<unknown>>(new Set<unknown>());
 
   const load = useCallback(async () => {
     setBusy(true);
@@ -43,7 +58,7 @@ export default function Appointments() {
         // fallback на другой ключ параметра
         res = await api.get('/appointments', { params: { d: date, limit: 200 } });
       }
-      const items = Array.isArray(res?.data?.items) ? (res.data.items as unknown[]) : Array.isArray(res?.data) ? (res.data as unknown[]) : [];
+      const items: AppointmentRow[] = Array.isArray(res?.data?.items) ? (res.data.items as AppointmentRow[]) : Array.isArray(res?.data) ? (res.data as AppointmentRow[]) : [];
       setRows(items);
     } catch (e) {
       const err = e as { data?: { detail?: string }; message?: string };
@@ -58,7 +73,7 @@ export default function Appointments() {
   const filtered = useMemo(() => {
     if (!q) return rows;
     const qq = q.toLowerCase();
-    return rows.filter(a =>
+    return rows.filter((a: AppointmentRow) =>
       String(a.patient_name || a.patient?.full_name || '').toLowerCase().includes(qq) ||
       String(a.doctor_name || a.doctor || '').toLowerCase().includes(qq) ||
       String(a.id || '').toLowerCase().includes(qq) ||
@@ -108,12 +123,12 @@ export default function Appointments() {
           <div style={toolbarStyle}>
             <label style={fieldStyle}>
               Дата:&nbsp;
-              <Input type="date" value={date} onChange={(e)=>setDate(e.target.value)} />
+              <Input type="date" value={date} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>)=>setDate(e.target.value)} />
             </label>
             <Input
               placeholder={t('misc.appo_poisk_po_patsientu_vrachu_st')}
               value={q}
-              onChange={(e)=>setQ(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>)=>setQ(e.target.value)}
               style={{ minWidth: 260 }}
               aria-label={t('misc.appo_poisk_po_zapisyam')}
             />
@@ -122,7 +137,7 @@ export default function Appointments() {
             </Button>
             <Checkbox
               checked={useAdvancedTable}
-              onChange={(next) => setUseAdvancedTable(next)}
+              onChange={(next: boolean) => setUseAdvancedTable(next)}
               label={t('misc.appo_rasshirennaya_tablitsa')}
             />
           </div>
@@ -144,8 +159,8 @@ export default function Appointments() {
               appointments={filtered}
               appointmentsSelected={selectedAppointments}
               setAppointmentsSelected={setSelectedAppointments}
-              updateAppointmentStatus={(id, status) => logger.log('Update status:', id, status)}
-              setShowWizard={(show) => logger.log('Show wizard:', show)}
+              updateAppointmentStatus={(id: unknown, status: unknown) => logger.log('Update status:', id, status)}
+              setShowWizard={(show: boolean) => logger.log('Show wizard:', show)}
             />
           ) : (
             <div style={tableWrapStyle}>
@@ -161,7 +176,7 @@ export default function Appointments() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((a, i) => (
+                {filtered.map((a: AppointmentRow, i: number) => (
                   <tr key={a.id || i}>
                     <td>{a.id}</td>
                     <td>{a.patient_name || a.patient?.full_name || '—'}</td>
@@ -174,10 +189,10 @@ export default function Appointments() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
                         {a.status || '—'}
                         {a.status && (
-                          <AppointmentFlow 
+                          <AppointmentFlow
                             appointment={a}
-                            onStartVisit={(appointment) => logger.log('Start visit:', appointment)}
-                            onPayment={(appointment) => logger.log('Payment:', appointment)}
+                            onStartVisit={(appointment: import('../components/AppointmentFlow').AppointmentFlowAppointment) => logger.log('Start visit:', appointment)}
+                            onPayment={(appointment: import('../components/AppointmentFlow').AppointmentFlowAppointment) => logger.log('Payment:', appointment)}
                           />
                         )}
                       </div>

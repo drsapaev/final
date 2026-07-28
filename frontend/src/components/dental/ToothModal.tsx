@@ -41,6 +41,37 @@ import {
 
 const iconSize = 15;
 
+interface Procedure {
+  id: string;
+  name: string;
+  price: number;
+  isProsthetic?: boolean;
+  date?: string;
+  [key: string]: unknown;
+}
+
+interface HistoryRecord {
+  procedure?: string;
+  date: string;
+  doctor?: string;
+  notes?: string;
+  [key: string]: unknown;
+}
+
+interface ToothFormData {
+  status: string;
+  procedures: Procedure[];
+  material: string;
+  notes: string;
+  price: number;
+  nextVisitDate: string;
+  requiresFollowUp: boolean;
+  shade: string;
+  fitQuality: string;
+  warrantyPeriod: string;
+  patientSatisfaction: string;
+}
+
 function clonePlainObject(value) {
   if (!value || typeof value !== 'object') {
     return {};
@@ -222,7 +253,7 @@ const ToothModal = ({
 }: { toothData?: Record<string, unknown>; onClose?: () => void; onSave?: (data: unknown) => void; toothNumber?: string | number; visitId?: string | number; open?: boolean; [k: string]: unknown }) => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<ToothFormData>({
     status: '',
     procedures: [],
     material: '',
@@ -239,7 +270,7 @@ const ToothModal = ({
     patientSatisfaction: '',
   });
   
-  const [history, setHistory] = useState([]);
+  const [history, setHistory] = useState<HistoryRecord[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -247,7 +278,7 @@ const ToothModal = ({
       const td = toothData as Record<string, unknown>;
       setFormData({
         status: String(td.status ?? ''),
-        procedures: (td.procedures as unknown[]) || [],
+        procedures: (td.procedures as Procedure[]) || [],
         material: String(td.material ?? ''),
         notes: String(td.notes ?? ''),
         price: Number(td.price ?? 0),
@@ -323,8 +354,8 @@ const ToothModal = ({
         );
       }
       
-      onSave && onSave(dataToSave);
-      onClose();
+      if (typeof onSave === 'function') onSave(dataToSave);
+      if (typeof onClose === 'function') onClose();
       
     } catch (error) {
       logger.error('Ошибка сохранения данных зуба:', error);

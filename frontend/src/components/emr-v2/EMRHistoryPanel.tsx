@@ -14,6 +14,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import type { ReactNode } from 'react';
 import PropTypes from 'prop-types';
 import { FileText, Pencil, CheckCircle2, FilePenLine, RefreshCw, GitBranch } from 'lucide-react';
 import { apiClient } from '../../api/client';
@@ -24,7 +25,7 @@ import { useTranslation } from '../../i18n/useTranslation';
 /**
  * Format date for display
  */
-function formatDate(dateStr) {
+function formatDate(dateStr: string | number | null | undefined): string {
     if (!dateStr) return '—';
     const date = new Date(dateStr);
     return date.toLocaleDateString('ru-RU', {
@@ -36,11 +37,26 @@ function formatDate(dateStr) {
     });
 }
 
+type ChangeType = 'created' | 'updated' | 'signed' | 'amended' | 'restored' | 'migrated' | string;
+
+type TranslateFn = (key: string, options?: Record<string, unknown>) => string;
+
+interface HistoryRevision {
+    id?: string | number;
+    version?: string | number;
+    change_type?: ChangeType;
+    change_summary?: string;
+    reason?: string;
+    edited_at?: string | number;
+    edited_by?: number;
+}
+
 /**
  * Get action label in Russian
  */
-function getActionLabel(changeType, t) {
-    const labels = {
+function getActionLabel(changeType: ChangeType | undefined, t: TranslateFn): string {
+    if (!changeType) return '';
+    const labels: Record<string, string> = {
         created: t('misc.ehp_action_created'),
         updated: t('misc.ehp_action_updated'),
         signed: t('misc.ehp_action_signed'),
@@ -55,8 +71,8 @@ function getActionLabel(changeType, t) {
  * Get action icon
  */
 // UX Audit Doctor M-22: emoji → lucide-react icons.
-function getActionIcon(changeType) {
-    const icons = {
+function getActionIcon(changeType: ChangeType | undefined): ReactNode {
+    const icons: Record<string, typeof FileText> = {
         created: FileText,
         updated: Pencil,
         signed: CheckCircle2,
@@ -64,7 +80,8 @@ function getActionIcon(changeType) {
         restored: RefreshCw,
         migrated: GitBranch,
     };
-    return icons[changeType] || null;
+    const Icon = changeType ? icons[changeType] : undefined;
+    return (Icon ?? null) as unknown as ReactNode;
 }
 
 /**
@@ -86,10 +103,10 @@ export function EMRHistoryPanel({
     isOpen = true,
     onClose,
 }) {
-    const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
-    const [history, setHistory] = useState([]);
+    const { t: rawT } = useTranslation(); const t = rawT as unknown as TranslateFn;
+    const [history, setHistory] = useState<HistoryRevision[]>([]);
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
+    const [error, setError] = useState<string | null>(null);
 
     // Load history on mount or visitId change
     useEffect(() => {
@@ -153,7 +170,7 @@ export function EMRHistoryPanel({
 
                 {!loading && !error && history.length > 0 && (
                     <ul className="emr-history-panel__list">
-                        {history.map((revision) => {
+                        {history.map((revision: HistoryRevision) => {
                             const isCurrentVersion = revision.version === currentVersion;
                             const isSelected = revision.version === selectedVersion;
 
@@ -213,7 +230,7 @@ export function EMRHistoryPanel({
                                         <span className="emr-history-panel__date">
                                             {formatDate(revision.edited_at)}
                                         </span>
-                                        {revision.edited_by > 0 && (
+                                        {revision.edited_by != null && revision.edited_by > 0 && (
                                             <span className="emr-history-panel__author">
                                                 👤 #{revision.edited_by}
                                             </span>

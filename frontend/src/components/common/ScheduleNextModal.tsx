@@ -34,6 +34,21 @@ interface ScheduleNextModalProps {
   specialtyFilter?: string | null;
 }
 
+interface Patient {
+  id?: string | number;
+  first_name?: string;
+  last_name?: string;
+  phone?: string;
+}
+
+interface Service {
+  id?: string | number;
+  name?: string;
+  category?: string;
+  code?: string;
+  price?: string | number;
+}
+
 const ScheduleNextModal = ({
   isOpen,
   onClose,
@@ -42,7 +57,7 @@ const ScheduleNextModal = ({
   theme,
   specialtyFilter = null
 }: ScheduleNextModalProps) => {
-  const { getColor, getSpacing, getFontSize } = theme;
+  const { getColor, getSpacing, getFontSize } = theme ?? { getColor: () => '', getSpacing: () => '', getFontSize: () => '' };
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
 
@@ -57,9 +72,9 @@ const ScheduleNextModal = ({
     confirmation_channel: 'telegram'
   });
 
-  const [patients, setPatients] = useState([]);
-  const [services, setServices] = useState([]);
-  const [filteredServices, setFilteredServices] = useState([]);
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
+  const [filteredServices, setFilteredServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -84,7 +99,7 @@ const ScheduleNextModal = ({
 
       // Применяем фильтр по специальности если указан
       if (specialtyFilter) {
-        filtered = services.filter((service) => {
+        filtered = services.filter((service: Service) => {
           const category = service.category?.toLowerCase();
           const name = service.name?.toLowerCase();
 
@@ -238,7 +253,7 @@ const ScheduleNextModal = ({
 
         // Сброс формы через 2 секунды
         setTimeout(() => {
-          onClose();
+          onClose?.();
           resetForm();
         }, 2000);
       } else {
@@ -481,7 +496,7 @@ const ScheduleNextModal = ({
               required>
               
               <option value="">{t('misc.snm_select_patient')}</option>
-              {patients.map((p) =>
+              {patients.map((p: Patient) =>
               <option key={p.id} value={p.id}>
                   {p.first_name} {p.last_name} - {p.phone}
                 </option>
@@ -544,7 +559,7 @@ const ScheduleNextModal = ({
                   required>
                   
                     <option value="">{t('misc.snm_select_service')}</option>
-                    {filteredServices.map((s) =>
+                    {filteredServices.map((s: Service) =>
                   <option key={s.id} value={s.id}>
                         {t('misc.snm_service_option', { name: s.name, price: s.price })}
                       </option>

@@ -42,6 +42,22 @@ import { api } from '../../api/client';
 import logger from '../../utils/logger';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
+
+interface BackupItem {
+  name: string;
+  type: string;
+  size: number;
+  created_at: string;
+  [key: string]: unknown;
+}
+
+interface AlertItem {
+  severity: string;
+  message: string;
+  timestamp: string;
+  [key: string]: unknown;
+}
+
 const SystemManagement = () => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
@@ -54,13 +70,13 @@ const SystemManagement = () => {
   // Состояние мониторинга
   const [systemHealth, setSystemHealth] = useState<Record<string, unknown> | null>(null);
   const [systemMetrics, setSystemMetrics] = useState<Record<string, unknown> | null>(null);
-  const [alerts, setAlerts] = useState([]);
+  const [alerts, setAlerts] = useState<AlertItem[]>([]);
   // UX Audit Admin #4.8: alerts display limit for pagination.
   const [alertsLimit, setAlertsLimit] = useState(10);
   const [thresholds, setThresholds] = useState<Record<string, unknown>>({});
 
   // Состояние бэкапов
-  const [backups, setBackups] = useState([]);
+  const [backups, setBackups] = useState<BackupItem[]>([]);
   const [backupForm, setBackupForm] = useState({
     backup_type: 'database',
     include_files: true,
@@ -137,7 +153,7 @@ const SystemManagement = () => {
   const loadBackups = async () => {
     try {
       const response = await api.get('/system/backup/list') as import('axios').AxiosResponse<Record<string, unknown>>;
-      setBackups((response.data?.backups as unknown[]) || []);
+      setBackups(((response.data?.backups as unknown[]) || []) as BackupItem[]);
     } catch (error) {
       logger.error('Ошибка загрузки бэкапов:', error);
     }
@@ -268,7 +284,7 @@ const SystemManagement = () => {
               </div>
             </div>
             
-            {systemHealth.components && Object.entries(systemHealth.components).map(([component, status]) => {
+            {systemHealth.components != null && Object.entries((systemHealth.components as Record<string, string>) || {}).map(([component, status]) => {
           const StatusIcon = getStatusIcon(status);
           return (
             <div key={component} className="text-center">
@@ -296,7 +312,7 @@ const SystemManagement = () => {
                 <Cpu className="w-4 h-4" />
                 CPU
               </h4>
-              <Badge variant={(systemMetrics.cpu as { usage_percent?: number })?.usage_percent > 80 ? 'error' : 'success'}>
+              <Badge variant={Number((systemMetrics.cpu as { usage_percent?: number })?.usage_percent || 0) > 80 ? 'error' : 'success'}>
                 {(systemMetrics.cpu as { usage_percent?: number })?.usage_percent?.toFixed(1)}%
               </Badge>
             </div>
@@ -306,7 +322,7 @@ const SystemManagement = () => {
             </div>
               {(systemMetrics.cpu as { frequency?: number })?.frequency &&
           <div className="admin-text-sm-primary">
-                  {t('admin2.sm_frequency', { freq: (systemMetrics.cpu as { frequency?: number }).frequency.toFixed(0) })}
+                  {t('admin2.sm_frequency', { freq: Number((systemMetrics.cpu as { frequency?: number }).frequency || 0).toFixed(0) })}
                 </div>
           }
             </div>
@@ -319,7 +335,7 @@ const SystemManagement = () => {
                 <MemoryStick className="w-4 h-4" />
                 {t('admin2.sm_memory')}
               </h4>
-              <Badge variant={(systemMetrics.memory as { usage_percent?: number })?.usage_percent > 85 ? 'error' : 'success'}>
+              <Badge variant={Number((systemMetrics.memory as { usage_percent?: number })?.usage_percent || 0) > 85 ? 'error' : 'success'}>
                 {(systemMetrics.memory as { usage_percent?: number })?.usage_percent?.toFixed(1)}%
               </Badge>
             </div>
@@ -343,7 +359,7 @@ const SystemManagement = () => {
                 <HardDrive className="w-4 h-4" />
                 {t('admin2.sm_disk')}
               </h4>
-              <Badge variant={(systemMetrics.disk as { usage_percent?: number })?.usage_percent > 90 ? 'error' : 'success'}>
+              <Badge variant={Number((systemMetrics.disk as { usage_percent?: number })?.usage_percent || 0) > 90 ? 'error' : 'success'}>
                 {(systemMetrics.disk as { usage_percent?: number })?.usage_percent?.toFixed(1)}%
               </Badge>
             </div>

@@ -7,6 +7,22 @@ import {
 import { useTranslation } from '../i18n/useTranslation';
 import type { CSSProperties } from 'react';
 
+interface AuditRow {
+  id?: string | number;
+  user?: string;
+  username?: string;
+  actor_user_id?: string | number;
+  action?: string;
+  entity?: string;
+  table?: string;
+  entity_type?: string;
+  created_at?: string;
+  time?: string;
+  details?: unknown;
+  payload?: unknown;
+  [key: string]: unknown;
+}
+
 /**
  * Аудит: список последних действий пользователей.
  * Совместимо с GET /audit?limit=...&offset=...
@@ -14,7 +30,7 @@ import type { CSSProperties } from 'react';
 export default function Audit() {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
-  const [rows, setRows] = useState([]);
+  const [rows, setRows] = useState<AuditRow[]>([]);
   const [limit, setLimit] = useState(100);
   const [q, setQ] = useState('');
   const [busy, setBusy] = useState(false);
@@ -26,7 +42,7 @@ export default function Audit() {
     try {
       const res = await api.get('/audit', { params: { limit } });
       const payload = res?.data;
-      const items = Array.isArray(payload) ? payload : Array.isArray(res) ? res : [];
+      const items: AuditRow[] = Array.isArray(payload) ? payload : Array.isArray(res) ? res : [];
       setRows(items);
     } catch (e) {
       const err = e as { data?: { detail?: string }; message?: string };
