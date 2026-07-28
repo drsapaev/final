@@ -67,7 +67,7 @@ dependencies = [
   # Web framework & ASGI
   "fastapi>=0.121,<0.136",
   "uvicorn[standard]>=0.29,<0.52",
-  "starlette>=0.40,<0.50",
+  "starlette>=0.40,<1.4",
   "python-multipart>=0.0.32,<0.0.33",
   "aiofiles>=24.1,<25.0",
   "aiohttp>=3.14.1,<3.15",
