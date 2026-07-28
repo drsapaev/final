@@ -3,36 +3,46 @@
 **📸 Before/After:** Screen readers previously did not consistently read out the error state of these fields automatically. With `aria-invalid`, they now detect and announce it properly when validation fails.
 **♿ Accessibility:** Enhanced ARIA attribute adherence for native accessibility notifications.
 
+---
+*PR created automatically by Jules for task [11575317694781192704](https://jules.google.com/task/11575317694781192704) started by @drsapaev*
+
 ## Summary
-- Added `aria-invalid` attribute to macos UI components (Input, Textarea, Select).
-- Improves accessibility by letting screen readers announce form validation error states.
+
+Added `aria-invalid` attribute to macos UI components (Input, Textarea, Select). Improves accessibility by letting screen readers announce form validation error states.
 
 ## Cyclic Execution Evidence
+
 - Fresh main sync: yes
 - Clean workspace: yes
 - Branch: palette/aria-invalid-inputs-v2
-- Scope gate: allowed paths: frontend/src/components/ui/macos/
-- Red-check handling: fix any before merge
+- Scope gate: frontend UI components only
+- Red-check handling: fix before merge
 
 ## Contract Impact
+
 not applicable - UI component attribute changes only, no API contract changes.
 
 ## RBAC / Permissions
+
 not applicable - UI components only, no auth changes.
 
 ## Notification / Realtime
+
 not applicable - UI components only, no realtime changes.
 
 ## Frontend Resilience
+
 not applicable - purely stylistic a11y attributes on components, no data flow changes.
 
 ## Scope Gate
+
 - Allowed paths: frontend/src/components/ui/macos/
 - Denied paths: backend
 - Migration/docs/test impact: none
 - Rollback note: revert the UI components changes
 
 ## Validation
+
 - Targeted tests or smoke run: ran pnpm lint:check and tested the specific components
 - Result: passed
 - Not checked: backend tests
