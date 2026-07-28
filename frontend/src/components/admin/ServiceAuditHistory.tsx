@@ -28,12 +28,32 @@ import {
   AppLoading,
 } from '../ui/macos';
 
-const ServiceAuditHistory = ({ serviceId, serviceName }) => {
+interface ServiceAuditHistoryEntryChange {
+  old: unknown;
+  new: unknown;
+}
+
+interface ServiceAuditHistoryItem {
+  id: string | number;
+  action: string;
+  user_name?: string | null;
+  created_at?: string | number | Date | null;
+  comment?: string | null;
+  changes?: Record<string, ServiceAuditHistoryEntryChange> | null;
+  [key: string]: unknown;
+}
+
+interface ServiceAuditHistoryProps {
+  serviceId: string | number;
+  serviceName?: string | null;
+}
+
+const ServiceAuditHistory = ({ serviceId, serviceName }: ServiceAuditHistoryProps) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [loading, setLoading] = useState(true);
-  const [history, setHistory] = useState([]);
+  const [history, setHistory] = useState<ServiceAuditHistoryItem[]>([]);
   const [errorMessage, setErrorMessage] = useState('');
-  const [expandedItems, setExpandedItems] = useState(new Set());
+  const [expandedItems, setExpandedItems] = useState<Set<string | number>>(new Set());
   const historyRegionLabel = serviceName
     ? t('admin2.sah_history_region_with_name', { name: serviceName })
     : t('admin2.sah_history_region');
@@ -53,12 +73,16 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
       setLoading(true);
       setErrorMessage('');
       const response = await servicesService.getServiceHistory(serviceId, { limit: 100 });
-      setHistory(response as unknown[]);
-    } catch (error) {
+      const nextHistory = Array.isArray(response)
+        ? (response as ServiceAuditHistoryItem[])
+        : (((response as { items?: ServiceAuditHistoryItem[] })?.items) || []);
+      setHistory(nextHistory);
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { detail?: string } }; data?: { detail?: string }; message?: string };
       setErrorMessage(
-        error?.response?.data?.detail ||
-          error?.data?.detail ||
-          error?.message ||
+        err?.response?.data?.detail ||
+          err?.data?.detail ||
+          err?.message ||
           t('admin2.sah_load_error')
       );
       logger.error('Ошибка загрузки истории:', error);
@@ -67,7 +91,7 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
     }
   };
 
-  const toggleExpand = (itemId) => {
+  const toggleExpand = (itemId: string | number) => {
     const newExpanded = new Set(expandedItems);
     if (newExpanded.has(itemId)) {
       newExpanded.delete(itemId);
@@ -77,7 +101,7 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
     setExpandedItems(newExpanded);
   };
 
-  const getActionIcon = (action) => {
+  const getActionIcon = (action: string) => {
     switch (action) {
       case 'create':
         return Plus;
@@ -94,7 +118,7 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
     }
   };
 
-  const getActionColor = (action) => {
+  const getActionColor = (action: string): string => {
     switch (action) {
       case 'create':
         return 'var(--mac-success)';
@@ -110,7 +134,7 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
     }
   };
 
-  const getActionLabel = (action) => {
+  const getActionLabel = (action: string): string => {
     const labels = {
       create: t('admin2.sah_action_create'),
       update: t('admin2.sah_action_update'),
@@ -118,10 +142,10 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
       activate: t('admin2.sah_action_activate'),
       deactivate: t('admin2.sah_action_deactivate')
     };
-    return labels[action] || action;
+    return labels[action as keyof typeof labels] || action;
   };
 
-  const formatFieldName = (field) => {
+  const formatFieldName = (field: string): string => {
     const fieldNames = {
       name: t('admin2.sah_field_name'),
       code: t('admin2.sah_field_code'),
@@ -139,17 +163,17 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
       allow_doctor_price_override: t('admin2.sah_field_allow_doctor_price_override'),
       active: t('admin2.sah_field_active')
     };
-    return fieldNames[field] || field;
+    return fieldNames[field as keyof typeof fieldNames] || field;
   };
 
-  const formatValue = (value) => {
+  const formatValue = (value: unknown): string => {
     if (value === null || value === undefined) return '—';
     if (typeof value === 'boolean') return value ? t('admin2.sah_value_yes') : t('admin2.sah_value_no');
     if (typeof value === 'number') return value.toString();
     return String(value);
   };
 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: string | number | Date): string => {
     const date = new Date(dateString);
     return new Intl.DateTimeFormat('ru-RU', {
       year: 'numeric',
@@ -262,9 +286,10 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
         {history.map((item, index) => {
           const ActionIcon = getActionIcon(item.action);
           const isExpanded = expandedItems.has(item.id);
-          const hasChanges = item.changes && Object.keys(item.changes).length > 0;
+          const itemChanges = item.changes;
+          const hasChanges = itemChanges ? Object.keys(itemChanges).length > 0 : false;
           const changesPanelId = `service-audit-history-changes-${item.id}`;
-          const changesCount = hasChanges ? Object.keys(item.changes).length : 0;
+          const changesCount = itemChanges ? Object.keys(itemChanges).length : 0;
           const changesToggleLabel = isExpanded
             ? t('admin2.sah_hide_changes_for_action', { action: getActionLabel(item.action) })
             : t('admin2.sah_show_changes_for_action', { action: getActionLabel(item.action), count: changesCount });
@@ -299,7 +324,7 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
                     </div>
                     <div className="admin-flex-center admin-gap-4">
                       <Clock size={12 as unknown as "small" | "default" | "large" | "xlarge"} />
-                      <span>{formatDate(item.created_at)}</span>
+                      <span>{formatDate(item.created_at ?? Date.now())}</span>
                     </div>
                   </div>
 
@@ -330,7 +355,7 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
                           aria-label={changesToggleLabel}
                           className="admin-mt-8-p-12-bgc-bg-secondary-radius-8"
                         >
-                          {Object.entries(item.changes).map(([field, change]) => (
+                          {itemChanges && Object.entries(itemChanges).map(([field, change]) => (
                             <div
                               key={field}
                               className="admin-d-grid-gtc-140px-1fr-1fr-gap-12-p-8px-0-bd-b-1px-solid-var-mac-bo-fs-13"
@@ -339,10 +364,10 @@ const ServiceAuditHistory = ({ serviceId, serviceName }) => {
                                 {formatFieldName(field)}
                               </div>
                               <div className="admin-error-td-line-through">
-                                {formatValue((change as Record<string, unknown>).old)}
+                                {formatValue(change.old)}
                               </div>
                               <div className="admin-success-fw-500">
-                                {formatValue((change as Record<string, unknown>).new)}
+                                {formatValue(change.new)}
                               </div>
                             </div>
                           ))}

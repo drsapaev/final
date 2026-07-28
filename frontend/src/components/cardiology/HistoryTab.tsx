@@ -19,6 +19,48 @@ import { formatRegistrarDate } from '../../utils/dateUtils';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
 
+/** Patient file shape used by history entries (subset of fields used here). */
+export interface HistoryTabPatientFile {
+  id?: string | number;
+  title?: string;
+  original_filename?: string;
+  filename?: string;
+  name?: string;
+  mime_type?: string;
+  type?: string;
+  file_size?: number | string;
+  [key: string]: unknown;
+}
+
+/** A single filter option rendered as a pill button. */
+export interface HistoryFilterOption {
+  value: string;
+  label: string;
+  count: number;
+}
+
+/** Discriminated history entry kinds rendered by the timeline. */
+export type HistoryEntryKind = 'ecg' | 'labs' | 'attachments';
+
+/** A single timeline entry rendered by the history tab. */
+export interface HistoryEntry {
+  id: string | number;
+  /** Entry kind — kept as `string` so callers passing inferred literals (e.g. from `.map`)
+   *  don't have to widen via `as const`. Compared against literal 'ecg'/'labs'/'attachments'. */
+  kind: string;
+  title: string;
+  subtitle: string;
+  timestamp?: string | number | Date | null;
+  badgeVariant?: string;
+  meta?: string | null;
+  file?: HistoryTabPatientFile | null;
+}
+
+/** Theme getter signatures (mirror of ThemeContext getters). */
+type ColorGetter = (color: string, shade?: number | string) => string;
+type SpacingGetter = (size: string) => string;
+type FontSizeGetter = (size: string) => string;
+
 /**
  * @param {Object} props
  * @param {Object|null} props.selectedPatient - Currently selected patient
@@ -34,6 +76,21 @@ import React from "react";
  * @param {Function} props.getFontSize - Theme font size getter
  * @param {Function} props.getSpacing - Theme spacing getter
  */
+export interface HistoryTabProps {
+  selectedPatient?: Record<string, unknown> | null;
+  selectedPatientLabel?: string;
+  filteredHistoryEntries?: HistoryEntry[];
+  historyFilterOptions?: HistoryFilterOption[];
+  historyFilter: string;
+  setHistoryFilter: (value: string) => void;
+  canPreviewAttachment: (file: HistoryTabPatientFile) => boolean;
+  downloadPatientFile: (file: HistoryTabPatientFile) => void | Promise<void>;
+  previewPatientFile: (file: HistoryTabPatientFile) => void | Promise<void>;
+  getColor: ColorGetter;
+  getFontSize: FontSizeGetter;
+  getSpacing: SpacingGetter;
+}
+
 export function HistoryTab({
   selectedPatient,
   selectedPatientLabel,
@@ -47,7 +104,7 @@ export function HistoryTab({
   getColor,
   getFontSize,
   getSpacing,
-}) {
+}: HistoryTabProps) {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // Empty state: no patient selected
   if (!selectedPatient) {
@@ -171,7 +228,7 @@ export function HistoryTab({
                       {canPreviewAttachment(entry.file) && (
                         <Button
                           variant="outline"
-                          onClick={() => previewPatientFile(entry.file)}
+                          onClick={() => previewPatientFile(entry.file as HistoryTabPatientFile)}
                           style={{ padding: '4px 10px', fontSize: getFontSize('xs') }}
                         >
                           <Eye size={12} className="cardio-icon-mr" /> {t('cardio.cardio_hist_view')}
@@ -179,7 +236,7 @@ export function HistoryTab({
                       )}
                       <Button
                         variant="outline"
-                        onClick={() => downloadPatientFile(entry.file)}
+                        onClick={() => downloadPatientFile(entry.file as HistoryTabPatientFile)}
                         style={{ padding: '4px 10px', fontSize: getFontSize('xs') }}
                       >
                         <Download size={12} className="cardio-icon-mr" /> {t('cardio.cardio_hist_download')}
