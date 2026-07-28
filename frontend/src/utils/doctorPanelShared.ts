@@ -189,7 +189,7 @@ export function makeEnsureCanonicalVisitId(
     const visitId = (row?.visit_id as number | null) || (appointmentId && typeof resolveCanonicalVisitId === 'function' ? await resolveCanonicalVisitId(appointmentId) : null);
 
     if (visitId && typeof setAppointments === 'function') {
-      setAppointments((prev: any) => (Array.isArray(prev) ? (prev as Array<Record<string, unknown>>).map((appointment) =>
+      setAppointments((prev: unknown[]) => (Array.isArray(prev) ? (prev as Array<Record<string, unknown>>).map((appointment) =>
         appointment && appointment.id === row.id ? { ...appointment, visit_id: visitId } : appointment
       ) : prev));
     }
