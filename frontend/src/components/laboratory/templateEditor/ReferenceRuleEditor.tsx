@@ -42,22 +42,73 @@ const RULE_OP_OPTIONS = [
   { value: 'between', labelKey: 'misc.rre_op_between' },
 ];
 
-function parseRuleText(text) {
+// Minimal translation fn signature accepted by the helpers below. Mirrors the
+// `useTranslation` adapter shape without coupling this file to its concrete type.
+export type ReferenceRuleTranslationFn = (key: string, options?: Record<string, unknown>) => string;
+
+// `when` clause of a reference rule case.
+export interface ReferenceRuleWhen {
+  source?: string;
+  op?: string;
+  value?: string | number;
+  min?: number;
+  max?: number;
+  [key: string]: unknown;
+}
+
+// A single case in the reference rule (when-clause + reference range).
+export interface ReferenceCase {
+  when?: ReferenceRuleWhen;
+  text?: string;
+  low?: number | string | null;
+  high?: number | string | null;
+  [key: string]: unknown;
+}
+
+// Default reference range applied when no case matches.
+export interface ReferenceDefault {
+  text?: string;
+  low?: number | string | null;
+  high?: number | string | null;
+  [key: string]: unknown;
+}
+
+// Full reference rule payload (cases + default).
+export interface ReferenceRule {
+  cases?: ReferenceCase[];
+  default?: ReferenceDefault;
+  [key: string]: unknown;
+}
+
+// Field shape consumed by the editor (subset of the lab template field).
+export interface ReferenceRuleField {
+  reference_rule_text?: string;
+  [key: string]: unknown;
+}
+
+export interface ReferenceRuleEditorProps {
+  sectionIndex: number;
+  fieldIndex: number;
+  field: ReferenceRuleField;
+  updateField: (sectionIndex: number, fieldIndex: number, fieldName: string, value: unknown) => void;
+}
+
+function parseRuleText(text: string | null | undefined): ReferenceRule | null {
   if (!text?.trim()) return null;
   try {
-    return JSON.parse(text);
+    return JSON.parse(text) as ReferenceRule;
   } catch {
     return null;
   }
 }
 
-function serializeRule(rule) {
+function serializeRule(rule: ReferenceRule | null | undefined): string {
   if (!rule) return '';
   return JSON.stringify(rule, null, 2);
 }
 
-function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }) {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }: ReferenceRuleEditorProps) {
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as ReferenceRuleTranslationFn;
   const rule = parseRuleText(field.reference_rule_text);
   const isStructured = rule === null || (rule && Array.isArray(rule.cases));
 
@@ -82,39 +133,39 @@ function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }) {
   const cases = rule?.cases || [];
   const defaultRule = rule?.default || { text: '', low: '', high: '' };
 
-  const updateRule = (nextRule) => {
+  const updateRule = (nextRule: ReferenceRule | null | undefined) => {
     updateField(sectionIndex, fieldIndex, 'reference_rule_text', serializeRule(nextRule));
   };
 
   const addCase = () => {
-    const newCase = {
+    const newCase: ReferenceCase = {
       when: { source: 'patient.sex', op: 'eq', value: 'M' },
       text: '',
       low: '',
       high: '',
     };
-    updateRule({ ...rule, cases: [...cases, newCase] });
+    updateRule({ ...(rule ?? {}), cases: [...cases, newCase] });
   };
 
-  const updateCase = (caseIndex, key, value) => {
-    const nextCases = cases.map((c, i) => i === caseIndex ? { ...c, [key]: value } : c);
-    updateRule({ ...rule, cases: nextCases });
+  const updateCase = (caseIndex: number, key: string, value: unknown) => {
+    const nextCases = cases.map((c: ReferenceCase, i: number) => i === caseIndex ? { ...c, [key]: value } : c);
+    updateRule({ ...(rule ?? {}), cases: nextCases });
   };
 
-  const updateCaseWhen = (caseIndex, whenKey, value) => {
-    const nextCases = cases.map((c, i) => {
+  const updateCaseWhen = (caseIndex: number, whenKey: string, value: unknown) => {
+    const nextCases = cases.map((c: ReferenceCase, i: number) => {
       if (i !== caseIndex) return c;
-      return { ...c, when: { ...c.when, [whenKey]: value } };
+      return { ...c, when: { ...(c.when ?? {}), [whenKey]: value } };
     });
-    updateRule({ ...rule, cases: nextCases });
+    updateRule({ ...(rule ?? {}), cases: nextCases });
   };
 
-  const removeCase = (caseIndex) => {
-    updateRule({ ...rule, cases: cases.filter((_, i) => i !== caseIndex) });
+  const removeCase = (caseIndex: number) => {
+    updateRule({ ...(rule ?? {}), cases: cases.filter((_unused: unknown, i: number) => i !== caseIndex) });
   };
 
-  const updateDefault = (key, value) => {
-    updateRule({ ...rule, default: { ...defaultRule, [key]: value } });
+  const updateDefault = (key: string, value: unknown) => {
+    updateRule({ ...(rule ?? {}), default: { ...defaultRule, [key]: value } });
   };
 
   return (
@@ -133,7 +184,7 @@ function ReferenceRuleEditor({ sectionIndex, fieldIndex, field, updateField }) {
         </span>
       )}
 
-      {cases.map((caseItem, caseIndex) => {
+      {cases.map((caseItem: ReferenceCase, caseIndex: number) => {
         const isBetween = caseItem.when?.op === 'between';
         return (
           <div key={caseIndex} className="ltw-case-card">

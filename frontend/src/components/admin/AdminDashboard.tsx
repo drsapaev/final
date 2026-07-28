@@ -43,8 +43,66 @@ const defaultStats = {
   pendingApprovals: 0,
 };
 
+// Minimal translation fn signature accepted by the helpers below. Mirrors the
+// `useTranslation` adapter shape without coupling this file to its concrete type.
+export type AdminTranslationFn = (key: string, options?: Record<string, unknown>) => string;
 
-function formatTimeAgo(date, t) {
+// Shape of `/admin/recent-activities` rows.
+export interface AdminRecentActivity {
+  id?: string | number;
+  status?: string;
+  message?: string;
+  notification_type?: string;
+  created_at?: string;
+  user?: string;
+  time?: string;
+  [key: string]: unknown;
+}
+
+// Shape of `/admin/activity-chart?days=N` payload.
+export interface AdminActivityEntry {
+  appointments?: number;
+  payments?: number;
+  users?: number;
+  total?: number;
+  [key: string]: unknown;
+}
+
+export interface AdminActivityChartData {
+  labels?: string[];
+  data: AdminActivityEntry[];
+  [key: string]: unknown;
+}
+
+// Shape of `/admin/stats` payload.
+export interface AdminStats {
+  totalUsers?: number;
+  totalDoctors?: number;
+  totalPatients?: number;
+  totalRevenue?: number;
+  appointmentsToday?: number;
+  pendingApprovals?: number;
+  [key: string]: unknown;
+}
+
+// Shape of `/notifications/history/stats?days=N` payload.
+export interface AdminSystemAlertsData {
+  recent_activity?: AdminRecentActivity[];
+  [key: string]: unknown;
+}
+
+// Flattened system alert row produced by `buildSystemAlerts`.
+export interface AdminSystemAlert {
+  id: string | number;
+  type: string;
+  message: string;
+  priority: string;
+  time: string;
+  [key: string]: unknown;
+}
+
+
+function formatTimeAgo(date: string | Date | null | undefined, t: AdminTranslationFn): string {
   if (!date) return t('admin2.adm_recent');
 
   const dateObj = typeof date === 'string' ? new Date(date) : date;
@@ -64,7 +122,7 @@ function formatTimeAgo(date, t) {
   return dateObj.toLocaleDateString('ru-RU');
 }
 
-function getStatusIcon(status) {
+function getStatusIcon(status: unknown) {
   const colorMap = {
     success: 'var(--mac-success)',
     warning: 'var(--mac-warning)',
@@ -80,10 +138,10 @@ function getStatusIcon(status) {
   return <Clock className="admin-w-16-h-16-col-dyn" style={{ '--admin-col0': colorMap.default } as CSSProperties} />;
 }
 
-function buildSystemAlerts(systemAlertsData, t) {
+function buildSystemAlerts(systemAlertsData: AdminSystemAlertsData | null | undefined, t: AdminTranslationFn): AdminSystemAlert[] {
   if (!systemAlertsData?.recent_activity) return [];
 
-  return systemAlertsData.recent_activity.slice(0, 5).map((alert, index) => ({
+  return systemAlertsData.recent_activity.slice(0, 5).map((alert: AdminRecentActivity, index: number) => ({
     id: alert.id || index + 1,
     type: alert.status === 'failed' ? 'error' : alert.status === 'pending' ? 'warning' : 'info',
     message: alert.message || alert.notification_type || t('admin2.adm_system_notification'),
@@ -94,20 +152,22 @@ function buildSystemAlerts(systemAlertsData, t) {
 
 // UX Audit Stage 3 (Dashboard issue 4.2): локализация приоритета уведомлений.
 // Раньше отображались английские 'high'/'medium'/'low' в русском UI.
-function getPriorityLabel(priority, t) {
+function getPriorityLabel(priority: unknown, t: AdminTranslationFn): string {
   const map = {
     high: t('admin2.adm_priority_high'),
     medium: t('admin2.adm_priority_medium'),
     low: t('admin2.adm_priority_low'),
   };
-  return map[priority] || priority;
+  return (typeof priority === 'string' && priority in map
+    ? map[priority as keyof typeof map]
+    : null) || String(priority ?? '');
 }
 
 // UX Audit Stage 3 (Dashboard issue 4.1):
 // Helper для экспорта данных активности в CSV.
 // Раньше кнопка «Экспорт» не имела onClick — была кнопкой-призраком.
-function exportActivityToCsv(chartData, t) {
-  if (!(chartData as Record<string, any>)?.data || chartData.data.length === 0) {
+function exportActivityToCsv(chartData: AdminActivityChartData | null | undefined, t: AdminTranslationFn): void {
+  if (!chartData?.data || chartData.data.length === 0) {
     return;
   }
 
@@ -118,7 +178,7 @@ function exportActivityToCsv(chartData, t) {
     t('admin2.adm_csv_users'),
     t('admin2.adm_csv_total'),
   ];
-  const rows = chartData.data.map((entry, index) => [
+  const rows = chartData.data.map((entry: AdminActivityEntry, index: number) => [
     chartData.labels?.[index] || '',
     entry.appointments || 0,
     entry.payments || 0,
@@ -127,7 +187,7 @@ function exportActivityToCsv(chartData, t) {
   ]);
 
   const csv = [headers, ...rows]
-    .map((row) => row.map((cell) => String(cell)).join(';'))
+    .map((row: unknown[]) => row.map((cell: unknown) => String(cell)).join(';'))
     .join('\n');
 
   const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -140,7 +200,7 @@ function exportActivityToCsv(chartData, t) {
 }
 
 const AdminDashboard = () => {
-  const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const { t: rawT } = useTranslation(); const t = rawT as unknown as AdminTranslationFn;
   const {
     data: statsDataRaw,
     loading: statsLoading,
@@ -181,11 +241,11 @@ const AdminDashboard = () => {
     initialData: { labels: [], data: [] },
   });
 
-  const statsData = statsDataRaw as Record<string, any>;
-  const activityChartData = activityChartDataRaw as Record<string, any>;
-  const stats = statsData || defaultStats;
-  const recentActivities = (recentActivitiesData as Record<string, any>)?.activities || [];
-  const systemAlerts = React.useMemo(() => buildSystemAlerts(systemAlertsData, t), [systemAlertsData, t]);
+  const statsData = statsDataRaw as AdminStats | null | undefined;
+  const activityChartData = activityChartDataRaw as AdminActivityChartData | null | undefined;
+  const stats: AdminStats = statsData || defaultStats;
+  const recentActivities = ((recentActivitiesData as { activities?: AdminRecentActivity[] })?.activities) || [];
+  const systemAlerts = React.useMemo(() => buildSystemAlerts(systemAlertsData as AdminSystemAlertsData | null | undefined, t), [systemAlertsData, t]);
 
   // UX Audit Stage 3 (Dashboard issue 4.1):
   // Handlers для кнопок «Экспорт» и «Все».
@@ -312,23 +372,23 @@ const AdminDashboard = () => {
             ) : activityChartData?.data && activityChartData.data.length > 0 ? (
               <div className="admin-h-256-radius-var-mac-radius-md-p-16-d-flex-fd-column-jc-between-bg-dyn-bd-dyn" style={{ '--admin-bg0': adminSurface, '--admin-bd1': adminBorder } as CSSProperties}>
                 <div className="admin-d-flex-ai-end-jc-around-h-200-gap-4">
-                  {activityChartData.data.map((item, index) => {
-                    const maxValue = Math.max(...activityChartData.data.map((entry) => entry.total || 0));
-                    const height = maxValue > 0 ? (item.total / maxValue) * 180 : 0;
+                  {activityChartData.data.map((item: AdminActivityEntry, index: number) => {
+                    const maxValue = Math.max(...activityChartData.data.map((entry: AdminActivityEntry) => entry.total || 0));
+                    const height = maxValue > 0 ? (Number(item.total ?? 0) / maxValue) * 180 : 0;
                     return (
                       <div key={`${activityChartData.labels?.[index] || 'activity'}-${index}`} className="admin-flex-1-d-flex-fd-column-ai-center-gap-4">
                         <div className="admin-w-100pct-bg-linear-gradient-to-t-radius-4px-4px-0-0-minh-4-tr-height-0-3s-ease-h-dyn" style={{ '--admin-h0': `${height}px` } as CSSProperties} />
                         <span className="admin-fs-10-tertiary-ta-center">
-                          {activityChartData.labels[index]}
+                          {activityChartData.labels?.[index] ?? ''}
                         </span>
                       </div>
                     );
                   })}
                 </div>
                 <div className="admin-d-flex-jc-around-mt-8-fs-12-col-dyn" style={{ '--admin-col0': adminTextSecondary } as CSSProperties}>
-                  <span>{t('admin2.adm_chart_appointments_count', { count: activityChartData.data.reduce((sum, entry) => sum + (entry.appointments || 0), 0) })}</span>
-                  <span>{t('admin2.adm_chart_payments_count', { count: activityChartData.data.reduce((sum, entry) => sum + (entry.payments || 0), 0) })}</span>
-                  <span>{t('admin2.adm_chart_users_count', { count: activityChartData.data.reduce((sum, entry) => sum + (entry.users || 0), 0) })}</span>
+                  <span>{t('admin2.adm_chart_appointments_count', { count: activityChartData.data.reduce((sum: number, entry: AdminActivityEntry) => sum + (entry.appointments || 0), 0) })}</span>
+                  <span>{t('admin2.adm_chart_payments_count', { count: activityChartData.data.reduce((sum: number, entry: AdminActivityEntry) => sum + (entry.payments || 0), 0) })}</span>
+                  <span>{t('admin2.adm_chart_users_count', { count: activityChartData.data.reduce((sum: number, entry: AdminActivityEntry) => sum + (entry.users || 0), 0) })}</span>
                 </div>
               </div>
             ) : (
@@ -367,7 +427,7 @@ const AdminDashboard = () => {
               </div>
             ) : (
               <div className="flex flex-col gap-4">
-                {recentActivities.map((activity) => (
+                {recentActivities.map((activity: AdminRecentActivity) => (
                   <div key={activity.id} className="admin-d-flex-ai-center-gap-12-p-12-radius-var-mac-radius-md-bg-dyn-bd-dyn" style={{ '--admin-bg0': adminInsetSurface, '--admin-bd1': adminBorder } as CSSProperties}>
                     {getStatusIcon(activity.status)}
                     <div className="admin-flex-1">
@@ -404,7 +464,7 @@ const AdminDashboard = () => {
             </div>
           ) : (
             <div className="flex flex-col gap-4">
-              {systemAlerts.map((alert) => (
+              {systemAlerts.map((alert: AdminSystemAlert) => (
                 <div key={alert.id} className="admin-d-flex-ai-center-gap-12-p-12-radius-var-mac-radius-md-bd-dyn-bg-dyn" style={{ '--admin-bd0': adminBorder, '--admin-bg1': adminInsetSurface } as CSSProperties}>
                   <AlertTriangle className="admin-w-20-h-20-warning" />
                   <div className="admin-flex-1">
