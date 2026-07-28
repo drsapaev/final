@@ -10,6 +10,73 @@ import { MacOSCard, Button, Input, Select, Textarea, Badge } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
 
+interface SkinExaminationForm {
+  patient_id: string;
+  visit_id: string;
+  examination_date: string;
+  exam_date?: string;
+  skin_type: string;
+  skin_condition: string;
+  lesions: string;
+  distribution: string;
+  symptoms: string;
+  diagnosis: string;
+  treatment_plan: string;
+}
+
+interface CosmeticProcedureForm {
+  patient_id: string;
+  visit_id: string;
+  procedure_date: string;
+  procedure_type: string;
+  area_treated: string;
+  products_used: string;
+  results: string;
+  follow_up: string;
+  total_cost?: string | number;
+}
+
+interface SkinExamRecord {
+  id: string | number;
+  exam_date?: string;
+  skin_type?: string;
+  skin_condition?: string;
+  lesions?: string;
+  diagnosis?: string;
+}
+
+interface CosmeticProcedureRecord {
+  id: string | number;
+  procedure_date?: string;
+  total_cost?: number | string;
+  procedure_type?: string;
+  area_treated?: string;
+  products_used?: string;
+}
+
+interface DermaExamsTabProps {
+  activeTab: string;
+  skinExamination: SkinExaminationForm;
+  setSkinExamination: (next: SkinExaminationForm) => void;
+  showSkinForm: boolean;
+  skinExaminations?: SkinExamRecord[];
+  onSkinSubmit?: (e: React.FormEvent<HTMLFormElement>) => void;
+  onOpenSkinForm?: () => void;
+  onCancelSkinForm?: () => void;
+  cosmeticProcedure: CosmeticProcedureForm;
+  setCosmeticProcedure: (next: CosmeticProcedureForm) => void;
+  showCosmeticForm: boolean;
+  cosmeticProcedures?: CosmeticProcedureRecord[];
+  onCosmeticSubmit?: (e: React.FormEvent<HTMLFormElement>) => void;
+  onOpenCosmeticForm?: () => void;
+  onCancelCosmeticForm?: () => void;
+  // Theme getters from useTheme() — method syntax keeps these bivariant so the
+  // caller's narrower ColorToken/FontSize/Spacing signatures stay assignable.
+  getColor?(color: string, shade?: number | string): string;
+  getFontSize?(size: string): string;
+  getSpacing?(size: string): string;
+}
+
 export function DermaExamsTab({
   activeTab,
   // Skin examination
@@ -32,11 +99,11 @@ export function DermaExamsTab({
   getColor,
   getFontSize,
   getSpacing,
-}) {
+}: DermaExamsTabProps) {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   if (activeTab === 'skin') {
     return (
-      <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: getSpacing('xl') }}>
+      <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: getSpacing?.('xl') }}>
         <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--mac-spacing-5)' }}>
             <h3 style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>
@@ -121,7 +188,7 @@ export function DermaExamsTab({
 
   if (activeTab === 'cosmetic') {
     return (
-      <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: getSpacing('xl') }}>
+      <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: getSpacing?.('xl') }}>
         <MacOSCard style={{ padding: 'var(--mac-spacing-6)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--mac-spacing-5)' }}>
             <h3 style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>
