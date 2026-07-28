@@ -13,7 +13,32 @@ import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
 
-const formatPrintServiceLabel = (service) => {
+interface PrintDocumentData {
+  patient_fio?: string;
+  services?: unknown;
+  cost?: number;
+  print_tickets?: unknown[];
+  queue_numbers?: unknown[];
+  [key: string]: unknown;
+}
+
+interface PrinterInfo {
+  id: string;
+  name: string;
+  status: string | null;
+  type: string;
+  isDefault: boolean;
+}
+
+interface PrintDialogComponentProps {
+  isOpen: boolean;
+  onClose: () => void;
+  documentType?: string;
+  documentData?: PrintDocumentData | null;
+  onPrint?: (data: PrintDocumentData | null | undefined, printerId?: string) => void | Promise<void>;
+}
+
+const formatPrintServiceLabel = (service: unknown): string => {
   if (service == null) return '';
 
   if (
@@ -25,14 +50,15 @@ const formatPrintServiceLabel = (service) => {
   }
 
   if (typeof service === 'object') {
+    const obj = service as Record<string, unknown>;
     const candidate =
-      service.service_name ||
-      service.name ||
-      service.code ||
-      service.service_code ||
-      service.label ||
-      service.title ||
-      service.value ||
+      obj.service_name ||
+      obj.name ||
+      obj.code ||
+      obj.service_code ||
+      obj.label ||
+      obj.title ||
+      obj.value ||
       '';
     return String(candidate).trim();
   }
@@ -40,7 +66,7 @@ const formatPrintServiceLabel = (service) => {
   return String(service).trim();
 };
 
-const formatPrintServices = (services) => {
+const formatPrintServices = (services: unknown): string => {
   if (Array.isArray(services)) {
     return services.map(formatPrintServiceLabel).filter(Boolean).join(', ');
   }
@@ -54,9 +80,9 @@ const PrintDialog = ({
   documentType = 'ticket',
   documentData,
   onPrint,
-}) => {
+}: PrintDialogComponentProps) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
-  const [printers, setPrinters] = useState([]);
+  const [printers, setPrinters] = useState<PrinterInfo[]>([]);
   const [selectedPrinter, setSelectedPrinter] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
@@ -90,12 +116,12 @@ const PrintDialog = ({
         );
       }
 
-      const backendPrinters = Array.isArray(result.data) ? result.data : [];
-      const normalizedPrinters = backendPrinters.map((printer) => ({
-        id: printer.name || String(printer.id),
-        name: printer.display_name || printer.name || t('misc.pd_printer'),
-        status: printer.status || null,
-        type: printer.printer_type || 'unknown',
+      const backendPrinters = Array.isArray(result.data) ? (result.data as Array<Record<string, unknown>>) : [];
+      const normalizedPrinters: PrinterInfo[] = backendPrinters.map((printer) => ({
+        id: String(printer.name || printer.id || ''),
+        name: String(printer.display_name || printer.name || t('misc.pd_printer')),
+        status: (printer.status as string | null) || null,
+        type: String(printer.printer_type || 'unknown'),
         isDefault: Boolean(printer.is_default),
       }));
 
@@ -125,7 +151,7 @@ const PrintDialog = ({
         onClose();
       } catch (err) {
         logger.error('Print error:', err);
-        toast.error(err?.message || t('misc.pd_oshibka_pri_pechati_dokument'));
+        toast.error((err as Error)?.message || t('misc.pd_oshibka_pri_pechati_dokument'));
       } finally {
         setIsPrinting(false);
       }
@@ -146,7 +172,7 @@ const PrintDialog = ({
       onClose();
     } catch (err) {
       logger.error('Print error:', err);
-      toast.error(err?.message || t('misc.pd_oshibka_pri_pechati_dokument'));
+      toast.error((err as Error)?.message || t('misc.pd_oshibka_pri_pechati_dokument'));
     } finally {
       setIsPrinting(false);
     }
@@ -202,11 +228,11 @@ const PrintDialog = ({
             <div className="print-doc-fields">
               {documentData.patient_fio && (
                 <p className="print-doc-field">
-                  Пациент: <strong>{documentData.patient_fio}</strong>
+                  Пациент: <strong>{String(documentData.patient_fio ?? '')}</strong>
                 </p>
               )}
 
-              {documentData.services && (
+              {documentData.services != null && (
                 <p className="print-doc-field">
                   Услуги: {formatPrintServices(documentData.services)}
                 </p>

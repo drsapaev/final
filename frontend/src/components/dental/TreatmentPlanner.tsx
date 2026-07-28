@@ -39,7 +39,7 @@ import notify from '../../services/notify';
 
 const iconSize = 15;
 
-function clonePlainObject(value) {
+function clonePlainObject(value: unknown) {
   if (!value || typeof value !== 'object') {
     return {};
   }
@@ -60,7 +60,7 @@ async function loadExistingEmrDraft(visitId: string | number) {
   return response.status === 404 ? null : response.data;
 }
 
-function buildTreatmentPlanEmrPayload(existingEmr, treatmentPlan) {
+function buildTreatmentPlanEmrPayload(existingEmr: Record<string, unknown> | null, treatmentPlan: TreatmentPlanState) {
   const data = clonePlainObject(existingEmr?.data);
   const specialtyData = clonePlainObject(data.specialty_data);
 
@@ -221,10 +221,30 @@ const priorityBadgeVariant = {
   low: 'info',
 };
 
+interface TreatmentStage {
+  id: string;
+  name: string;
+  description: string;
+  teeth: Array<string | number>;
+  date: string;
+  duration: number;
+  cost: number;
+  priority: string;
+  status: string;
+  [key: string]: unknown;
+}
+
+interface TreatmentPlanState {
+  name: string;
+  stages: TreatmentStage[];
+  totalCost: number;
+  totalDuration: number;
+}
+
 const TreatmentPlanner = ({ visitId, onUpdate, patientId, teethData }: { visitId?: string | number; onUpdate?: () => void; patientId?: string | number; teethData?: Record<string, unknown> }) => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
-  const [treatmentPlan, setTreatmentPlan] = useState({
+  const [treatmentPlan, setTreatmentPlan] = useState<TreatmentPlanState>({
     name: '',
     stages: [],
     totalCost: 0,
@@ -274,7 +294,7 @@ const TreatmentPlanner = ({ visitId, onUpdate, patientId, teethData }: { visitId
     });
   };
 
-  const handleDeleteStage = (stageId) => {
+  const handleDeleteStage = (stageId: string) => {
     setTreatmentPlan(prev => {
       const stage = prev.stages.find(s => s.id === stageId);
       return {
@@ -316,7 +336,7 @@ const TreatmentPlanner = ({ visitId, onUpdate, patientId, teethData }: { visitId
                 <td>${stage.date || t('dental.dental_tp_no_date')}</td>
                 <td>${stage.duration || 0}</td>
                 <td>${stage.cost || 0}</td>
-                <td>${PRIORITIES[stage.priority]?.label || stage.priority || ''}</td>
+                <td>${PRIORITIES[stage.priority as keyof typeof PRIORITIES]?.label || stage.priority || ''}</td>
               </tr>
             `
           )
@@ -443,8 +463,8 @@ const TreatmentPlanner = ({ visitId, onUpdate, patientId, teethData }: { visitId
                           <DollarSign style={styles.badgeIcon} aria-hidden="true" />
                           {`${(stage.cost / 1000).toFixed(0)}k`}
                         </Badge>
-                        <Badge size="small" variant={priorityBadgeVariant[stage.priority] || 'default'}>
-                          {PRIORITIES[stage.priority]?.label || stage.priority}
+                        <Badge size="small" variant={priorityBadgeVariant[stage.priority as keyof typeof priorityBadgeVariant] || 'default'}>
+                          {PRIORITIES[stage.priority as keyof typeof PRIORITIES]?.label || stage.priority}
                         </Badge>
                       </div>
                     </div>
