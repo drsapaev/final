@@ -18,6 +18,39 @@ import i18n from '../../i18n';
 import React from "react";
 const t18 = i18n.t as unknown as (key: string, options?: Record<string, unknown>) => string;
 
+export type ModernSelectOption = {
+  value: string | number;
+  label: string;
+  [key: string]: unknown;
+};
+
+export type ModernSelectOptionValue = ModernSelectOption | string | number;
+
+export interface ModernSelectProps {
+  label?: React.ReactNode;
+  placeholder?: string;
+  value?: ModernSelectOptionValue | ModernSelectOptionValue[];
+  onChange?: (value: ModernSelectOptionValue | ModernSelectOptionValue[] | null) => void;
+  options?: ModernSelectOptionValue[];
+  error?: React.ReactNode;
+  success?: React.ReactNode;
+  disabled?: boolean;
+  required?: boolean;
+  searchable?: boolean;
+  multiple?: boolean;
+  clearable?: boolean;
+  loading?: boolean;
+  size?: string;
+  variant?: string;
+  renderOption?: (option: ModernSelectOptionValue, isSelected: boolean) => React.ReactNode;
+  renderValue?: (selectedValues: ModernSelectOptionValue[]) => React.ReactNode;
+  groupBy?: string | ((option: ModernSelectOptionValue) => string);
+  className?: string;
+  id?: string;
+  style?: React.CSSProperties;
+  [key: string]: unknown;
+}
+
 const ModernSelect = ({
   label,
   placeholder = t18('misc.ms_vyberite_optsiyu'),
@@ -39,7 +72,7 @@ const ModernSelect = ({
   groupBy,
   className = '',
   ...props
-}) => {
+}: ModernSelectProps) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const selectListboxId = useId();
   const accessibleLabel = typeof label === 'string' && label.trim() ? label : placeholder;
@@ -55,8 +88,8 @@ const ModernSelect = ({
 
   // Закрытие при клике вне компонента
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (selectRef.current && !selectRef.current.contains(event.target)) {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (selectRef.current && !selectRef.current.contains(event.target as Node)) {
         setIsOpen(false);
         setSearchQuery('');
         setHighlightedIndex(-1);
@@ -76,25 +109,25 @@ const ModernSelect = ({
 
   // Обработка клавиш
   useEffect(() => {
-    const handleKeyDown = (event) => {
+    const handleKeyDown = (event: KeyboardEvent) => {
       if (!isOpen) return;
 
-      const filteredOptions = !searchQuery ? options : options.filter((option) => {
+      const filteredOptions = !searchQuery ? options : options.filter((option: ModernSelectOptionValue) => {
         const label = typeof option === 'object' ? (option as Record<string, any>).label : option;
-        return label.toLowerCase().includes(searchQuery.toLowerCase());
+        return String(label).toLowerCase().includes(searchQuery.toLowerCase());
       });
 
-      const selectOption = (option) => {
+      const selectOption = (option: ModernSelectOptionValue | undefined) => {
         if (!option) return;
         if (multiple) {
           const selectedValues = !value ? [] : Array.isArray(value) ? value : [value];
           const optionValue = typeof option === 'object' ? option.value : option;
-          const isSelected = selectedValues.some((val) =>
-            (typeof val === 'object' ? val.value : val) === optionValue
+          const isSelected = selectedValues.some((val: ModernSelectOptionValue) =>
+            (typeof val === 'object' ? (val as ModernSelectOption).value : val) === optionValue
           );
 
           const newValue = isSelected
-            ? selectedValues.filter((val) => (typeof val === 'object' ? val.value : val) !== optionValue)
+            ? selectedValues.filter((val: ModernSelectOptionValue) => (typeof val === 'object' ? (val as ModernSelectOption).value : val) !== optionValue)
             : [...selectedValues, option];
 
           onChange?.(newValue);
@@ -142,9 +175,9 @@ const ModernSelect = ({
   const getFilteredOptions = () => {
     if (!searchQuery) return options;
 
-    return options.filter((option) => {
+    return options.filter((option: ModernSelectOptionValue) => {
       const label = typeof option === 'object' ? (option as Record<string, any>).label : option;
-      return label.toLowerCase().includes(searchQuery.toLowerCase());
+      return String(label).toLowerCase().includes(searchQuery.toLowerCase());
     });
   };
 
@@ -154,8 +187,12 @@ const ModernSelect = ({
 
     if (!groupBy) return { '': filteredOptions };
 
-    return filteredOptions.reduce((groups, option) => {
-      const group = typeof groupBy === 'function' ? groupBy(option) : option[groupBy];
+    return filteredOptions.reduce<Record<string, ModernSelectOptionValue[]>>((groups, option: ModernSelectOptionValue) => {
+      const group = typeof groupBy === 'function'
+        ? groupBy(option)
+        : (typeof option === 'object' && option !== null
+          ? String((option as Record<string, unknown>)[groupBy as string] ?? '')
+          : '');
       if (!groups[group]) groups[group] = [];
       groups[group].push(option);
       return groups;
@@ -169,28 +206,28 @@ const ModernSelect = ({
   };
 
   // Проверка выбранности опции
-  const isOptionSelected = (option) => {
+  const isOptionSelected = (option: ModernSelectOptionValue): boolean => {
     const selectedValues = getSelectedValues();
     const optionValue = typeof option === 'object' ? option.value : option;
-    return selectedValues.some((val) =>
-    (typeof val === 'object' ? val.value : val) === optionValue
+    return selectedValues.some((val: ModernSelectOptionValue) =>
+    (typeof val === 'object' ? (val as ModernSelectOption).value : val) === optionValue
     );
   };
 
   // Обработка клика по опции
-  const handleOptionClick = (option) => {
+  const handleOptionClick = (option: ModernSelectOptionValue) => {
     if (multiple) {
       const selectedValues = getSelectedValues();
       const optionValue = typeof option === 'object' ? option.value : option;
 
-      const isSelected = selectedValues.some((val) =>
-      (typeof val === 'object' ? val.value : val) === optionValue
+      const isSelected = selectedValues.some((val: ModernSelectOptionValue) =>
+      (typeof val === 'object' ? (val as ModernSelectOption).value : val) === optionValue
       );
 
-      let newValue;
+      let newValue: ModernSelectOptionValue[];
       if (isSelected) {
-        newValue = selectedValues.filter((val) =>
-        (typeof val === 'object' ? val.value : val) !== optionValue
+        newValue = selectedValues.filter((val: ModernSelectOptionValue) =>
+        (typeof val === 'object' ? (val as ModernSelectOption).value : val) !== optionValue
         );
       } else {
         newValue = [...selectedValues, option];
@@ -206,24 +243,24 @@ const ModernSelect = ({
   };
 
   // Очистка выбора
-  const handleClear = (e) => {
+  const handleClear = (e: React.MouseEvent<HTMLElement>) => {
     e.stopPropagation();
     onChange?.(multiple ? [] : null);
   };
 
   // Удаление выбранной опции (для multiple)
-  const handleRemoveOption = (e, optionToRemove) => {
+  const handleRemoveOption = (e: React.MouseEvent<HTMLElement>, optionToRemove: ModernSelectOptionValue) => {
     e.stopPropagation();
     const selectedValues = getSelectedValues();
     const optionValue = typeof optionToRemove === 'object' ? optionToRemove.value : optionToRemove;
 
-    const newValue = selectedValues.filter((val) =>
-    (typeof val === 'object' ? val.value : val) !== optionValue
+    const newValue = selectedValues.filter((val: ModernSelectOptionValue) =>
+    (typeof val === 'object' ? (val as ModernSelectOption).value : val) !== optionValue
     );
 
     onChange?.(newValue);
   };
-  const handleSelectContainerKeyDown = (event) => {
+  const handleSelectContainerKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
     if (disabled || isOpen) return;
     if (event.key === 'Enter' || event.key === ' ' || event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault();
@@ -273,7 +310,7 @@ const ModernSelect = ({
   };
 
   // Рендер опции
-  const renderOptionContent = (option: unknown, index?: number) => {
+  const renderOptionContent = (option: ModernSelectOptionValue, index?: number) => {
     if (renderOption) {
       return renderOption(option, isOptionSelected(option));
     }

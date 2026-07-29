@@ -27,7 +27,30 @@ import { useTranslation } from '../i18n/useTranslation';
 //   2.5: CSS media queries для мобильных (отдельный Setup.css файл)
 // ============================================================================
 
-const initialForm = {
+export interface SetupFormState {
+  clinicName: string;
+  clinicAddress: string;
+  clinicPhone: string;
+  clinicEmail: string;
+  clinicTimezone: string;
+  clinicLogoUrl: string;
+  branchName: string;
+  branchCode: string;
+  branchAddress: string;
+  branchPhone: string;
+  branchEmail: string;
+  branchTimezone: string;
+  adminUsername: string;
+  adminPassword: string;
+  adminPasswordConfirm: string;
+  adminFullName: string;
+  adminEmail: string;
+  activationKey: string;
+}
+
+export type SetupFormKey = keyof SetupFormState;
+
+const initialForm: SetupFormState = {
   clinicName: '',
   clinicAddress: '',
   clinicPhone: '',
@@ -84,9 +107,16 @@ const TIMEZONES = [
   { value: 'America/New_York', labelKey: 'misc.setup_tz_new_york' },
 ];
 
+export interface PasswordStrengthResult {
+  score: number;
+  labelKey: string;
+  color: string;
+  percent: number;
+}
+
 // UX Audit Stage 2 (Setup issue 2.1): индикатор силы пароля.
 // Возвращает { score: 0-4, label, color, percent }.
-function getPasswordStrength(password) {
+function getPasswordStrength(password: string): PasswordStrengthResult {
   if (!password) {
     return { score: 0, labelKey: '', color: 'transparent', percent: 0 };
   }
@@ -115,48 +145,54 @@ function getPasswordStrength(password) {
 
 // UX Audit Stage 2 (Setup issue 2.2): правила валидации для real-time feedback.
 // Каждое правило возвращает true если поле заполнено корректно.
-const REQUIRED_FIELDS = [
+interface RequiredFieldSpec {
+  key: SetupFormKey;
+  labelKey: string;
+  isComplete: (form: SetupFormState) => boolean;
+}
+
+const REQUIRED_FIELDS: RequiredFieldSpec[] = [
   {
     key: 'clinicName',
     labelKey: 'misc.setup_label_clinic_name',
-    isComplete: (form) => Boolean(form.clinicName.trim())
+    isComplete: (form: SetupFormState) => Boolean(form.clinicName.trim())
   },
   {
     key: 'branchName',
     labelKey: 'misc.setup_label_branch_name',
-    isComplete: (form) => Boolean(form.branchName.trim())
+    isComplete: (form: SetupFormState) => Boolean(form.branchName.trim())
   },
   {
     key: 'adminUsername',
     labelKey: 'misc.setup_label_admin_username_min3',
-    isComplete: (form) => form.adminUsername.trim().length >= 3
+    isComplete: (form: SetupFormState) => form.adminUsername.trim().length >= 3
   },
   {
     key: 'adminFullName',
     labelKey: 'misc.setup_label_admin_full_name',
-    isComplete: (form) => Boolean(form.adminFullName.trim())
+    isComplete: (form: SetupFormState) => Boolean(form.adminFullName.trim())
   },
   {
     key: 'adminEmail',
     labelKey: 'misc.setup_label_admin_email',
-    isComplete: (form) => EMAIL_PATTERN.test(form.adminEmail.trim())
+    isComplete: (form: SetupFormState) => EMAIL_PATTERN.test(form.adminEmail.trim())
   },
   {
     key: 'adminPassword',
     labelKey: 'misc.setup_label_admin_password_min8',
-    isComplete: (form) => form.adminPassword.length >= 8
+    isComplete: (form: SetupFormState) => form.adminPassword.length >= 8
   },
   // UX Audit Stage 2 (Setup issue 2.1): подтверждение пароля — обязательное поле.
   {
     key: 'adminPasswordConfirm',
     labelKey: 'misc.setup_label_password_confirm',
-    isComplete: (form) =>
+    isComplete: (form: SetupFormState) =>
       Boolean(form.adminPasswordConfirm) &&
       form.adminPasswordConfirm === form.adminPassword
   }
 ];
 
-function buildPayload(form) {
+function buildPayload(form: SetupFormState) {
   return {
     clinic: {
       name: form.clinicName.trim(),
@@ -191,11 +227,11 @@ export default function Setup() {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
 
-  const requiredFieldRefs = useRef({});
+  const requiredFieldRefs = useRef<Record<string, HTMLElement | null>>({});
   // UX Audit Stage 2 (Setup issue 2.2): track touched fields для real-time валидации.
   // Поле считается "touched" после первого blur. До этого подсветки нет —
   // не обвиняем пользователя в ошибках, которых он ещё не сделал.
-  const [touched, setTouched] = useState({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
   // UX Audit Stage 2 (Setup issue 2.2): submitAttempted — был ли хотя бы один submit.
   // Hint об обязательных полях показываем только после первой попытки submit.
   const [submitAttempted, setSubmitAttempted] = useState(false);
@@ -258,7 +294,7 @@ export default function Setup() {
     return form.adminPassword === form.adminPasswordConfirm;
   }, [form.adminPassword, form.adminPasswordConfirm]);
 
-  const setRequiredFieldRef = (key) => (node) => {
+  const setRequiredFieldRef = (key: SetupFormKey) => (node: HTMLElement | null) => {
     if (node) {
       requiredFieldRefs.current[key] = node;
     }
@@ -279,32 +315,33 @@ export default function Setup() {
 
   // UX Audit Stage 2 (Setup issue 2.2): авто-копирование полей клиники в филиал
   // при включённом чекбоксе «Филиал = клиника».
-  const updateField = (key) => (event) => {
-    const value = event.target.value;
-    setForm((prev) => {
-      const next = { ...prev, [key]: value };
+  const updateField = (key: SetupFormKey) =>
+    (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+      const value = event.target.value;
+      setForm((prev) => {
+        const next: SetupFormState = { ...prev, [key]: value };
 
-      // Если включён branchSameAsClinic и меняется одно из клиники-полей,
-      // синхронизируем соответствующее branch-поле.
-      if (branchSameAsClinic) {
-        const syncMap = {
-          clinicAddress: 'branchAddress',
-          clinicPhone: 'branchPhone',
-          clinicEmail: 'branchEmail',
-          clinicTimezone: 'branchTimezone',
-        };
-        const branchKey = syncMap[key];
-        if (branchKey) {
-          next[branchKey] = value;
+        // Если включён branchSameAsClinic и меняется одно из клиники-полей,
+        // синхронизируем соответствующее branch-поле.
+        if (branchSameAsClinic) {
+          const syncMap: Record<string, SetupFormKey> = {
+            clinicAddress: 'branchAddress',
+            clinicPhone: 'branchPhone',
+            clinicEmail: 'branchEmail',
+            clinicTimezone: 'branchTimezone',
+          };
+          const branchKey = syncMap[key];
+          if (branchKey) {
+            next[branchKey] = value;
+          }
         }
-      }
 
-      return next;
-    });
-  };
+        return next;
+      });
+    };
 
   // UX Audit Stage 2 (Setup issue 2.2): обработчик blur — помечает поле как touched.
-  const handleBlur = (key) => () => {
+  const handleBlur = (key: SetupFormKey) => () => {
     setTouched((prev) => ({ ...prev, [key]: true }));
   };
 
@@ -315,7 +352,7 @@ export default function Setup() {
   // UX Audit Setup bugfix: macos Checkbox вызывает onChange(boolean) напрямую,
   // а не onChange(event). Раньше здесь было `event.target.checked` —
   // это undefined, и чекбокс вообще не работал.
-  const handleBranchSameAsClinicChange = (checked) => {
+  const handleBranchSameAsClinicChange = (checked: boolean) => {
     setBranchSameAsClinic(checked);
     if (checked) {
       setForm((prev) => ({
@@ -328,7 +365,7 @@ export default function Setup() {
     }
   };
 
-  const handleSubmit = async (event) => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     // UX Audit Stage 2 (Setup issue 2.2): помечаем все поля как "проверенные"
     // после первой попытки submit — теперь все ошибки видимы.
@@ -358,18 +395,19 @@ export default function Setup() {
       setTimeout(() => {
         navigate(loginRoute, { replace: true });
       }, 800);
-    } catch (error) {
+    } catch (error: unknown) {
       logger.error('[setup] initialization failed', error);
+      const errorMessage = error instanceof Error ? error.message : '';
       setStatus({
         loading: false,
-        error: error?.message || t('misc.setup_msg_error'),
+        error: errorMessage || t('misc.setup_msg_error'),
         success: ''
       });
     }
   };
 
   // UX Audit Stage 2 (Setup issue 2.1): helper для стиля инпута в зависимости от валидности.
-  const fieldStyle = (key) => {
+  const fieldStyle = (key: SetupFormKey) => {
     return visibleInvalidKeys.has(key) ? 'setup-field setup-field--invalid' : 'setup-field';
   };
 

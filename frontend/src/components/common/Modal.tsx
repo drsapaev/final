@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 
 import { useTranslation } from '../../i18n/useTranslation';
 import i18n from '../../i18n';
@@ -10,11 +10,11 @@ const t18 = i18n.t as unknown as (key: string, options?: Record<string, unknown>
 
 // Контекст для модальных окон
 const ModalContext = createContext<any>(null);
-let openModalExternal: ((modal: unknown) => number) | null = null;
+let openModalExternal: ((modal: Partial<ModalEntry>) => number) | null = null;
 
-const getFontSize = (size) => {
+const getFontSize = (size: string): string => {
   // t accessed via closure or t18()
-  const sizes = {
+  const sizes: Record<string, string> = {
     sm: '0.875rem',
     md: '1rem',
     lg: '1.125rem',
@@ -26,13 +26,17 @@ const getFontSize = (size) => {
 /**
  * Провайдер контекста модальных окон
  */
-export function ModalProvider({ children }) {
+export interface ModalProviderProps {
+  children?: ReactNode;
+}
+
+export function ModalProvider({ children }: ModalProviderProps) {
   const [modals, setModals] = useState<ModalEntry[]>([]);
   const theme = useTheme();
 
-  const openModal = useCallback((modal) => {
+  const openModal = useCallback((modal: Partial<ModalEntry>): number => {
     const id = Date.now() + Math.random();
-    const newModal = {
+    const newModal: ModalEntry = {
       id,
       type: 'default',
       size: 'medium',
@@ -44,7 +48,7 @@ export function ModalProvider({ children }) {
     return id;
   }, []);
 
-  const closeModal = useCallback((id) => {
+  const closeModal = useCallback((id: string | number) => {
     setModals((prev) => prev.filter((modal) => modal.id !== id));
   }, []);
 
@@ -93,6 +97,11 @@ export function useModal() {
 interface ModalEntry {
   id: string | number;
   closable?: boolean;
+  title?: ReactNode;
+  content?: ReactNode;
+  footer?: ReactNode;
+  size?: string;
+  type?: string;
   [key: string]: unknown;
 }
 
@@ -151,7 +160,12 @@ function ModalContainer({ modals, onClose, theme }: ModalContainerProps) {
 /**
  * Отдельное модальное окно
  */
-function ModalItem({ modal, onClose }) {
+interface ModalItemProps {
+  modal: ModalEntry;
+  onClose: (id: string | number) => void;
+}
+
+function ModalItem({ modal, onClose }: ModalItemProps) {
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
@@ -160,8 +174,8 @@ function ModalItem({ modal, onClose }) {
     return () => clearTimeout(timer);
   }, []);
 
-  const getSize = (size) => {
-    const sizes = {
+  const getSize = (size: string): string => {
+    const sizes: Record<string, string> = {
       small: '400px',
       medium: '600px',
       large: '800px',
@@ -175,7 +189,7 @@ function ModalItem({ modal, onClose }) {
     backgroundColor: 'var(--color-background-primary)',
     borderRadius: 'var(--mac-radius-lg)',
     boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)',
-    maxWidth: getSize(modal.size),
+    maxWidth: getSize(modal.size ?? 'medium'),
     width: '100%',
     maxHeight: '90vh',
     overflow: 'hidden',
@@ -232,7 +246,7 @@ function ModalItem({ modal, onClose }) {
     gap: '0.5rem'
   };
 
-  const handleKeyDown = useCallback((e) => {
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape' && modal.closable) {
       onClose(modal.id);
     }
@@ -283,6 +297,18 @@ function ModalItem({ modal, onClose }) {
 /**
  * Базовый компонент модального окна
  */
+export interface ModalProps {
+  isOpen?: boolean;
+  onClose?: () => void;
+  title?: ReactNode;
+  children?: ReactNode;
+  footer?: ReactNode;
+  size?: string;
+  closable?: boolean;
+  style?: CSSProperties;
+  [key: string]: unknown;
+}
+
 export function Modal({
   isOpen,
   onClose,
@@ -292,11 +318,11 @@ export function Modal({
   size = 'medium',
   closable = true,
   ...props
-}) {void
+}: ModalProps) {void
   useTheme();
 
-  const getSize = (size) => {
-    const sizes = {
+  const getSize = (size: string): string => {
+    const sizes: Record<string, string> = {
       small: '400px',
       medium: '600px',
       large: '800px',
@@ -387,9 +413,9 @@ export function Modal({
     gap: '0.5rem'
   };
 
-  const handleKeyDown = useCallback((e) => {
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape' && closable) {
-      onClose();
+      onClose?.();
     }
   }, [closable, onClose]);
 
@@ -451,7 +477,7 @@ export function Modal({
  * Утилиты для быстрого создания модальных окон
  */
 export const modal = {
-  confirm: (message, onConfirm, onCancel) => {
+  confirm: (message: ReactNode, onConfirm: () => void, onCancel: () => void): number | null => {
     if (!openModalExternal) {
       return null;
     }
@@ -467,7 +493,7 @@ export const modal = {
     });
   },
 
-  alert: (message, onClose) => {
+  alert: (message: ReactNode, onClose: () => void): number | null => {
     if (!openModalExternal) {
       return null;
     }
