@@ -776,8 +776,8 @@ export default function LabPanel() {
           recentReports={recentReports as unknown as never[]}
           activeInstance={activeInstance as unknown as null}
           onInstanceChange={setActiveInstance}
-          onOpenInstance={loadInstance as unknown as (id: string | number) => void}
-          onRefreshHistory={loadReportHistory as unknown as (patientId: string | number) => void}
+          onOpenInstance={loadInstance as unknown as (instance: Record<string, unknown>) => void}
+          onRefreshHistory={loadReportHistory as unknown as (patientId: string | number) => Promise<void>}
           onRefreshRecentReports={loadRecentReports as unknown as undefined}
           onQueueChanged={loadLabAppointments as unknown as undefined}
           notify={notify}

@@ -122,12 +122,16 @@ const FormContext = React.createContext<FormContextValue | null>(null);
 /**
  * Провайдер контекста форм
  */
-export function FormProvider({ children }) {
+export interface FormProviderProps {
+  children?: React.ReactNode;
+}
+
+export function FormProvider({ children }: FormProviderProps) {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
-  const [forms, setForms] = useState({});
+  const [forms, setForms] = useState<Record<string, FormState>>({});
 
-  const registerForm = useCallback((formId, initialValues = {}) => {
+  const registerForm = useCallback((formId: string, initialValues: Record<string, unknown> = {}) => {
     setForms((prev) => ({
       ...prev,
       [formId]: {
@@ -139,7 +143,7 @@ export function FormProvider({ children }) {
     }));
   }, []);
 
-  const updateForm = useCallback((formId, updates) => {
+  const updateForm = useCallback((formId: string, updates: Partial<FormState>) => {
     setForms((prev) => ({
       ...prev,
       [formId]: {
@@ -149,7 +153,7 @@ export function FormProvider({ children }) {
     }));
   }, []);
 
-  const getForm = useCallback((formId) => {
+  const getForm = useCallback((formId: string): FormState | null => {
     return forms[formId] || null;
   }, [forms]);
 
@@ -170,23 +174,23 @@ export function FormProvider({ children }) {
 /**
  * Хук для использования форм
  */
-export function useForm(formId, initialValues = {}) {
+export function useForm(formId: string | undefined, initialValues: Record<string, unknown> = {}) {
   const context = React.useContext(FormContext);
   if (!context) {
     throw new Error('useForm must be used within a FormProvider');
   }
 
   const { registerForm, updateForm, getForm } = context;
-  const form = getForm(formId);
+  const form = formId ? getForm(formId) : null;
 
   React.useEffect(() => {
     if (!form) {
-      registerForm(formId, initialValues);
+      registerForm(formId || '', initialValues);
     }
   }, [formId, initialValues, form, registerForm]);
 
-  const setValue = useCallback((name, value) => {
-    updateForm(formId, {
+  const setValue = useCallback((name: string, value: unknown) => {
+    updateForm(formId || '', {
       values: {
         ...form?.values,
         [name]: value
@@ -194,8 +198,8 @@ export function useForm(formId, initialValues = {}) {
     });
   }, [formId, form?.values, updateForm]);
 
-  const setError = useCallback((name, error) => {
-    updateForm(formId, {
+  const setError = useCallback((name: string, error: unknown) => {
+    updateForm(formId || '', {
       errors: {
         ...form?.errors,
         [name]: error
@@ -203,8 +207,8 @@ export function useForm(formId, initialValues = {}) {
     });
   }, [formId, form?.errors, updateForm]);
 
-  const setTouched = useCallback((name, touched = true) => {
-    updateForm(formId, {
+  const setTouched = useCallback((name: string, touched = true) => {
+    updateForm(formId || '', {
       touched: {
         ...form?.touched,
         [name]: touched
@@ -212,12 +216,12 @@ export function useForm(formId, initialValues = {}) {
     });
   }, [formId, form?.touched, updateForm]);
 
-  const setSubmitting = useCallback((isSubmitting) => {
-    updateForm(formId, { isSubmitting });
+  const setSubmitting = useCallback((isSubmitting: boolean) => {
+    updateForm(formId || '', { isSubmitting });
   }, [formId, updateForm]);
 
   const resetForm = useCallback(() => {
-    updateForm(formId, {
+    updateForm(formId || '', {
       values: initialValues,
       errors: {},
       touched: {},
@@ -236,7 +240,7 @@ export function useForm(formId, initialValues = {}) {
       }
     });
 
-    updateForm(formId, { errors });
+    updateForm(formId || '', { errors });
     return Object.keys(errors).length === 0;
   }, [formId, form?.values, updateForm]);
 
@@ -254,6 +258,16 @@ export function useForm(formId, initialValues = {}) {
 /**
  * Компонент формы
  */
+export interface FormProps {
+  formId?: string;
+  initialValues?: Record<string, unknown>;
+  onSubmit?: (values: Record<string, unknown> | undefined, form: FormState | null) => void | Promise<void>;
+  validationRules?: ValidationRules;
+  children?: React.ReactNode;
+  style?: React.CSSProperties;
+  [key: string]: unknown;
+}
+
 export function Form({
   formId,
   initialValues = {},
@@ -261,10 +275,10 @@ export function Form({
   validationRules = {},
   children,
   ...props
-}) {
+}: FormProps) {
   const { form, setSubmitting, validateForm } = useForm(formId, initialValues);
 
-  const handleSubmit = useCallback(async (e) => {
+  const handleSubmit = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     if (Object.keys(validationRules).length > 0) {
@@ -274,7 +288,7 @@ export function Form({
 
     setSubmitting(true);
     try {
-      await onSubmit?.(form?.values, form);
+      await onSubmit?.(form?.values, form ?? null);
     } finally {
       setSubmitting(false);
     }
@@ -320,7 +334,7 @@ export function FormField({
   const error = form?.errors?.[name] as string | undefined;
   const touched = form?.touched?.[name];
 
-  const handleChange = useCallback((e) => {
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const newValue = e.target.value;
     setValue(name, newValue);
 
@@ -451,7 +465,7 @@ export function FormTextArea({
   const error = form?.errors?.[name] as string | undefined;
   const touched = form?.touched?.[name];
 
-  const handleChange = useCallback((e) => {
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const newValue = e.target.value;
     setValue(name, newValue);
 
@@ -582,7 +596,7 @@ export function FormSelect({
   const error = form?.errors?.[name] as string | undefined;
   const touched = form?.touched?.[name];
 
-  const handleChange = useCallback((e) => {
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const newValue = e.target.value;
     setValue(name, newValue);
 
@@ -689,11 +703,18 @@ FormSelect.propTypes = {
 /**
  * Компонент кнопки отправки
  */
+export interface SubmitButtonProps {
+  children?: React.ReactNode;
+  formId?: string;
+  style?: React.CSSProperties;
+  [key: string]: unknown;
+}
+
 export function SubmitButton({
   children = 'Отправить',
   formId,
   ...props
-}) {
+}: SubmitButtonProps) {
   const { form } = useForm(formId);
   const theme = useTheme();
   const { getColor, getSpacing, getFontSize } = theme;
