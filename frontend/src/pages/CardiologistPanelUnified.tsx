@@ -1739,6 +1739,10 @@ const MacOSCardiologistPanelUnified = () => {
     }
   ];
 
+  const queuePanel: React.ReactNode = activeTab === 'queue' ? (
+    <QueueIntegration specialty="cardiology" />
+  ) : null;
+
   return (
     <div className="cardio-root-container">
 
@@ -1766,9 +1770,7 @@ const MacOSCardiologistPanelUnified = () => {
 
           {/* Прием пациента */}
           {/* Очередь — trivial 1-liner, no extraction needed */}
-          {activeTab === 'queue' ? (
-            <QueueIntegration specialty="cardiology" />
-          ) : null}
+          {queuePanel}
 
           {/* Приём пациента — R-15: extracted to VisitTab component */}
           {activeTab === 'visit' &&
