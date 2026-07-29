@@ -576,6 +576,20 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
     // RENDER
     // =========================================================================
 
+    const historyPanel: React.ReactNode = showHistory ? (
+        <EMRHistoryPanel
+            visitId={visitId}
+            currentVersion={version ?? undefined}
+            selectedVersion={selectedVersion ?? undefined}
+            onSelectVersion={(v) => {
+                setSelectedVersion(v ?? null);
+                setShowDiff(true);
+            }}
+            isOpen={showHistory}
+            onClose={() => setShowHistory(false)}
+        />
+    ) : null;
+
     return (
         <div className={`emr-v2-container ${showHistory ? 'emr-v2-container--with-sidebar' : ''}`}>
             {/* Main content */}
@@ -936,19 +950,7 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
             </div>
 
             {/* History sidebar */}
-            {showHistory ? (
-                <EMRHistoryPanel
-                    visitId={visitId}
-                    currentVersion={version ?? undefined}
-                    selectedVersion={selectedVersion ?? undefined}
-                    onSelectVersion={(v) => {
-                        setSelectedVersion(v ?? null);
-                        setShowDiff(true);
-                    }}
-                    isOpen={showHistory}
-                    onClose={() => setShowHistory(false)}
-                />
-            ) : null}
+            {historyPanel}
 
             {/* Diff viewer modal */}
             {Boolean(showDiff && selectedVersion) && (
