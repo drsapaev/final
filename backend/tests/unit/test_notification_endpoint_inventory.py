@@ -97,9 +97,9 @@ def test_frontend_notifications_api_contract_matches_backend_surface() -> None:
         "MARK_ALL_READ: '/notifications/mark-all-read'",
         "HISTORY_STATS: '/notifications/history/stats'",
         "SEND: '/notifications/send'",
-        "MARK_SEEN: (id) => `/notifications/${id}/seen`",
-        "MARK_READ: (id) => `/notifications/${id}/read`",
-        "ARCHIVE: (id) => `/notifications/${id}/archive`",
+        "MARK_SEEN: (id: string | number) => `/notifications/${id}/seen`",
+        "MARK_READ: (id: string | number) => `/notifications/${id}/read`",
+        "ARCHIVE: (id: string | number) => `/notifications/${id}/archive`",
     ]:
         assert marker in endpoints
 
