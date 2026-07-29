@@ -14,7 +14,8 @@
  */
 
 import { useState, useEffect } from 'react';
-import type { ReactNode } from 'react';
+import type { ReactNode, ReactElement } from 'react';
+import React from 'react';
 import PropTypes from 'prop-types';
 import { FileText, Pencil, CheckCircle2, FilePenLine, RefreshCw, GitBranch } from 'lucide-react';
 import { apiClient } from '../../api/client';
@@ -111,7 +112,7 @@ export function EMRHistoryPanel({
     onSelectVersion,
     isOpen = true,
     onClose,
-}: EMRHistoryPanelProps) {
+}: EMRHistoryPanelProps): React.ReactElement | null {
     const { t: rawT } = useTranslation(); const t = rawT as unknown as TranslateFn;
     const [history, setHistory] = useState<HistoryRevision[]>([]);
     const [loading, setLoading] = useState(false);

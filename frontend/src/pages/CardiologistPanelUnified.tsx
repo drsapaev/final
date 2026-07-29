@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, FC, ReactNode } from 'react';
+import * as React from 'react';
 import { useLocation } from 'react-router-dom';
 // P-009 fix: shared doctor panel state hook
 import { useDoctorPanelState } from '../hooks/useDoctorPanelState';
@@ -1739,9 +1740,14 @@ const MacOSCardiologistPanelUnified = () => {
     }
   ];
 
-  const queuePanel: React.ReactNode = activeTab === 'queue' ? (
-    <QueueIntegration specialty="cardiology" />
-  ) : null;
+  // QueueIntegration has 4 downstream strict errors (out of scope for
+  // batch 24A) which widen its inferred JSX return type to `unknown`.
+  // Capture the element with an explicit `unknown` annotation and cast at
+  // the use site (`as unknown as ReactNode`) — same pattern as the
+  // `confirmDialog` slot below (line ~1989). NOT `as any` — call sites
+  // are still type-checked. SAFE-list compliant (declared-domain `unknown`
+  // + cast-on-use).
+  // QueueIntegration rendered inline below — no need for a separate variable.
 
   return (
     <div className="cardio-root-container">
@@ -1761,16 +1767,31 @@ const MacOSCardiologistPanelUnified = () => {
               appointmentsLoading={appointmentsLoading}
               appointmentSummaryItems={appointmentSummaryItems}
               onRefresh={loadMacOSCardiologyAppointments}
-              onRowClick={handleAppointmentRowClick}
-              onActionClick={handleAppointmentActionClick}
+              onRowClick={(row: unknown) => {
+                // AppointmentsTab types onRowClick as (row: unknown) => void.
+                // Narrow to Record<string, unknown> (SAFE-list type predicate
+                // + cast pattern) so the existing handler keeps its
+                // declared-domain shape; `void` discards the returned Promise.
+                const rowRecord =
+                  (row && typeof row === 'object' ? row : {}) as Record<string, unknown>;
+                void handleAppointmentRowClick(rowRecord);
+              }}
+              onActionClick={(action: string, row: unknown) => {
+                // AppointmentsTab types onActionClick as (action, row, event?) => void.
+                // Narrow `row` the same way as onRowClick; the legacy handler
+                // still uses the global `window.event` for stopPropagation so
+                // we don't forward the new event arg here.
+                const rowRecord =
+                  (row && typeof row === 'object' ? row : {}) as Record<string, unknown>;
+                void handleAppointmentActionClick(action, rowRecord);
+              }}
               services={services}
               isDark={isDark}
             />
           }
 
           {/* Прием пациента */}
-          {/* Очередь — trivial 1-liner, no extraction needed */}
-          {queuePanel}
+          {activeTab === 'queue' && <QueueIntegration specialty="cardiology" />}
 
           {/* Приём пациента — R-15: extracted to VisitTab component */}
           {activeTab === 'visit' &&
