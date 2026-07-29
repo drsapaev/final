@@ -97,7 +97,9 @@ describe('DentalVisitScreen contract (Phase 4+ minimalist visit screen)', () => 
   it('passes onCompleteVisit through to PatientHeader (wired to C-1/C-3 confirm)', () => {
     const source = readSource('DentalVisitScreen.tsx');
 
-    expect(source).toContain('onCompleteVisit={onCompleteVisit}');
+    // Strict:true migration added `|| (() => {})` fallback so the prop is
+    // always a function (PatientHeader propTypes mark it as isRequired).
+    expect(source).toContain('onCompleteVisit={onCompleteVisit || (() => {})}');
     expect(source).toContain('Завершить визит');
   });
 

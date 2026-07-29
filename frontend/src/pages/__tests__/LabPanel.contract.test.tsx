@@ -82,9 +82,9 @@ describe('LabPanel queue/report status contract', () => {
   it('STRAT#16: AbortController in loadLabAppointments and loadMoreAppointments', () => {
     const source = readLabPanelSource();
 
-    // Refs for AbortControllers
-    expect(source).toContain('queueAbortControllerRef = useRef(null)');
-    expect(source).toContain('loadMoreAbortControllerRef = useRef(null)');
+    // Refs for AbortControllers — strict:true added `<AbortController | null>` type.
+    expect(source).toContain('queueAbortControllerRef = useRef<AbortController | null>(null)');
+    expect(source).toContain('loadMoreAbortControllerRef = useRef<AbortController | null>(null)');
 
     // loadLabAppointments: abort previous + create new + pass signal
     const loadBlock = extractBlock(
@@ -124,7 +124,7 @@ describe('LabPanel queue/report status contract', () => {
     const loadBlock = extractBlock(
       source,
       'const loadLabAppointments = useCallback(async () => {',
-      'const loadTemplates = useCallback(async (preferredTemplateId = null) => {',
+      'const loadTemplates = useCallback(async (preferredTemplateId: string | number | null = null) => {',
     );
     expect(loadBlock).toContain('normalizeListPayload(payload?.entries ?? [])');
     // Frontend не долженfabricировать статусы — они приходят готовые с backend.
@@ -145,7 +145,7 @@ describe('LabPanel queue/report status contract', () => {
     const loadBlock = extractBlock(
       source,
       'const loadLabAppointments = useCallback(async () => {',
-      'const loadTemplates = useCallback(async (preferredTemplateId = null) => {',
+      'const loadTemplates = useCallback(async (preferredTemplateId: string | number | null = null) => {',
     );
 
     expect(loadBlock).not.toContain('visit_ids');

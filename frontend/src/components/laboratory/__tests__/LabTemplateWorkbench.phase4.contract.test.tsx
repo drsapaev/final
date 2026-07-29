@@ -85,8 +85,8 @@ describe('LabTemplateWorkbench Phase 4+ structure contract', () => {
   it('preserves backend-owned template version action contract', () => {
     // hasTemplateVersionAction + TEMPLATE_VERSION_ACTION_CAN_FIELD
     // теперь в templateEditor/utils.js — тест проверяет оба файла.
-    expect(utilsSource).toContain('function hasTemplateVersionAction(version, action) {');
-    expect(source).toContain('async function ensureDraftVersion() {');
+    expect(utilsSource).toContain('export function hasTemplateVersionAction(version: Record<string, unknown> | null | undefined, action: string) {');
+    expect(source).toContain('async function ensureDraftVersion(): Promise<string | number> {');
     expect(source).toContain('labReportingApi.createTemplateVersion');
     expect(utilsSource).toContain('TEMPLATE_VERSION_ACTION_CAN_FIELD');
   });

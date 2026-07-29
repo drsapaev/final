@@ -52,7 +52,8 @@ describe('CardiologistPanel Phase 1 safety contract (C-1 through C-7 + H-1)', ()
     expect(source).toContain('await handleCancelAppointment(row)');
 
     // handleCancelAppointment must use confirm dialog + backend cancel call.
-    expect(source).toContain('const handleCancelAppointment = async (row) => {');
+    // Strict:true migration added param type annotation.
+    expect(source).toContain('const handleCancelAppointment = async (row: Record<string, unknown> | null) => {');
     expect(source).toContain('await confirm(');
     expect(source).toContain('/cancel');
     expect(source).toContain('notify.success');

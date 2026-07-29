@@ -8,10 +8,22 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT = path.resolve(__dirname, '..');
 
-const readSource = (fileName: string) =>
-  fs.readFileSync(path.join(ROOT, fileName), 'utf8').replace(/\r\n/g, '\n');
+const readSource = (fileName: string) => {
+  // PR #2433 renamed dentalConstants.js → dentalConstants.ts during the TS
+  // migration. Try the requested extension first, then fall back to the
+  // other one so the test survives both pre- and post-migration source.
+  const tryFiles = [fileName, fileName.replace(/\.js$/, '.ts'), fileName.replace(/\.ts$/, '.js')];
+  for (const candidate of tryFiles) {
+    try {
+      return fs.readFileSync(path.join(ROOT, candidate), 'utf8').replace(/\r\n/g, '\n');
+    } catch {
+      // try next
+    }
+  }
+  throw new Error(`Could not find source file: ${fileName}`);
+};
 
-describe('dental SSOT contract (dentalConstants.js)', () => {
+describe('dental SSOT contract (dentalConstants.ts)', () => {
   it('exposes the canonical TOOTH_STATUS values that persist into EMR JSONB', () => {
     const source = readSource('dentalConstants.js');
 

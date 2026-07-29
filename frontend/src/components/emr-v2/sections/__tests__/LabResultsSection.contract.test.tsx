@@ -54,13 +54,13 @@ describe('LabResultsSection UX-AUDIT-FIX6 — migrate lucide-react to macos Icon
     expect(source).toContain("from '../../common/ConfirmDialog'");
     expect(source).toContain('useConfirm');
 
-    // Ищем функцию handleOrder
-    const fnStart = source.indexOf('const handleOrder = async (templateId, templateName) => {');
+    // Ищем функцию handleOrder — strict:true added param types.
+    const fnStart = source.indexOf('const handleOrder = async (templateId: string | number, templateName: string) => {');
     expect(fnStart).toBeGreaterThan(-1);
     const fnEnd = source.indexOf('\n  };', fnStart);
     const fnBody = source.slice(fnStart, fnEnd);
 
-    expect(fnBody).toContain('await confirm(');
+    expect(fnBody).toMatch(/await\s+\(?confirm/);
     // STRAT#12: строка мигрирована на t('confirm.order_title')
     expect(fnBody).toContain("t('confirm.order_title')");
     expect(fnBody).toContain('if (!ok) return;');
@@ -82,14 +82,17 @@ describe('LabResultsSection UX-AUDIT-FIX6 — migrate lucide-react to macos Icon
     expect(source).not.toContain('const STATUS_LABELS = {');
     expect(source).not.toContain('const STATUS_VARIANTS = {');
 
-    // Использование в render: formatLabStatus(instance.status)
-    expect(source).toContain('formatLabStatus(instance.status)');
-    expect(source).toContain('getLabStatusVariant(instance.status)');
+    // Использование в render: strict:true migration added `|| ''` null-coalesce
+    // to coerce `instance.status` (which may be undefined) to a string.
+    expect(source).toContain('formatLabStatus(instance.status || \'\')');
+    expect(source).toContain('getLabStatusVariant(instance.status || \'\')');
   });
 
   it('STRAT#12: order confirm dialog uses t() and tInterpolate() from unified i18n', () => {
     // STRAT#12: order confirm dialog мигрирован на t()
-    expect(source).toContain("from '@/components/i18n/useTranslation'");
+    // Strict:true migration: useTranslation import path moved from
+    // '@/components/i18n/useTranslation' to '@/i18n/useTranslation'.
+    expect(source).toContain("from '@/i18n/useTranslation'");
     expect(source).toContain('import { useTranslation }');
 
     // Order dialog

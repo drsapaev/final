@@ -25,13 +25,13 @@ describe('Telegram Mini App deep-link guardrails', () => {
   it('keeps section deep links limited to canonical sections and approved aliases', () => {
     const aliases = sourceBetween(
       appSource,
-      'const MINI_APP_SECTION_ALIASES = {',
+      'const MINI_APP_SECTION_ALIASES: Record<string, string> = {',
       'const MINI_APP_EXPIRED_ENTRY_TOKEN_REASONS = new Set'
     );
     const selectedSectionParser = sourceBetween(
       appSource,
-      'function getTelegramMiniAppSelectedSection(search) {',
-      'function normalizeMiniAppLanguage(languageCode) {'
+      'function getTelegramMiniAppSelectedSection(search: string) {',
+      'function normalizeMiniAppLanguage(languageCode: string) {'
     );
 
     CANONICAL_SECTIONS.forEach((section) => {
@@ -75,7 +75,7 @@ describe('Telegram Mini App deep-link guardrails', () => {
     const panelGates = sourceBetween(
       appSource,
       'const canPreviewAppointments = Boolean(',
-      'const handleMiniAppCapabilitySelect = (section) => {'
+      'const handleMiniAppCapabilitySelect = (section: string) => {'
     );
     const capabilityGrid = sourceBetween(
       appSource,
@@ -101,8 +101,8 @@ describe('Telegram Mini App deep-link guardrails', () => {
   it('lets capability cards switch canonical Mini App sections without legacy URLs or raw patient identifiers', () => {
     const capabilitySelectHandler = sourceBetween(
       appSource,
-      'const handleMiniAppCapabilitySelect = (section) => {',
-      'const handleAppointmentPreviewFieldChange = (field) => (event) => {'
+      'const handleMiniAppCapabilitySelect = (section: string) => {',
+      'const handleAppointmentPreviewFieldChange = (field: string) => (event: { target: { value: string } }) => {'
     );
     const capabilityGrid = sourceBetween(
       appSource,
@@ -127,7 +127,7 @@ describe('Telegram Mini App deep-link guardrails', () => {
     const miniAppShell = sourceBetween(
       appSource,
       'function TelegramMiniAppPatientShell() {',
-      'const miniAppPageStyle = {'
+      'const miniAppPageStyle: CSSProperties = {'
     );
 
     expect(miniAppShell).toContain('/telegram/mini-app/patient/manifest');

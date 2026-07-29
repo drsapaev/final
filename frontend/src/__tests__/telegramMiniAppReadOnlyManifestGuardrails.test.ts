@@ -18,8 +18,8 @@ describe('Telegram Mini App protected runtime guardrails', () => {
   it('supports initData and entryToken auth without exposing raw identifiers in links', () => {
     const authBuilder = sourceBetween(
       appSource,
-      'function getTelegramMiniAppAuthPayload(search, section) {',
-      'function getTelegramMiniAppSelectedSection(search) {'
+      'function getTelegramMiniAppAuthPayload(search: string, section: string) {',
+      'function getTelegramMiniAppSelectedSection(search: string) {'
     );
 
     expect(authBuilder).toContain('const initData = getTelegramMiniAppInitData();');
@@ -79,7 +79,7 @@ describe('Telegram Mini App protected runtime guardrails', () => {
   it('keeps report download protected and avoids provider/payment payload drift', () => {
     const reportDownloadHandler = sourceBetween(
       appSource,
-      'const handleReportDownload = (report) => () => {',
+      'const handleReportDownload = (report: Record<string, any>) => () => {',
       'const previewAppointment = appointmentPreview.payload?.appointment || null;'
     );
 

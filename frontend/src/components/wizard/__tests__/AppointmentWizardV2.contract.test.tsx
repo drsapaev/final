@@ -40,7 +40,7 @@ describe('AppointmentWizardV2 registrar metadata contract', () => {
     const servicesLoadBlock = extractSourceBlock(
       source,
       'const loadServices = useCallback(async () => {',
-      'const getServiceName = useCallback((item) => {',
+      'const getServiceName = useCallback((item: CartItem): string => {',
     );
     const doctorsLoadBlock = extractSourceBlock(
       source,
@@ -60,19 +60,20 @@ describe('AppointmentWizardV2 registrar metadata contract', () => {
     const source = readCombinedWizardSource();
     const groupingBlock = extractSourceBlock(
       source,
-      'const groupCartItemsByVisit = () => {',
-      'const getDepartmentByService = (serviceId) => {',
+      'const groupCartItemsByVisit = (): unknown[] => {',
+      'const getDepartmentByService = (serviceId: string | number) => {',
     );
     const newServiceBlock = extractSourceBlock(
       source,
-      'const newServicesWithDoctorId = [];',
-      'const newServices = [];',
+      'const newServicesWithDoctorId: Array<{ doctor_id: string | number; service_id: string | number | undefined; service_name: string; quantity: number }> = [];',
+      'const newServices: Array<{ specialist_id: string | number | undefined; service_id: string | number | undefined; quantity: number }> = [];',
     );
 
     expect(groupingBlock).toContain('original_queue_id: item.original_queue_id || null');
     expect(newServiceBlock).toContain('const hasExistingQueueIdentity = Boolean(serviceItem.original_queue_id);');
     expect(newServiceBlock).toContain('const isNewService = !hasExistingQueueIdentity');
-    expect(source).toContain('const resolveExplicitQueueEntryId = (record, { allowLegacyId = true } = {}) => {');
+    expect(source).toContain('const resolveExplicitQueueEntryId = (');
+    expect(source).toContain('  { allowLegacyId = true }: { allowLegacyId?: boolean } = {}');
     expect(source).toContain('if (!allowLegacyId || hasQueueIdentityValue(record.queue_id))');
     expect(source).toContain('return resolveExplicitQueueEntryId(record) ?? getFirstQueueNumberId(record);');
   });
@@ -84,9 +85,9 @@ describe('AppointmentWizardV2 registrar metadata contract', () => {
     // and return type. Allow optional `: type` after both the param and the closing paren.
     expect(source).toMatch(/const resolveOriginalQueueId = \([^)]+\)[^=]*=>\s*\{/);
     expect(source).toContain('initialData.queue_numbers.find');
-    expect(source).toContain('}, resolveOriginalQueueId(serviceItem))');
-    expect(source).toContain('}, resolveOriginalQueueId({ name: serviceName, code: serviceCode }))');
-    expect(source).toContain('}, resolveOriginalQueueId({ code: normalizedCode || serviceCode, service_id: foundService?.id || null }))');
+    expect(source).toContain('}, resolveOriginalQueueId(item)))');
+    expect(source).toContain('}, resolveOriginalQueueId({ name: serviceName, code: serviceCode })))');
+    expect(source).toContain('}, resolveOriginalQueueId({ code: normalizedCode || serviceCode, service_id: foundService?.id || null })))');
   });
 
   it('normalizes edit-mode gender and persists selected existing-patient gender before submit', () => {
@@ -103,7 +104,7 @@ describe('AppointmentWizardV2 registrar metadata contract', () => {
     );
 
     // UX Audit Stage 3: helper now in wizardUtils.js as `export const`.
-    expect(source).toContain('normalizeGenderForForm = (value) => {');
+    expect(source).toContain('normalizeGenderForForm = (value: unknown): string => {');
     expect(source).toContain('[\'m\', \'male\', \'man\', \'men\', \'1\',');
     expect(source).toContain('[\'f\', \'female\', \'woman\', \'women\', \'2\',');
     // UX Audit Stage 3 (Wizard issue 5.2): helper functions moved to wizardUtils.js.
@@ -113,7 +114,7 @@ describe('AppointmentWizardV2 registrar metadata contract', () => {
     expect(source).toContain('record?.patient_sex');
     expect(source).toContain('genderToPatientSexForApi');
     expect(source).toContain('resolveInitialPatientId');
-    expect(initBlock).toContain('id: resolveInitialPatientId(initialData)');
+    expect(initBlock).toContain('id: (resolveInitialPatientId(initialData) as string | number | null) ?? null,');
     expect(initBlock).toContain('const genderValue = resolvePatientGenderValue(initialData);');
     expect(initBlock).toContain('return normalizeGenderForForm(genderValue);');
     expect(initBlock).toContain('const hydrateMissingEditGender = async () => {');
@@ -129,7 +130,7 @@ describe('AppointmentWizardV2 registrar metadata contract', () => {
     expect(source).toContain('sex: selectedPatientSex');
     expect(source).not.toContain('gender: wizardData.patient.gender');
     expect(patientIdBlock).toContain('const initialPatientId = resolveInitialPatientId(initialData);');
-    expect(patientIdBlock).toContain('patientId = initialPatientId;');
+    expect(patientIdBlock).toContain('patientId = initialPatientId as string | number;');
     // UX Audit Stage 3: raw fetch replaced with updatePatient() from api/patients.
     // Old: body: JSON.stringify({ sex: selectedPatientSex })
     // New: updatePatient(patientId, { sex: selectedPatientSex })
@@ -141,7 +142,7 @@ describe('AppointmentWizardV2 registrar metadata contract', () => {
     const servicesLoadBlock = extractSourceBlock(
       source,
       'const loadServices = useCallback(async () => {',
-      'const getServiceName = useCallback((item) => {',
+      'const getServiceName = useCallback((item: CartItem): string => {',
     );
 
     // PR-25: filter map renamed to _FALLBACK, function signature changed to accept queueProfiles
@@ -163,7 +164,7 @@ describe('AppointmentWizardV2 registrar metadata contract', () => {
     const servicesLoadBlock = extractSourceBlock(
       source,
       'const loadServices = useCallback(async () => {',
-      'const getServiceName = useCallback((item) => {',
+      'const getServiceName = useCallback((item: CartItem): string => {',
     );
     const displayedServicesBlock = extractSourceBlock(
       source,
@@ -171,9 +172,11 @@ describe('AppointmentWizardV2 registrar metadata contract', () => {
       'const displayedServices = getDisplayedServices();',
     );
 
-    expect(source).toContain('const serviceCodeToWizardCategory = (value) => {');
-    expect(source).toContain('const activeTabToWizardCategory = (value) => {');
-    expect(source).toContain('const resolveInitialServiceCategory = (items = [], activeTabValue = \'\') => {');
+    expect(source).toContain('export const serviceCodeToWizardCategory = (value: unknown): \'laboratory\' | \'procedures\' | \'specialists\' | null => {');
+    expect(source).toContain('export const activeTabToWizardCategory = (value: unknown): \'laboratory\' | \'procedures\' | \'specialists\' => {');
+    expect(source).toContain('export const resolveInitialServiceCategory = (');
+    expect(source).toContain('items: ServiceItemLike[] = [],');
+    expect(source).toContain('activeTabValue: unknown = \'\'');
     expect(initBlock).toContain('const initialCartItems = (() => {');
     expect(initBlock).toContain('setActiveServiceCategory(resolveInitialServiceCategory(initialCartItems, activeTab));');
     expect(initBlock).toContain('setActiveServiceCategory(activeTabToWizardCategory(activeTab));');
@@ -216,7 +219,7 @@ describe('AppointmentWizardV2 registrar metadata contract', () => {
     );
 
     expect(editSaveBlock).toContain('if (editMode && hasNewServices) {');
-    expect(editSaveBlock).toContain('const editDeltaServices = [');
+    expect(editSaveBlock).toContain('const editDeltaServices: Array<{ service_id: string | number; quantity?: unknown; specialist_id?: string | number | null }> = [');
     expect(editSaveBlock).toContain('applyRegistrarEditDelta({');
     expect(editSaveBlock).toContain('existingQueueEntryIds: Array.from(originalQueueIds)');
     expect(editSaveBlock).toContain('if (editMode && !hasNewServices) {');
