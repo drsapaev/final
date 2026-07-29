@@ -43,7 +43,7 @@ interface EMRDiffData {
 /**
  * Human-readable field labels (Russian)
  */
-const getFieldLabels = (t) => ({
+const getFieldLabels = (t: (key: string, options?: Record<string, unknown>) => string) => ({
     complaints: t('misc.edv_field_complaints'),
     anamnesis: t('misc.edv_field_anamnesis'),
     examination: t('misc.edv_field_examination'),
@@ -77,24 +77,24 @@ const FIELD_ORDER = [
 /**
  * Get human-readable field label
  */
-function getFieldLabel(field, t) {
-    return getFieldLabels(t)[field] || field;
+function getFieldLabel(field: string, t: (key: string, options?: Record<string, unknown>) => string) {
+    return (getFieldLabels(t) as Record<string, string>)[field] || field;
 }
 
 /**
  * Format value for display
  */
-function formatValue(value, t) {
+function formatValue(value: unknown, t: (key: string, options?: Record<string, unknown>) => string): string {
     if (value === null || value === undefined) {
         return '—';
     }
     if (typeof value === 'object') {
         // Handle nested objects/arrays
         if (Array.isArray(value)) {
-            return value.length > 0 ? value.map(v => formatValue(v, t)).join(', ') : '—';
+            return value.length > 0 ? value.map((v: unknown) => formatValue(v, t)).join(', ') : '—';
         }
         // Object - format key-value pairs
-        return Object.entries(value)
+        return Object.entries(value as Record<string, unknown>)
             .filter(([, v]) => v !== null && v !== undefined && v !== '')
             .map(([k, v]) => `${getFieldLabel(k, t)}: ${formatValue(v, t)}`)
             .join('; ') || '—';
@@ -114,12 +114,19 @@ function formatValue(value, t) {
  * @param {number} props.versionTo - Right version for comparison
  * @param {Function} props.onClose - Close callback
  */
+interface EMRDiffViewerProps {
+    visitId?: string | number | null;
+    versionFrom?: string | number | null;
+    versionTo?: string | number | null;
+    onClose?: () => void;
+}
+
 export function EMRDiffViewer({
     visitId,
     versionFrom,
     versionTo,
     onClose,
-}) {
+}: EMRDiffViewerProps) {
     const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
     const [diff, setDiff] = useState<EMRDiffData | null>(null);
     const [loading, setLoading] = useState(false);
@@ -170,7 +177,7 @@ export function EMRDiffViewer({
     /**
      * Get change type style
      */
-    const getChangeTypeClass = (changeType) => {
+    const getChangeTypeClass = (changeType: string) => {
         switch (changeType) {
             case 'added': return 'emr-diff__change--added';
             case 'removed': return 'emr-diff__change--removed';
@@ -182,7 +189,7 @@ export function EMRDiffViewer({
     /**
      * Get change type label
      */
-    const getChangeTypeLabel = (changeType) => {
+    const getChangeTypeLabel = (changeType: string) => {
         switch (changeType) {
             case 'added': return t('misc.edv_dobavleno');
             case 'removed': return t('misc.edv_udaleno');

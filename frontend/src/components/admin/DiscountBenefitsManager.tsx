@@ -228,7 +228,7 @@ const DiscountBenefitsManager = () => {
       loadData();
     } catch (error) {
       logger.error('Ошибка создания скидки:', error);
-      toast.error(error.response?.data?.detail || t('admin2.disc_create_error'));
+      toast.error((error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('admin2.disc_create_error'));
     }
   };
 
@@ -256,7 +256,7 @@ const DiscountBenefitsManager = () => {
       loadData();
     } catch (error) {
       logger.error('Ошибка создания льготы:', error);
-      toast.error(error.response?.data?.detail || t('admin2.disc_benefit_create_error'));
+      toast.error((error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('admin2.disc_benefit_create_error'));
     }
   };
 
@@ -280,7 +280,7 @@ const DiscountBenefitsManager = () => {
       loadData();
     } catch (error) {
       logger.error('Ошибка создания программы лояльности:', error);
-      toast.error(error.response?.data?.detail || t('admin2.disc_loyalty_create_error'));
+      toast.error((error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('admin2.disc_loyalty_create_error'));
     }
   };
 
@@ -695,7 +695,7 @@ const DiscountBenefitsManager = () => {
                       {discount.is_active ? t('admin2.disc_status_active') : t('admin2.disc_status_inactive')}
                     </Badge>
                     <Badge variant="info">
-                      {discountTypes[discount.discount_type]}
+                      {discountTypes[discount.discount_type as keyof typeof discountTypes]}
                     </Badge>
                     <Badge variant="warning">
                       {discount.discount_type === 'percentage' ? `${discount.value}%` : `${discount.value} ${t('admin2.disc_currency')}`}
@@ -768,7 +768,7 @@ const DiscountBenefitsManager = () => {
                       {benefit.is_active ? t('admin2.disc_status_active') : t('admin2.disc_status_inactive')}
                     </Badge>
                     <Badge variant="info">
-                      {benefitTypes[benefit.benefit_type]}
+                      {benefitTypes[benefit.benefit_type as keyof typeof benefitTypes]}
                     </Badge>
                     <Badge variant="warning">
                       {benefit.discount_percentage}%

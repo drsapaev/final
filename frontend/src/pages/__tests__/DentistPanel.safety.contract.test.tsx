@@ -12,7 +12,7 @@ const PANEL_PATH = path.join(ROOT, 'pages/DentistPanelUnified.tsx');
 const readSource = () =>
   fs.readFileSync(PANEL_PATH, 'utf8').replace(/\r\n/g, '\n');
 
-const extractBlock = (source, startMarker, endMarker) => {
+const extractBlock = (source: string, startMarker: string, endMarker: string) => {
   const start = source.indexOf(startMarker);
   expect(start).toBeGreaterThanOrEqual(0);
   const end = source.indexOf(endMarker, start);

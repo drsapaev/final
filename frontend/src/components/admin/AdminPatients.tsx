@@ -22,13 +22,15 @@ import logger from '../../utils/logger';
 import { useConfirm } from '../common/ConfirmDialog';
 import React from "react";
 
+type TFunc = (key: string, options?: Record<string, unknown>) => string;
+
 const GENDER_OPTION_KEYS = [
   { value: '', labelKey: 'admin2.ap_gender_all' },
   { value: 'male', labelKey: 'admin2.ap_gender_male' },
   { value: 'female', labelKey: 'admin2.ap_gender_female' },
 ];
 
-const getGenderOptions = (t) =>
+const getGenderOptions = (t: TFunc) =>
   GENDER_OPTION_KEYS.map(({ value, labelKey }) => ({
     value,
     label: t(labelKey),
@@ -43,7 +45,7 @@ const AGE_OPTION_KEYS = [
   { value: '65+', labelKey: 'admin2.ap_age_65_plus' },
 ];
 
-const getAgeOptions = (t) =>
+const getAgeOptions = (t: TFunc) =>
   AGE_OPTION_KEYS.map(({ value, labelKey }) => ({
     value,
     label: t(labelKey),
@@ -61,37 +63,37 @@ const BLOOD_TYPE_OPTION_VALUES = [
   { value: 'O-', label: 'O-' },
 ];
 
-const getBloodTypeOptions = (t) =>
+const getBloodTypeOptions = (t: TFunc) =>
   BLOOD_TYPE_OPTION_VALUES.map((opt) => ({
     value: opt.value,
     label: opt.labelKey ? t(opt.labelKey) : opt.label,
   }));
 
-const getPatientName = (patient, t) =>
+const getPatientName = (patient: Record<string, unknown>, t: TFunc) =>
   [patient.lastName, patient.firstName, patient.middleName].filter(Boolean).join(' ') || t('admin2.ap_patient_no_name');
 
-const getPatientInitials = (patient, t) =>
+const getPatientInitials = (patient: Record<string, unknown>, t: TFunc) =>
   [patient.firstName, patient.lastName]
     .filter(Boolean)
-    .map((part) => part[0])
+    .map((part) => (part as string)[0])
     .join('')
     .toUpperCase()
     .slice(0, 2) || t('admin2.ap_initial_fallback');
 
-const getGenderLabel = (gender, t) => {
-  const genderMap = {
+const getGenderLabel = (gender: string, t: TFunc) => {
+  const genderMap: Record<string, string> = {
     male: t('admin2.ap_gender_male'),
     female: t('admin2.ap_gender_female'),
   };
   return genderMap[gender] || t('admin2.ap_not_specified');
 };
 
-const formatDate = (value, t) => {
+const formatDate = (value: unknown, t: TFunc) => {
   if (!value) {
     return t('admin2.ap_no_visits');
   }
 
-  const parsed = new Date(value);
+  const parsed = new Date(value as string);
   if (Number.isNaN(parsed.getTime())) {
     return t('admin2.ap_no_visits');
   }
@@ -99,12 +101,12 @@ const formatDate = (value, t) => {
   return parsed.toLocaleDateString('ru-RU');
 };
 
-const formatAge = (patient, calculateAge, t) => {
+const formatAge = (patient: Record<string, unknown>, calculateAge: (birthDate: string) => number, t: TFunc) => {
   if (!patient.birthDate) {
     return t('admin2.ap_not_specified');
   }
 
-  const age = calculateAge(patient.birthDate);
+  const age = calculateAge(patient.birthDate as string);
   return Number.isFinite(age) && age >= 0 ? t('admin2.ap_age_years', { age }) : t('admin2.ap_not_specified');
 };
 
@@ -141,11 +143,13 @@ const AdminPatients = () => {
     patientModal.openModal(null);
   };
 
-  const handleEditPatient = (patient) => {
-    patientModal.openModal(patient);
+  const handleEditPatient = (patient: Record<string, unknown>) => {
+    // useModal's openModal is typed `(item = null)` so the param type is
+    // `null`. At runtime any value works; cast to satisfy the type.
+    patientModal.openModal(patient as never);
   };
 
-  const handleDeletePatient = async (patient) => {
+  const handleDeletePatient = async (patient: Record<string, unknown>) => {
     const patientName = getPatientName(patient, t);
     // P-013 fix: replaced window.confirm() with shared useConfirm hook.
     const ok = await (confirm as unknown as (opts: Record<string, unknown>) => Promise<boolean>)({
@@ -162,14 +166,14 @@ const AdminPatients = () => {
     }
 
     try {
-      await deletePatient(patient.id);
+      await deletePatient(patient.id as string | number);
     } catch (deleteError) {
       logger.error('Ошибка удаления пациента:', deleteError);
       notify.error(t('admin.patient_delete_error'));
     }
   };
 
-  const handleSavePatient = async (patientData) => {
+  const handleSavePatient = async (patientData: Record<string, unknown>) => {
     patientModal.setModalLoading(true);
     try {
       if (patientModal.selectedItem) {

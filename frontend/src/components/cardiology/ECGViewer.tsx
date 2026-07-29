@@ -96,7 +96,7 @@ const styles: Record<string, any> = {
     fontSize: 'var(--mac-font-size-xl)',
     fontWeight: 'var(--mac-font-weight-semibold)',
   },
-  dropzone: (active) => ({
+  dropzone: (active: boolean) => ({
     marginTop: 'var(--mac-spacing-4)',
     padding: 'var(--mac-spacing-6)',
     border: '2px dashed',
@@ -367,7 +367,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }: { visitId?: string | nu
       const parseResult = await parseECGFile(originalFile) as unknown as Record<string, unknown>;
       
       if (parseResult.success && parseResult.parameters) {
-        const analysis = analyzeECGParameters(parseResult.parameters);
+        const analysis = analyzeECGParameters(parseResult.parameters as Record<string, unknown>);
         const enrichedParams = {
           ...(parseResult.parameters as Record<string, unknown>),
           ...analysis,

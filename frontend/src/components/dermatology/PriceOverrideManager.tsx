@@ -40,6 +40,14 @@ const PriceOverrideManager = ({
   onPriceOverrideCreated,
   isOpen,
   onClose
+}: {
+  visitId: string | number;
+  serviceId: string | number;
+  serviceName: string;
+  originalPrice: number | string;
+  onPriceOverrideCreated?: (result: Record<string, unknown>) => void;
+  isOpen: boolean;
+  onClose: () => void;
 }) => {
   useTheme();
   const { t: rawT } = useTranslation();
@@ -79,7 +87,7 @@ const PriceOverrideManager = ({
     }
   }, [isOpen, visitId, loadPriceOverrides]);
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     if (!newPrice || !reason) {
@@ -120,13 +128,13 @@ const PriceOverrideManager = ({
       }
     } catch (error) {
       logger.error('Error creating price override:', error);
-      notify.error(error?.response?.data?.detail || t('derma.derma_price_create_failed'));
+      notify.error((error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('derma.derma_price_create_failed'));
     } finally {
       setIsLoading(false);
     }
   };
 
-  const formatPrice = (price) => {
+  const formatPrice = (price: number | string) => {
     return Number(price).toLocaleString('ru-RU') + ' UZS';
   };
 
@@ -139,7 +147,7 @@ const PriceOverrideManager = ({
 
 
 
-  const getStatusIcon = (status) => {
+  const getStatusIcon = (status: string) => {
     switch (status) {
       case 'pending':return <Clock size={16} />;
       case 'approved':return <CheckCircle size={16} />;
@@ -148,7 +156,7 @@ const PriceOverrideManager = ({
     }
   };
 
-  const getStatusText = (status) => {
+  const getStatusText = (status: string) => {
     switch (status) {
       case 'pending':return t('derma.derma_price_status_pending');
       case 'approved':return t('derma.derma_price_status_approved');

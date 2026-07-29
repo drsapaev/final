@@ -9,7 +9,7 @@ const sourcePath = path.resolve(
 
 const readSource = () => fs.readFileSync(sourcePath, 'utf8');
 
-const sourceSlice = (source, startMarker, endMarker) => {
+const sourceSlice = (source: string, startMarker: string, endMarker: string) => {
   const start = source.indexOf(startMarker);
   expect(start).toBeGreaterThanOrEqual(0);
   const end = source.indexOf(endMarker, start);

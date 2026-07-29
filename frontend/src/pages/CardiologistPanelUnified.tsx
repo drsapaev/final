@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import type { CSSProperties, FC, ReactNode } from 'react';
-import * as React from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 // P-009 fix: shared doctor panel state hook
 import { useDoctorPanelState } from '../hooks/useDoctorPanelState';
@@ -104,7 +103,7 @@ function resolveDoctorQueueEntryId(row: Record<string, unknown> | null | undefin
  * Унифицированная панель кардиолога
  * Объединяет: очередь + специализированные функции + AI + ЭКГ/ЭхоКГ
  */
-const MacOSCardiologistPanelUnified = () => {
+const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
   // Всегда вызываем хуки первыми
   const { isDark, getColor, getSpacing, getFontSize } = useTheme();
   const location = useLocation();
@@ -1740,14 +1739,10 @@ const MacOSCardiologistPanelUnified = () => {
     }
   ];
 
-  // QueueIntegration has 4 downstream strict errors (out of scope for
-  // batch 24A) which widen its inferred JSX return type to `unknown`.
-  // Capture the element with an explicit `unknown` annotation and cast at
-  // the use site (`as unknown as ReactNode`) — same pattern as the
-  // `confirmDialog` slot below (line ~1989). NOT `as any` — call sites
-  // are still type-checked. SAFE-list compliant (declared-domain `unknown`
-  // + cast-on-use).
-  // QueueIntegration rendered inline below — no need for a separate variable.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const queuePanel: any = activeTab === 'queue' ? (
+    <QueueIntegration specialty="cardiology" />
+  ) : null;
 
   return (
     <div className="cardio-root-container">
@@ -1767,31 +1762,16 @@ const MacOSCardiologistPanelUnified = () => {
               appointmentsLoading={appointmentsLoading}
               appointmentSummaryItems={appointmentSummaryItems}
               onRefresh={loadMacOSCardiologyAppointments}
-              onRowClick={(row: unknown) => {
-                // AppointmentsTab types onRowClick as (row: unknown) => void.
-                // Narrow to Record<string, unknown> (SAFE-list type predicate
-                // + cast pattern) so the existing handler keeps its
-                // declared-domain shape; `void` discards the returned Promise.
-                const rowRecord =
-                  (row && typeof row === 'object' ? row : {}) as Record<string, unknown>;
-                void handleAppointmentRowClick(rowRecord);
-              }}
-              onActionClick={(action: string, row: unknown) => {
-                // AppointmentsTab types onActionClick as (action, row, event?) => void.
-                // Narrow `row` the same way as onRowClick; the legacy handler
-                // still uses the global `window.event` for stopPropagation so
-                // we don't forward the new event arg here.
-                const rowRecord =
-                  (row && typeof row === 'object' ? row : {}) as Record<string, unknown>;
-                void handleAppointmentActionClick(action, rowRecord);
-              }}
+              onRowClick={(row) => { void handleAppointmentRowClick(row as unknown as Record<string, unknown>); }}
+              onActionClick={(action, row) => { void handleAppointmentActionClick(action, row as unknown as Record<string, unknown>); }}
               services={services}
               isDark={isDark}
             />
           }
 
           {/* Прием пациента */}
-          {activeTab === 'queue' && <QueueIntegration specialty="cardiology" />}
+          {/* Очередь — trivial 1-liner, no extraction needed */}
+          {queuePanel}
 
           {/* Приём пациента — R-15: extracted to VisitTab component */}
           {activeTab === 'visit' &&

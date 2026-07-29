@@ -34,19 +34,19 @@ vi.mock('../../../utils/logger', () => ({
 vi.mock('../../ui/macos', async () => {
   const React = await import('react');
 
-  const passthrough = (tag) => ({ children, color, gutterBottom, severity, variant, ...props }) => (
-    React.createElement(tag, props, children)
+  const passthrough = (tag: string) => ({ children, color, gutterBottom, severity, variant, ...props }: Record<string, unknown>) => (
+    React.createElement(tag, props, children as React.ReactNode)
   );
-  const Button = ({ children, fullWidth, size, variant, ...props }) => (
-    React.createElement('button', props, children)
+  const Button = ({ children, fullWidth, size, variant, ...props }: Record<string, unknown>) => (
+    React.createElement('button', props, children as React.ReactNode)
   );
-  const Input = ({ label, ...props }) => (
+  const Input = ({ label, ...props }: Record<string, unknown>) => (
     React.createElement('input', { 'aria-label': label, ...props })
   );
-  const Select = ({ children, label, ...props }) => (
-    React.createElement('select', { 'aria-label': label, ...props }, children)
+  const Select = ({ children, label, ...props }: Record<string, unknown>) => (
+    React.createElement('select', { 'aria-label': label, ...props }, children as React.ReactNode)
   );
-  const Dialog = ({ children, open }) => (open ? React.createElement('div', {}, children) : null);
+  const Dialog = ({ children, open }: Record<string, unknown>) => (open ? React.createElement('div', {}, children as React.ReactNode) : null);
 
   return {
     Alert: passthrough('div'),
@@ -87,7 +87,7 @@ function renderUploader(props = {}) {
   );
 }
 
-function getBeforeUploadInput(container) {
+function getBeforeUploadInput(container: HTMLElement) {
   const inputs = container.querySelectorAll('input[type="file"]');
   expect(inputs).toHaveLength(2);
   return inputs[0];

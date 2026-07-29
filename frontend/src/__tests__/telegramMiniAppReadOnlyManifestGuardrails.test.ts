@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 const appSource = fs.readFileSync(path.resolve(process.cwd(), 'src/pages/TelegramMiniAppPatientShell.tsx'), 'utf8').replace(/\r\n/g, '\n');
 
-function sourceBetween(source, start, end) {
+function sourceBetween(source: string, start: string, end: string) {
   const startIndex = source.indexOf(start);
   expect(startIndex).toBeGreaterThanOrEqual(0);
 

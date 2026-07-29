@@ -152,7 +152,8 @@ export const useRegistrarData = ({
 
         logger.info('🎯 Загрузка интегрированных данных завершена');
       } catch (fetchError) {
-        logger.warn('Backend недоступен для загрузки интегрированных данных, оставляем пустое состояние:', fetchError.message);
+        const fetchErr = fetchError as { message?: string };
+        logger.warn('Backend недоступен для загрузки интегрированных данных, оставляем пустое состояние:', fetchErr?.message);
       }
     } catch (error) {
       logger.error('Ошибка загрузки интегрированных данных:', error);

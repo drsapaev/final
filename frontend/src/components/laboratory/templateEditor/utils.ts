@@ -20,7 +20,7 @@ export const blankField = () => ({
   required: false
 });
 
-export const blankSection = (index) => ({
+export const blankSection = (index: number) => ({
   key: `section_${index}`,
   title: `Раздел ${index}`,
   sort_order: index * 10,
@@ -55,7 +55,7 @@ export const TEMPLATE_VERSION_ACTION_CAN_FIELD = {
   create_draft: 'can_create_draft'
 };
 
-export function hasTemplateVersionAction(version, action) {
+export function hasTemplateVersionAction(version: Record<string, unknown> | null | undefined, action: string) {
   const normalizedAction = String(action || '').trim().toLowerCase();
   if (!normalizedAction) {
     return false;
@@ -63,19 +63,19 @@ export function hasTemplateVersionAction(version, action) {
 
   if (Array.isArray(version?.available_actions)) {
     return version.available_actions.some(
-      (availableAction) => String(availableAction || '').trim().toLowerCase() === normalizedAction
+      (availableAction: unknown) => String(availableAction || '').trim().toLowerCase() === normalizedAction
     );
   }
 
-  const flagName = TEMPLATE_VERSION_ACTION_CAN_FIELD[normalizedAction];
+  const flagName = (TEMPLATE_VERSION_ACTION_CAN_FIELD as Record<string, string>)[normalizedAction];
   if (flagName && Object.prototype.hasOwnProperty.call(version || {}, flagName)) {
-    return Boolean(version[flagName]);
+    return Boolean((version as Record<string, unknown>)[flagName]);
   }
 
   return false;
 }
 
-export function parseJsonInput(value) {
+export function parseJsonInput(value: string | null | undefined) {
   if (!value?.trim()) {
     return null;
   }
@@ -86,19 +86,19 @@ export function parseJsonInput(value) {
   }
 }
 
-export function stringifyJson(value) {
+export function stringifyJson(value: unknown) {
   if (!value) {
     return '';
   }
   return JSON.stringify(value, null, 2);
 }
 
-export function buildVersionPayload(draftVersion) {
-  const sections = draftVersion.sections.map((section, sectionIndex) => ({
+export function buildVersionPayload(draftVersion: Record<string, any>) {
+  const sections = draftVersion.sections.map((section: Record<string, any>, sectionIndex: number) => ({
     ...section,
     sort_order: section.sort_order ?? (sectionIndex + 1) * 10,
     section_style: section.section_style || {},
-    fields: section.fields.map((field, fieldIndex) => {
+    fields: section.fields.map((field: Record<string, any>, fieldIndex: number) => {
       const referenceRule = parseJsonInput(field.reference_rule_text || '');
       const visibilityRule = parseJsonInput(field.visibility_rule_text || '');
       const highlightRule = parseJsonInput(field.highlight_rule_text || '');
@@ -128,7 +128,7 @@ export function buildVersionPayload(draftVersion) {
   };
 }
 
-export function hydrateVersion(version) {
+export function hydrateVersion(version: Record<string, any> | null | undefined) {
   if (!version) {
     return { ...blankVersion, sections: [blankSection(1)] };
   }
@@ -152,9 +152,9 @@ export function hydrateVersion(version) {
       ...(version.signer_defaults || {})
     },
     footer_notes: version.footer_notes || '',
-    sections: (version.sections || []).map((section) => ({
+    sections: (version.sections || []).map((section: Record<string, any>) => ({
       ...section,
-      fields: (section.fields || []).map((field) => ({
+      fields: (section.fields || []).map((field: Record<string, any>) => ({
         ...field,
         reference_rule_text: stringifyJson(field.reference_rule),
         visibility_rule_text: stringifyJson(field.visibility_rule),

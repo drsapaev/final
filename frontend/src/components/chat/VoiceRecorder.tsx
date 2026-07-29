@@ -10,7 +10,7 @@ import logger from '../../utils/logger';
 import PropTypes from 'prop-types';
 import { notify } from '../../services/notify';
 
-const VoiceRecorder = ({ onSend, onCancel }) => {
+const VoiceRecorder = ({ onSend, onCancel }: { onSend: (blob: Blob, duration: number) => void; onCancel: () => void }) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
     const [isRecording, setIsRecording] = useState(false);
     const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
@@ -134,7 +134,7 @@ const VoiceRecorder = ({ onSend, onCancel }) => {
     }, [reset]);
 
     // Форматирование времени
-    const formatTime = (seconds) => {
+    const formatTime = (seconds: number) => {
         const mins = Math.floor(seconds / 60);
         const secs = seconds % 60;
         return `${mins}:${secs.toString().padStart(2, '0')}`;

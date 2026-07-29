@@ -35,16 +35,24 @@ export const useRegistrarHotkeys = ({
   showWizard,
   showSlotsModal,
   appointments,
+}: {
+  setShowWizard: (show: boolean) => void;
+  setShowSlotsModal: (show: boolean) => void;
+  setActiveTab: (tab: string) => void;
+  navigate: (path: string) => void;
+  showWizard: boolean;
+  showSlotsModal: boolean;
+  appointments: unknown[];
 }) => {
   useEffect(() => {
-    const handleKeyDown = (e) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
       // R-15 fix: убран лог каждого нажатия клавиши — production log spam
       // + privacy concern (логировался весь ввод пользователя).
       // Debug: log only in dev mode if needed.
       // logger.info('Key pressed:', e.key, 'Ctrl:', e.ctrlKey, ...);
 
       // Ignore shortcuts when user is typing in an input/textarea
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+      if ((e.target as HTMLElement)?.tagName === 'INPUT' || (e.target as HTMLElement)?.tagName === 'TEXTAREA') {
         return;
       }
 

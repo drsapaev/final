@@ -92,7 +92,7 @@ const PaymentManager = ({
       setInvoices(Array.isArray(data) ? data : []);
     } catch (error) {
       logger.error('Ошибка загрузки счетов:', error);
-      toast.error(error?.message || t('payment.pay_mgr_error_loading'));
+      toast.error((error as { message?: string })?.message || t('payment.pay_mgr_error_loading'));
     } finally {
       setLoading(false);
     }
@@ -160,7 +160,7 @@ const PaymentManager = ({
       toast.success(t('payment.pay_mgr_invoice_created'));
     } catch (error) {
       logger.error('Ошибка создания счета:', error);
-      toast.error(t('payment.pay_mgr_invoice_create_error', { error: error?.message || t('payment.unknown_error') }));
+      toast.error(t('payment.pay_mgr_invoice_create_error', { error: (error as { message?: string })?.message || t('payment.unknown_error') }));
     } finally {
       setLoading(false);
     }

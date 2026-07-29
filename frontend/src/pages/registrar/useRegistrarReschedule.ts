@@ -17,18 +17,21 @@
  */
 import { useCallback } from 'react';
 
-export const useRegistrarReschedule = ({ setAppointments }) => {
-  const resolveRescheduleVisitId = useCallback((appointmentRow) => {
-    return appointmentRow?.visit_ids?.[0] ||
+export const useRegistrarReschedule = ({ setAppointments }: {
+  setAppointments: (updater: (prev: Record<string, unknown>[]) => Record<string, unknown>[]) => void;
+}) => {
+  const resolveRescheduleVisitId = useCallback((appointmentRow: Record<string, unknown>) => {
+    const visitIds = appointmentRow?.visit_ids as unknown[] | undefined;
+    return visitIds?.[0] ||
            appointmentRow?.visit_id ||
            appointmentRow?.visitId ||
            null;
   }, []);
 
-  const removeRescheduledAppointmentFromView = useCallback((appointmentRow, visitId) => {
+  const removeRescheduledAppointmentFromView = useCallback((appointmentRow: Record<string, unknown>, visitId: unknown) => {
     if (!appointmentRow) return;
 
-    const idsToRemove = new Set();
+    const idsToRemove = new Set<string>();
     [
       appointmentRow.id,
       appointmentRow.visit_id,
@@ -36,7 +39,7 @@ export const useRegistrarReschedule = ({ setAppointments }) => {
       appointmentRow.appointment_id,
       appointmentRow.queue_entry_id,
       visitId,
-    ].forEach((id) => {
+    ].forEach((id: unknown) => {
       if (id !== undefined && id !== null) {
         idsToRemove.add(String(id));
       }
@@ -46,9 +49,9 @@ export const useRegistrarReschedule = ({ setAppointments }) => {
       appointmentRow.visit_ids,
       appointmentRow.appointment_ids,
       appointmentRow.queue_entry_ids,
-    ].forEach((ids) => {
+    ].forEach((ids: unknown) => {
       if (Array.isArray(ids)) {
-        ids.forEach((id) => {
+        ids.forEach((id: unknown) => {
           if (id !== undefined && id !== null) {
             idsToRemove.add(String(id));
           }
@@ -57,14 +60,14 @@ export const useRegistrarReschedule = ({ setAppointments }) => {
     });
 
     if (Array.isArray(appointmentRow.aggregated_ids)) {
-      appointmentRow.aggregated_ids.forEach((id) => {
+      (appointmentRow.aggregated_ids as unknown[]).forEach((id: unknown) => {
         if (id !== undefined && id !== null) {
           idsToRemove.add(String(id));
         }
       });
     }
 
-    setAppointments((prev) => prev.filter((apt) => {
+    setAppointments((prev: Record<string, unknown>[]) => prev.filter((apt: Record<string, unknown>) => {
       const candidateIds = [
         apt.id,
         apt.visit_id,
@@ -72,7 +75,7 @@ export const useRegistrarReschedule = ({ setAppointments }) => {
         apt.appointment_id,
         apt.queue_entry_id,
       ];
-      return !candidateIds.some((id) =>
+      return !candidateIds.some((id: unknown) =>
         id !== undefined && id !== null && idsToRemove.has(String(id))
       );
     }));

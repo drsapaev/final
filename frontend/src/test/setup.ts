@@ -49,7 +49,7 @@ if (typeof window !== 'undefined') {
   // Use a store-backed mock so tests that call setItem then getItem work
   // (the tokenManager tests use vi.fn() expectations, but NotificationPrompt
   // and other UI tests rely on actual storage behavior).
-  const _sessionStore = {};
+  const _sessionStore: Record<string, string> = {};
   const sessionStorageMock = {
     getItem: vi.fn((key) => _sessionStore[key] ?? null),
     setItem: vi.fn((key, value) => { _sessionStore[key] = String(value); }),

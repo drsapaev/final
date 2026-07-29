@@ -190,7 +190,7 @@ function PatientFormsPreview({ status, preview = null, error = '', initData = ''
         setAutoSaveTimestamps((current) => ({ ...current, [form.id]: new Date() }));
       }
     } catch (err) {
-      const reason = err?.response?.data?.detail?.reason || 'patient_form_save_failed';
+      const reason = (err as { response?: { data?: { detail?: { reason?: string } } } })?.response?.data?.detail?.reason || 'patient_form_save_failed';
       setFormState((current) => ({
         ...current,
         [form.id]: {

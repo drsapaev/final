@@ -25,7 +25,7 @@ const t18 = i18n.t as unknown as (key: string, options?: Record<string, unknown>
 // Лабораторное помещение — публичное пространство, экран видят другие
 // пациенты и сотрудники. Раскрытие — по клику, с обратной маской.
 // Маска сохраняет последние 2 цифры (для опознания пациента) и страну.
-function maskPhone(phone) {
+function maskPhone(phone: string) {
   if (!phone || typeof phone !== 'string') return '';
   const trimmed = phone.trim();
   if (!trimmed) return '';
@@ -52,7 +52,7 @@ function maskPhone(phone) {
 //   3) :focus-visible для keyboard-навигации.
 //   4) title показывает действие («Показать» / «Скрыть»).
 // Соответствует Nielsen Heuristic #6 (Recognition rather than Recall).
-function MaskedPhone({ phone, canReveal = true }) {
+function MaskedPhone({ phone, canReveal = true }: { phone: string; canReveal?: boolean }) {
   const [revealed, setRevealed] = useState(false);
   if (!phone) return <span className="lqw-masked-phone-empty">{t18('pii.phone_not_set')}</span>;
   if (!canReveal) {
@@ -94,11 +94,11 @@ const activeQueueStatuses = new Set([
   'in_progress'
 ]);
 
-function formatServices(appointment) {
+function formatServices(appointment: Record<string, any>) {
   const serviceDetails = appointment?.service_details || [];
   if (serviceDetails.length > 0) {
     return serviceDetails
-      .map((item) => item?.name || item?.code)
+      .map((item: Record<string, unknown>) => item?.name || item?.code)
       .filter(Boolean)
       .join(', ');
   }
@@ -111,7 +111,7 @@ function formatServices(appointment) {
   return services.join(', ');
 }
 
-function historySeverityBadge(item) {
+function historySeverityBadge(item: Record<string, any>) {
   if ((item.critical_findings_count || 0) > 0) {
     return { label: 'critical', variant: 'danger' };
   }

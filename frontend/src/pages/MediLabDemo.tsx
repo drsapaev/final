@@ -277,7 +277,7 @@ const MediLabDemo = () => {
     },
   ];
 
-  const shiftColors = {
+  const shiftColors: Record<string, string> = {
     pink: 'var(--mac-error-bg)',
     yellow: 'var(--mac-warning-bg)',
     purple: 'var(--mac-accent-purple-bg)',
@@ -285,10 +285,10 @@ const MediLabDemo = () => {
     default: 'var(--mac-bg-secondary)',
   };
 
-  const getActionShadow = (color, opacity = '55%') =>
+  const getActionShadow = (color: string, opacity = '55%') =>
     `0 2px 8px color-mix(in srgb, ${color}, transparent ${opacity})`;
 
-  const getActionHoverShadow = (color, opacity = '38%') =>
+  const getActionHoverShadow = (color: string, opacity = '38%') =>
     `0 4px 12px color-mix(in srgb, ${color}, transparent ${opacity})`;
 
   const getActionHoverColor = (color: string) =>

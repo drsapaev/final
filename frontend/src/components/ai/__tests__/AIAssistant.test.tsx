@@ -6,7 +6,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, beforeEach, expect, vi } from 'vitest';
 import PropTypes from 'prop-types';
 
-function SnackbarProviderMock({ children }) {
+function SnackbarProviderMock({ children }: { children?: React.ReactNode }) {
   return <div>{children}</div>;
 }
 
@@ -47,10 +47,11 @@ SnackbarProviderMock.propTypes = {
   children: PropTypes.node
 };
 
-MockWrapper.propTypes = {
-  ...(MockWrapper.propTypes || {}),
+const mockWrapperPropTypes: Record<string, unknown> = {
   children: PropTypes.node,
 };
+
+MockWrapper.propTypes = mockWrapperPropTypes;
 
 describe('AIAssistant Component', () => {
   beforeEach(() => {

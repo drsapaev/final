@@ -18,15 +18,15 @@ const QUEUE_SPECIALTY_ALIASES = {
   dentist: ['dentistry', 'dental', 'dentist', 'stomatology'],
 };
 
-function normalizeQueueSpecialty(value) {
+function normalizeQueueSpecialty(value: unknown) {
   return String(value || '').trim().toLowerCase();
 }
 
-function matchesQueueSpecialty(item, requestedSpecialty) {
+function matchesQueueSpecialty(item: { specialty?: string; department?: string } | null | undefined, requestedSpecialty: unknown) {
   const normalizedRequested = normalizeQueueSpecialty(requestedSpecialty);
   if (!normalizedRequested) return false;
 
-  const aliases = QUEUE_SPECIALTY_ALIASES[normalizedRequested] || [normalizedRequested];
+  const aliases = (QUEUE_SPECIALTY_ALIASES as Record<string, string[]>)[normalizedRequested] || [normalizedRequested];
   const itemSpecialty = normalizeQueueSpecialty(item?.specialty || item?.department);
   return aliases.includes(itemSpecialty);
 }
@@ -47,7 +47,7 @@ const QueueIntegration = ({
   specialty = '',
   onPatientSelect,
   onStartVisit,
-}: QueueIntegrationProps) => {
+}: QueueIntegrationProps): React.JSX.Element | null => {
   const [availableSpecialists, setAvailableSpecialists] = useState<QueueSpecialist[]>([]);
   const [authProfile, setAuthProfile] = useState(auth.getState().profile);
 

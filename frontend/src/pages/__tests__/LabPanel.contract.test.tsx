@@ -9,7 +9,7 @@ const labPanelPath = path.resolve(__dirname, '../LabPanel.tsx');
 
 const readLabPanelSource = () => fs.readFileSync(labPanelPath, 'utf8');
 
-const extractBlock = (source, startMarker, endMarker) => {
+const extractBlock = (source: string, startMarker: string, endMarker: string) => {
   const start = source.indexOf(startMarker);
   expect(start).toBeGreaterThanOrEqual(0);
   const end = source.indexOf(endMarker, start);

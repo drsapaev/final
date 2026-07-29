@@ -7,7 +7,7 @@ const LEGACY_BACKEND_ORIGIN_PATTERN = /http:\/\/(?:127\.0\.0\.1|localhost):8000\
 const EXCLUDED_DIR_SEGMENTS = ['__tests__'];
 const EXCLUDED_FILE_SUFFIXES = ['.test.js', '.test.tsx', '.spec.js', '.spec.tsx'];
 
-function collectSourceFiles(dir) {
+function collectSourceFiles(dir: string) {
   const entries = fs.readdirSync(dir, { withFileTypes: true });
   const files: string[] = [];
 

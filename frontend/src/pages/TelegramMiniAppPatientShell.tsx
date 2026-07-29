@@ -29,7 +29,7 @@ const MINI_APP_CAPABILITY_SECTIONS = [
   'results',
 ];
 
-const MINI_APP_SECTION_ALIASES = {
+const MINI_APP_SECTION_ALIASES: Record<string, string> = {
   appointments: 'appointments',
   doctors: 'appointments',
   visits: 'visits',
@@ -696,7 +696,7 @@ function TelegramMiniAppPatientShell() {
   }, [location.search, selectedSection]);
 
   const capabilities = state.manifest?.capabilities || {};
-  const capabilityLabels = MINI_APP_CAPABILITY_SECTIONS.reduce((acc, section) => {
+  const capabilityLabels = MINI_APP_CAPABILITY_SECTIONS.reduce<Record<string, string>>((acc, section) => {
     acc[section] = translateMiniAppText(languageCode, `capabilities.${section}`);
     return acc;
   }, {});
@@ -982,7 +982,7 @@ const handlePatientFormFieldChange = (formId: string, field: Record<string, any>
           ...current,
           payload: {
             ...(current.payload || {}),
-            forms: (current.payload?.forms || []).map((item) => (
+            forms: (current.payload?.forms || []).map((item: Record<string, any>) => (
               item.id === form.id ? { ...item, submission } : item
             )),
           },
@@ -1059,7 +1059,7 @@ const handlePatientFormFieldChange = (formId: string, field: Record<string, any>
 
   const previewAppointment = appointmentPreview.payload?.appointment || null;
   const createdAppointmentId = appointmentCreate.payload?.appointment_id || null;
-  const patientForms = (formsPreview.payload?.forms || []).map((form) => (
+  const patientForms = (formsPreview.payload?.forms || []).map((form: Record<string, any>) => (
     localizeMiniAppPatientForm(languageCode, form)
   ));
   const patientReports = resultsSummary.payload?.reports || [];
@@ -1511,7 +1511,7 @@ const handlePatientFormFieldChange = (formId: string, field: Record<string, any>
                         <section style={miniAppVisitsSectionStyle}>
                           <h3 style={miniAppSubsectionTitleStyle}>{t('queueEntries')}</h3>
                           <div style={miniAppVisitsListStyle}>
-                            {patientQueueEntries.map((entry) => (
+                            {patientQueueEntries.map((entry: Record<string, any>) => (
                               <div key={`queue-${entry.number}-${entry.status}`} style={miniAppVisitItemStyle}>
                                 <div style={miniAppVisitItemHeaderStyle}>
                                   <strong>№{entry.number}</strong>
@@ -1593,7 +1593,7 @@ const handlePatientFormFieldChange = (formId: string, field: Record<string, any>
                       </Alert>
                     ) : (
                       <div style={miniAppVisitsListStyle}>
-                        {patientAppointments.map((appointment) => (
+                        {patientAppointments.map((appointment: Record<string, any>) => (
                           <div key={`appointment-${appointment.id}`} style={miniAppVisitItemStyle}>
                             <div style={miniAppVisitItemHeaderStyle}>
                               <strong>{t('appointmentNumber', { id: appointment.id })}</strong>
@@ -1627,7 +1627,7 @@ const handlePatientFormFieldChange = (formId: string, field: Record<string, any>
                       </Alert>
                     ) : (
                       <div style={miniAppVisitsListStyle}>
-                        {patientVisits.map((visit) => (
+                        {patientVisits.map((visit: Record<string, any>) => (
                           <div key={`visit-${visit.id}`} style={miniAppVisitItemStyle}>
                             <div style={miniAppVisitItemHeaderStyle}>
                               <strong>{t('visitNumber', { id: visit.id })}</strong>
@@ -1856,7 +1856,7 @@ const handlePatientFormFieldChange = (formId: string, field: Record<string, any>
               </Alert>
             )}
 
-            {selectedSection === 'forms' && formsPreview.status === 'ready' && patientForms.map((form) => (
+            {selectedSection === 'forms' && formsPreview.status === 'ready' && patientForms.map((form: Record<string, any>) => (
               <Card key={form.id} padding="small" shadow="none" style={miniAppAppointmentPreviewStyle}>
                 <CardContent style={miniAppAppointmentPreviewContentStyle}>
                   <div style={miniAppAppointmentPreviewHeaderStyle}>
@@ -1871,7 +1871,7 @@ const handlePatientFormFieldChange = (formId: string, field: Record<string, any>
                   </div>
 
                   <form style={miniAppAppointmentFormStyle} onSubmit={handlePatientFormSubmit(form)}>
-                    {(form.fields || []).map((field) => (
+                    {(form.fields || []).map((field: Record<string, any>) => (
                       field.type === 'boolean' ? (
                         <label key={field.key} style={miniAppCheckboxRowStyle}>
                           <Checkbox aria-label={field.label || field.key} checked={Boolean(getMiniAppFormFieldValue(formAnswers, form.id, field))} onChange={handlePatientFormFieldChange(form.id, field)} style={miniAppCheckboxStyle} />
@@ -1945,7 +1945,7 @@ const handlePatientFormFieldChange = (formId: string, field: Record<string, any>
                   </div>
 
                   <div style={miniAppListStyle}>
-                    {patientReports.map((report) => (
+                    {patientReports.map((report: Record<string, any>) => (
                       <div key={report.id} style={miniAppListItemStyle}>
                         <div>
                           <strong>{report.name}</strong>

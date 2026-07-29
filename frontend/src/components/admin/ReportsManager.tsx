@@ -200,7 +200,7 @@ const ReportsManager = () => {
 
 
 
-  const formatFileSize = (bytes) => {
+  const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
@@ -208,7 +208,7 @@ const ReportsManager = () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const downloadFile = async (filename) => {
+  const downloadFile = async (filename: string) => {
     try {
       const response = await api.get(`/reports/download/${filename}`, {
         responseType: 'blob' }) as import('axios').AxiosResponse<BlobPart>;
@@ -392,7 +392,7 @@ const ReportsManager = () => {
             variant="outline"
             title={t('admin2.rm_download_report_aria', { filename: (row as { filename?: string }).filename })}
             aria-label={t('admin2.rm_download_report_aria', { filename: (row as { filename?: string }).filename })}
-            onClick={() => downloadFile((row as { filename?: string }).filename)}>
+            onClick={() => downloadFile((row as { filename?: string }).filename || '')}>
                     <Download aria-hidden="true" className="w-4 h-4" />
                   </Button>
 
@@ -465,7 +465,7 @@ const ReportsManager = () => {
           header: t('admin2.rm_col_size'),
           render: (value: unknown) =>
           <span className="admin-span-13-secondary">
-                    {formatFileSize(value)}
+                    {formatFileSize(Number(value) || 0)}
                   </span>
 
         },
@@ -489,7 +489,7 @@ const ReportsManager = () => {
             variant="ghost"
             title={t('admin2.rm_download_file_aria', { filename: (row as { filename?: string }).filename })}
             aria-label={t('admin2.rm_download_file_aria', { filename: (row as { filename?: string }).filename })}
-            onClick={() => downloadFile((row as { filename?: string }).filename)}>
+            onClick={() => downloadFile((row as { filename?: string }).filename || '')}>
 
                     <Download aria-hidden="true" className="admin-icon-18-secondary" />
                   </Button>

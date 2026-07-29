@@ -29,7 +29,7 @@ import React from "react";
 const DisplayContentManager = ({
   boardId,
   className = ''
-}) => {
+}: { boardId?: string | number; className?: string }) => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const t18 = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;

@@ -35,7 +35,8 @@ export default function Health() {
         setAct(a);
       } catch (e) {
         if (!mounted) return;
-        setErr(e?.data?.detail || e?.message || t('misc.h_oshibka_zagruzki'));
+        const err = e as { data?: { detail?: string }; message?: string };
+        setErr(err?.data?.detail || err?.message || t('misc.h_oshibka_zagruzki'));
       } finally {
         if (mounted) setLoading(false);
       }

@@ -20,7 +20,7 @@ const authState = {
 vi.mock('../../../stores/auth.ts', () => ({
   default: {
     getState: () => authState,
-    subscribe: (callback) => {
+    subscribe: (callback: (state: typeof authState) => void) => {
       callback(authState);
       return () => {};
     },

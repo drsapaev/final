@@ -12,7 +12,7 @@ const FORBIDDEN_PATTERNS = [
   'from ../emr/',
 ];
 
-function collectCodeFiles(dir) {
+function collectCodeFiles(dir: string) {
   const entries = fs.readdirSync(dir, { withFileTypes: true });
   const files: string[] = [];
 

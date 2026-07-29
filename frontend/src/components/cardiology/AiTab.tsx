@@ -15,7 +15,7 @@ interface AiTabProps {
   onSuggestionSelect: (type: string, suggestion: unknown) => void;
 }
 
-export function AiTab({ onSuggestionSelect }: AiTabProps) {
+export function AiTab({ onSuggestionSelect }: AiTabProps): React.JSX.Element | null {
   const { t } = useTranslation();
   void t;
   return (

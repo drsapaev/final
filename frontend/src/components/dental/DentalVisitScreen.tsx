@@ -220,10 +220,11 @@ const ToothSummary = ({ toothStatus }: ToothSummaryProps) => {
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
       {teeth.map(([toothNum, data]: [string, any]) => {
-        const status = data?.status || 'healthy';
-        const label = TOOTH_STATUS_LABELS[status] || status;
-        const color = TOOTH_STATUS_COLORS[status] || 'var(--mac-text-tertiary)';
-        const procedures = Array.isArray(data?.procedures) ? data.procedures : [];
+        const status = (data?.status || 'healthy') as keyof typeof TOOTH_STATUS_LABELS | string;
+        const label = (TOOTH_STATUS_LABELS as Record<string, string>)[status] || status;
+        const color = (TOOTH_STATUS_COLORS as Record<string, string>)[status] || 'var(--mac-text-tertiary)';
+        const procedures: Array<{ name?: string } | Record<string, unknown>> =
+          Array.isArray(data?.procedures) ? data.procedures : [];
         return (
           <Badge
             key={toothNum}
@@ -235,7 +236,7 @@ const ToothSummary = ({ toothStatus }: ToothSummaryProps) => {
               padding: '4px 8px',
               fontSize: 12,
             }}
-            title={`${t('dental.dental_dvs_tooth_label')} ${toothNum} — ${getToothName(toothNum)}: ${label}${procedures.length > 0 ? ` (${procedures.map(p => p.name).join(', ')})` : ''}`}>
+            title={`${t('dental.dental_dvs_tooth_label')} ${toothNum} — ${getToothName(toothNum)}: ${label}${procedures.length > 0 ? ` (${procedures.map((p: { name?: string } | Record<string, unknown>) => (p as { name?: string }).name).join(', ')})` : ''}`}>
             {toothNum}: {label}
             {procedures.length > 0 && ` · ${procedures.length}℅`}
           </Badge>
@@ -611,7 +612,8 @@ const DentalVisitScreen = ({
         setRowVersion(0);
       }
     } catch (error) {
-      logger.error('[DentalVisitScreen] loadEMR failed', { error: error?.message });
+      const err = error as { message?: string } | undefined;
+      logger.error('[DentalVisitScreen] loadEMR failed', { error: err?.message });
       notify.error(t('dental2.visit_map_load_failed'));
     } finally {
       setLoading(false);
@@ -634,7 +636,8 @@ const DentalVisitScreen = ({
         setHistory(Array.isArray(summaries) ? summaries : []);
       }
     } catch (error) {
-      logger.warn('[DentalVisitScreen] loadHistory failed', { error: error?.message });
+      const err = error as { message?: string } | undefined;
+      logger.warn('[DentalVisitScreen] loadHistory failed', { error: err?.message });
       setHistory([]);
     } finally {
       setHistoryLoading(false);
@@ -648,7 +651,7 @@ const DentalVisitScreen = ({
 
   // Auto-save EMR draft (debounced via 1.5s timeout on field changes)
   const [saveTimer, setSaveTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
-  const scheduleAutosave = useCallback((nextData) => {
+  const scheduleAutosave = useCallback((nextData: typeof EMPTY_EMR_DATA) => {
     if (saveTimer) clearTimeout(saveTimer);
     const timer = setTimeout(async () => {
       if (!visitId) return;
@@ -657,7 +660,8 @@ const DentalVisitScreen = ({
         const result = await saveEMR(visitId, nextData, rowVersion, true);
         setRowVersion(result.row_version || rowVersion);
       } catch (error) {
-        logger.warn('[DentalVisitScreen] autosave failed', { error: error?.message });
+        const err = error as { message?: string } | undefined;
+        logger.warn('[DentalVisitScreen] autosave failed', { error: err?.message });
       } finally {
         setSaving(false);
       }
@@ -666,15 +670,15 @@ const DentalVisitScreen = ({
   }, [saveTimer, visitId, rowVersion]);
 
   // Field change handlers
-  const updateField = useCallback((field, value) => {
+  const updateField = useCallback((field: string, value: unknown) => {
     setEmrData(prev => {
-      const next = { ...prev, [field]: value };
+      const next = { ...prev, [field]: value } as typeof prev;
       scheduleAutosave(next);
       return next;
     });
   }, [scheduleAutosave]);
 
-  const updateSpecialtyData = useCallback((field, value) => {
+  const updateSpecialtyData = useCallback((field: string, value: unknown) => {
     setEmrData(prev => {
       const next = {
         ...prev,
@@ -682,19 +686,19 @@ const DentalVisitScreen = ({
           ...prev.specialty_data,
           [field]: value,
         },
-      };
+      } as typeof prev;
       scheduleAutosave(next);
       return next;
     });
   }, [scheduleAutosave]);
 
   // Tooth click → open ToothModal
-  const handleToothClick = useCallback((toothNumber, toothData) => {
+  const handleToothClick = useCallback((toothNumber: string | number, toothData: Record<string, unknown> | null) => {
     setSelectedTooth({ number: toothNumber, data: toothData || {} });
     setToothModalOpen(true);
   }, []);
 
-  const handleToothSave = useCallback((toothNumber, toothData) => {
+  const handleToothSave = useCallback((toothNumber: string | number, toothData: Record<string, unknown>) => {
     updateSpecialtyData('tooth_status', {
       ...(emrData.specialty_data?.tooth_status || {}),
       [toothNumber]: toothData,
@@ -709,7 +713,7 @@ const DentalVisitScreen = ({
     setShowAIDialog(true);
   }, []);
 
-  const applyAISuggestion = useCallback((icd10Code) => {
+  const applyAISuggestion = useCallback((icd10Code: string) => {
     updateField('icd10_code', icd10Code);
     notify.success(t('dental.dental_dvs_icd10_added', { code: icd10Code }));
   }, [updateField, t]);
@@ -792,7 +796,7 @@ const DentalVisitScreen = ({
           onClose={() => { setToothModalOpen(false); setSelectedTooth(null); }}
           toothNumber={selectedTooth.number}
           toothData={selectedTooth.data}
-          onSave={(data: unknown) => handleToothSave(selectedTooth?.number, data)}
+          onSave={(data: unknown) => handleToothSave(selectedTooth?.number, data as Record<string, unknown>)}
           visitId={visitId}
         />
       )}

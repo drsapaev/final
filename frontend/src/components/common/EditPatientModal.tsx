@@ -55,11 +55,11 @@ const EditPatientModal = ({ isOpen, onClose, patient, onSave, loading = false, t
       }
     : null;
 
-  const handleComplete = (wizardData: Record<string, unknown>) => {
+  const handleComplete = (wizardData: unknown) => {
     logger.info('[EditPatientModal] AppointmentWizardV2 completed (edit mode)', wizardData);
     if (typeof onSave === 'function') {
       // Fire-and-forget: parent decides whether to await.
-      Promise.resolve(onSave(wizardData)).catch((err) => {
+      Promise.resolve(onSave(wizardData as Record<string, unknown> | undefined)).catch((err) => {
         logger.warn('[EditPatientModal] onSave rejected', err);
       });
     }

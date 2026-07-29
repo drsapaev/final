@@ -72,7 +72,7 @@ describe('High-15: God component split plan', () => {
   });
 });
 
-function collectSourceFiles(dir) {
+function collectSourceFiles(dir: string) {
   const entries = fs.readdirSync(dir, { withFileTypes: true });
   const files: string[] = []
   for (const entry of entries) {

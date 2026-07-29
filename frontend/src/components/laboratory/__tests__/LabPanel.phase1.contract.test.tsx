@@ -8,7 +8,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT = path.resolve(__dirname, '../../..');
 
-const readSource = (relPath) =>
+const readSource = (relPath: string) =>
   fs.readFileSync(path.join(ROOT, relPath), 'utf8').replace(/\r\n/g, '\n');
 
 describe('LabPanel Phase 1 safety contract (H-1, H-2, H-3)', () => {

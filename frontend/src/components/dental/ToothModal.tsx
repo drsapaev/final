@@ -72,7 +72,7 @@ interface ToothFormData {
   patientSatisfaction: string;
 }
 
-function clonePlainObject(value) {
+function clonePlainObject(value: unknown) {
   if (!value || typeof value !== 'object') {
     return {};
   }
@@ -93,10 +93,10 @@ async function loadExistingEmrDraft(visitId: string | number) {
   return (response as { status?: number }).status === 404 ? null : response.data;
 }
 
-function buildToothEmrPayload(existingEmr, toothNumber, toothData) {
-  const data = clonePlainObject(existingEmr?.data);
-  const specialtyData = clonePlainObject(data.specialty_data);
-  const toothStatus = clonePlainObject(specialtyData.tooth_status);
+function buildToothEmrPayload(existingEmr: { data?: unknown; row_version?: number } | null, toothNumber: string | number, toothData: unknown) {
+  const data = clonePlainObject(existingEmr?.data) as Record<string, unknown>;
+  const specialtyData = clonePlainObject(data.specialty_data) as Record<string, unknown>;
+  const toothStatus = clonePlainObject(specialtyData.tooth_status) as Record<string, unknown>;
 
   toothStatus[toothNumber] = clonePlainObject(toothData);
 
@@ -295,8 +295,8 @@ const ToothModal = ({
   }, [open, toothData]);
 
   // Добавление процедуры
-  const addProcedure = (procedureId) => {
-    const procedure = TOOTH_PROCEDURES[procedureId];
+  const addProcedure = (procedureId: string) => {
+    const procedure = (TOOTH_PROCEDURES as Record<string, typeof TOOTH_PROCEDURES[keyof typeof TOOTH_PROCEDURES]>)[procedureId];
     if (!procedure) return;
     
     const newProcedure = {
@@ -313,7 +313,7 @@ const ToothModal = ({
   };
 
   // Удаление процедуры
-  const removeProcedure = (procedureId) => {
+  const removeProcedure = (procedureId: string) => {
     setFormData(prev => {
       const procedure = prev.procedures.find(p => p.id === procedureId);
       return {
@@ -350,11 +350,11 @@ const ToothModal = ({
         const existingEmr = await loadExistingEmrDraft(visitId);
         await api.post(
           `/v2/emr/${visitId}`,
-          buildToothEmrPayload(existingEmr, toothNumber, dataToSave)
+          buildToothEmrPayload(existingEmr as { data?: unknown; row_version?: number } | null, toothNumber ?? '', dataToSave)
         );
       }
       
-      if (typeof onSave === 'function') onSave(dataToSave);
+      if (typeof onSave === 'function') onSave(dataToSave as Record<string, unknown>);
       if (typeof onClose === 'function') onClose();
       
     } catch (error) {
@@ -366,7 +366,7 @@ const ToothModal = ({
   };
 
   // H6 fix: getToothName now delegates to SSOT (dentalConstants.getToothName).
-  const getToothName = (number) => ssotGetToothName(number);
+  const getToothName = (number: string | number) => ssotGetToothName(number);
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
@@ -374,7 +374,7 @@ const ToothModal = ({
         <div style={styles.header}>
           <h2 style={styles.title}>
             <Hospital size={18} aria-hidden="true" />
-            {t('dental.dental_tm_tooth_prefix')}{toothNumber} - {getToothName(toothNumber)}
+            {t('dental.dental_tm_tooth_prefix')}{toothNumber} - {getToothName(toothNumber ?? '')}
           </h2>
           <Badge variant="primary" size="small">
             {`${Math.floor(Number(toothNumber) / 10)} ${t('dental.dental_tm_quadrant_suffix')}`}
@@ -556,7 +556,7 @@ const ToothModal = ({
           {formData.procedures.length > 0 && (
             <span style={styles.totalCaption}>
               {t('dental.dental_tm_includes_label')}: {formData.procedures.map(p => p.name).join(', ')}
-              {formData.material && `, ${t('dental.dental_tm_material_prefix')}: ${MATERIALS[formData.material]?.name}`}
+              {formData.material && `, ${t('dental.dental_tm_material_prefix')}: ${(MATERIALS as Record<string, { id: string; name: string; price: number }>)[formData.material]?.name}`}
             </span>
           )}
         </Alert>

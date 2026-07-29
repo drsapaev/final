@@ -34,7 +34,7 @@ const API_BASE = getApiOrigin();
 /**
  * Форматирует дату в YYYY-MM-DD
  */
-const formatDate = (date) => {
+const formatDate = (date: Date | string) => {
   if (!date) return '';
   const d = new Date(date);
   return d.toISOString().split('T')[0];
@@ -43,7 +43,7 @@ const formatDate = (date) => {
 /**
  * Получает начало недели (понедельник)
  */
-const getWeekStart = (date) => {
+const getWeekStart = (date: Date | string) => {
   const d = new Date(date);
   const day = d.getDay();
   const diff = d.getDate() - day + (day === 0 ? -6 : 1);
@@ -53,7 +53,7 @@ const getWeekStart = (date) => {
 /**
  * Генерирует массив дней недели
  */
-const getWeekDays = (startDate) => {
+const getWeekDays = (startDate: Date | string) => {
   const days: Date[] = [];
   const start = new Date(startDate);
   for (let i = 0; i < 7; i++) {
@@ -84,6 +84,12 @@ const DoctorCalendar = ({
   onSelectSlot,
   onViewAppointment,
   compact = false
+}: {
+  doctorId?: string | number | null;
+  department?: string | null;
+  onSelectSlot?: (slot: Record<string, unknown>, date: Date) => void;
+  onViewAppointment?: (slot: Record<string, unknown>) => void;
+  compact?: boolean;
 }) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const { theme } = useTheme();
@@ -97,7 +103,7 @@ const DoctorCalendar = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   useState('week'); // 'week' | 'day' | 'month'
-  const [, setSelectedDay] = useState(null);
+  const [, setSelectedDay] = useState<Date | null>(null);
 
   // Генерируем дни недели при изменении начала недели
   useEffect(() => {
@@ -116,10 +122,10 @@ const DoctorCalendar = ({
       });
 
       if (doctorId) {
-        params.append('doctor_id', doctorId);
+        params.append('doctor_id', String(doctorId));
       }
       if (department) {
-        params.append('department', department);
+        params.append('department', String(department));
       }
 
       const response = await fetch(
@@ -168,7 +174,7 @@ const DoctorCalendar = ({
     setWeekStart(getWeekStart(new Date()));
     setCurrentDate(new Date());
   };
-  const handleActivationKeyDown = (event, onActivate) => {
+  const handleActivationKeyDown = (event: React.KeyboardEvent<HTMLElement>, onActivate: () => void) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       onActivate();
@@ -299,13 +305,13 @@ const DoctorCalendar = ({
   };
 
   // Проверяем, является ли день сегодняшним
-  const isToday = (date) => {
+  const isToday = (date: Date) => {
     const today = new Date();
     return date.toDateString() === today.toDateString();
   };
 
   // Рендерим слоты дня
-  const renderDaySlots = (date) => {
+  const renderDaySlots = (date: Date) => {
     const dateStr = formatDate(date);
     const daySchedule = schedule[dateStr] || [];
 
@@ -317,7 +323,7 @@ const DoctorCalendar = ({
 
     }
 
-    return daySchedule.slice(0, compact ? 2 : 4).map((slot, idx) =>
+    return daySchedule.slice(0, compact ? 2 : 4).map((slot: Record<string, unknown>, idx: number) =>
     <div
       key={idx}
       role="button"
@@ -329,16 +335,16 @@ const DoctorCalendar = ({
       onClick={() => slot.booked ? onViewAppointment?.(slot) : onSelectSlot?.(slot, date)}
       onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => handleActivationKeyDown(event, () => (slot.booked ? onViewAppointment?.(slot) : onSelectSlot?.(slot, date)))}>
 
-                <div style={{ fontWeight: 'var(--mac-font-weight-medium)' } as CSSProperties}>{slot.time || slot.start_time}</div>
-                {slot.patient_name &&
-      <div style={{ fontSize: 'var(--mac-font-size-xs)', opacity: 0.8 } as CSSProperties}>{slot.patient_name}</div>
+                <div style={{ fontWeight: 'var(--mac-font-weight-medium)' } as CSSProperties}>{String(slot.time || slot.start_time || '')}</div>
+                {Boolean(slot.patient_name) &&
+      <div style={{ fontSize: 'var(--mac-font-size-xs)', opacity: 0.8 } as CSSProperties}>{String(slot.patient_name)}</div>
       }
             </div>
     );
   };
 
   // Рендерим день
-  const renderDay = (date, index) => {
+  const renderDay = (date: Date, index: number) => {
     const today = isToday(date);
 
     return (

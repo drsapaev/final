@@ -353,7 +353,7 @@ export default function FamilyRelationsCard({
 
   const renderRelation = (rel: FamilyRelation, showPatient = false) => {
     const person = showPatient ? rel.patient : rel.related_patient;
-    const typeInfo = (rel.relation_type && RELATION_TYPES[rel.relation_type]) || RELATION_TYPES.other;
+    const typeInfo = (rel.relation_type && (RELATION_TYPES as Record<string, typeof RELATION_TYPES.other>)[rel.relation_type]) || RELATION_TYPES.other;
     const TypeIcon = typeInfo.Icon;
 
     return (

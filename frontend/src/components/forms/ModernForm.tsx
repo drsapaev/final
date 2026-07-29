@@ -99,14 +99,14 @@ const ModernForm = ({
   };
 
   // Обработка отправки формы
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     if (isSubmitting || loading) return;
 
     // Пометить все поля как затронутые
     const allFields = Object.keys(validation || {});
-    const newTouched = {};
+    const newTouched: Record<string, boolean> = {};
     allFields.forEach((field) => {
       newTouched[field] = true;
     });
@@ -135,7 +135,7 @@ const ModernForm = ({
   };
 
   // Клонирование дочерних элементов с передачей пропсов
-  const cloneChildren = (children) => {
+  const cloneChildren = (children: React.ReactNode): React.ReactNode => {
     return React.Children.map(children, (child) => {
       if (!React.isValidElement(child)) return child;
 
@@ -146,12 +146,12 @@ const ModernForm = ({
 
         return (React.cloneElement as unknown as (el: React.ReactElement, props: Record<string, unknown>) => React.ReactElement)(child as React.ReactElement, {
           value: values[name] || '',
-          onChange: (e) => {
-            const value = e.target ? e.target.value : e;
+          onChange: (e: { target?: { value: unknown } } | unknown) => {
+            const value = (e as { target?: { value: unknown } })?.target ? (e as { target: { value: unknown } }).target.value : e;
             updateValue(name, value);
             ((child.props as Record<string, unknown>).onChange as ((...args: unknown[]) => void) | undefined)?.(e);
           },
-          onBlur: (e) => {
+          onBlur: (e: unknown) => {
             markTouched(name);
             const error = validateField(name, values[name]);
             if (error && error !== true) {
@@ -168,7 +168,7 @@ const ModernForm = ({
       if ((child.props as Record<string, unknown>).children) {
         return (React.cloneElement as unknown as (el: React.ReactElement, props: Record<string, unknown>) => React.ReactElement)(child as React.ReactElement, {
           ...(child.props as Record<string, unknown>),
-          children: cloneChildren((child.props as Record<string, unknown>).children)
+          children: cloneChildren((child.props as Record<string, unknown>).children as React.ReactNode)
         });
       }
 
@@ -230,6 +230,14 @@ export const FormGroup = ({
   collapsible = false,
   defaultExpanded = true,
   ...props
+}: {
+  title?: React.ReactNode;
+  description?: React.ReactNode;
+  children?: React.ReactNode;
+  className?: string;
+  collapsible?: boolean;
+  defaultExpanded?: boolean;
+  [key: string]: unknown;
 }) => {
   const { getColor } = useTheme();
   const [expanded, setExpanded] = useState(defaultExpanded);
@@ -292,6 +300,12 @@ export const FormRow = ({
   gap = 'medium',
   align = 'stretch',
   ...props
+}: {
+  children?: React.ReactNode;
+  className?: string;
+  gap?: string;
+  align?: string;
+  [key: string]: unknown;
 }) => {
   return (
     <div
@@ -309,6 +323,11 @@ export const FormColumn = ({
   className = '',
   width = 'auto',
   ...props
+}: {
+  children?: React.ReactNode;
+  className?: string;
+  width?: string;
+  [key: string]: unknown;
 }) => {
   return (
     <div

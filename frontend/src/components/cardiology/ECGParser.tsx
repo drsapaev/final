@@ -16,7 +16,7 @@ const t18 = i18n.t as unknown as (key: string, options?: Record<string, unknown>
 // Until a real SCP-ECG library is integrated, we hard-fail: return success=false
 // so the caller (ECGViewer.parseECGFileData) shows a clear warning to the doctor
 // and does NOT persist fake parameters to the database.
-export const parseSCPFile = async (file) => {
+export const parseSCPFile = async (file: File) => {
   try {
     const buffer = await file.arrayBuffer();
 
@@ -53,7 +53,7 @@ export const parseSCPFile = async (file) => {
 };
 
 // Парсер для XML формата (HL7 aECG)
-export const parseXMLFile = async (file) => {
+export const parseXMLFile = async (file: File) => {
   try {
     const text = await file.text();
     const parser = new DOMParser();
@@ -111,7 +111,7 @@ export const parseXMLFile = async (file) => {
 };
 
 // Вспомогательная функция для извлечения значений из XML
-function extractXMLValue(xmlDoc, tagName, attribute) {
+function extractXMLValue(xmlDoc: Document, tagName: string, attribute: string) {
   const element = xmlDoc.querySelector(tagName);
   if (element) {
     if (attribute) {
@@ -123,20 +123,20 @@ function extractXMLValue(xmlDoc, tagName, attribute) {
 }
 
 // Извлечение текста из XML
-function extractXMLText(xmlDoc, tagName) {
+function extractXMLText(xmlDoc: Document, tagName: string) {
   const element = xmlDoc.querySelector(tagName);
   return element ? element.textContent : null;
 }
 
 // Извлечение данных отведений
-function extractLeads(xmlDoc) {
+function extractLeads(xmlDoc: Document) {
   const leads: { name: string | null; data: string | null }[] = [];
   const leadElements = xmlDoc.querySelectorAll('lead');
 
-  leadElements.forEach((lead) => {
+  leadElements.forEach((lead: Element) => {
     leads.push({
       name: lead.getAttribute('name'),
-      data: lead.querySelector('digits')?.textContent
+      data: lead.querySelector('digits')?.textContent ?? null
     });
   });
 
@@ -144,7 +144,7 @@ function extractLeads(xmlDoc) {
 }
 
 // Главная функция парсинга
-export const parseECGFile = async (file) => {
+export const parseECGFile = async (file: File) => {
   const fileName = file.name.toLowerCase();
 
   if (fileName.endsWith('.scp')) {
@@ -168,14 +168,14 @@ export const parseECGFile = async (file) => {
 };
 
 // Анализ параметров ЭКГ
-export const analyzeECGParameters = (parameters) => {
+export const analyzeECGParameters = (parameters: Record<string, unknown>) => {
   const findings: string[] = [];
   const alerts: string[] = [];
 
   if (!parameters) return { findings, alerts };
 
   // Анализ ЧСС
-  const hr = parseInt(parameters.heartRate);
+  const hr = parseInt(parameters.heartRate as string);
   if (hr > 100) {
     findings.push(t18('cardio.cardio_parser_tachycardia'));
     if (hr > 150) alerts.push(t18('cardio.cardio_parser_severe_tachycardia'));
@@ -187,7 +187,7 @@ export const analyzeECGParameters = (parameters) => {
   }
 
   // Анализ интервала PR
-  const pr = parseInt(parameters.prInterval);
+  const pr = parseInt(parameters.prInterval as string);
   if (pr > 200) {
     findings.push(t18('cardio.cardio_parser_pr_prolonged'));
     if (pr > 300) alerts.push(t18('cardio.cardio_parser_av_block'));
@@ -197,7 +197,7 @@ export const analyzeECGParameters = (parameters) => {
   }
 
   // Анализ QRS
-  const qrs = parseInt(parameters.qrsInterval);
+  const qrs = parseInt(parameters.qrsInterval as string);
   if (qrs > 120) {
     findings.push(t18('cardio.cardio_parser_qrs_wide'));
     alerts.push(t18('cardio.cardio_parser_bundle_branch_block'));
@@ -206,8 +206,8 @@ export const analyzeECGParameters = (parameters) => {
   }
 
   // Анализ QT
-  const qt = parseInt(parameters.qtInterval);
-  const qtc = parseInt(parameters.qtcInterval);
+  const qt = parseInt(parameters.qtInterval as string);
+  const qtc = parseInt(parameters.qtcInterval as string);
 
   if (qtc > 450 || qt > 450) {
     findings.push(t18('cardio.cardio_parser_qt_prolonged'));
@@ -219,7 +219,7 @@ export const analyzeECGParameters = (parameters) => {
   }
 
   // Анализ электрической оси
-  const axis = parseInt(parameters.axis);
+  const axis = parseInt(parameters.axis as string);
   if (axis < -30) {
     findings.push(t18('cardio.cardio_parser_axis_left'));
   } else if (axis > 90) {
@@ -236,7 +236,7 @@ export const analyzeECGParameters = (parameters) => {
 };
 
 // Генерация текстового заключения
-function generateSummary(findings, alerts) {
+function generateSummary(findings: string[], alerts: string[]) {
   let summary = t18('cardio.cardio_parser_analysis_prefix');
 
   if (alerts.length > 0) {
@@ -253,7 +253,7 @@ function generateSummary(findings, alerts) {
 }
 
 // Экспорт параметров в структурированный формат
-export const exportECGParameters = (parameters) => {
+export const exportECGParameters = (parameters: Record<string, unknown>) => {
   return {
     basic: {
       heartRate: parameters.heartRate,
@@ -272,7 +272,7 @@ export const exportECGParameters = (parameters) => {
     },
     interpretation: parameters.interpretation,
     recordingDate: parameters.recordingDate
-  };
+  } as Record<string, unknown>;
 };
 
 export default {

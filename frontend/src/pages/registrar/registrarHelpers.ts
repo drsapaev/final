@@ -14,7 +14,7 @@ import { getApiOrigin } from '../../api/runtime';
  * Permissive shape for registrar record payloads received from the backend.
  * All fields are optional because different endpoints return different subsets.
  */
-interface RegistrarRecordLike {
+export interface RegistrarRecordLike {
   record_kind?: string;
   source_kind?: string;
   record_type?: string;
@@ -190,7 +190,7 @@ export const findRegistrarRecordBySelectionKey = (
 const hasOwn = (object: Record<string, unknown> | null | undefined, key: string) =>
   Object.prototype.hasOwnProperty.call(object || {}, key);
 
-export const hasBackendAction = (record: RegistrarRecordLike | null | undefined, action: unknown) => {
+export const hasBackendAction = (record: RegistrarRecordLike | null | undefined, action: unknown): boolean => {
   if (!record) return false;
   const normalizedAction = String(action || '').trim();
   const equivalentActions = new Set([

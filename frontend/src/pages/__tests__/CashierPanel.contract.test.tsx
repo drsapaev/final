@@ -9,7 +9,7 @@ const cashierPanelPath = path.resolve(__dirname, '../CashierPanel.tsx');
 
 const readCashierPanelSource = () => fs.readFileSync(cashierPanelPath, 'utf8');
 
-const extractSourceBlock = (source, startMarker, endMarker) => {
+const extractSourceBlock = (source: string, startMarker: string, endMarker: string) => {
   const start = source.indexOf(startMarker);
   expect(start).toBeGreaterThanOrEqual(0);
   const end = source.indexOf(endMarker, start);

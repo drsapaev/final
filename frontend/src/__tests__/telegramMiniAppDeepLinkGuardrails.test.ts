@@ -11,7 +11,7 @@ const ALIAS_MAPPINGS = {
   navbat: 'queue',
 };
 
-function sourceBetween(source, start, end) {
+function sourceBetween(source: string, start: string, end: string) {
   const startIndex = source.indexOf(start);
   expect(startIndex).toBeGreaterThanOrEqual(0);
 

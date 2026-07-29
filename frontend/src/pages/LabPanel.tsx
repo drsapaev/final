@@ -202,7 +202,7 @@ export default function LabPanel() {
       return;
     }
 
-    const keyOffsets = {
+    const keyOffsets: Record<string, number> = {
       ArrowRight: 1,
       ArrowDown: 1,
       ArrowLeft: -1,
@@ -551,7 +551,7 @@ export default function LabPanel() {
     ? reportHistory.length
     : recentReports.length;
 
-  const statusCounters = useMemo(() => ({
+  const statusCounters = useMemo<Record<string, number>>(() => ({
     queue: appointments.length,
     templates: templates.length,
     reports: reportsCounter

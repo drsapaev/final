@@ -59,44 +59,44 @@ export function DoctorTemplatesPanel({
     } = useDoctorSectionTemplates({ section, icd10Code });
 
     // Edit state
-    const [editingTemplate, setEditingTemplate] = useState(null);
+    const [editingTemplate, setEditingTemplate] = useState<Record<string, unknown> | null>(null);
     const [editText, setEditText] = useState('');
     // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
     const [confirm, confirmDialog] = useConfirm();
 
     // Handle template click (apply)
-    const handleApply = useCallback((template) => {
-        onApply?.(template.template_text);
+    const handleApply = useCallback((template: Record<string, unknown>) => {
+        onApply?.(template.template_text as string);
         onClose?.();
     }, [onApply, onClose]);
 
     // Handle pin toggle
-    const handlePinToggle = useCallback(async (template, e) => {
+    const handlePinToggle = useCallback(async (template: Record<string, unknown>, e: React.MouseEvent<HTMLElement>) => {
         e.stopPropagation();
         if (template.is_pinned) {
-            await unpinTemplate(template.id);
+            await unpinTemplate(String(template.id));
         } else {
-            await pinTemplate(template.id);
+            await pinTemplate(String(template.id));
         }
     }, [pinTemplate, unpinTemplate]);
 
     // Handle edit start
-    const handleEditStart = useCallback((template, e) => {
+    const handleEditStart = useCallback((template: Record<string, unknown>, e: React.MouseEvent<HTMLElement>) => {
         e.stopPropagation();
         setEditingTemplate(template);
-        setEditText(template.template_text);
+        setEditText(template.template_text as string);
     }, []);
 
     // Handle edit save
-    const handleEditSave = useCallback(async (mode) => {
+    const handleEditSave = useCallback(async (mode: string) => {
         if (!editingTemplate || !editText.trim()) return;
-        await updateTemplate(String((editingTemplate as { id: string | number }).id), editText, mode);
+        await updateTemplate(String((editingTemplate as { id: string | number }).id), editText, mode as 'replace' | 'save_as_new');
         setEditingTemplate(null);
         setEditText('');
     }, [editingTemplate, editText, updateTemplate]);
 
     // Handle delete
-    const handleDelete = useCallback(async (template, e) => {
+    const handleDelete = useCallback(async (template: Record<string, unknown>, e: React.MouseEvent<HTMLElement>) => {
         e.stopPropagation();
         // P-013 fix: replaced window.confirm() with shared useConfirm hook.
         const ok = await (confirm as unknown as (opts: Record<string, unknown>) => Promise<boolean>)({
@@ -108,7 +108,7 @@ export function DoctorTemplatesPanel({
             intent: 'danger',
         });
         if (ok) {
-            await deleteTemplate(template.id);
+            await deleteTemplate(String(template.id));
         }
     }, [deleteTemplate, confirm]);
 
@@ -121,7 +121,7 @@ export function DoctorTemplatesPanel({
 
     if (!isOpen) return null;
 
-    const sectionLabel = SECTION_LABELS[section] || section;
+    const sectionLabel = (SECTION_LABELS as Record<string, string>)[section] || section;
     const backdropStyle = { border: 'none', margin: 0, padding: 0 };
 
     return (
@@ -178,25 +178,27 @@ export function DoctorTemplatesPanel({
                         </div>
                     ) : (
                         <div className="doctor-templates-list">
-                            {templates.map((template: Record<string, unknown>) => (
+                            {templates.map((template: unknown) => {
+                                const tmpl = template as Record<string, unknown>;
+                                return (
                                 <div
-                                    key={String(template.id)}
-                                    className={`doctor-templates-item ${template.is_pinned ? 'doctor-templates-item--pinned' : ''}`}
+                                    key={String(tmpl.id)}
+                                    className={`doctor-templates-item ${tmpl.is_pinned ? 'doctor-templates-item--pinned' : ''}`}
                                 >
                                     {/* Actions */}
                                     <div className="doctor-templates-item-actions">
                                         <button
                                             type="button"
-                                            onClick={(e: React.MouseEvent<HTMLElement>) => handlePinToggle(template, e)}
-                                            className={`doctor-templates-action-btn ${template.is_pinned ? 'active' : ''}`}
-                                            aria-label={t18('misc.dtp_template_is_pinned_otkrepit_', { is_pinned: template.is_pinned ? 'Открепить' : 'Закрепить' })}
-                                            title={template.is_pinned ? t18('misc.dtp_otkrepit') : t18('misc.dtp_zakrepit')}
+                                            onClick={(e: React.MouseEvent<HTMLElement>) => handlePinToggle(tmpl, e)}
+                                            className={`doctor-templates-action-btn ${tmpl.is_pinned ? 'active' : ''}`}
+                                            aria-label={t18('misc.dtp_template_is_pinned_otkrepit_', { is_pinned: tmpl.is_pinned ? 'Открепить' : 'Закрепить' })}
+                                            title={tmpl.is_pinned ? t18('misc.dtp_otkrepit') : t18('misc.dtp_zakrepit')}
                                         >
                                             <Pin size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
                                         </button>
                                         <button
                                             type="button"
-                                            onClick={(e: React.MouseEvent<HTMLElement>) => handleEditStart(template, e)}
+                                            onClick={(e: React.MouseEvent<HTMLElement>) => handleEditStart(tmpl, e)}
                                             className="doctor-templates-action-btn"
                                             aria-label={t18('misc.dtp_redaktirovat_shablon_vracha')}
                                             title={t18('misc.dtp_redaktirovat')}
@@ -205,7 +207,7 @@ export function DoctorTemplatesPanel({
                                         </button>
                                         <button
                                             type="button"
-                                            onClick={(e: React.MouseEvent<HTMLElement>) => handleDelete(template, e)}
+                                            onClick={(e: React.MouseEvent<HTMLElement>) => handleDelete(tmpl, e)}
                                             className="doctor-templates-action-btn doctor-templates-action-btn--danger"
                                             aria-label={t18('misc.dtp_udalit_shablon_vracha')}
                                             title={t18('misc.dtp_udalit')}
@@ -218,34 +220,35 @@ export function DoctorTemplatesPanel({
                                     <button
                                         type="button"
                                         className="doctor-templates-item-content"
-                                        onClick={() => handleApply(template)}
+                                        onClick={() => handleApply(tmpl)}
                                     >
                                         <div className="doctor-templates-item-text">
-                                            {(template.template_text as string).substring(0, 200)}
-                                            {(template.template_text as string).length > 200 && '...'}
+                                            {(tmpl.template_text as string).substring(0, 200)}
+                                            {(tmpl.template_text as string).length > 200 && '...'}
                                         </div>
 
                                         {/* Badges */}
                                         <div className="doctor-templates-item-badges">
-                                            {Boolean(template.is_stale) && (
+                                            {Boolean(tmpl.is_stale) && (
                                                 <span className="doctor-templates-badge doctor-templates-badge--stale">
                                                     Давно не использовал
                                                 </span>
                                             )}
-                                            {Boolean(template.frequency_label) && !template.is_stale && (
-                                                <span className={t18('misc.dtp_doctor_templates_badge_docto', { rare: template.frequency_label === 'часто' ? 'frequent' : 'rare' })}>
-                                                    {String(template.frequency_label)}
+                                            {Boolean(tmpl.frequency_label) && !tmpl.is_stale && (
+                                                <span className={t18('misc.dtp_doctor_templates_badge_docto', { rare: tmpl.frequency_label === 'часто' ? 'frequent' : 'rare' })}>
+                                                    {String(tmpl.frequency_label)}
                                                 </span>
                                             )}
-                                            {Boolean(template.icd10_code) && (
+                                            {Boolean(tmpl.icd10_code) && (
                                                 <span className="doctor-templates-badge doctor-templates-badge--icd">
-                                                    {String(template.icd10_code)}
+                                                    {String(tmpl.icd10_code)}
                                                 </span>
                                             )}
                                         </div>
                                     </button>
                                 </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     )}
                 </div>
@@ -322,6 +325,11 @@ export function DoctorTemplatesButton({
     disabled = false,
     hasTemplates = false,
     count = 0,
+}: {
+    onClick: () => void;
+    disabled?: boolean;
+    hasTemplates?: boolean;
+    count?: number;
 }) {
     return (
         <button

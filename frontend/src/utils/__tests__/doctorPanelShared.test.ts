@@ -228,7 +228,7 @@ describe('doctorPanelShared — countAppointmentsByStatuses', () => {
       { status: null },
       { status: 'completed' },
     ];
-    const legacyImpl = (apts, sts) =>
+    const legacyImpl = (apts: Array<{ status?: string | null | undefined }>, sts: Array<unknown>) =>
       apts.filter((apt) => sts.includes(apt.status)).length;
     for (const sts of [
       ['waiting'],
@@ -363,16 +363,16 @@ describe('doctorPanelShared — getAllPatientServices', () => {
   it('matches the legacy in-panel implementation bit-for-bit', () => {
     // Regression guard: the new shared implementation must return the same
     // result as the previous in-panel implementations for every input shape.
-    const legacyImpl = (patientId, allAppointments) => {
-      const patientServices = new Set();
-      const patientServiceCodes = new Set();
-      allAppointments.forEach((appointment) => {
+    const legacyImpl = (patientId: unknown, allAppointments: Array<Record<string, unknown>>) => {
+      const patientServices = new Set<unknown>();
+      const patientServiceCodes = new Set<unknown>();
+      allAppointments.forEach((appointment: Record<string, unknown>) => {
         if (appointment.patient_id === patientId) {
           if (appointment.services && Array.isArray(appointment.services)) {
-            appointment.services.forEach((service) => patientServices.add(service));
+            (appointment.services as unknown[]).forEach((service: unknown) => patientServices.add(service));
           }
           if (appointment.service_codes && Array.isArray(appointment.service_codes)) {
-            appointment.service_codes.forEach((code) => patientServiceCodes.add(code));
+            (appointment.service_codes as unknown[]).forEach((code: unknown) => patientServiceCodes.add(code));
           }
         }
       });
@@ -459,7 +459,7 @@ describe('doctorPanelShared — makeEnsureCanonicalVisitId', () => {
   });
 
   it('updates the matching appointment in state with the resolved visit_id', async () => {
-    let capturedUpdater;
+    let capturedUpdater: ((prev: unknown) => unknown) | undefined;
     const setAppointments = vi.fn((updater) => { capturedUpdater = updater; });
     const resolveCanonicalVisitId = vi.fn().mockResolvedValue(55);
     const ensure = makeEnsureCanonicalVisitId(setAppointments, resolveCanonicalVisitId);
@@ -472,7 +472,7 @@ describe('doctorPanelShared — makeEnsureCanonicalVisitId', () => {
       { id: 2, appointment_id: 200 },          // should be unchanged
       { id: 1, appointment_id: 100, visit_id: 99 }, // different row with same id (edge case - first match wins)
     ];
-    const nextState = capturedUpdater(prevState);
+    const nextState = capturedUpdater!(prevState) as Array<Record<string, unknown>>;
     expect(nextState[0]).toEqual({ id: 1, appointment_id: 100, visit_id: 55 });
     expect(nextState[1]).toEqual({ id: 2, appointment_id: 200 });
   });
@@ -501,7 +501,7 @@ describe('doctorPanelShared — makeEnsureCanonicalVisitId', () => {
   });
 
   it('handles setAppointments updater receiving non-array prev state', async () => {
-    let capturedUpdater;
+    let capturedUpdater: ((prev: unknown) => unknown) | undefined;
     const setAppointments = vi.fn((updater) => { capturedUpdater = updater; });
     const resolveCanonicalVisitId = vi.fn().mockResolvedValue(42);
     const ensure = makeEnsureCanonicalVisitId(setAppointments, resolveCanonicalVisitId);
@@ -510,14 +510,14 @@ describe('doctorPanelShared — makeEnsureCanonicalVisitId', () => {
     await ensure(row);
 
     // Should not crash if prev is not an array
-    expect(() => capturedUpdater(null)).not.toThrow();
-    expect(() => capturedUpdater(undefined)).not.toThrow();
-    expect(capturedUpdater(null)).toBeNull();
-    expect(capturedUpdater(undefined)).toBeUndefined();
+    expect(() => capturedUpdater!(null)).not.toThrow();
+    expect(() => capturedUpdater!(undefined)).not.toThrow();
+    expect(capturedUpdater!(null)).toBeNull();
+    expect(capturedUpdater!(undefined)).toBeUndefined();
   });
 
   it('handles appointments with null/undefined entries in the array', async () => {
-    let capturedUpdater;
+    let capturedUpdater: ((prev: unknown) => unknown) | undefined;
     const setAppointments = vi.fn((updater) => { capturedUpdater = updater; });
     const resolveCanonicalVisitId = vi.fn().mockResolvedValue(42);
     const ensure = makeEnsureCanonicalVisitId(setAppointments, resolveCanonicalVisitId);
@@ -526,7 +526,7 @@ describe('doctorPanelShared — makeEnsureCanonicalVisitId', () => {
     await ensure(row);
 
     const prevState = [null, undefined, { id: 1, visit_id: 0 }, { id: 1 }];
-    const nextState = capturedUpdater(prevState);
+    const nextState = capturedUpdater!(prevState) as Array<Record<string, unknown>>;
     // Should not crash on null/undefined entries
     expect(nextState).toHaveLength(4);
     // The entry with id:1 and no visit_id should be updated

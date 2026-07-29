@@ -95,7 +95,7 @@ describe('Medium-G: tabIndex on action icons', () => {
   });
 });
 
-function collectSourceFiles(dir) {
+function collectSourceFiles(dir: string) {
   const entries = fs.readdirSync(dir, { withFileTypes: true });
   const files: string[] = []
   for (const entry of entries) {

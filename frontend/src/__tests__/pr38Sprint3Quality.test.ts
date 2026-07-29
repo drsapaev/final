@@ -96,7 +96,7 @@ describe('Medium-23: Silent catches in Search.tsx', () => {
   });
 });
 
-function collectSourceFiles(dir) {
+function collectSourceFiles(dir: string) {
   const entries = fs.readdirSync(dir, { withFileTypes: true });
   const files: string[] = [];
   for (const entry of entries) {

@@ -40,7 +40,7 @@ const MobileNotifications = () => {
       if (response.ok) {
         const data = await response.json();
         setNotifications(data);
-        setUnreadCount(data.filter((n) => !n.is_read).length);
+        setUnreadCount(data.filter((n: { is_read?: boolean }) => !n.is_read).length);
       }
     } catch (error) {
       logger.error('Ошибка загрузки уведомлений:', error);

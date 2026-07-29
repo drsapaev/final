@@ -11,9 +11,9 @@ const DOCTOR_PANEL_FILES = [
   'pages/DermatologistPanelUnified.tsx',
 ];
 
-const read = (filePath) => fs.readFileSync(path.join(ROOT, filePath), 'utf8');
+const read = (filePath: string) => fs.readFileSync(path.join(ROOT, filePath), 'utf8');
 
-const extractBlock = (source, startMarker, endMarker) => {
+const extractBlock = (source: string, startMarker: string, endMarker: string) => {
   const start = source.indexOf(startMarker);
   expect(start).toBeGreaterThanOrEqual(0);
   const end = source.indexOf(endMarker, start);

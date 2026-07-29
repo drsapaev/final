@@ -145,7 +145,7 @@ describe('UserProfile page', () => {
   });
 
   it('reuses one in-flight self profile request across strict mode remounts', async () => {
-    let resolveRequest;
+    let resolveRequest: ((value: { data: typeof profileResponse }) => void) | undefined;
     apiGet.mockReturnValue(
       new Promise((resolve) => {
         resolveRequest = resolve;
@@ -158,7 +158,7 @@ describe('UserProfile page', () => {
       expect(apiGet).toHaveBeenCalledTimes(1);
     });
 
-    resolveRequest({ data: profileResponse });
+    resolveRequest!({ data: profileResponse });
 
     expect(await screen.findByDisplayValue('Registrar User')).toBeInTheDocument();
     expect(apiGet).toHaveBeenCalledTimes(1);

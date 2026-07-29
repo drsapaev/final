@@ -23,7 +23,7 @@ const t18 = i18n.t as unknown as (key: string, options?: Record<string, unknown>
 /**
  * Category metadata
  */
-const getCategoryMeta = (t) => ({
+const getCategoryMeta = (t: (key: string, options?: Record<string, unknown>) => string) => ({
     medications: { icon: '💊', label: t18('misc.ttp_cat_medications') },
     examinations: { icon: '🔬', label: t18('misc.ttp_cat_examinations') },
     labs: { icon: '🧪', label: t18('misc.ttp_cat_labs') },
@@ -33,7 +33,7 @@ const getCategoryMeta = (t) => ({
 /**
  * Merge strategy: APPEND_WITH_SEPARATOR
  */
-const mergeWithSeparator = (existing, templateBody) => {
+const mergeWithSeparator = (existing: string, templateBody: string) => {
     if (!existing || !existing.trim()) {
         return templateBody;
     }
@@ -43,7 +43,7 @@ const mergeWithSeparator = (existing, templateBody) => {
 /**
  * TreatmentTemplatesButton - Simple trigger button
  */
-export function TreatmentTemplatesButton({ onClick, disabled = false }) {
+export function TreatmentTemplatesButton({ onClick, disabled = false }: { onClick: () => void; disabled?: boolean }) {
     if (disabled) return null;
 
     return (
@@ -74,6 +74,12 @@ export function TreatmentTemplatesPanel({
     onApply,
     onClose,
     isOpen = false,
+}: {
+    specialty?: string;
+    currentValue?: string;
+    onApply?: (newValue: string, templateId: string) => void;
+    onClose?: () => void;
+    isOpen?: boolean;
 }) {
     const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
     const [activeCategory, setActiveCategory] = useState('medications');
@@ -81,8 +87,8 @@ export function TreatmentTemplatesPanel({
     const [previewTemplate, setPreviewTemplate] = useState<{ id: string; title: string; body: string; tags?: string[] } | null>(null);
 
     // Get templates for specialty
-    const templates = useMemo(() => {
-        return treatmentTemplatesData[specialty] || treatmentTemplatesData.general;
+    const templates = useMemo<Record<string, { id: string; title: string; body: string; tags?: string[] }[]>>(() => {
+        return (treatmentTemplatesData as Record<string, Record<string, { id: string; title: string; body: string; tags?: string[] }[]>>)[specialty] || (treatmentTemplatesData as Record<string, Record<string, { id: string; title: string; body: string; tags?: string[] }[]>>).general;
     }, [specialty]);
 
     // Filter by search
@@ -100,7 +106,7 @@ export function TreatmentTemplatesPanel({
     }, [templates, activeCategory, searchQuery]);
 
     // Handle insert
-    const handleInsert = useCallback((template) => {
+    const handleInsert = useCallback((template: { id: string; title: string; body: string; tags?: string[] }) => {
         const mergedValue = mergeWithSeparator(currentValue, template.body);
         onApply?.(mergedValue, template.id);
         setPreviewTemplate(null);
@@ -109,7 +115,7 @@ export function TreatmentTemplatesPanel({
     }, [currentValue, onApply, onClose]);
 
     // Handle preview
-    const handlePreview = useCallback((template) => {
+    const handlePreview = useCallback((template: { id: string; title: string; body: string; tags?: string[] }) => {
         setPreviewTemplate(template);
     }, []);
 
@@ -119,7 +125,7 @@ export function TreatmentTemplatesPanel({
         setSearchQuery('');
         onClose?.();
     }, [onClose]);
-    const handleActivationKeyDown = (event, action) => {
+    const handleActivationKeyDown = (event: React.KeyboardEvent<HTMLElement>, action: () => void) => {
         if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault();
             action();

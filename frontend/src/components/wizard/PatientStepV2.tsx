@@ -21,6 +21,25 @@ import './PatientStepV2.css';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
 
+interface PatientStepV2Props {
+  data?: Record<string, unknown>;
+  errors: Record<string, any>;
+  suggestions: Array<Record<string, any>>;
+  showSuggestions: boolean;
+  isSearching?: boolean;
+  onSearch: (value: string) => void;
+  onSelectPatient: (patient: any) => void;
+  onUpdate: (field: string, value: any) => void;
+  onPhoneChange: (value: string) => void;
+  onBirthDateChange: (value: string) => void;
+  formattedBirthDate: string;
+  fioRef: React.Ref<HTMLInputElement> | null;
+  phoneRef: React.Ref<HTMLInputElement> | null;
+  cart: Record<string, any> | null;
+  onUpdateCart: (field: string, value: any) => void;
+  phoneError: { message?: string; patient?: any } | null;
+}
+
 const PatientStepV2 = ({
   data = {}, // ✅ Default empty object to prevent crash
   errors,
@@ -38,7 +57,7 @@ const PatientStepV2 = ({
   cart,
   onUpdateCart,
   phoneError
-}) => {
+}: PatientStepV2Props) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const safeData = (data || {}) as Record<string, any>;
   const selectedGender = normalizeGenderForForm(safeData.gender);

@@ -12,7 +12,7 @@ import React from 'react';
 import DoctorServiceSelector from '../doctor/DoctorServiceSelector';
 import { useTranslation } from '../../i18n/useTranslation';
 
-export function ServicesTab() {
+export function ServicesTab(): React.JSX.Element | null {
   const { t } = useTranslation();
   return (
     <div className="cardio-w-full-visible">

@@ -50,7 +50,7 @@ export function VisitTab({
   onGoToAppointments: () => void;
   getColor: (key: string) => string;
   getFontSize: (key: string) => string;
-}) {
+}): React.JSX.Element | null {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   // Empty state: no patient selected
   if (!selectedPatient) {
