@@ -131,7 +131,7 @@ const RegistrarPanel = () => {
   // R-02 fix: activeTab синхронизирован с URL (?dept=...).
   // Раньше был useState(null) — F5 сбрасывал выбранное отделение.
   const [activeTab, setActiveTabRaw] = useState(() => searchParams.get('dept') || null);
-  const setActiveTab = useCallback((tab: string) => {
+  const setActiveTab = useCallback((tab: string | null) => {
     setActiveTabRaw(tab);
     // R-02: пишем в URL для shareable links + back button
     const params = new URLSearchParams(window.location.search);
@@ -296,8 +296,8 @@ const RegistrarPanel = () => {
     if (key.includes('.')) return tI18n(key);
     return tI18n('registrarPanel.' + key);
   };
-  const currentWorklistLabel = tI18n('registrarPanel.' + (REGISTRAR_TAB_LABEL_KEYS[activeTab || ''] || 'tabs_appointments'));
-  const statusFilterLabel = statusFilter ? tI18n('registrarPanel.' + (REGISTRAR_STATUS_LABEL_KEYS[statusFilter] || statusFilter)) : null;
+  const currentWorklistLabel = tI18n('registrarPanel.' + (REGISTRAR_TAB_LABEL_KEYS[activeTab as keyof typeof REGISTRAR_TAB_LABEL_KEYS] || 'tabs_appointments'));
+  const statusFilterLabel = statusFilter ? tI18n('registrarPanel.' + (REGISTRAR_STATUS_LABEL_KEYS[statusFilter as keyof typeof REGISTRAR_STATUS_LABEL_KEYS] || statusFilter)) : null;
   const { theme, getSpacing, getFontSize, getColor } = useTheme();
   // Адаптивные цвета из централизованной системы темизации
   // DS-2 fix: replaced --color-* variables with --mac-* canonical tokens
@@ -323,9 +323,10 @@ const RegistrarPanel = () => {
 
 
   // Улучшенная загрузка записей с поддержкой тихого режима
-  const loadAppointments = useCallback(async (options: Record<string, unknown> = {}) => {
-    const { silent = false } = options || {};
-    const callSource = String(options?.source || 'unknown');
+  const loadAppointments = useCallback(async (rawOptions: unknown = {}) => {
+    const options: Record<string, unknown> = (rawOptions && typeof rawOptions === 'object' ? rawOptions : {}) as Record<string, unknown>;
+    const { silent = false } = options;
+    const callSource = String(options.source || 'unknown');
     const isAutoRefreshCall = callSource === 'auto_refresh';
     if (isAutoRefreshCall) {
       const cooldownUntil = autoRefreshCooldownUntilRef.current;
@@ -390,8 +391,8 @@ const RegistrarPanel = () => {
           // Removed: appointmentsMap, mergedByPatientKey, getAppointmentKey, calcPriority, mergeAppointments
 
           // Minimal field adaptation layer
-          const adaptEntry = (entry, queue) => {
-            const fullEntry = entry.data || entry;
+          const adaptEntry = (entry: Record<string, unknown>, queue: Record<string, unknown>): Record<string, unknown> | null => {
+            const fullEntry = (entry.data ?? entry) as Record<string, unknown>;
             const entryId = fullEntry?.id;
             if (!entryId) return null; // Skip entries without ID
 
@@ -476,10 +477,11 @@ const RegistrarPanel = () => {
           };
 
           // ⭐ SSOT: flatMap all entries without any deduplication or aggregation
-          appointmentsData = data.queues.flatMap((queue) =>
-          (queue.entries || []).
-          map((entry) => adaptEntry(entry, queue)).
-          filter((entry) => entry !== null) // Remove entries without ID
+          const queuesList = data.queues as unknown as Record<string, unknown>[];
+          appointmentsData = queuesList.flatMap((queue) =>
+          (Array.isArray(queue.entries) ? queue.entries : [] as unknown[]).
+          map((entry: Record<string, unknown>) => adaptEntry(entry, queue)).
+          filter((entry: Record<string, unknown> | null) => entry !== null) // Remove entries without ID
           );
 
           logger.info(`📊 SSOT: Loaded ${appointmentsData.length} entries (no dedup, no aggregation)`);
@@ -587,8 +589,9 @@ const RegistrarPanel = () => {
 
   // Слушаем обновления отделений от админ-панели
   useEffect(() => {
-    const handleDepartmentsUpdate = (event) => {
-      logger.info('RegistrarPanel: Получено обновление отделений, перезагружаю...', event.detail);
+    const handleDepartmentsUpdate = (event: Event) => {
+      const detail = (event as CustomEvent).detail;
+      logger.info('RegistrarPanel: Получено обновление отделений, перезагружаю...', detail);
       loadIntegratedData();
     };
 
@@ -613,19 +616,20 @@ const RegistrarPanel = () => {
 
   // Слушаем глобальные события обновления очереди для синхронизации статусов
   useEffect(() => {
-    const handleQueueUpdate = (event) => {
-      const { action, specialty } = event.detail || {};
+    const handleQueueUpdate = (event: Event) => {
+      const detail = ((event as CustomEvent).detail ?? {}) as { action?: string; specialty?: string };
+      const { action, specialty } = detail;
       // UX Audit R-4.1: record WebSocket update timestamp to skip redundant interval refresh.
       lastQueueUpdatedRef.current = Date.now();
-      logger.info('[RegistrarPanel] Получено событие обновления очереди:', { action, specialty, detail: event.detail });
+      logger.info('[RegistrarPanel] Получено событие обновления очереди:', { action, specialty, detail });
 
       // Для критических действий обновляем немедленно без silent режима
       const criticalActions = ['patientCalled', 'visitStarted', 'visitCompleted', 'nextPatientCalled', 'refreshAll', 'entryAdded'];
-      const shouldUpdateImmediately = criticalActions.includes(action);
+      const shouldUpdateImmediately = action != null && criticalActions.includes(action);
 
       if (shouldUpdateImmediately) {
         logger.info('[RegistrarPanel] Немедленное обновление после действия:', action);
-        logger.info('[RegistrarPanel] Детали события:', event.detail);
+        logger.info('[RegistrarPanel] Детали события:', detail);
         // Увеличиваем задержку для гарантии сохранения данных в БД (особенно для новых записей)
         const delay = action === 'entryAdded' || action === 'refreshAll' ? 500 : 300;
         setTimeout(() => {
@@ -734,11 +738,11 @@ const RegistrarPanel = () => {
   // Esc — закрыть wizard/dialogs (если открыт)
   // Не срабатывает когда фокус в input/textarea (чтобы не мешать вводу).
   useEffect(() => {
-    const handleKeyDown = (event) => {
+    const handleKeyDown = (event: KeyboardEvent) => {
       // Ctrl+N — новая запись
       if ((event.ctrlKey || event.metaKey) && event.key === 'n') {
         // Не срабатываем в input/textarea/select
-        const tag = event.target?.tagName?.toLowerCase();
+        const tag = (event.target as HTMLElement | null)?.tagName?.toLowerCase();
         if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
         event.preventDefault();
         if (!showWizard) {
@@ -836,7 +840,7 @@ const RegistrarPanel = () => {
 
   // Мемоизированные счетчики и индикаторы по отделам
   const departmentStats = useMemo(() => {
-    const stats = {};
+    const stats: Record<string, unknown> = {};
 
     // ⭐ SSOT: Use queue profile keys from API, not hardcoded department keys
     // queueProfiles is loaded from GET /queues/profiles via ModernTabs
@@ -895,7 +899,7 @@ const RegistrarPanel = () => {
 
   // ✅ Функция фильтрации услуг по вкладке
   // ⭐ ИСПРАВЛЕНО: Для QR-записей с несколькими специалистами используем queue_numbers
-  const filterServicesByDepartment = useCallback((appointment, departmentKey) => {
+  const filterServicesByDepartment = useCallback((appointment: Appointment, departmentKey: string | null) => {
     // ⭐ SSOT: Используем централизованную функцию toServiceCode
     // Используем только канонический резолв из SSOT
     const toServiceCode = (value: unknown) => {
@@ -912,13 +916,14 @@ const RegistrarPanel = () => {
     const normalizeDepartmentKey = (value: unknown) => value ? String(value).toLowerCase().trim() : null;
     const targetDepartmentKey = normalizeDepartmentKey(departmentKey);
 
-    const getServiceIdentity = (serviceItem) => {
+    const getServiceIdentity = (serviceItem: unknown): { id: unknown; code: unknown; name: unknown; departmentKey: unknown } => {
       if (serviceItem && typeof serviceItem === 'object') {
+        const item = serviceItem as Record<string, unknown>;
         return {
-          id: serviceItem.id ?? serviceItem.service_id ?? null,
-          code: serviceItem.service_code ?? serviceItem.code ?? null,
-          name: serviceItem.name ?? serviceItem.service_name ?? null,
-          departmentKey: serviceItem.department_key ?? serviceItem.departmentKey ?? null
+          id: item.id ?? item.service_id ?? null,
+          code: item.service_code ?? item.code ?? null,
+          name: item.name ?? item.service_name ?? null,
+          departmentKey: item.department_key ?? item.departmentKey ?? null
         };
       }
 
@@ -930,35 +935,36 @@ const RegistrarPanel = () => {
       };
     };
 
-    const serviceMatchesIdentity = (candidate, identity) => {
+    const serviceMatchesIdentity = (candidate: unknown, identity: { id: unknown; code: unknown; name: unknown; departmentKey: unknown }) => {
       if (!candidate || typeof candidate !== 'object') return false;
-      const candidateId = candidate.id ?? candidate.service_id ?? null;
+      const c = candidate as Record<string, unknown>;
+      const candidateId = c.id ?? c.service_id ?? null;
       if (identity.id != null && candidateId != null && Number(candidateId) === Number(identity.id)) return true;
 
-      const candidateCode = candidate.service_code ?? candidate.code ?? null;
+      const candidateCode = c.service_code ?? c.code ?? null;
       if (identity.code && candidateCode && String(candidateCode).toUpperCase() === String(identity.code).toUpperCase()) return true;
 
-      const candidateName = candidate.name ?? candidate.service_name ?? null;
+      const candidateName = c.name ?? c.service_name ?? null;
       if (identity.name && candidateName && String(candidateName).trim() === String(identity.name).trim()) return true;
 
       return false;
     };
 
-    const findBackendServiceMeta = (serviceItem, index) => {
+    const findBackendServiceMeta = (serviceItem: unknown, index: number): Record<string, unknown> | null => {
       const identity = getServiceIdentity(serviceItem);
-      if (identity.departmentKey) return identity;
+      if (identity.departmentKey) return identity as Record<string, unknown>;
 
       const serviceDetails = Array.isArray(appointment.service_details) ? appointment.service_details : [];
-      const indexedDetail = serviceDetails[index];
+      const indexedDetail = serviceDetails[index] as Record<string, unknown> | undefined;
       if (indexedDetail?.department_key) return indexedDetail;
 
-      const detailMatch = serviceDetails.find((detail: unknown) => serviceMatchesIdentity(detail, identity));
+      const detailMatch = serviceDetails.find((detail: unknown) => serviceMatchesIdentity(detail, identity)) as Record<string, unknown> | undefined;
       if (detailMatch?.department_key) return detailMatch;
 
       if (services && typeof services === 'object') {
         for (const groupServices of Object.values(services)) {
           if (!Array.isArray(groupServices)) continue;
-          const serviceMatch = groupServices.find((service) => serviceMatchesIdentity(service, identity));
+          const serviceMatch = groupServices.find((service: unknown) => serviceMatchesIdentity(service, identity)) as Record<string, unknown> | undefined;
           if (serviceMatch?.department_key) return serviceMatch;
         }
       }
@@ -966,7 +972,7 @@ const RegistrarPanel = () => {
       return null;
     };
 
-    const filterByBackendDepartment = (appointmentServices) => {
+    const filterByBackendDepartment = (appointmentServices: unknown[]): unknown[] | null => {
       if (!targetDepartmentKey || !Array.isArray(appointmentServices) || appointmentServices.length === 0) {
         return null;
       }
@@ -1016,7 +1022,7 @@ const RegistrarPanel = () => {
         return backendFilteredServices;
       }
 
-      const departmentCodePrefixes = {
+      const departmentCodePrefixes: Record<string, string[]> = {
         'cardio': ['K'], // K01, K11 и т.д. - все кардиоуслуги кроме ECG
         'echokg': ['K10', 'ECG'], // Только ЭКГ (K10)
         'derma': ['D'], // D01 и т.д. (только консультации, не D_PROC)
@@ -1025,7 +1031,7 @@ const RegistrarPanel = () => {
         'procedures': ['P', 'C', 'D_PROC'] // P01, P02, C01, C05, D_PROC02 и т.д.
       };
 
-      const allowedPrefixes = departmentCodePrefixes[departmentKey] || [];
+      const allowedPrefixes = departmentCodePrefixes[departmentKey as keyof typeof departmentCodePrefixes] || [];
 
       // ✅ Фильтруем существующие services по категории
       if (appointment.services && Array.isArray(appointment.services) && appointment.services.length > 0) {
@@ -1033,7 +1039,7 @@ const RegistrarPanel = () => {
           // ✅ ИСПРАВЛЕНО: Извлекаем код из объекта если это объект, иначе используем как строку
           // Backend может возвращать services как [{code: "L10", name: "Общий белок", ...}] или как ["L10"]
           const code = typeof serviceItem === 'object' && serviceItem?.code ?
-          String(serviceItem.code).toUpperCase() :
+          String((serviceItem as Record<string, unknown>).code).toUpperCase() :
           String(serviceItem).toUpperCase();
 
           // Специальная логика для echokg: только K10 и ECG коды
@@ -1078,29 +1084,29 @@ const RegistrarPanel = () => {
       return backendFilteredServices;
     }
 
-    const serviceToCodeMap = new Map();
+    const serviceToCodeMap = new Map<unknown, string>();
 
-    appointmentServices.forEach((service, index) => {
+    appointmentServices.forEach((service: unknown, index: number) => {
       if (appointmentServiceCodes[index]) {
-        serviceToCodeMap.set(String(service), String(appointmentServiceCodes[index]).toUpperCase());
+        serviceToCodeMap.set(service, String(appointmentServiceCodes[index]).toUpperCase());
         return;
       }
 
       if (services && typeof services === 'object') {
         for (const groupName in services) {
-          const groupServices = services[groupName];
+          const groupServices = (services as Record<string, unknown>)[groupName];
           if (Array.isArray(groupServices)) {
             if (typeof service === 'number' || typeof service === 'string' && !isNaN(Number(service))) {
               const serviceId = parseInt(String(service));
-              const serviceByID = groupServices.find((s: Record<string, unknown>) => s.id === serviceId);
+              const serviceByID = groupServices.find((s: Record<string, unknown>) => s.id === serviceId) as Record<string, unknown> | undefined;
               if (serviceByID && serviceByID.service_code) {
-                serviceToCodeMap.set(String(service), String(serviceByID.service_code).toUpperCase());
+                serviceToCodeMap.set(service, String(serviceByID.service_code).toUpperCase());
                 return;
               }
             }
-            const serviceByName = groupServices.find((s: Record<string, unknown>) => s.name === service);
+            const serviceByName = groupServices.find((s: Record<string, unknown>) => s.name === service) as Record<string, unknown> | undefined;
             if (serviceByName && serviceByName.service_code) {
-              serviceToCodeMap.set(String(service), String(serviceByName.service_code).toUpperCase());
+              serviceToCodeMap.set(service, String(serviceByName.service_code).toUpperCase());
               return;
             }
           }
@@ -1109,7 +1115,7 @@ const RegistrarPanel = () => {
     });
 
     // Маппинг категорий по вкладкам
-    const departmentCategoryMapping = {
+    const departmentCategoryMapping: Record<string, string[]> = {
       'cardio': ['K', 'ECHO'],
       'echokg': ['ECG'],
       'derma': ['D', 'DERM', 'DERM_PROC'],
@@ -1142,14 +1148,14 @@ const RegistrarPanel = () => {
       return null;
     };
 
-    const targetCategoryCodes = departmentCategoryMapping[departmentKey] || [];
+    const targetCategoryCodes = departmentCategoryMapping[departmentKey as keyof typeof departmentCategoryMapping] || [];
 
     const filteredServices = appointmentServices.
-    filter((service) => {
+    filter((service: unknown) => {
       const serviceCode = serviceToCodeMap.get(service);
       if (!serviceCode) return false;
       const category = getServiceCategoryByCode(serviceCode);
-      return targetCategoryCodes.includes(category);
+      return category != null && targetCategoryCodes.includes(category);
     });
 
     return filteredServices;
@@ -1307,24 +1313,25 @@ const RegistrarPanel = () => {
 
 
   // Обработчик действий контекстного меню
-  const openRecordPreview = useCallback((row: Appointment) => {
-    setRecordPreviewDialog({ open: true, row });
+  const openRecordPreview = useCallback((row: unknown) => {
+    setRecordPreviewDialog({ open: true, row: row as Appointment });
   }, []);
 
-  const openRecordEditor = useCallback((row: Appointment) => {
-    if (isMultiRecordAggregateRow(row)) {
+  const openRecordEditor = useCallback((row: unknown) => {
+    const appt = row as Appointment;
+    if (isMultiRecordAggregateRow(appt)) {
       logger.info('[RegistrarPanel] Opening edit wizard for aggregate all-departments row', {
-        patient: row?.patient_fio || row?.patient_name,
-        groupedRecords: row?.grouped_records?.length || 0,
-        recordRefs: row?.grouped_record_refs?.length || 0,
-        aggregatedIds: row?.aggregated_ids?.length || 0
+        patient: appt?.patient_fio || appt?.patient_name,
+        groupedRecords: appt?.grouped_records?.length || 0,
+        recordRefs: appt?.grouped_record_refs?.length || 0,
+        aggregatedIds: appt?.aggregated_ids?.length || 0
       });
     }
 
     // UX Audit R-3.6: убрано логирование patient_fio (PII leak).
-    logger.info('[RegistrarPanel] Opening edit wizard for appointment:', row?.id);
+    logger.info('[RegistrarPanel] Opening edit wizard for appointment:', appt?.id);
     setWizardEditMode(true);
-    setWizardInitialData(row);
+    setWizardInitialData(appt as unknown as Record<string, unknown>);
     setShowWizard(true);
   }, []);
 
@@ -1522,15 +1529,15 @@ const RegistrarPanel = () => {
             setTempDateInput={setTempDateInput}
             setSearchParams={setSearchParams}
             navigate={navigate}
-            setPaymentDialog={setPaymentDialog}
-            setPrintDialog={setPrintDialog}
-            setContextMenu={setContextMenu}
+            setPaymentDialog={setPaymentDialog as unknown as React.Dispatch<React.SetStateAction<{ open: boolean; row: unknown; paid: boolean; source: unknown }>>}
+            setPrintDialog={setPrintDialog as unknown as React.Dispatch<React.SetStateAction<{ open: boolean; type: string; data: unknown }>>}
+            setContextMenu={setContextMenu as unknown as React.Dispatch<React.SetStateAction<{ open: boolean; row: unknown; position: { x: number; y: number } }>>}
             openRecordPreview={openRecordPreview}
             openRecordEditor={openRecordEditor}
-            updateAppointmentStatus={updateAppointmentStatus}
-            handleStartVisit={handleStartVisit}
-            generateCSV={generateCSV}
-            downloadCSV={downloadCSV}
+            updateAppointmentStatus={updateAppointmentStatus as unknown as (id: unknown, status: string, note: string, row?: unknown) => void | Promise<void>}
+            handleStartVisit={handleStartVisit as unknown as (row: unknown) => void | Promise<void>}
+            generateCSV={generateCSV as unknown as (...args: unknown[]) => unknown}
+            downloadCSV={downloadCSV as unknown as (...args: unknown[]) => void}
             DataSourceIndicator={() => (
               <DataSourceIndicator
                 dataSource={dataSource}
@@ -1854,7 +1861,7 @@ const RegistrarPanel = () => {
               const successCount = Number(result.success_count || 0);
               const failedCount = Number(result.failed_count || 0);
               if (successCount === 0) {
-                throw new Error(result.results?.find((item) => !item.success)?.error || 'cancel_failed');
+                throw new Error(result.results?.find((item: { success?: boolean; error?: string }) => !item.success)?.error || 'cancel_failed');
               }
               notify.warning('Cancelled ' + successCount + '; failed ' + failedCount);
             }
@@ -1882,10 +1889,12 @@ const RegistrarPanel = () => {
             }
           }
         }}
-        onPrintTicket={(appointment: Appointment) => {
+        onPrintTicket={(appointment: unknown) => {
+          const rowObj = (paymentDialog.row && typeof paymentDialog.row === 'object' ? paymentDialog.row : {}) as Record<string, unknown>;
+          const apptObj = (appointment && typeof appointment === 'object' ? appointment : {}) as Record<string, unknown>;
           const printSource = {
-            ...(paymentDialog.row || {}),
-            ...(appointment || {})
+            ...rowObj,
+            ...apptObj
           };
           // UX Audit: закрываем PaymentDialog при открытии PrintDialog.
           setPaymentDialog({ open: false, row: null, paid: false, source: null });
@@ -1957,8 +1966,9 @@ const RegistrarPanel = () => {
         onComplete={async (wizardData) => {
           logger.info('AppointmentWizardV2 completed successfully:', wizardData);
           const wasEditMode = wizardEditMode;
-          const postWizardPaymentRow = (!wasEditMode || Number(wizardData?.total_amount || 0) > 0)
-            ? buildPostWizardPaymentRow(wizardData)
+          const wizardDataObj = (wizardData && typeof wizardData === 'object' ? wizardData : {}) as Record<string, unknown>;
+          const postWizardPaymentRow = (!wasEditMode || Number(wizardDataObj.total_amount ?? 0) > 0)
+            ? buildPostWizardPaymentRow(wizardDataObj)
             : null;
 
           // Обновляем данные (работает и для создания, и для редактирования)
