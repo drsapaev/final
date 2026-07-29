@@ -20,7 +20,9 @@ import notify from '../../services/notify';
 import React from "react";
 const t18 = i18n.t as unknown as (key: string, options?: Record<string, unknown>) => string;
 
-interface QueueProfile {
+// Local queue-profile admin shape. Named `QueueProfileDto` because `QueueProfile`
+// and `QueueProfilesResponse` are canonical domain types in @/types/domain/queue.
+interface QueueProfileDto {
   key: string;
   queue_tags?: string[];
   is_active?: boolean;
@@ -90,11 +92,11 @@ const getAllowedPrefixesForGroup = (groupKey: string | null): string | string[] 
 };
 
 
-const ServiceForm = ({ service, categories, doctors, queueProfiles = [] as QueueProfile[], setMessage, onSave, onCancel }: {
+const ServiceForm = ({ service, categories, doctors, queueProfiles = [] as QueueProfileDto[], setMessage, onSave, onCancel }: {
   service?: ServiceRecord | null;
   categories: Array<{ id: number; name_ru?: string; specialty?: string; [k: string]: unknown }>;
   doctors: Array<{ id: string | number; specialty?: string; user?: { full_name?: string; [k: string]: unknown }; [k: string]: unknown }>;
-  queueProfiles?: QueueProfile[];
+  queueProfiles?: QueueProfileDto[];
   setMessage: (msg: { type: string; text: string }) => void;
   onSave: (data: Record<string, unknown>) => void;
   onCancel: () => void;
@@ -253,7 +255,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [] as Queue
 
     // ⭐ SSOT: Sync queue_tag with department_key
     if (field === 'queue_tag' && normalizedValue) {
-      const matchingProfile = queueProfiles.find((p: QueueProfile) =>
+      const matchingProfile = queueProfiles.find((p: QueueProfileDto) =>
       (p.queue_tags || []).includes(normalizedValue as string) || p.key === normalizedValue
       );
 
@@ -454,8 +456,8 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [] as Queue
               options={[
               { value: '', label: t18('admin2.sf_no_queue_option') },
               ...queueProfiles.
-              filter((profile: QueueProfile) => profile.is_active !== false).
-              map((profile: QueueProfile) => ({
+              filter((profile: QueueProfileDto) => profile.is_active !== false).
+              map((profile: QueueProfileDto) => ({
                 value: profile.queue_tags?.[0] || profile.key,
                 label: profile.title_ru || profile.title
               }))]

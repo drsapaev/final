@@ -41,7 +41,9 @@ interface PrinterCapabilities {
   [key: string]: unknown;
 }
 
-interface Printer {
+// Local printer-list shape. Named `PrinterRecord` to avoid colliding with
+// the `Printer` icon import from lucide-react (no-redeclare).
+interface PrinterRecord {
   id: string | number;
   name: string;
   description?: string;
@@ -129,7 +131,7 @@ const getProviderOptions = (providers: ProviderName[] = [], t: TranslationFn) =>
     label: getProviderLabel(provider, t)
   }));
 
-const getPrinterOptions = (printers: Printer[] = [], providerName: string = '', t: TranslationFn) =>
+const getPrinterOptions = (printers: PrinterRecord[] = [], providerName: string = '', t: TranslationFn) =>
   printers
     .filter((printer) => printer.provider === providerName)
     .map((printer) => ({
@@ -137,7 +139,7 @@ const getPrinterOptions = (printers: Printer[] = [], providerName: string = '', 
       label: `${printer.name} (${getStatusText(printer.status, t)})`
     }));
 
-const normalizeLocalPrinter = (printer: Record<string, unknown>, t: TranslationFn): Printer => ({
+const normalizeLocalPrinter = (printer: Record<string, unknown>, t: TranslationFn): PrinterRecord => ({
   id: (printer.name as string) || String(printer.id ?? ''),
   name: (printer.display_name as string) || (printer.name as string) || t('admin2.cp_local_printer'),
   description:
@@ -167,11 +169,11 @@ const CloudPrintingManager = () => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as TranslationFn;
   const [activeTab, setActiveTab] = useState('printers');
-  const [printers, setPrinters] = useState<Printer[]>([]);
-  const [localPrinters, setLocalPrinters] = useState<Printer[]>([]);
+  const [printers, setPrinters] = useState<PrinterRecord[]>([]);
+  const [localPrinters, setLocalPrinters] = useState<PrinterRecord[]>([]);
   const [providers, setProviders] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
-  const [selectedPrinter, setSelectedPrinter] = useState<Printer | null>(null);
+  const [selectedPrinter, setSelectedPrinter] = useState<PrinterRecord | null>(null);
   const [statistics, setStatistics] = useState<PrinterStatistics | null>(null);
 
   // Состояние для печати документа
@@ -237,7 +239,7 @@ const CloudPrintingManager = () => {
         api.get('/cloud-printing/printers'),
         api.get('/print/printers')
       ]);
-      const printersData = (cloudResponse.data?.printers ?? []) as Printer[];
+      const printersData = (cloudResponse.data?.printers ?? []) as PrinterRecord[];
       const providersData = (cloudResponse.data?.providers ?? []) as string[];
       const localPrintersData = ((localResponse.data?.printers ?? []) as Array<Record<string, unknown>>).map(
         (printer) => normalizeLocalPrinter(printer, t)
@@ -344,7 +346,7 @@ const CloudPrintingManager = () => {
     }
   };
 
-  const renderPrinterGrid = (list: Printer[], emptyTitle: string) =>
+  const renderPrinterGrid = (list: PrinterRecord[], emptyTitle: string) =>
     <>
       <div className="admin-grid-auto-300">
         {list.map((printer) =>

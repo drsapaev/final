@@ -49,7 +49,7 @@ import {
 import { useConfirm } from '../common/ConfirmDialog';
 import { notify } from '../../services/notify';
 
-interface QueueProfile {
+interface QueueProfileDto {
     key: string;
     title?: string;
     title_ru?: string;
@@ -65,7 +65,7 @@ interface QueueProfile {
     [key: string]: unknown;
 }
 
-interface Department {
+interface DepartmentDto {
     key?: string;
     name_ru?: string;
     [key: string]: unknown;
@@ -109,14 +109,14 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
     // P-013 fix: shared ConfirmDialog hook (replaces 2 window.confirm() calls).
     const [confirmRaw, confirmDialog] = useConfirm();
   const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
-    const [profiles, setProfiles] = useState<QueueProfile[]>([]);
+    const [profiles, setProfiles] = useState<QueueProfileDto[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [editingProfile, setEditingProfile] = useState<QueueProfile | null>(null);
+    const [editingProfile, setEditingProfile] = useState<QueueProfileDto | null>(null);
     const [showCreateForm, setShowCreateForm] = useState(false);
     // PR-21: load departments for department_key Select in ProfileForm
-    const [departments, setDepartments] = useState<Department[]>([]);
+    const [departments, setDepartments] = useState<DepartmentDto[]>([]);
 
     // ⭐ New: Search and filter
     const [searchTerm, setSearchTerm] = useState('');
@@ -133,7 +133,7 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
             setLoading(true);
             setError(null);
             const response = (await api.get('/queues/profiles?active_only=false')) as import('axios').AxiosResponse<Record<string, unknown>>;
-            setProfiles(((response.data.profiles as unknown[]) || []) as unknown as QueueProfile[]);
+            setProfiles(((response.data.profiles as unknown[]) || []) as unknown as QueueProfileDto[]);
             setSelectedProfiles([]); // Clear selection on reload
             logger.info(`Loaded ${(response.data?.profiles as unknown[])?.length || 0} queue profiles`);
         } catch (err) {
@@ -148,13 +148,13 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
         loadProfiles();
         // PR-21: load departments for department_key Select
         api.get('/admin/departments').then((res: import('axios').AxiosResponse<Record<string, unknown>>) => {
-            setDepartments(((res.data?.data as unknown[]) || []) as unknown as Department[]);
+            setDepartments(((res.data?.data as unknown[]) || []) as unknown as DepartmentDto[]);
         }).catch(err => logger.error('Failed to load departments:', err));
     }, [loadProfiles]);
 
     // ⭐ New: Filtered profiles
     const filteredProfiles = useMemo(() => {
-        return profiles.filter((profile: QueueProfile) => {
+        return profiles.filter((profile: QueueProfileDto) => {
             // Search filter
             const matchesSearch = searchTerm === '' ||
                 profile.key?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -176,9 +176,9 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
     // ⭐ New: Statistics
     const stats = useMemo(() => ({
         total: profiles.length,
-        active: profiles.filter((p: QueueProfile) => p.is_active !== false).length,
-        inactive: profiles.filter((p: QueueProfile) => p.is_active === false).length,
-        totalTags: profiles.reduce((sum: number, p: QueueProfile) => sum + (p.queue_tags?.length || 0), 0),
+        active: profiles.filter((p: QueueProfileDto) => p.is_active !== false).length,
+        inactive: profiles.filter((p: QueueProfileDto) => p.is_active === false).length,
+        totalTags: profiles.reduce((sum: number, p: QueueProfileDto) => sum + (p.queue_tags?.length || 0), 0),
     }), [profiles]);
 
     // Create new profile
@@ -245,14 +245,14 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
     };
 
     // Toggle active status
-    const handleToggleActive = async (profile: QueueProfile) => {
+    const handleToggleActive = async (profile: QueueProfileDto) => {
         await handleUpdate(profile.key, { is_active: !profile.is_active });
     };
 
     // ⭐ New: Bulk selection handlers
     const handleSelectAll = (checked: boolean) => {
         if (checked) {
-            setSelectedProfiles(filteredProfiles.map((p: QueueProfile) => p.key));
+            setSelectedProfiles(filteredProfiles.map((p: QueueProfileDto) => p.key));
         } else {
             setSelectedProfiles([]);
         }
@@ -329,7 +329,7 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
             const headers = ['key', 'title', 'title_ru', 'queue_tags', 'icon', 'color', 'display_order', 'is_active'];
             const csvContent = [
                 headers.join(','),
-                ...profiles.map((p: QueueProfile) => [
+                ...profiles.map((p: QueueProfileDto) => [
                     `"${(p.key || '').replace(/"/g, '""')}"`,
                     `"${(p.title || '').replace(/"/g, '""')}"`,
                     `"${(p.title_ru || '').replace(/"/g, '""')}"`,
@@ -408,7 +408,7 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
 
             for (const profile of importedProfiles) {
                 try {
-                    const existing = profiles.find((p: QueueProfile) => p.key === profile.key);
+                    const existing = profiles.find((p: QueueProfileDto) => p.key === profile.key);
                     if (existing) {
                         await api.put(`/queues/profiles/${profile.key}`, profile);
                         updated++;
@@ -448,7 +448,7 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
     }
 
     const isAllSelected = filteredProfiles.length > 0 &&
-        filteredProfiles.every((p: QueueProfile) => selectedProfiles.includes(p.key));
+        filteredProfiles.every((p: QueueProfileDto) => selectedProfiles.includes(p.key));
 
     return (
         <div className="admin-qp-container">
@@ -624,7 +624,7 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
                         </tr>
                     </thead>
                     <tbody>
-                        {filteredProfiles.map((profile: QueueProfile) => (
+                        {filteredProfiles.map((profile: QueueProfileDto) => (
                             <tr key={profile.key}>
                                 <td className="admin-qp-td">
                                     <button
@@ -759,7 +759,7 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
     );
 };
 // Profile form component with show_on_qr_page support
-const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = false, departments = [] }: { profile?: Record<string, unknown>; onSubmit?: (data: Record<string, unknown>) => void | Promise<void>; onCancel?: () => void; saving?: boolean; isDark?: boolean; isEdit?: boolean; departments?: Department[] }) => {
+const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = false, departments = [] }: { profile?: Record<string, unknown>; onSubmit?: (data: Record<string, unknown>) => void | Promise<void>; onCancel?: () => void; saving?: boolean; isDark?: boolean; isEdit?: boolean; departments?: DepartmentDto[] }) => {
     const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
     const availableIcons = getAvailableIcons(t);

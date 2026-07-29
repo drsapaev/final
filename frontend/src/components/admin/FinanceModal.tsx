@@ -14,7 +14,10 @@ import { useTranslation } from '../../i18n/useTranslation';
 
 type TranslationFn = (key: string, options?: Record<string, unknown>) => string;
 
-interface Patient {
+// Local option-list shapes for the <select> dropdowns. Named with `Record`
+// suffix to avoid shadowing the canonical `Patient` / `Doctor` domain types
+// in @/types/domain/clinic.
+interface PatientRecord {
   id: number | string;
   lastName?: string;
   firstName?: string;
@@ -23,7 +26,7 @@ interface Patient {
   name?: string;
 }
 
-interface Doctor {
+interface DoctorRecord {
   id: number | string;
   user?: {
     full_name?: string;
@@ -69,8 +72,8 @@ interface FinanceModalProps {
   transaction?: FinanceTransaction | Record<string, unknown> | null;
   onSave: (data: TransactionPayload) => Promise<void> | void;
   loading?: boolean;
-  patients?: Patient[];
-  doctors?: Doctor[];
+  patients?: PatientRecord[];
+  doctors?: DoctorRecord[];
 }
 
 const getTransactionTypeOptions = (t: TranslationFn) => [
@@ -121,8 +124,8 @@ const FinanceModal = ({
   transaction = null as FinanceTransaction | Record<string, unknown> | null,
   onSave,
   loading = false,
-  patients = [] as Patient[],
-  doctors = [] as Doctor[]
+  patients = [] as PatientRecord[],
+  doctors = [] as DoctorRecord[]
 }: FinanceModalProps) => {
   const [formData, setFormData] = useState<Record<string, unknown>>({
     type: 'income',

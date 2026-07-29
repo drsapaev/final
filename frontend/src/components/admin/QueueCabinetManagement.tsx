@@ -50,7 +50,10 @@ interface QueueRow {
   integrity_warnings?: string[];
 }
 
-interface QueueStats {
+// Local queue-statistics shape for the cabinet-management admin panel. Named
+// `QueueStatsDto` because `QueueStats` is a canonical domain type in
+// @/types/domain/queue.
+interface QueueStatsDto {
   total_queues?: number;
   queues_with_cabinet?: number;
   cabinets?: unknown[];
@@ -91,7 +94,7 @@ const toOptionalString = (value: unknown): string | null => {
 };
 
 const buildStatsSummary = (
-  stats: QueueStats | null,
+  stats: QueueStatsDto | null,
   queues: QueueRow[],
 ): StatsSummary => {
   const safeQueues = Array.isArray(queues) ? queues : [];
@@ -119,7 +122,7 @@ const QueueCabinetManagement = () => {
   const [filters, setFilters] = useState(INITIAL_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState(INITIAL_FILTERS);
   const [queues, setQueues] = useState<QueueRow[]>([]);
-  const [statistics, setStatistics] = useState<QueueStats | null>(null);
+  const [statistics, setStatistics] = useState<QueueStatsDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
 
@@ -150,7 +153,7 @@ const QueueCabinetManagement = () => {
 
       if (statisticsResult.status === 'fulfilled') {
         const payload = (statisticsResult.value || {}) as Record<string, unknown>;
-        setStatistics((payload.statistics || payload) as QueueStats | null);
+        setStatistics((payload.statistics || payload) as QueueStatsDto | null);
       } else {
         logger.warn(
           'API /api/v1/admin/queues/cabinet-statistics недоступен',

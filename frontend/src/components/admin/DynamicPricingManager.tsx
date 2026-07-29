@@ -58,7 +58,9 @@ type PricingRuleType = 'time_based' | 'volume_based' | 'seasonal' | 'loyalty' | 
 type DiscountType = 'percentage' | 'fixed_amount' | 'buy_x_get_y' | 'tiered';
 type Translator = (key: string, options?: Record<string, unknown>) => string;
 
-interface Service {
+// Local service-list shape for the dynamic-pricing picker. Named `ServiceItem`
+// to avoid shadowing the canonical `Service` domain type in @/types/domain/clinic.
+interface ServiceItem {
   id: string | number;
   name: string;
   price: string | number;
@@ -124,7 +126,7 @@ interface PackageForm {
 }
 
 interface ServiceChecklistProps {
-  services?: Service[];
+  services?: ServiceItem[];
   value?: Array<string | number>;
   onChange: (ids: number[]) => void;
 }
@@ -270,7 +272,7 @@ const DynamicPricingManager = () => {
   const [activeTab, setActiveTab] = useState<'rules' | 'packages' | 'analytics'>('rules');
   const [pricingRules, setPricingRules] = useState<PricingRule[]>([]);
   const [servicePackages, setServicePackages] = useState<ServicePackage[]>([]);
-  const [services, setServices] = useState<Service[]>([]);
+  const [services, setServices] = useState<ServiceItem[]>([]);
   const [analytics, setAnalytics] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(false);
   const [showCreateRule, setShowCreateRule] = useState(false);
@@ -316,7 +318,7 @@ const DynamicPricingManager = () => {
       // Загружаем услуги
       try {
         const response = (await api.get('/services')) as import('axios').AxiosResponse<Record<string, unknown>>;
-        setServices(Array.isArray(response.data) ? (response.data as Service[]) : []);
+        setServices(Array.isArray(response.data) ? (response.data as ServiceItem[]) : []);
       } catch (e: unknown) {
         logger.error('Failed to load services:', e);
         setServices([]);

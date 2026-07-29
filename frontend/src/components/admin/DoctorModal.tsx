@@ -27,7 +27,9 @@ interface DoctorUser {
   linked_doctor_id?: string | number | null;
 }
 
-interface Doctor {
+// Local doctor-record shape for the DoctorModal admin form. Named `DoctorRecord`
+// to avoid shadowing the canonical `Doctor` domain type in @/types/domain/clinic.
+interface DoctorRecord {
   id?: string | number;
   user_id?: string | number | null;
   specialty?: string;
@@ -39,7 +41,9 @@ interface Doctor {
   user?: DoctorUser | null;
 }
 
-interface Department {
+// Local department-list shape (used for <Select> options). Named `DepartmentDto`
+// because `Department` is a canonical domain type in @/types/domain/clinic.
+interface DepartmentDto {
   value: string;
   label: string;
 }
@@ -47,11 +51,11 @@ interface Department {
 interface DoctorModalProps {
   isOpen: boolean;
   onClose: () => void;
-  doctor?: Doctor | null;
+  doctor?: DoctorRecord | null;
   onSave: (data: Record<string, unknown>) => Promise<void> | void;
   loading?: boolean;
   availableUsers?: DoctorUser[];
-  departments?: Department[];
+  departments?: DepartmentDto[];
 }
 
 interface DoctorFormState {

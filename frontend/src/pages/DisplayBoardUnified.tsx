@@ -48,7 +48,7 @@ interface BoardState {
   sound_default: boolean;
 }
 
-interface QueueEntry {
+interface QueueEntryDto {
   number: number | string;
   patient_name?: string;
   status: string;
@@ -91,7 +91,7 @@ interface BoardSettingsState {
 interface WSMessageData {
   number?: number | string;
   cabinet?: string;
-  queue_entries?: QueueEntry[];
+  queue_entries?: QueueEntryDto[];
   current_call?: CurrentCall | null;
   announcements?: Announcement[];
   created_at?: string;
@@ -171,7 +171,7 @@ export default function DisplayBoardUnified({
 
   // Состояние очереди (новое)
   const [connected, setConnected] = useState(false);
-  const [queueData, setQueueData] = useState<QueueEntry[]>([]);
+  const [queueData, setQueueData] = useState<QueueEntryDto[]>([]);
   const [currentCall, setCurrentCall] = useState<CurrentCall | null>(null);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
 
@@ -354,7 +354,7 @@ export default function DisplayBoardUnified({
         // Обновляем очередь при добавлении/изменении записей
         if (message.event_type === 'queue.created') {
           // Добавляем новую запись в очередь
-          const newEntry: QueueEntry = {
+          const newEntry: QueueEntryDto = {
             number: Number(data.number ?? 0),
             patient_name: typeof data.patient_name === 'string' ? data.patient_name : undefined,
             status: typeof data.status === 'string' ? data.status : '',

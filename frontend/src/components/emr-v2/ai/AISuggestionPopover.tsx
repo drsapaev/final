@@ -22,7 +22,7 @@ import { createPortal } from 'react-dom';
 import './AISuggestionPopover.css';
 import { useTranslation } from '@/i18n/useTranslation';
 
-interface AISuggestion {
+interface AISuggestionDto {
     id?: string | number;
     content?: string;
     explanation?: string;
@@ -32,8 +32,8 @@ interface AISuggestion {
 }
 
 interface AISuggestionPopoverProps {
-    suggestions?: AISuggestion[];
-    onApply?: (suggestion: AISuggestion) => void;
+    suggestions?: AISuggestionDto[];
+    onApply?: (suggestion: AISuggestionDto) => void;
     onDismiss?: (suggestionId: string | number | undefined) => void;
     disabled?: boolean;
     position?: 'top' | 'bottom' | 'right';

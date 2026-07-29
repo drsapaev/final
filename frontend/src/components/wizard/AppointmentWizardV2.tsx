@@ -128,7 +128,7 @@ interface DoctorData {
   [k: string]: unknown;
 }
 
-interface QueueProfile {
+interface QueueProfileDto {
   key?: string;
   queue_tags?: unknown[];
   [k: string]: unknown;
@@ -313,7 +313,7 @@ const AppointmentWizardV2 = ({
   const [filteredServices, setFilteredServices] = useState<ServiceData[]>([]);
   const [showAllServices, setShowAllServices] = useState(false);
   // PR-25: queue profiles for dynamic department filtering
-  const [queueProfiles, setQueueProfiles] = useState<QueueProfile[]>([]);
+  const [queueProfiles, setQueueProfiles] = useState<QueueProfileDto[]>([]);
   const [formattedBirthDate, setFormattedBirthDate] = useState('');
   const [repeatEligibilityByItemId, setRepeatEligibilityByItemId] = useState({} as Record<string, unknown>);
   const [isRepeatEligibilityLoading, setIsRepeatEligibilityLoading] = useState(false);
@@ -749,11 +749,11 @@ const AppointmentWizardV2 = ({
       const { data } = await api.get('/registrar/services');
 
         // PR-25: load queue profiles for dynamic department filtering
-        let profiles: QueueProfile[] = queueProfiles;
+        let profiles: QueueProfileDto[] = queueProfiles;
         if (profiles.length === 0) {
           try {
             const profilesRes = await api.get('/queues/profiles?active_only=true') as import('axios').AxiosResponse<Record<string, unknown>>;
-            profiles = (profilesRes.data?.profiles as QueueProfile[]) || [];
+            profiles = (profilesRes.data?.profiles as QueueProfileDto[]) || [];
             setQueueProfiles(profiles);
           } catch (e: unknown) {
             logger.error('Failed to load queue profiles for filter:', e);
