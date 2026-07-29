@@ -31,12 +31,15 @@ describe('Doctor panels SSOT contract', () => {
       expect(source).not.toContain('appointmentMetaMap');
       expect(source).not.toContain('appointmentsDBData');
 
-      expect(source).toContain('payment_status: entry.payment_status ?? null');
-      expect(source).toContain('payment_type: entry.payment_type');
-      expect(source).toContain('queue_status: entry.queue_status ?? null');
-      expect(source).toContain('canonical_status: entry.canonical_status ?? null');
-      expect(source).toContain('status: entry.status ?? null');
-      expect(source).toContain('available_actions: entry.available_actions || []');
+      // Strict:true migration added explicit type casts in DentistPanelUnified.tsx
+      // (e.g., `(entry.payment_status as string | undefined) ?? null`). Use regex
+      // to accept both the plain form and the cast form.
+      expect(source).toMatch(/payment_status:\s+\(?entry\.payment_status[^,]*?\)?\s*\?\?\s*null/);
+      expect(source).toMatch(/payment_type:\s+\(?entry\.payment_type[^,]*?\)?\s*\|\|\s*null/);
+      expect(source).toMatch(/queue_status:\s+\(?entry\.queue_status[^,]*?\)?\s*\?\?\s*null/);
+      expect(source).toMatch(/canonical_status:\s+\(?entry\.canonical_status[^,]*?\)?\s*\?\?\s*null/);
+      expect(source).toMatch(/status:\s+\(?entry\.status[^,]*?\)?\s*\?\?\s*null/);
+      expect(source).toMatch(/available_actions:\s+\(?entry\.available_actions[^,]*?\)?\s*\|\|\s*\[\]/);
       expect(source).toContain('can_mark_paid: Boolean(entry.can_mark_paid)');
       expect(source).toContain('can_start_visit: Boolean(entry.can_start_visit) && doctorQueueEntryId !== null');
       expect(source).toContain('can_print_ticket: Boolean(entry.can_print_ticket)');
@@ -85,7 +88,7 @@ describe('Doctor panels SSOT contract', () => {
     for (const filePath of DOCTOR_PANEL_FILES) {
       const source = read(filePath);
 
-      expect(source).toContain('function resolveDoctorQueueEntryId(row)');
+      expect(source).toContain('function resolveDoctorQueueEntryId(row:');
       expect(source).toContain('const explicitQueueEntryId = row?.doctor_queue_entry_id ?? row?.queue_entry_id ?? null;');
       expect(source).toContain('/doctor/queue/${queueEntryId}/start-visit');
       expect(source).not.toContain('recordKind === \'online_queue\' && row?.id');
@@ -198,9 +201,9 @@ describe('Doctor panels SSOT contract', () => {
     expect(source).toContain('const selectNextCallEntryId =');
     expect(source).toContain('queuePayload?.next_call_entry_id');
     expect(source).toContain('hasBackendQueueAction(entry, \'call\', \'can_call\')');
-    expect(source).toContain('canCallNext: response.data?.can_call_next === true');
+    expect(source).toContain('canCallNext: data?.can_call_next === true');
     expect(source).toContain('canCallNext: queueControls.canCallNext');
-    expect(callNextBlock).toContain('selectNextCallEntryId(currentQueue.data)');
+    expect(callNextBlock).toContain('selectNextCallEntryId(currentQueue.data as DoctorQueuePayload)');
     expect(callNextBlock).toContain('/doctor/queue/${nextCallEntryId}/call');
     expect(source).not.toContain('canCallNext: Boolean(response.data?.can_call_next ?? nextCallEntryId)');
     expect(callNextBlock).not.toContain('entry.status === \'waiting\'');

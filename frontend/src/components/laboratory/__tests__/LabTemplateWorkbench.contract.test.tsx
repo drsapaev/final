@@ -33,12 +33,12 @@ describe('LabTemplateWorkbench template version command contract', () => {
     // helper теперь в utils.js
     const helperBlock = blockFromFile(
       utilsSource,
-      'function hasTemplateVersionAction(version, action) {',
-      'function parseJsonInput(value) {'
+      'export function hasTemplateVersionAction(version: Record<string, unknown> | null | undefined, action: string) {',
+      'export function parseJsonInput(value: string | null | undefined) {'
     );
     const ensureDraftBlock = blockFromFile(
       source,
-      'async function ensureDraftVersion() {',
+      'async function ensureDraftVersion(): Promise<string | number> {',
       'async function handleSaveTemplate() {'
     );
 

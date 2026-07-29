@@ -64,11 +64,11 @@ describe('RegistrarPanel command contract', () => {
     // to 'return enrichedAppointments;' (last line of the function in the hook).
     const enrichmentBlock = extractSourceBlock(
       source,
-      'const enrichAppointmentsWithPatientData = useCallback(async (appointments) => {',
+      'const enrichAppointmentsWithPatientData = useCallback(async (appointments: Record<string, unknown>[]) => {',
       'return enrichedAppointments;',
     );
 
-    expect(source).toContain('if (apt.patient_id && (!hasBackendPatientDisplayContract(apt) || !hasBackendPatientGenderContract(apt)))');
+    expect(source).toContain('if (apt.patient_id as string | number && (!hasBackendPatientDisplayContract(apt) || !hasBackendPatientGenderContract(apt)))');
     expect(source).toContain('patient_fio: fullEntry.patient_fio ?? fullEntry.patient_name');
     expect(source).toContain('patient_birth_year: fullEntry.patient_birth_year ?? fullEntry.birth_year');
     expect(source).toContain('patient_phone: fullEntry.patient_phone ?? fullEntry.phone');
@@ -78,15 +78,15 @@ describe('RegistrarPanel command contract', () => {
     expect(enrichmentBlock).toContain('!hasBackendPatientGenderContract(apt)');
     expect(enrichmentBlock).toContain('patient_gender: patientGender');
     expect(enrichmentBlock.indexOf('!hasBackendPatientDisplayContract(apt)')).toBeLessThan(
-      enrichmentBlock.indexOf('fetchPatientData(apt.patient_id)'),
+      enrichmentBlock.indexOf('fetchPatientData(apt.patient_id as string | number)'),
     );
   });
 
   it('keeps Registrar table view separate from edit mode', () => {
     const source = readRegistrarSourceTree();
 
-    expect(source).toContain('const openRecordPreview = useCallback((row) => {');
-    expect(source).toContain('const openRecordEditor = useCallback((row) => {');
+    expect(source).toContain('const openRecordPreview = useCallback((row: unknown) => {');
+    expect(source).toContain('const openRecordEditor = useCallback((row: unknown) => {');
     expect(source).toContain('case \'view\':');
     expect(source).toContain('openRecordPreview(row);');
     expect(source).toContain('case \'edit\':');
@@ -97,13 +97,13 @@ describe('RegistrarPanel command contract', () => {
     const source = readRegistrarSourceTree();
     const editBlock = extractSourceBlock(
       source,
-      'const openRecordEditor = useCallback((row) => {',
-      'const handleContextMenuAction = useCallback(async (action, row) => {',
+      'const openRecordEditor = useCallback((row: unknown) => {',
+      'const handleContextMenuAction = useCallback(async (action: string, row: Appointment) => {',
     );
 
-    expect(source).toContain('const isMultiRecordAggregateRow = (row) => (');
+    expect(source).toContain('export const isMultiRecordAggregateRow = (row: Record<string, unknown>) => (');
     expect(source).toContain('hasMultipleRecordRefs(row?.grouped_record_refs)');
-    expect(editBlock).toContain('if (isMultiRecordAggregateRow(row))');
+    expect(editBlock).toContain('if (isMultiRecordAggregateRow(appt))');
     expect(editBlock).toContain('Opening edit wizard for aggregate all-departments row');
     expect(editBlock).not.toContain('openRecordPreview(row);');
     expect(editBlock).not.toContain('notify.warning');
@@ -113,9 +113,9 @@ describe('RegistrarPanel command contract', () => {
   it('restores post-wizard payment or ticket handoff for creates and paid edit deltas', () => {
     const source = readRegistrarSourceTree();
 
-    expect(source).toContain('const buildPostWizardPaymentRow = (wizardResult) => {');
-    expect(source).toContain('const normalizeWizardQueueAssignment = (assignment, visitId = null) => {');
-    expect(source).toContain('const resolveWizardQueueEntryId = (assignment) => {');
+    expect(source).toContain('const buildPostWizardPaymentRow = (wizardResult: Record<string, unknown> | null | undefined) => {');
+    expect(source).toContain('const normalizeWizardQueueAssignment = (');
+    expect(source).toContain('const resolveWizardQueueEntryId = (assignment: Record<string, unknown> | null | undefined) => {');
     expect(source).toContain('if (hasQueueIdentityValue(assignment.queue_id)) return null;');
     expect(source).toContain('if (Array.isArray(queueNumbers))');
     expect(source).toContain('queue_entry_id: queueEntryId');
@@ -124,7 +124,7 @@ describe('RegistrarPanel command contract', () => {
     expect(source).toContain('grouped_record_refs: visitIds.map');
     expect(source).toContain('queue_number: firstQueueNumber?.queue_number ?? null');
     expect(source).toContain('print_tickets: printTickets');
-    expect(source).toContain('const postWizardPaymentRow = (!wasEditMode || Number(wizardData?.total_amount || 0) > 0)');
+    expect(source).toContain('const postWizardPaymentRow = (!wasEditMode || Number(wizardDataObj.total_amount ?? 0) > 0)');
     expect(source).toContain('source: wasEditMode ? \'wizard-edit\' : \'wizard-create\'');
     expect(source).toContain('setPrintDialog({ open: true, type: \'ticket\', data: postWizardPaymentRow });');
   });
@@ -142,7 +142,7 @@ describe('RegistrarPanel command contract', () => {
     const loadIntegratedDataBlock = extractSourceBlock(
       source,
       'const loadIntegratedData = useCallback(async () => {',
-      'const fetchPatientData = useCallback(async (patientId) => {',
+      'const fetchPatientData = useCallback(async (patientId: number | string) => {',
     );
 
     expect(loadIntegratedDataBlock).toContain('api.get(\'/registrar/doctors\')');
@@ -157,18 +157,18 @@ describe('RegistrarPanel command contract', () => {
     const source = readRegistrarSourceTree();
     const filterBlock = extractSourceBlock(
       source,
-      'const filterServicesByDepartment = useCallback((appointment, departmentKey) => {',
+      'const filterServicesByDepartment = useCallback((appointment: Appointment, departmentKey: string | null) => {',
       'const filteredAppointments = useMemo(() => {',
     );
 
     expect(source).toContain('service_details: Array.isArray(fullEntry.service_details) ? fullEntry.service_details : []');
-    expect(filterBlock).toContain('const filterByBackendDepartment = (appointmentServices) => {');
+    expect(filterBlock).toContain('const filterByBackendDepartment = (appointmentServices: unknown[]): unknown[] | null => {');
     expect(filterBlock).toContain('serviceMeta?.department_key ?? serviceMeta?.departmentKey');
     expect(filterBlock.indexOf('const backendFilteredServices = filterByBackendDepartment(appointment.services || [])')).toBeLessThan(
-      filterBlock.indexOf('const departmentCodePrefixes = {'),
+      filterBlock.indexOf('const departmentCodePrefixes: Record<string, string[]> = {'),
     );
     expect(filterBlock.indexOf('const backendFilteredServices = filterByBackendDepartment(appointmentServices)')).toBeLessThan(
-      filterBlock.indexOf('const serviceToCodeMap = new Map()'),
+      filterBlock.indexOf('const serviceToCodeMap = new Map'),
     );
   });
 
@@ -183,13 +183,13 @@ describe('RegistrarPanel command contract', () => {
     const source = readRegistrarSourceTree();
     const hasBackendActionBlock = extractSourceBlock(
       source,
-      'const hasBackendAction = (record, action) => {',
-      'const getRegistrarActionForStatus = (status) => {',
+      'const hasBackendAction = (record: RegistrarRecordLike | null | undefined, action: unknown): boolean => {',
+      'const getRegistrarActionForStatus = (status: unknown): string | null => {',
     );
     const runActionBlock = extractSourceBlock(
       source,
-      'const runRegistrarRecordAction = useCallback(async (record, action, payload = {}) => {',
-      'const handleStartVisit = useCallback(async (appointment) => {',
+      'const runRegistrarRecordAction = useCallback(async (record: Record<string, unknown>, action: string, payload: Record<string, unknown> = {}) => {',
+      'const handleStartVisit = useCallback(async (appointment: Record<string, unknown>) => {',
     );
 
     expect(hasBackendActionBlock).toContain('record.available_actions');
@@ -207,13 +207,13 @@ describe('RegistrarPanel command contract', () => {
     const source = readRegistrarSourceTree();
     const hasBackendActionBlock = extractSourceBlock(
       source,
-      'const hasBackendAction = (record, action) => {',
-      'const getRegistrarActionForStatus = (status) => {',
+      'const hasBackendAction = (record: RegistrarRecordLike | null | undefined, action: unknown): boolean => {',
+      'const getRegistrarActionForStatus = (status: unknown): string | null => {',
     );
     const runActionBlock = extractSourceBlock(
       source,
-      'const runRegistrarRecordAction = useCallback(async (record, action, payload = {}) => {',
-      'const handleStartVisit = useCallback(async (appointment) => {',
+      'const runRegistrarRecordAction = useCallback(async (record: Record<string, unknown>, action: string, payload: Record<string, unknown> = {}) => {',
+      'const handleStartVisit = useCallback(async (appointment: Record<string, unknown>) => {',
     );
     const forbiddenDecisionInputs = [
       'record_type',
@@ -245,13 +245,13 @@ describe('RegistrarPanel command contract', () => {
     const source = readRegistrarSourceTree();
     const resolverBlock = extractSourceBlock(
       source,
-      'const resolveRescheduleVisitId = useCallback((appointmentRow) => {',
+      'const resolveRescheduleVisitId = useCallback((appointmentRow: Record<string, unknown>) => {',
       'const removeRescheduledAppointmentFromView = useCallback',
     );
 
     expect(source).toContain('appointment_id: fullEntry.appointment_id || entry.appointment_id || null');
     expect(source).not.toContain('appointment_id: fullEntry.appointment_id || entry.appointment_id || entryId');
-    expect(resolverBlock).toContain('appointmentRow?.visit_ids?.[0]');
+    expect(resolverBlock).toContain('visitIds?.[0]');
     expect(resolverBlock).toContain('appointmentRow?.visit_id');
     expect(resolverBlock).toContain('appointmentRow?.visitId');
     expect(resolverBlock).not.toContain('appointment_id');

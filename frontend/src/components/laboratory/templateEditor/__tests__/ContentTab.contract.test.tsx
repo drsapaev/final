@@ -25,8 +25,7 @@ describe('ContentTab UX-AUDIT-FIX4 — confirm dialog on field/section delete', 
     const handlerEnd = source.indexOf('\n  }', handlerStart);
     const handlerBody = source.slice(handlerStart, handlerEnd);
 
-    expect(handlerBody).toContain('await confirm(');
-    // STRAT#11: строка мигрирована на t('confirm.delete_section_title')
+    expect(handlerBody).toMatch(/await\s+\(?confirm/);
     expect(handlerBody).toContain("t('confirm.delete_section_title')");
     expect(handlerBody).toContain("intent: 'danger'");
     expect(handlerBody).toContain('if (ok) onRemoveSection(sectionIndex)');
@@ -38,7 +37,7 @@ describe('ContentTab UX-AUDIT-FIX4 — confirm dialog on field/section delete', 
     const handlerEnd = source.indexOf('\n  }', handlerStart);
     const handlerBody = source.slice(handlerStart, handlerEnd);
 
-    expect(handlerBody).toContain('await confirm(');
+    expect(handlerBody).toMatch(/await\s+\(?confirm/);
     // STRAT#11: строка мигрирована на t('confirm.delete_field_title')
     expect(handlerBody).toContain("t('confirm.delete_field_title')");
     expect(handlerBody).toContain("intent: 'danger'");
@@ -105,7 +104,9 @@ describe('ContentTab UX-AUDIT-FIX4 — confirm dialog on field/section delete', 
   it('STRAT#11: both delete dialogs use t() from unified i18n', () => {
     // STRAT#11: delete section и delete field dialogs мигрированы на t()
     // i18n-unification: tInterpolate() replaced with t(key, params) — react-i18next handles interpolation
-    expect(source).toContain("from '@/components/i18n/useTranslation'");
+    // Strict:true migration: useTranslation import path moved from
+    // '@/components/i18n/useTranslation' to '@/i18n/useTranslation'.
+    expect(source).toContain("from '@/i18n/useTranslation'");
     expect(source).toContain('useTranslation');
 
     // Delete section dialog

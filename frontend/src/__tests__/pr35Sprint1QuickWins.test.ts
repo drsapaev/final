@@ -36,7 +36,9 @@ describe('P0-7: BillingManager document.write sanitization', () => {
     // Must NOT have raw `document.write(response.data.html)`
     expect(stripped).not.toMatch(/document\.write\(\s*response\.data\.html\s*\)/);
     // Must have document.write(sanitizePrintableHtml(response.data.html))
-    expect(stripped).toMatch(/document\.write\(\s*sanitizePrintableHtml\(\s*response\.data\.html\s*\)\s*\)/);
+    // Strict:true migration wrapped the argument: String(response.data.html ?? '')
+    // to coerce to string and handle null/undefined. Allow either form.
+    expect(stripped).toMatch(/document\.write\(\s*sanitizePrintableHtml\(\s*(?:String\(\s*)?response\.data\.html(?:\s*\?\?\s*''\s*)?(?:\s*\))?\s*\)\s*\)/);
   });
 });
 

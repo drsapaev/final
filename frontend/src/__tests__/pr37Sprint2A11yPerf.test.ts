@@ -27,12 +27,15 @@ describe('P0-A: Modal focus trap', () => {
       .replace(/\/\*[\s\S]*?\*\//g, '');
     // Must handle Tab key explicitly (focus trap)
     // Acceptable patterns:
-    //   - e.key === 'Tab' in a keydown handler
+    //   - e.key === 'Tab' or e.key !== 'Tab' (early-return guard) in a keydown handler
     //   - useFocusTrap hook imported and used
     //   - references to focusable elements query (a[href], button, input, etc.)
-    const hasTabHandler = /e\.key\s*===\s*['"]Tab['"]/.test(stripped);
+    //     — either as inline string literal in querySelectorAll(...) or as a
+    //     variable name (strict:true migration extracts selectors to a typed
+    //     array, e.g. `const focusableSelectors = ['a[href]', ...].join(',')`).
+    const hasTabHandler = /e\.key\s*(?:===|!==)\s*['"]Tab['"]/.test(stripped);
     const hasFocusTrapHook = /useFocusTrap|focus-trap-react/.test(stripped);
-    const hasFocusableQuery = /querySelectorAll\(\s*['"][^'"]*(?:a\[href\]|button|input|select|textarea)/.test(stripped);
+    const hasFocusableQuery = /querySelectorAll(?:<[^>]+>)?\(\s*(?:['"][^'"]*(?:a\[href\]|button|input|select|textarea)|focusableSelectors)/.test(stripped);
     expect(hasTabHandler || hasFocusTrapHook || hasFocusableQuery).toBe(true);
   });
 

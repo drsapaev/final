@@ -33,7 +33,9 @@ describe('DentistPanel safety guards contract (C-1, C-2, C-3)', () => {
     expect(completeBlock).toContain('await confirm(confirmOptions)');
     expect(completeBlock).toContain('if (!ok) {');
     // Must use the shared useConfirm hook (not window.confirm).
-    expect(source).toContain('const [confirm, confirmDialog] = useConfirm()');
+    // Strict:true migration: destructured as `confirmRaw` and aliased to a
+    // typed `confirm` on the next line (avoids `unknown`-arg type errors).
+    expect(source).toContain('const [confirmRaw, confirmDialog] = useConfirm()');
     expect(source).not.toContain('window.confirm(');
   });
 

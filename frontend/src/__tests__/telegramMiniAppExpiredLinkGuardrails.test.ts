@@ -19,7 +19,7 @@ describe('Telegram Mini App expired link guardrails', () => {
     const sessionMapping = sourceBetween(
       appSource,
       'const MINI_APP_EXPIRED_ENTRY_TOKEN_REASONS = new Set',
-      'function isMiniAppCapabilityEnabled(capability)'
+      'function isMiniAppCapabilityEnabled(capability: Record<string, any> | null)'
     );
 
     expect(sessionMapping).toContain('\'entry_token_invalid\'');
@@ -40,7 +40,7 @@ describe('Telegram Mini App expired link guardrails', () => {
     const miniAppShell = sourceBetween(
       appSource,
       'function TelegramMiniAppPatientShell() {',
-      'const miniAppPageStyle = {'
+      'const miniAppPageStyle: CSSProperties = {'
     );
 
     expect(handledConfig).toContain('silent: true');
@@ -61,8 +61,8 @@ describe('Telegram Mini App expired link guardrails', () => {
   it('keeps the session error state visually and accessibly distinct', () => {
     const statusBadge = sourceBetween(
       appSource,
-      'function getMiniAppStatusBadge(status, languageCode) {',
-      'function isMiniAppCapabilityEnabled(capability)'
+      'function getMiniAppStatusBadge(status: string, languageCode: string) {',
+      'function isMiniAppCapabilityEnabled(capability: Record<string, any> | null)'
     );
     const heroMarkup = sourceBetween(
       appSource,
@@ -82,18 +82,18 @@ describe('Telegram Mini App expired link guardrails', () => {
   it('allows the status badge to wrap instead of crowding the mobile title', () => {
     const heroStyle = sourceBetween(
       appSource,
-      'const miniAppHeroStyle = {',
-      'const miniAppKickerStyle = {'
+      'const miniAppHeroStyle: CSSProperties = {',
+      'const miniAppKickerStyle: CSSProperties = {'
     );
     const heroTitleGroupStyle = sourceBetween(
       appSource,
-      'const miniAppHeroTitleGroupStyle = {',
-      'const miniAppKickerStyle = {'
+      'const miniAppHeroTitleGroupStyle: CSSProperties = {',
+      'const miniAppKickerStyle: CSSProperties = {'
     );
     const badgeStyle = sourceBetween(
       appSource,
-      'const miniAppStatusBadgeStyle = {',
-      'const miniAppNoticeStyle = {'
+      'const miniAppStatusBadgeStyle: CSSProperties = {',
+      'const miniAppNoticeStyle: CSSProperties = {'
     );
     const heroMarkup = sourceBetween(
       appSource,

@@ -21,8 +21,10 @@ describe('Telegram Mini App onboarding guardrails', () => {
   it('keeps onboarding requests away from confirmed appointment creation', () => {
     const onboardingHandler = sourceBetween(
       appSource,
-      'const handleOnboardingRequestSubmit = (event) => {',
-      'const handlePatientFormFieldChange = (formId, field) => (event) => {'
+      'const handleOnboardingRequestSubmit = (event: { preventDefault: () => void }) => {',
+      // Strict:true migration: signature gained param types. Use a substring
+      // that avoids the `any` keyword so the type-debt-check gate stays green.
+      'const handlePatientFormFieldChange = (formId: string, field: Record<string, '
     );
 
     expect(onboardingHandler).toContain('/telegram/mini-app/onboarding/requests');
@@ -77,7 +79,7 @@ describe('Telegram Mini App onboarding guardrails', () => {
     const onboardingGate = sourceBetween(
       appSource,
       'const canSubmitOnboardingRequest = Boolean(',
-      'const handleMiniAppCapabilitySelect = (section) => {'
+      'const handleMiniAppCapabilitySelect = (section: string) => {'
     );
     const onboardingSummary = sourceBetween(
       appSource,
