@@ -255,6 +255,7 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(({
           style={trigger}
           aria-haspopup="listbox"
           aria-expanded={isOpen}
+          aria-invalid={!!error}
           disabled={disabled}
           {...props}
         >
