@@ -20,7 +20,7 @@
 
 import { existsSync, statSync, readFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
-import { resolve, dirname } from 'node:path';
+import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -44,21 +44,30 @@ function run(cmd, cwd = REPO) {
 }
 
 /**
- * Check if a pattern exists in a file. Uses rg if available, falls back to grep.
- * Returns true if pattern is found.
+ * Check if a pattern exists in a file.
+ *
+ * Implementation note: reads the file via fs and runs a RegExp in-process to
+ * avoid cross-platform shell-quoting issues (cmd.exe on Windows does not
+ * handle single-quoted multi-word patterns the way POSIX shells do, which
+ * caused BS-9/16/35/36/53 to register as false-positive regressions).
+ *
+ * The pattern is treated as a JavaScript RegExp source. Callers that need
+ * literal matching of regex metacharacters must escape them.
  */
 function fileContains(pattern, filePath, cwd = FRONTEND) {
-  // Try rg first (faster, respects gitignore)
-  const rgResult = run(`rg -c ${pattern} ${filePath} 2>/dev/null || true`, cwd);
-  if (rgResult && rgResult.trim() !== '') {
-    return parseInt(rgResult.trim(), 10) > 0;
+  const fullPath = join(cwd, filePath);
+  let content = '';
+  try {
+    content = readFileSync(fullPath, 'utf-8');
+  } catch {
+    return false;
   }
-  // Fallback to grep with -E for regex support
-  const grepResult = run(`grep -cE ${pattern} ${filePath} 2>/dev/null || true`, cwd);
-  if (grepResult && grepResult.trim() !== '') {
-    return parseInt(grepResult.trim(), 10) > 0;
+  try {
+    return new RegExp(pattern).test(content);
+  } catch {
+    // If the pattern is not a valid regex, fall back to literal substring.
+    return content.includes(pattern);
   }
-  return false;
 }
 
 /**
@@ -164,7 +173,7 @@ const checks = [
     category: 'static',
     name: 'EMRHttpStatus exists in domain/emr.ts',
     check: () => {
-      return fileContains('"export type EMRHttpStatus"', 'src/types/domain/emr.ts');
+      return fileContains('export type EMRHttpStatus', 'src/types/domain/emr.ts');
     },
   },
   {
@@ -181,7 +190,7 @@ const checks = [
     category: 'static',
     name: 'ChatContext value wrapped in useMemo',
     check: () => {
-      return fileContains('"useMemo"', 'src/contexts/ChatContext.tsx');
+      return fileContains('useMemo', 'src/contexts/ChatContext.tsx');
     },
   },
   {
@@ -208,7 +217,7 @@ const checks = [
     category: 'static',
     name: 'CONFLICT_RESOLVED resets history: []',
     check: () => {
-      return fileContains('"history: \\[\\]"', 'src/reducers/emrReducer.ts');
+      return fileContains('history: \\[\\]', 'src/reducers/emrReducer.ts');
     },
   },
   {
@@ -216,7 +225,7 @@ const checks = [
     category: 'static',
     name: 'useFinance.deletedIds has TTL (DELETED_IDS_TTL_MS)',
     check: () => {
-      return fileContains('"DELETED_IDS_TTL_MS"', 'src/hooks/useFinance.ts');
+      return fileContains('DELETED_IDS_TTL_MS', 'src/hooks/useFinance.ts');
     },
   },
   {
@@ -261,7 +270,7 @@ const checks = [
     category: 'static',
     name: 'ChatWindow uses safeMessageURL helper',
     check: () => {
-      return fileContains('"safeMessageURL"', 'src/components/chat/ChatWindow.tsx');
+      return fileContains('safeMessageURL', 'src/components/chat/ChatWindow.tsx');
     },
   },
   {
