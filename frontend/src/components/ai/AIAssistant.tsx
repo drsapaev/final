@@ -1,6 +1,6 @@
 import { useTranslation } from '../../i18n/useTranslation';
 import { useState } from 'react';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import PropTypes from 'prop-types';
 import {
   Card, CardContent, Typography, Alert, Badge, CircularProgress, Button,
@@ -16,7 +16,7 @@ import logger from '../../utils/logger';
  * Рекурсивная санитизация AI-generated контента
  * Защита от AI prompt injection attacks
  */
-function sanitizeAIResponse(obj) {
+function sanitizeAIResponse(obj: unknown): unknown {
   if (typeof obj === 'string') {
     return sanitizeAIContent(obj);
   }
@@ -26,7 +26,7 @@ function sanitizeAIResponse(obj) {
   }
 
   if (obj && typeof obj === 'object') {
-    const sanitized = {};
+    const sanitized: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(obj)) {
       sanitized[key] = sanitizeAIResponse(value);
     }
@@ -39,24 +39,50 @@ function sanitizeAIResponse(obj) {
 const AI_DRAFT_NOTICE = 'misc.aia_draft_notice';
 const AI_PROVIDER_UNAVAILABLE_NOTICE = 'misc.aia_provider_unavailable_notice';
 
-function getAIResponseError(payload) {
+/**
+ * Minimal shape of an MCP client response envelope. The MCP client returns
+ * `Promise<unknown>`, but every method resolves to an object with optional
+ * status/error/data fields — captured here so the assistant can read them
+ * without resorting to `any`.
+ */
+interface McpResult {
+  status?: string;
+  error?: string;
+  data?: Record<string, unknown>;
+}
+
+/**
+ * AI analysis result returned by the backend / MCP layer. The shape is
+ * dynamic (complaint / icd10 / lab / ecg variants) so we keep it as an
+ * index-signature object; the icd10 path also accepts a plain array of
+ * suggestions, hence the union with `unknown[]`.
+ */
+type AIResult = Record<string, unknown> | unknown[];
+
+/** Type guard: narrows `AIResult | null` to the object variant. */
+function isResultObject(value: AIResult | null | undefined): value is Record<string, unknown> {
+  return !!value && !Array.isArray(value);
+}
+
+function getAIResponseError(payload: unknown): string | null {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
     return null;
   }
 
-  if (typeof payload.error === 'string' && payload.error.trim()) {
-    return payload.error;
+  const p = payload as Record<string, unknown>;
+  if (typeof p.error === 'string' && p.error.trim()) {
+    return p.error;
   }
 
-  if (typeof payload.detail === 'string' && payload.detail.trim()) {
-    return payload.detail;
+  if (typeof p.detail === 'string' && p.detail.trim()) {
+    return p.detail;
   }
 
   return null;
 }
 
-function normalizeAIErrorMessage(message) {
-  const rawMessage = String(message || '').trim();
+function normalizeAIErrorMessage(message: unknown): string | null {
+  const rawMessage = String(message ?? '').trim();
   if (!rawMessage) {
     return null;
   }
@@ -74,7 +100,7 @@ function normalizeAIErrorMessage(message) {
   return rawMessage;
 }
 
-function getResultProvider(value) {
+function getResultProvider(value: unknown): string | null {
   if (Array.isArray(value)) {
     for (const item of value) {
       const provider = getResultProvider(item);
@@ -87,12 +113,28 @@ function getResultProvider(value) {
     return null;
   }
 
-  return value.provider || value.provider_used || value.model || value.source || null;
+  const v = value as Record<string, unknown>;
+  const provider = v.provider ?? v.provider_used ?? v.model ?? v.source;
+  return typeof provider === 'string' ? provider : null;
 }
 
-function isFallbackProvider(providerName) {
-  const normalized = String(providerName || '').toLowerCase();
+function isFallbackProvider(providerName: unknown): boolean {
+  const normalized = String(providerName ?? '').toLowerCase();
   return normalized === 'mock' || normalized === 'none' || normalized.includes('mock');
+}
+
+/**
+ * Extracts `{ detail?, error? }` from an axios-like error response without
+ * requiring the caller to assert on `unknown`. Used by the catch-block in
+ * `analyzeData` to surface backend error messages.
+ */
+function getErrResponseData(err: unknown): { detail?: string; error?: string } | undefined {
+  if (!err || typeof err !== 'object') return undefined;
+  const maybeResponse = (err as { response?: unknown }).response;
+  if (!maybeResponse || typeof maybeResponse !== 'object') return undefined;
+  const data = (maybeResponse as { data?: unknown }).data;
+  if (!data || typeof data !== 'object') return undefined;
+  return data as { detail?: string; error?: string };
 }
 
 interface AIAssistantProps {
@@ -121,7 +163,7 @@ const AIAssistant = ({
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<AIResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [provider, setProvider] = useState('deepseek');
   const [retryCount, setRetryCount] = useState(0);
@@ -147,8 +189,8 @@ const AIAssistant = ({
     }
 
     try {
-      let response;
-      let mcpResult;
+      let response: { data?: unknown } | undefined;
+      let mcpResult: McpResult | undefined;
 
       switch (effectiveAnalysisType) {
         case 'complaint':
@@ -158,7 +200,7 @@ const AIAssistant = ({
               patientAge: data.patient_age,
               patientGender: data.patient_gender,
               provider: provider
-            });
+            }) as McpResult;
             if (mcpResult.status === 'success') {
               response = { data: mcpResult.data };
             } else {
@@ -181,11 +223,11 @@ const AIAssistant = ({
               specialty: data.specialty,
               provider: provider,
               maxSuggestions: data.maxSuggestions || 5
-            });
+            }) as McpResult;
             if (mcpResult.status === 'success') {
-              if (mcpResult.data.clinical_recommendations) {
+              if (mcpResult.data?.clinical_recommendations) {
                 response = { data: mcpResult.data };
-              } else if (mcpResult.data.suggestions) {
+              } else if (mcpResult.data?.suggestions) {
                 response = { data: mcpResult.data.suggestions };
               } else {
                 response = { data: [] };
@@ -206,7 +248,7 @@ const AIAssistant = ({
               patientGender: data.patient_gender,
               provider: provider,
               includeRecommendations: true
-            });
+            }) as McpResult;
             if (mcpResult.status === 'success') {
               response = { data: mcpResult.data };
             } else {
@@ -228,7 +270,7 @@ const AIAssistant = ({
               data.lesionInfo as Record<string, unknown> | null,
               data.patientHistory as Record<string, unknown> | null,
               provider
-            );
+            ) as McpResult;
             if (mcpResult.status === 'success') {
               response = { data: mcpResult.data };
             } else {
@@ -249,7 +291,7 @@ const AIAssistant = ({
               data.image as File,
               (data.imageType as string) || 'general',
               { modality: data.modality, clinicalContext: data.clinicalContext, provider: provider }
-            );
+            ) as McpResult;
             if (mcpResult.status === 'success') {
               response = { data: mcpResult.data };
             } else {
@@ -270,15 +312,16 @@ const AIAssistant = ({
         throw new Error(responseError);
       }
 
-      const sanitizedData = sanitizeAIResponse(response.data);
+      const sanitizedData = sanitizeAIResponse(response?.data) as AIResult;
       setResult(sanitizedData);
       if (onResult) onResult(sanitizedData);
       notify.success(t('misc.aia_analysis_done'));
       logger.log('AI response sanitized and validated');
       setRetryCount(0);
-    } catch (err) {
+    } catch (err: unknown) {
+      const errData = getErrResponseData(err);
       const errorMsg = normalizeAIErrorMessage(
-        err.response?.data?.detail || err.response?.data?.error || (err instanceof Error ? err.message : String(err))
+        errData?.detail || errData?.error || (err instanceof Error ? err.message : String(err))
       );
       setError(errorMsg);
       notify.error(t('misc.aia_analysis_error', { message: errorMsg }));
@@ -288,20 +331,24 @@ const AIAssistant = ({
     }
   };
 
-  const copyToClipboard = (text) => {
+  const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     notify.info(t('final.copied_to_clipboard'));
   };
 
-  const Pill = ({ children, color = 'default' }) => {
-    const colors = {
+  interface PillProps {
+    children?: ReactNode;
+    color?: string;
+  }
+  const Pill = ({ children, color = 'default' }: PillProps) => {
+    const colors: { border?: string; bg?: string } = {
       default: { border: 'var(--mac-border)', bg: 'transparent' },
       primary: { border: 'var(--mac-accent-blue)', bg: 'rgba(0,122,255,0.08)' },
       success: { border: 'rgba(52,199,89,0.45)', bg: 'rgba(52,199,89,0.08)' },
       warning: { border: 'rgba(255,149,0,0.45)', bg: 'rgba(255,149,0,0.08)' },
       error: { border: 'rgba(255,59,48,0.45)', bg: 'rgba(255,59,48,0.08)' },
       info: { border: 'rgba(0,122,255,0.45)', bg: 'rgba(0,122,255,0.08)' }
-    }[color] || {};
+    }[color || 'default'] || {};
     return (
       <span style={{
         display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -317,59 +364,63 @@ const AIAssistant = ({
   };
 
   const renderComplaintResult = () => {
-    if (!result) return null;
+    if (!isResultObject(result)) return null;
+    const resultObj = result;
     return (
       <div>
-        {result.preliminary_diagnosis &&
+        {Array.isArray(resultObj.preliminary_diagnosis) && resultObj.preliminary_diagnosis.length > 0 &&
         <div style={{ marginBottom: 12 }}>
             <Typography variant="subtitle2" gutterBottom>{t('misc.aia_preliminary_dx')}</Typography>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {result.preliminary_diagnosis.map((diagnosis, idx) =>
-            <Pill key={idx} color="primary">{diagnosis}</Pill>
+              {resultObj.preliminary_diagnosis.map((diagnosis: unknown, idx: number) =>
+            <Pill key={idx} color="primary">{String(diagnosis ?? '')}</Pill>
             )}
             </div>
           </div>
         }
-        {result.examinations && result.examinations.length > 0 &&
+        {Array.isArray(resultObj.examinations) && resultObj.examinations.length > 0 &&
         <div style={{ marginBottom: 12 }}>
             <Typography variant="subtitle2" gutterBottom>{t('misc.aia_exam_plan')}</Typography>
             <ul style={{ margin: 0, paddingLeft: 18 }}>
-              {result.examinations.map((exam, idx) =>
-            <li key={idx}>
-                  <span><CheckCircle style={{ width: 14, height: 14, marginRight: 6 }} />{`${exam.type}: ${exam.name}`}</span>
-                  {exam.reason &&
-              <div style={{ fontSize: 12, color: 'var(--mac-text-secondary)' }}>{exam.reason}</div>
+              {resultObj.examinations.map((exam: unknown, idx: number) => {
+            const examObj = (exam ?? null) as Record<string, unknown> | null;
+            return (
+              <li key={idx}>
+                  <span><CheckCircle style={{ width: 14, height: 14, marginRight: 6 }} />{`${String(examObj?.type ?? '')}: ${String(examObj?.name ?? '')}`}</span>
+                  {Boolean(examObj?.reason) &&
+              <div style={{ fontSize: 12, color: 'var(--mac-text-secondary)' }}>{String(examObj?.reason ?? '')}</div>
               }
                 </li>
-            )}
+            );
+          })}
             </ul>
           </div>
         }
-        {result.lab_tests && result.lab_tests.length > 0 &&
+        {Array.isArray(resultObj.lab_tests) && resultObj.lab_tests.length > 0 &&
         <div style={{ marginBottom: 12 }}>
             <Typography variant="subtitle2" gutterBottom>{t('misc.aia_lab_tests')}</Typography>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {result.lab_tests.map((test, idx) =>
-            <Pill key={idx}>{test}</Pill>
+              {resultObj.lab_tests.map((test: unknown, idx: number) =>
+            <Pill key={idx}>{String(test ?? '')}</Pill>
             )}
             </div>
           </div>
         }
-        {result.red_flags && result.red_flags.length > 0 &&
+        {Array.isArray(resultObj.red_flags) && resultObj.red_flags.length > 0 &&
         <Alert severity="warning" style={{ marginTop: 8 }}>
             <Typography variant="subtitle2" gutterBottom>{t('misc.aia_red_flags')}</Typography>
             <ul style={{ margin: 0, paddingLeft: 18 }}>
-              {result.red_flags.map((flag, idx) => <li key={idx}>{flag}</li>)}
+              {resultObj.red_flags.map((flag: unknown, idx: number) => <li key={idx}>{String(flag ?? '')}</li>)}
             </ul>
           </Alert>
         }
-        {result.urgency &&
+        {Boolean(resultObj.urgency) &&
         <div style={{ marginTop: 8 }}>
             <Pill color={
-          result.urgency === t('misc.aia_urgency_emergency') ? 'error' :
-          result.urgency === t('misc.aia_urgency_urgent') ? 'warning' : 'info'
+          resultObj.urgency === t('misc.aia_urgency_emergency') ? 'error' :
+          resultObj.urgency === t('misc.aia_urgency_urgent') ? 'warning' : 'info'
           }>
-              {t('misc.aia_urgency_label')} {result.urgency}
+              {t('misc.aia_urgency_label')} {String(resultObj.urgency ?? '')}
             </Pill>
           </div>
         }
@@ -378,37 +429,40 @@ const AIAssistant = ({
   };
 
   const renderICD10Result = () => {
-    if (result && result.clinical_recommendations) {
+    if (isResultObject(result) && result.clinical_recommendations) {
+      const resultObj = result;
       return (
         <div>
           <Alert severity="info" style={{ marginBottom: 12 }}>
             <Typography variant="body2" style={{ whiteSpace: 'pre-wrap' }}>
-              {result.clinical_recommendations}
+              {String(resultObj.clinical_recommendations ?? '')}
             </Typography>
           </Alert>
-          {result.suggestions && result.suggestions.length > 0 &&
+          {Array.isArray(resultObj.suggestions) && resultObj.suggestions.length > 0 &&
           <div>
               <Typography variant="subtitle2" gutterBottom>{t('misc.aia_icd10_codes')}</Typography>
               <div>
-                {result.suggestions.map((item, idx) =>
+                {resultObj.suggestions.map((item: unknown, idx: number) => {
+                  const itemObj = (item ?? null) as Record<string, unknown> | null;
+                  return (
               <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--mac-spacing-2) 0', borderBottom: '1px solid var(--mac-border)' }}>
                     <div>
-                      {`${item.code} - ${item.name || item.description}`}
-                      {item.relevance &&
+                      {`${String(itemObj?.code ?? '')} - ${String(itemObj?.name ?? itemObj?.description ?? '')}`}
+                      {Boolean(itemObj?.relevance) &&
                   <span style={{ marginLeft: 8 }}>
-                          <Pill color={item.relevance === t('misc.aia_relevance_high') ? 'success' : item.relevance === t('misc.aia_relevance_medium') ? 'warning' : 'default'}>
-                            {item.relevance}
+                          <Pill color={itemObj?.relevance === t('misc.aia_relevance_high') ? 'success' : itemObj?.relevance === t('misc.aia_relevance_medium') ? 'warning' : 'default'}>
+                            {String(itemObj?.relevance ?? '')}
                           </Pill>
                         </span>
                   }
                     </div>
                     <div style={{ display: 'flex', gap: 'var(--mac-spacing-1)' }}>
-                    <Button variant="outline" onClick={() => copyToClipboard(`${item.code} - ${item.name || item.description}`)}>
+                    <Button variant="outline" onClick={() => copyToClipboard(`${String(itemObj?.code ?? '')} - ${String(itemObj?.name ?? itemObj?.description ?? '')}`)}>
                       <Copy style={{ width: 14, height: 14, marginRight: 6 }} />{t('misc.aia_copy')}
                     </Button>
                     {onSuggestionSelect && (
                     <Button variant="primary" onClick={() => {
-                      onSuggestionSelect('icd10', item.code);
+                      onSuggestionSelect('icd10', itemObj?.code);
                       notify.success(t('final.icd_added_to_form'));
                     }}>
                       <CheckCircle style={{ width: 14, height: 14, marginRight: 6 }} />{t('misc.aia_use')}
@@ -416,7 +470,8 @@ const AIAssistant = ({
                     )}
                     </div>
                   </div>
-              )}
+                  );
+                })}
               </div>
             </div>
           }
@@ -426,25 +481,27 @@ const AIAssistant = ({
     if (!result || !Array.isArray(result)) return null;
     return (
       <div>
-        {result.map((item, idx) =>
+        {result.map((item: unknown, idx: number) => {
+          const itemObj = (item ?? null) as Record<string, unknown> | null;
+          return (
         <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--mac-spacing-2) 0', borderBottom: '1px solid var(--mac-border)' }}>
             <div>
-              {`${item.code} - ${item.name || item.description}`}
-              {item.relevance &&
+              {`${String(itemObj?.code ?? '')} - ${String(itemObj?.name ?? itemObj?.description ?? '')}`}
+              {Boolean(itemObj?.relevance) &&
             <span style={{ marginLeft: 8 }}>
-                  <Pill color={item.relevance === t('misc.aia_relevance_high') ? 'success' : item.relevance === t('misc.aia_relevance_medium') ? 'warning' : 'default'}>
-                    {item.relevance}
+                  <Pill color={itemObj?.relevance === t('misc.aia_relevance_high') ? 'success' : itemObj?.relevance === t('misc.aia_relevance_medium') ? 'warning' : 'default'}>
+                    {String(itemObj?.relevance ?? '')}
                   </Pill>
                 </span>
             }
             </div>
             <div style={{ display: 'flex', gap: 'var(--mac-spacing-1)' }}>
-            <Button variant="outline" onClick={() => copyToClipboard(`${item.code} - ${item.name || item.description}`)}>
+            <Button variant="outline" onClick={() => copyToClipboard(`${String(itemObj?.code ?? '')} - ${String(itemObj?.name ?? itemObj?.description ?? '')}`)}>
               <Copy style={{ width: 14, height: 14, marginRight: 6 }} />{t('misc.aia_copy')}
             </Button>
             {onSuggestionSelect && (
             <Button variant="primary" onClick={() => {
-              onSuggestionSelect('icd10', item.code);
+              onSuggestionSelect('icd10', itemObj?.code);
               notify.success(t('final.icd_added_to_form'));
             }}>
               <CheckCircle style={{ width: 14, height: 14, marginRight: 6 }} />{t('misc.aia_use')}
@@ -452,59 +509,64 @@ const AIAssistant = ({
             )}
             </div>
           </div>
-        )}
+          );
+        })}
       </div>);
 
   };
 
   const renderLabResult = () => {
-    if (!result) return null;
+    if (!isResultObject(result)) return null;
+    const resultObj = result;
     return (
       <div>
-        {result.summary &&
+        {Boolean(resultObj.summary) &&
         <Alert severity="info" style={{ marginBottom: 12 }}>
-            <Typography variant="body2">{result.summary}</Typography>
+            <Typography variant="body2">{String(resultObj.summary ?? '')}</Typography>
           </Alert>
         }
-        {result.abnormal_values && result.abnormal_values.length > 0 &&
+        {Array.isArray(resultObj.abnormal_values) && resultObj.abnormal_values.length > 0 &&
         <div style={{ marginBottom: 12 }}>
             <Typography variant="subtitle2" gutterBottom>{t('misc.aia_abnormal_values')}</Typography>
-            {result.abnormal_values.map((item, idx) =>
+            {resultObj.abnormal_values.map((item: unknown, idx: number) => {
+          const itemObj = (item ?? null) as Record<string, unknown> | null;
+          return (
           <details key={idx} open={idx === 0} style={{
             border: '1px solid var(--mac-border)', borderRadius: 8, padding: 12, marginBottom: 8
           }}>
                 <summary style={{ cursor: 'pointer', listStyle: 'none' }}>
-                  {item.parameter}: {item.value}
+                  {String(itemObj?.parameter ?? '')}: {String(itemObj?.value ?? '')}
                 </summary>
                 <div style={{ marginTop: 8 }}>
-                  <Typography variant="body2" gutterBottom><strong>{t('misc.aia_interpretation')}</strong> {item.interpretation}</Typography>
-                  <Typography variant="body2"><strong>{t('misc.aia_clinical_significance')}</strong> {item.clinical_significance}</Typography>
+                  <Typography variant="body2" gutterBottom><strong>{t('misc.aia_interpretation')}</strong> {String(itemObj?.interpretation ?? '')}</Typography>
+                  <Typography variant="body2"><strong>{t('misc.aia_clinical_significance')}</strong> {String(itemObj?.clinical_significance ?? '')}</Typography>
                 </div>
               </details>
-          )}
+          );
+        })}
           </div>
         }
-        {result.possible_conditions && result.possible_conditions.length > 0 &&
+        {Array.isArray(resultObj.possible_conditions) && resultObj.possible_conditions.length > 0 &&
         <div style={{ marginBottom: 12 }}>
             <Typography variant="subtitle2" gutterBottom>{t('misc.aia_possible_conditions')}</Typography>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {result.possible_conditions.map((condition, idx) =>
-            <Pill key={idx} color="warning">{condition}</Pill>
+              {resultObj.possible_conditions.map((condition: unknown, idx: number) =>
+            <Pill key={idx} color="warning">{String(condition ?? '')}</Pill>
             )}
             </div>
           </div>
         }
-        {result.recommendations && result.recommendations.length > 0 &&
+        {Array.isArray(resultObj.recommendations) && resultObj.recommendations.length > 0 &&
         <div style={{ marginBottom: 12 }}>
             <Typography variant="subtitle2" gutterBottom>{t('misc.aia_recommendations')}</Typography>
             <ul style={{ margin: 0, paddingLeft: 18 }}>
-              {result.recommendations.map((rec, idx) => <li key={idx}>{rec}</li>)}
+              {resultObj.recommendations.map((rec: unknown, idx: number) => <li key={idx}>{String(rec ?? '')}</li>)}
             </ul>
           </div>
         }
-        {result.urgency &&
-        <Alert severity={result.urgency === t('misc.aia_yes') ? 'warning' : 'info'} style={{ marginTop: 8 }}>
-            {t('misc.aia_urgent_consultation')}: {result.urgency}
+        {Boolean(resultObj.urgency) &&
+        <Alert severity={resultObj.urgency === t('misc.aia_yes') ? 'warning' : 'info'} style={{ marginTop: 8 }}>
+            {t('misc.aia_urgent_consultation')}: {String(resultObj.urgency ?? '')}
           </Alert>
         }
       </div>);
@@ -512,43 +574,44 @@ const AIAssistant = ({
   };
 
   const renderECGResult = () => {
-    if (!result) return null;
+    if (!isResultObject(result)) return null;
+    const resultObj = result;
     return (
       <div>
         <div style={{ border: '1px solid var(--mac-border)', borderRadius: 8, padding: 12, marginBottom: 12 }}>
           <Typography variant="subtitle2" gutterBottom>{t('misc.aia_main_params')}</Typography>
           <div style={{ display: 'grid', gap: 6 }}>
-            {result.rhythm && <Typography variant="body2"><strong>{t('misc.aia_rhythm')}</strong> {result.rhythm}</Typography>}
-            {result.rate && <Typography variant="body2"><strong>{t('misc.aia_hr')}</strong> {result.rate}</Typography>}
-            {result.conduction && <Typography variant="body2"><strong>{t('misc.aia_conduction')}</strong> {result.conduction}</Typography>}
-            {result.axis && <Typography variant="body2"><strong>{t('misc.aia_axis')}</strong> {result.axis}</Typography>}
+            {Boolean(resultObj.rhythm) && <Typography variant="body2"><strong>{t('misc.aia_rhythm')}</strong> {String(resultObj.rhythm ?? '')}</Typography>}
+            {Boolean(resultObj.rate) && <Typography variant="body2"><strong>{t('misc.aia_hr')}</strong> {String(resultObj.rate ?? '')}</Typography>}
+            {Boolean(resultObj.conduction) && <Typography variant="body2"><strong>{t('misc.aia_conduction')}</strong> {String(resultObj.conduction ?? '')}</Typography>}
+            {Boolean(resultObj.axis) && <Typography variant="body2"><strong>{t('misc.aia_axis')}</strong> {String(resultObj.axis ?? '')}</Typography>}
           </div>
         </div>
-        {result.abnormalities && result.abnormalities.length > 0 &&
+        {Array.isArray(resultObj.abnormalities) && resultObj.abnormalities.length > 0 &&
         <Alert severity="warning">
             <Typography variant="subtitle2" gutterBottom>{t('misc.aia_abnormalities')}</Typography>
             <ul style={{ margin: 0, paddingLeft: 18 }}>
-              {result.abnormalities.map((item, idx) => <li key={idx}>{item}</li>)}
+              {resultObj.abnormalities.map((item: unknown, idx: number) => <li key={idx}>{String(item ?? '')}</li>)}
             </ul>
           </Alert>
         }
-        {result.interpretation &&
+        {Boolean(resultObj.interpretation) &&
         <div style={{ border: '1px solid var(--mac-border)', borderRadius: 8, padding: 12, marginTop: 12 }}>
             <Typography variant="subtitle2" gutterBottom>{t('misc.aia_conclusion')}</Typography>
-            <Typography variant="body2">{result.interpretation}</Typography>
+            <Typography variant="body2">{String(resultObj.interpretation ?? '')}</Typography>
           </div>
         }
-        {result.recommendations && result.recommendations.length > 0 &&
+        {Array.isArray(resultObj.recommendations) && resultObj.recommendations.length > 0 &&
         <div style={{ marginTop: 12 }}>
             <Typography variant="subtitle2" gutterBottom>{t('misc.aia_recommendations')}</Typography>
             <ul style={{ margin: 0, paddingLeft: 18 }}>
-              {result.recommendations.map((rec, idx) => <li key={idx}>{rec}</li>)}
+              {resultObj.recommendations.map((rec: unknown, idx: number) => <li key={idx}>{String(rec ?? '')}</li>)}
             </ul>
           </div>
         }
-        {result.urgency &&
-        <Pill color={result.urgency === t('misc.aia_urgency_emergency') ? 'error' : result.urgency === t('misc.aia_urgency_planned') ? 'info' : 'default'}>
-            {t('misc.aia_cardio_consultation')}: {result.urgency}
+        {Boolean(resultObj.urgency) &&
+        <Pill color={resultObj.urgency === t('misc.aia_urgency_emergency') ? 'error' : resultObj.urgency === t('misc.aia_urgency_planned') ? 'info' : 'default'}>
+            {t('misc.aia_cardio_consultation')}: {String(resultObj.urgency ?? '')}
           </Pill>
         }
       </div>);
