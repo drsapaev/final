@@ -23,6 +23,9 @@ import IconButton from './IconButton';
 import logger from '../../utils/logger';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
+import type { Appointment, Doctor } from '../../types/domain/clinic';
+
+type AdminTranslationFn = (key: string, options?: Record<string, unknown>) => string;
 
 const getStatusOptions = (t: (key: string) => string) => [
   { value: '', label: t('admin2.appt_filter_all_statuses') },
@@ -49,49 +52,53 @@ const textCellStyle = {
   color: 'var(--mac-text-secondary)',
 };
 
-const getAppointmentPatientDisplayName = (appointment, t) => {
+const getAppointmentPatientDisplayName = (appointment: Appointment, t: AdminTranslationFn): string => {
+  const patient = (appointment?.patient ?? null) as Record<string, unknown> | null;
   const rawName =
     appointment?.patientName ||
     appointment?.patient_name ||
-    appointment?.patient?.full_name ||
-    appointment?.patient?.fio ||
-    appointment?.patient?.name ||
-    appointment?.patient?.first_name ||
-    appointment?.patient?.last_name ||
+    patient?.full_name ||
+    patient?.fio ||
+    patient?.name ||
+    patient?.first_name ||
+    patient?.last_name ||
     t('admin2.appt_patient_default');
 
   const normalized = String(rawName).trim();
   return normalized || t('admin2.appt_patient_default');
 };
 
-const getAppointmentDoctorDisplayName = (appointment, t) => {
+const getAppointmentDoctorDisplayName = (appointment: Appointment, t: AdminTranslationFn): string => {
+  const doctor = (appointment?.doctor ?? null) as Record<string, unknown> | null;
+  const doctorUser = (doctor?.user ?? null) as Record<string, unknown> | null;
   const rawName =
     appointment?.doctorName ||
     appointment?.doctor_name ||
-    appointment?.doctor?.full_name ||
-    appointment?.doctor?.name ||
-    appointment?.doctor?.user?.full_name ||
-    appointment?.doctor?.user?.username ||
+    doctor?.full_name ||
+    doctor?.name ||
+    doctorUser?.full_name ||
+    doctorUser?.username ||
     t('admin2.appt_doctor_default');
 
   const normalized = String(rawName).trim();
   return normalized || t('admin2.appt_doctor_default');
 };
 
-const getAppointmentDoctorSpecialization = (appointment) => {
+const getAppointmentDoctorSpecialization = (appointment: Appointment): string => {
+  const doctor = (appointment?.doctor ?? null) as Record<string, unknown> | null;
   const rawValue =
     appointment?.doctorSpecialization ||
     appointment?.doctor_specialization ||
     appointment?.specialization ||
-    appointment?.doctor?.specialization ||
-    appointment?.doctor?.specialty ||
+    doctor?.specialization ||
+    doctor?.specialty ||
     '';
 
   return String(rawValue).trim();
 };
 
-const getAppointmentStatusLabel = (status, t) => {
-  const statusMap = {
+const getAppointmentStatusLabel = (status: unknown, t: AdminTranslationFn): string => {
+  const statusMap: Record<string, string> = {
     pending: t('admin2.appt_status_pending'),
     scheduled: t('admin2.appt_status_scheduled'),
     confirmed: t('admin2.appt_status_confirmed'),
@@ -101,11 +108,14 @@ const getAppointmentStatusLabel = (status, t) => {
     cancelled: t('admin2.appt_status_cancelled'),
     no_show: t('admin2.appt_status_no_show'),
   };
-  return statusMap[status] || status || t('admin2.appt_status_not_specified');
+  if (typeof status === 'string' && status in statusMap) {
+    return statusMap[status] || t('admin2.appt_status_not_specified');
+  }
+  return String(status ?? '') || t('admin2.appt_status_not_specified');
 };
 
-const getAppointmentStatusVariant = (status) => {
-  const variantMap = {
+const getAppointmentStatusVariant = (status: unknown): string => {
+  const variantMap: Record<string, string> = {
     pending: 'warning',
     scheduled: 'warning',
     confirmed: 'info',
@@ -115,10 +125,13 @@ const getAppointmentStatusVariant = (status) => {
     cancelled: 'error',
     no_show: 'secondary',
   };
-  return variantMap[status] || 'secondary';
+  if (typeof status === 'string' && status in variantMap) {
+    return variantMap[status];
+  }
+  return 'secondary';
 };
 
-const getInitials = (value, fallback) =>
+const getInitials = (value: unknown, fallback: string) =>
   String(value || fallback)
     .split(/\s+/)
     .filter(Boolean)
@@ -127,21 +140,26 @@ const getInitials = (value, fallback) =>
     .toUpperCase()
     .slice(0, 2) || fallback;
 
-const formatAppointmentDate = (value, t) => {
+const formatAppointmentDate = (value: unknown, t: AdminTranslationFn): string => {
   if (!value) {
     return t('admin2.appt_date_not_specified');
   }
 
-  const parsed = new Date(value);
+  const parsed = new Date(String(value));
   if (Number.isNaN(parsed.getTime())) {
-    return value;
+    return String(value);
   }
 
   return parsed.toLocaleDateString('ru-RU');
 };
 
-const getDoctorOptionLabel = (doctor, t) => {
-  const name = doctor.user?.full_name || doctor.name || doctor.user?.username || t('admin2.appt_doctor_with_id', { id: doctor.id });
+const getDoctorOptionLabel = (doctor: Doctor, t: AdminTranslationFn): string => {
+  const name = String(
+    doctor.user?.full_name ||
+    doctor.name ||
+    doctor.user?.username ||
+    t('admin2.appt_doctor_with_id', { id: doctor.id })
+  );
   const flags = [
     doctor.active === false ? t('admin2.appt_doctor_inactive_flag') : null,
     doctor.user?.is_active === false ? t('admin2.appt_doctor_account_inactive_flag') : null,
@@ -202,11 +220,11 @@ const AdminAppointments = () => {
     appointmentModal.openModal(null);
   };
 
-  const handleEditAppointment = (appointment) => {
-    appointmentModal.openModal(appointment);
+  const handleEditAppointment = (appointment: Appointment) => {
+    appointmentModal.openModal(appointment as unknown as null);
   };
 
-  const handleDeleteAppointment = async (appointment) => {
+  const handleDeleteAppointment = async (appointment: Appointment) => {
     const patientName = getAppointmentPatientDisplayName(appointment, t);
     const doctorName = getAppointmentDoctorDisplayName(appointment, t);
     // P-013 fix: replaced window.confirm() with shared useConfirm hook.
@@ -224,14 +242,19 @@ const AdminAppointments = () => {
     }
 
     try {
-      await deleteAppointment(appointment.id);
+      const appointmentId = appointment.id;
+      if (appointmentId === undefined || appointmentId === null) {
+        notify.error(t('admin.appointment_delete_error'));
+        return;
+      }
+      await deleteAppointment(appointmentId);
     } catch (deleteError) {
       logger.error('Ошибка удаления записи:', deleteError);
       notify.error(t('admin.appointment_delete_error'));
     }
   };
 
-  const handleSaveAppointment = async (appointmentData) => {
+  const handleSaveAppointment = async (appointmentData: Record<string, unknown>) => {
     appointmentModal.setModalLoading(true);
     try {
       if (appointmentModal.selectedItem) {

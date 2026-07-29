@@ -8,43 +8,45 @@ import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
 
-const getAppointmentDate = (appointment) => appointment.date || appointment.appointment_date;
+type StatsAppointmentAccessor = ((key: string) => unknown) & Record<string, unknown>;
 
-const shiftDate = (dateString, days) => {
+const getAppointmentDate = (appointment: StatsAppointmentAccessor): unknown => appointment.date || appointment.appointment_date;
+
+const shiftDate = (dateString: string, days: number): string => {
   const date = new Date(`${dateString}T00:00:00`);
   date.setDate(date.getDate() + days);
   return date.toISOString().split('T')[0];
 };
 
-const toNumber = (value) => {
+const toNumber = (value: unknown): number => {
   const numericValue = Number(value);
   return Number.isFinite(numericValue) ? numericValue : 0;
 };
 
-const getPercentChange = (current, previous) => {
+const getPercentChange = (current: number, previous: number): number => {
   if (previous === 0) {
     return current > 0 ? 100 : 0;
   }
   return Math.round(Math.abs((current - previous) / previous) * 100);
 };
 
-const getTrendDirection = (current, previous, goodWhenDown = false) => {
+const getTrendDirection = (current: number, previous: number, goodWhenDown: boolean = false): 'up' | 'down' => {
   if (current === previous) {
     return goodWhenDown ? 'down' : 'up';
   }
   return current > previous ? 'up' : 'down';
 };
 
-const getAverageWaitTime = (appointments) => {
+const getAverageWaitTime = (appointments: StatsAppointmentAccessor[]): number => {
   const waitTimes = appointments.
-  map((apt) => toNumber(apt('misc.ms_wait_time_minutes') ?? apt('misc.ms_wait_minutes') ?? apt('misc.ms_queue_wait_minutes') ?? apt('misc.ms_wait_time'))).
-  filter((minutes) => minutes > 0);
+  map((apt: StatsAppointmentAccessor) => toNumber(apt('misc.ms_wait_time_minutes') ?? apt('misc.ms_wait_minutes') ?? apt('misc.ms_queue_wait_minutes') ?? apt('misc.ms_wait_time'))).
+  filter((minutes: number) => minutes > 0);
 
   if (waitTimes.length === 0) {
     return 0;
   }
 
-  return Math.round(waitTimes.reduce((sum, minutes) => sum + minutes, 0) / waitTimes.length);
+  return Math.round(waitTimes.reduce((sum: number, minutes: number) => sum + minutes, 0) / waitTimes.length);
 };
 
 interface ModernStatisticsProps {
@@ -215,7 +217,7 @@ const ModernStatistics = ({
 
   // Анимация счетчиков
   useEffect(() => {
-    const animateValue = (key, targetValue) => {
+    const animateValue = (key: string, targetValue: number) => {
       const duration = 1000;
       const steps = 60;
       const stepValue = targetValue / steps;
@@ -318,7 +320,7 @@ const ModernStatistics = ({
 
 
   // Форматирование значений
-  const formatValue = (value, format) => {
+  const formatValue = (value: number, format?: string): string => {
     if (format === 'currency') {
       return new Intl.NumberFormat('ru-RU').format(value);
     }
@@ -326,7 +328,7 @@ const ModernStatistics = ({
   };
 
   // Получение цвета тренда
-  const getTrendColor = (trend, isGoodWhenDown = false) => {
+  const getTrendColor = (trend: string, isGoodWhenDown: boolean = false): string => {
     if (isGoodWhenDown) {
       return trend === 'down' ? 'var(--mac-success)' : 'var(--mac-error)';
     }
