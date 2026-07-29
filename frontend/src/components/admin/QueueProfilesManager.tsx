@@ -744,7 +744,7 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
                 {editingProfile && (
                     <ProfileForm
                         profile={editingProfile}
-                        onSubmit={(data: React.FormEvent<HTMLFormElement>) => handleUpdate(editingProfile.key, data as unknown as Record<string, unknown>)}
+                        onSubmit={(data: Record<string, unknown>) => handleUpdate(editingProfile.key, data)}
                         onCancel={() => setEditingProfile(null)}
                         saving={saving}
                         isDark={isDark}
@@ -759,7 +759,7 @@ const QueueProfilesManager = ({ theme = 'light' }: { theme?: 'light' | 'dark' })
     );
 };
 // Profile form component with show_on_qr_page support
-const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = false, departments = [] }: { profile?: Record<string, unknown>; onSubmit?: (data: unknown) => void; onCancel?: () => void; saving?: boolean; isDark?: boolean; isEdit?: boolean; departments?: unknown[] }) => {
+const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = false, departments = [] }: { profile?: Record<string, unknown>; onSubmit?: (data: Record<string, unknown>) => void | Promise<void>; onCancel?: () => void; saving?: boolean; isDark?: boolean; isEdit?: boolean; departments?: Department[] }) => {
     const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
     const availableIcons = getAvailableIcons(t);
@@ -881,7 +881,7 @@ const ProfileForm = ({ profile, onSubmit, onCancel, saving, isDark, isEdit = fal
                             onChange={e => setFormData({ ...formData, department_key: e.target.value })}
                         >
                             <option value="">{t('admin2.qp_department_none')}</option>
-                            {departments.map((d: { key?: string; name_ru?: string }) => (
+                            {departments.map((d) => (
                                 <option key={d.key} value={d.key}>{d.name_ru || d.key}</option>
                             ))}
                         </select>
