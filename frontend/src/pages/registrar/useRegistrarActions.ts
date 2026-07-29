@@ -114,7 +114,7 @@ export const useRegistrarActions = ({ appointments, loadAppointments }) => {
 
   const updateAppointmentStatus = useCallback(async (recordSelectionKey: unknown, status: string, reason = '', sourceRecord: Record<string, unknown> | null = null) => {
     try {
-      const record = sourceRecord || findRegistrarRecordBySelectionKey(appointments, recordSelectionKey);
+      const record = sourceRecord || findRegistrarRecordBySelectionKey(appointments, String(recordSelectionKey ?? ''));
       const requiredBackendAction = getRegistrarActionForStatus(status);
       if (!requiredBackendAction) {
         logger.warn('RegistrarPanel: unsupported status command', { recordSelectionKey, status, record });

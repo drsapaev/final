@@ -140,7 +140,7 @@ const ExaminationMatrix = ({
     // Remove key if null
     if (!newType) delete newStatus[item];
 
-    setStatus(newStatus);
+    setStatus(newStatus as Record<string, string>);
     generateText(newStatus);
   };
 

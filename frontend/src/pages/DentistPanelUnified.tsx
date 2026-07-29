@@ -76,17 +76,58 @@ import { useVisitLifecycle } from '../hooks/useVisitLifecycle';
 
 const LazyReportsAndAnalytics = lazy(() => import('../components/dental/ReportsAndAnalytics'));
 
+/**
+ * Loose shape for the doctor-panel `selectedPatient` state object.
+ * The shared `useDoctorPanelState` hook keeps `selectedPatient` typed as
+ * `null` (its useState is declared without an explicit generic, and the
+ * runtime payload is built ad-hoc from API/queue rows). Until the hook
+ * ships a proper type, the panel casts its return through this alias.
+ */
+type SelectedPatient = {
+  id?: string | number | null;
+  appointment_id?: string | number | null;
+  visit_id?: string | number | null;
+  patient_id?: string | number | null;
+  patient_name?: string;
+  patient_fio?: string;
+  name?: string;
+  phone?: string;
+  number?: string | number | null;
+  doctor_queue_entry_id?: string | number | null;
+  queue_entry_id?: string | number | null;
+  source?: string;
+  status?: string | null;
+  specialty?: string;
+  patient?: { id?: string | number; full_name?: string; name?: string; [k: string]: unknown } | null;
+  visitData?: Record<string, unknown> | null;
+  examinationData?: Record<string, unknown> | null;
+  diagnosisData?: Record<string, unknown> | null;
+  photoArchive?: Record<string, unknown> | null;
+  dentalChart?: Record<string, unknown> | null;
+  [k: string]: unknown;
+};
+
+type DoctorPanelState = {
+  activeTab: string;
+  setActiveTab: (tab: string) => void;
+  handleTabChange: (tab: string) => void;
+  patientIdFromUrl: number | null;
+  visitIdFromUrl: number | null;
+  selectedPatient: SelectedPatient | null;
+  setSelectedPatient: React.Dispatch<React.SetStateAction<SelectedPatient | null>>;
+};
+
 const API_V1_BASE = getApiBaseUrl();
 const DENTISTRY_WAITING_STATUSES = ['waiting', 'confirmed', 'pending'];
 const DENTISTRY_CALLED_STATUSES = ['called', 'in_progress'];
 const DENTISTRY_COMPLETED_STATUSES = ['completed', 'done'];
-let dentistAppointmentsCache = null;
-let dentistAppointmentsLoadPromise = null;
-let dentistServicesCache = null;
-let dentistServicesLoadPromise = null;
-const dentistVisitProtocolsCache = new Map();
-const dentistVisitProtocolsLoadPromises = new Map();
-const dentistFallbackLoggedKeys = new Set();
+let dentistAppointmentsCache: Appointment[] | null = null;
+let dentistAppointmentsLoadPromise: Promise<Appointment[]> | null = null;
+let dentistServicesCache: Record<string, unknown> | null = null;
+let dentistServicesLoadPromise: Promise<Record<string, unknown> | null> | null = null;
+const dentistVisitProtocolsCache = new Map<string, Record<string, unknown>[]>();
+const dentistVisitProtocolsLoadPromises = new Map<string, Promise<Record<string, unknown>[]>>();
+const dentistFallbackLoggedKeys = new Set<string>();
 
 // audit/phase-1, BS-42: invalidation helper for the 7 module-level caches.
 // Previously these caches were never invalidated on patient switch, so on
@@ -110,38 +151,41 @@ function invalidateDentistPanelCaches() {
 // countAppointmentsByStatuses and normalizeNumericId are imported from
 // utils/doctorPanelShared (unified across Cardiology / Dermatology / Dentistry).
 
-function resolveDoctorQueueEntryId(row) {
+function resolveDoctorQueueEntryId(row: Record<string, unknown> | null | undefined): string | number | null {
   const explicitQueueEntryId = row?.doctor_queue_entry_id ?? row?.queue_entry_id ?? null;
   if (explicitQueueEntryId !== null && explicitQueueEntryId !== undefined) {
-    return explicitQueueEntryId;
+    return explicitQueueEntryId as string | number;
   }
 
   return null;
 }
 
-function buildPatientsFromAppointments(appointments, t) {
-  const patientsById = new Map();
+function buildPatientsFromAppointments(
+  appointments: Appointment[] | null | undefined,
+  t: (key: string, params?: Record<string, unknown>) => string,
+): SelectedPatient[] {
+  const patientsById = new Map<string | number, SelectedPatient>();
 
-  appointments.forEach((appointment: Appointment) => {
+  (appointments ?? []).forEach((appointment: Appointment) => {
     const patientId = appointment.patient_id || appointment.id;
     if (!patientId || patientsById.has(patientId)) {
       return;
     }
 
     const patientName =
-      appointment.patient_fio || appointment.patient_name || appointment.name || t('dental.dental_panel_patient_default');
+      appointment.patient_fio || appointment.patient_name || (appointment.name as string | undefined) || t('dental.dental_panel_patient_default');
 
     patientsById.set(patientId, {
       id: patientId,
       patient_id: patientId,
-      appointment_id: appointment.appointment_id || null,
+      appointment_id: (appointment.appointment_id as string | number | null | undefined) || null,
       visit_id: normalizeNumericId(appointment.visit_id),
       name: patientName,
       patient_name: patientName,
       patient_fio: patientName,
-      phone: appointment.patient_phone || appointment.phone || '',
-      specialty: appointment.specialty || 'dentistry',
-      source: appointment.source || 'appointments',
+      phone: (appointment.patient_phone as string) || (appointment.phone as string) || '',
+      specialty: (appointment.specialty as string) || 'dentistry',
+      source: (appointment.source as string) || 'appointments',
     });
   });
 
@@ -191,30 +235,30 @@ const DentistPanelUnified = () => {
     defaultTab: 'queue',
     visitDeepLinkTab: 'visit',
     patientDeepLinkTab: 'patients',
-  });
+  }) as DoctorPanelState;
 
-  const handleCardKeyDown = useCallback((event, action) => {
+  const handleCardKeyDown = useCallback((event: React.KeyboardEvent<HTMLElement>, action: () => void) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       action();
     }
   }, []);
-  const [patients, setPatients] = useState([]);
+  const [patients, setPatients] = useState<SelectedPatient[]>([]);
   // Phase 4+ cleanup: treatmentPlans/prosthetics state removed (dead UI).
   const [loading, setLoading] = useState(true);
   // P-009: selectedPatient / setSelectedPatient now come from useDoctorPanelState
-  const [savedVisitProtocols, setSavedVisitProtocols] = useState(
+  const [savedVisitProtocols, setSavedVisitProtocols] = useState<Record<string, unknown>[]>(
     () => loadStoredDentistDocuments().visitProtocols
   );
-  const [scheduleNextModal, setScheduleNextModal] = useState({ open: false, patient: null });
-  const [protocolTemplateDraft, setProtocolTemplateDraft] = useState<Record<string, unknown> | null>(null);
+  const [scheduleNextModal, setScheduleNextModal] = useState<{ open: boolean; patient: SelectedPatient | Record<string, unknown> | null }>({ open: false, patient: null });
+  const [protocolTemplateDraft, setProtocolTemplateDraft] = useState<SelectedPatient | null>(null);
 
   // Состояния для таблицы записей
-  const [appointmentsTableData, setAppointmentsTableData] = useState([]);
+  const [appointmentsTableData, setAppointmentsTableData] = useState<Appointment[]>([]);
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
   const [services, setServices] = useState<Record<string, unknown>>({});
-  const appointmentsTableDataRef = useRef([]);
-  const appointmentsLoadPromiseRef = useRef(null);
+  const appointmentsTableDataRef = useRef<Appointment[]>([]);
+  const appointmentsLoadPromiseRef = useRef<Promise<Appointment[]> | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [showDentalChart, setShowDentalChart] = useState(false);
@@ -249,7 +293,10 @@ const DentistPanelUnified = () => {
     selectedPatient?.id ||
     patientIdFromUrl ||
     null;
-  useVisitLifecycle(lifecycleVisitId, lifecyclePatientId, {
+  useVisitLifecycle(
+    lifecycleVisitId as unknown as string | number,
+    lifecyclePatientId as unknown as string | number,
+    {
     invalidateCacheOnChange: true,
     onCleanup: () => {
       // Reset local protocol state so stale data does not bleed into the
@@ -264,7 +311,8 @@ const DentistPanelUnified = () => {
       // the previous patient's PHI could be displayed to the next clinician.
       invalidateDentistPanelCaches();
     },
-  });
+  },
+  );
   // Состояние для DentalPriceManager
   const [showPriceManager, setShowPriceManager] = useState(false);
   const [selectedServiceForPrice, setSelectedServiceForPrice] = useState<{ id?: string | number; name?: string; price?: number; [key: string]: unknown } | null>(null);
@@ -290,8 +338,10 @@ const DentistPanelUnified = () => {
     appointmentsTableDataRef.current = appointmentsTableData;
   }, [appointmentsTableData]);
 
-  const loadDentistVisitProtocolsForPatient = useCallback(async (patient) => {
-    const patientId = patient?.patient?.id || patient?.patient_id || patient?.id || null;
+  const loadDentistVisitProtocolsForPatient = useCallback(async (patient: SelectedPatient | Record<string, unknown> | null) => {
+    const patientRecord = (patient ?? {}) as Record<string, unknown>;
+    const nestedPatient = patientRecord.patient as { id?: string | number; [k: string]: unknown } | undefined;
+    const patientId = nestedPatient?.id || patientRecord.patient_id || patientRecord.id || null;
     if (!patientId) {
       return [];
     }
@@ -309,7 +359,7 @@ const DentistPanelUnified = () => {
 
     logger.info('[Dentist] Загружаю протоколы визитов из EMR v2', {
       patientId,
-      patientName: patient?.patient_name || patient?.patient_fio || patient?.name || 'Пациент',
+      patientName: patientRecord.patient_name as string || patientRecord.patient_fio as string || patientRecord.name as string || 'Пациент',
     });
 
     const loadPromise = (async () => {
@@ -317,16 +367,16 @@ const DentistPanelUnified = () => {
         const response = await apiClient.get(`/v2/emr/patient/${patientId}`, {
           params: { limit: 20 },
           silent: true,
-        });
+        } as Record<string, unknown>);
 
-        const summaries = Array.isArray(response.data) ? response.data : [];
+        const summaries: Record<string, unknown>[] = Array.isArray(response.data) ? response.data : [];
         const records = await Promise.all(
           summaries.map(async (summary) => {
             try {
               const emrResponse = await apiClient.get(`/v2/emr/${summary.visit_id}`, {
                 silent: true,
-                validateStatus: (status) => status === 404 || (status >= 200 && status < 300),
-              });
+                validateStatus: (status: number) => status === 404 || (status >= 200 && status < 300),
+              } as Record<string, unknown>);
 
               if (emrResponse.status === 404) {
                 return null;
@@ -334,7 +384,7 @@ const DentistPanelUnified = () => {
 
               const protocolRecord = mapDentistVisitProtocolFromEmr(
                 emrResponse.data,
-                patient,
+                patient as Record<string, unknown> | null,
               );
 
               if (!protocolRecord) {
@@ -353,7 +403,7 @@ const DentistPanelUnified = () => {
           })
         );
 
-        const filteredRecords = records.filter(Boolean);
+        const filteredRecords = records.filter((r): r is Record<string, unknown> => Boolean(r));
         dentistVisitProtocolsCache.set(cacheKey, filteredRecords);
         return filteredRecords;
       } catch (error: unknown) {
@@ -368,7 +418,7 @@ const DentistPanelUnified = () => {
     return loadPromise;
   }, []);
 
-  const loadDentistVisitProtocolByVisitId = useCallback(async (visitId, patient = null) => {
+  const loadDentistVisitProtocolByVisitId = useCallback(async (visitId: string | number | null | undefined, patient: SelectedPatient | Record<string, unknown> | null = null) => {
     if (!visitId) {
       return null;
     }
@@ -376,14 +426,14 @@ const DentistPanelUnified = () => {
     try {
       const response = await apiClient.get(`/v2/emr/${visitId}`, {
         silent: true,
-        validateStatus: (status) => status === 404 || (status >= 200 && status < 300),
-      });
+        validateStatus: (status: number) => status === 404 || (status >= 200 && status < 300),
+      } as Record<string, unknown>);
 
       if (response.status === 404) {
         return null;
       }
 
-      const protocolRecord = mapDentistVisitProtocolFromEmr(response.data, patient);
+      const protocolRecord = mapDentistVisitProtocolFromEmr(response.data, patient as Record<string, unknown> | null);
       if (!protocolRecord) {
         return null;
       }
@@ -502,12 +552,12 @@ const DentistPanelUnified = () => {
   }, []);
 
   // Функция для получения всех услуг пациента из всех записей
-  const getAllPatientServicesCb = useCallback((patientId, allAppointments) => {
-    return getAllPatientServices(patientId, allAppointments);
+  const getAllPatientServicesCb = useCallback((patientId: string | number | null | undefined, allAppointments: Appointment[] | null | undefined) => {
+    return getAllPatientServices(patientId, allAppointments as unknown as Array<Record<string, unknown>> | null | undefined);
   }, []);
 
   // Загрузка записей стоматолога
-  const loadDentistryAppointments = useCallback(async (forceRefresh = false) => {
+  const loadDentistryAppointments = useCallback(async (forceRefresh = false): Promise<Appointment[]> => {
     if (!forceRefresh && dentistAppointmentsCache) {
       appointmentsTableDataRef.current = dentistAppointmentsCache;
       setAppointmentsTableData(dentistAppointmentsCache);
@@ -519,10 +569,10 @@ const DentistPanelUnified = () => {
     }
 
     if (appointmentsLoadPromiseRef.current || dentistAppointmentsLoadPromise) {
-      return appointmentsLoadPromiseRef.current || dentistAppointmentsLoadPromise;
+      return (appointmentsLoadPromiseRef.current || dentistAppointmentsLoadPromise) as Promise<Appointment[]>;
     }
 
-    const loadPromise = (async () => {
+    const loadPromise = (async (): Promise<Appointment[]> => {
       setAppointmentsLoading(true);
       try {
         const token = tokenManager.getAccessToken();
@@ -535,54 +585,57 @@ const DentistPanelUnified = () => {
         const response = await apiClient.get('/registrar/queues/today');
 
         if (response.status < 400) {
-          const data = response.data;
+          const data = response.data as Record<string, unknown>;
 
           // Собираем ВСЕ записи из всех очередей для получения полной картины услуг
-          const allAppointments = [];
+          const allAppointments: Appointment[] = [];
           if (data && data.queues && Array.isArray(data.queues)) {
-            data.queues.forEach((queue) => {
-              if (queue.entries) {
-                queue.entries.forEach((entry) => {
+            (data.queues as Record<string, unknown>[]).forEach((queue) => {
+              const entries = queue?.entries as Record<string, unknown>[] | undefined;
+              if (entries) {
+                entries.forEach((entry) => {
                   const doctorQueueEntryId = resolveDoctorQueueEntryId(entry);
+                  const patientObj = entry.patient as { first_name?: string; last_name?: string; [k: string]: unknown } | undefined;
+                  const entryWithTimes = { ...entry, ...adaptTimeFields(entry, data) };
                   allAppointments.push({
-                    id: entry.id,
-                    appointment_id: entry.appointment_id || null,
-                    visit_id: entry.visit_id || null,
-                    patient_id: entry.patient_id,
-                    patient_fio: entry.patient_name || `${entry.patient?.first_name || ''} ${entry.patient?.last_name || ''}`.trim(),
-                    patient_phone: entry.phone || '',
-                    patient_birth_year: entry.patient_birth_year || '',
-                    address: entry.address || '',
+                    id: entry.id as string | number,
+                    appointment_id: (entry.appointment_id as string | number | null | undefined) || null,
+                    visit_id: (entry.visit_id as string | number | null | undefined) || null,
+                    patient_id: entry.patient_id as string | number,
+                    patient_fio: (entry.patient_name as string) || `${patientObj?.first_name || ''} ${patientObj?.last_name || ''}`.trim(),
+                    patient_phone: (entry.phone as string) || '',
+                    patient_birth_year: (entry.patient_birth_year as number | undefined) || undefined,
+                    address: (entry.address as string) || '',
                     visit_type:
                       entry.discount_mode === 'repeat' ? tI18n('dental.dental_panel_discount_repeat') :
                       entry.discount_mode === 'benefit' ? tI18n('dental.dental_panel_discount_benefit') :
                       entry.discount_mode === 'all_free' ? 'All Free' :
                       tI18n('dental.dental_panel_discount_paid'),
-                    discount_mode: entry.discount_mode || 'none',
-                    services: entry.services || [],
-                    service_codes: entry.service_codes || [],
-                    payment_type: entry.payment_type || null,
-                    payment_status: entry.payment_status ?? null,
-                    available_actions: entry.available_actions || [],
+                    discount_mode: (entry.discount_mode as string) || 'none',
+                    services: (entry.services as Appointment['services']) || [],
+                    service_codes: (entry.service_codes as string[]) || [],
+                    payment_type: (entry.payment_type as string) || null,
+                    payment_status: (entry.payment_status as string | undefined) ?? null,
+                    available_actions: (entry.available_actions as unknown[]) || [],
                     can_mark_paid: Boolean(entry.can_mark_paid),
                     can_start_visit: Boolean(entry.can_start_visit) && doctorQueueEntryId !== null,
                     can_print_ticket: Boolean(entry.can_print_ticket),
                     can_complete: Boolean(entry.can_complete) && doctorQueueEntryId !== null,
                     can_cancel: Boolean(entry.can_cancel),
-                    queue_entry_id: entry.queue_entry_id ?? null,
+                    queue_entry_id: (entry.queue_entry_id as string | number | null | undefined) ?? null,
                     doctor_queue_entry_id: doctorQueueEntryId,
-                    canonical_record_id: entry.canonical_record_id || entry.id,
+                    canonical_record_id: (entry.canonical_record_id as string | number | undefined) || entry.id as string | number,
                     record_kind: entry.record_kind,
                     source_kind: entry.source_kind,
-                    canonical_status: entry.canonical_status ?? null,
-                    queue_status: entry.queue_status ?? null,
+                    canonical_status: (entry.canonical_status as string | null | undefined) ?? null,
+                    queue_status: (entry.queue_status as string | null | undefined) ?? null,
                     queue_position: entry.queue_position,
-                    doctor: entry.doctor_name || tI18n('dental.dental_panel_doctor_default'),
-                    specialty: queue.specialty,
-                    ...adaptTimeFields(entry, data),
-                    status: entry.status ?? null,
-                    cost: entry.cost || 0
-                  });
+                    doctor: (entry.doctor_name as string) || tI18n('dental.dental_panel_doctor_default'),
+                    specialty: queue.specialty as string,
+                    ...entryWithTimes,
+                    status: (entry.status as string | null | undefined) ?? null,
+                    cost: (entry.cost as number) || 0
+                  } as Appointment);
                 });
               }
             });
@@ -645,8 +698,9 @@ const DentistPanelUnified = () => {
     }
 
     // Слушаем глобальные события обновления очереди
-    const handleQueueUpdate = (event) => {
-      logger.info('[Dentist] Получено событие обновления очереди:', event.detail);
+    const handleQueueUpdate = (event: Event) => {
+      const customEvent = event as CustomEvent<unknown>;
+      logger.info('[Dentist] Получено событие обновления очереди:', customEvent.detail);
       if (activeTab === 'appointments') {
         loadDentistryAppointments(true);
       }
@@ -659,20 +713,23 @@ const DentistPanelUnified = () => {
   }, [activeTab, loadDentistryAppointments]);
 
   const ensureCanonicalVisitId = useCallback(
-    (row) => makeEnsureCanonicalVisitId(setAppointmentsTableData, resolveCanonicalVisitId)(row),
+    (row: Appointment | Record<string, unknown>) => makeEnsureCanonicalVisitId(setAppointmentsTableData as unknown as React.Dispatch<React.SetStateAction<unknown[]>>, resolveCanonicalVisitId)(row as Record<string, unknown>),
     []
   );
 
-  const resolvePatientId = useCallback((patient) => (
-    patient?.patient?.id || patient?.patient_id || patient?.id || null
-  ), []);
+  const resolvePatientId = useCallback((patient: SelectedPatient | Record<string, unknown> | null | undefined) => {
+    const record = (patient ?? {}) as Record<string, unknown>;
+    const nestedPatient = record.patient as { id?: string | number; [k: string]: unknown } | undefined;
+    return nestedPatient?.id || record.patient_id || record.id || null;
+  }, []);
 
-  const resolvePatientName = useCallback((patient) => (
-    patient?.patient_name || patient?.patient_fio || patient?.name || tI18n('dental.dental_panel_patient_default')
-  ), [tI18n]);
+  const resolvePatientName = useCallback((patient: SelectedPatient | Record<string, unknown> | null | undefined) => {
+    const record = (patient ?? {}) as Record<string, unknown>;
+    return (record.patient_name as string) || (record.patient_fio as string) || (record.name as string) || tI18n('dental.dental_panel_patient_default');
+  }, [tI18n]);
 
   // Обработчики для таблицы записей
-  const handleAppointmentRowClick = async (row) => {
+  const handleAppointmentRowClick = async (row: Appointment) => {
     logger.info('Клик по записи:', row);
     // Можно открыть детали записи или переключиться на прием
     if (row.patient_fio) {
@@ -683,14 +740,14 @@ const DentistPanelUnified = () => {
       }
 
       // Создаем объект пациента для переключения на прием
-      const patientData = {
+      const patientData: SelectedPatient = {
         id: row.id,
-        appointment_id: row.appointment_id || null,
+        appointment_id: (row.appointment_id as string | number | null | undefined) || null,
         visit_id: visitId,
         patient_name: row.patient_fio,
-        phone: row.patient_phone,
+        phone: row.patient_phone || (row.phone as string) || '',
         number: row.id,
-        doctor_queue_entry_id: resolveDoctorQueueEntryId(row),
+        doctor_queue_entry_id: resolveDoctorQueueEntryId(row as unknown as Record<string, unknown>),
         source: 'appointments'
       };
       setSelectedPatient(patientData);
@@ -698,7 +755,7 @@ const DentistPanelUnified = () => {
     }
   };
 
-  const handleAppointmentActionClick = async (action, row, event) => {
+  const handleAppointmentActionClick = async (action: string, row: Appointment, event: React.MouseEvent<HTMLElement>) => {
     logger.info('[Dentist] handleAppointmentActionClick:', action, row);
     event.stopPropagation();
 
@@ -733,9 +790,9 @@ const DentistPanelUnified = () => {
       case 'print':
         logger.info('[Dentist] Печать талона для:', row.patient_fio);
         try {
-          const printResult = await printPanelTicket(row, {
+          const printResult = await printPanelTicket(row as unknown as Record<string, unknown>, {
             specialtyName: tI18n('dental.dental_panel_specialty_name')
-          });
+          }) as { message?: string } | undefined;
           notify.success(printResult?.message || tI18n('dental.dental_panel_ticket_printed', { name: row.patient_fio }));
         } catch (error: unknown) {
           logger.error('[Dentist] Ошибка печати талона:', error);
@@ -751,14 +808,14 @@ const DentistPanelUnified = () => {
             break;
           }
 
-          const patient = {
+          const patient: SelectedPatient = {
             id: row.id,
-            appointment_id: row.appointment_id || null,
+            appointment_id: (row.appointment_id as string | number | null | undefined) || null,
             visit_id: visitId,
             patient_name: row.patient_fio,
-            phone: row.patient_phone,
+            phone: row.patient_phone || (row.phone as string) || '',
             number: row.id,
-            doctor_queue_entry_id: resolveDoctorQueueEntryId(row),
+            doctor_queue_entry_id: resolveDoctorQueueEntryId(row as unknown as Record<string, unknown>),
             source: 'appointments',
             status: 'in_cabinet'
           };
@@ -939,18 +996,18 @@ const DentistPanelUnified = () => {
           const patientName =
             matchingAppointment.patient_fio ||
             matchingAppointment.patient_name ||
-            matchingAppointment.name ||
+            (matchingAppointment.name as string | undefined) ||
             tI18n('dental.dental_panel_patient_default');
 
-          const patientObj = {
-            id: matchingAppointment.appointment_id || matchingAppointment.id || patientIdFromUrl || visitIdFromUrl,
+          const patientObj: SelectedPatient = {
+            id: (matchingAppointment.appointment_id as string | number | undefined) || matchingAppointment.id || patientIdFromUrl || visitIdFromUrl,
             patient_id: matchingAppointment.patient_id || patientIdFromUrl || matchingAppointment.id,
-            appointment_id: matchingAppointment.appointment_id || null,
+            appointment_id: (matchingAppointment.appointment_id as string | number | null | undefined) || null,
             visit_id: visitIdFromUrl || normalizeNumericId(matchingAppointment.visit_id) || null,
             patient_name: patientName,
             patient_fio: patientName,
-            phone: matchingAppointment.patient_phone || matchingAppointment.phone || '',
-            source: matchingAppointment.source || 'appointments',
+            phone: matchingAppointment.patient_phone || (matchingAppointment.phone as string) || '',
+            source: (matchingAppointment.source as string) || 'appointments',
             specialty: matchingAppointment.specialty || 'dental'
           };
 
@@ -965,7 +1022,7 @@ const DentistPanelUnified = () => {
             ? tI18n('dental.dental_panel_patient_url_fallback', { id: patientIdFromUrl })
             : tI18n('dental.dental_panel_visit_url_fallback', { id: visitIdFromUrl });
 
-          const patientObj = {
+          const patientObj: SelectedPatient = {
             id: patientIdFromUrl || visitIdFromUrl,
             patient_id: patientIdFromUrl || visitIdFromUrl,
             appointment_id: null,
@@ -994,13 +1051,13 @@ const DentistPanelUnified = () => {
   }, [location.search, patientIdFromUrl, visitIdFromUrl, appointmentsTableData, loadDentistryAppointments]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Обработчики
-  const handlePatientSelect = (patient) => {
-    const normalizedPatient = {
-      ...patient,
+  const handlePatientSelect = (patient: SelectedPatient | Record<string, unknown> | null) => {
+    const normalizedPatient: SelectedPatient = {
+      ...(patient as Record<string, unknown>),
       patient_id: resolvePatientId(patient),
       patient_name: resolvePatientName(patient),
       patient_fio: resolvePatientName(patient)
-    };
+    } as SelectedPatient;
     setSelectedPatient(normalizedPatient);
 
     if (normalizedPatient.visit_id) {
@@ -1073,7 +1130,7 @@ const DentistPanelUnified = () => {
   const CRITICAL_ICD10_CODES = useRef(['K04', 'K10']).current;
 
   const getCriticalDiagnosisWarning = useCallback(
-    (icd10Code) => {
+    (icd10Code: unknown) => {
       if (!icd10Code || typeof icd10Code !== 'string') return null;
       const code = icd10Code.trim().toUpperCase();
       // Match by prefix (e.g. "K04" matches "K04.0", "K04.9", "K049")
@@ -1219,57 +1276,59 @@ const DentistPanelUnified = () => {
 
 
 
-  const handleExamination = (patient) => {
+  const handleExamination = (patient: SelectedPatient | Record<string, unknown> | null) => {
     const patientId = resolvePatientId(patient);
     setSelectedPatient({
-      ...patient,
+      ...(patient as Record<string, unknown>),
       patient_id: patientId,
       patient_name: resolvePatientName(patient),
       patient_fio: resolvePatientName(patient)
-    });
-    setExaminationForm({ ...examinationForm, patient_id: patientId });
+    } as SelectedPatient);
+    setExaminationForm({ ...examinationForm, patient_id: String(patientId ?? '') });
     setShowExaminationForm(true);
   };
 
 
 
-  const handleDiagnosis = (patient) => {
+  const handleDiagnosis = (patient: SelectedPatient | Record<string, unknown> | null) => {
     setSelectedPatient({
-      ...patient,
+      ...(patient as Record<string, unknown>),
       patient_id: resolvePatientId(patient),
       patient_name: resolvePatientName(patient),
       patient_fio: resolvePatientName(patient)
-    });
+    } as SelectedPatient);
     setShowDiagnosisForm(true);
   };
 
-  const handleVisitProtocol = async (patient) => {
-    const visitId = patient?.visit_id || await ensureCanonicalVisitId(patient);
+  const handleVisitProtocol = async (patient: SelectedPatient | Record<string, unknown> | null) => {
+    const patientRecord = (patient ?? {}) as Record<string, unknown>;
+    const visitId = (patientRecord.visit_id as string | number | null | undefined) || await ensureCanonicalVisitId(patientRecord);
     if (!visitId) {
       notify.error(tI18n('dental.protocol_needs_visit_id'));
       return;
     }
 
     const backendProtocol = await loadDentistVisitProtocolByVisitId(visitId, patient);
+    const backendRecord = (backendProtocol ?? {}) as Record<string, unknown>;
     setSelectedPatient({
-      ...patient,
+      ...(patient as Record<string, unknown>),
       patient_id: resolvePatientId(patient),
       patient_name: resolvePatientName(patient),
       patient_fio: resolvePatientName(patient),
       visit_id: visitId,
-      visitData: backendProtocol?.visitData || patient?.visitData || null,
-      source: backendProtocol?.source || patient?.source || 'appointments',
-    });
+      visitData: (backendRecord.visitData as Record<string, unknown> | null) || (patientRecord.visitData as Record<string, unknown> | null) || null,
+      source: (backendRecord.source as string) || (patientRecord.source as string) || 'appointments',
+    } as SelectedPatient);
     setShowVisitProtocol(true);
   };
 
-  const handlePhotoArchive = (patient) => {
+  const handlePhotoArchive = (patient: SelectedPatient | Record<string, unknown> | null) => {
     setSelectedPatient({
-      ...patient,
+      ...(patient as Record<string, unknown>),
       patient_id: resolvePatientId(patient),
       patient_name: resolvePatientName(patient),
       patient_fio: resolvePatientName(patient)
-    });
+    } as SelectedPatient);
     setShowPhotoArchive(true);
   };
 
@@ -1277,48 +1336,54 @@ const DentistPanelUnified = () => {
     setShowProtocolTemplates(true);
   };
 
-  const buildVisitProtocolDraftFromTemplate = useCallback((template) => {
+  const buildVisitProtocolDraftFromTemplate = useCallback((template: Record<string, unknown> | null) => {
     if (!template) {
       return null;
     }
 
+    const templatePhotos = template.photos as Array<Record<string, unknown>> | undefined;
+    const templateSteps = template.steps as Array<Record<string, unknown> | string> | undefined;
+    const templateMaterials = template.materials as Array<Record<string, unknown>> | undefined;
+    const templateAnesthesia = template.anesthesia as Array<Record<string, unknown>> | undefined;
+    const templatePrescriptions = template.prescriptions as Array<Record<string, unknown>> | undefined;
+
     const mapPhotoList = (type: string) => (
-      Array.isArray(template.photos)
-        ? template.photos.filter((photo) => photo?.type === type).map((photo, index) => ({
+      Array.isArray(templatePhotos)
+        ? templatePhotos.filter((photo) => photo?.type === type).map((photo: Record<string, unknown>, index: number) => ({
           id: `${type}-${index}-${Date.now()}`,
           url: '',
-          filename: photo.description || `${type} photo ${index + 1}`,
+          filename: (photo.description as string) || `${type} photo ${index + 1}`,
           size: 0,
           type,
           uploadedAt: new Date().toISOString(),
-          description: photo.description || '',
+          description: (photo.description as string) || '',
         }))
         : []
     );
 
     return {
-      chiefComplaint: template.description || template.name || '',
-      historyOfPresentIllness: template.description || '',
-      procedures: Array.isArray(template.steps)
-        ? template.steps.map((step, index) => ({
-          name: typeof step === 'string' ? step : step?.name || tI18n('dental.dental_panel_step_label', { index: index + 1 }),
+      chiefComplaint: (template.description as string) || (template.name as string) || '',
+      historyOfPresentIllness: (template.description as string) || '',
+      procedures: Array.isArray(templateSteps)
+        ? templateSteps.map((step: Record<string, unknown> | string, index: number) => ({
+          name: typeof step === 'string' ? step : (step?.name as string) || tI18n('dental.dental_panel_step_label', { index: index + 1 }),
           teeth: '',
           notes: '',
-          duration: typeof step === 'object' && step !== null ? step.duration || 0 : 0,
+          duration: typeof step === 'object' && step !== null ? (step as Record<string, unknown>).duration as number || 0 : 0,
         }))
         : [],
-      materials: Array.isArray(template.materials)
-        ? template.materials.map((material) => ({
-          name: material?.name || '',
-          quantity: material?.quantity || '',
+      materials: Array.isArray(templateMaterials)
+        ? templateMaterials.map((material: Record<string, unknown>) => ({
+          name: (material?.name as string) || '',
+          quantity: (material?.quantity as string) || '',
           notes: material?.required ? tI18n('dental.dental_panel_required_material') : '',
         }))
         : [],
-      anesthesia: Array.isArray(template.anesthesia)
-        ? template.anesthesia.map((anesthesia) => ({
-          drug: anesthesia?.drug || '',
-          dose: anesthesia?.dose || '',
-          method: anesthesia?.method || '',
+      anesthesia: Array.isArray(templateAnesthesia)
+        ? templateAnesthesia.map((anesthesia: Record<string, unknown>) => ({
+          drug: (anesthesia?.drug as string) || '',
+          dose: (anesthesia?.dose as string) || '',
+          method: (anesthesia?.method as string) || '',
           required: Boolean(anesthesia?.required),
         }))
         : [],
@@ -1328,27 +1393,27 @@ const DentistPanelUnified = () => {
         after: mapPhotoList('after'),
       },
       radiographs: [],
-      prescriptions: Array.isArray(template.prescriptions)
-        ? template.prescriptions.map((prescription) => ({
-          medication: prescription?.medication || '',
-          dosage: prescription?.dosage || '',
-          instructions: prescription?.instructions || '',
+      prescriptions: Array.isArray(templatePrescriptions)
+        ? templatePrescriptions.map((prescription: Record<string, unknown>) => ({
+          medication: (prescription?.medication as string) || '',
+          dosage: (prescription?.dosage as string) || '',
+          instructions: (prescription?.instructions as string) || '',
           required: Boolean(prescription?.required),
         }))
         : [],
-      recommendations: template.aftercare || '',
+      recommendations: (template.aftercare as string) || '',
       nextVisit: { date: '', time: '', purpose: '' },
     };
   }, [tI18n]);
 
-  const handleProtocolTemplateSelect = useCallback((template) => {
-    const templateName = template?.name || tI18n('dental.dental_panel_template_default');
+  const handleProtocolTemplateSelect = useCallback((template: Record<string, unknown> | null) => {
+    const templateName = (template?.name as string) || tI18n('dental.dental_panel_template_default');
     const currentPatientName = resolvePatientName(selectedPatient);
-    const draft = {
-      patient_id: selectedPatient?.patient_id || selectedPatient?.id || null,
+    const draft: SelectedPatient = {
+      patient_id: (selectedPatient?.patient_id as string | number | null) || (selectedPatient?.id as string | number | null) || null,
       patient_name: currentPatientName || tI18n('dental.dental_panel_template_label', { name: templateName }),
       patient_fio: currentPatientName || tI18n('dental.dental_panel_template_label', { name: templateName }),
-      visit_id: selectedPatient?.visit_id || null,
+      visit_id: (selectedPatient?.visit_id as string | number | null) || null,
       source: 'protocol-template',
       visitData: buildVisitProtocolDraftFromTemplate(template),
     };
@@ -1367,13 +1432,15 @@ const DentistPanelUnified = () => {
     setShowReports(true);
   };
 
-  const persistVisitProtocol = useCallback(async (patient, visitData) => {
-    if (!patient?.visit_id) {
+  const persistVisitProtocol = useCallback(async (patient: SelectedPatient | Record<string, unknown> | null, visitData: Record<string, unknown>) => {
+    const patientRecord = (patient ?? {}) as Record<string, unknown>;
+    if (!patientRecord.visit_id) {
       return;
     }
 
-    const patientId = patient?.patient?.id || patient?.patient_id || patient?.id || null;
-    const patientName = patient?.patient_name || patient?.patient_fio || patient?.name || tI18n('dental.dental_panel_patient_default');
+    const nestedPatient = patientRecord.patient as { id?: string | number; [k: string]: unknown } | undefined;
+    const patientId = nestedPatient?.id || patientRecord.patient_id || patientRecord.id || null;
+    const patientName = (patientRecord.patient_name as string) || (patientRecord.patient_fio as string) || (patientRecord.name as string) || tI18n('dental.dental_panel_patient_default');
     const localRecord = buildDentistVisitProtocolCard(patient, visitData, {
       source: 'local_cache',
     });
@@ -1384,18 +1451,18 @@ const DentistPanelUnified = () => {
         rowVersion: 0,
       });
       logger.info('[Dentist] Сохраняю протокол визита в EMR v2', {
-        visitId: patient.visit_id,
+        visitId: patientRecord.visit_id,
         patientId,
       });
 
-      const response = await apiClient.post(`/v2/emr/${patient.visit_id}`, payload);
-      const backendRecord = mapDentistVisitProtocolFromEmr(response.data, patient) || localRecord;
+      const response = await apiClient.post(`/v2/emr/${patientRecord.visit_id}`, payload);
+      const backendRecord = mapDentistVisitProtocolFromEmr(response.data, patient as Record<string, unknown> | null) || localRecord;
 
       setSavedVisitProtocols((prev) => upsertDentistVisitProtocol(prev, backendRecord));
       return backendRecord;
     } catch (error: unknown) {
       logger.warn('[Dentist] Не удалось сохранить протокол визита в EMR v2, сохраняю локальный кеш', {
-        visitId: patient.visit_id,
+        visitId: patientRecord.visit_id,
         patientName,
         error: (error as Error)?.message || error,
       });
@@ -1405,57 +1472,58 @@ const DentistPanelUnified = () => {
     }
   }, [tI18n]);
 
-  const reopenVisitProtocol = useCallback(async (protocolRecord) => {
-    const backendProtocol = await loadDentistVisitProtocolByVisitId(protocolRecord?.visit_id, protocolRecord);
+  const reopenVisitProtocol = useCallback(async (protocolRecord: Record<string, unknown> | null) => {
+    const backendProtocol = await loadDentistVisitProtocolByVisitId(protocolRecord?.visit_id as string | number | null | undefined, protocolRecord);
 
     if (!backendProtocol && !protocolRecord?.visitData) {
       notify.error(tI18n('dental.protocol_not_found'));
       return;
     }
 
-    const selectedProtocol = backendProtocol || protocolRecord;
+    const selectedProtocol = (backendProtocol || protocolRecord) as Record<string, unknown>;
     setSelectedPatient({
-      id: selectedProtocol.patient_id || protocolRecord?.patient_id || null,
-      patient_id: selectedProtocol.patient_id || protocolRecord?.patient_id || null,
-      patient_name: selectedProtocol.patient_name || protocolRecord?.patient_name || tI18n('dental.dental_panel_patient_default'),
-      patient_fio: selectedProtocol.patient_name || protocolRecord?.patient_name || tI18n('dental.dental_panel_patient_default'),
-      visit_id: selectedProtocol.visit_id || protocolRecord?.visit_id || null,
-      visitData: selectedProtocol.visitData || protocolRecord?.visitData || null,
-      source: selectedProtocol.source || protocolRecord?.source || 'reports',
-    });
+      id: (selectedProtocol.patient_id as string | number | null) || (protocolRecord?.patient_id as string | number | null) || null,
+      patient_id: (selectedProtocol.patient_id as string | number | null) || (protocolRecord?.patient_id as string | number | null) || null,
+      patient_name: (selectedProtocol.patient_name as string) || (protocolRecord?.patient_name as string) || tI18n('dental.dental_panel_patient_default'),
+      patient_fio: (selectedProtocol.patient_name as string) || (protocolRecord?.patient_name as string) || tI18n('dental.dental_panel_patient_default'),
+      visit_id: (selectedProtocol.visit_id as string | number | null) || (protocolRecord?.visit_id as string | number | null) || null,
+      visitData: (selectedProtocol.visitData as Record<string, unknown> | null) || (protocolRecord?.visitData as Record<string, unknown> | null) || null,
+      source: (selectedProtocol.source as string) || (protocolRecord?.source as string) || 'reports',
+    } as SelectedPatient);
     setShowVisitProtocol(true);
   }, [loadDentistVisitProtocolByVisitId, setSelectedPatient, tI18n]);
 
-  const handleDentalChart = (patient) => {
+  const handleDentalChart = (patient: SelectedPatient | Record<string, unknown> | null) => {
     setSelectedPatient({
-      ...patient,
+      ...(patient as Record<string, unknown>),
       patient_id: resolvePatientId(patient),
       patient_name: resolvePatientName(patient),
       patient_fio: resolvePatientName(patient)
-    });
-    setDentalChartData(patient.dentalChart || null);
+    } as SelectedPatient);
+    setDentalChartData((patient as Record<string, unknown>)?.dentalChart as Record<string, unknown> | null | undefined || null);
     setShowDentalChart(true);
   };
 
-  const handleTreatmentPlanner = async (patient) => {
-    const visitId = patient?.visit_id || await ensureCanonicalVisitId(patient);
+  const handleTreatmentPlanner = async (patient: SelectedPatient | Record<string, unknown> | null) => {
+    const patientRecord = (patient ?? {}) as Record<string, unknown>;
+    const visitId = (patientRecord.visit_id as string | number | null | undefined) || await ensureCanonicalVisitId(patientRecord);
     if (!visitId) {
       notify.error(tI18n('dental.treatment_plan_needs_visit_id'));
       return;
     }
 
     setSelectedPatient({
-      ...patient,
+      ...(patient as Record<string, unknown>),
       patient_id: resolvePatientId(patient),
       patient_name: resolvePatientName(patient),
       patient_fio: resolvePatientName(patient),
       visit_id: visitId
-    });
+    } as SelectedPatient);
     setShowTreatmentPlanner(true);
   };
 
   // Обработчики отправки форм
-  const handleExaminationSubmit = async (e) => {
+  const handleExaminationSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     try {
       const res = await apiClient.post('/dental/examinations', examinationForm);
@@ -1499,7 +1567,11 @@ const DentistPanelUnified = () => {
       // then fall back to appointment_date
       const ts = apt.queue_time || apt.created_at;
       if (ts) {
-        const aptDate = getLocalDateString(parseRegistrarTimestamp(ts));
+        const parsedDate = parseRegistrarTimestamp(ts);
+        if (!parsedDate) {
+          return false;
+        }
+        const aptDate = getLocalDateString(parsedDate);
         return aptDate === todayString;
       }
       // Fall back to appointment_date (may be YYYY-MM-DD already)
@@ -1555,9 +1627,9 @@ const DentistPanelUnified = () => {
     />;
   const renderPatients = () =>
     <DentalPatientsTab
-      patients={patients}
-      onSelectPatient={handlePatientSelect}
-      onDentalChart={handleDentalChart}
+      patients={patients as unknown as Array<Record<string, unknown>>}
+      onSelectPatient={handlePatientSelect as unknown as (patient: Record<string, unknown>) => void}
+      onDentalChart={handleDentalChart as unknown as (patient: Record<string, unknown>) => void}
     />;
   const renderAppointments = () =>
   <div className="dental-appointments-root">
@@ -1588,8 +1660,8 @@ const DentistPanelUnified = () => {
         outerBorder={false}
         services={services}
         showCheckboxes={false}
-        onRowClick={handleAppointmentRowClick}
-        onActionClick={handleAppointmentActionClick} />
+        onRowClick={handleAppointmentRowClick as unknown as (row: unknown) => void}
+        onActionClick={handleAppointmentActionClick as unknown as (action: string, row: unknown, event?: unknown) => void} />
 
       </Card>
     </div>;
@@ -1689,7 +1761,7 @@ const DentistPanelUnified = () => {
     if (selectedPatient) {
       return (
         <DentalVisitScreen
-          patient={selectedPatient}
+          patient={selectedPatient as unknown as Record<string, unknown>}
           onCompleteVisit={handleCompleteVisit}
           onBackToQueue={() => {
             setSelectedPatient(null);
@@ -1798,9 +1870,9 @@ const DentistPanelUnified = () => {
     />;
   const renderReports = () =>
     <DentalReportsTab
-      savedVisitProtocols={savedVisitProtocols}
-      onReopenProtocol={reopenVisitProtocol}
-      patients={patients}
+      savedVisitProtocols={savedVisitProtocols as unknown as Array<{ visit_id: string | number; patient_name: string; saved_at: string; visitData?: Record<string, unknown> }>}
+      onReopenProtocol={reopenVisitProtocol as unknown as (protocol: { visit_id: string | number; patient_name: string; saved_at: string; visitData?: Record<string, unknown> }) => void}
+      patients={patients as unknown as Array<Record<string, unknown>>}
       diagnoses={[]}
     />;
   const renderDentalChart = () =>
@@ -1917,7 +1989,7 @@ const DentistPanelUnified = () => {
 
   }
 
-  const selectedPatientId = selectedPatient?.patient?.id || selectedPatient?.patient_id || selectedPatient?.id || null;
+  const selectedPatientId: string | number | undefined = selectedPatient?.patient?.id || selectedPatient?.patient_id || selectedPatient?.id || undefined;
   const selectedPatientDisplayName =
     selectedPatient?.patient_name || selectedPatient?.patient_fio || selectedPatient?.name || tI18n('dental.dental_panel_patient_default');
 
@@ -1928,8 +2000,8 @@ const DentistPanelUnified = () => {
       {/* Модальные окна */}
       {showPatientCard && selectedPatient &&
       <PatientCard
-        patient={selectedPatient}
-        onSave={(updatedPatient) => {
+        patient={selectedPatient as unknown as Record<string, unknown>}
+        onSave={(updatedPatient: unknown) => {
           logger.info('Сохранение пациента:', updatedPatient);
           setShowPatientCard(false);
         }}
@@ -1941,7 +2013,7 @@ const DentistPanelUnified = () => {
       <ExaminationForm
         patientId={selectedPatientId}
         initialData={selectedPatient.examinationData}
-        onSave={(examinationData) => {
+        onSave={(examinationData: unknown) => {
           logger.info('Сохранение осмотра:', examinationData);
           setShowExaminationForm(false);
         }}
@@ -1954,7 +2026,7 @@ const DentistPanelUnified = () => {
         patientId={selectedPatientId}
         patientName={selectedPatientDisplayName}
         initialData={selectedPatient.diagnosisData}
-        onSave={(diagnosisData) => {
+        onSave={(diagnosisData: unknown) => {
           logger.info('Сохранение диагнозов:', diagnosisData);
           setShowDiagnosisForm(false);
         }}
@@ -1964,13 +2036,13 @@ const DentistPanelUnified = () => {
 
       {showVisitProtocol && (selectedPatient || protocolTemplateDraft) &&
       <VisitProtocol
-        patientId={(selectedPatient || protocolTemplateDraft)?.patient_id || selectedPatientId}
+        patientId={((selectedPatient || protocolTemplateDraft)?.patient_id as string | number | undefined) || selectedPatientId}
         patientName={(selectedPatient || protocolTemplateDraft)?.patient_name || selectedPatientDisplayName}
-        visitId={(selectedPatient || protocolTemplateDraft)?.visit_id || selectedPatient?.visit_id}
-        initialData={(selectedPatient || protocolTemplateDraft)?.visitData || selectedPatient?.visitData}
-        onSave={async (visitData) => {
+        visitId={((selectedPatient || protocolTemplateDraft)?.visit_id as string | number | undefined) || (selectedPatient?.visit_id as string | number | undefined)}
+        initialData={((selectedPatient || protocolTemplateDraft)?.visitData as Record<string, unknown> | null | undefined) || (selectedPatient?.visitData as Record<string, unknown> | null | undefined)}
+        onSave={async (visitData: unknown) => {
           logger.info('Сохранение протокола визита:', visitData);
-          await persistVisitProtocol(selectedPatient || protocolTemplateDraft, visitData);
+          await persistVisitProtocol(selectedPatient || protocolTemplateDraft, visitData as Record<string, unknown>);
           setShowVisitProtocol(false);
           setProtocolTemplateDraft(null);
         }}
@@ -1984,10 +2056,10 @@ const DentistPanelUnified = () => {
 
       {showPhotoArchive && selectedPatient &&
       <PhotoArchive
-        patientId={selectedPatientId}
+        patientId={selectedPatientId as string | number}
         patientName={selectedPatientDisplayName}
         initialData={selectedPatient.photoArchive}
-        onSave={(archiveData) => {
+        onSave={(archiveData: unknown) => {
           logger.info('Сохранение фото архива:', archiveData);
           setShowPhotoArchive(false);
         }}
@@ -1997,7 +2069,7 @@ const DentistPanelUnified = () => {
 
       {showProtocolTemplates &&
       <ProtocolTemplates
-        onSelectTemplate={handleProtocolTemplateSelect}
+        onSelectTemplate={handleProtocolTemplateSelect as unknown as (template: unknown) => void}
         onClose={() => setShowProtocolTemplates(false)} />
 
       }
@@ -2085,7 +2157,7 @@ const DentistPanelUnified = () => {
             </div>
             <TreatmentPlanner
             patientId={selectedPatientId}
-            visitId={selectedPatient.visit_id}
+            visitId={(selectedPatient.visit_id as string | number | undefined)}
             teethData={dentalChartData || {}}
             onUpdate={() => {
               logger.info('План лечения обновлен');
@@ -2291,14 +2363,14 @@ const DentistPanelUnified = () => {
           setToothModalOpen(false);
         }}
         patientId={selectedPatient?.id}
-        visitId={selectedPatient?.visit_id} />
+        visitId={(selectedPatient?.visit_id as string | number | undefined)} />
 
       }
 
       {/* DentalPriceManager Modal */}
       {showPriceManager && selectedServiceForPrice &&
       <DentalPriceManager
-        visitId={selectedPatient?.visit_id}
+        visitId={(selectedPatient?.visit_id as string | number | undefined)}
         serviceId={selectedServiceForPrice.id}
         serviceName={selectedServiceForPrice.name}
         originalPrice={selectedServiceForPrice.price}
@@ -2319,7 +2391,7 @@ const DentistPanelUnified = () => {
       <ScheduleNextModal
         isOpen={scheduleNextModal.open}
         onClose={() => setScheduleNextModal({ open: false, patient: null })}
-        patient={scheduleNextModal.patient}
+        patient={(scheduleNextModal.patient ?? undefined) as Record<string, unknown> | undefined}
         theme={{ isDark, getColor, getSpacing, getFontSize }}
         specialtyFilter="dentistry" />
 
