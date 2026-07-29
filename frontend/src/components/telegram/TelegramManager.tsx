@@ -212,7 +212,7 @@ const TelegramManager = () => {
     }
   };
 
-  const updateSettings = async (newSettings) => {
+  const updateSettings = async (newSettings: Record<string, unknown>) => {
     setLoading(true);
     setError('');
 
@@ -241,7 +241,7 @@ const TelegramManager = () => {
     }
   };
 
-  const setWebhook = async (webhookUrl) => {
+  const setWebhook = async (webhookUrl: string) => {
     setLoading(true);
     setError('');
 
@@ -274,7 +274,7 @@ const TelegramManager = () => {
 
 
 
-  const getStatusColor = (status) => {
+  const getStatusColor = (status: string) => {
     switch (status) {
       case 'active':return 'text-green-600 bg-green-50';
       case 'inactive':return 'text-red-600 bg-red-50';
@@ -283,7 +283,7 @@ const TelegramManager = () => {
     }
   };
 
-  const getStatusLabel = (status) => {
+  const getStatusLabel = (status: string) => {
     switch (status) {
       case 'active':return t('misc.tm_status_active');
       case 'inactive':return t('misc.tm_status_inactive');
@@ -490,7 +490,7 @@ const TelegramManager = () => {
               {t('misc.tm_btn_check_bot')}
             </Button>
             <Button
-            onClick={() => setWebhook(settings.webhook_url)}
+            onClick={() => setWebhook(String(settings.webhook_url ?? ''))}
             variant="outline"
             disabled={loading}>
             

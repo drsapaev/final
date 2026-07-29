@@ -114,17 +114,17 @@ const ModernInput = ({
   const hasSuccess = success && !hasError;
 
   // Обработчики событий
-  const handleFocus = (e) => {
+  const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
     setFocused(true);
     onFocus?.(e);
   };
 
-  const handleBlur = (e) => {
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
     setFocused(false);
     onBlur?.(e);
   };
 
-  const handleChange = (e) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onChange?.(e);
   };
 
@@ -134,8 +134,8 @@ const ModernInput = ({
     inputRef.current?.focus();
   };
 
-  const handleSuggestionClick = (suggestion) => {
-    onSuggestionSelect?.(suggestion);
+  const handleSuggestionClick = (suggestion: unknown) => {
+    onSuggestionSelect?.(suggestion as SuggestionItem);
     inputRef.current?.focus();
   };
 

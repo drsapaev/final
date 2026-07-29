@@ -92,10 +92,10 @@ const PaymentProviderSettings = () => {
     );
   };
 
-  const testProvider = async (providerName) => {
+  const testProvider = async (providerName: string) => {
     await executeAction(
       async () => {
-        const result = await testPaymentProviderConfig(providerName, settings[providerName]);
+        const result = await testPaymentProviderConfig(providerName, (settings as Record<string, any>)[providerName]);
 
         setTestResults(prev => ({
           ...prev,
@@ -119,25 +119,25 @@ const PaymentProviderSettings = () => {
     );
   };
 
-  const updateProviderSetting = (provider, field, value) => {
+  const updateProviderSetting = (provider: string, field: string, value: unknown) => {
     setSettings(prev => ({
       ...prev,
       [provider]: {
-        ...prev[provider],
+        ...(prev as Record<string, any>)[provider],
         [field]: value
       }
     }));
   };
 
-  const updateGeneralSetting = (field, value) => {
+  const updateGeneralSetting = (field: string, value: unknown) => {
     setSettings(prev => ({
       ...prev,
       [field]: value
-    }));
+    } as typeof prev));
   };
 
-  const toggleProviderEnabled = (provider) => {
-    const newEnabled = !settings[provider].enabled;
+  const toggleProviderEnabled = (provider: string) => {
+    const newEnabled = !(settings as Record<string, any>)[provider].enabled;
     updateProviderSetting(provider, 'enabled', newEnabled);
 
     // Обновляем список включённых провайдеров
@@ -158,14 +158,14 @@ const PaymentProviderSettings = () => {
     }
   };
 
-  const toggleShowSecret = (provider) => {
+  const toggleShowSecret = (provider: string) => {
     setShowSecrets(prev => ({
       ...prev,
-      [provider]: !prev[provider]
+      [provider]: !(prev as Record<string, boolean>)[provider]
     }));
   };
 
-  const renderProviderConfig = (providerName, providerConfig) => {
+  const renderProviderConfig = (providerName: string, providerConfig: { enabled: boolean; service_id?: string; merchant_id?: string; secret_key?: string; base_url?: string; test_mode?: boolean; api_url?: string }) => {
     const testResult = testResults[providerName];
 
     return (
@@ -451,7 +451,7 @@ const PaymentProviderSettings = () => {
             <div className="admin-flex-col-24">
               {Object.entries(settings).map(([key, value]) => {
                 if (key === 'click' || key === 'payme') {
-                  return renderProviderConfig(key, value);
+                  return renderProviderConfig(key, value as { enabled: boolean; service_id?: string; merchant_id?: string; secret_key?: string; base_url?: string; test_mode?: boolean; api_url?: string });
                 }
                 return null;
               })}

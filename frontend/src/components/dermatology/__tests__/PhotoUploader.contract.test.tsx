@@ -8,7 +8,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT = path.resolve(__dirname, '..');
 
-const readSource = (fileName) =>
+const readSource = (fileName: string) =>
   fs.readFileSync(path.join(ROOT, fileName), 'utf8').replace(/\r\n/g, '\n');
 
 describe('derma PhotoUploader wiring contract (CRITICAL #1 + MEDIUM #9)', () => {

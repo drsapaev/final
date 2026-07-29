@@ -100,24 +100,24 @@ const PatientPanel = () => {
 
       // L-M-6 fix: каждый API-вызов в своём try/catch — sync exceptions
       // (token expired, network error) не валит весь loader.
-      const safeFetch = async (url, setter, label) => {
+      const safeFetch = async <T,>(url: string, setter: (data: T[]) => void, label: string) => {
         try {
           const response = await api.get(url);
           if (!cancelled) {
-            setter(Array.isArray(response.data) ? response.data : []);
+            setter(Array.isArray(response.data) ? response.data as T[] : []);
           }
         } catch (error) {
           logger.error(`[PatientPanel] Failed to load ${label}:`, error);
           // Не показываем error если это просто 401 (пользователь не авторизован)
-          if (error?.response?.status !== 401) {
+          if ((error as { response?: { status?: number } })?.response?.status !== 401) {
             setPatientDataError(t('misc.pp_ne_udalos_zagruzit_label_obn', { label: label }));
           }
         }
       };
 
       await Promise.allSettled([
-        safeFetch('/patients/appointments', setAppointments, t('misc.pp_zapisi')),
-        safeFetch('/patients/results', setResults, t('misc.pp_rezultaty')),
+        safeFetch<PatientAppointment>('/patients/appointments', setAppointments, t('misc.pp_zapisi')),
+        safeFetch<PatientResult>('/patients/results', setResults, t('misc.pp_rezultaty')),
       ]);
 
       if (!cancelled) {
@@ -129,7 +129,7 @@ const PatientPanel = () => {
     return () => { cancelled = true; };
   }, []);
 
-  const sectionConfig = PATIENT_SECTIONS[activeSection];
+  const sectionConfig = (PATIENT_SECTIONS as Record<string, { title: string; icon: string; description?: string; visibleInTabs?: boolean }>)[activeSection];
   const isSectionMode = Boolean(sectionConfig);
   const sectionTitle = sectionConfig?.title || t('misc.pp_glavnaya_patsienta');
 
@@ -165,7 +165,7 @@ const PatientPanel = () => {
       })
       .catch((err) => {
         if (cancelled) return;
-        const reason = err?.response?.data?.detail?.reason || 'forms_preview_failed';
+        const reason = (err as { response?: { data?: { detail?: { reason?: string } } } })?.response?.data?.detail?.reason || 'forms_preview_failed';
         setFormsError(describePatientError('forms', reason));
         setFormsStatus('error');
       });
@@ -174,7 +174,7 @@ const PatientPanel = () => {
   }, [activeSection]);
 
   // L-H-6 fix: tablist navigation handlers.
-  const switchSection = useCallback((sectionId) => {
+  const switchSection = useCallback((sectionId: string) => {
     // 'home' — отдельный случай (no ?tab= param)
     if (sectionId === 'home') {
       setSearchParams({}, { replace: true });
@@ -183,7 +183,7 @@ const PatientPanel = () => {
     setSearchParams({ tab: sectionId }, { replace: true });
   }, [setSearchParams]);
 
-  const handleTabKeyDown = useCallback((event, currentSectionId) => {
+  const handleTabKeyDown = useCallback((event: React.KeyboardEvent<HTMLElement>, currentSectionId: string) => {
     const tabs = ['home', ...VISIBLE_PATIENT_TABS];
     const currentIndex = tabs.indexOf(currentSectionId);
     if (currentIndex === -1) return;
@@ -213,8 +213,8 @@ const PatientPanel = () => {
     { id: 'home', label: t('misc.pp_glavnaya'), icon: 'house' },
     ...VISIBLE_PATIENT_TABS.map((key) => ({
       id: key,
-      label: PATIENT_SECTIONS[key].title,
-      icon: PATIENT_SECTIONS[key].icon,
+      label: (PATIENT_SECTIONS as Record<string, { title: string; icon: string }>)[key].title,
+      icon: (PATIENT_SECTIONS as Record<string, { title: string; icon: string }>)[key].icon,
     })),
   ], []);
 

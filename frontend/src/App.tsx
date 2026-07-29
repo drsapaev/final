@@ -387,15 +387,16 @@ AppShell.propTypes = {
   children: PropTypes.node,
 };
 
-function RouteRenderer({ route }) {
-  const Component = ROUTE_COMPONENTS[route.component];
+function RouteRenderer({ route }: { route: { component: string; shell?: string; id: string; [key: string]: unknown } }) {
+  const Component = ROUTE_COMPONENTS[route.component as keyof typeof ROUTE_COMPONENTS];
 
   if (!Component) {
     return <NotFoundPage />;
   }
 
-  let element = <Component />;
-  element = <RouteAccessBoundary route={route}>{element}</RouteAccessBoundary>;
+  const RenderableComponent = Component as React.ComponentType<Record<string, unknown>>;
+  let element = <RenderableComponent />;
+  element = <RouteAccessBoundary route={route as never}>{element}</RouteAccessBoundary>;
 
   if (route.shell === 'app-shell') {
     element = <AppShell>{element}</AppShell>;

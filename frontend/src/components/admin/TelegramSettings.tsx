@@ -111,8 +111,8 @@ const TelegramSettings = () => {
     }
   };
 
-  const handleSettingChange = (key, value) => {
-    setSettings((prev) => ({ ...prev, [key]: value }));
+  const handleSettingChange = (key: string, value: unknown) => {
+    setSettings((prev) => ({ ...prev, [key]: value }) as typeof prev);
   };
 
   const saveSettings = async () => {

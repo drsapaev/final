@@ -69,15 +69,15 @@ const SERVICE_GROUP_ALIASES = {
 // The lookup is performed via t18() at the call site so the dictionary remains
 // free of hardcoded Russian strings.
 
-const resolveServiceGroup = ({ queueTag, departmentKey, categorySpecialty }) => {
+const resolveServiceGroup = ({ queueTag, departmentKey, categorySpecialty }: { queueTag?: string; departmentKey?: string; categorySpecialty?: string }) => {
   // t accessed via closure or t18()
   for (const rawValue of [queueTag, departmentKey, categorySpecialty]) {
     if (!rawValue) continue;
     const normalized = String(rawValue).trim().toLowerCase();
     if (!normalized) continue;
-    if (SERVICE_GROUP_PREFIXES[normalized]) return normalized;
-    if (SERVICE_GROUP_ALIASES[normalized]) {
-      return SERVICE_GROUP_ALIASES[normalized];
+    if ((SERVICE_GROUP_PREFIXES as Record<string, string>)[normalized]) return normalized;
+    if ((SERVICE_GROUP_ALIASES as Record<string, string>)[normalized]) {
+      return (SERVICE_GROUP_ALIASES as Record<string, string>)[normalized];
     }
   }
 
@@ -139,7 +139,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [] as Queue
       try {
         setCheckingDuplicates(true);
         const response = await api.get('/services');
-        const services = response.data;
+        const services: Array<{ id?: string | number; code?: string; service_code?: string; name?: string }> = response.data;
         const duplicate = services.find(
           (s) => (s.code === normalizedCode || s.service_code === normalizedCode) && s.id !== service?.id
         );
@@ -185,7 +185,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [] as Queue
   // Auto-extract category_code from code prefix (guarded by prefix alignment checks)
   const derivedCategoryCode = formData.code ? formData.code.charAt(0).toUpperCase() : '';
 
-  const handleSubmit = (e) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!formData.name.trim()) {
@@ -244,11 +244,11 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [] as Queue
     onSave(apiData);
   };
 
-  const handleChange = (field, value) => {
+  const handleChange = (field: string, value: unknown) => {
     let normalizedValue = value;
 
     if (field === 'code') {
-      normalizedValue = formatServiceCodeInput(value) as string;
+      normalizedValue = formatServiceCodeInput(value as string);
     }
 
     // ⭐ SSOT: Sync queue_tag with department_key
@@ -258,12 +258,12 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [] as Queue
       );
 
       if (matchingProfile) {
-        setFormData((prev) => ({ ...prev, [field]: normalizedValue, department_key: matchingProfile.key }));
+        setFormData((prev) => ({ ...prev, [field]: normalizedValue, department_key: matchingProfile.key }) as typeof prev);
         return;
       }
     }
 
-    setFormData((prev) => ({ ...prev, [field]: normalizedValue }));
+    setFormData((prev) => ({ ...prev, [field]: normalizedValue }) as typeof prev);
   };
 
   const tabs = [

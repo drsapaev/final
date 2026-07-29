@@ -93,7 +93,7 @@ const DentalPriceManager = ({
     }
   }, [isOpen, visitId, loadPriceOverrides]);
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!finalPrice || !reason) {
@@ -135,17 +135,17 @@ const DentalPriceManager = ({
       }
     } catch (error) {
       logger.error('Error setting price:', error);
-      notify.error(error?.response?.data?.detail || t('dental.dental_dpm_error_set_price'));
+      notify.error((error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('dental.dental_dpm_error_set_price'));
     } finally {
       setIsLoading(false);
     }
   };
 
-  const formatPrice = (price) => {
+  const formatPrice = (price: number | string) => {
     return Number(price).toLocaleString('ru-RU') + ' UZS';
   };
 
-  const getStatusColor = (status) => {
+  const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending':return 'text-yellow-600 bg-yellow-100';
       case 'approved':return 'text-green-600 bg-green-100';
@@ -154,7 +154,7 @@ const DentalPriceManager = ({
     }
   };
 
-  const getStatusIcon = (status) => {
+  const getStatusIcon = (status: string) => {
     switch (status) {
       case 'pending':return <Clock size={16 as unknown as "small" | "default" | "large" | "xlarge"} />;
       case 'approved':return <CheckCircle size={16 as unknown as "small" | "default" | "large" | "xlarge"} />;
@@ -163,7 +163,7 @@ const DentalPriceManager = ({
     }
   };
 
-  const getStatusText = (status) => {
+  const getStatusText = (status: string) => {
     switch (status) {
       case 'pending':return t('dental.dental_dpm_status_pending');
       case 'approved':return t('dental.dental_dpm_status_approved');
@@ -185,7 +185,7 @@ const DentalPriceManager = ({
               {t('dental.dental_dpm_header_title')}
             </h3>
             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-              {t('dental.dental_dpm_header_subtitle', { serviceName, price: formatPrice(originalPrice) })}
+              {t('dental.dental_dpm_header_subtitle', { serviceName, price: formatPrice(originalPrice ?? 0) })}
             </p>
           </div>
           <button

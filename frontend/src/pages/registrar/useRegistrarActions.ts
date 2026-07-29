@@ -35,9 +35,13 @@ import {
   hasBackendAction,
   getRegistrarActionForStatus,
 } from './registrarHelpers';
+import type { RegistrarRecordLike } from './registrarHelpers';
 
-export const useRegistrarActions = ({ appointments, loadAppointments }) => {
-  const runRegistrarRecordAction = useCallback(async (record, action, payload = {}) => {
+export const useRegistrarActions = ({ appointments, loadAppointments }: {
+  appointments: unknown[];
+  loadAppointments: (opts?: Record<string, unknown>) => Promise<void> | void;
+}) => {
+  const runRegistrarRecordAction = useCallback(async (record: Record<string, unknown>, action: string, payload: Record<string, unknown> = {}) => {
     const records = getRegistrarRecordRefs(record);
     if (records.length === 0) {
       logger.warn('RegistrarPanel: action requires backend record refs', { action, record });
@@ -58,12 +62,12 @@ export const useRegistrarActions = ({ appointments, loadAppointments }) => {
     return response.data;
   }, []);
 
-  const handleStartVisit = useCallback(async (appointment) => {
+  const handleStartVisit = useCallback(async (appointment: Record<string, unknown>) => {
     try {
       const result = await runRegistrarRecordAction(appointment, 'start_visit');
       if (!result) return null;
       if (!result.success) {
-        throw new Error(result.results?.find((item) => !item.success)?.error || 'start_visit_failed');
+        throw new Error(result.results?.find((item: Record<string, unknown>) => !item.success)?.error || 'start_visit_failed');
       }
 
       logger.info('RegistrarPanel: start_visit completed through backend command contract', result);
@@ -77,7 +81,7 @@ export const useRegistrarActions = ({ appointments, loadAppointments }) => {
     }
   }, [loadAppointments, runRegistrarRecordAction]);
 
-  const handlePayment = useCallback(async (appointment, paymentData: { amount?: number | null; method?: string | null } | null = null) => {
+  const handlePayment = useCallback(async (appointment: Record<string, unknown>, paymentData: { amount?: number | null; method?: string | null } | null = null) => {
     try {
       const result = await runRegistrarRecordAction(appointment, 'mark_paid', {
         amount: paymentData?.amount ?? null,
@@ -103,7 +107,7 @@ export const useRegistrarActions = ({ appointments, loadAppointments }) => {
         return result.results || [];
       }
 
-      notify.error(result.results?.find((item) => !item.success)?.error || 'Ошибка оплаты');
+      notify.error(result.results?.find((item: Record<string, unknown>) => !item.success)?.error || 'Ошибка оплаты');
       return result.results || [];
     } catch (error) {
       logger.error('RegistrarPanel: Payment error:', error);
@@ -114,7 +118,7 @@ export const useRegistrarActions = ({ appointments, loadAppointments }) => {
 
   const updateAppointmentStatus = useCallback(async (recordSelectionKey: unknown, status: string, reason = '', sourceRecord: Record<string, unknown> | null = null) => {
     try {
-      const record = sourceRecord || findRegistrarRecordBySelectionKey(appointments, String(recordSelectionKey ?? ''));
+      const record = sourceRecord || findRegistrarRecordBySelectionKey(appointments as unknown as RegistrarRecordLike[], String(recordSelectionKey ?? ''));
       const requiredBackendAction = getRegistrarActionForStatus(status);
       if (!requiredBackendAction) {
         logger.warn('RegistrarPanel: unsupported status command', { recordSelectionKey, status, record });
@@ -130,7 +134,7 @@ export const useRegistrarActions = ({ appointments, loadAppointments }) => {
       const result = await runRegistrarRecordAction(record, requiredBackendAction, { reason });
       if (!result) return null;
       if (!result.success) {
-        throw new Error(result.results?.find((item) => !item.success)?.error || 'status_update_failed');
+        throw new Error(result.results?.find((item: Record<string, unknown>) => !item.success)?.error || 'status_update_failed');
       }
 
       await loadAppointments({ source: 'status_update' });

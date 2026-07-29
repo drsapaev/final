@@ -9,7 +9,7 @@ const __dirname = path.dirname(__filename);
 const ROOT = path.resolve(__dirname, '..');
 const PANEL_PATH = path.resolve(__dirname, '../../../pages/DentistPanelUnified.tsx');
 
-const readSource = (fileName) =>
+const readSource = (fileName: string) =>
   fs.readFileSync(path.join(ROOT, fileName), 'utf8').replace(/\r\n/g, '\n');
 
 const readPanel = () =>

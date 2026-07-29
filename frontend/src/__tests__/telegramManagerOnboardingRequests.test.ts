@@ -7,7 +7,7 @@ const managerSource = fs.readFileSync(
   'utf8'
 ).replace(/\r\n/g, '\n');
 
-function sourceBetween(source, start, end) {
+function sourceBetween(source: string, start: string, end: string) {
   const startIndex = source.indexOf(start);
   expect(startIndex).toBeGreaterThanOrEqual(0);
 

@@ -34,17 +34,17 @@ const {
   DoctorQueuePanelTestMacOSEmptyState,
   DoctorQueuePanelTestMacOSAlert,
 } = vi.hoisted(() => {
-  const DoctorQueuePanelTestMacOSCard = ({ children }) => <div>{children}</div>;
+  const DoctorQueuePanelTestMacOSCard = ({ children }: { children?: React.ReactNode }) => <div>{children}</div>;
 
-  const DoctorQueuePanelTestMacOSButton = ({ children, ...props }) => <button {...props}>{children}</button>;
+  const DoctorQueuePanelTestMacOSButton = ({ children, ...props }: { children?: React.ReactNode; [key: string]: unknown }) => <button {...props as Record<string, unknown>}>{children}</button>;
 
-  const DoctorQueuePanelTestMacOSBadge = ({ children }) => <span>{children}</span>;
+  const DoctorQueuePanelTestMacOSBadge = ({ children }: { children?: React.ReactNode }) => <span>{children}</span>;
 
   const DoctorQueuePanelTestMacOSLoadingSkeleton = () => <div>loading</div>;
 
-  const DoctorQueuePanelTestMacOSEmptyState = ({ title }) => <div>{title}</div>;
+  const DoctorQueuePanelTestMacOSEmptyState = ({ title }: { title?: React.ReactNode }) => <div>{title}</div>;
 
-  const DoctorQueuePanelTestMacOSAlert = ({ title, description }) => (
+  const DoctorQueuePanelTestMacOSAlert = ({ title, description }: { title?: React.ReactNode; description?: React.ReactNode }) => (
     <div>
       {title}
       {description}

@@ -39,14 +39,39 @@ import logger from '../../utils/logger';
 import { sanitizePrintableHtml } from '../../utils/printWindow';  // PR-35 / P0-7
 import { useTranslation } from '../../i18n/useTranslation';
 
-const getInvoiceTypeOptions = (t) => [
+type InvoiceForm = {
+  patient_id: string | number;
+  visit_id: string | number;
+  appointment_id: string | number;
+  invoice_type: string;
+  items: Array<{ description: string; quantity: number | string; unit_price: number | string; [k: string]: unknown }>;
+  description: string;
+  notes: string;
+  due_days: number | string;
+  auto_send: boolean;
+  send_reminders: boolean;
+  is_recurring: boolean;
+  recurrence_type: string;
+  recurrence_interval: number | string;
+};
+
+type PaymentForm = {
+  invoice_id: string | number;
+  amount: number | string;
+  payment_method: string;
+  reference_number: string;
+  description: string;
+  notes: string;
+};
+
+const getInvoiceTypeOptions = (t: (key: string, options?: Record<string, unknown>) => string) => [
   { value: 'standard', label: t('admin2.bill_inv_type_standard') },
   { value: 'recurring', label: t('admin2.bill_inv_type_recurring') },
   { value: 'advance', label: t('admin2.bill_inv_type_advance') },
   { value: 'correction', label: t('admin2.bill_inv_type_correction') }
 ];
 
-const getPaymentMethodOptions = (t) => [
+const getPaymentMethodOptions = (t: (key: string, options?: Record<string, unknown>) => string) => [
   { value: 'cash', label: t('admin2.bill_pay_method_cash') },
   { value: 'card', label: t('admin2.bill_pay_method_card') },
   { value: 'bank_transfer', label: t('admin2.bill_pay_method_bank_transfer') },
@@ -55,16 +80,16 @@ const getPaymentMethodOptions = (t) => [
   { value: 'installment', label: t('admin2.bill_pay_method_installment') }
 ];
 
-const toNullableInteger = (value) => {
+const toNullableInteger = (value: unknown) => {
   if (value === '' || value === null || value === undefined) {
     return null;
   }
 
-  const parsed = Number.parseInt(value, 10);
+  const parsed = Number.parseInt(String(value), 10);
   return Number.isNaN(parsed) ? null : parsed;
 };
 
-const buildInvoicePayload = (form) => ({
+const buildInvoicePayload = (form: InvoiceForm) => ({
   ...form,
   patient_id: toNullableInteger(form.patient_id),
   visit_id: toNullableInteger(form.visit_id),
@@ -78,7 +103,7 @@ const buildInvoicePayload = (form) => ({
   }))
 });
 
-const buildPaymentPayload = (form) => ({
+const buildPaymentPayload = (form: PaymentForm) => ({
   ...form,
   invoice_id: toNullableInteger(form.invoice_id),
   amount: Number(form.amount) || 0
@@ -214,7 +239,7 @@ const BillingManager = () => {
     }
   };
 
-  const handleSendInvoice = async (invoiceId) => {
+  const handleSendInvoice = async (invoiceId: string | number) => {
     try {
       await api.post(`/billing/invoices/${invoiceId}/send`);
       toast.success(t('admin2.bill_inv_sent'));
@@ -224,7 +249,7 @@ const BillingManager = () => {
     }
   };
 
-  const handleViewInvoiceHTML = async (invoiceId) => {
+  const handleViewInvoiceHTML = async (invoiceId: string | number) => {
     try {
       const response = (await api.get(`/billing/invoices/${invoiceId}/html`)) as import('axios').AxiosResponse<Record<string, unknown>>;
       // PR-35 / P0-7: Sanitize backend HTML before writing to a new window.
@@ -252,18 +277,18 @@ const BillingManager = () => {
     });
   };
 
-  const removeInvoiceItem = (index) => {
+  const removeInvoiceItem = (index: number) => {
     const newItems = invoiceForm.items.filter((_, i) => i !== index);
     setInvoiceForm({ ...invoiceForm, items: newItems });
   };
 
-  const updateInvoiceItem = (index, field, value) => {
+  const updateInvoiceItem = (index: number, field: string, value: unknown) => {
     const newItems = [...invoiceForm.items];
-    newItems[index][field] = value;
+    (newItems[index] as Record<string, unknown>)[field] = value;
     setInvoiceForm({ ...invoiceForm, items: newItems });
   };
 
-  const getStatusBadge = (status) => {
+  const getStatusBadge = (status: string) => {
     const statusConfig = {
       'draft': { variant: 'secondary', label: t('admin2.bill_status_draft'), icon: FileText },
       'pending': { variant: 'warning', label: t('admin2.bill_status_pending'), icon: Clock },
@@ -274,7 +299,7 @@ const BillingManager = () => {
       'refunded': { variant: 'warning', label: t('admin2.bill_status_refunded'), icon: AlertCircle }
     };
 
-    const config = statusConfig[status] || statusConfig['draft'];
+    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig['draft'];
     const Icon = config.icon;
 
     return (
@@ -329,7 +354,7 @@ const BillingManager = () => {
                     <h4 className="admin-m-0-primary-fs-var-mac-font-size-md-fw-semi">
                       {t('admin2.bill_inv_number', { number: invoice.invoice_number })}
                     </h4>
-                    {getStatusBadge(invoice.status)}
+                    {getStatusBadge(String(invoice.status ?? ''))}
                     <Badge variant="outline">
                       {invoiceTypeLabels[invoice.invoice_type ?? ''] || invoice.invoice_type}
                     </Badge>

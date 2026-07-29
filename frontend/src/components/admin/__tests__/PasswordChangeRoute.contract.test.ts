@@ -11,7 +11,7 @@ const changePasswordRequiredPath = path.resolve(
   '../../../pages/auth/ChangePasswordRequired.tsx'
 );
 
-const readSource = (filePath) => fs.readFileSync(filePath, 'utf8');
+const readSource = (filePath: string): string => fs.readFileSync(filePath, 'utf8');
 
 describe('password change API contract', () => {
   it('uses the canonical authentication password-change route', () => {

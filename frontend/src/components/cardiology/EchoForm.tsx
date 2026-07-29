@@ -132,15 +132,15 @@ const DEFAULT_ECHO_DATA = {
   conclusion: ''
 };
 
-function deepMerge(base, incoming) {
+function deepMerge(base: Record<string, unknown>, incoming: Record<string, unknown> | null | undefined): Record<string, unknown> {
   if (!incoming || typeof incoming !== 'object' || Array.isArray(incoming)) {
     return base;
   }
 
-  const result = Array.isArray(base) ? [...base] : { ...base };
+  const result: Record<string, unknown> = { ...base };
   for (const [key, value] of Object.entries(incoming)) {
     if (value && typeof value === 'object' && !Array.isArray(value) && base?.[key] && typeof base[key] === 'object') {
-      result[key] = deepMerge(base[key], value);
+      result[key] = deepMerge(base[key] as Record<string, unknown>, value as Record<string, unknown>);
     } else {
       result[key] = value;
     }
@@ -148,44 +148,50 @@ function deepMerge(base, incoming) {
   return result;
 }
 
-function getNestedValue(source, path) {
+function getNestedValue(source: unknown, path: string): string {
   if (!source || !path) return '';
-  return String(path).split('.').reduce((acc, key) => acc?.[key], source) ?? '';
+  const result = String(path).split('.').reduce<unknown>((acc, key) => {
+    if (acc && typeof acc === 'object') {
+      return (acc as Record<string, unknown>)[key];
+    }
+    return undefined;
+  }, source);
+  return result == null ? '' : String(result);
 }
 
-function setNestedValue(source, path, value) {
+function setNestedValue(source: Record<string, unknown>, path: string, value: unknown): Record<string, unknown> {
   const keys = String(path).split('.');
   const result = { ...source };
-  let current = result;
+  let current: Record<string, unknown> = result;
   for (let i = 0; i < keys.length - 1; i += 1) {
     const key = keys[i];
-    current[key] = current[key] && typeof current[key] === 'object' ? { ...current[key] } : {};
-    current = current[key];
+    current[key] = current[key] && typeof current[key] === 'object' ? { ...(current[key] as Record<string, unknown>) } : {};
+    current = current[key] as Record<string, unknown>;
   }
   current[keys[keys.length - 1]] = value;
   return result;
 }
 
-async function loadExistingEmrDraft(visitId) {
+async function loadExistingEmrDraft(visitId: string | number | null | undefined) {
   try {
     const response = await api.get(`/v2/emr/${visitId}`);
     return response.data || null;
   } catch (err) {
-    if (err?.response?.status === 404) {
+    if ((err as { response?: { status?: number } })?.response?.status === 404) {
       return null;
     }
     throw err;
   }
 }
 
-function buildEchoEmrPayload(existingEmr, echoData) {
-  const currentData = existingEmr?.data || {};
+function buildEchoEmrPayload(existingEmr: Record<string, unknown> | null, echoData: EchoData) {
+  const currentData = (existingEmr?.data as Record<string, unknown>) || {};
   return {
     data: {
       ...currentData,
       specialty: currentData.specialty || 'cardiology',
       specialty_data: {
-        ...(currentData.specialty_data || {}),
+        ...((currentData.specialty_data as Record<string, unknown>) || {}),
         echo: echoData
       }
     },
@@ -211,7 +217,7 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
 
   useEffect(() => {
     if (initialData) {
-      setEchoData(deepMerge(DEFAULT_ECHO_DATA, initialData));
+      setEchoData(deepMerge(DEFAULT_ECHO_DATA as Record<string, unknown>, initialData as Record<string, unknown>) as EchoData);
     }
   }, [initialData]);
 
@@ -219,15 +225,15 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
     setEchoData((prev) => ({
       ...prev,
       [section]: field.includes('.')
-        ? setNestedValue(prev[section] || {}, field, value)
+        ? setNestedValue((prev[section] || {}) as Record<string, unknown>, field, value)
         : {
-          ...(prev[section] as Record<string, unknown> || {}),
+          ...((prev[section] as Record<string, unknown>) || {}),
           [field]: value
         }
     }));
   };
 
-  const toggleSection = (section) => {
+  const toggleSection = (section: keyof typeof expandedSections) => {
     setExpandedSections((prev) => ({
       ...prev,
       [section]: !prev[section]
@@ -266,7 +272,12 @@ const EchoForm = ({ visitId, onSave, onDataUpdate, initialData = null }: EchoFor
     }
   };
 
-  const renderSection = (title, section, fields, expanded) =>
+  const renderSection = (
+    title: string,
+    section: keyof typeof expandedSections,
+    fields: Array<{ key: string; label: string; placeholder: string }>,
+    expanded: boolean
+  ) =>
   <div style={{ marginBottom: 24 }}>
       <div
       role="button"

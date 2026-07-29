@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 const ROOT = path.resolve(__dirname, '../../..', 'components');
 
-const readComponent = (relativePath) =>
+const readComponent = (relativePath: string) =>
   fs.readFileSync(path.join(ROOT, relativePath), 'utf8').replace(/\r\n/g, '\n');
 
 describe('specialist price override API client contract', () => {

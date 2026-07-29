@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { A11Y_COLORS } from '../../constants/a11yTokens';
 
-function hexToRgb(hex) {
+function hexToRgb(hex: string) {
   const value = hex.replace('#', '');
   return {
     r: parseInt(value.slice(0, 2), 16),
@@ -12,7 +12,7 @@ function hexToRgb(hex) {
 
 function relativeLuminance(hex: string) {
   const { r, g, b } = hexToRgb(hex);
-  const normalize = (channel) => {
+  const normalize = (channel: number) => {
     const value = channel / 255;
     return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
   };
@@ -22,7 +22,7 @@ function relativeLuminance(hex: string) {
   return 0.2126 * rr + 0.7152 * gg + 0.0722 * bb;
 }
 
-function contrastRatio(foreground, background) {
+function contrastRatio(foreground: string, background: string) {
   const fg = relativeLuminance(foreground);
   const bg = relativeLuminance(background);
   const lighter = Math.max(fg, bg);

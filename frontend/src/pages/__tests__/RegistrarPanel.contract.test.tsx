@@ -36,7 +36,7 @@ const readRegistrarSourceTree = () => [
   fs.readFileSync(useRegistrarActionsPath, 'utf8'),
 ].join('\n\n');
 
-const extractSourceBlock = (source, startMarker, endMarker) => {
+const extractSourceBlock = (source: string, startMarker: string, endMarker: string) => {
   const start = source.indexOf(startMarker);
   expect(start).toBeGreaterThanOrEqual(0);
   const end = source.indexOf(endMarker, start);

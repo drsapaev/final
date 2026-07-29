@@ -24,7 +24,7 @@ vi.mock('../../../utils/logger', () => ({
 }));
 
 vi.mock('../NotificationBell', () => ({
-  default: ({ unreadCount, onClick }) => (
+  default: ({ unreadCount, onClick }: { unreadCount?: number; onClick?: () => void }) => (
     <button type="button" onClick={onClick}>
       Bell {unreadCount}
     </button>
@@ -38,8 +38,8 @@ vi.mock('../NotificationInbox', () => ({
 import RoleNotificationCenter from '../RoleNotificationCenter';
 
 describe('RoleNotificationCenter', () => {
-  let loadNotifications;
-  let getUnreadCount;
+  let loadNotifications: ReturnType<typeof vi.fn>;
+  let getUnreadCount: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.clearAllMocks();

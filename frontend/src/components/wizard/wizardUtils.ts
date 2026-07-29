@@ -353,7 +353,7 @@ export const getWizardDepartmentFilterKeys = (
   }
 
   // Fallback to hardcoded map
-  return WIZARD_DEPARTMENT_FILTER_KEYS_FALLBACK[normalized] || [normalized];
+  return (WIZARD_DEPARTMENT_FILTER_KEYS_FALLBACK as Record<string, string[]>)[normalized] || [normalized];
 };
 
 export const serviceCodeToWizardCategory = (value: unknown): 'laboratory' | 'procedures' | 'specialists' | null => {

@@ -134,7 +134,7 @@ const ClinicManagement = () => {
 
 
 
-  const getHealthLabel = (status) => {
+  const getHealthLabel = (status: string) => {
     switch (status) {
       case 'healthy':return t('admin2.cm_health_healthy');
       case 'warning':return t('admin2.cm_health_warning');
@@ -178,7 +178,7 @@ const ClinicManagement = () => {
               <Badge
             variant={systemHealth.status === 'healthy' ? 'success' :
             systemHealth.status === 'warning' ? 'warning' : 'error'}
-            text={getHealthLabel(systemHealth.status)} />
+            text={getHealthLabel(systemHealth.status || '')} />
           
               <span className="text-sm text-[var(--mac-text-secondary)]">
                 {t('admin2.cm_last_check', { date: new Date().toLocaleString() })}

@@ -8,6 +8,7 @@ import {
   Skeleton,
   Input,
   Select,
+  type SelectChangeEvent,
   Textarea,
 } from '../ui/macos';
 import {
@@ -262,7 +263,7 @@ const PhoneVerificationManager = () => {
             </label>
             <Select
             value={adminForm.purpose}
-            onChange={(value: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setAdminForm((prev) => ({ ...prev, purpose: value }))}
+            onChange={(value: SelectChangeEvent) => setAdminForm((prev) => ({ ...prev, purpose: value.target.value }))}
             options={[
             { value: 'verification', label: t('admin2.pvm_purpose_verification') },
             { value: 'password_reset', label: t('admin2.pvm_purpose_password_reset') },
@@ -280,7 +281,7 @@ const PhoneVerificationManager = () => {
             </label>
             <Select
             value={adminForm.provider}
-            onChange={(value: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setAdminForm((prev) => ({ ...prev, provider: value }))}
+            onChange={(value: SelectChangeEvent) => setAdminForm((prev) => ({ ...prev, provider: value.target.value }))}
             options={[
             { value: '', label: t('admin2.pvm_provider_default') },
             { value: 'eskiz', label: 'Eskiz' },

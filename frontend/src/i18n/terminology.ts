@@ -173,7 +173,7 @@ export const TERM = {
  * Falls back to Russian, then to the key itself.
  */
 export function getTerm(key: string, language: string) {
-  const term = TERM[key];
+  const term = (TERM as Record<string, Record<string, string>>)[key];
   if (!term) return key;
   return term[language] || term.ru || key;
 }

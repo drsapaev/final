@@ -20,7 +20,7 @@ const utilsSource = fs.readFileSync(
   'utf8'
 );
 
-function blockFromFile(fileContent, startMarker, endMarker) {
+function blockFromFile(fileContent: string, startMarker: string, endMarker: string) {
   const start = fileContent.indexOf(startMarker);
   expect(start).toBeGreaterThanOrEqual(0);
   const end = fileContent.indexOf(endMarker, start);

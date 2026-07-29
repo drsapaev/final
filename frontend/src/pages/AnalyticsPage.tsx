@@ -962,7 +962,7 @@ export default function AnalyticsPage() {
         return (
           <AnalyticsSectionCard title={t('misc.an_pred_section_title')} subtitle={t('misc.an_pred_section_subtitle')} compact={isCompactLayout}>
             <PredictiveAnalytics
-              data={data.predictive}
+              data={data.predictive as never}
               loading={loading}
               onRefresh={() => loadAnalytics('predictive')}
               onExport={() => exportData('json')} />

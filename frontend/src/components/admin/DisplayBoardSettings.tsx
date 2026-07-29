@@ -25,6 +25,7 @@ import {
 'lucide-react';
 import {
   MacOSCard, Button, Select,
+  type SelectChangeEvent,
   Input,
   Checkbox } from '../ui/macos';
 import { api } from '../../api/client';
@@ -327,7 +328,7 @@ const DisplayBoardSettings = () => {
               </label>
               <Select
                 value={selectedBoard.theme}
-                onChange={(value: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleBoardSettingChange('theme', value)}
+                onChange={(value: SelectChangeEvent) => handleBoardSettingChange('theme', value.target.value)}
                 options={themes.map((theme) => ({
                   value: theme.name,
                   label: theme.display_name
@@ -343,7 +344,7 @@ const DisplayBoardSettings = () => {
               </label>
               <Select
                 value={selectedBoard.show_patient_names}
-                onChange={(value: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleBoardSettingChange('show_patient_names', value)}
+                onChange={(value: SelectChangeEvent) => handleBoardSettingChange('show_patient_names', value.target.value === 'true')}
                 options={privacyOptions.map((option) => ({
                   value: option.value,
                   label: `${option.label} - ${option.description}`
@@ -453,7 +454,7 @@ const DisplayBoardSettings = () => {
                   </label>
                   <Select
                   value={selectedBoard.voice_language}
-                  onChange={(value: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleBoardSettingChange('voice_language', value)}
+                  onChange={(value: SelectChangeEvent) => handleBoardSettingChange('voice_language', value.target.value)}
                   options={voiceLanguages.map((lang) => ({
                     value: lang.value,
                     label: lang.label

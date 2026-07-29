@@ -26,12 +26,37 @@ import { Input } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
 
+interface CommandItem {
+  id: string;
+  label: string;
+  description?: string;
+  path?: string;
+  icon?: string;
+  section?: string;
+  keywords?: string[];
+  action: 'navigate' | 'back';
+  target?: string;
+}
+
+type CommandProfile = {
+  role?: string;
+  role_name?: string;
+  roles?: string[];
+  is_superuser?: boolean;
+  is_admin?: boolean;
+  admin?: boolean;
+  username?: string;
+  email?: string;
+  specialty?: string;
+  [key: string]: unknown;
+} | null | undefined;
+
 const MAX_RESULTS = 8;
 const MAX_RECENT = 5;
 const RECENT_KEY = 'cmd_palette_recent';
 
 // Quick actions available in the palette (not routes, but shortcuts)
-const getQuickActions = (t) => [
+const getQuickActions = (t: (key: string, options?: Record<string, unknown>) => string): CommandItem[] => [
   {
     id: 'action-new-appointment',
     label: t('misc.cpqa_new_appointment_label'),
@@ -72,7 +97,7 @@ function loadRecent() {
   }
 }
 
-function saveRecent(items) {
+function saveRecent(items: unknown[]) {
   try {
     localStorage.setItem(RECENT_KEY, JSON.stringify(items.slice(0, MAX_RECENT)));
   } catch {
@@ -80,7 +105,7 @@ function saveRecent(items) {
   }
 }
 
-function fuzzyMatch(query, text) {
+function fuzzyMatch(query: string, text: string) {
   if (!query) return true;
   const q = query.toLowerCase();
   const t = (text || '').toLowerCase();
@@ -93,13 +118,13 @@ function fuzzyMatch(query, text) {
   return qi === q.length;
 }
 
-function scoreResult(query, item) {
+function scoreResult(query: string, item: CommandItem) {
   if (!query) return 0;
   const q = query.toLowerCase();
   const label = (item.label || '').toLowerCase();
   const id = (item.id || '').toLowerCase();
   const path = (item.path || '').toLowerCase();
-  const keywords = (item.keywords || []).map(k => k.toLowerCase());
+  const keywords = (item.keywords || []).map((k: string) => k.toLowerCase());
 
   // Exact match = highest score
   if (label === q) return 100;
@@ -128,7 +153,7 @@ function scoreResult(query, item) {
   return 0;
 }
 
-export function CommandPalette({ profile, navigate }) {
+export function CommandPalette({ profile, navigate }: { profile: CommandProfile; navigate: (path: string) => void }) {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -147,7 +172,7 @@ export function CommandPalette({ profile, navigate }) {
       isRouteAccessibleToProfile(route, profile)
     );
 
-    const routeItems = accessibleRoutes.map(route => ({
+    const routeItems: CommandItem[] = accessibleRoutes.map(route => ({
       id: route.id,
       label: (typeof route.nav === 'object' && route.nav ? (route.nav as { label?: string }).label : null) || route.title || route.id,
       description: (typeof route.nav === 'object' && route.nav ? (route.nav as { section?: string }).section : null) || route.group || '',
@@ -179,8 +204,8 @@ export function CommandPalette({ profile, navigate }) {
     if (!query.trim()) {
       // Show recent first, then first N items
       const recentItems = recent
-        .map(id => allItems.find(item => item.id === id))
-        .filter(Boolean);
+        .map((id: string) => allItems.find(item => item.id === id))
+        .filter(Boolean) as CommandItem[];
       const nonRecent = allItems.filter(item => !recent.includes(item.id));
       return [...recentItems, ...nonRecent].slice(0, MAX_RESULTS);
     }
@@ -195,7 +220,7 @@ export function CommandPalette({ profile, navigate }) {
 
   // Global Cmd+K / Ctrl+K listener
   useEffect(() => {
-    const handleKeyDown = (e) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
         setIsOpen(prev => !prev);
@@ -233,7 +258,7 @@ export function CommandPalette({ profile, navigate }) {
   }, [query]);
 
   // Keyboard navigation
-  const handleKeyDown = useCallback((e) => {
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLElement>) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       setSelectedIndex(prev => Math.min(prev + 1, results.length - 1));
@@ -247,9 +272,9 @@ export function CommandPalette({ profile, navigate }) {
     }
   }, [results, selectedIndex]);
 
-  const handleSelect = useCallback((item) => {
+  const handleSelect = useCallback((item: CommandItem) => {
     // Save to recent
-    const newRecent = [item.id, ...recent.filter(id => id !== item.id)].slice(0, MAX_RECENT);
+    const newRecent = [item.id, ...recent.filter((id: string) => id !== item.id)].slice(0, MAX_RECENT);
     setRecent(newRecent);
     saveRecent(newRecent);
 

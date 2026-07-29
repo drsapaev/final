@@ -64,7 +64,7 @@ const ExaminationForm = ({
     },
 
     // Пародонтальные карманы (по зубам)
-    periodontalPockets: {},
+    periodontalPockets: {} as Record<string, string>,
 
     // Дополнительные измерения
     measurements: {
@@ -116,13 +116,13 @@ const ExaminationForm = ({
   }, [initialData]);
 
   // Обработчики
-  const handleInputChange = (field, value) => {
+  const handleInputChange = (field: string, value: any) => {
     if (field.includes('.')) {
       const [parent, child] = field.split('.');
       setFormData((prev) => ({
         ...prev,
         [parent]: {
-          ...prev[parent],
+          ...(prev as Record<string, any>)[parent],
           [child]: value
         }
       }));
@@ -134,21 +134,21 @@ const ExaminationForm = ({
     }
   };
 
-  const handleArrayAdd = (field, item) => {
+  const handleArrayAdd = (field: string, item: any) => {
     setFormData((prev) => ({
       ...prev,
-      [field]: [...prev[field], item]
+      [field]: [...(prev as Record<string, any>)[field], item]
     }));
   };
 
-  const handleArrayRemove = (field, index) => {
+  const handleArrayRemove = (field: string, index: number) => {
     setFormData((prev) => ({
       ...prev,
-      [field]: prev[field].filter((_, i) => i !== index)
+      [field]: ((prev as Record<string, any>)[field] as any[]).filter((_: any, i: number) => i !== index)
     }));
   };
 
-  const handlePhotoUpload = (category, file) => {
+  const handlePhotoUpload = (category: string, file: File) => {
     const reader = new FileReader();
     reader.onload = (e) => {
       const photoData = {

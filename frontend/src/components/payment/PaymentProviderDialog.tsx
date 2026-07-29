@@ -175,8 +175,9 @@ const PaymentProviderDialog = ({
         loadingMessage: t('payment.pay_dlg_loading_init'),
         successMessage: t('payment.pay_dlg_success_created'),
         errorMessage: t('payment.pay_dlg_error_create'),
-        onError: (err: { message?: string }) => {
-          setError(err?.message || '');
+        onError: (err: unknown) => {
+          const message = (err as { message?: string })?.message || '';
+          setError(message);
           setPaymentState('failed');
         }
       }

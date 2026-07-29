@@ -74,7 +74,7 @@ const baseSettings = {
   quiet_hours_end: '07:00',
 };
 
-function renderPreferences(ui) {
+function renderPreferences(ui: React.ReactNode) {
   return render(
     <MacOSThemeProvider>
       <ThemeProvider>{ui}</ThemeProvider>
@@ -97,7 +97,7 @@ describe('NotificationPreferences', () => {
   });
 
   it('reuses one in-flight settings request across StrictMode remounts', async () => {
-    let resolveRequest;
+    let resolveRequest: ((value: typeof baseSettings | PromiseLike<typeof baseSettings>) => void) | undefined;
     notificationGetSettings.mockReturnValue(
       new Promise((resolve) => {
         resolveRequest = resolve;
@@ -115,7 +115,7 @@ describe('NotificationPreferences', () => {
       expect(notificationGetSettings).toHaveBeenCalledWith(20);
     });
 
-    resolveRequest(baseSettings);
+    resolveRequest?.(baseSettings);
 
     expect(await screen.findByText('Каналы уведомлений')).toBeInTheDocument();
   });

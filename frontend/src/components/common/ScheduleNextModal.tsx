@@ -169,12 +169,12 @@ const ScheduleNextModal = ({
     }
   };
 
-  const handleInputChange = (field, value) => {
+  const handleInputChange = (field: string, value: unknown) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     setError('');
   };
 
-  const handleServiceChange = (index, field, value) => {
+  const handleServiceChange = (index: number, field: string, value: unknown) => {
     const newServices = [...formData.services];
     newServices[index] = { ...newServices[index], [field]: value };
     setFormData((prev) => ({ ...prev, services: newServices }));
@@ -187,14 +187,14 @@ const ScheduleNextModal = ({
     }));
   };
 
-  const removeService = (index) => {
+  const removeService = (index: number) => {
     if (formData.services.length > 1) {
       const newServices = formData.services.filter((_, i) => i !== index);
       setFormData((prev) => ({ ...prev, services: newServices }));
     }
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
     setError('');
@@ -437,7 +437,7 @@ const ScheduleNextModal = ({
         return t('misc.snm_title_default');
     }
   };
-  const handleActivationKeyDown = (event, action) => {
+  const handleActivationKeyDown = (event: React.KeyboardEvent<HTMLElement>, action: () => void) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       action();
@@ -450,7 +450,7 @@ const ScheduleNextModal = ({
       role="button"
       tabIndex={0}
       onClick={onClose}
-      onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => handleActivationKeyDown(event, onClose)}>
+      onKeyDown={(event: React.KeyboardEvent<HTMLElement>) => handleActivationKeyDown(event, onClose ?? (() => undefined))}>
       <div style={modalStyle} onClickCapture={(e) => e.stopPropagation()}>
         {/* Заголовок */}
         <div style={headerStyle}>

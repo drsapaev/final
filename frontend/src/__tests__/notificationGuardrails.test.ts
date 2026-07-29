@@ -21,7 +21,7 @@ const PANEL_FILES = [
   'pages/LabPanel.tsx'
 ];
 
-function read(filePath) {
+function read(filePath: string) {
   return fs.readFileSync(path.join(ROOT, filePath), 'utf8');
 }
 

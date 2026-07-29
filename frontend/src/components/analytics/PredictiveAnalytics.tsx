@@ -23,13 +23,59 @@ import {
  * Компонент предиктивной аналитики
  * Включает прогнозы, тренды, рекомендации
  */
+interface PredictiveFactor {
+  name?: string;
+  impact?: number;
+}
+
+interface PredictiveForecast {
+  period?: string;
+  confidence?: number;
+  trend?: number;
+  value?: { toLocaleString: () => string };
+  unit?: string;
+  metric?: string;
+  metric_label?: string;
+  factors?: PredictiveFactor[];
+}
+
+interface PredictiveRecommendation {
+  priority?: 'high' | 'medium' | 'low' | string;
+  title?: string;
+  description?: string;
+  impact?: string | number;
+  timeline?: string;
+}
+
+interface PredictiveTrend {
+  metric?: string;
+  description?: string;
+  direction?: 'up' | 'down' | string;
+  change?: string | number;
+  period?: string;
+}
+
+interface PredictiveData {
+  forecasts?: PredictiveForecast[];
+  recommendations?: PredictiveRecommendation[];
+  trends?: PredictiveTrend[];
+}
+
+interface PredictiveAnalyticsProps {
+  data?: PredictiveData | null;
+  loading?: boolean;
+  onRefresh?: () => void;
+  onExport?: (section?: string) => void;
+  showRecommendations?: boolean;
+}
+
 const PredictiveAnalytics = ({
   data,
   loading = false,
   onRefresh,
   onExport,
   showRecommendations = true
-}) => {
+}: PredictiveAnalyticsProps) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [selectedMetric, setSelectedMetric] = useState('revenue');
   const [forecastPeriod, setForecastPeriod] = useState('30d');
@@ -49,12 +95,12 @@ const PredictiveAnalytics = ({
   { id: '1y', label: t('misc.pa_1_god') }];
 
 
-  const getMetricIcon = (metricId) => {
+  const getMetricIcon = (metricId: string) => {
     const metric = metricOptions.find((m) => m.id === metricId);
     return metric ? <metric.icon className="w-5 h-5" /> : <Activity className="w-5 h-5" />;
   };
 
-  const visibleForecasts = (data?.forecasts || []).filter((forecast) =>
+  const visibleForecasts = (data?.forecasts || []).filter((forecast: PredictiveForecast) =>
     !forecast.metric || forecast.metric === selectedMetric
   );
 
@@ -63,7 +109,7 @@ const PredictiveAnalytics = ({
 
 
 
-  const renderForecastCard = (forecast) => {
+  const renderForecastCard = (forecast: PredictiveForecast) => {
     const confidence = forecast.confidence || 0;
     const trend = forecast.trend || 0;
     const isPositive = trend > 0;
@@ -96,7 +142,7 @@ const PredictiveAnalytics = ({
           <div className="space-y-3">
             <div className="flex items-baseline space-x-2">
               <span className="text-2xl font-bold">
-                {forecast.value.toLocaleString()}
+                {forecast.value?.toLocaleString()}
               </span>
               <span className="text-sm text-gray-500">
                 {forecast.unit || ''}
@@ -127,14 +173,14 @@ const PredictiveAnalytics = ({
             <div className="pt-2 border-t border-gray-100">
                 <div className="text-xs text-gray-600 mb-1">{t('misc.pa_klyuchevye_faktory')}</div>
                 <div className="space-y-1">
-                  {forecast.factors.map((factor, index) =>
+                  {forecast.factors.map((factor: PredictiveFactor, index: number) =>
                 <div key={index} className="flex items-center space-x-2 text-xs">
                       <div className={`w-2 h-2 rounded-full ${
-                  factor.impact > 0 ? 'bg-green-500' : 'bg-red-500'}`
+                  (factor.impact || 0) > 0 ? 'bg-green-500' : 'bg-red-500'}`
                   }></div>
                       <span>{factor.name}</span>
                       <span className="text-gray-500">
-                        ({factor.impact > 0 ? '+' : ''}{factor.impact.toFixed(1)}%)
+                        ({(factor.impact || 0) > 0 ? '+' : ''}{(factor.impact || 0).toFixed(1)}%)
                       </span>
                     </div>
                 )}
@@ -174,7 +220,7 @@ const PredictiveAnalytics = ({
         </div>
 
         <div className="space-y-4">
-          {data.recommendations.map((rec, index) =>
+          {data.recommendations.map((rec: PredictiveRecommendation, index: number) =>
           <div key={index} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
               <div className={`p-1 rounded-full ${
             rec.priority === 'high' ? 'bg-red-100' :
@@ -212,7 +258,7 @@ const PredictiveAnalytics = ({
         <h3 className="text-lg font-semibold mb-4">{t('misc.pa_analiz_trendov')}</h3>
         
         <div className="space-y-4">
-          {data.trends.map((trend, index) =>
+          {data.trends.map((trend: PredictiveTrend, index: number) =>
           <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
               <div className="flex items-center space-x-3">
                 <div className={`p-2 rounded-lg ${
@@ -344,7 +390,7 @@ const PredictiveAnalytics = ({
       <div>
           <h3 className="text-lg font-semibold mb-4">Прогнозы на {forecastPeriod}</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {visibleForecasts.map((forecast) => renderForecastCard(forecast))}
+            {visibleForecasts.map((forecast: PredictiveForecast) => renderForecastCard(forecast))}
           </div>
         </div>
       }

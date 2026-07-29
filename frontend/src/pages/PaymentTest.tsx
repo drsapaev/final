@@ -133,7 +133,7 @@ const PaymentTest = () => {
     window.location.assign('/login');
   };
 
-  const handlePaymentSuccess = (paymentData: Record<string, unknown>) => {
+  const handlePaymentSuccess = (paymentData: unknown) => {
     logger.log('Payment Success:', paymentData);
     setResult({
       type: 'success',

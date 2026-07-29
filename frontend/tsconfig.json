@@ -1,7 +1,7 @@
 {
-  // Phase 0 — Infrastructure
+  // Phase 9 — strict:true enabled (G8 migration complete)
   // Plan: JS-to-TS-Migration-Plan v3, section 0.1
-  // Strategy: allowJs + strict:false → gradual migration; strict:true at Phase 9.
+  // Strategy: allowJs + strict:true (achieved after ~4786 strict errors fixed)
   //
   // Note: `baseUrl` is removed — deprecated in TS 6.0. With `moduleResolution: "bundler"`,
   // `paths` resolves relative to the tsconfig.json file location.
@@ -14,8 +14,7 @@
     "allowJs": true,
     "checkJs": false,
     "jsx": "react-jsx",
-    "strict": false,
-    "noImplicitAny": false,
+    "strict": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,

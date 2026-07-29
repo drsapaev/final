@@ -138,7 +138,7 @@ export function Table({
   }, [filteredData, currentPage, pageSize, pagination]);
 
   // Обработка сортировки
-  const handleSort = useCallback((field) => {
+  const handleSort = useCallback((field: string) => {
     if (!sortable) return;
     
     if (sortField === field) {
@@ -152,7 +152,7 @@ export function Table({
   }, [sortField, sortDirection, sortable, onSort]);
 
   // Обработка фильтрации
-  const handleFilter = useCallback((field, value) => {
+  const handleFilter = useCallback((field: string, value: string) => {
     setFilters(prev => ({
       ...prev,
       [field]: value
@@ -162,7 +162,7 @@ export function Table({
   }, [onFilter]);
 
   // Обработка изменения страницы
-  const handlePageChange = useCallback((page) => {
+  const handlePageChange = useCallback((page: number) => {
     setCurrentPage(page);
     onPageChange?.(page);
   }, [onPageChange]);
@@ -254,7 +254,7 @@ export function Table({
     borderColor: getColor('primary', 'main')
   };
 
-  const getSortIcon = (field) => {
+  const getSortIcon = (field: string) => {
     if (sortField !== field) return '↕️';
     return sortDirection === 'asc' ? '↑' : '↓';
   };
@@ -440,15 +440,19 @@ function TableLoading({ columns = 3, rows = 5 }) {
 /**
  * Компонент для экспорта таблицы
  */
-export function TableExport({ data, columns, filename = 'export.csv' }) {
+export function TableExport({ data, columns, filename = 'export.csv' }: {
+  data: Record<string, unknown>[];
+  columns: TableColumn[];
+  filename?: string;
+}) {
   const theme = useTheme();
   const { getColor, getSpacing, getFontSize } = theme;
 
   const handleExport = useCallback(() => {
     const csvContent = [
-      columns.map(col => col.title).join(','),
-      ...data.map(row => 
-        columns.map(col => {
+      columns.map((col: TableColumn) => col.title).join(','),
+      ...data.map((row: Record<string, unknown>) => 
+        columns.map((col: TableColumn) => {
           const value = row[col.key];
           return typeof value === 'string' ? `"${value}"` : value;
         }).join(',')

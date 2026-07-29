@@ -47,6 +47,7 @@ import { useModal } from '../hooks/useModal';
 import { useBreakpoint, useTouchDevice } from '../hooks/useEnhancedMediaQuery';
 import useDoctorQueue from '../hooks/useDoctorQueue';
 import { getProfile } from '../stores/auth';
+import type { UserProfile } from '../types/domain/auth';
 import ScheduleNextModal from '../components/common/ScheduleNextModal';
 import AIChatWidget from '../components/ai/AIChatWidget';
 import { getApiOrigin } from '../api/runtime';
@@ -210,7 +211,7 @@ const DoctorPanel = () => {
   const [doctorSpecialty, setDoctorSpecialty] = useState('general');
 
   useEffect(() => {
-    getProfile().then((profile: Record<string, unknown>) => {
+    getProfile().then((profile: UserProfile | null) => {
       if (profile?.specialty) {
         setDoctorSpecialty(String(profile.specialty ?? ''));
       }
@@ -1308,7 +1309,7 @@ const DoctorPanel = () => {
       <ScheduleNextModal
         isOpen={scheduleNextModal.open}
         onClose={() => setScheduleNextModal({ open: false, patient: null })}
-        onSuccess={handleScheduleNextSuccess}
+        onSuccess={handleScheduleNextSuccess as (result?: unknown, formData?: Record<string, unknown>) => void}
         patient={scheduleNextModal.patient ?? undefined}
         theme={{ isDark, getColor, getSpacing, getFontSize }} />
 

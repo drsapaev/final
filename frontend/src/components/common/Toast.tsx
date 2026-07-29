@@ -9,17 +9,17 @@ import { useTranslation } from '../../i18n/useTranslation';
 
 // Контекст для уведомлений
 const ToastContext = createContext<unknown>(null);
-let addToastExternal: ((toast: unknown) => void) | null = null;
+let addToastExternal: ((toast: Record<string, unknown>) => string | number | null) | null = null;
 
 /**
  * Провайдер контекста уведомлений
  */
-export function ToastProvider({ children }) {
+export function ToastProvider({ children }: { children: React.ReactNode }) {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [toasts, setToasts] = useState<Record<string, unknown>[]>([]);
   const theme = useTheme();
 
-  const addToast = useCallback((toast) => {
+  const addToast = useCallback((toast: Record<string, unknown>) => {
     const id = Date.now() + Math.random();
     const newToast = {
       id,
@@ -40,7 +40,7 @@ export function ToastProvider({ children }) {
     return id;
   }, []);
 
-  const removeToast = useCallback((id) => {
+  const removeToast = useCallback((id: string | number) => {
     setToasts((prev) => prev.filter((toast) => toast.id !== id));
   }, []);
 
@@ -86,7 +86,7 @@ export function useToast() {
 /**
  * Контейнер для отображения уведомлений
  */
-function ToastContainer({ toasts, onRemove, theme }) {
+function ToastContainer({ toasts, onRemove, theme }: { toasts: Record<string, unknown>[]; onRemove: (id: string | number) => void; theme?: unknown }) {
 
   const containerStyle = {
     position: 'fixed',
@@ -102,12 +102,12 @@ function ToastContainer({ toasts, onRemove, theme }) {
 
   return (
     <div style={containerStyle as CSSProperties}>
-      {toasts.map((toast) =>
+      {toasts.map((toast: Record<string, unknown>) =>
       <ToastItem
-        key={toast.id}
+        key={toast.id as string | number}
         toast={toast}
         onRemove={onRemove}
-        theme={theme} />
+        theme={theme as string} />
 
       )}
     </div>);
@@ -127,7 +127,7 @@ function ToastItem({ toast, onRemove, theme }: { toast: Record<string, unknown>;
     return () => clearTimeout(timer);
   }, []);
 
-  const getToastStyles = (type) => {
+  const getToastStyles = (type: string) => {
     const baseStyle = {
       padding: '1rem',
       borderRadius: 'var(--mac-radius-md)',
@@ -165,10 +165,10 @@ function ToastItem({ toast, onRemove, theme }: { toast: Record<string, unknown>;
       }
     };
 
-    return { ...baseStyle, ...typeStyles[type] };
+    return { ...baseStyle, ...typeStyles[type as keyof typeof typeStyles] };
   };
 
-  const getIcon = (type) => {
+  const getIcon = (type: string) => {
     const iconStyle = {
       fontSize: 'var(--mac-font-size-lg)',
       flexShrink: 0,
@@ -182,7 +182,7 @@ function ToastItem({ toast, onRemove, theme }: { toast: Record<string, unknown>;
       info: 'ℹ️'
     };
 
-    return <span style={iconStyle}>{icons[type] || icons.info}</span>;
+    return <span style={iconStyle}>{icons[type as keyof typeof icons] || icons.info}</span>;
   };
 
   const contentStyle = {
@@ -276,22 +276,22 @@ ToastItem.propTypes = {
  * Утилиты для быстрого создания уведомлений
  */
 export const toast = {
-  success: (message, options = {}) => {
+  success: (message: string, options: Record<string, unknown> = {}) => {
     if (!addToastExternal) return null;
     return addToastExternal({ type: 'success', message, ...options });
   },
 
-  error: (message, options = {}) => {
+  error: (message: string, options: Record<string, unknown> = {}) => {
     if (!addToastExternal) return null;
     return addToastExternal({ type: 'error', message, ...options });
   },
 
-  warning: (message, options = {}) => {
+  warning: (message: string, options: Record<string, unknown> = {}) => {
     if (!addToastExternal) return null;
     return addToastExternal({ type: 'warning', message, ...options });
   },
 
-  info: (message, options = {}) => {
+  info: (message: string, options: Record<string, unknown> = {}) => {
     if (!addToastExternal) return null;
     return addToastExternal({ type: 'info', message, ...options });
   }

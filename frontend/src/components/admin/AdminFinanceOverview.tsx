@@ -34,7 +34,9 @@ import FinanceModal from './FinanceModal';
 import { useConfirm } from '../common/ConfirmDialog';
 import React from "react";
 
-function getCategoryOptions(t) {
+type TFunc = (key: string, options?: Record<string, unknown>) => string;
+
+function getCategoryOptions(t: TFunc) {
   return [
     { value: '', label: t('admin2.fo_cat_all') },
     { value: 'Консультация врача', label: t('admin2.fo_cat_consultation') },
@@ -49,16 +51,16 @@ function getCategoryOptions(t) {
 }
 
 
-function getTransactionTypeLabel(type, t) {
-  const typeMap = {
+function getTransactionTypeLabel(type: string, t: TFunc) {
+  const typeMap: Record<string, string> = {
     income: t('admin2.fo_type_income'),
     expense: t('admin2.fo_type_expense'),
   };
   return typeMap[type] || type;
 }
 
-function getTransactionStatusLabel(status, t) {
-  const statusMap = {
+function getTransactionStatusLabel(status: string, t: TFunc) {
+  const statusMap: Record<string, string> = {
     pending: t('admin2.fo_status_pending'),
     completed: t('admin2.fo_status_completed'),
     cancelled: t('admin2.fo_status_cancelled'),
@@ -67,8 +69,8 @@ function getTransactionStatusLabel(status, t) {
   return statusMap[status] || status;
 }
 
-function getTransactionStatusVariant(status) {
-  const variantMap = {
+function getTransactionStatusVariant(status: string): string {
+  const variantMap: Record<string, string> = {
     pending: 'warning',
     completed: 'success',
     cancelled: 'danger',
@@ -77,8 +79,8 @@ function getTransactionStatusVariant(status) {
   return variantMap[status] || 'secondary';
 }
 
-function getPaymentMethodLabel(method, t) {
-  const methodMap = {
+function getPaymentMethodLabel(method: string, t: TFunc) {
+  const methodMap: Record<string, string> = {
     cash: t('admin2.fo_method_cash'),
     card: t('admin2.fo_method_card'),
     transfer: t('admin2.fo_method_transfer'),
@@ -87,10 +89,10 @@ function getPaymentMethodLabel(method, t) {
   return methodMap[method] || method;
 }
 
-function formatTransactionDate(transactionDate, t) {
+function formatTransactionDate(transactionDate: unknown, t: TFunc): string {
   if (!transactionDate) return t('admin2.fo_no_date');
-  const parsed = new Date(transactionDate);
-  if (Number.isNaN(parsed.getTime())) return transactionDate;
+  const parsed = new Date(transactionDate as string);
+  if (Number.isNaN(parsed.getTime())) return String(transactionDate);
   return parsed.toLocaleDateString('ru-RU');
 }
 
@@ -133,15 +135,17 @@ const AdminFinanceOverview = () => {
     financeModal.openModal(null);
   };
 
-  const handleEditTransaction = (transaction) => {
-    financeModal.openModal(transaction);
+  const handleEditTransaction = (transaction: Record<string, unknown>) => {
+    // useModal's openModal is typed `(item = null)` so the param type is
+    // `null`. At runtime any value works; cast to satisfy the type.
+    financeModal.openModal(transaction as never);
   };
 
-  const handleDeleteTransaction = async (transaction) => {
+  const handleDeleteTransaction = async (transaction: Record<string, unknown>) => {
     // P-013 fix: replaced window.confirm() with shared useConfirm hook.
     const ok = await (confirm as unknown as (opts: Record<string, unknown>) => Promise<boolean>)({
       title: t('admin.delete_transaction_title'),
-      message: t('admin2.fo_delete_transaction_message', { description: transaction.description }),
+      message: t('admin2.fo_delete_transaction_message', { description: transaction.description as string | undefined }),
       description: t('admin2.fo_action_irreversible'),
       confirmLabel: t('admin.delete_confirm'),
       cancelLabel: t('admin.cancel'),
@@ -152,23 +156,23 @@ const AdminFinanceOverview = () => {
     }
 
     try {
-      await deleteTransaction(transaction.id);
+      await deleteTransaction(transaction.id as string | number);
     } catch (error) {
       logger.error('Ошибка удаления финансовой транзакции:', error);
       notify.error(t('admin.transaction_delete_error'));
     }
   };
 
-  const handleSaveTransaction = async (transactionData) => {
+  const handleSaveTransaction = async (transactionData: unknown) => {
     financeModal.setModalLoading(true);
     try {
       if (financeModal.selectedItem) {
         // useModal's selectedItem is typed as `null` (from useState(null));
         // cast to the typed shape so the `.id` access type-checks. Runtime
         // value is unchanged.
-        await updateTransaction((financeModal.selectedItem as { id: string | number }).id, transactionData);
+        await updateTransaction((financeModal.selectedItem as { id: string | number }).id, transactionData as Record<string, unknown>);
       } else {
-        await createTransaction(transactionData);
+        await createTransaction(transactionData as Partial<import('../../types/domain/clinic').Transaction>);
       }
       financeModal.closeModal();
     } catch (error) {

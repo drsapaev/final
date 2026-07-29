@@ -77,18 +77,18 @@ const DoctorServiceSelector = ({
   const [error, setError] = useState('');
 
   // Иконки для категорий услуг
-  const categoryIcons = {
-    'consultation.cardiology': Heart,
-    'consultation.dermatology': Stethoscope,
-    'consultation.stomatology': TestTube,
-    'diagnostics.ecg': Activity,
-    'diagnostics.echo': Heart,
-    'procedure.cosmetology': Stethoscope,
-    'laboratory.blood': TestTube
+  const categoryIcons: Record<string, React.ComponentType<{ size?: number | string; style?: React.CSSProperties; className?: string }>> = {
+    'consultation.cardiology': Heart as unknown as React.ComponentType<{ size?: number | string; style?: React.CSSProperties; className?: string }>,
+    'consultation.dermatology': Stethoscope as unknown as React.ComponentType<{ size?: number | string; style?: React.CSSProperties; className?: string }>,
+    'consultation.stomatology': TestTube as unknown as React.ComponentType<{ size?: number | string; style?: React.CSSProperties; className?: string }>,
+    'diagnostics.ecg': Activity as unknown as React.ComponentType<{ size?: number | string; style?: React.CSSProperties; className?: string }>,
+    'diagnostics.echo': Heart as unknown as React.ComponentType<{ size?: number | string; style?: React.CSSProperties; className?: string }>,
+    'procedure.cosmetology': Stethoscope as unknown as React.ComponentType<{ size?: number | string; style?: React.CSSProperties; className?: string }>,
+    'laboratory.blood': TestTube as unknown as React.ComponentType<{ size?: number | string; style?: React.CSSProperties; className?: string }>
   };
 
   // Названия категорий
-  const categoryNames = {
+  const categoryNames: Record<string, string> = {
     'consultation.cardiology': t('misc.dss_konsultatsiya_kardiologa'),
     'consultation.dermatology': t('misc.dss_konsultatsiya_dermatologa'),
     'consultation.stomatology': t('misc.dss_konsultatsiya_stomatologa'),
@@ -136,7 +136,7 @@ const DoctorServiceSelector = ({
     loadServices();
   }, [loadServices]);
 
-  const handleServiceToggle = (service) => {
+  const handleServiceToggle = (service: Record<string, unknown>) => {
     const existingIndex = selectedServices.findIndex((s) => s.id === service.id);
 
     if (existingIndex >= 0) {
@@ -156,11 +156,11 @@ const DoctorServiceSelector = ({
         total: service.price
       };
 
-      onServicesChange?.([...selectedServices, newService]);
+      onServicesChange?.([...selectedServices, newService as DoctorServiceItem]);
     }
   };
 
-  const handleQuantityChange = (serviceId, quantity) => {
+  const handleQuantityChange = (serviceId: string | number, quantity: number) => {
     const newServices = selectedServices.map((service) => {
       if (service.id === serviceId) {
         return {
@@ -175,7 +175,7 @@ const DoctorServiceSelector = ({
     onServicesChange?.(newServices);
   };
 
-  const handlePriceChange = (serviceId, newPrice) => {
+  const handlePriceChange = (serviceId: string | number, newPrice: number) => {
     if (!canEditPrices) return;
 
     const newServices = selectedServices.map((service) => {
@@ -192,7 +192,7 @@ const DoctorServiceSelector = ({
     onServicesChange?.(newServices);
   };
 
-  const isServiceSelected = (serviceId) => {
+  const isServiceSelected = (serviceId: string | number) => {
     return selectedServices.some((s) => s.id === serviceId);
   };
 
@@ -203,7 +203,7 @@ const DoctorServiceSelector = ({
   const getTotalDuration = () => {
     return selectedServices.reduce((total, service) => total + (Number(service.duration_minutes ?? 0) * Number(service.quantity ?? 1)), 0);
   };
-  const handleActivationKeyDown = (event, onActivate) => {
+  const handleActivationKeyDown = (event: React.KeyboardEvent<HTMLElement>, onActivate: () => void) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       onActivate();
@@ -342,7 +342,7 @@ const DoctorServiceSelector = ({
                   variant="ghost"
                   title={`Decrease quantity for ${service.name}`}
                   aria-label={`Decrease quantity for ${service.name}`}
-                  onClick={() => handleQuantityChange(service.id, (service.quantity ?? 1) - 1)}
+                  onClick={() => handleQuantityChange(service.id || '', (service.quantity ?? 1) - 1)}
                   disabled={(service.quantity ?? 1) <= 1}>
 
                       <Minus aria-hidden="true" size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
@@ -359,7 +359,7 @@ const DoctorServiceSelector = ({
                   variant="ghost"
                   title={`Increase quantity for ${service.name}`}
                   aria-label={`Increase quantity for ${service.name}`}
-                  onClick={() => handleQuantityChange(service.id, (service.quantity ?? 1) + 1)}>
+                  onClick={() => handleQuantityChange(service.id || '', (service.quantity ?? 1) + 1)}>
 
                       <Plus aria-hidden="true" size={14 as unknown as "small" | "default" | "large" | "xlarge"} />
                     </Button>
@@ -371,7 +371,7 @@ const DoctorServiceSelector = ({
                 type="number"
                 aria-label={t('misc.dss_tsena_uslugi_service_name', { name: service.name })}
                 value={service.price}
-                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handlePriceChange(service.id, parseFloat(e.target.value) || 0)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handlePriceChange(service.id || '', parseFloat(e.target.value) || 0)}
                 style={{
                   width: '96px',
                   paddingLeft: '8px',
@@ -446,7 +446,7 @@ const DoctorServiceSelector = ({
               </h3>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-2)' }}>
-                {categoryData.services.map((service) => {
+                {categoryData.services.map((service: Record<string, any>) => {
                   const isSelected = isServiceSelected(service.id);
 
                   return (

@@ -415,9 +415,9 @@ const RegistrarPanel = () => {
               patient_fio: fullEntry.patient_fio ?? fullEntry.patient_name ?? entry.patient_fio ?? entry.patient_name ?? tI18n('registrarPanel.rp_unknown_patient'),
               patient_birth_year: fullEntry.patient_birth_year ?? fullEntry.birth_year ?? entry.patient_birth_year ?? entry.birth_year ?? null,
               patient_phone: fullEntry.patient_phone ?? fullEntry.phone ?? entry.patient_phone ?? entry.phone ?? '',
-              patient_gender: normalizePatientGender(fullEntry) ?? normalizePatientGender(entry),
-              gender: normalizePatientGender(fullEntry) ?? normalizePatientGender(entry),
-              sex: normalizePatientGender(fullEntry) ?? normalizePatientGender(entry),
+              patient_gender: normalizePatientGender(fullEntry as Record<string, unknown>) ?? normalizePatientGender(entry as Record<string, unknown>),
+              gender: normalizePatientGender(fullEntry as Record<string, unknown>) ?? normalizePatientGender(entry as Record<string, unknown>),
+              sex: normalizePatientGender(fullEntry as Record<string, unknown>) ?? normalizePatientGender(entry as Record<string, unknown>),
               address: fullEntry.address ?? entry.address ?? '',
               services: Array.isArray(fullEntry.services) ? fullEntry.services : [],
               service_codes: Array.isArray(fullEntry.service_codes) ? fullEntry.service_codes : [],
@@ -1825,7 +1825,7 @@ const RegistrarPanel = () => {
               [tI18n('registrarPanel.rp_field_patient'), recordPreviewDialog.row.patient_fio || recordPreviewDialog.row.patient_name],
               [tI18n('registrarPanel.rp_field_phone'), recordPreviewDialog.row.patient_phone || recordPreviewDialog.row.phone],
               [tI18n('registrarPanel.rp_field_birth_year'), recordPreviewDialog.row.patient_birth_year || recordPreviewDialog.row.birth_year],
-              [tI18n('registrarPanel.rp_field_gender'), normalizePatientGender(recordPreviewDialog.row as unknown as Parameters<typeof normalizePatientGender>[0])],
+              [tI18n('registrarPanel.rp_field_gender'), normalizePatientGender(recordPreviewDialog.row as unknown as Parameters<typeof normalizePatientGender>[0] as Record<string, unknown>)],
               [tI18n('registrarPanel.rp_field_department'), recordPreviewDialog.row.queue_name || recordPreviewDialog.row.department || recordPreviewDialog.row.specialty],
               [tI18n('registrarPanel.rp_field_services'), formatPreviewList(recordPreviewDialog.row.services || recordPreviewDialog.row.service_details)],
               [tI18n('registrarPanel.rp_field_queue'), formatPreviewList(recordPreviewDialog.row.queue_numbers)],
@@ -1855,7 +1855,7 @@ const RegistrarPanel = () => {
             const data = appointmentId === cancelDialog.row?.id
               ? cancelDialog.row
               : appointments.find((a) => a.id === appointmentId);
-            const result = await runRegistrarRecordAction(data, 'cancel', { reason });
+            const result = await runRegistrarRecordAction(data as unknown as Record<string, unknown>, 'cancel', { reason });
             if (!result) return;
             if (!result.success) {
               const successCount = Number(result.success_count || 0);
@@ -2061,7 +2061,7 @@ const RegistrarPanel = () => {
                   return;
                 }
                 logger.info(`Перенос визита ${targetVisitId} на завтра`);
-                await rescheduleTomorrow(targetVisitId);
+                await rescheduleTomorrow(targetVisitId as string | number);
                 notify.success(tI18n('registrar.visit_postponed'));
                 removeRescheduledAppointmentFromView(rescheduleData, targetVisitId);
                 setRescheduleData(null);
@@ -2132,7 +2132,7 @@ const RegistrarPanel = () => {
                   return;
                 }
                 logger.info(`Перенос визита ${targetVisitId} на ${dateStr}${timeStr ? ' ' + timeStr : ''}`);
-                await rescheduleVisit(targetVisitId, dateStr, timeStr || undefined);
+                await rescheduleVisit(targetVisitId as string | number, dateStr, timeStr || undefined);
                 notify.success(tI18n('registrar.visit_postponed_date') + ` ${dateStr}${timeStr ? ' ' + timeStr : ''}`);
                 removeRescheduledAppointmentFromView(rescheduleData, targetVisitId);
                 setRescheduleData(null);

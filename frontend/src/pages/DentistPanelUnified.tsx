@@ -18,6 +18,7 @@ import ToothModal from '../components/dental/ToothModal';
 import DentalVisitScreen from '../components/dental/DentalVisitScreen';
 import TreatmentPlanner from '../components/dental/TreatmentPlanner';
 import PatientCard from '../components/dental/PatientCard';
+import type { PatientFormData } from '../components/dental/PatientCard';
 import DentalPriceManager from '../components/dental/DentalPriceManager';
 import ExaminationForm from '../components/dental/ExaminationForm';
 import DiagnosisForm from '../components/dental/DiagnosisForm';
@@ -2000,7 +2001,7 @@ const DentistPanelUnified = () => {
       {/* Модальные окна */}
       {showPatientCard && selectedPatient &&
       <PatientCard
-        patient={selectedPatient as unknown as Record<string, unknown>}
+        patient={selectedPatient as unknown as PatientFormData}
         onSave={(updatedPatient: unknown) => {
           logger.info('Сохранение пациента:', updatedPatient);
           setShowPatientCard(false);

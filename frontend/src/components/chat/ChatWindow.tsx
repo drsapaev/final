@@ -1441,7 +1441,7 @@ const ChatWindow = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void 
           message={contextMenu.message}
           isOwn={contextMenu.message.sender_id === user?.id}
           onBlur={() => setContextMenu(null)}
-          onAction={handleMenuAction} />
+          onAction={(action: string, msg) => { void handleMenuAction(action, msg as unknown as ChatMessage); }} />
 
                 }
 

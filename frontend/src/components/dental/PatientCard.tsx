@@ -23,6 +23,49 @@ import {
 import PropTypes from 'prop-types';
 import notify from '../../services/notify';
 
+export type PatientFormData = {
+  id: string;
+  name: string;
+  surname: string;
+  patronymic: string;
+  birthDate: string;
+  gender: string;
+  phone: string;
+  email: string;
+  address: string;
+  passport: {
+    series: string;
+    number: string;
+    issuedBy: string;
+    issueDate: string;
+    departmentCode: string;
+  };
+  insurance: {
+    policyNumber: string;
+    company: string;
+    validUntil: string;
+    type: string;
+  };
+  emergencyContact: {
+    name: string;
+    relationship: string;
+    phone: string;
+    address: string;
+  };
+  medicalHistory: {
+    complaints: string;
+    somaticDiseases: string[];
+    dentalHistory: string;
+    allergies: string[];
+    currentMedications: string[];
+    bloodType: string;
+    rhFactor: string;
+  };
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 /**
  * Расширенная карточка пациента для стоматологической ЭМК
  * Включает все необходимые поля согласно медицинским стандартам
@@ -32,10 +75,15 @@ const PatientCard = ({
   onSave,
   onClose,
   isEditMode = false
+}: {
+  patient?: PatientFormData | null;
+  onSave?: (data: PatientFormData) => void | Promise<void>;
+  onClose?: () => void;
+  isEditMode?: boolean;
 }) => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<PatientFormData>({
     // Основные данные
     id: '',
     name: '',
@@ -120,13 +168,13 @@ const PatientCard = ({
   }, [patient]);
 
   // Обработчики
-  const handleInputChange = (field, value) => {
+  const handleInputChange = (field: string, value: unknown) => {
     if (field.includes('.')) {
       const [parent, child] = field.split('.');
       setFormData((prev) => ({
         ...prev,
         [parent]: {
-          ...prev[parent],
+          ...(prev[parent as keyof PatientFormData] as Record<string, unknown>),
           [child]: value
         }
       }));
@@ -138,17 +186,17 @@ const PatientCard = ({
     }
   };
 
-  const handleArrayAdd = (field, item) => {
+  const handleArrayAdd = (field: string, item: unknown) => {
     setFormData((prev) => ({
       ...prev,
-      [field]: [...prev[field], item]
+      [field]: [...(prev[field as keyof PatientFormData] as unknown as unknown[]), item]
     }));
   };
 
-  const handleArrayRemove = (field, index) => {
+  const handleArrayRemove = (field: string, index: number) => {
     setFormData((prev) => ({
       ...prev,
-      [field]: prev[field].filter((_, i) => i !== index)
+      [field]: (prev[field as keyof PatientFormData] as unknown as unknown[]).filter((_, i) => i !== index)
     }));
   };
 

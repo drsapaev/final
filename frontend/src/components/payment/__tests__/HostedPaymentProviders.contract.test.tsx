@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 const ROOT = path.resolve(process.cwd(), 'src/components/payment');
 
-const readProvider = (fileName) =>
+const readProvider = (fileName: string) =>
   fs.readFileSync(path.join(ROOT, fileName), 'utf8').replace(/\r\n/g, '\n');
 
 describe('hosted payment provider ticket contract', () => {

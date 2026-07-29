@@ -134,8 +134,8 @@ const UserExportManager = () => {
       const exportData = {
         format: exportForm.format,
         fields: exportForm.fields.length > 0 ? exportForm.fields : null,
-        filters: Object.keys(exportForm.filters).reduce((acc, key) => {
-          const value = exportForm.filters[key];
+        filters: Object.keys(exportForm.filters).reduce((acc: Record<string, unknown>, key) => {
+          const value = (exportForm.filters as Record<string, unknown>)[key];
           if (value !== '' && value !== null) {
             acc[key] = value;
           }
@@ -166,7 +166,7 @@ const UserExportManager = () => {
     }
   };
 
-  const handleDownload = async (filename) => {
+  const handleDownload = async (filename: string) => {
     try {
       const response = await api.get(`/users/users/export/download/${filename}`, {
         responseType: 'blob'
@@ -189,7 +189,7 @@ const UserExportManager = () => {
     }
   };
 
-  const handleDeleteFile = async (filename) => {
+  const handleDeleteFile = async (filename: string) => {
     // P-013 fix: replaced native confirm() with shared useConfirm hook.
     const ok = await confirm({
       title: t('admin2.delete_file_title'),
@@ -220,7 +220,7 @@ const UserExportManager = () => {
 
 
 
-  const getFileIcon = (filename) => {
+  const getFileIcon = (filename: string) => {
     if (filename.endsWith('.csv')) return <FileText className="admin-w-20-h-20-success" />;
     if (filename.endsWith('.xlsx')) return <FileSpreadsheet className="admin-w-20-h-20-blue" />;
     if (filename.endsWith('.json')) return <FileJson className="admin-w-20-h-20-warning" />;
@@ -228,7 +228,7 @@ const UserExportManager = () => {
     return <File className="admin-w-20-h-20-tertiary" />;
   };
 
-  const formatFileSize = (bytes) => {
+  const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];

@@ -142,7 +142,7 @@ const LicenseManagement = () => {
     loadLicenses();
   }, [loadLicenses]);
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!String(formData.name ?? '').trim() || !formData.type || !String(formData.license_key ?? '').trim()) {
       setMessage({ type: 'error', text: t('admin2.lm_msg_required') });
@@ -171,13 +171,13 @@ const LicenseManagement = () => {
     }
   };
 
-  const handleEdit = (license) => {
+  const handleEdit = (license: License) => {
     setFormData(license);
     setEditingLicense(license);
     setShowAddForm(true);
   };
 
-  const handleDelete = async (licenseId) => {
+  const handleDelete = async (licenseId: string | number) => {
     try {
       await api.delete(`/clinic/licenses/${licenseId}`);
       setMessage({ type: 'success', text: t('admin2.lm_msg_deleted') });
@@ -187,14 +187,14 @@ const LicenseManagement = () => {
     }
   };
 
-  const toggleKeyVisibility = (licenseId) => {
+  const toggleKeyVisibility = (licenseId: string | number) => {
     setShowKeys((prev) => ({
       ...prev,
       [licenseId]: !prev[licenseId]
     }));
   };
 
-  const copyKey = (key) => {
+  const copyKey = (key: string) => {
     navigator.clipboard.writeText(key);
     setMessage({ type: 'success', text: t('admin2.lm_msg_copied') });
   };
@@ -214,12 +214,12 @@ const LicenseManagement = () => {
     });
   };
 
-  const getStatusColor = (status) => {
+  const getStatusColor = (status: string) => {
     const statusOption = statusOptions.find((s) => s.value === status);
     return statusOption ? statusOption.color : 'gray';
   };
 
-  const getStatusLabel = (status) => {
+  const getStatusLabel = (status: string) => {
     const statusOption = statusOptions.find((s) => s.value === status);
     return statusOption ? statusOption.label : status;
   };
@@ -229,7 +229,7 @@ const LicenseManagement = () => {
     return typeOption ? typeOption.label : type;
   };
 
-  const isExpiringSoon = (expiryDate) => {
+  const isExpiringSoon = (expiryDate: string) => {
     const expiry = new Date(expiryDate);
     const now = new Date();
     const diffTime = expiry.getTime() - now.getTime();
@@ -552,8 +552,8 @@ const LicenseManagement = () => {
                   </p>
                 </div>
                 <Badge
-              variant={getStatusColor(license.status)}
-              text={getStatusLabel(license.status)} />
+              variant={getStatusColor(license.status || '')}
+              text={getStatusLabel(license.status || '')} />
             
               </div>
 
@@ -580,7 +580,7 @@ const LicenseManagement = () => {
                 type="button"
                 variant="outline"
                 aria-label={t('admin2.lm_key_copy_aria', { name: license.name })}
-                onClick={() => copyKey(license.license_key)}
+                onClick={() => copyKey(license.license_key || '')}
                 className="admin-p-2px6-minw-auto">
                 
                     <Copy aria-hidden="true" className="admin-w-12-h-12" />

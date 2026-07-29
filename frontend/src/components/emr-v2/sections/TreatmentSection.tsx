@@ -111,12 +111,15 @@ export function TreatmentSection({
 
   // Merge suggestions: history first, then AI
   const allSuggestions = useMemo(() => {
-    const historyItems = doctorSuggestions.map((s: Record<string, any>) => ({
-      id: s.id,
-      content: s.text,
-      source: 'history',
-      confidence: 1.0
-    }));
+    const historyItems = doctorSuggestions.map((s: unknown) => {
+      const item = s as Record<string, any>;
+      return {
+        id: item.id,
+        content: item.text,
+        source: 'history',
+        confidence: 1.0
+      };
+    });
     return [...historyItems, ...suggestions];
   }, [doctorSuggestions, suggestions]);
 
@@ -124,7 +127,7 @@ export function TreatmentSection({
   const aiEnabled = Boolean(complaints && complaints.trim().length > 0);
 
   // Handle AI request - only if complaints exist
-  const handleRequestAI = useCallback((fieldName) => {
+  const handleRequestAI = useCallback((fieldName: string) => {
     if (!aiEnabled) {
       logger.log('[TreatmentSection] AI disabled - no complaints');
       return;
@@ -133,7 +136,7 @@ export function TreatmentSection({
   }, [aiEnabled, onRequestAI]);
 
   // Handle template apply (generic)
-  const handleApplyTemplate = useCallback((newValue, templateId) => {
+  const handleApplyTemplate = useCallback((newValue: string, templateId: string) => {
     onChange?.(newValue, {
       source: 'template',
       templateId
@@ -141,7 +144,7 @@ export function TreatmentSection({
   }, [onChange]);
 
   // Handle "My Experience" template apply
-  const handleApplyMyExperience = useCallback((template) => {
+  const handleApplyMyExperience = useCallback((template: Record<string, any>) => {
     onChange?.(template.treatment_text, {
       source: 'my_experience',
       templateId: template.id,

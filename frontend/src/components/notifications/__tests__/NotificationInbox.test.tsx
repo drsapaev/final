@@ -55,7 +55,7 @@ function createNotification(overrides = {}) {
 }
 
 describe('NotificationInbox routing', () => {
-  let pushStateSpy;
+  let pushStateSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     vi.clearAllMocks();

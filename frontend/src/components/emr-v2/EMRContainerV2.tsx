@@ -23,7 +23,7 @@ import { useDebouncedCallback } from '../../hooks/useDebouncedCallback';
 import { cacheService, CACHE_CONFIG, CACHE_TAGS } from '../../core/cache';
 import { DEBOUNCE } from '../../core/debouncePolicy';
 import EMRStatusIndicator from './EMRStatusIndicator';
-import EMRHistoryPanel, { type EMRHistoryPanelProps } from './EMRHistoryPanel';
+import EMRHistoryPanel from './EMRHistoryPanel';
 import EMRDiffViewer from './EMRDiffViewer';
 import EMRConflictDialog from './EMRConflictDialog';
 import EMRHelpDialog from './EMRHelpDialog';
@@ -152,7 +152,7 @@ interface EMRHookResult {
     forceOverwrite: () => Promise<unknown>;
 }
 
-export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Component = null }: EMRContainerV2Props): React.ReactElement {
+export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Component = null }: EMRContainerV2Props) {
     // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
     const [confirm, confirmDialog] = useConfirm();
     const { t: rawT } = useTranslation();
@@ -203,7 +203,7 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
     useBeforeUnload(isDirty);
 
     // Local UI state
-    const [showHistory, setShowHistory] = useState<boolean>(false);
+    const [showHistory, setShowHistory] = useState(false);
     const [showHelp, setShowHelp] = useState(false);
     const [selectedVersion, setSelectedVersion] = useState<string | number | null>(null);
     const [showDiff, setShowDiff] = useState(false);
@@ -458,12 +458,12 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                     logger.info('[EMR AI] No AI handler for field:', fieldName);
             }
         } catch (err) {
-            const errRec = err as { name?: string; code?: string; message?: string };
-            if (errRec?.name === 'CanceledError' || errRec?.code === 'ERR_CANCELED') {
+            const errObj = err as { name?: string; code?: string; message?: string };
+            if (errObj?.name === 'CanceledError' || errObj?.code === 'ERR_CANCELED') {
                 return;
             }
             logger.error('[EMR AI Error]', err);
-            handleTelemetry({ type: 'ai.error', payload: { fieldName, error: errRec?.message } });
+            handleTelemetry({ type: 'ai.error', payload: { fieldName, error: errObj?.message } });
         } finally {
             setAiLoading(prev => ({ ...prev, [fieldName]: false }));
         }
@@ -576,6 +576,20 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
     // =========================================================================
     // RENDER
     // =========================================================================
+
+    const renderHistoryPanel = (): React.ReactNode => showHistory ? (
+        <EMRHistoryPanel
+            visitId={visitId}
+            currentVersion={version ?? undefined}
+            selectedVersion={selectedVersion ?? undefined}
+            onSelectVersion={(v: string | number | undefined) => {
+                setSelectedVersion(v as number | null);
+                setShowDiff(true);
+            }}
+            isOpen={showHistory}
+            onClose={() => setShowHistory(false)}
+        />
+    ) : null;
 
     return (
         <div className={`emr-v2-container ${showHistory ? 'emr-v2-container--with-sidebar' : ''}`}>
@@ -937,19 +951,7 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
             </div>
 
             {/* History sidebar */}
-            {showHistory ? (
-                <EMRHistoryPanel
-                    visitId={visitId}
-                    currentVersion={version ?? undefined}
-                    selectedVersion={selectedVersion ?? undefined}
-                    onSelectVersion={(v) => {
-                        setSelectedVersion(v ?? null);
-                        setShowDiff(true);
-                    }}
-                    isOpen={showHistory}
-                    onClose={() => setShowHistory(false)}
-                />
-            ) : null}
+            {renderHistoryPanel()}
 
             {/* Diff viewer modal */}
             {Boolean(showDiff && selectedVersion) && (
@@ -978,9 +980,9 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
             )}
 
             {/* Conflict dialog */}
-            {conflict && (
+            {Boolean(conflict) && (
                 <EMRConflictDialog
-                    conflict={conflict}
+                    conflict={conflict as Record<string, unknown> | null}
                     isSigned={isSigned}
                     onReload={reloadFromServer}
                     onCompare={handleCompareConflict}

@@ -13,7 +13,7 @@ vi.mock('../../../contexts/ThemeContext', () => ({
 
 import { FormField, FormProvider, FormSelect, FormTextArea } from '../Form';
 
-function renderWithProvider(ui) {
+function renderWithProvider(ui: React.ReactNode) {
   return render(<FormProvider>{ui}</FormProvider>);
 }
 

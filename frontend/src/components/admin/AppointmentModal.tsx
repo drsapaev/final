@@ -7,6 +7,7 @@ import {
   Badge,
   Input,
   Select,
+  type SelectChangeEvent,
   Textarea,
   Modal,
   Alert,
@@ -229,7 +230,7 @@ const AppointmentModal = ({
                   </label>
                   <Select
                 value={formData.patientId}
-                onChange={(value: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('patientId', value)}
+                onChange={(value: SelectChangeEvent) => handleChange('patientId', value.target.value)}
                 options={[
                 { value: '', label: t('admin2.am_placeholder_patient') },
                 ...patients.map((patient) => ({
@@ -255,7 +256,7 @@ const AppointmentModal = ({
                   </label>
                   <Select
                 value={formData.doctorId}
-                onChange={(value: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('doctorId', value)}
+                onChange={(value: SelectChangeEvent) => handleChange('doctorId', value.target.value)}
                 options={[
                 { value: '', label: t('admin2.am_placeholder_doctor') },
                 ...doctors.map((doctor) => ({
@@ -346,7 +347,7 @@ const AppointmentModal = ({
                 </label>
                 <Select
               value={(formData as Record<string, any>).status}
-              onChange={(value: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => handleChange('status', value)}
+              onChange={(value: SelectChangeEvent) => handleChange('status', value.target.value)}
               options={[
               { value: '', label: t('admin2.am_status_default') },
               { value: 'pending', label: t('admin2.am_status_pending') },

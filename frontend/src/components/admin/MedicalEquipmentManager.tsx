@@ -169,15 +169,16 @@ const MedicalEquipmentManager = () => {
       }
     } catch (error) {
       logger.error('Ошибка измерения:', error);
-      if (error.response && error.response.data) {
-        toast.error(error.response.data.detail || t('admin2.equip_toast_measurement_failed'));
+      const err = error as { response?: { data?: { detail?: string } } };
+      if (err.response && err.response.data) {
+        toast.error(err.response.data.detail || t('admin2.equip_toast_measurement_failed'));
       } else {
         toast.error(t('admin2.equip_toast_measurement_failed'));
       }
     }
   };
 
-  const calibrateDevice = async (deviceId) => {
+  const calibrateDevice = async (deviceId: string) => {
     try {
       const response = (await api.post(`/medical-equipment/devices/${deviceId}/calibrate`)) as import('axios').AxiosResponse<Record<string, unknown>>;
       const data = response.data;
@@ -193,7 +194,7 @@ const MedicalEquipmentManager = () => {
     }
   };
 
-  const runDiagnostics = async (deviceId) => {
+  const runDiagnostics = async (deviceId: string) => {
     try {
       const response = (await api.post(`/medical-equipment/devices/${deviceId}/diagnostics`)) as import('axios').AxiosResponse<Record<string, unknown>>;
       const data = response.data;
@@ -205,7 +206,7 @@ const MedicalEquipmentManager = () => {
     }
   };
 
-  const getStatusBadgeVariant = (status) => {
+  const getStatusBadgeVariant = (status: string) => {
     switch (status) {
       case 'online':return 'success';
       case 'busy':return 'warning';
@@ -217,7 +218,7 @@ const MedicalEquipmentManager = () => {
     }
   };
 
-  const getStatusText = (status) => {
+  const getStatusText = (status: string) => {
     switch (status) {
       case 'online':return t('admin2.equip_status_online');
       case 'busy':return t('admin2.equip_status_busy');
@@ -229,7 +230,7 @@ const MedicalEquipmentManager = () => {
     }
   };
 
-  const getDeviceIcon = (deviceType) => {
+  const getDeviceIcon = (deviceType: string) => {
     switch (deviceType) {
       case 'blood_pressure':return Heart;
       case 'pulse_oximeter':return Activity;
@@ -241,7 +242,7 @@ const MedicalEquipmentManager = () => {
     }
   };
 
-  const getDeviceTypeName = (deviceType) => {
+  const getDeviceTypeName = (deviceType: string) => {
     switch (deviceType) {
       case 'blood_pressure':return t('admin2.equip_type_blood_pressure');
       case 'pulse_oximeter':return t('admin2.equip_type_pulse_oximeter');

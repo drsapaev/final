@@ -227,7 +227,7 @@ const WaitTimeAnalytics = () => {
     serviceAnalytics
   ]);
 
-  const formatTime = (minutes) => {
+  const formatTime = (minutes: number) => {
     if (minutes < 60) {
       return t('misc.wta_time_minutes', { minutes: Math.round(minutes) });
     }
@@ -236,7 +236,7 @@ const WaitTimeAnalytics = () => {
     return t('misc.wta_time_hours_minutes', { hours, mins });
   };
 
-  const getPerformanceColor = (rating) => {
+  const getPerformanceColor = (rating: string) => {
     switch (rating) {
       case 'Отлично':return 'var(--mac-success)';
       case 'Хорошо':return 'var(--mac-info)';
@@ -260,7 +260,7 @@ const WaitTimeAnalytics = () => {
             <Badge
           variant="secondary"
           style={{
-            backgroundColor: getPerformanceColor(summary.performance_rating),
+            backgroundColor: getPerformanceColor(String(summary.performance_rating ?? '')),
             color: 'white'
           }}>
           
@@ -271,14 +271,14 @@ const WaitTimeAnalytics = () => {
           <div className="wta-stat-grid">
             <MacOSStatCard
           title={t('misc.wta_stat_avg_wait_time')}
-          value={formatTime(summary.average_wait_time_minutes)}
+          value={formatTime(Number(summary.average_wait_time_minutes ?? 0))}
           icon={Clock}
           color="var(--mac-info)" />
         
 
             <MacOSStatCard
           title={t('misc.wta_stat_median_time')}
-          value={formatTime(summary.median_wait_time_minutes)}
+          value={formatTime(Number(summary.median_wait_time_minutes ?? 0))}
           icon={Activity}
           color="var(--mac-success)" />
         
@@ -358,7 +358,7 @@ const WaitTimeAnalytics = () => {
                       </span>
                       <span className="wta-queue-stat">
                         <Clock style={{ width: '14px', height: '14px' }} />
-                        {t('misc.wta_per_patient', { time: formatTime(queue.average_service_time) })}
+                        {t('misc.wta_per_patient', { time: formatTime(Number(queue.average_service_time ?? 0)) })}
                       </span>
                     </div>
                   </div>
@@ -385,9 +385,9 @@ const WaitTimeAnalytics = () => {
           {realTimeEstimates.summary && Object.keys(realTimeEstimates.queues || {}).length > 0 &&
       <div className="wta-summary-box">
               <div className="wta-summary-row">
-                <span className="wta-recommendation-text-default">{t('misc.wta_min_wait')} <strong>{formatTime(realTimeEstimates.summary.shortest_wait)}</strong></span>
-                <span className="wta-recommendation-text-default">{t('misc.wta_avg_wait')} <strong>{formatTime(realTimeEstimates.summary.average_wait)}</strong></span>
-                <span className="wta-recommendation-text-default">{t('misc.wta_max_wait')} <strong>{formatTime(realTimeEstimates.summary.longest_wait)}</strong></span>
+                <span className="wta-recommendation-text-default">{t('misc.wta_min_wait')} <strong>{formatTime(realTimeEstimates.summary.shortest_wait ?? 0)}</strong></span>
+                <span className="wta-recommendation-text-default">{t('misc.wta_avg_wait')} <strong>{formatTime(realTimeEstimates.summary.average_wait ?? 0)}</strong></span>
+                <span className="wta-recommendation-text-default">{t('misc.wta_max_wait')} <strong>{formatTime(realTimeEstimates.summary.longest_wait ?? 0)}</strong></span>
               </div>
             </div>
       }
@@ -414,35 +414,35 @@ const WaitTimeAnalytics = () => {
             <div className="wta-stat-grid-sm">
               <MacOSStatCard
             title={t('misc.wta_stat_average')}
-            value={formatTime(analytics.overall_stats?.average_minutes)}
+            value={formatTime(analytics.overall_stats?.average_minutes ?? 0)}
             icon={Clock}
             color="var(--mac-info)" />
           
 
               <MacOSStatCard
             title={t('misc.wta_stat_median')}
-            value={formatTime(analytics.overall_stats?.median_minutes)}
+            value={formatTime(analytics.overall_stats?.median_minutes ?? 0)}
             icon={Activity}
             color="var(--mac-success)" />
           
 
               <MacOSStatCard
             title={t('misc.wta_stat_min')}
-            value={formatTime(analytics.overall_stats?.min_minutes)}
+            value={formatTime(analytics.overall_stats?.min_minutes ?? 0)}
             icon={TrendingDown}
             color="var(--mac-warning)" />
           
 
               <MacOSStatCard
             title={t('misc.wta_stat_max')}
-            value={formatTime(analytics.overall_stats?.max_minutes)}
+            value={formatTime(analytics.overall_stats?.max_minutes ?? 0)}
             icon={TrendingUp}
             color="var(--mac-error)" />
           
 
               <MacOSStatCard
             title={t('misc.wta_stat_90th_percentile')}
-            value={formatTime(analytics.overall_stats?.percentile_90)}
+            value={formatTime(analytics.overall_stats?.percentile_90 ?? 0)}
             icon={BarChart3}
             color="var(--mac-accent-purple)" />
           
@@ -471,10 +471,10 @@ const WaitTimeAnalytics = () => {
                     </div>
                     <div className="wta-queue-right">
                       <div className="wta-dept-avg">
-                        {formatTime(stats.average_minutes)}
+                        {formatTime(stats.average_minutes ?? 0)}
                       </div>
                       <div className="wta-dept-median">
-                        {t('misc.wta_median_label')} {formatTime(stats.median_minutes)}
+                        {t('misc.wta_median_label')} {formatTime(stats.median_minutes ?? 0)}
                       </div>
                     </div>
                   </div>
@@ -566,7 +566,7 @@ const WaitTimeAnalytics = () => {
           <div className="wta-stat-grid-xs">
                     <MacOSStatCard
               title={t('misc.wta_stat_average')}
-              value={formatTime(data.wait_time_stats.average_minutes)}
+              value={formatTime(data.wait_time_stats.average_minutes ?? 0)}
               icon={Clock}
               color="var(--mac-info)"
               size="small" />
@@ -574,7 +574,7 @@ const WaitTimeAnalytics = () => {
 
                     <MacOSStatCard
               title={t('misc.wta_stat_median')}
-              value={formatTime(data.wait_time_stats.median_minutes)}
+              value={formatTime(data.wait_time_stats.median_minutes ?? 0)}
               icon={Activity}
               color="var(--mac-success)"
               size="small" />
@@ -652,7 +652,7 @@ const WaitTimeAnalytics = () => {
                   {hourData.hour_label}
                 </div>
                 <div style={{ fontSize: 'var(--mac-font-size-xs)' }}>
-                  {formatTime(hourData.average_wait_minutes)}
+                  {formatTime(Number(hourData.average_wait_minutes ?? 0))}
                 </div>
                 <div style={{ fontSize: 'var(--mac-font-size-xs)', opacity: 0.8 }}>
                   {t('misc.wta_patients_short', { count: hourData.patient_count })}

@@ -38,8 +38,8 @@ describe('labTranslations (STRAT#3)', () => {
   describe('tInterpolate() function', () => {
     it('replaces {param} placeholders with provided values', () => {
       const template = 'Поле {field} = {value} {unit}';
-      const interpolated = template.replace(/\{(\w+)\}/g, (m, p) => {
-        const params = { field: 'Hemoglobin', value: 12.5, unit: 'g/dL' };
+      const interpolated = template.replace(/\{(\w+)\}/g, (m: string, p: string) => {
+        const params: Record<string, unknown> = { field: 'Hemoglobin', value: 12.5, unit: 'g/dL' };
         return params[p] !== undefined ? String(params[p]) : m;
       });
       expect(interpolated).toBe('Поле Hemoglobin = 12.5 g/dL');
@@ -54,8 +54,8 @@ describe('labTranslations (STRAT#3)', () => {
 
     it('leaves unmatched placeholders in place', () => {
       const template = 'Hello {name}, your score is {score}';
-      const result = template.replace(/\{(\w+)\}/g, (m, p) => {
-        const params = { name: 'Alice' };
+      const result = template.replace(/\{(\w+)\}/g, (m: string, p: string) => {
+        const params: Record<string, unknown> = { name: 'Alice' };
         return params[p] !== undefined ? String(params[p]) : m;
       });
       expect(result).toBe('Hello Alice, your score is {score}');
@@ -79,23 +79,23 @@ describe('labTranslations (STRAT#3)', () => {
         'pii',
       ];
       for (const ns of expectedNamespaces) {
-        expect(TRANSLATIONS[ns]).toBeDefined();
-        expect(typeof TRANSLATIONS[ns]).toBe('object');
+        expect((TRANSLATIONS as Record<string, unknown>)[ns]).toBeDefined();
+        expect(typeof (TRANSLATIONS as Record<string, unknown>)[ns]).toBe('object');
       }
     });
 
     it('status namespace has all 7 lab report statuses', () => {
       const statuses = ['draft', 'in_progress', 'ready', 'finalized', 'printed', 'archived', 'unknown'];
       for (const s of statuses) {
-        expect(TRANSLATIONS.status[s]).toBeDefined();
-        expect(typeof TRANSLATIONS.status[s]).toBe('string');
+        expect((TRANSLATIONS.status as Record<string, unknown>)[s]).toBeDefined();
+        expect(typeof (TRANSLATIONS.status as Record<string, unknown>)[s]).toBe('string');
       }
     });
 
     it('common namespace has essential action verbs', () => {
       const essentials = ['save', 'cancel', 'delete', 'confirm', 'close', 'refresh'];
       for (const e of essentials) {
-        expect(TRANSLATIONS.common[e]).toBeDefined();
+        expect((TRANSLATIONS.common as Record<string, unknown>)[e]).toBeDefined();
       }
     });
 
@@ -109,8 +109,8 @@ describe('labTranslations (STRAT#3)', () => {
         'order_title', 'order_message', 'order_description',
       ];
       for (const d of dialogs) {
-        expect(TRANSLATIONS.confirm[d]).toBeDefined();
-        expect(typeof TRANSLATIONS.confirm[d]).toBe('string');
+        expect((TRANSLATIONS.confirm as Record<string, unknown>)[d]).toBeDefined();
+        expect(typeof (TRANSLATIONS.confirm as Record<string, unknown>)[d]).toBe('string');
       }
     });
 

@@ -36,7 +36,7 @@ describe('DisplayBoardUnified contract', () => {
   });
 
   it('treats /board/state as stats-only and uses websocket initial_state for live rows', async () => {
-    let wsMessageHandler;
+    let wsMessageHandler: ((data: unknown) => void) | null;
     apiMock.api.get.mockResolvedValueOnce({
       data: {
         department: 'Reg',
@@ -80,7 +80,7 @@ describe('DisplayBoardUnified contract', () => {
     expect(screen.queryByText(/REST Announcement/)).not.toBeInTheDocument();
 
     act(() => {
-      wsMessageHandler({
+      wsMessageHandler!({
         type: 'initial_state',
         data: {
           queue_entries: [

@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -18,8 +19,8 @@ vi.mock('../../../contexts/ThemeContext', () => ({
 
 // UX Audit Stage 2: mock useTranslation чтобы не требовать TranslationProvider
 vi.mock('../../../hooks/useTranslation', () => ({
-  useTranslation: () => ({ language: 'ru', setLanguage: vi.fn(), availableLanguages: [], t: (k) => k }),
-  TranslationProvider: ({ children }) => children,
+  useTranslation: () => ({ language: 'ru', setLanguage: vi.fn(), availableLanguages: [], t: (k: string) => k }),
+  TranslationProvider: ({ children }: { children?: ReactNode }) => children,
 }));
 
 const setupCtaName = /\u0421\u043e\u0437\u0434\u0430\u0442\u044c \u043a\u043b\u0438\u043d\u0438\u043a\u0443/i;

@@ -371,7 +371,7 @@ const GraphQLExplorer = () => {
   };
 
   const loadExample = (exampleKey: string) => {
-    const example = queryExamples[exampleKey];
+    const example = (queryExamples as Record<string, { name: string; query: string; variables: unknown }>)[exampleKey];
     if (example) {
       setQuery(example.query);
       setVariables(JSON.stringify(example.variables, null, 2));

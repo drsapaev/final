@@ -26,7 +26,7 @@
  * Map of view names to canonical paths.
  * Used by navigation helpers and route registry.
  */
-export const REGISTRAR_VIEW_PATHS = {
+export const REGISTRAR_VIEW_PATHS: Record<string, string> = {
   welcome: '/registrar/welcome',
   queue: '/registrar/queue',
   worklist: '/registrar',
@@ -35,7 +35,7 @@ export const REGISTRAR_VIEW_PATHS = {
 /**
  * Map of paths back to view names.
  */
-export const REGISTRAR_PATH_TO_VIEW = {
+export const REGISTRAR_PATH_TO_VIEW: Record<string, string | null> = {
   '/registrar/welcome': 'welcome',
   '/registrar/queue': 'queue',
   // /registrar maps to null = worklist table (the default landing page).
@@ -60,8 +60,8 @@ export const REGISTRAR_PATH_TO_VIEW = {
  * getRegistrarPath('queue', searchParams)  // → '/registrar/queue?date=2026-07-02'
  * getRegistrarPath(null)  // → '/registrar'
  */
-export const getRegistrarPath = (view, searchParams) => {
-  const basePath = REGISTRAR_VIEW_PATHS[view] || REGISTRAR_VIEW_PATHS.worklist;
+export const getRegistrarPath = (view: string | null, searchParams?: URLSearchParams) => {
+  const basePath = REGISTRAR_VIEW_PATHS[view as string] || REGISTRAR_VIEW_PATHS.worklist;
   if (!searchParams) return basePath;
 
   // Clone searchParams and remove the legacy ?view= param (canonical path replaces it)
@@ -86,7 +86,7 @@ export const getRegistrarPath = (view, searchParams) => {
  * getViewFromPath('/registrar')          // → null (worklist)
  * getViewFromPath('/registrar/anything') // → null
  */
-export const getViewFromPath = (pathname) => {
+export const getViewFromPath = (pathname: string): string | null => {
   return REGISTRAR_PATH_TO_VIEW[pathname] ?? null;
 };
 
@@ -97,7 +97,7 @@ export const getViewFromPath = (pathname) => {
  * @param {string} pathname
  * @returns {boolean}
  */
-export const isRegistrarRoute = (pathname) => {
+export const isRegistrarRoute = (pathname: string): boolean => {
   return pathname === '/registrar' ||
          pathname.startsWith('/registrar/');
 };
@@ -111,8 +111,8 @@ export const isRegistrarRoute = (pathname) => {
  * @param {Object} [searchParams] - current URLSearchParams to preserve
  * @returns {{ pathname: string, search: string }}
  */
-export const navigateToRegistrarView = (view, searchParams) => {
-  const pathname = REGISTRAR_VIEW_PATHS[view] || REGISTRAR_VIEW_PATHS.worklist;
+export const navigateToRegistrarView = (view: string | null, searchParams?: URLSearchParams): { pathname: string; search: string } => {
+  const pathname = REGISTRAR_VIEW_PATHS[view as string] || REGISTRAR_VIEW_PATHS.worklist;
   if (!searchParams) return { pathname, search: '' };
 
   const params = new URLSearchParams(searchParams);

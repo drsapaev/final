@@ -177,7 +177,7 @@ const SystemManagement = () => {
     }
   };
 
-  const deleteBackup = async (backupName) => {
+  const deleteBackup = async (backupName: string) => {
     // P-013 fix: replaced window.confirm() with shared useConfirm hook.
     const ok = await confirm({
       title: t('admin2.delete_backup_title'),
@@ -207,7 +207,7 @@ const SystemManagement = () => {
 
   // ===================== УТИЛИТЫ =====================
 
-  const formatBytes = (bytes) => {
+  const formatBytes = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
@@ -215,7 +215,7 @@ const SystemManagement = () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const getStatusColor = (status) => {
+  const getStatusColor = (status: string) => {
     switch (status) {
       case 'healthy':return 'var(--mac-success)';
       case 'warning':return 'var(--mac-warning)';
@@ -224,7 +224,7 @@ const SystemManagement = () => {
     }
   };
 
-  const getStatusIcon = (status) => {
+  const getStatusIcon = (status: string) => {
     switch (status) {
       case 'healthy':return CheckCircle;
       case 'warning':return AlertTriangle;
@@ -233,7 +233,7 @@ const SystemManagement = () => {
     }
   };
 
-  const getSeverityColor = (severity) => {
+  const getSeverityColor = (severity: string) => {
     switch (severity) {
       case 'critical':return 'error';
       case 'warning':return 'warning';
@@ -243,8 +243,8 @@ const SystemManagement = () => {
   };
 
   // UX Audit Admin #2.4: русские лейблы для severity (consistency с AdminDashboard).
-  const getSeverityLabel = (s) => {
-    const map = {
+  const getSeverityLabel = (s: string) => {
+    const map: Record<string, string> = {
       critical: t('admin2.sm_severity_critical'),
       warning: t('admin2.sm_severity_warning'),
       info: t('admin2.sm_severity_info'),
@@ -276,7 +276,7 @@ const SystemManagement = () => {
         {systemHealth &&
       <div className="admin-grid-auto-200">
             <div className="text-center">
-              <div className="admin-stat-value-dynamic" style={{ '--admin-stat-color': getStatusColor(systemHealth.overall_status) } as CSSProperties}>
+              <div className="admin-stat-value-dynamic" style={{ '--admin-stat-color': getStatusColor(String(systemHealth.overall_status || '')) } as CSSProperties}>
                 {String(systemHealth.overall_status ?? '').toUpperCase()}
               </div>
               <div className="admin-text-sm-secondary">
@@ -341,13 +341,13 @@ const SystemManagement = () => {
             </div>
             <div className="flex flex-col gap-2">
               <div className="admin-text-sm-primary">
-                {t('admin2.sm_total')} {formatBytes((systemMetrics.memory as { total?: number })?.total)}
+                {t('admin2.sm_total')} {formatBytes((systemMetrics.memory as { total?: number })?.total || 0)}
               </div>
               <div className="admin-text-sm-primary">
-                {t('admin2.sm_used')} {formatBytes((systemMetrics.memory as { used?: number })?.used)}
+                {t('admin2.sm_used')} {formatBytes((systemMetrics.memory as { used?: number })?.used || 0)}
               </div>
               <div className="admin-text-sm-primary">
-                {t('admin2.sm_available')} {formatBytes((systemMetrics.memory as { available?: number })?.available)}
+                {t('admin2.sm_available')} {formatBytes((systemMetrics.memory as { available?: number })?.available || 0)}
             </div>
             </div>
           </MacOSCard>
@@ -365,13 +365,13 @@ const SystemManagement = () => {
             </div>
             <div className="flex flex-col gap-2">
               <div className="admin-text-sm-primary">
-                {t('admin2.sm_total')} {formatBytes((systemMetrics.disk as { total?: number })?.total)}
+                {t('admin2.sm_total')} {formatBytes((systemMetrics.disk as { total?: number })?.total || 0)}
               </div>
               <div className="admin-text-sm-primary">
-                {t('admin2.sm_used')} {formatBytes((systemMetrics.disk as { used?: number })?.used)}
+                {t('admin2.sm_used')} {formatBytes((systemMetrics.disk as { used?: number })?.used || 0)}
               </div>
               <div className="admin-text-sm-primary">
-                {t('admin2.sm_free')} {formatBytes((systemMetrics.disk as { free?: number })?.free)}
+                {t('admin2.sm_free')} {formatBytes((systemMetrics.disk as { free?: number })?.free || 0)}
             </div>
             </div>
           </MacOSCard>
