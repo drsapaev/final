@@ -205,7 +205,7 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
     // Local UI state
     const [showHistory, setShowHistory] = useState(false);
     const [showHelp, setShowHelp] = useState(false);
-    const [selectedVersion, setSelectedVersion] = useState(null);
+    const [selectedVersion, setSelectedVersion] = useState<string | number | null>(null);
     const [showDiff, setShowDiff] = useState(false);
     const [amendReason, setAmendReason] = useState('');
     const [showAmendForm, setShowAmendForm] = useState(false);
@@ -216,7 +216,7 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
     const [aiLoading, setAiLoading] = useState<Record<string, boolean>>({});
 
     // 🔄 Visit Lifecycle Management - критично для безопасности данных
-    const visitLifecycle = useVisitLifecycle(visitId, patientId, {
+    const visitLifecycle = useVisitLifecycle(visitId, patientId ?? 0, {
         invalidateCacheOnChange: true,
         onVisitChange: ({ prevVisitId, newVisitId }) => {
             // Очищаем AI-состояние при смене визита
@@ -251,12 +251,12 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
         setExperimentalGhostMode(false);
     }, [visitId]);
 
-    const buildAiCacheKey = useCallback((fieldName) => {
-        const specialty = data.specialty || 'general';
-        const complaints = (data.complaints || '').trim().toLowerCase();
-        const diagnosis = (data.diagnosis || '').trim().toLowerCase();
-        const patientAge = typeof data.patient_age === 'number' ? data.patient_age : String(data.patient_age ?? '');
-        const patientGender = typeof data.patient_gender === 'string' ? data.patient_gender : String(data.patient_gender ?? '');
+    const buildAiCacheKey = useCallback((fieldName: string) => {
+        const specialty = data?.specialty || 'general';
+        const complaints = (data?.complaints || '').trim().toLowerCase();
+        const diagnosis = (data?.diagnosis || '').trim().toLowerCase();
+        const patientAge = typeof data?.patient_age === 'number' ? data?.patient_age : String(data?.patient_age ?? '');
+        const patientGender = typeof data?.patient_gender === 'string' ? data?.patient_gender : String(data?.patient_gender ?? '');
         return cacheService.generateKey(
             'ai',
             fieldName,
@@ -266,7 +266,7 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
             patientAge,
             patientGender
         );
-    }, [data.specialty, data.complaints, data.diagnosis, data.patient_age, data.patient_gender]);
+    }, [data?.specialty, data?.complaints, data?.diagnosis, data?.patient_age, data?.patient_gender]);
 
     const buildAiTags = useCallback(() => {
         const tags = [CACHE_TAGS.aiAnalysis];
@@ -276,7 +276,7 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
     }, [visitId, patientId]);
 
     // Handle Telemetry
-    const handleTelemetry = useCallback((event) => {
+    const handleTelemetry = useCallback((event: { type?: string; payload?: Record<string, unknown> }) => {
         // Log minimal counters
         // ghost.enabled, ghost.accepted, ghost.dismissed, history.accepted
         if (event && event.type) {
@@ -288,12 +288,12 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
     }, []);
 
     // Handle AI Request - calls MCP API for suggestions
-    const handleRequestAI = useCallback(async (fieldName) => {
+    const handleRequestAI = useCallback(async (fieldName: string) => {
         logger.info('[EMR AI Request]', {
             fieldName,
-            specialty: data.specialty || 'general',
-            complaintsLength: data.complaints?.length || 0,
-            complaintsPreview: data.complaints?.substring(0, 50) || '(empty)'
+            specialty: data?.specialty || 'general',
+            complaintsLength: data?.complaints?.length || 0,
+            complaintsPreview: data?.complaints?.substring(0, 50) || '(empty)'
         });
         handleTelemetry({ type: 'ai.requested', payload: { fieldName } });
 
@@ -310,19 +310,44 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
         setAiLoading(prev => ({ ...prev, [fieldName]: true }));
 
         try {
-            let result;
-            const specialty = data.specialty || 'general';
+            type AiSuggestion = {
+                code?: string;
+                id?: string;
+                label?: string;
+                name?: string;
+                description?: string;
+                confidence?: number;
+            };
+            type AiResult = {
+                debug_meta?: unknown;
+                data?: {
+                    suggestions?: AiSuggestion[];
+                    examination_plan?: string;
+                    treatment_suggestion?: string;
+                    recommendations?: unknown;
+                } & Record<string, unknown>;
+                suggestions?: AiSuggestion[];
+            } & Record<string, unknown>;
+            type FormattedSuggestion = {
+                id: string;
+                content: string;
+                source: string;
+                confidence: number;
+                meta?: Record<string, unknown>;
+            };
+            let result: AiResult | undefined;
+            const specialty = data?.specialty || 'general';
             const requestOptions = { signal: getAbortSignal() };
 
             switch (fieldName) {
                 case 'diagnosis': {
                     // Use ICD-10 suggestions
                     result = await mcpAPI.suggestICD10({
-                        symptoms: data.complaints ? [data.complaints] : [],
-                        diagnosis: data.diagnosis || '',
+                        symptoms: data?.complaints ? [data?.complaints] : [],
+                        diagnosis: data?.diagnosis || '',
                         specialty,
                         maxSuggestions: 5
-                    }, requestOptions);
+                    }, requestOptions) as AiResult;
                     logger.info('[EMR AI] ICD10 result:', result);
 
                     // Log debug_meta in dev mode for transparency
@@ -331,15 +356,15 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                     }
 
                     // Handle wrapped response: {status, data: {suggestions: [...]}}
-                    const icd10Data = result?.data || result;
+                    const icd10Data: AiResult['data'] | AiResult | undefined = result?.data || result;
 
                     // Backend now returns structured JSON: {suggestions: [{code, label, confidence}]}
-                    const suggestions = icd10Data?.suggestions || [];
+                    const suggestions: AiSuggestion[] = (icd10Data && 'suggestions' in icd10Data ? icd10Data.suggestions : undefined) || [];
 
                     if (suggestions.length > 0) {
-                        const formattedSuggestions = suggestions.map(s => ({
-                            id: s.code || s.id,
-                            content: `${s.code} - ${s.label || s.name || s.description}`,
+                        const formattedSuggestions: FormattedSuggestion[] = suggestions.map(s => ({
+                            id: s.code || s.id || '',
+                            content: `${s.code || ''} - ${s.label || s.name || s.description || ''}`,
                             source: 'ai',
                             confidence: s.confidence || 0.8,
                             meta: { code: s.code, label: s.label }
@@ -361,12 +386,12 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                 case 'examination':
                 case 'treatment':
                     // Use complaint analysis for general suggestions
-                    if (data.complaints) {
+                    if (data?.complaints) {
                         result = await mcpAPI.analyzeComplaint({
-                            complaint: data.complaints,
-                            patientAge: data.patient_age,
-                            patientGender: data.patient_gender
-                        }, requestOptions);
+                            complaint: data?.complaints,
+                            patientAge: data?.patient_age,
+                            patientGender: data?.patient_gender
+                        }, requestOptions) as AiResult;
                         logger.info('[EMR AI] Complaint analysis result:', result);
 
                         // Log debug_meta in dev mode for transparency
@@ -374,10 +399,10 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                             logger.info('[AI Debug]', result.debug_meta);
                         }
 
-                        const analysisData = result?.data || result;
+                        const analysisData: AiResult['data'] | AiResult | undefined = result?.data || result;
                         if (analysisData) {
-                            const fieldSuggestions = [];
-                            if (fieldName === 'examination' && analysisData.examination_plan) {
+                            const fieldSuggestions: FormattedSuggestion[] = [];
+                            if (fieldName === 'examination' && 'examination_plan' in analysisData && analysisData.examination_plan) {
                                 fieldSuggestions.push({
                                     id: 'exam-1',
                                     content: analysisData.examination_plan,
@@ -385,7 +410,7 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                                     confidence: 0.8
                                 });
                             }
-                            if (fieldName === 'treatment' && analysisData.treatment_suggestion) {
+                            if (fieldName === 'treatment' && 'treatment_suggestion' in analysisData && analysisData.treatment_suggestion) {
                                 fieldSuggestions.push({
                                     id: 'treat-1',
                                     content: analysisData.treatment_suggestion,
@@ -394,7 +419,7 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                                 });
                             }
                             // Also check for recommendations field
-                            if (analysisData.recommendations) {
+                            if ('recommendations' in analysisData && analysisData.recommendations) {
                                 fieldSuggestions.push({
                                     id: 'rec-1',
                                     content: typeof analysisData.recommendations === 'string'
@@ -442,11 +467,11 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
             setAiLoading(prev => ({ ...prev, [fieldName]: false }));
         }
     }, [
-        data.specialty,
-        data.complaints,
-        data.diagnosis,
-        data.patient_age,
-        data.patient_gender,
+        data?.specialty,
+        data?.complaints,
+        data?.diagnosis,
+        data?.patient_age,
+        data?.patient_gender,
         handleTelemetry,
         buildAiCacheKey,
         buildAiTags,
@@ -474,7 +499,7 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
     };
 
     // Field change handlers
-    const handleFieldChange = useCallback((field) => (value) => {
+    const handleFieldChange = useCallback((field: string) => (value: unknown) => {
         setField(field, value);
     }, [setField]);
 
@@ -542,7 +567,7 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
 
     // Conflict handlers
     const handleCompareConflict = () => {
-        const conflictData = (conflict ?? null) as { serverVersion?: unknown } | null;
+        const conflictData = (conflict ?? null) as { serverVersion?: string | number | null } | null;
         setSelectedVersion(conflictData?.serverVersion ?? null);
         setShowDiff(true);
     };
@@ -571,9 +596,9 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                             isAmended={isAmended}
                             lastSaved={lastSaved}
                             lastAutosave={lastAutosave}
-                            error={error}
-                            conflict={conflict}
-                            version={version}
+                            error={error as string | { message?: string; status?: number } | null | undefined}
+                            conflict={conflict as { yourVersion?: string | number; serverVersion?: string | number } | null | undefined}
+                            version={version ?? undefined}
                             autosaveConfig={autosaveConfig}
                         />
 
@@ -660,37 +685,37 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                         Notes (filled only when clinically relevant — collapsing
                         them removes visual noise from the default visit screen). */}
                     <ComplaintsSection
-                        value={data.complaints}
+                        value={data?.complaints}
                         onChange={handleFieldChange('complaints')}
                         disabled={isSigned}
                         doctorId={doctorId}
                     />
 
                     <AnamnesisMorbiSection
-                        value={data.anamnesis_morbi}
+                        value={data?.anamnesis_morbi}
                         onChange={handleFieldChange('anamnesis_morbi')}
                         disabled={isSigned}
                         doctorId={doctorId}
-                        icd10Code={data.icd10_code || ''}
+                        icd10Code={data?.icd10_code || ''}
                     />
 
                     <AnamnesisVitaeSection
-                        value={data.anamnesis_vitae}
+                        value={data?.anamnesis_vitae}
                         onChange={handleFieldChange('anamnesis_vitae')}
                         disabled={isSigned}
                         doctorId={doctorId}
-                        vitals={data.vitals || {}}
+                        vitals={data?.vitals || {}}
                         onVitalsChange={handleFieldChange('vitals')}
                         defaultOpen={false}
                     />
 
                     <ExaminationSection
-                        value={data.examination}
+                        value={data?.examination}
                         onChange={handleFieldChange('examination')}
                         disabled={isSigned}
-                        specialty={data.specialty || 'general'}
-                        icd10Code={data.icd10_code || ''}
-                        complaints={data.complaints || ''}
+                        specialty={data?.specialty || 'general'}
+                        icd10Code={data?.icd10_code || ''}
+                        complaints={data?.complaints || ''}
                         doctorId={doctorId}
                         experimentalGhostMode={experimentalGhostMode}
                         onTelemetry={handleTelemetry}
@@ -700,8 +725,8 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                     />
 
                     <DiagnosisSection
-                        diagnosis={data.diagnosis}
-                        icd10Code={data.icd10_code}
+                        diagnosis={data?.diagnosis}
+                        icd10Code={data?.icd10_code}
                         onDiagnosisChange={handleFieldChange('diagnosis')}
                         onIcd10Change={handleFieldChange('icd10_code')}
                         disabled={isSigned}
@@ -715,20 +740,20 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                     />
 
                     <TreatmentSection
-                        value={data.medications?.text || ''}
+                        value={data?.medications?.text || ''}
                         onChange={(text) => handleFieldChange('medications')({
-                            ...(data.medications || {}),
+                            ...(data?.medications || {}),
                             text
                         })}
-                        medications={data.medications?.list || []}
+                        medications={data?.medications?.list || []}
                         onMedicationsChange={(list) => handleFieldChange('medications')({
-                            ...(data.medications || {}),
+                            ...(data?.medications || {}),
                             list
                         })}
                         disabled={isSigned}
-                        specialty={data.specialty || 'general'}
-                        icd10Code={data.icd10_code || ''}
-                        complaints={data.complaints || ''}
+                        specialty={data?.specialty || 'general'}
+                        icd10Code={data?.icd10_code || ''}
+                        complaints={data?.complaints || ''}
                         experimentalGhostMode={experimentalGhostMode}
                         doctorId={doctorId}
                         onTelemetry={handleTelemetry}
@@ -757,28 +782,28 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                         BUT I will bind medications to 'medications'. 
                     */}
                     <RecommendationsSection
-                        value={data.recommendations}
+                        value={data?.recommendations}
                         onChange={handleFieldChange('recommendations')}
                         disabled={isSigned}
-                        icd10Code={data.icd10_code || ''}
+                        icd10Code={data?.icd10_code || ''}
                         defaultOpen={false}
                     />
 
                     <NotesSection
-                        value={data.notes}
+                        value={data?.notes}
                         onChange={handleFieldChange('notes')}
                         disabled={isSigned}
                         defaultOpen={false}
                     />
 
                     {/* Specialty-specific sections */}
-                    {data.specialty === 'cardiology' && (
+                    {data?.specialty === 'cardiology' && (
                         <CardiologySection
-                            ecgData={(data.specialty_data?.ecg as Record<string, unknown>) || {}}
-                            echoData={(data.specialty_data?.echo as Record<string, unknown>) || {}}
-                            labResults={(data.specialty_data?.cardio_labs as Record<string, unknown>) || {}}
+                            ecgData={(data?.specialty_data?.ecg as Record<string, unknown>) || {}}
+                            echoData={(data?.specialty_data?.echo as Record<string, unknown>) || {}}
+                            labResults={(data?.specialty_data?.cardio_labs as Record<string, unknown>) || {}}
                             onChange={(field, value) => handleFieldChange('specialty_data')({
-                                ...(data.specialty_data || {}),
+                                ...(data?.specialty_data || {}),
                                 [field]: value
                             })}
                             disabled={isSigned}
@@ -787,14 +812,14 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                         />
                     )}
 
-                    {data.specialty === 'dermatology' && (
+                    {data?.specialty === 'dermatology' && (
                         <DermatologySection
-                            photos={(data.specialty_data?.photos as DermatologyPhoto[]) || []}
-                            skinType={(data.specialty_data?.skin_type as string) || ''}
-                            conditions={(data.specialty_data?.conditions as unknown[]) || []}
-                            localization={(data.specialty_data?.localization as Record<string, unknown>) || {}}
+                            photos={(data?.specialty_data?.photos as DermatologyPhoto[]) || []}
+                            skinType={(data?.specialty_data?.skin_type as string) || ''}
+                            conditions={(data?.specialty_data?.conditions as unknown[]) || []}
+                            localization={(data?.specialty_data?.localization as Record<string, unknown>) || {}}
                             onChange={(field, value) => handleFieldChange('specialty_data')({
-                                ...(data.specialty_data || {}),
+                                ...(data?.specialty_data || {}),
                                 [field]: value
                             })}
                             disabled={isSigned}
@@ -803,15 +828,15 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                         />
                     )}
 
-                    {(data.specialty === 'dentist' || data.specialty === 'dentistry') && (
+                    {(data?.specialty === 'dentist' || data?.specialty === 'dentistry') && (
                         <DentistrySection
-                            toothStatus={(data.specialty_data?.tooth_status as Record<string, unknown>) || {}}
-                            hygieneIndices={(data.specialty_data?.hygiene_indices as Record<string, unknown>) || {}}
-                            periodontalPockets={(data.specialty_data?.periodontal_pockets as Record<string, unknown>) || {}}
-                            measurements={(data.specialty_data?.measurements as Record<string, unknown>) || {}}
-                            radiographs={(data.specialty_data?.radiographs as Record<string, unknown>) || {}}
+                            toothStatus={(data?.specialty_data?.tooth_status as Record<string, unknown>) || {}}
+                            hygieneIndices={(data?.specialty_data?.hygiene_indices as Record<string, unknown>) || {}}
+                            periodontalPockets={(data?.specialty_data?.periodontal_pockets as Record<string, unknown>) || {}}
+                            measurements={(data?.specialty_data?.measurements as Record<string, unknown>) || {}}
+                            radiographs={(data?.specialty_data?.radiographs as Record<string, unknown>) || {}}
                             onChange={(field, value) => handleFieldChange('specialty_data')({
-                                ...(data.specialty_data || {}),
+                                ...(data?.specialty_data || {}),
                                 [field]: value
                             })}
                             disabled={isSigned}
@@ -914,10 +939,10 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
             {showHistory && (
                 <EMRHistoryPanel
                     visitId={visitId}
-                    currentVersion={version}
-                    selectedVersion={selectedVersion}
+                    currentVersion={version ?? undefined}
+                    selectedVersion={selectedVersion ?? undefined}
                     onSelectVersion={(v) => {
-                        setSelectedVersion(v);
+                        setSelectedVersion(v ?? null);
                         setShowDiff(true);
                     }}
                     isOpen={showHistory}
