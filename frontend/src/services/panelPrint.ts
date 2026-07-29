@@ -319,7 +319,7 @@ function normalizeDisplayLabel(value: unknown): string | null {
     return null;
   }
 
-  const mapped = QUEUE_DISPLAY_NAMES[raw.toLowerCase()];
+  const mapped = QUEUE_DISPLAY_NAMES[raw.toLowerCase() as keyof typeof QUEUE_DISPLAY_NAMES];
   if (mapped) {
     return mapped;
   }
@@ -369,7 +369,7 @@ function resolveServicePriceForTicket(row: Record<string, unknown>, source: Reco
     normalizeDisplayLabel(source?.department),
   ]
     .filter(Boolean)
-    .map((value: Record<string, unknown>) => String(value).trim().toLowerCase());
+    .map((value: unknown) => String(value).trim().toLowerCase());
 
   if (normalizedCandidates.length === 0) {
     return null;
@@ -588,7 +588,7 @@ export function buildPanelTicketPayload(row: Record<string, unknown>, overrides:
   };
 }
 
-function escapeHtml(value) {
+function escapeHtml(value: unknown) {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -597,7 +597,7 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
-function renderTicketMetadata(label, value, visible) {
+function renderTicketMetadata(label: unknown, value: unknown, visible: unknown) {
   if (!visible || value === null || value === undefined || value === '') {
     return '';
   }
@@ -605,7 +605,7 @@ function renderTicketMetadata(label, value, visible) {
   return `<div class="meta"><span class="label">${escapeHtml(label)}:</span> ${escapeHtml(value)}</div>`;
 }
 
-function renderTicketQrMarkup(qrPayload, visible) {
+function renderTicketQrMarkup(qrPayload: unknown, visible: unknown) {
   if (!visible || !qrPayload) {
     return '';
   }
@@ -672,7 +672,7 @@ function renderPanelTicketMarkup(payload: Record<string, unknown>, settings: Rec
   `;
 }
 
-function renderPanelTicketHtml(payloads, settings, branding) {
+function renderPanelTicketHtml(payloads: unknown, settings: Record<string, unknown>, branding: Record<string, unknown>) {
   const issuedAt = formatRegistrarDateTime(new Date().toISOString());
   const safePayloads = Array.isArray(payloads) && payloads.length > 0 ? payloads : [];
   const documentTitle = safePayloads.length > 1
@@ -793,7 +793,7 @@ function renderPanelTicketHtml(payloads, settings, branding) {
   `;
 }
 
-function renderPanelTicketErrorHtml(message, details = '') {
+function renderPanelTicketErrorHtml(message: unknown, details: string = '') {
   const safeMessage = escapeHtml(message || 'Не удалось подготовить талон к печати');
   const safeDetails = details ? escapeHtml(details) : '';
 
@@ -873,13 +873,13 @@ export async function buildPanelTicketPrintableHtml(row: Record<string, unknown>
   return renderPanelTicketHtml(payloads, settings, branding);
 }
 
-async function buildAndFinalizePanelTicketWindow(printWindow, row, overrides = {}) {
+async function buildAndFinalizePanelTicketWindow(printWindow: Window, row: Record<string, unknown>, overrides: Record<string, unknown> = {}) {
   const html = await buildPanelTicketPrintableHtml(row, overrides);
   finalizePrintableWindow(printWindow, html, logger);
   return { success: true };
 }
 
-function renderPrintableErrorWindow(printWindow, error, row) {
+function renderPrintableErrorWindow(printWindow: Window, error: unknown, row: Record<string, unknown>) {
   const details = [
     row?.appointment_id ? `appointment_id: ${row.appointment_id}` : null,
     row?.visit_id ? `visit_id: ${row.visit_id}` : null,
@@ -888,7 +888,7 @@ function renderPrintableErrorWindow(printWindow, error, row) {
 
   try {
     const errorHtml = renderPanelTicketErrorHtml(
-      error?.message || 'Не удалось подготовить талон к печати',
+      (error instanceof Error && error.message) ? error.message : 'Не удалось подготовить талон к печати',
       details
     );
     printWindow.document.open();
@@ -949,7 +949,7 @@ export async function printPanelTicket(row: Record<string, unknown>, overrides: 
   };
 }
 
-function formatMoney(value, currency = 'UZS') {
+function formatMoney(value: unknown, currency: string = 'UZS') {
   const normalizedValue = typeof value === 'number'
     ? value
     : Number(String(value ?? 0).replace(/[^\d.-]/g, ''));
@@ -957,9 +957,9 @@ function formatMoney(value, currency = 'UZS') {
   return `${new Intl.NumberFormat('ru-RU').format(amount)} ${escapeHtml(currency)}`;
 }
 
-export function buildPanelReceiptPrintableHtml(receiptPayload) {
-  const payment = receiptPayload?.payment || {};
-  const patient = receiptPayload?.patient || {};
+export function buildPanelReceiptPrintableHtml(receiptPayload: Record<string, unknown>) {
+  const payment = (receiptPayload?.payment as Record<string, unknown> | null | undefined) || {} as Record<string, unknown>;
+  const patient = (receiptPayload?.patient as Record<string, unknown> | null | undefined) || {} as Record<string, unknown>;
   const services = Array.isArray(receiptPayload?.services) ? receiptPayload.services : [];
   const currency = services[0]?.currency || 'UZS';
   const issuedAt = formatRegistrarDateTime(new Date().toISOString());

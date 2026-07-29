@@ -25,6 +25,11 @@ import PropTypes from 'prop-types';
 import { Input } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
 
+interface ProtocolTemplatesProps {
+  onSelectTemplate?: (template: unknown) => void;
+  onClose?: () => void;
+}
+
 /**
  * Шаблоны протоколов для стоматологической ЭМК
  * Включает стандартные процедуры, материалы, анестезию
@@ -32,7 +37,7 @@ import { useTranslation } from '../../i18n/useTranslation';
 const ProtocolTemplates = ({
   onSelectTemplate,
   onClose
-}) => {
+}: ProtocolTemplatesProps) => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [templates, setTemplates] = useState([
@@ -223,9 +228,10 @@ const ProtocolTemplates = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
   const [filterDifficulty, setFilterDifficulty] = useState('all');
-  const [selectedTemplate, setSelectedTemplate] = useState<typeof templates[number] | null>(null);
+  type Template = typeof templates[number];
+  const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
   const [, setIsEditing] = useState(false);
-  const [, setEditingTemplate] = useState<typeof templates[number] | null>(null);
+  const [, setEditingTemplate] = useState<Template | null>(null);
 
   // Фильтрация шаблонов
   const filteredTemplates = templates.filter((template) => {
@@ -258,17 +264,15 @@ const ProtocolTemplates = ({
 
 
   // Обработчики
-  const handleSelectTemplate = (template) => {
+  const handleSelectTemplate = (template: Template) => {
     if (onSelectTemplate) {
       onSelectTemplate(template);
     }
-    onClose();
+    onClose?.();
   };
 
   useEffect(() => {
-    // TECH-DEBT(protocol-templates-handlers): event is `any` — handlers
-    // are attached to mixed Element subtypes with different Event subtypes.
-    const handlers: Array<[Element, (event: any) => void]> = [];
+    const handlers: Array<[Element, (event: Event) => void]> = [];
 
     document.querySelectorAll('button[data-protocol-template-select="true"]').forEach((button) => {
       const templateId = button.getAttribute('data-template-id');
@@ -276,7 +280,7 @@ const ProtocolTemplates = ({
         return;
       }
 
-      const handler = (event) => {
+      const handler = (event: Event) => {
         event.stopPropagation();
         const template = templates.find((item) => item.id === templateId);
         if (template) {
@@ -295,12 +299,12 @@ const ProtocolTemplates = ({
     };
   }, [handleSelectTemplate, templates, filteredTemplates, selectedTemplate]);
 
-  const handleEditTemplate = (template) => {
+  const handleEditTemplate = (template: Template) => {
     setEditingTemplate(template);
     setIsEditing(true);
   };
 
-  const handleDeleteTemplate = (templateId) => {
+  const handleDeleteTemplate = (templateId: string) => {
     setTemplates((prev) => prev.filter((t) => t.id !== templateId));
   };
 
@@ -314,7 +318,7 @@ const ProtocolTemplates = ({
 
 
 
-  const handleDuplicateTemplate = (template) => {
+  const handleDuplicateTemplate = (template: Template) => {
     const newTemplate = {
       ...template,
       id: Date.now().toString(),
@@ -325,7 +329,7 @@ const ProtocolTemplates = ({
   };
 
   // Рендер карточки шаблона
-  const renderTemplateCard = (template) =>
+  const renderTemplateCard = (template: Template) =>
   <div key={template.id} className="border rounded-lg p-4 hover:shadow-lg transition-shadow">
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-3">
@@ -422,7 +426,7 @@ const ProtocolTemplates = ({
 
 
   // Рендер детального просмотра шаблона
-  const renderTemplateDetails = (template) =>
+  const renderTemplateDetails = (template: Template) =>
   <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold">{template.name}</h2>
