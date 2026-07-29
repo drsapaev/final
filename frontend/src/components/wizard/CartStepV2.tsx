@@ -35,7 +35,7 @@ export interface CartItem {
   quantity?: number;
   price?: number;
   service_price?: number;
-  doctor_id?: string | number;
+  doctor_id?: string | number | null;
   doctor_name?: string;
   doctor?: string;
   visit_type?: string;

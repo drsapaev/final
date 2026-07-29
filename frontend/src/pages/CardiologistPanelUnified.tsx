@@ -52,10 +52,48 @@ const CARDIOLOGY_COMPLETED_STATUSES = ['completed', 'done'];
 // countAppointmentsByStatuses is imported from utils/doctorPanelShared
 // (unified implementation shared with Dermatology and Dentistry panels).
 
-function resolveDoctorQueueEntryId(row) {
+/**
+ * Loose shape for the doctor-panel `selectedPatient` state object.
+ *
+ * The shared `useDoctorPanelState` hook keeps `selectedPatient` typed as
+ * `null` (its useState is declared without an explicit generic, and the
+ * runtime payload is built ad-hoc from API/queue rows). Until the hook
+ * ships a proper type, the panels cast its return through this alias.
+ */
+type SelectedPatient = {
+  id?: string | number | null;
+  appointment_id?: string | number | null;
+  visit_id?: string | number | null;
+  patient_id?: string | number | null;
+  patient_name?: string;
+  patient_fio?: string;
+  phone?: string;
+  number?: string | number | null;
+  doctor_queue_entry_id?: string | number | null;
+  queue_entry_id?: string | number | null;
+  source?: string;
+  status?: string | null;
+  payment_status?: string | null;
+  discount_mode?: string;
+  specialty?: string;
+  patient?: { id?: string | number; full_name?: string; name?: string; [k: string]: unknown } | null;
+  [k: string]: unknown;
+};
+
+type DoctorPanelState = {
+  activeTab: string;
+  setActiveTab: (tab: string) => void;
+  handleTabChange: (tab: string) => void;
+  patientIdFromUrl: number | null;
+  visitIdFromUrl: number | null;
+  selectedPatient: SelectedPatient | null;
+  setSelectedPatient: React.Dispatch<React.SetStateAction<SelectedPatient | null>>;
+};
+
+function resolveDoctorQueueEntryId(row: Record<string, unknown> | null | undefined): string | number | null {
   const explicitQueueEntryId = row?.doctor_queue_entry_id ?? row?.queue_entry_id ?? null;
   if (explicitQueueEntryId !== null && explicitQueueEntryId !== undefined) {
-    return explicitQueueEntryId;
+    return explicitQueueEntryId as string | number;
   }
 
   return null;
@@ -85,8 +123,8 @@ const MacOSCardiologistPanelUnified = () => {
     defaultTab: 'queue',
     visitDeepLinkTab: 'visit',
     patientDeepLinkTab: 'patients',
-  });
-  const [selectedServices, setSelectedServices] = useState([]);
+  }) as DoctorPanelState;
+  const [selectedServices, setSelectedServices] = useState<unknown[]>([]);
   const [visitData, setVisitData] = useState({
     complaint: '',
     diagnosis: '',
@@ -104,8 +142,8 @@ const MacOSCardiologistPanelUnified = () => {
   const confirm = confirmRaw as unknown as (opts: Record<string, unknown>) => Promise<boolean>;
   // STRAT#32: useTranslation adapter for confirm/notify i18n.
   const { t: tI18n } = useTranslation();
-  const [scheduleNextModal, setScheduleNextModal] = useState({ open: false, patient: null });
-  const [editPatientModal, setEditPatientModal] = useState({ open: false, patient: null, loading: false });
+  const [scheduleNextModal, setScheduleNextModal] = useState<{ open: boolean; patient: SelectedPatient | Record<string, unknown> | null }>({ open: false, patient: null });
+  const [editPatientModal, setEditPatientModal] = useState<{ open: boolean; patient: SelectedPatient | Record<string, unknown> | null; loading: boolean }>({ open: false, patient: null, loading: false });
   const [settingsOpen, setSettingsOpen] = useState(false);
   // P-016 (UX audit): settings now persist in localStorage. The doctor's
   // LDL threshold and ECG/Echo layout preference survive page reloads.
@@ -116,10 +154,10 @@ const MacOSCardiologistPanelUnified = () => {
   const [emr, setEmr] = useState<Record<string, unknown> | null>(null);
 
   // Ref для отслеживания предыдущего пациента для очистки EMR
-  const prevSelectedPatientRef = useRef(null);
+  const prevSelectedPatientRef = useRef<string | number | null>(null);
 
   // Состояния для таблицы записей
-  const [appointments, setAppointments] = useState([]);
+  const [appointments, setAppointments] = useState<Record<string, unknown>[]>([]);
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
   const [services, setServices] = useState({} as Record<string, unknown>); // ✅ Добавлено: состояние для услуг
 
@@ -164,9 +202,9 @@ const MacOSCardiologistPanelUnified = () => {
   } as Record<string, unknown>);
 
   const [showForm, setShowForm] = useState({ open: false, type: 'blood' } as Record<string, unknown>);
-  const [ecgResults, setEcgResults] = useState([]);
-  const [bloodTests, setBloodTests] = useState([]);
-  const [patientFiles, setPatientFiles] = useState([]);
+  const [ecgResults, setEcgResults] = useState<Record<string, unknown>[]>([]);
+  const [bloodTests, setBloodTests] = useState<Record<string, unknown>[]>([]);
+  const [patientFiles, setPatientFiles] = useState<Record<string, unknown>[]>([]);
   const [historyFilter, setHistoryFilter] = useState('all');
   const [authRefreshTick, setAuthRefreshTick] = useState(0);
   const filesAccessDeniedRef = useRef(false);
@@ -198,17 +236,20 @@ const MacOSCardiologistPanelUnified = () => {
     selectedPatient?.patient_id ||
     patientIdFromUrl ||
     null;
-  useVisitLifecycle(currentVisitId, currentPatientId, {
-    invalidateCacheOnChange: true,
-    onCleanup: () => {
-      // Reset local EMR state so stale data does not bleed into the
-      // next visit's view. loadEMR will be re-invoked by the existing
-      // useEffect when selectedPatient changes.
-      setEmr(null);
-    },
-  });
+  useVisitLifecycle(
+    currentVisitId as unknown as string | number,
+    currentPatientId as unknown as string | number,
+    {
+      invalidateCacheOnChange: true,
+      onCleanup: () => {
+        // Reset local EMR state so stale data does not bleed into the
+        // next visit's view. loadEMR will be re-invoked by the existing
+        // useEffect when selectedPatient changes.
+        setEmr(null);
+      },
+    });
 
-  const getEmptyBloodTestForm = useCallback((overrides = {}) => ({
+  const getEmptyBloodTestForm = useCallback((overrides: Record<string, unknown> = {}) => ({
     patient_id: '',
     test_date: '',
     cholesterol_total: '',
@@ -222,7 +263,7 @@ const MacOSCardiologistPanelUnified = () => {
     ...overrides
   }), []);
 
-  const normalizeOptionalNumber = (value) => {
+  const normalizeOptionalNumber = (value: unknown) => {
     if (value === '' || value === null || value === undefined) {
       return null;
     }
@@ -239,7 +280,7 @@ const MacOSCardiologistPanelUnified = () => {
   // that's why the threshold is configurable. We use it to paint the LDL
   // value red wherever it appears: in the entry form, in the average-LDL
   // stat card, and in the blood-test history list.
-  const isLdlCritical = useCallback((rawValue) => {
+  const isLdlCritical = useCallback((rawValue: number | string | undefined) => {
     const parsed = typeof rawValue === 'number' ? rawValue : Number(rawValue);
     if (!Number.isFinite(parsed)) {
       return false;
@@ -266,12 +307,12 @@ const MacOSCardiologistPanelUnified = () => {
   }).current;
 
   const getFieldRangeWarning = useCallback(
-    (fieldName, rawValue) => {
-      const range = FIELD_RANGES[fieldName];
-      if (!range) return null;
+    (fieldName: string, rawValue: unknown): { valid?: boolean; message?: string } | undefined => {
+      const range = (FIELD_RANGES as Record<string, { min: number; max: number; unit: string; label: string }>)[fieldName];
+      if (!range) return undefined;
       const parsed = Number(rawValue);
       if (!Number.isFinite(parsed) || rawValue === '' || rawValue === null || rawValue === undefined) {
-        return null;
+        return undefined;
       }
       if (parsed < range.min) {
         return {
@@ -285,7 +326,7 @@ const MacOSCardiologistPanelUnified = () => {
           message: tI18n('cardio.cardio_panel_range_above_max', { label: range.label, value: parsed, unit: range.unit, max: range.max }),
         };
       }
-      return { valid: true, message: null };
+      return { valid: true, message: undefined };
     },
     [FIELD_RANGES]
   );
@@ -306,7 +347,7 @@ const MacOSCardiologistPanelUnified = () => {
   }).current;
 
   const getCriticalDiagnosisWarning = useCallback(
-    (icd10Code) => {
+    (icd10Code: unknown) => {
       if (!icd10Code || typeof icd10Code !== 'string') return null;
       const code = icd10Code.trim().toUpperCase();
       // Match by prefix (e.g. "I21" matches "I21.0", "I21.9", "I219")
@@ -348,7 +389,7 @@ const MacOSCardiologistPanelUnified = () => {
       });
       if (ecgResponse.ok) {
         const ecgData = await ecgResponse.json();
-        setEcgResults(ecgData);
+        setEcgResults(Array.isArray(ecgData) ? ecgData : []);
       }
 
       // Загружаем анализы крови пациента
@@ -357,7 +398,7 @@ const MacOSCardiologistPanelUnified = () => {
       });
       if (bloodResponse.ok) {
         const bloodData = await bloodResponse.json();
-        setBloodTests(bloodData);
+        setBloodTests(Array.isArray(bloodData) ? bloodData : []);
       }
 
       const fileEndpoints = [
@@ -373,7 +414,7 @@ const MacOSCardiologistPanelUnified = () => {
         return;
       }
 
-      const mergedFiles = new Map();
+      const mergedFiles = new Map<unknown, Record<string, unknown>>();
       for (const endpoint of fileEndpoints) {
         const fileResponse = await fetch(endpoint, {
           headers: { 'Authorization': `Bearer ${token}` },
@@ -393,10 +434,11 @@ const MacOSCardiologistPanelUnified = () => {
         }
 
         const fileData = await fileResponse.json();
-        const files = Array.isArray(fileData?.files) ? fileData.files : [];
+        const files: unknown[] = Array.isArray(fileData?.files) ? fileData.files : [];
         files.forEach((file) => {
-          if (file?.id != null) {
-            mergedFiles.set(file.id, file);
+          const fileRecord = file as Record<string, unknown>;
+          if (fileRecord?.id != null) {
+            mergedFiles.set(fileRecord.id, fileRecord);
           }
         });
       }
@@ -410,7 +452,7 @@ const MacOSCardiologistPanelUnified = () => {
   // ✅ Очистка EMR и visitData при смене пациента
   useEffect(() => {
     if (selectedPatient) {
-      const currentPatientId = selectedPatient.patient_id || selectedPatient.id || selectedPatient.appointment_id;
+      const currentPatientId = (selectedPatient.patient_id ?? selectedPatient.id ?? selectedPatient.appointment_id) as string | number | null | undefined;
       const previousPatientId = prevSelectedPatientRef.current;
 
       // Если это новый пациент (не просто обновление того же)
@@ -421,7 +463,7 @@ const MacOSCardiologistPanelUnified = () => {
       }
 
       // Сохраняем ID текущего пациента
-      prevSelectedPatientRef.current = currentPatientId;
+      prevSelectedPatientRef.current = currentPatientId ?? null;
 
       // Загружаем данные пациента
       loadPatientData();
@@ -473,8 +515,8 @@ const MacOSCardiologistPanelUnified = () => {
 
         if (response.ok) {
           const data = await response.json();
-          const servicesData = data.services_by_group || {};
-          setServices(servicesData);
+          const servicesData = data?.services_by_group || {};
+          setServices(servicesData as Record<string, unknown>);
         }
       } catch (error: unknown) {
       notify.error(getErrorMessage(error, tI18n('cardio.cardio_panel_services_load_failed')));
@@ -510,10 +552,10 @@ const MacOSCardiologistPanelUnified = () => {
       }
 
       const patientData = await patientResponse.json();
-      const patientName = `${patientData.last_name || ''} ${patientData.first_name || ''} ${patientData.middle_name || ''}`.trim();
+      const patientName = `${patientData?.last_name || ''} ${patientData?.first_name || ''} ${patientData?.middle_name || ''}`.trim();
 
-      setSelectedPatient((prev) => ({
-        ...prev,
+      setSelectedPatient((prev: SelectedPatient | null) => ({
+        ...(prev || {}),
         id: prev?.id || patientData.id,
         patient_id: patientData.id,
         patient_name: patientName,
@@ -540,7 +582,7 @@ const MacOSCardiologistPanelUnified = () => {
   // P-009: goToTab is now handleTabChange from useDoctorPanelState
 
   const ensureCanonicalVisitId = useCallback(
-    (row) => makeEnsureCanonicalVisitId(setAppointments, resolveCanonicalVisitId)(row),
+    (row: Record<string, unknown>) => makeEnsureCanonicalVisitId(setAppointments, resolveCanonicalVisitId)(row),
     []
   );
 
@@ -550,17 +592,17 @@ const MacOSCardiologistPanelUnified = () => {
       return;
     }
 
-    const matchingAppointment = appointments.find((appointment) => {
+    const matchingAppointment = appointments.find((appointment: Record<string, unknown>) => {
       if (visitIdFromUrl && appointment.visit_id === visitIdFromUrl) {
         return true;
       }
-      return patientIdFromUrl && appointment.patient_id === patientIdFromUrl;
+      return Boolean(patientIdFromUrl) && appointment.patient_id === patientIdFromUrl;
     });
     if (!matchingAppointment) {
       return;
     }
 
-    setSelectedPatient((prev) => {
+    setSelectedPatient((prev: SelectedPatient | null) => {
       const prevPatientId = prev?.patient?.id || prev?.patient_id || null;
       const prevVisitId = prev?.visit_id || null;
       if (patientIdFromUrl && prevPatientId && prevPatientId !== patientIdFromUrl) {
@@ -570,24 +612,24 @@ const MacOSCardiologistPanelUnified = () => {
         return prev;
       }
 
-      const nextAppointmentId = matchingAppointment.appointment_id || prev?.appointment_id || null;
-      const nextVisitId = matchingAppointment.visit_id || visitIdFromUrl || prev?.visit_id || null;
-      const nextPatientName = matchingAppointment.patient_fio || prev?.patient_name || prev?.patient_fio || '';
-      const nextPatient = {
-        ...prev,
+      const nextAppointmentId = (matchingAppointment.appointment_id as string | number | null | undefined) || prev?.appointment_id || null;
+      const nextVisitId = (matchingAppointment.visit_id as string | number | null | undefined) || visitIdFromUrl || prev?.visit_id || null;
+      const nextPatientName = (matchingAppointment.patient_fio as string | undefined) || prev?.patient_name || prev?.patient_fio || '';
+      const nextPatient: SelectedPatient = {
+        ...(prev || {}),
         id: nextAppointmentId || prev?.id || patientIdFromUrl,
         appointment_id: nextAppointmentId,
         visit_id: nextVisitId,
         patient_id: patientIdFromUrl,
         patient_name: nextPatientName,
         patient_fio: nextPatientName,
-        phone: matchingAppointment.patient_phone || prev?.phone || '',
+        phone: (matchingAppointment.patient_phone as string | undefined) || prev?.phone || '',
         number: nextAppointmentId || prev?.number || patientIdFromUrl,
         source: 'appointments',
-        status: matchingAppointment.status ?? null,
-        payment_status: matchingAppointment.payment_status ?? null,
-        discount_mode: matchingAppointment.discount_mode || prev?.discount_mode,
-        specialty: matchingAppointment.specialty || prev?.specialty || 'cardiology'
+        status: (matchingAppointment.status as string | null) ?? null,
+        payment_status: (matchingAppointment.payment_status as string | null) ?? null,
+        discount_mode: (matchingAppointment.discount_mode as string | undefined) || prev?.discount_mode,
+        specialty: (matchingAppointment.specialty as string | undefined) || prev?.specialty || 'cardiology'
       };
 
       const didChange =
@@ -602,7 +644,7 @@ const MacOSCardiologistPanelUnified = () => {
   }, [appointments, patientIdFromUrl, visitIdFromUrl, setSelectedPatient]);
 
   // Функция для получения всех услуг пациента из всех записей
-  const getAllPatientServicesCb = useCallback((patientId, allAppointments) => {
+  const getAllPatientServicesCb = useCallback((patientId: string | number | null | undefined, allAppointments: Record<string, unknown>[]) => {
     return getAllPatientServices(patientId, allAppointments);
   }, []);
 
@@ -628,13 +670,14 @@ const MacOSCardiologistPanelUnified = () => {
         const data = await response.json();
 
         // Собираем ВСЕ записи из всех очередей для получения полной картины услуг
-        const allAppointments = [];
-        const seenIds = new Set(); // Для отслеживания уже добавленных записей
+        const allAppointments: Record<string, unknown>[] = [];
+        const seenIds = new Set<string>(); // Для отслеживания уже добавленных записей
 
         if (data && data.queues && Array.isArray(data.queues)) {
-          data.queues.forEach((queue) => {
-            if (queue.entries) {
-              queue.entries.forEach((entry) => {
+          data.queues.forEach((queue: Record<string, unknown>) => {
+            const entries = queue.entries;
+            if (Array.isArray(entries)) {
+              entries.forEach((entry: Record<string, unknown>) => {
                 const appointmentId = entry.appointment_id || null;
                 const doctorQueueEntryId = resolveDoctorQueueEntryId(entry);
                 const recordKey = `${entry.patient_id}_${entry.canonical_record_id || entry.id}_${queue.specialty}`;
@@ -645,12 +688,13 @@ const MacOSCardiologistPanelUnified = () => {
                 }
                 seenIds.add(recordKey);
 
+                const patientEntry = entry.patient as Record<string, unknown> | undefined;
                 allAppointments.push({
                   id: entry.id,
                   appointment_id: appointmentId,
                   visit_id: entry.visit_id || null,
                   patient_id: entry.patient_id,
-                  patient_fio: entry.patient_name || `${entry.patient?.first_name || ''} ${entry.patient?.last_name || ''}`.trim(),
+                  patient_fio: entry.patient_name || `${patientEntry?.first_name || ''} ${patientEntry?.last_name || ''}`.trim(),
                   patient_phone: entry.phone || '',
                   patient_birth_year: entry.patient_birth_year || '',
                   address: entry.address || '',
@@ -700,7 +744,7 @@ const MacOSCardiologistPanelUnified = () => {
           const isCardiology = apt.specialty === 'cardio' || apt.specialty === 'cardiology';
 
           // ✅ Проверяем по кодам услуг: исключаем записи, которые содержат только ЭКГ
-          const serviceCodes = apt.service_codes || apt.services || [];
+          const serviceCodes = (apt.service_codes || apt.services || []) as unknown[];
           const hasOnlyECG = serviceCodes.length > 0 && serviceCodes.every((code) => {
             const codeStr = String(code).toUpperCase();
             return codeStr.includes('ECG') || codeStr.includes('ЭКГ') || codeStr === 'ECG';
@@ -725,11 +769,11 @@ const MacOSCardiologistPanelUnified = () => {
 
         // Добавляем информацию о всех услугах пациента в каждую запись
         const enrichedAppointmentsData = appointmentsData.map((apt) => {
-          const allPatientServices = getAllPatientServicesCb(apt.patient_id, allAppointments);
+          const allPatientServices = getAllPatientServicesCb(apt.patient_id as string | number | null | undefined, allAppointments);
           return {
             ...apt,
-            all_patient_services: allPatientServices.services,
-            all_patient_service_codes: allPatientServices.service_codes
+            all_patient_services: (allPatientServices as { services?: unknown[]; service_codes?: unknown[] }).services,
+            all_patient_service_codes: (allPatientServices as { services?: unknown[]; service_codes?: unknown[] }).service_codes
           };
         });
 
@@ -749,8 +793,9 @@ const MacOSCardiologistPanelUnified = () => {
     }
 
     // Слушаем глобальные события обновления очереди
-    const handleQueueUpdate = (event) => {
-      const { action } = event.detail || {};
+    const handleQueueUpdate = (event: Event) => {
+      const detail = (event as unknown as { detail?: { action?: string } }).detail || {};
+      const { action } = detail;
 
       // Автоматически обновляем список appointments после завершения приёма
       if (action === 'visitCompleted' || action === 'nextPatientCalled') {
@@ -775,9 +820,9 @@ const MacOSCardiologistPanelUnified = () => {
   }, [activeTab, loadMacOSCardiologyAppointments, shouldHydrateAppointmentContext]);
 
   // Функция для получения данных пациента по ID
-  const fetchPatientData = useCallback(async (patientId) => {
+  const fetchPatientData = useCallback(async (patientId: string | number) => {
     // Проверяем, является ли это демо-пациентом (ID >= 1000)
-    if (patientId >= 1000) {
+    if (Number(patientId) >= 1000) {
       return null;
     }
 
@@ -799,7 +844,7 @@ const MacOSCardiologistPanelUnified = () => {
   }, []);
 
   // Функция для преобразования данных пациента из формата API в формат PatientModal
-  const transformPatientData = useCallback((apiPatient) => {
+  const transformPatientData = useCallback((apiPatient: Record<string, unknown> | null) => {
     if (!apiPatient) return null;
 
     return {
@@ -826,7 +871,7 @@ const MacOSCardiologistPanelUnified = () => {
   // Функция для создания частичного объекта пациента из данных row (для QR-пациентов)
   // УПРОЩЕНО: Не нормализуем ФИО здесь - это делает backend (Single Source of Truth)
   // Просто преобразуем данные для отображения
-  const createPartialPatientFromRow = useCallback((row) => {
+  const createPartialPatientFromRow = useCallback((row: Record<string, unknown>) => {
     return {
       // Используем полное ФИО как есть, без нормализации
       fullName: row.patient_fio || '',
@@ -840,7 +885,7 @@ const MacOSCardiologistPanelUnified = () => {
   }, []);
 
   // Обработчик редактирования пациента
-  const handleEditPatient = useCallback(async (row) => {
+  const handleEditPatient = useCallback(async (row: Record<string, unknown>) => {
     // Если нет patient_id (QR-пациент), используем частичные данные из row
     if (!row.patient_id) {
       const partialPatient = createPartialPatientFromRow(row);
@@ -853,7 +898,7 @@ const MacOSCardiologistPanelUnified = () => {
       setEditPatientModal({ open: true, patient: null, loading: true });
 
       // Загружаем полные данные пациента
-      const apiPatient = await fetchPatientData(row.patient_id);
+      const apiPatient = await fetchPatientData(row.patient_id as string | number);
 
       if (!apiPatient) {
         // Если не удалось загрузить, используем данные из row (частичные)
@@ -875,7 +920,7 @@ const MacOSCardiologistPanelUnified = () => {
   }, [fetchPatientData, transformPatientData, createPartialPatientFromRow]);
 
   // Обработчики для таблицы записей
-  const handleAppointmentRowClick = async (row) => {
+  const handleAppointmentRowClick = async (row: Record<string, unknown>) => {
     // Можно открыть детали записи или переключиться на прием
     if (row.patient_fio) {
       const appointmentId = row.appointment_id || null;
@@ -885,20 +930,20 @@ const MacOSCardiologistPanelUnified = () => {
         return;
       }
 
-      const patientData = {
-        id: row.id,
-        appointment_id: appointmentId,
+      const patientData: SelectedPatient = {
+        id: row.id as string | number | undefined,
+        appointment_id: (appointmentId as string | number | null) ?? null,
         visit_id: visitId,
-        patient_id: row.patient_id,
-        patient_name: row.patient_fio,
-        phone: row.patient_phone,
-        number: row.id,
+        patient_id: row.patient_id as string | number | undefined,
+        patient_name: row.patient_fio as string,
+        phone: row.patient_phone as string | undefined,
+        number: row.id as string | number | undefined,
         doctor_queue_entry_id: resolveDoctorQueueEntryId(row),
         source: 'appointments',
-        status: row.status ?? null,
-        payment_status: row.payment_status ?? null,
-        discount_mode: row.discount_mode,
-        specialty: row.specialty || 'cardiology'
+        status: (row.status as string | null) ?? null,
+        payment_status: (row.payment_status as string | null) ?? null,
+        discount_mode: row.discount_mode as string | undefined,
+        specialty: (row.specialty as string) || 'cardiology'
       };
       setSelectedPatient(patientData);
 
@@ -918,10 +963,10 @@ const MacOSCardiologistPanelUnified = () => {
   // C-3 fix: cancel appointment with confirm dialog + backend call.
   // Previously the 'cancel' action was a no-op stub — the button rendered
   // but did nothing, leaving the doctor with no feedback.
-  const handleCancelAppointment = async (row) => {
+  const handleCancelAppointment = async (row: Record<string, unknown> | null) => {
     const ok = await confirm({
       title: tI18n('cardio.cancel_appointment_title'),
-      message: tI18n('cardio.cancel_appointment_message', { name: (row?.patient_fio || row?.patient_name || '').trim() }),
+      message: tI18n('cardio.cancel_appointment_message', { name: ((row?.patient_fio || row?.patient_name || '') as string).trim() }),
       description: tI18n('cardio.cardio_panel_appointment_cancel_description'),
       confirmLabel: tI18n('cardio.cancel_appointment_confirm'),
       cancelLabel: tI18n('cardio.cancel_appointment_cancel'),
@@ -957,8 +1002,11 @@ const MacOSCardiologistPanelUnified = () => {
     }
   };
 
-  const handleAppointmentActionClick = async (action, row) => {
-    event.stopPropagation();
+  const handleAppointmentActionClick = async (action: string, row: Record<string, unknown>) => {
+    // Note: `event` here is the legacy `window.event` global — preserved
+    // for runtime parity. Guard with optional chaining so strict mode is
+    // satisfied without changing runtime behavior.
+    (event as Event | undefined)?.stopPropagation?.();
 
     switch (action) {
       case 'view':
@@ -974,20 +1022,20 @@ const MacOSCardiologistPanelUnified = () => {
           }
 
           // Создаем объект пациента
-          const patientData = {
-            id: row.id,
-            appointment_id: appointmentId,
+          const patientData: SelectedPatient = {
+            id: row.id as string | number | undefined,
+            appointment_id: (appointmentId as string | number | null) ?? null,
             visit_id: visitId,
-            patient_id: row.patient_id,
-            patient_name: row.patient_fio,
-            phone: row.patient_phone,
-            number: row.id,
+            patient_id: row.patient_id as string | number | undefined,
+            patient_name: row.patient_fio as string,
+            phone: row.patient_phone as string | undefined,
+            number: row.id as string | number | undefined,
             doctor_queue_entry_id: resolveDoctorQueueEntryId(row),
             source: 'appointments',
-            status: row.status ?? null,
-            payment_status: row.payment_status ?? null,
-            discount_mode: row.discount_mode,
-            specialty: row.specialty || 'cardiology'
+            status: (row.status as string | null) ?? null,
+            payment_status: (row.payment_status as string | null) ?? null,
+            discount_mode: row.discount_mode as string | undefined,
+            specialty: (row.specialty as string) || 'cardiology'
           };
 
           setSelectedPatient(patientData);
@@ -1019,7 +1067,7 @@ const MacOSCardiologistPanelUnified = () => {
 
           if (response.ok) {
             await loadMacOSCardiologyAppointments();
-            notify.success(tI18n('cardio.cardio_panel_patient_called', { name: row.patient_fio }));
+            notify.success(tI18n('cardio.cardio_panel_patient_called', { name: row.patient_fio as string }));
           }
         } catch (error: unknown) {
           notify.error(getErrorMessage(error, tI18n('cardio.cardio_panel_call_patient_failed')));
@@ -1039,7 +1087,7 @@ const MacOSCardiologistPanelUnified = () => {
           const printResult = await printPanelTicket(row, {
             specialtyName: tI18n('cardio.cardio_panel_specialty_name')
           });
-          notify.success(printResult?.message || tI18n('cardio.cardio_panel_ticket_printed', { name: row.patient_fio }));
+          notify.success(printResult?.message || tI18n('cardio.cardio_panel_ticket_printed', { name: row.patient_fio as string }));
         } catch (error: unknown) {
           notify.error(getErrorMessage(error, tI18n('cardio.cardio_panel_ticket_print_failed')));
         }
@@ -1053,20 +1101,20 @@ const MacOSCardiologistPanelUnified = () => {
               break;
             }
             // Переходим на вкладку визита для завершения
-            const patient = {
-              id: row.id,
-              appointment_id: row.appointment_id || null,
+            const patient: SelectedPatient = {
+              id: row.id as string | number | undefined,
+              appointment_id: (row.appointment_id as string | number | null) ?? null,
               visit_id: visitId,
-              patient_id: row.patient_id,
-              patient_name: row.patient_fio,
-              phone: row.patient_phone,
-              number: row.id,
+              patient_id: row.patient_id as string | number | undefined,
+              patient_name: row.patient_fio as string,
+              phone: row.patient_phone as string | undefined,
+              number: row.id as string | number | undefined,
               doctor_queue_entry_id: resolveDoctorQueueEntryId(row),
               source: 'appointments',
               status: 'in_cabinet',
-              payment_status: row.payment_status,
-              discount_mode: row.discount_mode,
-              specialty: row.specialty || 'cardiology'
+              payment_status: (row.payment_status as string | null) ?? null,
+              discount_mode: row.discount_mode as string | undefined,
+              specialty: (row.specialty as string) || 'cardiology'
             };
 
             setSelectedPatient(patient);
@@ -1124,9 +1172,9 @@ const MacOSCardiologistPanelUnified = () => {
   }
 
   // Обработка AI предложений
-  const handleAISuggestion = (type, suggestion) => {
+  const handleAISuggestion = (type: string, suggestion: unknown) => {
     if (type === 'icd10') {
-      setVisitData({ ...visitData, icd10: suggestion });
+      setVisitData({ ...visitData, icd10: String(suggestion ?? '') });
       notify.success(tI18n('cardio.icd_added_from_ai'));
       // P-020 (UX audit): immediately warn if the AI-suggested ICD-10 code
       // is a critical diagnosis, so the doctor can double-check before
@@ -1138,7 +1186,7 @@ const MacOSCardiologistPanelUnified = () => {
         );
       }
     } else if (type === 'diagnosis') {
-      setVisitData({ ...visitData, diagnosis: suggestion });
+      setVisitData({ ...visitData, diagnosis: String(suggestion ?? '') });
       notify.success(tI18n('cardio.diagnosis_added_from_ai'));
     }
   };
@@ -1164,7 +1212,7 @@ const MacOSCardiologistPanelUnified = () => {
     const missingCritical = !hasDiagnosis || !hasComplaint;
     const criticalWarning = getCriticalDiagnosisWarning(visitData?.icd10);
 
-    let confirmOptions;
+    let confirmOptions: Record<string, unknown>;
     if (criticalWarning) {
       confirmOptions = {
         title: tI18n('cardio.cardio_panel_critical_diagnosis_title', { label: criticalWarning.label, code: criticalWarning.code }),
@@ -1261,8 +1309,8 @@ const MacOSCardiologistPanelUnified = () => {
       // Автоматически вызвать следующего пациента для кардиолога
       try {
         const next = await queueService.callNextWaiting(SPECIALTY_KEYS.CARDIOLOGY);
-        if (next?.success) {
-          notify.success(tI18n('cardio.cardio_panel_next_patient_called', { number: next.entry.number }));
+        if (next?.success && next.entry) {
+          notify.success(tI18n('cardio.cardio_panel_next_patient_called', { number: (next.entry as Record<string, unknown>).number }));
         }
       } catch (err) {
         notify.warning(getErrorMessage(
@@ -1295,7 +1343,7 @@ const MacOSCardiologistPanelUnified = () => {
   //   - 5xx → 'Сервер недоступен, попробуйте позже'
   //   - Network/AbortError → silent (component unmounted or visit changed)
   //   - Other → generic fallback via getErrorMessage
-  const loadEMR = async (visitId) => {
+  const loadEMR = async (visitId: string | number | null | undefined) => {
     if (!visitId) {
       notify.error(tI18n('cardio.emr_v2_no_visit_id'));
       return null;
@@ -1472,7 +1520,7 @@ const MacOSCardiologistPanelUnified = () => {
   };
 
   // Обработка анализов крови
-  const handleBloodTestSubmit = async (e) => {
+  const handleBloodTestSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const { patientId, visitId } = getSelectedPatientContext();
 
@@ -1521,37 +1569,42 @@ const MacOSCardiologistPanelUnified = () => {
   };
 
 
-  const getHistoryTimestampValue = (value) => {
+  const getHistoryTimestampValue = (value: unknown) => {
     if (!value) {
       return 0;
     }
 
-    const parsed = new Date(value);
+    const parsed = new Date(value as string | number | Date);
     return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
   };
 
-  const formatFileSize = (size) => {
+  const formatFileSize = (size: number | unknown) => {
     if (!size && size !== 0) {
       return '—';
     }
 
-    if (size < 1024) {
-      return `${size} B`;
+    const numericSize = Number(size);
+    if (!Number.isFinite(numericSize)) {
+      return '—';
     }
 
-    if (size < 1024 * 1024) {
-      return `${(size / 1024).toFixed(1)} KB`;
+    if (numericSize < 1024) {
+      return `${numericSize} B`;
     }
 
-    return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+    if (numericSize < 1024 * 1024) {
+      return `${(numericSize / 1024).toFixed(1)} KB`;
+    }
+
+    return `${(numericSize / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  const canPreviewAttachment = (file) => {
+  const canPreviewAttachment = (file: Record<string, unknown> | null | undefined) => {
     const mimeType = String(file?.mime_type || file?.type || '').toLowerCase();
     return mimeType.startsWith('image/') || mimeType.startsWith('text/') || mimeType === 'application/pdf';
   };
 
-  const downloadPatientFile = async (file) => {
+  const downloadPatientFile = async (file: Record<string, unknown> | null | undefined) => {
     if (!file?.id) {
       return;
     }
@@ -1570,7 +1623,7 @@ const MacOSCardiologistPanelUnified = () => {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = file.title || file.original_filename || file.filename || `file-${file.id}`;
+      link.download = (file.title as string) || (file.original_filename as string) || (file.filename as string) || `file-${file.id}`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -1580,7 +1633,7 @@ const MacOSCardiologistPanelUnified = () => {
     }
   };
 
-  const previewPatientFile = async (file) => {
+  const previewPatientFile = async (file: Record<string, unknown> | null | undefined) => {
     if (!file?.id) {
       return;
     }
@@ -1613,30 +1666,30 @@ const MacOSCardiologistPanelUnified = () => {
       kind: 'labs',
       title: tI18n('cardio.cardio_panel_blood_test_title', { date: test.test_date || '—' }),
       subtitle: tI18n('cardio.cardio_panel_blood_test_subtitle', { total: test.cholesterol_total || '—', ldl: test.cholesterol_ldl || '—', glucose: test.glucose || '—' }),
-      timestamp: test.test_date || test.created_at || test.updated_at,
+      timestamp: (test.test_date || test.created_at || test.updated_at) as string | number | Date | null,
       badgeVariant: 'secondary',
-      meta: test.interpretation || tI18n('cardio.cardio_panel_blood_test_meta', { id: test.id }),
+      meta: (test.interpretation as string | null | undefined) || tI18n('cardio.cardio_panel_blood_test_meta', { id: test.id }),
     })),
     ...ecgResults.map((result) => ({
       id: `ecg-${result.id || result.ecg_date}`,
       kind: 'ecg',
       title: tI18n('cardio.cardio_panel_ecg_title', { date: result.ecg_date || '—' }),
       subtitle: tI18n('cardio.cardio_panel_ecg_subtitle', { rhythm: result.rhythm || '—', heart_rate: result.heart_rate || '—' }),
-      timestamp: result.ecg_date || result.created_at || result.updated_at,
+      timestamp: (result.ecg_date || result.created_at || result.updated_at) as string | number | Date | null,
       badgeVariant: 'success',
-      meta: result.source || tI18n('cardio.cardio_panel_ecg_meta', { id: result.id || '—' }),
+      meta: (result.source as string | null | undefined) || tI18n('cardio.cardio_panel_ecg_meta', { id: result.id || '—' }),
     })),
     ...patientFiles.map((file) => {
-      const fileLabel = file.title || file.original_filename || file.filename || file.name || tI18n('cardio.cardio_panel_file_label', { id: file.id });
-      const tags = Array.isArray(file.tags) && file.tags.length > 0 ? file.tags.join(', ') : '';
-      const fileType = file.file_type || file.mime_type || file.type || 'attachment';
+      const fileLabel = (file.title || file.original_filename || file.filename || file.name || tI18n('cardio.cardio_panel_file_label', { id: file.id })) as string;
+      const tags = Array.isArray(file.tags) && file.tags.length > 0 ? (file.tags as unknown[]).join(', ') : '';
+      const fileType = (file.file_type || file.mime_type || file.type || 'attachment') as string;
 
       return {
         id: `file-${file.id}`,
         kind: 'attachments',
         title: fileLabel,
         subtitle: `${fileType}${tags ? ` • ${tags}` : ''}`,
-        timestamp: file.created_at || file.updated_at || file.uploaded_at,
+        timestamp: (file.created_at || file.updated_at || file.uploaded_at) as string | number | Date | null,
         badgeVariant: 'info',
         meta: formatFileSize(file.file_size),
         file,
@@ -1713,14 +1766,21 @@ const MacOSCardiologistPanelUnified = () => {
 
           {/* Прием пациента */}
           {/* Очередь — trivial 1-liner, no extraction needed */}
-          {activeTab === 'queue' &&
-          <QueueIntegration specialty="cardiology" />
-          }
+          {Boolean(activeTab === 'queue') && (
+            <QueueIntegration specialty="cardiology" />
+          )}
 
           {/* Приём пациента — R-15: extracted to VisitTab component */}
           {activeTab === 'visit' &&
             <VisitTab
-              selectedPatient={selectedPatient}
+              selectedPatient={selectedPatient as unknown as {
+                patient_name?: string;
+                patient?: { full_name?: string; id?: number };
+                patient_id?: number;
+                number?: string | number;
+                phone?: string;
+                visit_id?: number | string;
+              } | null}
               emr={emr}
               loading={loading}
               onCancel={() => {
@@ -1820,7 +1880,7 @@ const MacOSCardiologistPanelUnified = () => {
               bloodTests={bloodTests}
               bloodTestForm={bloodTestForm}
               setBloodTestForm={setBloodTestForm}
-              showFormOpen={showForm.open && showForm.type === 'blood'}
+              showFormOpen={Boolean(showForm.open) && showForm.type === 'blood'}
               onNewTest={openBloodTestForm}
               onCancelForm={() => setShowForm({ open: false, type: 'blood' })}
               onSubmit={handleBloodTestSubmit}
@@ -1870,7 +1930,7 @@ const MacOSCardiologistPanelUnified = () => {
         <ScheduleNextModal
           isOpen={scheduleNextModal.open}
           onClose={() => setScheduleNextModal({ open: false, patient: null })}
-          patient={scheduleNextModal.patient}
+          patient={scheduleNextModal.patient ?? undefined}
           theme={{ isDark, getColor, getSpacing, getFontSize }}
           specialtyFilter="cardiology" />
 
@@ -1881,7 +1941,7 @@ const MacOSCardiologistPanelUnified = () => {
         <EditPatientModal
           isOpen={editPatientModal.open}
           onClose={() => setEditPatientModal({ open: false, patient: null, loading: false })}
-          patient={editPatientModal.patient}
+          patient={editPatientModal.patient ?? undefined}
           onSave={async () => {
             await loadMacOSCardiologyAppointments();
             setEditPatientModal({ open: false, patient: null, loading: false });

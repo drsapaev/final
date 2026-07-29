@@ -1,5 +1,5 @@
 import { useTranslation } from '../../i18n/useTranslation';
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import {
   Search,
@@ -70,6 +70,120 @@ import CartStepV2 from './CartStepV2';
 import EditModeBanner from './EditModeBanner';
 import StepProgressIndicator from './StepProgressIndicator';
 
+// ============================================================================
+// Type definitions (TypeScript strict-mode migration)
+// ============================================================================
+
+interface CartItem {
+  id?: string | number;
+  service_id?: string | number;
+  service_name?: string;
+  service_price?: number;
+  doctor_id?: string | number | null;
+  doctor_name?: string;
+  notes?: string;
+  _temp_name?: string;
+  _temp_price?: number;
+  quantity?: number;
+  visit_date?: string;
+  visit_time?: string | null;
+  original_queue_id?: string | number;
+  service_code?: string;
+  name?: string;
+  _source?: string;
+  code?: string;
+  [k: string]: unknown;
+}
+
+interface PatientRecord {
+  id?: string | number;
+  phone?: string;
+  fio?: string;
+  last_name?: string;
+  first_name?: string;
+  middle_name?: string;
+  gender?: string;
+  birth_date?: string;
+  [k: string]: unknown;
+}
+
+interface ServiceData {
+  id?: string | number;
+  name: string;
+  service_code?: string;
+  queue_tag?: string;
+  category_code?: string;
+  price?: number;
+  is_consultation?: boolean;
+  requires_doctor?: boolean;
+  [k: string]: unknown;
+}
+
+interface DoctorData {
+  id?: string | number;
+  name?: string;
+  full_name?: string;
+  specialty?: string;
+  department?: string;
+  [k: string]: unknown;
+}
+
+interface QueueProfile {
+  key?: string;
+  queue_tags?: unknown[];
+  [k: string]: unknown;
+}
+
+interface WizardProps {
+  isOpen?: boolean;
+  onClose?: () => void;
+  onComplete?: (result: unknown) => void;
+  isProcessing?: boolean;
+  setIsProcessing?: (v: boolean) => void;
+  activeTab?: string | null;
+  editMode?: boolean;
+  initialData?: Record<string, unknown> | null;
+}
+
+interface WizardAction {
+  label?: string;
+  variant?: string;
+  onClick?: () => void;
+  disabled?: boolean;
+  loading?: boolean;
+  icon?: React.ReactNode;
+  [k: string]: unknown;
+}
+
+interface VisitServiceItem {
+  service_id?: string | number;
+  service_name?: string;
+  service_price?: number;
+  quantity?: number | string;
+  original_queue_id?: string | number;
+  service_code?: string;
+  name?: string;
+  _source?: string;
+  [k: string]: unknown;
+}
+
+interface VisitGroup {
+  doctor_id?: string | number | null;
+  services: VisitServiceItem[];
+  visit_date?: string;
+  visit_time?: string | null;
+  department?: string;
+  notes?: string | null;
+  [k: string]: unknown;
+}
+
+interface RepeatCandidate {
+  candidate_key: string;
+  doctor_id?: string | number;
+  service_id?: string | number;
+  visit_date: string;
+}
+
 
 // UX Audit Stage 3 (Wizard issue 5.1):
 // API_BASE удалён — все вызовы идут через api-клиент, который сам
@@ -120,7 +234,7 @@ const AppointmentWizardV2 = ({
   activeTab = null, // ✅ ДОБАВЛЯЕМ activeTab для фильтрации услуг по отделению
   editMode = false, // ✨ НОВОЕ: Режим редактирования
   initialData = null // ✨ НОВОЕ: Данные для редактирования
-}) => {
+}: WizardProps) => {
   // Проверка прав доступа
   const { hasRole } = useRoleAccess();
   const hasRegistrarAccess = hasRole(['Admin', 'Registrar', 'Receptionist']);
@@ -183,48 +297,23 @@ const AppointmentWizardV2 = ({
     },
     doctors: [] as unknown[]
   });
-  
-interface CartItem {
-  id?: string | number;
-  service_id?: string | number;
-  service_name?: string;
-  service_price?: number;
-  doctor_id?: string | number;
-  doctor_name?: string;
-  notes?: string;
-  _temp_name?: string;
-  _temp_price?: number;
-  [k: string]: unknown;
-}
-
-interface PatientRecord {
-  id?: string | number;
-  phone?: string;
-  fio?: string;
-  last_name?: string;
-  first_name?: string;
-  middle_name?: string;
-  gender?: string;
-  birth_date?: string;
-  [k: string]: unknown;
-}
 
 // wizardData now typed with explicit interface (was 'any' — see Type Debt Register)
 
   // Состояние UI
   const [errors, setErrors] = useState({} as Record<string, unknown>);
-  const [patientSuggestions, setPatientSuggestions] = useState([]);
+  const [patientSuggestions, setPatientSuggestions] = useState<PatientRecord[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [searchTimeout, setSearchTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
   const [isSearchingPatients, setIsSearchingPatients] = useState(false); // UX Audit Registrar #11
   const [phoneCheckTimeout, setPhoneCheckTimeout] = useState<ReturnType<typeof setTimeout> | null>(null); // ✅ Timeout для проверки телефона
   const [phoneError, setPhoneError] = useState<{ message?: string; patient?: unknown } | null>(null); // ✅ Ошибка уникальности телефона
-  const [servicesData, setServicesData] = useState([]);
-  const [doctorsData, setDoctorsData] = useState([]);
-  const [filteredServices, setFilteredServices] = useState([]);
+  const [servicesData, setServicesData] = useState<ServiceData[]>([]);
+  const [doctorsData, setDoctorsData] = useState<DoctorData[]>([]);
+  const [filteredServices, setFilteredServices] = useState<ServiceData[]>([]);
   const [showAllServices, setShowAllServices] = useState(false);
   // PR-25: queue profiles for dynamic department filtering
-  const [queueProfiles, setQueueProfiles] = useState([]);
+  const [queueProfiles, setQueueProfiles] = useState<QueueProfile[]>([]);
   const [formattedBirthDate, setFormattedBirthDate] = useState('');
   const [repeatEligibilityByItemId, setRepeatEligibilityByItemId] = useState({} as Record<string, unknown>);
   const [isRepeatEligibilityLoading, setIsRepeatEligibilityLoading] = useState(false);
@@ -244,8 +333,10 @@ interface PatientRecord {
         // В реальном приложении может потребоваться маппинг
 
         // ✅ ИСПРАВЛЕНО: Правильная инициализация даты рождения
-        const birthDate = initialData.patient_birth_date || (
+        const birthDateRaw = initialData.patient_birth_date || (
         initialData.patient_birth_year ? `${initialData.patient_birth_year}-01-01` : '');
+        const birthDate = String(birthDateRaw ?? '');
+        const initialDataPatient = (initialData.patient as { fio?: string; phone?: string; address?: string } | null | undefined) ?? {};
         const initialCartItems = (() => {
           logger.log('📦 AppointmentWizardV2: Using SSOT normalizeServicesFromInitialData');
           const items = normalizeServicesFromInitialData(initialData, []);
@@ -263,13 +354,13 @@ interface PatientRecord {
 
         setWizardData({
           patient: {
-            id: resolveInitialPatientId(initialData),
-            fio: initialData.patient_fio || initialData.patient_name || initialData.patient?.fio || '',
+            id: (resolveInitialPatientId(initialData) as string | number | null) ?? null,
+            fio: String(initialData.patient_fio || initialData.patient_name || initialDataPatient.fio || ''),
             birth_date: birthDate, // ✅ ИСПРАВЛЕНО: Приоритет полной даты
             phone: formatUzbekPhoneDisplay(
-              initialData.phone || initialData.patient_phone || initialData.patient?.phone || ''
+              String(initialData.phone || initialData.patient_phone || initialDataPatient.phone || '')
             ),
-            address: initialData.address || initialData.patient?.address || '',
+            address: String(initialData.address || initialDataPatient.address || ''),
             gender: (() => {
               // ✅ ИСПРАВЛЕНО: Преобразование пола из формата БД (M/F/sex) в формат формы (male/female)
               const genderValue = resolvePatientGenderValue(initialData);
@@ -279,13 +370,13 @@ interface PatientRecord {
           cart: {
             // ⭐ SSOT: Используем унифицированную функцию вместо 5 разных источников
             items: initialCartItems,
-            discount_mode: initialData.discount_mode || 'none', // ✅ ИСПРАВЛЕНО: Восстанавливаем скидки
-            all_free: initialData.all_free || false,
-            notes: initialData.notes || ''
+            discount_mode: String(initialData.discount_mode || 'none'), // ✅ ИСПРАВЛЕНО: Восстанавливаем скидки
+            all_free: Boolean(initialData.all_free || false),
+            notes: String(initialData.notes || '')
           },
           payment: {
-            method: initialData.payment_method || initialData.payment_type || 'cash',
-            total_amount: initialData.total_amount || initialData.cost || 0
+            method: String(initialData.payment_method || initialData.payment_type || 'cash'),
+            total_amount: Number(initialData.total_amount || initialData.cost || 0)
           }
         });
 
@@ -306,7 +397,7 @@ interface PatientRecord {
   useEffect(() => {
     if (!isOpen || !editMode || wizardData.patient.gender) return;
 
-    const patientId = wizardData.patient.id || resolveInitialPatientId(initialData);
+    const patientId: string | number | null = (wizardData.patient.id || (resolveInitialPatientId(initialData) as string | number | null)) ?? null;
     if (!patientId) return;
 
     let cancelled = false;
@@ -394,17 +485,17 @@ interface PatientRecord {
   const [serviceSearchQuery, setServiceSearchQuery] = useState('');
 
   // Refs
-  const fioRef = useRef(null);
-  const phoneRef = useRef(null);
-  const nextStepRef = useRef(() => {});
-  const handleCompleteRef = useRef(async () => {});
+  const fioRef = useRef<HTMLInputElement>(null);
+  const phoneRef = useRef<HTMLInputElement>(null);
+  const nextStepRef = useRef<() => void>(() => {});
+  const handleCompleteRef = useRef<() => Promise<void>>(async () => {});
 
   // Общее количество шагов
   const totalSteps = TOTAL_STEPS;
 
   // ===================== ПРОВЕРКА ТЕЛЕФОНА =====================
 
-  const checkPhoneUniqueness = async (phone) => {
+  const checkPhoneUniqueness = async (phone: string) => {
     const normalizedPhone = normalizeUzbekPhoneForApi(phone);
     const cleanPhone = normalizedPhone.replace(/\D/g, '');
 
@@ -441,7 +532,7 @@ interface PatientRecord {
     }
   };
 
-  const handlePhoneChange = (value) => {
+  const handlePhoneChange = (value: string) => {
     const formatted = formatUzbekPhoneDisplay(value);
     setWizardData((prev) => ({
       ...prev,
@@ -480,7 +571,7 @@ interface PatientRecord {
 
   // ===================== МАСКИ ВВОДА =====================
 
-  const formatBirthDate = (value) => {
+  const formatBirthDate = (value: string) => {
     // Убираем все символы кроме цифр
     const digits = value.replace(/\D/g, '');
 
@@ -494,7 +585,7 @@ interface PatientRecord {
     return `${limitedDigits.slice(0, 2)}.${limitedDigits.slice(2, 4)}.${limitedDigits.slice(4)}`;
   };
 
-  const convertDateToISO = (dateStr) => {
+  const convertDateToISO = (dateStr: string) => {
     // Конвертируем ДД.ММ.ГГГГ в ГГГГ-ММ-ДД
     if (!dateStr || dateStr.length !== 10) return '';
     const [day, month, year] = dateStr.split('.');
@@ -502,7 +593,7 @@ interface PatientRecord {
     return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
   };
 
-  const convertDateFromISO = (isoStr) => {
+  const convertDateFromISO = (isoStr: string) => {
     // Конвертируем ГГГГ-ММ-ДД в ДД.ММ.ГГГГ
     if (!isoStr) return '';
     const [year, month, day] = isoStr.split('-');
@@ -512,7 +603,7 @@ interface PatientRecord {
 
   // ===================== ПОИСК ПАЦИЕНТОВ =====================
 
-  const searchPatients = useCallback(async (query) => {
+  const searchPatients = useCallback(async (query: string) => {
     if (!query || query.length < 2) {
       setPatientSuggestions([]);
       setShowSuggestions(false);
@@ -577,7 +668,7 @@ interface PatientRecord {
     }
   }, []);
 
-  const handlePatientSearch = (value) => {
+  const handlePatientSearch = (value: string) => {
     // 🚨 FIX: Сбрасываем ID при изменении текста, чтобы не было "призраков"
     // Если пользователь меняет имя, это уже не тот пациент, которого выбрали ранее
     setWizardData((prev) => ({
@@ -595,7 +686,7 @@ interface PatientRecord {
     setSearchTimeout(timeout);
   };
 
-  const selectPatient = (patient) => {
+  const selectPatient = (patient: PatientRecord) => {
     // ✅ УПРОЩЕНО: Формируем fio из отдельных полей для отображения (Single Source of Truth)
     // Backend уже нормализует ФИО, здесь только форматируем для UI
     let patientFio = patient.fio;
@@ -614,11 +705,11 @@ interface PatientRecord {
     setWizardData((prev) => ({
       ...prev,
       patient: {
-        id: patient.id,
+        id: patient.id ?? null,
         fio: patientFio,
         birth_date: patient.birth_date || '',
         phone: patient.phone || '',
-        address: patient.address || '',
+        address: String(patient.address || ''),
         gender: (() => {
           // ✅ ИСПРАВЛЕНО: Преобразование пола из формата БД (M/F/sex) в формат формы (male/female)
           const genderValue = resolvePatientGenderValue(patient);
@@ -632,14 +723,14 @@ interface PatientRecord {
     }));
 
     // Обновляем отформатированную дату
-    setFormattedBirthDate(convertDateFromISO(patient.birth_date));
+    setFormattedBirthDate(convertDateFromISO(patient.birth_date || ''));
     setShowSuggestions(false);
     setErrors((prev) => ({ ...prev, fio: null }));
   };
 
 
 
-  const handleBirthDateChange = (value) => {
+  const handleBirthDateChange = (value: string) => {
     const formatted = formatBirthDate(value);
     setFormattedBirthDate(formatted);
 
@@ -658,11 +749,11 @@ interface PatientRecord {
       const { data } = await api.get('/registrar/services');
 
         // PR-25: load queue profiles for dynamic department filtering
-        let profiles = queueProfiles;
+        let profiles: QueueProfile[] = queueProfiles;
         if (profiles.length === 0) {
           try {
             const profilesRes = await api.get('/queues/profiles?active_only=true') as import('axios').AxiosResponse<Record<string, unknown>>;
-            profiles = (profilesRes.data?.profiles as unknown[]) || [];
+            profiles = (profilesRes.data?.profiles as QueueProfile[]) || [];
             setQueueProfiles(profiles);
           } catch (e: unknown) {
             logger.error('Failed to load queue profiles for filter:', e);
@@ -670,11 +761,11 @@ interface PatientRecord {
         }
 
         // Извлекаем все услуги из групп
-        let allServices = [];
+        let allServices: ServiceData[] = [];
         if (data.services_by_group) {
-          Object.values(data.services_by_group).forEach((groupServices) => {
+          Object.values(data.services_by_group as Record<string, unknown>).forEach((groupServices) => {
             if (Array.isArray(groupServices)) {
-              allServices = allServices.concat(groupServices);
+              allServices = allServices.concat(groupServices as ServiceData[]);
             }
           });
         }
@@ -695,12 +786,12 @@ interface PatientRecord {
     } catch (error: unknown) {
       logger.error('Ошибка загрузки услуг:', error);
     }
-  }, [activeTab, editMode]);
+  }, [activeTab, editMode, queueProfiles]);
 
   // ===================== РЕЗОЛВИНГ УСЛУГ (SSOT) =====================
 
   // ✅ SSOT: Функция для получения названия услуги из servicesData
-  const getServiceName = useCallback((item) => {
+  const getServiceName = useCallback((item: CartItem): string => {
     if (!item) return t('misc.aw_unknown_service');
 
     // Приоритет 1: Если есть service_id, ищем в servicesData
@@ -721,15 +812,16 @@ interface PatientRecord {
     if (serviceName && typeof serviceName === 'string' && serviceName.length > 3 && !/^[A-Z]\d+$/i.test(serviceName)) {
       // Если это не код (не формат "K01", "p09" и т.д.), а реальное название
       const foundByName = servicesData.find((s) => s.name === serviceName);
-      if (foundByName) return foundByName.name;
+      if (foundByName && foundByName.name) return foundByName.name;
     }
 
     // Приоритет 3: Пытаемся найти по коду
-    let searchName = item._temp_name || (item as { service_name?: string }).service_name || item.code;
+    let searchName: unknown = item._temp_name || (item as { service_name?: string }).service_name || item.code;
 
     // ⭐ DEFENSIVE FIX: Если searchName это объект
     if (typeof searchName === 'object' && searchName !== null) {
-      searchName = searchName.code || searchName.service_code || searchName.name || String(searchName);
+      const searchNameObj = searchName as { code?: string; service_code?: string; name?: string };
+      searchName = searchNameObj.code || searchNameObj.service_code || searchNameObj.name || String(searchName);
     }
 
     if (searchName && typeof searchName === 'string' && servicesData.length > 0) {
@@ -899,14 +991,14 @@ interface PatientRecord {
     }
   }, [isOpen, loadServices, loadDoctors]); // ✅ Обновляем услуги при смене вкладки
 
-  const getServiceById = useCallback((serviceId) => {
+  const getServiceById = useCallback((serviceId: string | number) => {
     if (!serviceId) return null;
     return servicesData.find((service) => service.id === serviceId) || null;
   }, [servicesData]);
 
   const consultationCartItems = useMemo(() =>
   (wizardData.cart.items || []).
-  map((item) => ({ item, service: getServiceById((item as { service_id?: string | number }).service_id) })).
+  map((item) => ({ item, service: getServiceById((item as { service_id?: string | number }).service_id as string | number) })).
   filter(({ service }) => Boolean(service?.is_consultation)),
   [wizardData.cart.items, getServiceById]);
 
@@ -931,12 +1023,12 @@ interface PatientRecord {
     })();
 
     const initialMap: Record<string, { eligible: boolean; reason?: string; repeat_discount_percent?: number; [k: string]: unknown }> = {};
-    const previewCandidates = [];
+    const previewCandidates: RepeatCandidate[] = [];
 
     consultationCartItems.forEach(({ item, service }) => {
       if (!service) return;
       if (!patientId) {
-        initialMap[item.id] = {
+        initialMap[String(item.id)] = {
           eligible: false,
           reason: t('misc.aw_repeat_check_needs_patient'),
           repeat_discount_percent: 0,
@@ -946,7 +1038,7 @@ interface PatientRecord {
       }
 
       if (!(item as { doctor_id?: string | number }).doctor_id) {
-        initialMap[item.id] = {
+        initialMap[String(item.id)] = {
           eligible: false,
           reason: t('misc.aw_repeat_check_needs_doctor'),
           repeat_discount_percent: 0,
@@ -1108,7 +1200,7 @@ interface PatientRecord {
   }, [repeatSuggestionSummary, isRepeatEligibilityLoading, t]);
 
   // 🔧 УПРОЩЕННАЯ ФИЛЬТРАЦИЯ: Показываем все услуги без привязки к врачам
-  const filterServices = (allServices) => {
+  const filterServices = (allServices: ServiceData[]) => {
 
     // Если нет услуг, показываем пустой массив
     if (!Array.isArray(allServices) || allServices.length === 0) {
@@ -1133,7 +1225,7 @@ interface PatientRecord {
 
   // ===================== КОРЗИНА =====================
 
-  const addToCart = (service) => {
+  const addToCart = (service: ServiceData) => {
     // ✅ SSOT: Всегда используем данные из servicesData
     const serviceFromData = servicesData.find((s) => s.id === service.id) || service;
 
@@ -1167,7 +1259,7 @@ interface PatientRecord {
     filterServices(servicesData);
   };
 
-  const removeFromCart = (itemId) => {
+  const removeFromCart = (itemId: string | number | undefined) => {
     const newItems = wizardData.cart.items.filter((item) => item.id !== itemId);
     setWizardData((prev) => ({
       ...prev,
@@ -1180,7 +1272,7 @@ interface PatientRecord {
     filterServices(servicesData);
   };
 
-  const updateCartItem = (itemId, field, value) => {
+  const updateCartItem = (itemId: string | number | undefined, field: string, value: unknown) => {
     const newItems = wizardData.cart.items.map((item) =>
     item.id === itemId ? { ...item, [field]: value } : item
     );
@@ -1220,7 +1312,7 @@ interface PatientRecord {
     return Math.round(total); // Округляем до целых
   };
 
-  const validatePatientFio = (rawFio) => {
+  const validatePatientFio = (rawFio: string) => {
     const normalizedFio = rawFio.trim();
 
     if (!normalizedFio) {
@@ -1257,7 +1349,7 @@ interface PatientRecord {
 
   // ===================== НАВИГАЦИЯ =====================
 
-  const validateStep = (step) => {
+  const validateStep = (step: number) => {
     const newErrors: Record<string, string> = {};
 
     if (step === 1) {
@@ -1326,11 +1418,12 @@ interface PatientRecord {
   // ===================== ГОРЯЧИЕ КЛАВИШИ =====================
 
   useEffect(() => {
-    const handleKeyDown = (e) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
       if (!isOpen) return;
+      const target = e.target as HTMLElement | null;
 
       // Enter - следующий шаг (кроме textarea)
-      if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && e.target.tagName !== 'TEXTAREA') {
+      if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && target?.tagName !== 'TEXTAREA') {
         e.preventDefault();
         if (currentStep < totalSteps) {
           nextStepRef.current();
@@ -1504,7 +1597,7 @@ interface PatientRecord {
       let patientId = wizardData.patient.id;
       const initialPatientId = resolveInitialPatientId(initialData);
       if (editMode && initialPatientId && !patientId) {
-        patientId = initialPatientId;
+        patientId = initialPatientId as string | number;
         logger.warn('[AppointmentWizardV2] Restored edit-mode patient_id from initialData before submit', {
           patientId: initialPatientId
         });
@@ -1532,7 +1625,7 @@ interface PatientRecord {
         // UX Audit Stage 3 (Wizard issue 5.1 + 5.3):
         // Заменён двойной raw fetch() (по форматированному + очищенному телефону)
         // на единый helper findPatientByPhoneVariants из api/patients.
-        const foundPatient = await findPatientByPhoneVariants(normalizedPhone);
+        const foundPatient = await findPatientByPhoneVariants(normalizedPhone as string);
         if (foundPatient) {
           logger.log('📋 Found existing patient by phone:', foundPatient.id);
         }
@@ -1652,15 +1745,16 @@ interface PatientRecord {
             patient: { ...prev.patient, id: patient.id }
           }));
           logger.log('✅ Пациент создан успешно:', patient.id);
-        } catch (createError) {
+        } catch (createError: unknown) {
           // createPatient бросает Error с .status === 400 если «пациент уже существует»
-          if (createError.status === 400 && wizardData.patient.phone) {
+          const createErr = createError as Error & { status?: number; message: string };
+          if (createErr.status === 400 && wizardData.patient.phone) {
             // Пациент уже существует — ищем по телефону
             const cleanPhone = normalizedPhoneDigits;
             logger.log(`⚠️ Ищем существующего пациента по номеру телефона: ${wizardData.patient.phone} (clean: ${cleanPhone})`);
 
             // UX Audit Stage 3 (issue 5.3): используем findPatientByPhoneVariants
-            const foundPatient = await findPatientByPhoneVariants(normalizedPhone);
+            const foundPatient = await findPatientByPhoneVariants(normalizedPhone as string);
 
             if (foundPatient) {
               patientId = foundPatient.id as string | number;
@@ -1674,13 +1768,13 @@ interface PatientRecord {
               logger.error('❌ Exact phone match not found after 400');
               throw new Error(t('misc.aw_patient_phone_exists_not_found', { phone: wizardData.patient.phone }));
             }
-          } else if (createError.status === 400) {
+          } else if (createErr.status === 400) {
             // Нет телефона и ошибка создания - это проблема валидации
-            throw new Error(t('misc.aw_patient_validation_error', { message: createError.message }));
+            throw new Error(t('misc.aw_patient_validation_error', { message: createErr.message }));
           } else {
             // Другие ошибки (5xx, network)
-            logger.error('❌ Ошибка создания пациента:', createError.status, createError.message);
-            throw new Error(t('misc.aw_patient_creation_error', { status: createError.status || '', message: createError.message }));
+            logger.error('❌ Ошибка создания пациента:', createErr.status, createErr.message);
+            throw new Error(t('misc.aw_patient_creation_error', { status: createErr.status || '', message: createErr.message }));
           }
         }
       }
@@ -1704,11 +1798,12 @@ interface PatientRecord {
             patientId,
             sex: selectedPatientSex
           });
-        } catch (updateError) {
+        } catch (updateError: unknown) {
+          const updateErr = updateError as Error & { status?: number; message: string };
           logger.error('[AppointmentWizardV2] Failed to persist patient gender before edit submit', {
             patientId,
-            status: updateError.status,
-            errorText: updateError.message
+            status: updateErr.status,
+            errorText: updateErr.message
           });
           toast.error(t('misc.aw_patient_gender_save_failed'));
           return;
@@ -1734,7 +1829,7 @@ interface PatientRecord {
       // PR-14: collect updated_at per queue entry for optimistic locking.
       // Map<entryId, isoString> — passed to applyRegistrarEditDelta as
       // expectedEntryUpdatedAt so backend can detect concurrent edits.
-      const entryUpdatedAtMap = {};
+      const entryUpdatedAtMap: Record<string, string> = {};
 
       if (hasQueueEntries) {
         // ✅ Устанавливаем source по умолчанию для записей типа visit
@@ -1778,7 +1873,7 @@ interface PatientRecord {
             const cartServices = wizardData.cart.items.map((item) => ({
               service_id: (item as { service_id?: string | number }).service_id,
               quantity: item.quantity || 1
-            })).filter((s): s is { service_id: string | number; quantity: unknown } => s.service_id != null);
+            })).filter((s) => s.service_id != null) as Array<{ service_id: string | number; quantity: unknown }>;
 
             // Определяем visit_type и discount_mode
             const visitType = wizardData.cart.discount_mode === 'repeat' ? 'repeat' :
@@ -1789,8 +1884,8 @@ interface PatientRecord {
             // logger.log('📤 Вызов updateOnlineQueueEntry:', { ... }); // Removed to reduce noise
 
             // ⭐ FIX: Собираем все ID из объединённой строки для проверки дубликатов
-            const aggregatedIds = initialData.aggregated_ids ||
-            (initialData.queue_numbers || []).map((qn) => qn.id).filter(Boolean);
+            const aggregatedIds: Array<string | number> = (initialData.aggregated_ids as Array<string | number> | undefined) ||
+            ((initialData.queue_numbers as Array<{ id?: string | number }> | undefined) || []).map((qn) => qn.id).filter((id): id is string | number => Boolean(id));
 
             const updateResult = await updateOnlineQueueEntry({
               entryId: queueEntryId,
@@ -1808,12 +1903,13 @@ interface PatientRecord {
             // Завершаем без создания новых записей
             // (QW-08: removed dead if(!editMode){localStorage.removeItem(...)} block)
             onComplete?.(updateResult);
-            onClose();
+            onClose?.();
             return; // ⭐ ВАЖНО: Завершаем handleComplete, не продолжаем с cart endpoint
-          } catch (updateError) {
+          } catch (updateError: unknown) {
             // ⭐ FIX: Не продолжаем с fallback - это создавало дубликаты!
             logger.error('❌ Ошибка обновления QR-записи:', updateError);
-            const errorMessage = updateError?.response?.data?.detail || updateError?.message || t('misc.aw_unknown_error');
+            const updateErr = updateError as { response?: { data?: { detail?: string } }; message?: string };
+            const errorMessage = updateErr?.response?.data?.detail || updateErr?.message || t('misc.aw_unknown_error');
             toast.error(t('misc.aw_record_update_error', { message: errorMessage }));
             setIsProcessing(false);
             return; // ⭐ CRITICAL: Не создаём дубликаты через cart endpoint
@@ -2032,11 +2128,11 @@ interface PatientRecord {
 
         // Определяем новые услуги (которых не было в исходной записи)
         // Сначала собираем все новые услуги с doctor_id для последующей конвертации
-        const newServicesWithDoctorId = [];
-        const newServicesWithoutDoctor = [];
-        const existingServices = [];
+        const newServicesWithDoctorId: Array<{ doctor_id: string | number; service_id: string | number | undefined; service_name: string; quantity: number }> = [];
+        const newServicesWithoutDoctor: Array<{ service_id: string | number | undefined; quantity: number }> = [];
+        const existingServices: Array<{ service_id?: string | number; service_name?: string; service_price?: number; quantity?: number; original_queue_id?: string | number; [k: string]: unknown }> = [];
 
-        for (const visit of visits as Array<{ doctor_id?: string | number; services?: Array<{ service_id?: string | number; service_name?: string; service_price?: number; [k: string]: unknown }>; [k: string]: unknown }>) {
+        for (const visit of visits as Array<{ doctor_id?: string | number; services: Array<{ service_id?: string | number; service_name?: string; service_price?: number; quantity?: number; original_queue_id?: string | number; [k: string]: unknown }>; [k: string]: unknown }>) {
           logger.log(`🔍 Проверка визита: doctor_id=${visit.doctor_id}, services count=${visit.services.length}`);
           for (const serviceItem of visit.services) {
             const service = servicesData.find((s) => s.id === serviceItem.service_id);
@@ -2089,13 +2185,13 @@ interface PatientRecord {
         }
 
         // ✅ Готовим batch payload в каноническом формате Doctor.id
-        const newServices = [];
+        const newServices: Array<{ specialist_id: string | number | undefined; service_id: string | number | undefined; quantity: number }> = [];
         if (newServicesWithDoctorId.length > 0) {
           logger.log(`🔄 Подготовка ${newServicesWithDoctorId.length} новых услуг для batch endpoint через Doctor.id...`);
           newServicesWithDoctorId.forEach((item) => {
             newServices.push({
-              specialist_id: (item as { doctor_id?: string | number }).doctor_id,
-              service_id: (item as { service_id?: string | number }).service_id,
+              specialist_id: item.doctor_id,
+              service_id: item.service_id,
               quantity: item.quantity
             });
           });
@@ -2105,15 +2201,19 @@ interface PatientRecord {
         const hasNewServices = newServices.length > 0 || newServicesWithoutDoctor.length > 0;
 
         if (editMode && hasNewServices) {
-          const editDeltaServices = [
-            ...newServices,
-            ...newServicesWithoutDoctor.map((item) => ({
-              service_id: (item as { service_id?: string | number }).service_id,
+          const editDeltaServices: Array<{ service_id: string | number; quantity?: unknown; specialist_id?: string | number | null }> = [
+            ...newServices.map((item) => ({
+              service_id: item.service_id as string | number,
               quantity: item.quantity,
-              specialist_id: null
+              specialist_id: item.specialist_id as string | number
+            })),
+            ...newServicesWithoutDoctor.map((item) => ({
+              service_id: item.service_id as string | number,
+              quantity: item.quantity,
+              specialist_id: null as string | number | null
             }))
           ];
-          const patientDataForEditDelta = {
+          const patientDataForEditDelta: Record<string, unknown> = {
             full_name: wizardData.patient.fio || wizardData.patient.name,
             phone: normalizedPhone,
             birth_date: wizardData.patient.birth_date || wizardData.patient.birthDate || null,
@@ -2149,14 +2249,15 @@ interface PatientRecord {
               throw new Error(editDeltaResult?.message || 'Edit delta failed');
             }
 
-            await cancelRemovedQueueEntries(originalQueueIds, wizardData.cart.items, 'edit-delta');
+            await cancelRemovedQueueEntries(Array.from(originalQueueIds), wizardData.cart.items, 'edit-delta');
             toast.success(t('misc.aw_record_updated_short'));
             onComplete?.(editDeltaResult);
-            onClose();
+            onClose?.();
             return;
-          } catch (editDeltaError) {
+          } catch (editDeltaError: unknown) {
+            const editDeltaErr = editDeltaError as { response?: { data?: { detail?: string } }; message?: string };
             logger.error('[AppointmentWizardV2] edit delta failed', editDeltaError);
-            toast.error(editDeltaError?.response?.data?.detail || editDeltaError?.message || t('misc.aw_record_update_failed'));
+            toast.error(editDeltaErr?.response?.data?.detail || editDeltaErr?.message || t('misc.aw_record_update_failed'));
             return;
           }
         }
@@ -2173,7 +2274,7 @@ interface PatientRecord {
           });
 
           // Фильтруем услуги, которые требуют специалиста (имеют specialist_id)
-          const servicesWithSpecialist = newServices.filter((s) => s.specialist_id);
+          const servicesWithSpecialist = newServices.filter((s) => s.specialist_id) as Array<{ specialist_id: string | number; service_id: string | number; quantity?: number }>;
 
           if (servicesWithSpecialist.length > 0) {
             // Используем batch endpoint для добавления новых услуг с специалистами
@@ -2250,13 +2351,14 @@ interface PatientRecord {
 
                   // (QW-08: removed dead if(!editMode){localStorage.removeItem(...)} block)
                   onComplete?.(batchResult);
-                  onClose();
+                  onClose?.();
                   return;
                 }
               }
-            } catch (batchError) {
+            } catch (batchError: unknown) {
+              const batchErr = batchError as Error & { message?: string };
               logger.error('❌ Ошибка batch endpoint:', batchError);
-              toast.error(t('misc.aw_add_services_error', { message: batchError.message || t('misc.aw_unknown_error') }));
+              toast.error(t('misc.aw_add_services_error', { message: batchErr.message || t('misc.aw_unknown_error') }));
               // Продолжаем с обычным cart endpoint как fallback
               logger.log('ℹ️ Продолжаем с cart endpoint как fallback...');
             }
@@ -2271,9 +2373,16 @@ interface PatientRecord {
               logger.log('📝 Режим редактирования: создаем визиты только из новых услуг');
 
               // Группируем только новые услуги по визитам
-              const newServiceVisits = {};
+              const newServiceVisits: Record<string, {
+                doctor_id: string | number | null;
+                services: Array<{ service_id?: string | number; quantity?: number }>;
+                visit_date: string;
+                visit_time: string | null;
+                department: string;
+                notes: string | null;
+              }> = {};
               newServicesWithoutDoctor.forEach((item) => {
-                const department = getDepartmentByService((item as { service_id?: string | number }).service_id);
+                const department = getDepartmentByService((item as { service_id?: string | number }).service_id as string | number);
                 const key = `${department}_no_doctor_${new Date().toISOString().split('T')[0]}_no_time`;
 
                 if (!newServiceVisits[key]) {
@@ -2318,7 +2427,7 @@ interface PatientRecord {
         logger.log('📝 Режим редактирования: visits пустой, обновляем только данные пациента через patients API');
 
         // Обновляем данные пациента через отдельный endpoint
-        const patientUpdateData = {
+        const patientUpdateData: Record<string, unknown> = {
           full_name: wizardData.patient.fio || wizardData.patient.name,
           phone: normalizedPhone,
           birth_date: wizardData.patient.birth_date || wizardData.patient.birthDate,
@@ -2350,15 +2459,16 @@ interface PatientRecord {
 
           if (removedQueueIds.length > 0) {
             logger.log(`🗑️ Найдены удаленные записи очереди (Update Path): ${removedQueueIds.join(', ')}`);
-            await cancelRemovedQueueEntries(originalQueueIds, wizardData.cart.items, 'patient-update');
+            await cancelRemovedQueueEntries(Array.from(originalQueueIds), wizardData.cart.items, 'patient-update');
           }
 
           onComplete?.({ success: true, message: t('misc.aw_patient_data_updated') });
-          onClose();
+          onClose?.();
           return;
-        } catch (patientError) {
+        } catch (patientError: unknown) {
+          const patientErr = patientError as Error & { message?: string };
           logger.error('❌ Ошибка обновления данных пациента:', patientError);
-          toast.error(t('misc.aw_patient_data_update_error', { message: patientError.message || t('misc.aw_unknown_error') }));
+          toast.error(t('misc.aw_patient_data_update_error', { message: patientErr.message || t('misc.aw_unknown_error') }));
           // Продолжаем с обычным flow (хотя visits пустой, это не должно произойти)
         }
       }
@@ -2393,12 +2503,13 @@ interface PatientRecord {
       let result;
       try {
         result = await createRegistrarCart(cartData);
-      } catch (cartError) {
+      } catch (cartError: unknown) {
         // Обработка ошибок создания корзины
-        let errorMessage = cartError.message || t('misc.aw_record_creation_error_status', { status: cartError.status || 'network' });
-        const isPermissionError = cartError.status === 403;
+        const cartErr = cartError as Error & { status?: number; message?: string };
+        let errorMessage = cartErr.message || t('misc.aw_record_creation_error_status', { status: cartErr.status || 'network' });
+        const isPermissionError = cartErr.status === 403;
 
-        logger.error('❌ Ошибка создания корзины:', cartError.status, errorMessage);
+        logger.error('❌ Ошибка создания корзины:', cartErr.status, errorMessage);
 
         if (isPermissionError) {
           if (errorMessage.includes('Not enough permissions')) {
@@ -2412,7 +2523,7 @@ interface PatientRecord {
             }
           });
           // Закрываем мастер при ошибке прав доступа
-          onClose();
+          onClose?.();
         } else {
           toast.error(t('misc.aw_record_creation_error', { message: errorMessage }));
         }
@@ -2437,11 +2548,11 @@ interface PatientRecord {
 
       if (removedQueueIds.length > 0) {
         logger.log(`🗑️ Найдены удаленные записи очереди (Cart Path): ${removedQueueIds.join(', ')}`);
-        await cancelRemovedQueueEntries(originalQueueIds, wizardData.cart.items, 'cart-update');
+        await cancelRemovedQueueEntries(Array.from(originalQueueIds), wizardData.cart.items, 'cart-update');
       }
 
       onComplete?.(result);
-      onClose();
+      onClose?.();
     } catch (error: unknown) {
       logger.error('Ошибка завершения мастера:', error);
       toast.error((error as Error)?.message || t('misc.aw_error_occurred'));
@@ -2453,7 +2564,21 @@ interface PatientRecord {
 
   // Группировка элементов корзины по визитам
   const groupCartItemsByVisit = (): unknown[] => {
-    const visits: unknown[] = [];
+    const visits: Record<string, {
+      doctor_id: string | number | null;
+      services: Array<{
+        service_id?: string | number;
+        quantity?: number;
+        original_queue_id?: string | number | null;
+        service_code?: string | null;
+        service_name?: string | null;
+        _source?: string | null;
+      }>;
+      visit_date?: string;
+      visit_time?: string | null;
+      department: string;
+      notes: string | null;
+    }> = {};
 
     // ✅ ИСПРАВЛЕНО: Фильтруем элементы корзины без service_id
     const validItems = wizardData.cart.items.filter((item) => {
@@ -2471,7 +2596,7 @@ interface PatientRecord {
 
     validItems.forEach((item) => {
       // Определяем отделение для услуги
-      const department = getDepartmentByService((item as { service_id?: string | number }).service_id);
+      const department = getDepartmentByService((item as { service_id?: string | number }).service_id as string | number);
 
       // ✅ ИСПРАВЛЕНО: Объединяем все процедуры в один визит
       // Все процедуры (P, C, D_PROC) должны быть в одном визите с department = 'procedures'
@@ -2507,7 +2632,7 @@ interface PatientRecord {
     return Object.values(visits);
   };
 
-  const getDepartmentByService = (serviceId) => {
+  const getDepartmentByService = (serviceId: string | number) => {
     // ✅ ИСПРАВЛЕНО: Проверка на null/undefined перед поиском
     if (!serviceId || serviceId === null || serviceId === undefined) {
       logger.warn('⚠️ getDepartmentByService: serviceId is null/undefined');
@@ -2530,7 +2655,7 @@ interface PatientRecord {
     }
 
     // ✅ ИСПРАВЛЕННЫЙ МАППИНГ - соответствует вкладкам RegistrarPanel
-    const mapping = {
+    const mapping: Record<string, string> = {
       'K': 'cardiology', // Кардиология → вкладка cardio (БЕЗ ЭКГ!)
       'D': 'dermatology', // Дерматология → вкладка derma (только консультации)
       'S': 'dentistry', // Стоматология → вкладка dental
@@ -2553,21 +2678,21 @@ interface PatientRecord {
     const normalizedCategoryCode = service.category_code ? normalizeCategoryCode(service.category_code) : '';
 
     // ✅ ИСПРАВЛЕНИЕ: Маппинг для нормализованных кодов (только для случаев, когда нет прямого маппинга)
-    const normalizedMapping = {
+    const normalizedMapping: Record<string, string> = {
       'specialists': 'cardiology', // Консультации специалистов (только если не 'D' или 'S') -> cardiology
       'laboratory': 'lab', // ✅ ИСПРАВЛЕНИЕ: Лаборатория -> lab (для соответствия вкладке)
       'procedures': 'procedures', // Процедуры -> procedures
       'other': 'general' // Прочее -> general
     };
 
-    const result = normalizedMapping[normalizedCategoryCode] || mapping[service.category_code] || 'general';
+    const result = normalizedMapping[normalizedCategoryCode] || mapping[service.category_code as string] || 'general';
     logger.log(`🎯 getDepartmentByService результат: serviceId=${serviceId}, category_code=${normalizedCategoryCode}, department=${result}`);
     return result;
   };
 
   // ===================== ДЕЙСТВИЯ ДИАЛОГА =====================
 
-  const actions = [
+  const actions: WizardAction[] = ([
   {
     label: t('misc.aw_clear_form'),
     onClick: clearDraft,
@@ -2575,13 +2700,13 @@ interface PatientRecord {
     icon: <Trash2 size={16} />,
     disabled: isProcessing
   },
-  currentStep > STEP_PATIENT && {
+  currentStep > STEP_PATIENT ? {
     label: t('misc.aw_back'),
     onClick: prevStep,
     variant: 'secondary',
     icon: <ArrowLeft size={16} />,
     disabled: isProcessing
-  },
+  } : null,
   {
     label: currentStep === totalSteps ? t('misc.aw_finish') : t('misc.aw_next'),
     onClick: currentStep === totalSteps ? handleComplete : nextStep,
@@ -2589,8 +2714,8 @@ interface PatientRecord {
     icon: currentStep === totalSteps ? <Check size={16} /> : <ArrowRight size={16} />,
     disabled: isProcessing,
     loading: isProcessing
-  }].
-  filter(Boolean);
+  }] as Array<WizardAction | null>).
+  filter((a): a is WizardAction => Boolean(a));
 
   // ===================== ОБРАБОТЧИКИ ОНЛАЙН ОПЛАТЫ УБРАНЫ =====================
 
@@ -2950,7 +3075,7 @@ interface PatientRecord {
               isSearching={isSearchingPatients}
               onSearch={handlePatientSearch}
               onSelectPatient={selectPatient}
-              onUpdate={(field, value) =>
+              onUpdate={(field: string, value: unknown) =>
               setWizardData((prev) => ({
                 ...prev,
                 patient: { ...prev.patient, [field]: value }
@@ -2962,7 +3087,7 @@ interface PatientRecord {
               fioRef={fioRef}
               phoneRef={phoneRef}
               cart={wizardData.cart}
-              onUpdateCart={(field, value) =>
+              onUpdateCart={(field: string, value: unknown) =>
               setWizardData((prev) => ({
                 ...prev,
                 cart: { ...prev.cart, [field]: value }
@@ -2981,7 +3106,7 @@ interface PatientRecord {
               onAddToCart={addToCart}
               onRemoveFromCart={removeFromCart}
               onUpdateItem={updateCartItem}
-              onUpdateCart={(field, value) =>
+              onUpdateCart={(field: string, value: unknown) =>
               setWizardData((prev) => ({
                 ...prev,
                 cart: { ...prev.cart, [field]: value }
