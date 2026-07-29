@@ -34,14 +34,14 @@ interface ScheduleNextModalProps {
   specialtyFilter?: string | null;
 }
 
-interface Patient {
+interface PatientRecord {
   id?: string | number;
   first_name?: string;
   last_name?: string;
   phone?: string;
 }
 
-interface Service {
+interface ServiceItem {
   id?: string | number;
   name?: string;
   category?: string;
@@ -72,9 +72,9 @@ const ScheduleNextModal = ({
     confirmation_channel: 'telegram'
   });
 
-  const [patients, setPatients] = useState<Patient[]>([]);
-  const [services, setServices] = useState<Service[]>([]);
-  const [filteredServices, setFilteredServices] = useState<Service[]>([]);
+  const [patients, setPatients] = useState<PatientRecord[]>([]);
+  const [services, setServices] = useState<ServiceItem[]>([]);
+  const [filteredServices, setFilteredServices] = useState<ServiceItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -99,7 +99,7 @@ const ScheduleNextModal = ({
 
       // Применяем фильтр по специальности если указан
       if (specialtyFilter) {
-        filtered = services.filter((service: Service) => {
+        filtered = services.filter((service: ServiceItem) => {
           const category = service.category?.toLowerCase();
           const name = service.name?.toLowerCase();
 
@@ -496,7 +496,7 @@ const ScheduleNextModal = ({
               required>
               
               <option value="">{t('misc.snm_select_patient')}</option>
-              {patients.map((p: Patient) =>
+              {patients.map((p: PatientRecord) =>
               <option key={p.id} value={p.id}>
                   {p.first_name} {p.last_name} - {p.phone}
                 </option>
@@ -559,7 +559,7 @@ const ScheduleNextModal = ({
                   required>
                   
                     <option value="">{t('misc.snm_select_service')}</option>
-                    {filteredServices.map((s: Service) =>
+                    {filteredServices.map((s: ServiceItem) =>
                   <option key={s.id} value={s.id}>
                         {t('misc.snm_service_option', { name: s.name, price: s.price })}
                       </option>

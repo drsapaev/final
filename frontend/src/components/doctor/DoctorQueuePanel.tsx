@@ -40,7 +40,7 @@ const QUEUE_ACTION_ALIASES = {
 
 type QueueActionKey = keyof typeof QUEUE_ACTION_ALIASES;
 
-interface QueueEntry {
+interface QueueEntryDto {
   id: number | string;
   number: string | number;
   patient_name?: string;
@@ -56,7 +56,7 @@ interface QueueEntry {
   [key: string]: unknown;
 }
 
-interface QueueStats {
+interface QueueStatsDto {
   total?: number;
   waiting?: number;
   served?: number;
@@ -69,12 +69,12 @@ interface QueueDoctor {
   cabinet?: string;
 }
 
-interface QueueData {
+interface QueueDataDto {
   queue_exists?: boolean;
   opened_at?: string;
-  stats?: QueueStats;
+  stats?: QueueStatsDto;
   doctor?: QueueDoctor;
-  entries?: QueueEntry[];
+  entries?: QueueEntryDto[];
 }
 
 interface DoctorInfo {
@@ -98,7 +98,7 @@ interface DoctorQueuePanelProps {
   className?: string;
 }
 
-const hasBackendQueueAction = (entry: QueueEntry | null | undefined, action: string, flagName?: string) => {
+const hasBackendQueueAction = (entry: QueueEntryDto | null | undefined, action: string, flagName?: string) => {
   if (flagName && entry?.[flagName] === true) {
     return true;
   }
@@ -124,9 +124,9 @@ const DoctorQueuePanel = ({
   const isDemoMode = import.meta.env.MODE === 'development' && window.location.hostname === 'localhost';
 
   const [loading, setLoading] = useState(true);
-  const [queueData, setQueueData] = useState<QueueData | null>(null);
+  const [queueData, setQueueData] = useState<QueueDataDto | null>(null);
   const [doctorInfo, setDoctorInfo] = useState<DoctorInfo | null>(null);
-  const [selectedPatient, setSelectedPatient] = useState<QueueEntry | null>(null);
+  const [selectedPatient, setSelectedPatient] = useState<QueueEntryDto | null>(null);
   const [message, setMessage] = useState<{ type: string; text: string }>({ type: '', text: '' });
   const loadQueueDataRef = useRef<() => void>(() => {});
 

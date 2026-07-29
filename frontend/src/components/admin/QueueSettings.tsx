@@ -37,7 +37,9 @@ import type { SelectChangeEvent } from '../ui/macos/Select';
 
 type TranslationFn = (key: string, options?: Record<string, unknown>) => string;
 
-interface Doctor {
+// Local doctor-list shape for the queue-settings dropdown. Named `DoctorRecord`
+// to avoid shadowing the canonical `Doctor` domain type in @/types/domain/clinic.
+interface DoctorRecord {
   id?: number;
   active?: boolean;
   cabinet?: string;
@@ -48,7 +50,10 @@ interface Doctor {
   };
 }
 
-interface QueueProfile {
+// Local queue-profile shape returned by /admin/queue/profiles. Named `QueueProfileDto`
+// because `QueueProfile` and `QueueProfilesResponse` are canonical domain types
+// in @/types/domain/queue.
+interface QueueProfileDto {
   key: string;
   title_ru?: string;
   title?: string;
@@ -121,14 +126,14 @@ const getNumberSetting = (
 
 const normalizeText = (value: unknown): string => String(value ?? '').trim().toLowerCase();
 
-const getDoctorDisplayName = (doctor: Doctor | null | undefined, t: TranslationFn): string => (
+const getDoctorDisplayName = (doctor: DoctorRecord | null | undefined, t: TranslationFn): string => (
   doctor?.user?.full_name || doctor?.user?.username || t('admin2.qs_doctor_fallback', { id: doctor?.id ?? '—' })
 );
 
 const pickCanonicalDoctorForSpecialty = (
-  doctorsList: Doctor[] | null | undefined,
+  doctorsList: DoctorRecord[] | null | undefined,
   specialtyKey: string
-): { doctor: Doctor | null; candidates: Doctor[] } => {
+): { doctor: DoctorRecord | null; candidates: DoctorRecord[] } => {
   const specialty = normalizeText(specialtyKey);
   const candidates = (Array.isArray(doctorsList) ? doctorsList : [])
     .filter((doctor) => normalizeText(doctor?.specialty) === specialty)
@@ -180,7 +185,7 @@ const QueueSettings = () => {
 
   // ⭐ SSOT: Загружаем специальности из QueueProfiles API
   const [specialties, setSpecialties] = useState<Specialty[]>([]);
-  const [doctors, setDoctors] = useState<Doctor[]>([]);
+  const [doctors, setDoctors] = useState<DoctorRecord[]>([]);
 
   // Загрузка профилей и докторов
   const loadProfiles = useCallback(async () => {
@@ -190,7 +195,7 @@ const QueueSettings = () => {
       api.get('/admin/doctors').catch(() => ({ data: [] }))]
       );
 
-      const profilesRaw = (profilesRes.data?.profiles ?? []) as QueueProfile[];
+      const profilesRaw = (profilesRes.data?.profiles ?? []) as QueueProfileDto[];
       setSpecialties(profilesRaw.map((p) => ({
         key: p.key,
         name: p.title_ru || p.title || p.key,
@@ -199,7 +204,7 @@ const QueueSettings = () => {
         description: (p.queue_tags || []).join(', ')
       })));
 
-      const doctorsData = (doctorsRes.data ?? []) as Doctor[];
+      const doctorsData = (doctorsRes.data ?? []) as DoctorRecord[];
       setDoctors(doctorsData);
 
       logger.info(`Loaded ${profilesRaw.length} queue profiles and ${doctorsData.length} doctors`);

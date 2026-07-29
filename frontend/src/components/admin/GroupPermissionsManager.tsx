@@ -30,7 +30,10 @@ import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
 
-interface User {
+// Local admin-panel user shape for the user-picker table. Named `UserRecord`
+// to avoid colliding with the `User` icon import below and with the canonical
+// `AuthUser` / `UserProfile` domain types in @/types/domain/auth.
+interface UserRecord {
   id: number | string;
   username: string;
   full_name?: string;
@@ -39,7 +42,9 @@ interface User {
   [key: string]: unknown;
 }
 
-interface Role {
+// Local role-list shape. Named `RoleDto` because `Role` and `RoleRecord` are
+// both canonical domain types in @/types/domain/auth.
+interface RoleDto {
   id: number;
   display_name: string;
   name?: string;
@@ -56,7 +61,9 @@ interface Group {
   [key: string]: unknown;
 }
 
-interface Permission {
+// Local permission-list shape. Named `PermissionDto` because `Permission`
+// is a canonical domain type in @/types/domain/auth.
+interface PermissionDto {
   codename: string;
   name: string;
   [key: string]: unknown;
@@ -146,16 +153,16 @@ const GroupPermissionsManager = () => {
   const [activeTab, setActiveTab] = useState('users');
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [selectedUser, setSelectedUser] = useState<UserRecord | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
   const [permissionToCheck, setPermissionToCheck] = useState('');
   const [roleToAssign, setRoleToAssign] = useState('');
 
   // Данные
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<UserRecord[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
-  const [roles, setRoles] = useState<Role[]>([]);
-  const [permissions, setPermissions] = useState<Permission[]>([]);
+  const [roles, setRoles] = useState<RoleDto[]>([]);
+  const [permissions, setPermissions] = useState<PermissionDto[]>([]);
   const [userPermissions, setUserPermissions] = useState<UserPermissions | null>(null);
   const [groupSummary, setGroupSummary] = useState<GroupSummary | null>(null);
   const [cacheStats, setCacheStats] = useState<CacheStats>({
@@ -180,10 +187,10 @@ const GroupPermissionsManager = () => {
       api.get('/admin/permissions/cache/stats')]
       );
 
-      setUsers(toArray(usersRes.data, ['users', 'items', 'results']) as unknown as User[]);
+      setUsers(toArray(usersRes.data, ['users', 'items', 'results']) as unknown as UserRecord[]);
       setGroups(toArray(groupsRes.data, ['groups', 'items', 'results']) as unknown as Group[]);
-      setRoles(toArray(rolesRes.data, ['roles', 'items', 'results']) as unknown as Role[]);
-      setPermissions(toArray(permissionsRes.data, ['permissions', 'items', 'results']) as unknown as Permission[]);
+      setRoles(toArray(rolesRes.data, ['roles', 'items', 'results']) as unknown as RoleDto[]);
+      setPermissions(toArray(permissionsRes.data, ['permissions', 'items', 'results']) as unknown as PermissionDto[]);
       setCacheStats(normalizeCacheStats((cacheRes.data as Record<string, unknown>)?.cache_stats || cacheRes.data));
     } catch (error) {
       logger.error('Ошибка загрузки данных:', error);
@@ -516,7 +523,7 @@ const GroupPermissionsManager = () => {
                   }}
                   options={[
                   { value: '', label: t('admin2.gpm_select_permission_ph') },
-                  ...permissions.map((perm: Permission) => ({
+                  ...permissions.map((perm: PermissionDto) => ({
                     value: perm.codename,
                     label: `${perm.name} (${perm.codename})`
                   }))]
@@ -671,7 +678,7 @@ const GroupPermissionsManager = () => {
                   }}
                   options={[
                   { value: '', label: t('admin2.gpm_select_role_ph') },
-                  ...roles.filter((role: Role) => !groupSummary.roles.some((gr: GroupSummaryRole) => gr.id === role.id)).map((role: Role) => ({
+                  ...roles.filter((role: RoleDto) => !groupSummary.roles.some((gr: GroupSummaryRole) => gr.id === role.id)).map((role: RoleDto) => ({
                     value: String(role.id),
                     label: role.display_name
                   }))]

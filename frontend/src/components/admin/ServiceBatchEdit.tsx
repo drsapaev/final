@@ -30,7 +30,9 @@ interface ServiceItem {
   [key: string]: unknown;
 }
 
-interface ServiceCategory {
+// Local service-category shape. Named `ServiceCategoryDto` because
+// `ServiceCategory` is a canonical domain type in @/types/domain/clinic.
+interface ServiceCategoryDto {
   id: number | string;
   name_ru: string;
   [key: string]: unknown;
@@ -57,7 +59,7 @@ interface ServiceBatchField {
 
 interface ServiceBatchEditProps {
   selectedServices: ServiceItem[];
-  categories: ServiceCategory[];
+  categories: ServiceCategoryDto[];
   onComplete: () => void;
   onCancel: () => void;
 }
@@ -242,7 +244,7 @@ const ServiceBatchEdit = ({ selectedServices, categories, onComplete, onCancel }
                 if (field.type === 'select') {
                   const rawOptions = field.options || [];
                   const options = fieldKey === 'category_id'
-                    ? (rawOptions as ServiceCategory[]).map(cat => ({ value: String(cat.id), label: cat.name_ru }))
+                    ? (rawOptions as ServiceCategoryDto[]).map(cat => ({ value: String(cat.id), label: cat.name_ru }))
                     : (rawOptions as string[]).map(opt => ({ value: opt, label: opt }));
 
                   const currentValue = updates[String(fieldKey)];

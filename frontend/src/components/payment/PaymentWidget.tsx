@@ -37,7 +37,10 @@ import { useTranslation } from '../../i18n/useTranslation';
 // UX Audit #4 regression fix: dividerStyle, providerOptionStyle, providerNameStyle
 // вынесены в CSS-классы .pw-divider, .pw-provider-option, .pw-provider-name.
 
-interface PaymentProvider {
+// Local payment-provider list shape for the picker dropdown. Named
+// `PaymentProviderDto` because `PaymentProvider` is a canonical domain type
+// in @/types/domain/billing.
+interface PaymentProviderDto {
   code: string;
   name: string;
   is_active?: boolean;
@@ -89,7 +92,7 @@ const PaymentWidget = ({
     window.location.hostname === '127.0.0.1';
 
   // Состояния
-  const [providers, setProviders] = useState<PaymentProvider[]>([]);
+  const [providers, setProviders] = useState<PaymentProviderDto[]>([]);
   const [selectedProvider, setSelectedProvider] = useState('');
   const [loading, setLoading] = useState(false);
   const [providersLoading, setProvidersLoading] = useState(true);
@@ -129,7 +132,7 @@ const PaymentWidget = ({
       if (response.data?.providers) {
         // Фильтруем активные провайдеры по валюте
         const availableProviders = response.data.providers.filter(
-          (provider: PaymentProvider) => provider.is_active &&
+          (provider: PaymentProviderDto) => provider.is_active &&
           provider.supported_currencies.includes(currency)
         );
         setProviders(availableProviders);
@@ -530,7 +533,7 @@ const PaymentWidget = ({
           onValueChange={(value: unknown) => setSelectedProvider(String(value))}
           disabled={loading}
           className="pw-select-margin"
-          options={providers.map((provider: PaymentProvider) => ({
+          options={providers.map((provider: PaymentProviderDto) => ({
             value: provider.code,
             label: (
               <span className="pw-provider-option">

@@ -47,7 +47,10 @@ interface LicenseStatus {
   [key: string]: unknown;
 }
 
-interface PaymentProvider {
+// Local payment-provider admin shape for the Settings page form. Named
+// `PaymentProviderDto` because `PaymentProvider` is a canonical domain type
+// in @/types/domain/billing.
+interface PaymentProviderDto {
   id: number | string;
   name?: string;
   code?: string;
@@ -60,7 +63,7 @@ interface PaymentProvider {
 }
 
 interface ProviderCardProps {
-  provider: PaymentProvider;
+  provider: PaymentProviderDto;
   onEdit: () => void;
   onDelete: () => void;
 }
@@ -136,10 +139,10 @@ export default function Settings() {void
   const [errAct, setErrAct] = useState('');
 
   // payment providers tab
-  const [providers, setProviders] = useState<PaymentProvider[]>([]);
+  const [providers, setProviders] = useState<PaymentProviderDto[]>([]);
   const [loadingProviders, setLoadingProviders] = useState(false);
   const [showAddProvider, setShowAddProvider] = useState(false);
-  const [editingProvider, setEditingProvider] = useState<PaymentProvider | null>(null);
+  const [editingProvider, setEditingProvider] = useState<PaymentProviderDto | null>(null);
 
   async function loadStatus() {
     try {
@@ -174,7 +177,7 @@ export default function Settings() {void
     try {
       const response = (await api.get('/admin/providers')) as import('axios').AxiosResponse<unknown>;
       const data = response?.data as unknown;
-      setProviders(Array.isArray(data) ? (data as PaymentProvider[]) : []);
+      setProviders(Array.isArray(data) ? (data as PaymentProviderDto[]) : []);
     } catch (error) {
       logger.error('Ошибка загрузки провайдеров:', error);
     } finally {

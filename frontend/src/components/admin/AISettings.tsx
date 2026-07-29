@@ -65,7 +65,9 @@ import logger from '../../utils/logger';
 import { notify } from '../../services/notify';
 
 // Provider shape returned by GET /admin/ai/providers and stored in `providers` state.
-interface AIProvider {
+// Named `AIProviderRecord` to avoid shadowing the canonical `AIProvider` union
+// type (string provider id) defined in @/types/domain/ai.
+interface AIProviderRecord {
   id: string | number;
   name: string;
   display_name: string;
@@ -110,7 +112,7 @@ interface AIProviderConfig {
 type AIProviderConfigs = Record<string, AIProviderConfig>;
 
 interface ProviderFormProps {
-  provider?: AIProvider | null;
+  provider?: AIProviderRecord | null;
   providerConfigs: AIProviderConfigs;
   onSave: (data: AIProviderFormData) => Promise<void> | void;
   onCancel: () => void;
@@ -125,10 +127,10 @@ const AISettings = () => {
   const { t: rawT } = useTranslation();
   const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
   const [loading, setLoading] = useState(true);
-  const [providers, setProviders] = useState<AIProvider[]>([]);
+  const [providers, setProviders] = useState<AIProviderRecord[]>([]);
   const [systemSettings, setSystemSettings] = useState<AISystemSettings>({});
   const [stats, setStats] = useState<AIStats>({});
-  const [editingProvider, setEditingProvider] = useState<AIProvider | null>(null);
+  const [editingProvider, setEditingProvider] = useState<AIProviderRecord | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [showApiKeys, setShowApiKeys] = useState<Record<string, boolean>>({});
   const [testResults, setTestResults] = useState<Record<string, AITestResult>>({});
@@ -186,7 +188,7 @@ const AISettings = () => {
       );
 
       if (providersRes.status === 'fulfilled') {
-        setProviders((providersRes.value as import('axios').AxiosResponse<AIProvider[]>).data);
+        setProviders((providersRes.value as import('axios').AxiosResponse<AIProviderRecord[]>).data);
       }
 
       if (settingsRes.status === 'fulfilled') {

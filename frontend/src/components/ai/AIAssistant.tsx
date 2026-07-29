@@ -45,7 +45,7 @@ const AI_PROVIDER_UNAVAILABLE_NOTICE = 'misc.aia_provider_unavailable_notice';
  * status/error/data fields — captured here so the assistant can read them
  * without resorting to `any`.
  */
-interface McpResult {
+interface McpResultDto {
   status?: string;
   error?: string;
   data?: Record<string, unknown>;
@@ -190,7 +190,7 @@ const AIAssistant = ({
 
     try {
       let response: { data?: unknown } | undefined;
-      let mcpResult: McpResult | undefined;
+      let mcpResult: McpResultDto | undefined;
 
       switch (effectiveAnalysisType) {
         case 'complaint':
@@ -200,7 +200,7 @@ const AIAssistant = ({
               patientAge: data.patient_age,
               patientGender: data.patient_gender,
               provider: provider
-            }) as McpResult;
+            }) as McpResultDto;
             if (mcpResult.status === 'success') {
               response = { data: mcpResult.data };
             } else {
@@ -223,7 +223,7 @@ const AIAssistant = ({
               specialty: data.specialty,
               provider: provider,
               maxSuggestions: data.maxSuggestions || 5
-            }) as McpResult;
+            }) as McpResultDto;
             if (mcpResult.status === 'success') {
               if (mcpResult.data?.clinical_recommendations) {
                 response = { data: mcpResult.data };
@@ -248,7 +248,7 @@ const AIAssistant = ({
               patientGender: data.patient_gender,
               provider: provider,
               includeRecommendations: true
-            }) as McpResult;
+            }) as McpResultDto;
             if (mcpResult.status === 'success') {
               response = { data: mcpResult.data };
             } else {
@@ -270,7 +270,7 @@ const AIAssistant = ({
               data.lesionInfo as Record<string, unknown> | null,
               data.patientHistory as Record<string, unknown> | null,
               provider
-            ) as McpResult;
+            ) as McpResultDto;
             if (mcpResult.status === 'success') {
               response = { data: mcpResult.data };
             } else {
@@ -291,7 +291,7 @@ const AIAssistant = ({
               data.image as File,
               (data.imageType as string) || 'general',
               { modality: data.modality, clinicalContext: data.clinicalContext, provider: provider }
-            ) as McpResult;
+            ) as McpResultDto;
             if (mcpResult.status === 'success') {
               response = { data: mcpResult.data };
             } else {

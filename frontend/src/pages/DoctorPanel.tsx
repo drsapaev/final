@@ -73,7 +73,7 @@ type QueueEntryLike = {
   [key: string]: unknown;
 };
 
-interface Patient {
+interface PatientRecord {
   id: string | number;
   name?: string;
   phone?: string;
@@ -84,7 +84,7 @@ interface Patient {
   [key: string]: unknown;
 }
 
-interface Appointment {
+interface AppointmentDto {
   id: string | number;
   patientId?: number | null;
   patientName?: string;
@@ -144,8 +144,8 @@ const DoctorPanel = () => {
     }
     return 'dashboard';
   });
-  const [patients, setPatients] = useState<Patient[]>([]);
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [patients, setPatients] = useState<PatientRecord[]>([]);
+  const [appointments, setAppointments] = useState<AppointmentDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   // ✅ УЛУЧШЕНИЕ: Универсальный хук вместо дублированных состояний
@@ -154,11 +154,11 @@ const DoctorPanel = () => {
   const patientModal = useModal() as unknown as {
     isOpen: boolean;
     isAnimating: boolean;
-    selectedItem: Patient | null;
+    selectedItem: PatientRecord | null;
     loading: boolean;
-    openModal: (item: Patient | Record<string, unknown> | null) => void;
+    openModal: (item: PatientRecord | Record<string, unknown> | null) => void;
     closeModal: () => void;
-    toggleModal: (item?: Patient | Record<string, unknown> | null) => void;
+    toggleModal: (item?: PatientRecord | Record<string, unknown> | null) => void;
     setModalLoading: (isLoading: boolean) => void;
   };
   const [scheduleNextModal, setScheduleNextModal] = useState<{ open: boolean; patient: Record<string, unknown> | null }>({ open: false, patient: null });
@@ -326,7 +326,7 @@ const DoctorPanel = () => {
     const visitTime = String(confirmation.visit_time ?? submittedFormData?.visit_time ?? '');
     const servicesRaw = submittedFormData?.services as unknown[] | undefined;
 
-    const nextAppointment: Appointment = {
+    const nextAppointment: AppointmentDto = {
       id: (result?.visit_id as string | number | undefined) ?? Date.now(),
       patientId: normalizedPatientId,
       patientName: String(confirmation.patient_name ?? selectedPatient?.name ?? t('doctor.new_patient')),
@@ -381,7 +381,7 @@ const DoctorPanel = () => {
           const patientData: Record<string, unknown> = await patientResponse.json();
 
           // Создаем объект пациента для отображения
-          const patientObj: Patient = {
+          const patientObj: PatientRecord = {
             id: patientData.id as string | number,
             name: `${patientData.last_name || ''} ${patientData.first_name || ''} ${patientData.middle_name || ''}`.trim(),
             phone: String(patientData.phone ?? ''),
@@ -570,13 +570,13 @@ const DoctorPanel = () => {
     return `queue entry ${queueNumber} for ${patientName}`;
   };
 
-  const getPatientA11yContext = (patient: Patient | null | undefined) => {
+  const getPatientA11yContext = (patient: PatientRecord | null | undefined) => {
     const patientId = patient?.id || 'unknown';
     const patientName = patient?.name || 'patient';
     return `patient ${patientName} (${patientId})`;
   };
 
-  const getAppointmentA11yContext = (appointment: Appointment | null | undefined) => {
+  const getAppointmentA11yContext = (appointment: AppointmentDto | null | undefined) => {
     const appointmentId = appointment?.id || 'unknown';
     const patientName = appointment?.patientName || 'patient';
     const appointmentTime = appointment?.time ? ` at ${appointment.time}` : '';
@@ -634,7 +634,7 @@ const DoctorPanel = () => {
   };
 
   // ✅ УЛУЧШЕНИЕ: Обработчик с универсальным хуком
-  const handlePatientClick = (patient: Patient | Record<string, unknown> | null) => {
+  const handlePatientClick = (patient: PatientRecord | Record<string, unknown> | null) => {
     patientModal.openModal(patient);
   };
 
