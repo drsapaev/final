@@ -186,7 +186,7 @@ const ServiceCatalog = () => {
 
   // Иконки специальностей
   // UX Audit Admin #3.9: унифицированы ключи с SERVICE_GROUP_LABELS.
-  const specialtyIcons = {
+  const specialtyIcons: Record<string, typeof Package> = {
     cardiology: Heart,
     ecg: Activity,
     dermatology: Stethoscope,
@@ -197,7 +197,7 @@ const ServiceCatalog = () => {
     physiotherapy: Package, // alias для обратной совместимости
   };
 
-  const specialtyColors = {
+  const specialtyColors: Record<string, string> = {
     cardiology: 'var(--mac-error)',
     dermatology: 'var(--mac-warning)',
     stomatology: 'var(--mac-info)',
@@ -913,7 +913,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
   // Auto-extract category_code from code prefix (guarded by prefix alignment checks)
   const derivedCategoryCode = formData.code ? String(formData.code).charAt(0).toUpperCase() : '';
 
-  const handleSubmit = (e) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     if (!String(formData.name ?? '').trim()) {
@@ -949,7 +949,7 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
   const handleConfirmSave = () => {
     // Подготавливаем данные для API
     const canonicalCode = normalizedCode || null;
-    const apiData = {
+    const apiData: Record<string, unknown> = {
       ...formData,
       price: formData.price ? parseFloat(String(formData.code ?? '')) : null,
       category_id: formData.category_id ? parseInt(String(formData.code ?? '')) : null,
@@ -972,18 +972,19 @@ const ServiceForm = ({ service, categories, doctors, queueProfiles = [], setMess
     onSave(apiData);
   };
 
-  const handleChange = (field, value) => {
+  const handleChange = (field: string, value: unknown) => {
     let normalizedValue = value;
 
     if (field === 'code') {
-      normalizedValue = formatServiceCodeInput(value);
+      normalizedValue = formatServiceCodeInput(String(value ?? ''));
     }
 
     // ⭐ SSOT: Sync queue_tag with department_key
     if (field === 'queue_tag' && normalizedValue) {
+      const normalizedStr = String(normalizedValue ?? '');
       const matchingProfile = queueProfiles.find((p: unknown) => {
         const profile = p as { queue_tags?: string[]; key?: string };
-        return (profile.queue_tags || []).includes(normalizedValue) || profile.key === normalizedValue;
+        return (profile.queue_tags || []).includes(normalizedStr) || profile.key === normalizedStr;
       });
 
       if (matchingProfile) {

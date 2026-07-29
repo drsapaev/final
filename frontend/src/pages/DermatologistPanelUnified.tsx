@@ -165,6 +165,42 @@ interface SelectedServiceItem {
   [key: string]: unknown;
 }
 
+// Queue entry shape returned by /registrar/queues/today, used by
+// loadDermatologyAppointments to build DermatologyAppointment rows.
+interface DermatologyQueueEntryItem {
+  id?: number | string;
+  appointment_id?: number | string | null;
+  patient_id?: number | string;
+  patient_name?: string;
+  patient?: { first_name?: string; last_name?: string; [k: string]: unknown };
+  phone?: string;
+  patient_birth_year?: string | number;
+  address?: string;
+  discount_mode?: string;
+  services?: unknown[];
+  service_codes?: unknown[];
+  payment_type?: string | null;
+  payment_status?: string | null;
+  available_actions?: unknown[];
+  can_mark_paid?: boolean;
+  can_start_visit?: boolean;
+  can_print_ticket?: boolean;
+  can_complete?: boolean;
+  can_cancel?: boolean;
+  queue_entry_id?: number | string | null;
+  canonical_record_id?: number | string;
+  record_kind?: string;
+  source_kind?: string;
+  canonical_status?: string | null;
+  queue_status?: string | null;
+  queue_position?: number;
+  doctor_name?: string;
+  status?: string | null;
+  cost?: number;
+  visit_id?: number | string | null;
+  [key: string]: unknown;
+}
+
 interface SkinExaminationRecord {
   patient_id?: string | number;
   visit_id?: string | number;
@@ -429,7 +465,7 @@ const DermatologistPanelUnified = () => {
   // (PriceOverrideManager import also removed — component was not rendered)
 
   // Локальный справочник цен для дерма/косметологии
-  const dermaPriceMap = useMemo(() => ({
+  const dermaPriceMap = useMemo((): Record<string, number> => ({
     derma_consultation: 50000,
     derma_biopsy: 150000,
     cosm_cleaning: 80000,
@@ -541,7 +577,7 @@ const DermatologistPanelUnified = () => {
           if (queuesData && queuesData.queues && Array.isArray(queuesData.queues)) {
             queuesData.queues.forEach((queue) => {
               if (queue.entries) {
-                queue.entries.forEach((entry) => {
+                (queue.entries as unknown as DermatologyQueueEntryItem[]).forEach((entry) => {
                   const doctorQueueEntryId = resolveDoctorQueueEntryId(entry);
                   allAppointments.push({
                     id: entry.id,
@@ -723,9 +759,11 @@ const DermatologistPanelUnified = () => {
     }
   };
 
-  const handleAppointmentActionClick = async (action: string, row: DermatologyAppointment, event: React.MouseEvent) => {
+  const handleAppointmentActionClick = async (action: string, row: DermatologyAppointment, event?: unknown) => {
     logger.info('[Dermatology] handleAppointmentActionClick:', action, row);
-    event.stopPropagation();
+    if (event) {
+      (event as React.MouseEvent).stopPropagation();
+    }
 
     switch (action) {
       case 'view':
@@ -1184,7 +1222,7 @@ const DermatologistPanelUnified = () => {
   }, [currentAppointment?.appointment_id, currentAppointment?.id, currentAppointment?.visit_id]);
 
 
-  const savePrescription = async (prescriptionData) => {
+  const savePrescription = async (prescriptionData: unknown) => {
     try {
       const appointmentId = currentAppointment?.appointment_id || null;
       if (!appointmentId) {
@@ -1207,7 +1245,7 @@ const DermatologistPanelUnified = () => {
     }
   };
 
-  const printPrescription = async (prescriptionData) => {
+  const printPrescription = async (prescriptionData: unknown) => {
     const patientFullName =
       selectedPatient?.patient_name ||
       currentAppointment?.patient_fio ||
@@ -1215,10 +1253,11 @@ const DermatologistPanelUnified = () => {
       selectedPatient?.name ||
       i18nT('derma.derma_panel_patient_default');
 
+    const prescriptionRecord = prescriptionData as Record<string, unknown>;
     const payload = {
       prescription: {
-        ...prescriptionData,
-        recommendations: prescriptionData.instructions || ''
+        ...prescriptionRecord,
+        recommendations: (prescriptionRecord.instructions as string) || ''
       },
       patient: {
         id: getSelectedPatientId(),
@@ -1254,12 +1293,12 @@ const DermatologistPanelUnified = () => {
   // УДАЛЕНО: старая функция completeVisit заменена на унифицированную handleSaveVisit
 
   // Обработка AI предложений
-  const handleAISuggestion = (type, suggestion) => {
+  const handleAISuggestion = (type: string, suggestion: unknown) => {
     if (type === 'icd10') {
-      setVisitData({ ...visitData, icd10: suggestion });
+      setVisitData({ ...visitData, icd10: String(suggestion ?? '') });
         notify.success(t('derma.icd_added_from_ai'));
     } else if (type === 'diagnosis') {
-      setVisitData({ ...visitData, diagnosis: suggestion });
+      setVisitData({ ...visitData, diagnosis: String(suggestion ?? '') });
         notify.success(t('derma.diagnosis_added_from_ai'));
     }
   };
@@ -1367,7 +1406,7 @@ const DermatologistPanelUnified = () => {
   };
 
   // Обработка осмотра кожи
-  const handleSkinExaminationSubmit = async (e) => {
+  const handleSkinExaminationSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     try {
       const payload = {
@@ -1407,7 +1446,7 @@ const DermatologistPanelUnified = () => {
   };
 
   // Обработка косметической процедуры
-  const handleCosmeticProcedureSubmit = async (e) => {
+  const handleCosmeticProcedureSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     try {
       const payload = {
