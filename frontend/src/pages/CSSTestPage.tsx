@@ -172,7 +172,7 @@ const CSSTestPage = () => {
           
           <ModernTabs
             activeTab={activeTab}
-            onTabChange={setActiveTab}
+            onTabChange={(tab) => setActiveTab(tab ?? '')}
             departmentStats={departmentStats}
             theme="light"
             language="ru"

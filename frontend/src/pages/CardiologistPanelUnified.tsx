@@ -1766,9 +1766,9 @@ const MacOSCardiologistPanelUnified = () => {
 
           {/* Прием пациента */}
           {/* Очередь — trivial 1-liner, no extraction needed */}
-          {Boolean(activeTab === 'queue') && (
+          {activeTab === 'queue' ? (
             <QueueIntegration specialty="cardiology" />
-          )}
+          ) : null}
 
           {/* Приём пациента — R-15: extracted to VisitTab component */}
           {activeTab === 'visit' &&

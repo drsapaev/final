@@ -300,7 +300,7 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
         const cacheKey = buildAiCacheKey(fieldName);
         const cachedSuggestions = cacheService.get(cacheKey);
         if (cachedSuggestions) {
-            setAiSuggestions(prev => ({ ...prev, [fieldName]: cachedSuggestions }));
+            setAiSuggestions(prev => ({ ...prev, [fieldName]: cachedSuggestions }) as Record<string, unknown[]>);
             setAiLoading(prev => ({ ...prev, [fieldName]: false }));
             handleTelemetry({ type: 'ai.cache.hit', payload: { fieldName } });
             return;
@@ -405,7 +405,7 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                             if (fieldName === 'examination' && 'examination_plan' in analysisData && analysisData.examination_plan) {
                                 fieldSuggestions.push({
                                     id: 'exam-1',
-                                    content: analysisData.examination_plan,
+                                    content: String(analysisData.examination_plan),
                                     source: 'ai',
                                     confidence: 0.8
                                 });
@@ -413,7 +413,7 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                             if (fieldName === 'treatment' && 'treatment_suggestion' in analysisData && analysisData.treatment_suggestion) {
                                 fieldSuggestions.push({
                                     id: 'treat-1',
-                                    content: analysisData.treatment_suggestion,
+                                    content: String(analysisData.treatment_suggestion),
                                     source: 'ai',
                                     confidence: 0.8
                                 });
@@ -936,7 +936,7 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
             </div>
 
             {/* History sidebar */}
-            {showHistory && (
+            {showHistory ? (
                 <EMRHistoryPanel
                     visitId={visitId}
                     currentVersion={version ?? undefined}
@@ -948,10 +948,10 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                     isOpen={showHistory}
                     onClose={() => setShowHistory(false)}
                 />
-            )}
+            ) : null}
 
             {/* Diff viewer modal */}
-            {showDiff && selectedVersion && (
+            {Boolean(showDiff && selectedVersion) && (
                 <div
                     className="emr-v2-modal-overlay"
                     onClick={() => setShowDiff(false)}
