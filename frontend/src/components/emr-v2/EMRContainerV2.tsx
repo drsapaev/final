@@ -23,7 +23,7 @@ import { useDebouncedCallback } from '../../hooks/useDebouncedCallback';
 import { cacheService, CACHE_CONFIG, CACHE_TAGS } from '../../core/cache';
 import { DEBOUNCE } from '../../core/debouncePolicy';
 import EMRStatusIndicator from './EMRStatusIndicator';
-import EMRHistoryPanel from './EMRHistoryPanel';
+import EMRHistoryPanel, { type EMRHistoryPanelProps } from './EMRHistoryPanel';
 import EMRDiffViewer from './EMRDiffViewer';
 import EMRConflictDialog from './EMRConflictDialog';
 import EMRHelpDialog from './EMRHelpDialog';
@@ -152,7 +152,7 @@ interface EMRHookResult {
     forceOverwrite: () => Promise<unknown>;
 }
 
-export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Component = null }: EMRContainerV2Props) {
+export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Component = null }: EMRContainerV2Props): React.ReactElement {
     // P-013 fix: shared ConfirmDialog hook (replaces 1 window.confirm() call).
     const [confirm, confirmDialog] = useConfirm();
     const { t: rawT } = useTranslation();
@@ -203,7 +203,7 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
     useBeforeUnload(isDirty);
 
     // Local UI state
-    const [showHistory, setShowHistory] = useState(false);
+    const [showHistory, setShowHistory] = useState<boolean>(false);
     const [showHelp, setShowHelp] = useState(false);
     const [selectedVersion, setSelectedVersion] = useState<string | number | null>(null);
     const [showDiff, setShowDiff] = useState(false);
@@ -458,11 +458,12 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
                     logger.info('[EMR AI] No AI handler for field:', fieldName);
             }
         } catch (err) {
-            if (err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED') {
+            const errRec = err as { name?: string; code?: string; message?: string };
+            if (errRec?.name === 'CanceledError' || errRec?.code === 'ERR_CANCELED') {
                 return;
             }
             logger.error('[EMR AI Error]', err);
-            handleTelemetry({ type: 'ai.error', payload: { fieldName, error: err.message } });
+            handleTelemetry({ type: 'ai.error', payload: { fieldName, error: errRec?.message } });
         } finally {
             setAiLoading(prev => ({ ...prev, [fieldName]: false }));
         }
@@ -575,20 +576,6 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
     // =========================================================================
     // RENDER
     // =========================================================================
-
-    const historyPanel: React.ReactNode = showHistory ? (
-        <EMRHistoryPanel
-            visitId={visitId}
-            currentVersion={version ?? undefined}
-            selectedVersion={selectedVersion ?? undefined}
-            onSelectVersion={(v) => {
-                setSelectedVersion(v ?? null);
-                setShowDiff(true);
-            }}
-            isOpen={showHistory}
-            onClose={() => setShowHistory(false)}
-        />
-    ) : null;
 
     return (
         <div className={`emr-v2-container ${showHistory ? 'emr-v2-container--with-sidebar' : ''}`}>
@@ -950,7 +937,19 @@ export function EMRContainerV2({ visitId, patientId = null, specialty, ICD10Comp
             </div>
 
             {/* History sidebar */}
-            {historyPanel}
+            {showHistory ? (
+                <EMRHistoryPanel
+                    visitId={visitId}
+                    currentVersion={version ?? undefined}
+                    selectedVersion={selectedVersion ?? undefined}
+                    onSelectVersion={(v) => {
+                        setSelectedVersion(v ?? null);
+                        setShowDiff(true);
+                    }}
+                    isOpen={showHistory}
+                    onClose={() => setShowHistory(false)}
+                />
+            ) : null}
 
             {/* Diff viewer modal */}
             {Boolean(showDiff && selectedVersion) && (
