@@ -28,15 +28,19 @@ interface PatientStepV2Props {
   showSuggestions: boolean;
   isSearching?: boolean;
   onSearch: (value: string) => void;
+  // TECH-DEBT(patient-step-patient-any): patient is `any` — raw API response shape
   onSelectPatient: (patient: any) => void;
   onUpdate: (field: string, value: any) => void;
+  // TECH-DEBT(patient-step-update-any): value is `any` — multiple field types
   onPhoneChange: (value: string) => void;
   onBirthDateChange: (value: string) => void;
   formattedBirthDate: string;
   fioRef: React.Ref<HTMLInputElement> | null;
   phoneRef: React.Ref<HTMLInputElement> | null;
   cart: Record<string, any> | null;
+  // TECH-DEBT(patient-step-cart-any): value is `any` — cart field types vary
   onUpdateCart: (field: string, value: any) => void;
+  // TECH-DEBT(patient-step-phone-any): patient is `any` — phone error shape from API
   phoneError: { message?: string; patient?: any } | null;
 }
 

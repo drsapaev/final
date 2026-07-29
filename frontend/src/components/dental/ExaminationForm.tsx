@@ -116,6 +116,7 @@ const ExaminationForm = ({
   }, [initialData]);
 
   // Обработчики
+  // TECH-DEBT(dental-exam-value-any): value is `any` — multiple input types (string/number/boolean)
   const handleInputChange = (field: string, value: any) => {
     if (field.includes('.')) {
       const [parent, child] = field.split('.');
@@ -134,6 +135,7 @@ const ExaminationForm = ({
     }
   };
 
+  // TECH-DEBT(dental-exam-item-any): item is `any` — heterogeneous array items (photos/notes/etc)
   const handleArrayAdd = (field: string, item: any) => {
     setFormData((prev) => ({
       ...prev,
@@ -144,6 +146,7 @@ const ExaminationForm = ({
   const handleArrayRemove = (field: string, index: number) => {
     setFormData((prev) => ({
       ...prev,
+                // TECH-DEBT(dental-exam-filter-any): prev cast + any[] filter for generic array removal
       [field]: ((prev as Record<string, any>)[field] as any[]).filter((_: any, i: number) => i !== index)
     }));
   };
