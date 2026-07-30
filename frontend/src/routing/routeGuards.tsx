@@ -1,5 +1,4 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import PropTypes from 'prop-types';
 import { Navigate, useLocation } from 'react-router-dom';
 import auth from '../stores/auth';
 import type { AuthState } from '../types/domain/auth';
@@ -172,15 +171,6 @@ export function RouteAccessBoundary({ route, children }: RouteAccessBoundaryProp
   return children;
 }
 
-RouteAccessBoundary.propTypes = {
-  route: PropTypes.shape({
-    id: PropTypes.string.isRequired,
-    group: PropTypes.string,
-    auth: PropTypes.string,
-    roles: PropTypes.arrayOf(PropTypes.string),
-  }),
-  children: PropTypes.node,
-};
 
 export function LegacyRouteRedirect() {
   const location = useLocation();
@@ -228,11 +218,6 @@ function SystemRoutePage({ title, description, code }: SystemRoutePageProps) {
   );
 }
 
-SystemRoutePage.propTypes = {
-  title: PropTypes.string.isRequired,
-  description: PropTypes.string.isRequired,
-  code: PropTypes.string.isRequired,
-};
 
 export function UnauthorizedPage() {
   const { t } = useTranslation();

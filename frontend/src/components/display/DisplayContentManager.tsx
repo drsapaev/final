@@ -19,7 +19,6 @@ import { Card, Button, Badge,
   Input } from '../ui/macos';
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
-import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
 /**
@@ -443,9 +442,5 @@ const DisplayContentManager = ({
 
 
 // audit/strict: removed self-referencing propTypes spread
-DisplayContentManager.propTypes = {
-  boardId: PropTypes.any,
-  className: PropTypes.any,
-};
 
 export default DisplayContentManager;

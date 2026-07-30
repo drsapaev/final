@@ -1,6 +1,5 @@
 
 import { useState, useEffect } from 'react';
-import PropTypes from 'prop-types';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
@@ -119,13 +118,3 @@ function StatusCard({ title, configured, details }: StatusCardProps) {
     );
 }
 
-StatusCard.propTypes = {
-    title: PropTypes.string.isRequired,
-    configured: PropTypes.bool,
-    details: PropTypes.arrayOf(
-        PropTypes.shape({
-            label: PropTypes.string.isRequired,
-            value: PropTypes.oneOfType([PropTypes.string, PropTypes.number, PropTypes.bool]),
-        })
-    ).isRequired,
-};

@@ -6,7 +6,6 @@ import { MacOSThemeProvider } from './theme/macosTheme';
 import Landing from './pages/Landing';
 import Login from './pages/Login';
 import LoginFormStyled from './components/auth/LoginFormStyled';
-import PropTypes from 'prop-types';
 
 const App = lazy(() => import('./App'));
 
@@ -22,9 +21,6 @@ function PublicProviders({ children }: { children: React.ReactNode }) {
 
 
 // audit/strict: removed self-referencing propTypes spread
-PublicProviders.propTypes = {
-  children: PropTypes.any,
-};
 
 function AppBridge() {
   return (

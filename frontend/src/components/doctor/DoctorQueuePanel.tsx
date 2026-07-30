@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 import type { CSSProperties } from 'react';
-import PropTypes from 'prop-types';
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
 import { buildApiUrl } from '../../api/runtime';
@@ -812,10 +811,5 @@ const DoctorQueuePanel = ({
 
 };
 
-DoctorQueuePanel.propTypes = {
-  specialty: PropTypes.string,
-  onPatientSelect: PropTypes.func,
-  className: PropTypes.string,
-};
 
 export default DoctorQueuePanel;

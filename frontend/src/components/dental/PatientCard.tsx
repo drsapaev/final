@@ -20,7 +20,6 @@ import {
 
 
 'lucide-react';
-import PropTypes from 'prop-types';
 import notify from '../../services/notify';
 
 export type PatientFormData = {
@@ -930,17 +929,5 @@ const PatientCard = ({
 
 
 // audit/strict: removed self-referencing propTypes spread
-PatientCard.propTypes = {
-  emergencyContact: PropTypes.any,
-  insurance: PropTypes.any,
-  isEditMode: PropTypes.any,
-  medicalHistory: PropTypes.any,
-  name: PropTypes.any,
-  onClose: PropTypes.any,
-  onSave: PropTypes.any,
-  passport: PropTypes.any,
-  patient: PropTypes.any,
-  surname: PropTypes.any,
-};
 
 export default PatientCard;

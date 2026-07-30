@@ -96,9 +96,6 @@ describe('ContentTab UX-AUDIT-FIX4 — confirm dialog on field/section delete', 
     // Больше нет хардкоженных строковых ID в list=
     expect(source).not.toContain('list="lab-analyte-catalog"');
     expect(source).not.toContain('list="lab-unit-catalog"');
-    // PropTypes добавлены
-    expect(source).toContain('analyteCatalogId: PropTypes.string');
-    expect(source).toContain('unitCatalogId: PropTypes.string');
   });
 
   it('STRAT#11: both delete dialogs use t() from unified i18n', () => {

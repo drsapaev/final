@@ -8,7 +8,6 @@ import { useTranslation } from '../i18n/useTranslation';
 import {
   Button, Icon,
 } from './ui/macos';
-import PropTypes from 'prop-types';
 
 const LanguageSwitcher = ({ compact = false }) => {
     const { language, setLanguage, availableLanguages, t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
@@ -113,8 +112,5 @@ const LanguageSwitcher = ({ compact = false }) => {
 
 
 // audit/strict: removed self-referencing propTypes spread
-LanguageSwitcher.propTypes = {
-  compact: PropTypes.any,
-};
 
 export default LanguageSwitcher;

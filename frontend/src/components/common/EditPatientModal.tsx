@@ -12,7 +12,6 @@
 // (used by RegistrarPanel), enforces RBAC via useRoleAccess, and emits
 // onComplete when the edit succeeds. We delegate to that path instead
 // of duplicating the form.
-import PropTypes from 'prop-types';
 import AppointmentWizardV2 from '../wizard/AppointmentWizardV2';
 import logger from '../../utils/logger';
 
@@ -87,15 +86,5 @@ const EditPatientModal = ({ isOpen, onClose, patient, onSave, loading = false, t
 };
 
 // audit/strict: removed self-referencing propTypes spread
-EditPatientModal.propTypes = {
-  isOpen: PropTypes.any,
-  onClose: PropTypes.any,
-  patient: PropTypes.any,
-  onSave: PropTypes.any,
-  loading: PropTypes.any,
-  // Theme is accepted for backwards compat with cardio/derma/dentist callers
-  // but is no longer used — AppointmentWizardV2 has its own theming.
-  theme: PropTypes.any
-};
 
 export default EditPatientModal;

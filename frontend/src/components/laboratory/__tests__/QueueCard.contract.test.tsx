@@ -25,12 +25,6 @@ describe('QueueCard STRAT#28 — React.memo wrapped card component', () => {
     expect(source).toContain('onOpenAppointment');
   });
 
-  it('has PropTypes for all props', () => {
-    expect(source).toContain('appointment: PropTypes.object.isRequired');
-    expect(source).toContain('isSelected: PropTypes.bool');
-    expect(source).toContain('onOpenAppointment: PropTypes.func.isRequired');
-  });
-
   it('uses t() for all i18n strings', () => {
     expect(source).toContain("t('queue.patient_no_name')");
     expect(source).toContain("t('queue.visit')");

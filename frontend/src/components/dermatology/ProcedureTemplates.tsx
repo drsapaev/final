@@ -43,7 +43,6 @@ import {
 
 
 import logger from '../../utils/logger';
-import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 import type { SelectChangeEvent } from '../ui/macos/Select';
 
@@ -647,8 +646,5 @@ const ProcedureTemplates = ({ onSelectProcedure, visitId }: { onSelectProcedure?
 
 
 // audit/strict: removed self-referencing propTypes spread
-ProcedureTemplates.propTypes = {
-  onSelectProcedure: PropTypes.any,
-};
 
 export default ProcedureTemplates;

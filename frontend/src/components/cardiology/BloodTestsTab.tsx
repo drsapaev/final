@@ -16,7 +16,6 @@
  * reduces the parent by ~14% and makes both files easier to maintain.
  */
 
-import PropTypes from 'prop-types';
 import { TestTube, Plus, Save } from 'lucide-react';
 import { Button, Textarea, Badge, MacOSCard } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
@@ -342,21 +341,5 @@ export function BloodTestsTab({
   );
 }
 
-BloodTestsTab.propTypes = {
-  bloodTests: PropTypes.array,
-  bloodTestForm: PropTypes.object.isRequired,
-  setBloodTestForm: PropTypes.func.isRequired,
-  showFormOpen: PropTypes.bool,
-  onNewTest: PropTypes.func.isRequired,
-  onCancelForm: PropTypes.func.isRequired,
-  onSubmit: PropTypes.func.isRequired,
-  getEmptyBloodTestForm: PropTypes.func.isRequired,
-  getFieldRangeWarning: PropTypes.func.isRequired,
-  isLdlCritical: PropTypes.func.isRequired,
-  settings: PropTypes.object,
-  getColor: PropTypes.func.isRequired,
-  getFontSize: PropTypes.func.isRequired,
-  getSpacing: PropTypes.func.isRequired,
-};
 
 export default BloodTestsTab;

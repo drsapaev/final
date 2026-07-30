@@ -1,7 +1,6 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRef } from 'react';
-import PropTypes from 'prop-types';
 import NotificationBell from './NotificationBell';
 import NotificationInbox from './NotificationInbox';
 import { useNotificationCenter } from '../../contexts/NotificationCenterContext';
@@ -121,15 +120,3 @@ export default function RoleNotificationCenter({ userRole }: { userRole: string 
   );
 }
 
-RoleNotificationCenter.propTypes = {
-  userRole: PropTypes.oneOf([
-    'doctor',
-    'registrar',
-    'lab',
-    'patient',
-    'cardiologist',
-    'dermatologist',
-    'dentist',
-    'admin'
-  ]).isRequired
-};

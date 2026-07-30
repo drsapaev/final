@@ -1,5 +1,4 @@
 
-import PropTypes from 'prop-types';
 import { useCallback, useRef } from 'react';
 import {
   Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle, Icon,
@@ -204,12 +203,3 @@ export default function LabReportHistoryPanel({
   );
 }
 
-LabReportHistoryPanel.propTypes = {
-  showRecentReportsBrowser: PropTypes.bool,
-  recentReports: PropTypes.array,
-  reportHistory: PropTypes.array,
-  historySeverityFilter: PropTypes.string,
-  onSeverityFilterChange: PropTypes.func.isRequired,
-  activeInstanceId: PropTypes.number,
-  onOpenInstance: PropTypes.func.isRequired,
-};

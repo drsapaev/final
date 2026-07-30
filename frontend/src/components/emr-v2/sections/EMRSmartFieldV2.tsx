@@ -18,7 +18,6 @@
  * - Explicit commit required (Tab/Enter)
  */
 
-import PropTypes from 'prop-types';
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { SmartAssistButton } from '../ai/SmartAssistButton';
 import { AISuggestionPopover } from '../ai/AISuggestionPopover';
@@ -306,39 +305,6 @@ export function EMRSmartFieldV2({
     );
 }
 
-const suggestionShape = PropTypes.shape({
-    id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-    content: PropTypes.string,
-    source: PropTypes.string,
-    confidence: PropTypes.number,
-});
 
-EMRSmartFieldV2.propTypes = {
-    value: PropTypes.oneOfType([
-        PropTypes.string,
-        PropTypes.shape({
-            main: PropTypes.string,
-            primary: PropTypes.string,
-            text: PropTypes.string,
-            value: PropTypes.string,
-            description: PropTypes.string,
-        }),
-    ]),
-    onChange: PropTypes.func,
-    placeholder: PropTypes.string,
-    multiline: PropTypes.bool,
-    rows: PropTypes.number,
-    disabled: PropTypes.bool,
-    id: PropTypes.string,
-    fieldName: PropTypes.string,
-    suggestions: PropTypes.arrayOf(suggestionShape),
-    aiLoading: PropTypes.bool,
-    onApplySuggestion: PropTypes.func,
-    onDismissSuggestion: PropTypes.func,
-    onRequestAI: PropTypes.func,
-    showAIButton: PropTypes.bool,
-    experimentalGhostMode: PropTypes.bool,
-    onTelemetry: PropTypes.func,
-};
 
 export default EMRSmartFieldV2;

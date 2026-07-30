@@ -6,7 +6,6 @@ import { api } from '../../api/client';
 import { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import type { CSSProperties } from "react";
 import ReactDOM from 'react-dom';
-import PropTypes from 'prop-types';
 import { X, Send, MessageCircle, ChevronLeft, ChevronDown, Plus, Search, Check, CheckCheck, Mic, Filter, Smile, Paperclip, Zap, AlertCircle, VolumeX, Volume2 } from 'lucide-react';
 import { useChat } from '../../hooks/useChat';
 import auth from '../../stores/auth';
@@ -1464,9 +1463,5 @@ const ChatWindow = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void 
   );
 };
 
-ChatWindow.propTypes = {
-  isOpen: PropTypes.bool.isRequired,
-  onClose: PropTypes.func.isRequired,
-};
 
 export default ChatWindow;

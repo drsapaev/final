@@ -13,7 +13,6 @@
  * - Doctor decides
  */
 
-import PropTypes from 'prop-types';
 import { useState, useCallback } from 'react';
 
 import './CompletenessChecker.css';
@@ -271,17 +270,3 @@ export function CompletenessChecker({
 
 export default CompletenessChecker;
 
-CompletenessChecker.propTypes = {
-  emrData: PropTypes.shape({
-    complaints: PropTypes.string,
-    anamnesis_morbi: PropTypes.string,
-    anamnesis_vitae: PropTypes.string,
-    examination: PropTypes.string,
-    diagnosis: PropTypes.string,
-    icd10_code: PropTypes.string,
-    treatment: PropTypes.string,
-    recommendations: PropTypes.string
-  }),
-  specialty: PropTypes.string,
-  onFieldClick: PropTypes.func
-};

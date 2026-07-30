@@ -1,6 +1,5 @@
 
 import { useState, useRef, useEffect, useId } from 'react';
-import PropTypes from 'prop-types';
 import {
   ChevronDown,
   ChevronUp,
@@ -545,26 +544,5 @@ const ModernSelect = ({
 
 };
 
-ModernSelect.propTypes = {
-  label: PropTypes.node,
-  placeholder: PropTypes.string,
-  value: PropTypes.any,
-  onChange: PropTypes.func,
-  options: PropTypes.array,
-  error: PropTypes.node,
-  success: PropTypes.node,
-  disabled: PropTypes.bool,
-  required: PropTypes.bool,
-  searchable: PropTypes.bool,
-  multiple: PropTypes.bool,
-  clearable: PropTypes.bool,
-  loading: PropTypes.bool,
-  size: PropTypes.string,
-  variant: PropTypes.string,
-  renderOption: PropTypes.func,
-  renderValue: PropTypes.func,
-  groupBy: PropTypes.oneOfType([PropTypes.string, PropTypes.func]),
-  className: PropTypes.string
-};
 
 export default ModernSelect;

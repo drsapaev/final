@@ -11,7 +11,6 @@
  */
 
 import { useState, useCallback } from 'react';
-import PropTypes from 'prop-types';
 import EMRSection from './EMRSection';
 import React from 'react';
 import ComplaintsField, { type ComplaintsFieldSuggestion } from './ComplaintsField';
@@ -148,12 +147,3 @@ export function ComplaintsSection({
 
 export default ComplaintsSection;
 
-ComplaintsSection.propTypes = {
-    value: PropTypes.string,
-    onChange: PropTypes.func,
-    disabled: PropTypes.bool,
-    required: PropTypes.bool,
-    defaultOpen: PropTypes.bool,
-    doctorId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-    specialty: PropTypes.oneOf(['general', 'cardiology', 'dermatology', 'dentist', 'dentistry']),
-};

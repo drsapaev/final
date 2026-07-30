@@ -4,7 +4,6 @@ import { useTranslation } from '../../i18n/useTranslation';
 import i18n from '../../i18n';
 // Система модальных окон
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import PropTypes from 'prop-types';
 import { useTheme } from '../../contexts/ThemeContext';
 const t18 = i18n.t as unknown as (key: string, options?: Record<string, unknown>) => string;
 
@@ -507,30 +506,8 @@ export const modal = {
   }
 };
 
-ModalProvider.propTypes = {
-  children: PropTypes.node
-};
 
-ModalContainer.propTypes = {
-  modals: PropTypes.array,
-  onClose: PropTypes.func,
-  theme: PropTypes.any
-};
 
 const ModalContainerAny = ModalContainer;
 
-ModalItem.propTypes = {
-  modal: PropTypes.object,
-  onClose: PropTypes.func
-};
 
-Modal.propTypes = {
-  isOpen: PropTypes.bool,
-  onClose: PropTypes.func,
-  title: PropTypes.node,
-  children: PropTypes.node,
-  footer: PropTypes.node,
-  size: PropTypes.string,
-  closable: PropTypes.bool,
-  style: PropTypes.object
-};

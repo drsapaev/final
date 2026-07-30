@@ -1,5 +1,4 @@
 import React, { useState, useCallback, useEffect, type CSSProperties, type MouseEvent } from 'react';
-import PropTypes from 'prop-types';
 import { useDropzone, type FileRejection, type DropzoneRootProps, type DropzoneInputProps, type Accept } from 'react-dropzone';
 import { Upload, X, File as FileIcon, AlertCircle, Loader } from 'lucide-react';
 import logger from '../../utils/logger';
@@ -329,16 +328,5 @@ const FileUpload = ({
 
 
 // audit/strict: removed self-referencing propTypes spread
-FileUpload.propTypes = {
-  accept: PropTypes.any,
-  className: PropTypes.any,
-  clearOnSelect: PropTypes.any,
-  disabled: PropTypes.any,
-  maxSize: PropTypes.any,
-  multiple: PropTypes.any,
-  onFilesSelected: PropTypes.any,
-  showPreviews: PropTypes.any,
-  style: PropTypes.any,
-};
 
 export default FileUpload;

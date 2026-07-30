@@ -1,6 +1,5 @@
 import type { CSSProperties } from "react";
 import { Calendar, Clock, Edit, Plus, RefreshCw, Search, Trash2 } from 'lucide-react';
-import PropTypes from 'prop-types';
 
 import AppointmentModal from './AppointmentModal';
 import useAppointments from '../../hooks/useAppointments';

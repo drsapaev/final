@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect, type CSSProperties, type ChangeEvent, type ClipboardEvent, type KeyboardEvent, type RefObject } from 'react';
-import PropTypes from 'prop-types';
 import { Input } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
 
@@ -187,12 +186,5 @@ const PhoneInput = ({
 
 
 // audit/strict: removed self-referencing propTypes spread
-PhoneInput.propTypes = {
-  className: PropTypes.any,
-  onChange: PropTypes.any,
-  placeholder: PropTypes.any,
-  style: PropTypes.any,
-  value: PropTypes.any,
-};
 
 export default PhoneInput;

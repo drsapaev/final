@@ -3,7 +3,6 @@
  * DentalPatientsTab — R-15: extracted from DentistPanelUnified.
  * Renders the "Пациенты" tab: patient cards with action buttons.
  */
-import PropTypes from 'prop-types';
 import { Card, Button } from '../ui/macos';
 import { Scissors, FileText, Eye } from 'lucide-react';
 // P0 fix: 'Tooth' is not exported by lucide-react. Use Stethoscope as alias (matches DentistPanelUnified.jsx:42).
@@ -117,12 +116,5 @@ export function DentalPatientsTab({
   );
 }
 
-DentalPatientsTab.propTypes = {
-  patients: PropTypes.array,
-  onSelectPatient: PropTypes.func,
-  onDentalChart: PropTypes.func,
-  onTreatment: PropTypes.func,
-  onProsthetic: PropTypes.func,
-};
 
 export default DentalPatientsTab;

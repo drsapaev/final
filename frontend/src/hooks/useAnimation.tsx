@@ -3,7 +3,6 @@
  * Основана на принципах доступности и медицинских стандартах UX
  */
 
-import PropTypes from 'prop-types';
 import { useState, useEffect, useRef } from 'react';
 // macOS-совместимые анимации
 export const animations = {
@@ -392,37 +391,9 @@ export const AnimatedCounter = ({
   );
 };
 
-AnimatedTransition.propTypes = {
-  children: PropTypes.node,
-  isVisible: PropTypes.bool,
-  animationType: PropTypes.oneOf(Object.keys(animations)),
-  duration: PropTypes.number,
-  delay: PropTypes.number,
-  className: PropTypes.string,
-  style: PropTypes.object
-};
 
-AnimatedList.propTypes = {
-  items: PropTypes.arrayOf(PropTypes.object),
-  renderItem: PropTypes.func,
-  animationType: PropTypes.oneOf(Object.keys(animations)),
-  className: PropTypes.string
-};
 
-AnimatedProgress.propTypes = {
-  value: PropTypes.number,
-  max: PropTypes.number,
-  animationDuration: PropTypes.number,
-  showValue: PropTypes.bool,
-  className: PropTypes.string
-};
 
-AnimatedCounter.propTypes = {
-  value: PropTypes.number,
-  duration: PropTypes.number,
-  format: PropTypes.func,
-  className: PropTypes.string
-};
 
 // Утилита для создания кастомных анимаций
 export const createAnimation = (config: {

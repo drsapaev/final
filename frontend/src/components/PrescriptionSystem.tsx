@@ -1,6 +1,5 @@
 
 import { useState, useEffect } from 'react';
-import PropTypes from 'prop-types';
 import { Pill, Plus, X, Save, Printer, AlertCircle, CheckCircle } from 'lucide-react';
 import { Card, Button, Badge,
   Input } from './ui/macos';
@@ -481,34 +480,5 @@ const PrescriptionSystem = ({
 
 };
 
-PrescriptionSystem.propTypes = {
-  appointment: PropTypes.shape({
-    id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-    doctor_id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-    status: PropTypes.string,
-    patient_name: PropTypes.string,
-    specialist: PropTypes.string,
-    prescription: PropTypes.shape({
-      medications: PropTypes.arrayOf(PropTypes.object),
-      instructions: PropTypes.string,
-      doctorNotes: PropTypes.string,
-      isDraft: PropTypes.bool,
-      printedAt: PropTypes.string
-    })
-  }),
-  emr: PropTypes.shape({
-    isDraft: PropTypes.bool
-  }),
-  prescription: PropTypes.shape({
-    medications: PropTypes.arrayOf(PropTypes.object),
-    instructions: PropTypes.string,
-    doctorNotes: PropTypes.string,
-    isDraft: PropTypes.bool,
-    printedAt: PropTypes.string
-  }),
-  canCreatePrescription: PropTypes.bool,
-  onSave: PropTypes.func,
-  onPrint: PropTypes.func
-};
 
 export default PrescriptionSystem;

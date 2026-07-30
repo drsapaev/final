@@ -8,7 +8,6 @@ import auth from '../../stores/auth';
 import '../../styles/sidebar-buttons.css';
 import '../../styles/cursor-effects.css';
 import logger from '../../utils/logger';
-import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 
 /**
@@ -495,9 +494,5 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }: { isCollapsed?: boole
 
 
 // audit/strict: removed self-referencing propTypes spread
-UnifiedSidebar.propTypes = {
-  isCollapsed: PropTypes.any,
-  onToggle: PropTypes.any,
-};
 
 export default UnifiedSidebar;

@@ -26,7 +26,6 @@ import notify from '../../services/notify';
 import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
 import { formatUZS } from '../../utils/formatCurrency';
-import PropTypes from 'prop-types';
 // UX Audit #3.4: inline-стили перенесены в CSS-классы.
 import './RefundRequestsTable.css';
 
@@ -427,8 +426,5 @@ const RefundRequestsTable = ({ onRefresh }: RefundRequestsTableProps) => {
   );
 };
 
-RefundRequestsTable.propTypes = {
-  onRefresh: PropTypes.func
-};
 
 export default RefundRequestsTable;

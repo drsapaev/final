@@ -11,7 +11,6 @@
  */
 
 import { useMemo, useCallback } from 'react';
-import PropTypes from 'prop-types';
 import { AlertCircle, X } from 'lucide-react';
 import { Button, Tooltip,
   Checkbox } from '../ui/macos';
@@ -606,23 +605,6 @@ const CartStepV2 = ({
 
 };
 
-CartStepV2.propTypes = {
-  cart: PropTypes.object,
-  onAddToCart: PropTypes.func,
-  onRemoveFromCart: PropTypes.func,
-  servicesData: PropTypes.array,
-  doctorsData: PropTypes.oneOfType([PropTypes.array, PropTypes.object]),
-  errors: PropTypes.object,
-  activeCategory: PropTypes.string,
-  searchQuery: PropTypes.string,
-  editMode: PropTypes.bool,
-  getServiceName: PropTypes.func,
-  onUpdateItem: PropTypes.func,
-  repeatEligibilityByItemId: PropTypes.object,
-  isRepeatEligibilityLoading: PropTypes.bool,
-  onApplyRepeatSuggestion: PropTypes.func,
-  repeatSuggestionSummary: PropTypes.object
-};
 
 
 export default CartStepV2;

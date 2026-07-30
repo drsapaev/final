@@ -1,7 +1,6 @@
 import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect, useCallback } from 'react';
 import type { CSSProperties } from "react";
-import PropTypes from 'prop-types';
 import {
   MacOSCard,
   Button,
@@ -228,17 +227,6 @@ const ServiceChecklist = ({ services = [], value = [], onChange }: ServiceCheckl
   );
 };
 
-ServiceChecklist.propTypes = {
-  services: PropTypes.arrayOf(
-    PropTypes.shape({
-      id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
-      name: PropTypes.node,
-      price: PropTypes.oneOfType([PropTypes.string, PropTypes.number])
-    })
-  ),
-  value: PropTypes.arrayOf(PropTypes.oneOfType([PropTypes.string, PropTypes.number])),
-  onChange: PropTypes.func.isRequired
-};
 
 const buildPricingRulePayload = (form: RuleForm): Record<string, unknown> =>
   Object.fromEntries(

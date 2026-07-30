@@ -7,7 +7,6 @@
  */
 
 import { useState, useMemo, useCallback } from 'react';
-import PropTypes from 'prop-types';
 
 import EMRSection from './EMRSection';
 import React from 'react';
@@ -142,14 +141,3 @@ export function AnamnesisMorbiSection({
 
 export default AnamnesisMorbiSection;
 
-AnamnesisMorbiSection.propTypes = {
-  value: PropTypes.string,
-  onChange: PropTypes.func,
-  disabled: PropTypes.bool,
-  defaultOpen: PropTypes.bool,
-  icd10Code: PropTypes.string,
-  onApplySuggestion: PropTypes.func,
-  onDismissSuggestion: PropTypes.func,
-  doctorId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-  specialty: PropTypes.oneOf(['general', 'cardiology', 'dermatology', 'dentist', 'dentistry']),
-};

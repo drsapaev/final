@@ -7,7 +7,6 @@
  */
 
 import { memo } from 'react';
-import PropTypes from 'prop-types';
 import { Icon } from '../../components/ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
 
@@ -63,14 +62,5 @@ const DataSourceIndicator = memo(({ dataSource, count, paginationInfo, onRetry }
 });
 
 DataSourceIndicator.displayName = 'DataSourceIndicator';
-(DataSourceIndicator as unknown as { propTypes: unknown }).propTypes = {
-  count: PropTypes.number.isRequired,
-  dataSource: PropTypes.oneOf(['loading', 'api', 'error']),
-  paginationInfo: PropTypes.shape({
-    total: PropTypes.number,
-    hasMore: PropTypes.bool,
-  }),
-  onRetry: PropTypes.func,
-};
 
 export default DataSourceIndicator;

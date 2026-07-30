@@ -15,7 +15,6 @@ import {
 
   CheckCircle } from
 'lucide-react';
-import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
 
@@ -234,9 +233,5 @@ const AIClinicalText = ({ content, variant = 'info' }: AIClinicalTextProps) => {
 
 
 // audit/strict: removed self-referencing propTypes spread
-AIClinicalText.propTypes = {
-  content: PropTypes.any,
-  variant: PropTypes.any,
-};
 
 export default AIClinicalText;

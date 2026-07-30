@@ -1,7 +1,6 @@
 
 import { useTranslation } from '../../i18n/useTranslation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import PropTypes from 'prop-types';
 import {
   Badge, Button, Checkbox, Icon, Input, Textarea,
 } from '../ui/macos';
@@ -444,20 +443,6 @@ function PatientFormsPreview({ status, preview = null, error = '', initData = ''
   );
 }
 
-PatientFormsPreview.propTypes = {
-  status: PropTypes.string.isRequired,
-  preview: PropTypes.shape({
-    forms: PropTypes.array,
-    policy: PropTypes.shape({
-      storage_enabled: PropTypes.bool,
-    }),
-    scope: PropTypes.shape({
-      patient_id: PropTypes.number,
-    }),
-  }),
-  error: PropTypes.string,
-  initData: PropTypes.string,
-};
 
 
 export default PatientFormsPreview;

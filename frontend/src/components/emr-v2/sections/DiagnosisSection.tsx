@@ -8,7 +8,6 @@
  * to keep section independent from specific implementation
  */
 
-import PropTypes from 'prop-types';
 import { useMemo } from 'react';
 import EMRSection from './EMRSection';
 import React from 'react';
@@ -171,43 +170,5 @@ export function DiagnosisSection({
     );
 }
 
-DiagnosisSection.propTypes = {
-    diagnosis: PropTypes.oneOfType([
-        PropTypes.string,
-        PropTypes.shape({
-            main: PropTypes.string,
-            primary: PropTypes.string,
-            text: PropTypes.string,
-            value: PropTypes.string,
-            description: PropTypes.string,
-            icd10_code: PropTypes.string,
-        }),
-    ]),
-    icd10Code: PropTypes.oneOfType([
-        PropTypes.string,
-        PropTypes.shape({
-            main: PropTypes.string,
-            primary: PropTypes.string,
-            text: PropTypes.string,
-            value: PropTypes.string,
-            description: PropTypes.string,
-            icd10_code: PropTypes.string,
-        }),
-    ]),
-    onDiagnosisChange: PropTypes.func,
-    onIcd10Change: PropTypes.func,
-    disabled: PropTypes.bool,
-    defaultOpen: PropTypes.bool,
-    ICD10Component: PropTypes.elementType,
-    suggestions: PropTypes.arrayOf(PropTypes.object),
-    aiLoading: PropTypes.bool,
-    onApplySuggestion: PropTypes.func,
-    onDismissSuggestion: PropTypes.func,
-    onRequestAI: PropTypes.func,
-    doctorId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-    specialty: PropTypes.string,
-    experimentalGhostMode: PropTypes.bool,
-    onTelemetry: PropTypes.func,
-};
 
 export default DiagnosisSection;

@@ -1,5 +1,4 @@
 
-import PropTypes from 'prop-types';
 import { Badge, Icon, Input } from '../ui/macos';
 import { formatFlagLabel, formatThreshold } from './utils/labReportNormalize';
 import { flagVariant } from './utils/labReportActions';
@@ -283,13 +282,3 @@ export default function ReportEditor({
   );
 }
 
-ReportEditor.propTypes = {
-  activeInstance: PropTypes.object.isRequired,
-  draftValues: PropTypes.object.isRequired,
-  collapsedSections: PropTypes.object.isRequired,
-  onToggleSection: PropTypes.func.isRequired,
-  onUpdateField: PropTypes.func.isRequired,
-  canEditActiveInstance: PropTypes.bool,
-  reportHistory: PropTypes.array,
-  notify: PropTypes.func,
-};

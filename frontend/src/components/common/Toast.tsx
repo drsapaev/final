@@ -1,7 +1,6 @@
 import type { CSSProperties } from 'react';
 
 // Система уведомлений (Toast)
-import PropTypes from 'prop-types';
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useTranslation } from '../../i18n/useTranslation';
@@ -249,28 +248,9 @@ function ToastItem({ toast, onRemove, theme }: { toast: Record<string, unknown>;
 
 }
 
-const toastShape = PropTypes.shape({
-  id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
-  type: PropTypes.oneOf(['success', 'error', 'warning', 'info']),
-  title: PropTypes.string,
-  message: PropTypes.string,
-  duration: PropTypes.number
-});
 
-ToastProvider.propTypes = {
-  children: PropTypes.node
-};
 
-ToastContainer.propTypes = {
-  toasts: PropTypes.arrayOf(toastShape),
-  onRemove: PropTypes.func,
-  theme: PropTypes.oneOfType([PropTypes.object, PropTypes.string])
-};
 
-ToastItem.propTypes = {
-  toast: toastShape,
-  onRemove: PropTypes.func
-};
 
 /**
  * Утилиты для быстрого создания уведомлений

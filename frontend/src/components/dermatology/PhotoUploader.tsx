@@ -42,7 +42,6 @@ import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import notify from '../../services/notify';
 import { convertHEICToJPEG, isHEICFile } from '../../utils/heicConverter';
-import PropTypes from 'prop-types';
 
 interface PhotoMetadata {
   zone: string;
@@ -725,10 +724,5 @@ const PhotoUploader = ({ patientId, visitId, onDataUpdate }: PhotoUploaderProps)
 
 
 // audit/strict: removed self-referencing propTypes spread
-PhotoUploader.propTypes = {
-  onDataUpdate: PropTypes.any,
-  patientId: PropTypes.any,
-  visitId: PropTypes.any,
-};
 
 export default PhotoUploader;

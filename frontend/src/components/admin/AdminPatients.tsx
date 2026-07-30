@@ -1,7 +1,6 @@
 
 import { useTranslation } from '../../i18n/useTranslation';
 import { Edit, Plus, RefreshCw, Search, Trash2, Users } from 'lucide-react';
-import PropTypes from 'prop-types';
 
 import PatientModal from './PatientModal';
 import usePatients from '../../hooks/usePatients';

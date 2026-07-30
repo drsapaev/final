@@ -4,7 +4,6 @@ import { Printer, CheckCircle, Clock, X } from 'lucide-react';
 import './MultipleTicketsPrinter.css';
 import { buildPanelTicketPayload, printPanelTicketInBrowserAsync } from '../../services/panelPrint';
 import logger from '../../utils/logger';
-import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 
 type TFunc = (key: string, options?: Record<string, unknown>) => string;
@@ -181,14 +180,5 @@ const MultipleTicketsPrinter = ({ tickets, onClose, onAllPrinted }: {
 
 
 // audit/strict: removed self-referencing propTypes spread
-MultipleTicketsPrinter.propTypes = {
-  forEach: PropTypes.any,
-  length: PropTypes.any,
-  map: PropTypes.any,
-  onAllPrinted: PropTypes.any,
-  onClose: PropTypes.any,
-  some: PropTypes.any,
-  tickets: PropTypes.any,
-};
 
 export default MultipleTicketsPrinter;

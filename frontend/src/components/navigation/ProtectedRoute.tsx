@@ -1,5 +1,4 @@
 // Компонент для защищенных маршрутов с ролевыми ограничениями
-import PropTypes from 'prop-types';
 import React, { type ReactNode } from 'react';
 import { Routes, Route, type PathRouteProps } from 'react-router-dom';
 import { RequireAuth, RequireRoles, RequirePermissions } from '../auth/RequireAuth';
@@ -350,77 +349,11 @@ export function useRoleBasedRoutes() {
   };
 }
 
-const rolePermissionShape = {
-  roles: PropTypes.arrayOf(PropTypes.string),
-  permissions: PropTypes.arrayOf(PropTypes.string)
-};
 
-ProtectedRoute.propTypes = {
-  path: PropTypes.string,
-  element: PropTypes.node,
-  roles: PropTypes.arrayOf(PropTypes.string),
-  permissions: PropTypes.arrayOf(PropTypes.string),
-  requireAuth: PropTypes.bool,
-  fallback: PropTypes.node
-};
 
-ProtectedRouteGroup.propTypes = {
-  children: PropTypes.node,
-  roles: PropTypes.arrayOf(PropTypes.string),
-  permissions: PropTypes.arrayOf(PropTypes.string),
-  requireAuth: PropTypes.bool,
-  fallback: PropTypes.node
-};
 
-ConditionalRoute.propTypes = {
-  condition: PropTypes.bool,
-  children: PropTypes.node,
-  fallback: PropTypes.node
-};
 
-RoleBasedRoute.propTypes = {
-  children: PropTypes.node,
-  roles: PropTypes.arrayOf(PropTypes.string),
-  permissions: PropTypes.arrayOf(PropTypes.string),
-  fallback: PropTypes.node,
-  requireAll: PropTypes.bool
-};
 
-RoleBasedRoutes.propTypes = {
-  routes: PropTypes.arrayOf(
-    PropTypes.shape({
-      ...rolePermissionShape,
-      path: PropTypes.string,
-      element: PropTypes.node,
-      props: PropTypes.object
-    })
-  ),
-  fallback: PropTypes.node
-};
 
-RoleBasedNavigation.propTypes = {
-  items: PropTypes.arrayOf(
-    PropTypes.shape({
-      ...rolePermissionShape
-    })
-  ),
-  fallback: PropTypes.node
-};
 
-RoleBasedSidebar.propTypes = {
-  sections: PropTypes.arrayOf(
-    PropTypes.shape({
-      ...rolePermissionShape
-    })
-  ),
-  fallback: PropTypes.node
-};
 
-RoleBasedActions.propTypes = {
-  actions: PropTypes.arrayOf(
-    PropTypes.shape({
-      ...rolePermissionShape
-    })
-  ),
-  fallback: PropTypes.node
-};

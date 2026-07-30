@@ -22,7 +22,6 @@ import {
   Eye,
   EyeOff } from
 'lucide-react';
-import PropTypes from 'prop-types';
 
 /**
  * Мастер настройки Two-Factor Authentication
@@ -550,8 +549,5 @@ const TwoFactorSetupWizard = ({ onComplete, onCancel }: { onComplete?: () => voi
 
 
 // audit/strict: removed self-referencing propTypes spread
-TwoFactorSetupWizard.propTypes = {
-  onComplete: PropTypes.any,
-};
 
 export default TwoFactorSetupWizard;

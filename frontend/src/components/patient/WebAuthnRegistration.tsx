@@ -1,6 +1,5 @@
 
 import { useState, useEffect, useCallback } from 'react';
-import PropTypes from 'prop-types';
 import {
   Card, CardContent, CardHeader, CardTitle, Badge, Button, Icon, Alert, Input,
 } from '../ui/macos';
@@ -163,6 +162,3 @@ export default function WebAuthnRegistration({ patientId }: { patientId?: string
   );
 }
 
-WebAuthnRegistration.propTypes = {
-  patientId: PropTypes.number,
-};

@@ -1,7 +1,6 @@
 import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect } from 'react';
 import type { CSSProperties } from 'react';
-import PropTypes from 'prop-types';
 import {
   Brain,
   Plus,
@@ -803,40 +802,8 @@ const SystemSettingsForm = ({ settings, onSave }: SystemSettingsFormProps) => {
 
 };
 
-const providerShape = PropTypes.shape({
-  name: PropTypes.string,
-  display_name: PropTypes.string,
-  api_key: PropTypes.string,
-  api_url: PropTypes.string,
-  model: PropTypes.string,
-  temperature: PropTypes.number,
-  max_tokens: PropTypes.number,
-  active: PropTypes.bool,
-  is_default: PropTypes.bool,
-  capabilities: PropTypes.arrayOf(PropTypes.string)
-});
 
-const providerConfigShape = PropTypes.shape({
-  displayName: PropTypes.string,
-  defaultModel: PropTypes.string,
-  capabilities: PropTypes.arrayOf(PropTypes.string)
-});
 
-ProviderForm.propTypes = {
-  provider: providerShape,
-  providerConfigs: PropTypes.objectOf(providerConfigShape),
-  onSave: PropTypes.func,
-  onCancel: PropTypes.func
-};
 
-SystemSettingsForm.propTypes = {
-  settings: PropTypes.shape({
-    enabled: PropTypes.bool,
-    cache_enabled: PropTypes.bool,
-    require_consent_for_files: PropTypes.bool,
-    anonymize_data: PropTypes.bool
-  }),
-  onSave: PropTypes.func
-};
 
 export default AISettings;

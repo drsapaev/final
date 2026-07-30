@@ -1,6 +1,5 @@
 
 import { useState, useRef, useEffect } from 'react';
-import PropTypes from 'prop-types';
 import {
   Eye,
   EyeOff,
@@ -317,32 +316,5 @@ const ModernInput = ({
 
 };
 
-ModernInput.propTypes = {
-  type: PropTypes.string,
-  label: PropTypes.node,
-  placeholder: PropTypes.string,
-  value: PropTypes.any,
-  onChange: PropTypes.func,
-  onBlur: PropTypes.func,
-  onFocus: PropTypes.func,
-  error: PropTypes.node,
-  success: PropTypes.node,
-  disabled: PropTypes.bool,
-  required: PropTypes.bool,
-  icon: PropTypes.oneOfType([PropTypes.node, PropTypes.func]),
-  clearable: PropTypes.bool,
-  autoComplete: PropTypes.string,
-  maxLength: PropTypes.number,
-  minLength: PropTypes.number,
-  pattern: PropTypes.string,
-  validation: PropTypes.func,
-  suggestions: PropTypes.array,
-  showSuggestions: PropTypes.bool,
-  onSuggestionSelect: PropTypes.func,
-  className: PropTypes.string,
-  size: PropTypes.string,
-  variant: PropTypes.string,
-  id: PropTypes.string
-};
 
 export default ModernInput;

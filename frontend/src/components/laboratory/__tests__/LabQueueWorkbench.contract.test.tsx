@@ -64,11 +64,6 @@ describe('LabQueueWorkbench UX-AUDIT-FIX11 — MaskedPhone affordance', () => {
     expect(source).toContain('hasMore = false,');
     expect(source).toContain('loadingMore = false,');
     expect(source).toContain('queueTotal = 0,');
-    // PropTypes добавлены
-    expect(source).toContain('onLoadMore: PropTypes.func');
-    expect(source).toContain('hasMore: PropTypes.bool');
-    expect(source).toContain('loadingMore: PropTypes.bool');
-    expect(source).toContain('queueTotal: PropTypes.number');
   });
 
   it('STRAT#8 / STRAT#27: passes server-side pagination props to VirtualizedQueueList', () => {

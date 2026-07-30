@@ -1,5 +1,4 @@
 import './Avatar.css';
-import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 
 const roleGradients = {
@@ -70,16 +69,5 @@ const Avatar = ({ user, size = 40, showStatus = false, isOnline = false, classNa
 
 
 // audit/strict: removed self-referencing propTypes spread
-Avatar.propTypes = {
-  className: PropTypes.any,
-  full_name: PropTypes.any,
-  isOnline: PropTypes.any,
-  name: PropTypes.any,
-  role: PropTypes.any,
-  showStatus: PropTypes.any,
-  size: PropTypes.any,
-  user: PropTypes.any,
-  user_name: PropTypes.any,
-};
 
 export default Avatar;

@@ -12,7 +12,6 @@ import {
   Select,
 } from '../ui/macos';
 import type { SelectChangeEvent } from '../ui/macos/Select';
-import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
 
@@ -378,13 +377,5 @@ const DoctorModal = ({
   );
 };
 
-DoctorModal.propTypes = {
-  availableUsers: PropTypes.array,
-  doctor: PropTypes.any,
-  isOpen: PropTypes.any,
-  loading: PropTypes.any,
-  onClose: PropTypes.any,
-  onSave: PropTypes.any,
-};
 
 export default DoctorModal;

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
-import PropTypes from 'prop-types';
 import {
   BadgeCheck,
   Bell,
@@ -229,12 +228,6 @@ function ProfileTabButton({ active, icon: Icon, label, onClick }: ProfileTabButt
   );
 }
 
-ProfileTabButton.propTypes = {
-  active: PropTypes.bool.isRequired,
-  icon: PropTypes.elementType.isRequired,
-  label: PropTypes.string.isRequired,
-  onClick: PropTypes.func.isRequired,
-};
 
 interface ProfileMetaCardProps {
   icon: React.ElementType;
@@ -276,12 +269,6 @@ function ProfileMetaCard({ icon: Icon, label, value, accent }: ProfileMetaCardPr
   );
 }
 
-ProfileMetaCard.propTypes = {
-  accent: PropTypes.string.isRequired,
-  icon: PropTypes.elementType.isRequired,
-  label: PropTypes.string.isRequired,
-  value: PropTypes.string.isRequired,
-};
 
 interface ProfileFieldProps {
   label: React.ReactNode;
@@ -305,10 +292,6 @@ function ProfileField({ label, children }: ProfileFieldProps) {
   );
 }
 
-ProfileField.propTypes = {
-  children: PropTypes.node.isRequired,
-  label: PropTypes.string.isRequired,
-};
 
 export default function UserProfile() {
   const { t: rawT } = useTranslation();

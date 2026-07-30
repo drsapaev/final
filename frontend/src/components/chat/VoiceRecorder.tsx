@@ -7,7 +7,6 @@ import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Mic, Square, Send, Trash2 } from 'lucide-react';
 import logger from '../../utils/logger';
-import PropTypes from 'prop-types';
 import { notify } from '../../services/notify';
 
 const VoiceRecorder = ({ onSend, onCancel }: { onSend: (blob: Blob, duration: number) => void; onCancel: () => void }) => {
@@ -209,9 +208,5 @@ const VoiceRecorder = ({ onSend, onCancel }: { onSend: (blob: Blob, duration: nu
 
 
 // audit/strict: removed self-referencing propTypes spread
-VoiceRecorder.propTypes = {
-  onCancel: PropTypes.any,
-  onSend: PropTypes.any,
-};
 
 export default VoiceRecorder;

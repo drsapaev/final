@@ -2,7 +2,6 @@ import React from 'react';
 import type { CSSProperties } from 'react';
 
 import { useState } from 'react';
-import PropTypes from 'prop-types';
 import {
   Bell,
   CheckCircle2,
@@ -139,13 +138,6 @@ function CapabilityChip({ children, icon: Icon, variant = 'outline', onClick, ar
   );
 }
 
-CapabilityChip.propTypes = {
-  ariaLabel: PropTypes.string,
-  children: PropTypes.node.isRequired,
-  icon: PropTypes.elementType,
-  onClick: PropTypes.func,
-  variant: PropTypes.oneOf(['default', 'primary', 'secondary', 'success', 'warning', 'danger', 'info', 'outline'])
-};
 
 
 const PWAInstallPrompt = ({ onClose }: { onClose?: () => void }) => {
@@ -333,8 +325,5 @@ const PWAInstallPrompt = ({ onClose }: { onClose?: () => void }) => {
   );
 };
 
-PWAInstallPrompt.propTypes = {
-  onClose: PropTypes.func
-};
 
 export default PWAInstallPrompt;

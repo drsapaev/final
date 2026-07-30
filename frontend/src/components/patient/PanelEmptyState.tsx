@@ -1,4 +1,3 @@
-import PropTypes from 'prop-types';
 import { Icon } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
 import type { ReactNode } from 'react';
@@ -35,11 +34,5 @@ function PanelEmptyState({ icon, title, description, variant = 'empty' }: PanelE
   );
 }
 
-PanelEmptyState.propTypes = {
-  icon: PropTypes.string.isRequired,
-  title: PropTypes.string.isRequired,
-  description: PropTypes.node,
-  variant: PropTypes.oneOf(['empty', 'loading', 'error']),
-};
 
 export default PanelEmptyState;

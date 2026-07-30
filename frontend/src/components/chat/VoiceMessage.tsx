@@ -6,7 +6,6 @@ import { useState, useRef, useEffect } from 'react';
 import { Play, Pause } from 'lucide-react';
 import auth from '../../stores/auth';
 import logger from '../../utils/logger';
-import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 
 interface VoiceMessageData {
@@ -269,10 +268,5 @@ const VoiceMessage = ({ message, fileUrl }: VoiceMessageProps) => {
 
 
 // audit/strict: removed self-referencing propTypes spread
-VoiceMessage.propTypes = {
-  fileUrl: PropTypes.any,
-  message: PropTypes.any,
-  voice_duration: PropTypes.any,
-};
 
 export default VoiceMessage;

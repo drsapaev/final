@@ -1,5 +1,4 @@
 
-import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 export const ControlCenter = ({ onActivate, onLogin }: { onActivate: () => void; onLogin: () => void }) => {
   const { t: rawT } = useTranslation(); const t = rawT as unknown as (key: string, options?: Record<string, unknown>) => string;
@@ -62,7 +61,3 @@ export const ControlCenter = ({ onActivate, onLogin }: { onActivate: () => void;
 
 
 // audit/strict: removed self-referencing propTypes spread
-ControlCenter.propTypes = {
-  onActivate: PropTypes.any,
-  onLogin: PropTypes.any,
-};

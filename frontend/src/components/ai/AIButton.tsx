@@ -4,7 +4,6 @@ import {
   Button,
 } from '../ui/macos';
 import { Brain, Sparkles, Bot } from 'lucide-react';
-import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 
 interface AIButtonProps {
@@ -134,18 +133,5 @@ const AIButton = ({
 
 
 // audit/strict: removed self-referencing propTypes spread
-AIButton.propTypes = {
-  disabled: PropTypes.any,
-  fullWidth: PropTypes.any,
-  icon: PropTypes.any,
-  loading: PropTypes.any,
-  onClick: PropTypes.any,
-  onProviderSelect: PropTypes.any,
-  providers: PropTypes.any,
-  size: PropTypes.any,
-  text: PropTypes.any,
-  tooltip: PropTypes.any,
-  variant: PropTypes.any,
-};
 
 export default AIButton;

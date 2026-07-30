@@ -3,7 +3,6 @@
  * DentalTemplatesTab — R-15: extracted from DentistPanelUnified.
  * Renders the "Шаблоны" tab: ProtocolTemplates + management button.
  */
-import PropTypes from 'prop-types';
 import { Card, Button } from '../ui/macos';
 import { FileText } from 'lucide-react';
 import ProtocolTemplates from './ProtocolTemplates';
@@ -78,10 +77,5 @@ export function DentalTemplatesTab({
   );
 }
 
-DentalTemplatesTab.propTypes = {
-  onManageTemplates: PropTypes.func,
-  templates: PropTypes.array,
-  onApplyTemplate: PropTypes.func,
-};
 
 export default DentalTemplatesTab;

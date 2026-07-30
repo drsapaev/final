@@ -1,7 +1,6 @@
 import { useTranslation } from '../../i18n/useTranslation';
 import { useCallback, useEffect, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
-import PropTypes from 'prop-types';
 import {
   Key,
   Smartphone,
@@ -771,9 +770,5 @@ const ActivationKeyForm = ({ onSave, onCancel }: ActivationKeyFormProps) => {
 
 };
 
-ActivationKeyForm.propTypes = {
-  onSave: PropTypes.func.isRequired,
-  onCancel: PropTypes.func.isRequired
-};
 
 export default ActivationSystem;

@@ -1,7 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
 
 import { useTheme } from '../../contexts/ThemeContext';
-import PropTypes from 'prop-types';
 import './ModernGrid.css';
 import { useTranslation } from '../../i18n/useTranslation';
 
@@ -101,24 +100,6 @@ export const GridItem = ({
 
 };
 
-ModernGrid.propTypes = {
-  children: PropTypes.node,
-  columns: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
-  gap: PropTypes.oneOfType([PropTypes.oneOf(['none', 'small', 'medium', 'large', 'xl']), PropTypes.string, PropTypes.number]),
-  alignItems: PropTypes.string,
-  justifyContent: PropTypes.string,
-  responsive: PropTypes.bool,
-  minColumnWidth: PropTypes.string,
-  className: PropTypes.string
-};
 
-GridItem.propTypes = {
-  children: PropTypes.node,
-  colSpan: PropTypes.number,
-  rowSpan: PropTypes.number,
-  alignSelf: PropTypes.string,
-  justifySelf: PropTypes.string,
-  className: PropTypes.string
-};
 
 export default ModernGrid;

@@ -3,7 +3,6 @@
  * DentalReportsTab — R-15: extracted from DentistPanelUnified.
  * Renders the "Отчёты" tab: saved visit protocols + ReportsAndAnalytics.
  */
-import PropTypes from 'prop-types';
 import { Card, Button } from '../ui/macos';
 import { BarChart3 } from 'lucide-react';
 import { useTranslation } from '../../i18n/useTranslation';
@@ -43,11 +42,6 @@ const ReportsAndAnalytics = ({ patients, diagnoses, prosthetics }: {
   );
 };
 
-ReportsAndAnalytics.propTypes = {
-  patients: PropTypes.array,
-  diagnoses: PropTypes.array,
-  prosthetics: PropTypes.array,
-};
 
 interface SavedVisitProtocol {
   visit_id: string | number;
@@ -110,12 +104,5 @@ export function DentalReportsTab({
   );
 }
 
-DentalReportsTab.propTypes = {
-  savedVisitProtocols: PropTypes.array,
-  onReopenProtocol: PropTypes.func,
-  patients: PropTypes.array,
-  diagnoses: PropTypes.array,
-  prosthetics: PropTypes.array,
-};
 
 export default DentalReportsTab;

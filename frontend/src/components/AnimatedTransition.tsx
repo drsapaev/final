@@ -1,5 +1,4 @@
 import { useState, useEffect, ReactNode, CSSProperties } from 'react';
-import PropTypes from 'prop-types';
 
 
 interface AnimatedTransitionProps {
@@ -308,40 +307,8 @@ export const AnimatedCard = ({
 
 };
 
-AnimatedTransition.propTypes = {
-  children: PropTypes.node,
-  type: PropTypes.string,
-  duration: PropTypes.number,
-  delay: PropTypes.number,
-  direction: PropTypes.string,
-  className: PropTypes.string,
-  style: PropTypes.object
-};
 
-AnimatedList.propTypes = {
-  items: PropTypes.array,
-  renderItem: PropTypes.func,
-  animationType: PropTypes.string,
-  staggerDelay: PropTypes.number,
-  className: PropTypes.string,
-  style: PropTypes.object
-};
 
-AnimatedButton.propTypes = {
-  children: PropTypes.node,
-  onClick: PropTypes.func,
-  variant: PropTypes.string,
-  size: PropTypes.string,
-  animationType: PropTypes.string,
-  className: PropTypes.string,
-  style: PropTypes.object
-};
 
-AnimatedCard.propTypes = {
-  children: PropTypes.node,
-  hover: PropTypes.bool,
-  className: PropTypes.string,
-  style: PropTypes.object
-};
 
 export default AnimatedTransition;

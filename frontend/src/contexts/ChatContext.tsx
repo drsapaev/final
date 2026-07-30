@@ -1,12 +1,12 @@
 import { createContext, useContext, useEffect, useState, useRef, useCallback, useMemo, type ReactNode, type Dispatch, type SetStateAction } from 'react';
 import { useLocation } from 'react-router-dom';
-import PropTypes from 'prop-types';
 import { getWsBaseUrl } from '../api/runtime';
 import auth from '../stores/auth';
 import * as messagesApi from '../api/messages';
 import { pushNotifications } from '../services/pushNotifications';
 import logger from '../utils/logger';
 import tokenManager from '../utils/tokenManager';
+import { parseWsEvent } from '../utils/ws-schemas';
 import {
   MESSAGE_EVENT_TYPES,
   MESSAGING_CONTRACT_VERSION,
@@ -467,7 +467,8 @@ export const ChatProvider = ({ children }: ChatProviderProps) => {
 
       ws.onmessage = (event: MessageEvent) => {
         try {
-          const data = JSON.parse(event.data as string) as WsIncomingMessage;
+          const data = parseWsEvent(event.data as string) as WsIncomingMessage | null;
+          if (!data) return;
           if (
             data.contract_version &&
             !isSupportedMessagingContractVersion(data.contract_version) &&
@@ -777,9 +778,6 @@ export const ChatProvider = ({ children }: ChatProviderProps) => {
 
 };
 
-ChatProvider.propTypes = {
-  children: PropTypes.node.isRequired
-};
 
 export const useChat = (): ChatContextValue => {
   const context = useContext(ChatContext);

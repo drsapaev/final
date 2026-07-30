@@ -11,7 +11,6 @@ import {
 import { useRoles } from '../../hooks/useRoles';
 
 import logger from '../../utils/logger';
-import PropTypes from 'prop-types';
 import React from "react";
 
 /**
@@ -178,9 +177,6 @@ const UserModal = ({
 
 
   // audit/strict: removed self-referencing propTypes spread
-ErrorMessage.propTypes = {
-    message: PropTypes.any,
-  };
 
   // Form field wrapper with icon
   interface FormFieldProps {
@@ -207,13 +203,6 @@ ErrorMessage.propTypes = {
 
 
 // audit/strict: removed self-referencing propTypes spread
-FormField.propTypes = {
-    children: PropTypes.any,
-    error: PropTypes.any,
-    icon: PropTypes.any,
-    label: PropTypes.any,
-    required: PropTypes.any,
-  };
 
   return (
     <Modal
@@ -369,12 +358,5 @@ FormField.propTypes = {
 
 
 // audit/strict: removed self-referencing propTypes spread
-UserModal.propTypes = {
-  isOpen: PropTypes.any,
-  loading: PropTypes.any,
-  onClose: PropTypes.any,
-  onSave: PropTypes.any,
-  user: PropTypes.any,
-};
 
 export default UserModal;

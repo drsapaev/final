@@ -3,7 +3,6 @@ import {
   Card, Badge,
 } from '../ui/macos';
 import { Clock, User } from 'lucide-react';
-import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 
 // === Domain types ===
@@ -134,15 +133,5 @@ const QueuePositionCard = ({ queueEntry }: QueuePositionCardProps) => {
 
 
 // audit/strict: removed self-referencing propTypes spread
-QueuePositionCard.propTypes = {
-  cabinet: PropTypes.any,
-  doctorName: PropTypes.any,
-  estimatedWaitTime: PropTypes.any,
-  number: PropTypes.any,
-  peopleBefore: PropTypes.any,
-  queueEntry: PropTypes.any,
-  specialty: PropTypes.any,
-  status: PropTypes.any,
-};
 
 export default QueuePositionCard;

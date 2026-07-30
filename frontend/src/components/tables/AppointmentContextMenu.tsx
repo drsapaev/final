@@ -1,7 +1,6 @@
 
 import { useTranslation } from '../../i18n/useTranslation';
 import { useEffect, useRef, useState } from 'react';
-import PropTypes from 'prop-types';
 import {
   User,
   Calendar,
@@ -316,15 +315,5 @@ const AppointmentContextMenu = ({
 
 };
 
-AppointmentContextMenu.propTypes = {
-  row: PropTypes.object,
-  position: PropTypes.shape({
-    x: PropTypes.number,
-    y: PropTypes.number
-  }),
-  onClose: PropTypes.func,
-  onAction: PropTypes.func,
-  theme: PropTypes.string
-};
 
 export default AppointmentContextMenu;

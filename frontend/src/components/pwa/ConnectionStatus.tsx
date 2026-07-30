@@ -1,7 +1,6 @@
 import type { CSSProperties } from 'react';
 
 import { useState, useEffect } from 'react';
-import PropTypes from 'prop-types';
 import { Cloud, RefreshCw, Wifi, WifiOff, X } from 'lucide-react';
 
 import {
@@ -180,15 +179,6 @@ function ConnectionToast({ open, position, tone, icon: Icon, title, description,
   );
 }
 
-ConnectionToast.propTypes = {
-  description: PropTypes.string.isRequired,
-  icon: PropTypes.elementType.isRequired,
-  onClose: PropTypes.func.isRequired,
-  open: PropTypes.bool.isRequired,
-  position: PropTypes.oneOf(['top', 'bottom']).isRequired,
-  title: PropTypes.string.isRequired,
-  tone: PropTypes.oneOf(['primary', 'success', 'warning', 'danger']).isRequired
-};
 
 const ConnectionStatus = ({ showOfflineAlert = true, position = 'top' }: { showOfflineAlert?: boolean; position?: string }) => {
   const { isOnline, isServiceWorkerReady } = usePWA();
@@ -358,9 +348,5 @@ const ConnectionStatus = ({ showOfflineAlert = true, position = 'top' }: { showO
   );
 };
 
-ConnectionStatus.propTypes = {
-  position: PropTypes.oneOf(['top', 'bottom']),
-  showOfflineAlert: PropTypes.bool
-};
 
 export default ConnectionStatus;

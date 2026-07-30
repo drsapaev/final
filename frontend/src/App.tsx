@@ -1,6 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import type { CSSProperties } from 'react';
-import PropTypes from 'prop-types';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import { SpeedInsights } from '@vercel/speed-insights/react';
@@ -383,9 +382,6 @@ function AppShell({ children }: { children: React.ReactNode }) {
   );
 }
 
-AppShell.propTypes = {
-  children: PropTypes.node,
-};
 
 function RouteRenderer({ route }: { route: { component: string; shell?: string; id: string; [key: string]: unknown } }) {
   const Component = ROUTE_COMPONENTS[route.component as keyof typeof ROUTE_COMPONENTS];
@@ -405,13 +401,6 @@ function RouteRenderer({ route }: { route: { component: string; shell?: string; 
   return element;
 }
 
-RouteRenderer.propTypes = {
-  route: PropTypes.shape({
-    id: PropTypes.string.isRequired,
-    component: PropTypes.string.isRequired,
-    shell: PropTypes.string,
-  }).isRequired,
-};
 
 function AppContent() {
   const location = useLocation();

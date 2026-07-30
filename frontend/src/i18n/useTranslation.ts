@@ -117,13 +117,9 @@ export { ru as TRANSLATIONS };
  */
 import React from 'react';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-import PropTypes from 'prop-types';
 
 export function TranslationProvider({ children }: { children: React.ReactNode }) {
   return children;
 }
 
-TranslationProvider.propTypes = {
-  children: PropTypes.any,
-};
 

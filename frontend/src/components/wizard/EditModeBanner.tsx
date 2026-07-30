@@ -8,7 +8,6 @@
  * Раньше: 3 объекта style={{...}} с hardcoded rgba() colors.
  * Теперь: CSS-классы с var(--mac-*) tokens.
  */
-import PropTypes from 'prop-types';
 import './EditModeBanner.css';
 import { useTranslation } from '../../i18n/useTranslation';
 
@@ -31,9 +30,5 @@ const EditModeBanner = ({ editMode, initialData }: { editMode?: boolean; initial
   );
 };
 
-EditModeBanner.propTypes = {
-  editMode: PropTypes.bool,
-  initialData: PropTypes.object,
-};
 
 export default EditModeBanner;

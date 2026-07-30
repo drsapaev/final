@@ -1,5 +1,4 @@
 import { createContext, useCallback, useContext, useMemo, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
-import PropTypes from 'prop-types';
 import { notificationsService } from '../api/services';
 import logger from '../utils/logger';
 
@@ -992,9 +991,6 @@ export function NotificationCenterProvider({ children }: NotificationCenterProvi
   );
 }
 
-NotificationCenterProvider.propTypes = {
-  children: PropTypes.node.isRequired
-};
 
 export function useNotificationCenter(): NotificationCenterContextValue {
   const ctx = useContext(NotificationCenterContext);

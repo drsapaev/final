@@ -1,7 +1,6 @@
 import { useTranslation } from '../../i18n/useTranslation';
 import { useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
-import PropTypes from 'prop-types';
 import {
   Card, CardContent, Typography, Alert, Badge, CircularProgress, Button,
 } from '../ui/macos';
@@ -357,10 +356,6 @@ const AIAssistant = ({
         padding: 'var(--mac-spacing-1) var(--mac-spacing-2)', borderRadius: 9999, fontSize: 12
       }}>{children}</span>);
 
-  };
-  Pill.propTypes = {
-    children: PropTypes.node,
-    color: PropTypes.string
   };
 
   const renderComplaintResult = () => {
@@ -724,17 +719,5 @@ const AIAssistant = ({
 
 };
 
-AIAssistant.propTypes = {
-  analysisType: PropTypes.string,
-  data: PropTypes.object,
-  onResult: PropTypes.func,
-  title: PropTypes.string,
-  expanded: PropTypes.bool,
-  useMCP: PropTypes.bool,
-  providerOptions: PropTypes.array,
-  // X-1 (UX audit): new props for specialty-scoped AI integration
-  specialty: PropTypes.string,
-  onSuggestionSelect: PropTypes.func,
-};
 
 export default AIAssistant;

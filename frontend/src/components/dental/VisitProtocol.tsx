@@ -2,7 +2,6 @@ import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect } from 'react';
 import logger from '../../utils/logger';
 import { Camera, Check, Edit, FileText, Pill, Plus, Save, Scissors, Syringe, Trash2, Upload, X } from 'lucide-react';
-import PropTypes from 'prop-types';
 import notify from '../../services/notify';
 
 /**
@@ -1094,12 +1093,5 @@ const VisitProtocol = ({
 
 
 // audit/strict: removed self-referencing propTypes spread
-VisitProtocol.propTypes = {
-  initialData: PropTypes.any,
-  onClose: PropTypes.any,
-  onComplete: PropTypes.func,
-  onSave: PropTypes.any,
-  patientName: PropTypes.any,
-};
 
 export default VisitProtocol;

@@ -2,7 +2,6 @@
 import { useState, useEffect } from 'react';
 import './LinkPreview.css';
 import logger from '../../utils/logger';
-import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 import { api } from '../../api/client';
 
@@ -93,8 +92,5 @@ const LinkPreview = ({ url }: LinkPreviewProps) => {
 
 
 // audit/strict: removed self-referencing propTypes spread
-LinkPreview.propTypes = {
-  url: PropTypes.any,
-};
 
 export default LinkPreview;

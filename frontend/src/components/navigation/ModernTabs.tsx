@@ -23,7 +23,6 @@ import {
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import './ModernTabs.css';
-import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 
 // Маппинг иконок из lucide-react
@@ -401,12 +400,5 @@ const ModernTabs = ({
 
 
 // audit/strict: removed self-referencing propTypes spread
-ModernTabs.propTypes = {
-  activeTab: PropTypes.any,
-  departmentStats: PropTypes.any,
-  language: PropTypes.any,
-  onProfilesLoaded: PropTypes.any,
-  onTabChange: PropTypes.any,
-};
 
 export default ModernTabs;

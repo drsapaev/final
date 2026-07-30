@@ -1,6 +1,5 @@
 
 import { useRef, useEffect } from 'react';
-import PropTypes from 'prop-types';
 import { useVirtualizer } from '@tanstack/react-virtual';
 // STRAT#28: QueueCard already wrapped in React.memo for per-item performance.
 import QueueCard from './QueueCard';
@@ -151,12 +150,3 @@ export default function VirtualizedQueueList({
   );
 }
 
-VirtualizedQueueList.propTypes = {
-  appointments: PropTypes.array.isRequired,
-  selectedAppointment: PropTypes.object,
-  onOpenAppointment: PropTypes.func.isRequired,
-  onLoadMore: PropTypes.func,
-  hasMore: PropTypes.bool,
-  loadingMore: PropTypes.bool,
-  queueTotal: PropTypes.number,
-};

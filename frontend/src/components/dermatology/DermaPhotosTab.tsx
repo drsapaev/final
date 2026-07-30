@@ -4,7 +4,6 @@ import logger from '../../utils/logger';
  * DermaPhotosTab — R-15: extracted from DermatologistPanelUnified.
  * Renders the "Фото" tab: PhotoUploader + SkinAnalysis + PhotoComparison.
  */
-import PropTypes from 'prop-types';
 import { MacOSCard, MacOSEmptyState, Button } from '../ui/macos';
 import React from 'react';
 import { Camera } from 'lucide-react';
@@ -100,13 +99,5 @@ export function DermaPhotosTab({
   );
 }
 
-DermaPhotosTab.propTypes = {
-  hasPatient: PropTypes.bool,
-  currentAppointment: PropTypes.object,
-  selectedPatient: PropTypes.object,
-  photoData: PropTypes.object,
-  onPhotoUpdate: PropTypes.func,
-  onGoToAppointments: PropTypes.func,
-};
 
 export default DermaPhotosTab;

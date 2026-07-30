@@ -1,5 +1,4 @@
 
-import PropTypes from 'prop-types';
 import { useState, useEffect } from 'react';
 import {
   Badge, Button, Card, CardContent, CardHeader, CardTitle, Icon, Alert,
@@ -81,10 +80,6 @@ function MaskedPhone({ phone, canReveal = true }: { phone: string; canReveal?: b
   );
 }
 
-MaskedPhone.propTypes = {
-  phone: PropTypes.string,
-  canReveal: PropTypes.bool,
-};
 
 const activeQueueStatuses = new Set([
   'waiting',
@@ -413,16 +408,3 @@ export default function LabQueueWorkbench({
   );
 }
 
-LabQueueWorkbench.propTypes = {
-  appointments: PropTypes.array.isRequired,
-  loading: PropTypes.bool,
-  onRefresh: PropTypes.func.isRequired,
-  onOpenAppointment: PropTypes.func.isRequired,
-  selectedAppointment: PropTypes.object,
-  reportHistory: PropTypes.array,
-  // STRAT#8: server-side pagination props
-  onLoadMore: PropTypes.func,
-  hasMore: PropTypes.bool,
-  loadingMore: PropTypes.bool,
-  queueTotal: PropTypes.number,
-};

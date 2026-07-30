@@ -1,4 +1,3 @@
-import PropTypes from 'prop-types';
 import { layoutOptions, brandingFieldLabels } from './config';
 import { useTranslation } from '@/i18n/useTranslation';
 
@@ -70,11 +69,5 @@ function DesignTab({ draftVersion, onUpdateLayout, onUpdateFooter, onUpdateBrand
   );
 }
 
-DesignTab.propTypes = {
-  draftVersion: PropTypes.object.isRequired,
-  onUpdateLayout: PropTypes.func.isRequired,
-  onUpdateFooter: PropTypes.func.isRequired,
-  onUpdateBranding: PropTypes.func.isRequired,
-};
 
 export default DesignTab;

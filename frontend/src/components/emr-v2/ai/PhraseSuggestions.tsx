@@ -14,7 +14,6 @@
  */
 
 import { useState, useMemo, useCallback } from 'react';
-import PropTypes from 'prop-types';
 import './PhraseSuggestions.css';
 import { Checkbox } from '../../ui/macos';
 import { useTranslation } from '@/i18n/useTranslation';
@@ -217,10 +216,3 @@ export function PhraseSuggestions({
 
 export default PhraseSuggestions;
 
-PhraseSuggestions.propTypes = {
-    currentText: PropTypes.string,
-    fieldName: PropTypes.string,
-    onInsert: PropTypes.func,
-    disabled: PropTypes.bool,
-    isOpen: PropTypes.bool,
-};

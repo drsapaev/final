@@ -1,5 +1,4 @@
 
-import PropTypes from 'prop-types';
 import { useState } from 'react';
 import { Badge, Button, Icon } from '../../ui/macos';
 import { useConfirm } from '../../common/ConfirmDialog';
@@ -417,26 +416,5 @@ function ContentTab({
   );
 }
 
-ContentTab.propTypes = {
-  draftVersion: PropTypes.object.isRequired,
-  expandedSections: PropTypes.object.isRequired,
-  expandedFields: PropTypes.object.isRequired,
-  onToggleSection: PropTypes.func.isRequired,
-  onToggleField: PropTypes.func.isRequired,
-  onAddSection: PropTypes.func.isRequired,
-  onAddField: PropTypes.func.isRequired,
-  onRemoveSection: PropTypes.func.isRequired,
-  onRemoveField: PropTypes.func.isRequired,
-  onDuplicateField: PropTypes.func.isRequired,
-  onMoveField: PropTypes.func.isRequired,
-  onMoveSection: PropTypes.func.isRequired,
-  onUpdateSection: PropTypes.func.isRequired,
-  onUpdateField: PropTypes.func.isRequired,
-  onUpdateFieldCatalog: PropTypes.func.isRequired,
-  onLoadCatalogReferenceRange: PropTypes.func.isRequired,
-  // UX-AUDIT-FIX14: уникальные ID для <datalist> от parent (useId).
-  analyteCatalogId: PropTypes.string,
-  unitCatalogId: PropTypes.string,
-};
 
 export default ContentTab;

@@ -2,7 +2,6 @@
 /**
  * EMRHelpDialog - Справка и безопасность
  */
-import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 
 interface EMRHelpDialogProps {
@@ -83,9 +82,5 @@ const EMRHelpDialog = ({ isOpen, onClose }: EMRHelpDialogProps) => {
     );
 };
 
-EMRHelpDialog.propTypes = {
-    isOpen: PropTypes.bool,
-    onClose: PropTypes.func,
-};
 
 export default EMRHelpDialog;

@@ -9,7 +9,6 @@ import { generatePath, useNavigate } from 'react-router-dom';
 import { api } from '../../api';
 import auth from '../../stores/auth';
 import logger from '../../utils/logger';
-import PropTypes from 'prop-types';
 import { getCanonicalRouteById, getRoleHomeRoute } from '../../routing/routeSelectors';
 import { Input } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
@@ -590,6 +589,3 @@ export default function GlobalSearchBar({ className = '' }: GlobalSearchBarProps
 
 
 // audit/strict: removed self-referencing propTypes spread
-GlobalSearchBar.propTypes = {
-  className: PropTypes.any,
-};

@@ -29,7 +29,6 @@ import {
 import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
-import PropTypes from 'prop-types';
 import notify from '../../services/notify';
 import {
   TOOTH_PROCEDURES,
@@ -582,15 +581,6 @@ const ToothModal = ({
 
 
 // audit/strict: removed self-referencing propTypes spread
-ToothModal.propTypes = {
-  onClose: PropTypes.any,
-  onSave: PropTypes.any,
-  open: PropTypes.any,
-  patientId: PropTypes.any,
-  toothData: PropTypes.any,
-  toothNumber: PropTypes.any,
-  visitId: PropTypes.any,
-};
 
 export default ToothModal;
 

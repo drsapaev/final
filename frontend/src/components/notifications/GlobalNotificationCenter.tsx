@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useState, useRef } from 'react';
-import PropTypes from 'prop-types';
 import NotificationInbox from './NotificationInbox';
 import { useNotificationCenter } from '../../contexts/NotificationCenterContext';
 import { getProfile } from '../../stores/auth';
 import logger from '../../utils/logger';
+
+interface RecipientScope {
+  recipientId: string | number;
+  recipientType: string;
+}
 
 /**
  * GlobalNotificationCenter — renders the notification inbox dropdown
@@ -18,11 +22,11 @@ import logger from '../../utils/logger';
  */
 export default function GlobalNotificationCenter() {
   const { inboxOpen, setInboxOpen, loadNotifications, getUnreadCount } = useNotificationCenter();
-  const [recipientScope, setRecipientScope] = useState(null);
-  const lastLoadKeyRef = useRef(null);
+  const [recipientScope, setRecipientScope] = useState<RecipientScope | null>(null);
+  const lastLoadKeyRef = useRef<string | null>(null);
   const lastLoadAtRef = useRef(0);
 
-  const shouldSkipLoad = useCallback((scope, source) => {
+  const shouldSkipLoad = useCallback((scope: RecipientScope | null, source: string) => {
     if (!scope?.recipientId) {
       return true;
     }
@@ -41,15 +45,15 @@ export default function GlobalNotificationCenter() {
     return false;
   }, []);
 
-  const runLoadNotifications = useCallback((source) => {
+  const runLoadNotifications = useCallback((source: string) => {
     if (shouldSkipLoad(recipientScope, source)) {
       return Promise.resolve([]);
     }
 
     return loadNotifications({
-      role: recipientScope.recipientType,
-      recipient_id: recipientScope.recipientId,
-      recipient_type: recipientScope.recipientType,
+      role: recipientScope!.recipientType,
+      recipient_id: recipientScope!.recipientId,
+      recipient_type: recipientScope!.recipientType,
       status: 'all',
       limit: 50
     });
@@ -112,5 +116,3 @@ export default function GlobalNotificationCenter() {
     />
   );
 }
-
-GlobalNotificationCenter.propTypes = {};

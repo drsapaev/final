@@ -1,5 +1,4 @@
 import { createContext, useContext, useReducer, useCallback, useMemo } from 'react';
-import PropTypes from 'prop-types';
 import type { ReactNode } from 'react';
 import type {
   AppDataState,
@@ -398,10 +397,6 @@ export const AppDataProvider = ({ children }: { children: ReactNode }) => {
 };
 
 
-AppDataProvider.propTypes = {
-  // audit/strict: removed self-referencing propTypes spread
-  children: PropTypes.any,
-};
 
 // Хук для использования контекста
 export const useAppData = (): AppDataContextValue => {

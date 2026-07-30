@@ -9,7 +9,6 @@
  * All state and handlers stay in the parent.
  */
 
-import PropTypes from 'prop-types';
 import React from 'react';
 import { Calendar } from 'lucide-react';
 import { MacOSCard, Skeleton, MacOSEmptyState } from '../ui/macos';
@@ -79,15 +78,5 @@ export function AppointmentsTab({
   );
 }
 
-AppointmentsTab.propTypes = {
-  appointments: PropTypes.array,
-  appointmentsLoading: PropTypes.bool,
-  appointmentSummaryItems: PropTypes.array,
-  onRefresh: PropTypes.func.isRequired,
-  onRowClick: PropTypes.func,
-  onActionClick: PropTypes.func,
-  services: PropTypes.object,
-  isDark: PropTypes.bool,
-};
 
 export default AppointmentsTab;

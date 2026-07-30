@@ -16,7 +16,6 @@ import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, MouseEvent as 
  * Uses Portal to render outside EMR section DOM hierarchy to avoid z-index issues.
  */
 
-import PropTypes from 'prop-types';
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import './AISuggestionPopover.css';
@@ -279,28 +278,6 @@ export function AISuggestionPopover({
     return createPortal(popoverContent, document.body);
 }
 
-const suggestionShape = PropTypes.shape({
-    id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-    content: PropTypes.string,
-    explanation: PropTypes.string,
-    source: PropTypes.string,
-    confidence: PropTypes.number,
-});
 
-AISuggestionPopover.propTypes = {
-    suggestions: PropTypes.arrayOf(suggestionShape),
-    onApply: PropTypes.func,
-    onDismiss: PropTypes.func,
-    disabled: PropTypes.bool,
-    position: PropTypes.oneOf(['top', 'bottom', 'right']),
-    isOpen: PropTypes.bool,
-    onClose: PropTypes.func,
-    anchorRef: PropTypes.shape({
-        current: PropTypes.shape({
-            getBoundingClientRect: PropTypes.func,
-            contains: PropTypes.func,
-        }),
-    }),
-};
 
 export default AISuggestionPopover;

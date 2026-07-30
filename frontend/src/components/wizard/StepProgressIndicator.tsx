@@ -8,7 +8,6 @@
  * статусы (active/completed/pending) + CSS-классы вместо inline-стилей.
  * Раньше: только 4-пиксельные полоски без текста — Nielsen #1 (visibility).
  */
-import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 
 const STEP_LABELS = {
@@ -42,10 +41,5 @@ const StepProgressIndicator = ({ currentStep, totalSteps, language = 'ru' }: Ste
   );
 };
 
-StepProgressIndicator.propTypes = {
-  currentStep: PropTypes.number.isRequired,
-  totalSteps: PropTypes.number.isRequired,
-  language: PropTypes.oneOf(['ru', 'uz', 'en']),
-};
 
 export default StepProgressIndicator;

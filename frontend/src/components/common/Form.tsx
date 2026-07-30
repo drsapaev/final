@@ -1,6 +1,5 @@
 // Система форм с валидацией
 import React, { useState, useCallback } from 'react';
-import PropTypes from 'prop-types';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Input } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
@@ -428,9 +427,6 @@ export function FormField({
 
 
 // audit/strict: removed self-referencing propTypes spread
-FormField.propTypes = {
-  id: PropTypes.any,
-};
 
 /**
  * Компонент текстовой области
@@ -559,9 +555,6 @@ export function FormTextArea({
 
 
 // audit/strict: removed self-referencing propTypes spread
-FormTextArea.propTypes = {
-  id: PropTypes.any,
-};
 
 /**
  * Компонент селекта
@@ -696,9 +689,6 @@ export function FormSelect({
 
 
 // audit/strict: removed self-referencing propTypes spread
-FormSelect.propTypes = {
-  id: PropTypes.any,
-};
 
 /**
  * Компонент кнопки отправки
@@ -745,53 +735,8 @@ export function SubmitButton({
 
 }
 
-FormProvider.propTypes = {
-  children: PropTypes.node
-};
 
-Form.propTypes = {
-  formId: PropTypes.string,
-  initialValues: PropTypes.object,
-  onSubmit: PropTypes.func,
-  validationRules: PropTypes.object,
-  children: PropTypes.node
-};
 
-FormField.propTypes = {
-  name: PropTypes.string,
-  label: PropTypes.node,
-  type: PropTypes.string,
-  placeholder: PropTypes.string,
-  required: PropTypes.bool,
-  validationRules: PropTypes.object,
-  formId: PropTypes.string,
-  style: PropTypes.object
-};
 
-FormTextArea.propTypes = {
-  name: PropTypes.string,
-  label: PropTypes.node,
-  placeholder: PropTypes.string,
-  required: PropTypes.bool,
-  validationRules: PropTypes.object,
-  formId: PropTypes.string,
-  rows: PropTypes.number,
-  style: PropTypes.object
-};
 
-FormSelect.propTypes = {
-  name: PropTypes.string,
-  label: PropTypes.node,
-  options: PropTypes.array,
-  placeholder: PropTypes.string,
-  required: PropTypes.bool,
-  validationRules: PropTypes.object,
-  formId: PropTypes.string,
-  style: PropTypes.object
-};
 
-SubmitButton.propTypes = {
-  children: PropTypes.node,
-  formId: PropTypes.string,
-  style: PropTypes.object
-};

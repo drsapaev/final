@@ -17,7 +17,6 @@
  * to the EMR context and not duplicated elsewhere).
  */
 
-import PropTypes from 'prop-types';
 import { useState, useCallback } from 'react';
 import EMRSection from '../EMRSection';
 import React from 'react';
@@ -426,10 +425,3 @@ export function CardiologySection({
 
 export default CardiologySection;
 
-CardiologySection.propTypes = {
-  ecgData: PropTypes.object,
-  echoData: PropTypes.object,
-  labResults: PropTypes.object,
-  onChange: PropTypes.func,
-  disabled: PropTypes.bool,
-};

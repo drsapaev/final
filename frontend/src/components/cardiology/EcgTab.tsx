@@ -10,7 +10,6 @@
  * All state stays in the parent. This is a presentational wrapper.
  */
 
-import PropTypes from 'prop-types';
 import { Plus } from 'lucide-react';
 import { Button } from '../ui/macos';
 import ECGViewer from './ECGViewer';
@@ -68,11 +67,5 @@ export function EcgTab({
   );
 }
 
-EcgTab.propTypes = {
-  selectedPatient: PropTypes.object,
-  onAddEcg: PropTypes.func.isRequired,
-  onDataUpdate: PropTypes.func.isRequired,
-  getSpacing: PropTypes.func.isRequired,
-};
 
 export default EcgTab;

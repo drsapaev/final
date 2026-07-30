@@ -17,7 +17,6 @@ import React, { type CSSProperties } from 'react';
  */
 
 import { useState } from 'react';
-import PropTypes from 'prop-types';
 const unifiedTheme = { colors: { primary: '#007aff', text: '#000', background: '#fff', secondary: '#f5f5f7' }, spacing: { xs: '4px', sm: '8px', md: '16px', lg: '24px' }, borderRadius: { sm: '4px', md: '8px', lg: '12px' }, shadows: { sm: '0 1px 2px rgba(0,0,0,0.05)', md: '0 4px 6px rgba(0,0,0,0.1)' } } as Record<string, any>;
 
 const { colors, spacing, borderRadius, shadows, typography, transitions } = unifiedTheme;
@@ -242,19 +241,6 @@ const RefactoredCard = ({
   );
 };
 
-RefactoredCard.propTypes = {
-  children: PropTypes.node,
-  variant: PropTypes.oneOf(['default', 'elevated', 'outlined', 'success', 'warning', 'danger']),
-  hoverable: PropTypes.bool,
-  clickable: PropTypes.bool,
-  onClick: PropTypes.func,
-  header: PropTypes.node,
-  footer: PropTypes.node,
-  title: PropTypes.string,
-  description: PropTypes.string,
-  className: PropTypes.string,
-  style: PropTypes.object,
-};
 
 const RefactoredCardAny = RefactoredCard;
 

@@ -3,7 +3,6 @@
  * DermaHistoryTab — R-15: extracted from DermatologistPanelUnified.
  * Renders the "История" tab: skin examinations + cosmetic procedures history.
  */
-import PropTypes from 'prop-types';
 import { Calendar } from 'lucide-react';
 import { MacOSCard, Badge } from '../ui/macos';
 import { useTranslation } from '../../i18n/useTranslation';
@@ -101,10 +100,5 @@ export function DermaHistoryTab({
   );
 }
 
-DermaHistoryTab.propTypes = {
-  skinExaminations: PropTypes.array,
-  cosmeticProcedures: PropTypes.array,
-  getSpacing: PropTypes.func,
-};
 
 export default DermaHistoryTab;

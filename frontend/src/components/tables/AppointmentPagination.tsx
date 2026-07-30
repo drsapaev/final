@@ -4,7 +4,6 @@
  * Pagination controls for the appointments table.
  * Previously inline JSX (lines 2490-2590).
  */
-import PropTypes from 'prop-types';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useTranslation } from '../../i18n/useTranslation';
 
@@ -84,13 +83,5 @@ const AppointmentPagination = ({
   );
 };
 
-AppointmentPagination.propTypes = {
-  currentPage: PropTypes.number.isRequired,
-  totalPages: PropTypes.number.isRequired,
-  totalItems: PropTypes.number.isRequired,
-  pageSize: PropTypes.number.isRequired,
-  onPageChange: PropTypes.func.isRequired,
-  t: PropTypes.object,
-};
 
 export default AppointmentPagination;

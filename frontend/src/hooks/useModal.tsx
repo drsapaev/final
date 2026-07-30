@@ -5,7 +5,6 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useReducedMotion } from './useEnhancedMediaQuery';
-import PropTypes from 'prop-types';
 
 // Hook for managing animations
 const useAnimation = (isActive: boolean, type = 'fade', duration = 300) => {
@@ -295,16 +294,6 @@ export const Modal = ({
 };
 
 
-Modal.propTypes = {
-  children: PropTypes.any,
-  className: PropTypes.any,
-  closable: PropTypes.any,
-  isOpen: PropTypes.any,
-  maskClosable: PropTypes.any,
-  onClose: PropTypes.any,
-  size: PropTypes.any,
-  title: PropTypes.any,
-};
 
 // Placeholder components for backwards compatibility
 export const ModalWithActions = Modal;

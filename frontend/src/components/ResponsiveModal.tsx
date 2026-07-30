@@ -3,7 +3,6 @@ import { useEffect } from 'react';
 import { useBreakpoint } from '../hooks/useEnhancedMediaQuery';
 import { Button } from './ui';
 import { X } from 'lucide-react';
-import PropTypes from 'prop-types';
 import React from 'react';
 
 type ResponsiveModalSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'full';
@@ -211,14 +210,5 @@ const ResponsiveModal = ({
 
 
 // audit/strict: removed self-referencing propTypes spread
-ResponsiveModal.propTypes = {
-  children: PropTypes.any,
-  className: PropTypes.any,
-  isOpen: PropTypes.any,
-  onClose: PropTypes.any,
-  size: PropTypes.any,
-  style: PropTypes.any,
-  title: PropTypes.any,
-};
 
 export default ResponsiveModal;

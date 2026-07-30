@@ -18,7 +18,6 @@ import {
 
 
 'lucide-react';
-import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 
 /**
@@ -325,11 +324,5 @@ const DataExporter = ({
 
 
 // audit/strict: removed self-referencing propTypes spread
-DataExporter.propTypes = {
-  availableFormats: PropTypes.any,
-  data: PropTypes.any,
-  onExport: PropTypes.any,
-  showAdvanced: PropTypes.any,
-};
 
 export default DataExporter;

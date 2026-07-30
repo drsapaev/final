@@ -1,6 +1,5 @@
 
 import { useState, useRef, useEffect } from 'react';
-import PropTypes from 'prop-types';
 import {
   AlertCircle,
   CheckCircle,
@@ -255,29 +254,5 @@ const ModernTextarea = ({
 
 };
 
-ModernTextarea.propTypes = {
-  label: PropTypes.node,
-  placeholder: PropTypes.string,
-  value: PropTypes.any,
-  onChange: PropTypes.func,
-  onBlur: PropTypes.func,
-  onFocus: PropTypes.func,
-  error: PropTypes.node,
-  success: PropTypes.node,
-  disabled: PropTypes.bool,
-  required: PropTypes.bool,
-  rows: PropTypes.number,
-  maxRows: PropTypes.number,
-  minRows: PropTypes.number,
-  maxLength: PropTypes.number,
-  minLength: PropTypes.number,
-  autoResize: PropTypes.bool,
-  resizable: PropTypes.bool,
-  expandable: PropTypes.bool,
-  className: PropTypes.string,
-  size: PropTypes.string,
-  variant: PropTypes.string,
-  id: PropTypes.string
-};
 
 export default ModernTextarea;

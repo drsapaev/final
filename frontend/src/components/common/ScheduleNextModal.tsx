@@ -1,7 +1,6 @@
 import { api } from '../../api/client';
 import { useState, useEffect } from 'react';
 import type { CSSProperties } from 'react';
-import PropTypes from 'prop-types';
 import logger from '../../utils/logger';
 import { getApiOrigin } from '../../api/runtime';
 import tokenManager from '../../utils/tokenManager';
@@ -661,19 +660,5 @@ const ScheduleNextModal = ({
 
 };
 
-ScheduleNextModal.propTypes = {
-  isOpen: PropTypes.bool.isRequired,
-  onClose: PropTypes.func.isRequired,
-  onSuccess: PropTypes.func,
-  patient: PropTypes.shape({
-    id: PropTypes.oneOfType([PropTypes.string, PropTypes.number])
-  }),
-  theme: PropTypes.shape({
-    getColor: PropTypes.func.isRequired,
-    getSpacing: PropTypes.func.isRequired,
-    getFontSize: PropTypes.func.isRequired
-  }).isRequired,
-  specialtyFilter: PropTypes.oneOf(['cardiology', 'dermatology', 'dentistry', null])
-};
 
 export default ScheduleNextModal;

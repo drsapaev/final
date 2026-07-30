@@ -1,7 +1,6 @@
 
 import React from 'react';
 import { useState, useCallback } from 'react';
-import PropTypes from 'prop-types';
 import EMRSection from './EMRSection';
 import EMRTextField from './EMRTextField';
 import VitalsWidget from './VitalsWidget';
@@ -112,11 +111,3 @@ export function AnamnesisVitaeSection({
 
 export default AnamnesisVitaeSection;
 
-AnamnesisVitaeSection.propTypes = {
-    value: PropTypes.string,
-    onChange: PropTypes.func,
-    disabled: PropTypes.bool,
-    defaultOpen: PropTypes.bool,
-    vitals: PropTypes.object,
-    onVitalsChange: PropTypes.func,
-};

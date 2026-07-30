@@ -4,7 +4,6 @@ import { useTheme } from '../../contexts/ThemeContext';
 import {
   Button, Card, Icon,
 } from '../ui/macos';
-import PropTypes from 'prop-types';
 import { useTranslation } from '../../i18n/useTranslation';
 import React from "react";
 
@@ -463,12 +462,5 @@ const ModernStatistics = ({
 
 
 // audit/strict: removed self-referencing propTypes spread
-ModernStatistics.propTypes = {
-  appointments: PropTypes.any,
-  language: PropTypes.any,
-  onExport: PropTypes.any,
-  onRefresh: PropTypes.any,
-  selectedDate: PropTypes.any,
-};
 
 export default ModernStatistics;
