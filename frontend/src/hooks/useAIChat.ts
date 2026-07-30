@@ -466,7 +466,7 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
     }, []);
 
     useEffect(() => {
-        handleWebSocketMessageRef.current = handleWebSocketMessage as WsMessageHandler;
+        handleWebSocketMessageRef.current = handleWebSocketMessage as unknown as WsMessageHandler;
     }, [handleWebSocketMessage]);
 
     /**

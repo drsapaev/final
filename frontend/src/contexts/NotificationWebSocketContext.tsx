@@ -4,6 +4,7 @@ import { buildWsUrl } from '../api/runtime';
 import notify from '../services/notify';
 import { tokenManager } from '../utils/tokenManager';
 import logger from '../utils/logger';
+import { parseWsEvent } from '../utils/ws-schemas';
 import { useNotificationCenter } from './NotificationCenterContext';
 import { clearNotificationQueryCache } from '../api/services';
 import { isPublicRoutePath } from '../routing/routeSelectors';
@@ -82,7 +83,7 @@ const TYPE_ALIASES: Record<string, string> = {
 };
 
 function normalizePayload(payload: WsPayload = {}): NormalizedNotification {
-  const nested = (payload.notification || payload.payload || payload.data || payload) as WsPayload;
+  const nested = (payload.notification || payload.payload || payload.data || payload) as Record<string, unknown>;
   const rawType =
     nested.type ||
     nested.event_type ||
@@ -322,7 +323,8 @@ export function NotificationWebSocketProvider({ children }: NotificationWebSocke
 
     socket.onmessage = (event: MessageEvent) => {
       try {
-        const data = JSON.parse(event.data as string) as WsPayload;
+        const data = parseWsEvent(event.data as string) as WsPayload | null;
+        if (!data) return;
         handleMessageRef.current(data);
       } catch (error) {
         logger.error('[NotificationWS] failed to parse message', error);
