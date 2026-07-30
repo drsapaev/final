@@ -6,8 +6,10 @@
  * As the strict-mode migration progresses, these can be tightened.
  */
 
+import type { UserId, PatientId, AppointmentId, DoctorId, QueueEntryId } from './branded';
+
 export interface AppUser {
-  id: string | number;
+  id: UserId;
   name?: string;
   full_name?: string;
   email?: string;
@@ -15,21 +17,21 @@ export interface AppUser {
 }
 
 export interface AppPatient {
-  id: string | number;
+  id: PatientId;
   name?: string;
   full_name?: string;
   phone?: string;
 }
 
 export interface AppAppointment {
-  id: string | number;
-  patient_id?: string | number;
-  doctor_id?: string | number;
+  id: AppointmentId;
+  patient_id?: PatientId;
+  doctor_id?: DoctorId;
   status?: string;
 }
 
 export interface AppQueueEntry {
-  id: string | number;
+  id: QueueEntryId;
   status?: string;
 }
 

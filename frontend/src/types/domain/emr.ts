@@ -5,6 +5,7 @@
  * and the record structure used by useEMR.
  */
 
+import type { VisitId, PatientId, DoctorId } from './branded';
 export interface EMRTemplateField {
   id?: string;
   label?: string;
@@ -41,7 +42,7 @@ export interface EMRTemplateSuggestion {
 
 export interface EMRRecord {
   id?: string | number;
-  visit_id?: string | number;
+  visit_id?: VisitId;
   specialty_data?: Record<string, unknown>;
   row_version?: number;
   is_draft?: boolean;

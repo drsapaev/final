@@ -11,6 +11,7 @@
  */
 
 // audit/phase-5a, BS-3: added 'served' — backend (backend/app/crud/queue.py +
+import type { DoctorId, PatientId, QueueEntryId } from './branded';
 // backend/app/api/v1/endpoints/doctor_integration/_queue_ops.py) uses this
 // status when a patient has been fully served. Was missing from the TS union,
 // which caused `e.status === 'served'` comparisons to be flagged as
