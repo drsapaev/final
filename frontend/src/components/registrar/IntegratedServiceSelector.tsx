@@ -21,6 +21,7 @@ import { Card } from '../ui/macos';
 import { fetchRegistrarServices } from '../../api/registrar';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
+import { getErrorMessage } from '../../utils/type-guards';
 /**
  * Интегрированный селектор услуг для регистратуры
  * Использует справочник из админ панели согласно detail.md стр. 112
@@ -180,7 +181,7 @@ const IntegratedServiceSelector = ({
       logger.error('IntegratedServiceSelector: Critical error:', err);
       // Fallback данные уже установлены выше, просто показываем ошибку
       if (retryCount > 0) {
-        setError(t('misc.iss_err_load', { message: (err as Error)?.message || 'unknown' }));
+        setError(t('misc.iss_err_load', { message: getErrorMessage(err) || 'unknown' }));
       }
     }
   }, [retryCount, DEMO_SERVICES, DEMO_CATEGORIES, t]);

@@ -62,6 +62,7 @@ interface AIProviderFormData {
 
 import logger from '../../utils/logger';
 import { notify } from '../../services/notify';
+import { getErrorMessage } from '../../utils/type-guards';
 
 // Provider shape returned by GET /admin/ai/providers and stored in `providers` state.
 // Named `AIProviderRecord` to avoid shadowing the canonical `AIProvider` union
@@ -223,7 +224,7 @@ const AISettings = () => {
       await loadData();
     } catch (error: unknown) {
       logger.error('Ошибка сохранения:', error);
-      const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      const detail = getErrorMessage(error);
       setMessage({ type: 'error', text: detail || (error instanceof Error ? error.message : String(error)) || t('admin2.ais_provider_save_error') });
     }
   };

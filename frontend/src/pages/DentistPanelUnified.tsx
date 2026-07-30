@@ -74,6 +74,7 @@ import {
   SPECIALTY_KEYS,
 } from '../utils/doctorPanelShared';
 import { useVisitLifecycle } from '../hooks/useVisitLifecycle';
+import { getErrorMessage } from '../utils/type-guards';
 
 const LazyReportsAndAnalytics = lazy(() => import('../components/dental/ReportsAndAnalytics'));
 
@@ -397,7 +398,7 @@ const DentistPanelUnified = () => {
               logger.warn('[Dentist] Не удалось загрузить EMR визита для протокола', {
                 patientId,
                 visitId: summary.visit_id,
-                error: (error as Error)?.message || error,
+                error: getErrorMessage(error) || error,
               });
               return null;
             }
@@ -449,7 +450,7 @@ const DentistPanelUnified = () => {
     } catch (error: unknown) {
       logger.warn('[Dentist] Не удалось загрузить протокол визита из EMR v2', {
         visitId,
-        error: (error as Error)?.message || error,
+        error: getErrorMessage(error) || error,
       });
       return null;
     }
@@ -797,7 +798,7 @@ const DentistPanelUnified = () => {
           notify.success(printResult?.message || tI18n('dental.dental_panel_ticket_printed', { name: row.patient_fio }));
         } catch (error: unknown) {
           logger.error('[Dentist] Ошибка печати талона:', error);
-          notify.error((error as Error)?.message || tI18n('dental.dental_panel_ticket_print_failed'));
+          notify.error(getErrorMessage(error) || tI18n('dental.dental_panel_ticket_print_failed'));
         }
         break;
       case 'complete':
@@ -937,7 +938,7 @@ const DentistPanelUnified = () => {
       } catch (error: unknown) {
         logger.warn('[Dentist] Не удалось синхронизировать историю протоколов из EMR v2', {
           patientId: selectedPatientIdForProtocols,
-          error: (error as Error)?.message || error,
+          error: getErrorMessage(error) || error,
         });
       }
     };
@@ -1247,7 +1248,7 @@ const DentistPanelUnified = () => {
     } catch (error: unknown) {
       logger.error('[Dentistry] handleCompleteVisit: error', error);
       notify.error(
-        (error as Error)?.message || tI18n('dental.dental_panel_complete_failed')
+        getErrorMessage(error) || tI18n('dental.dental_panel_complete_failed')
       );
     } finally {
       logger.info('[Dentistry] handleCompleteVisit: finish');
@@ -1465,7 +1466,7 @@ const DentistPanelUnified = () => {
       logger.warn('[Dentist] Не удалось сохранить протокол визита в EMR v2, сохраняю локальный кеш', {
         visitId: patientRecord.visit_id,
         patientName,
-        error: (error as Error)?.message || error,
+        error: getErrorMessage(error) || error,
       });
 
       setSavedVisitProtocols((prev) => upsertDentistVisitProtocol(prev, localRecord));

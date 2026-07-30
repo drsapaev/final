@@ -25,6 +25,7 @@ import { api } from '../../api/client';
 
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
+import { getErrorMessage } from '../../utils/type-guards';
 
 type TranslationFn = (key: string, options?: Record<string, unknown>) => string;
 
@@ -287,7 +288,7 @@ const CloudPrintingManager = () => {
       }
     } catch (error: unknown) {
       logger.error('Ошибка тестовой печати:', error);
-      const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      const detail = getErrorMessage(error);
       toast.error(detail || t('admin2.cp_test_print_error'));
     }
   };
@@ -312,7 +313,7 @@ const CloudPrintingManager = () => {
       }
     } catch (error: unknown) {
       logger.error('Ошибка печати:', error);
-      const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      const detail = getErrorMessage(error);
       toast.error(detail || t('admin2.cp_medical_print_error'));
     }
   };

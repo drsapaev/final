@@ -3,6 +3,7 @@
  * Централизованная работа с платежной системой
  */
 import { api } from '../api/client';
+import { getErrorMessage } from '../utils/type-guards';
 
 export const paymentService = {
   /**
@@ -19,7 +20,7 @@ export const paymentService = {
     } catch (error) {
       return {
         success: false,
-        error: (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Ошибка получения провайдеров'
+        error: getErrorMessage(error) || 'Ошибка получения провайдеров'
       };
     }
   },
@@ -38,7 +39,7 @@ export const paymentService = {
     } catch (error) {
       return {
         success: false,
-        error: (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Ошибка инициализации платежа'
+        error: getErrorMessage(error) || 'Ошибка инициализации платежа'
       };
     }
   },
@@ -57,7 +58,7 @@ export const paymentService = {
     } catch (error) {
       return {
         success: false,
-        error: (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Ошибка получения статуса платежа'
+        error: getErrorMessage(error) || 'Ошибка получения статуса платежа'
       };
     }
   },
@@ -78,7 +79,7 @@ export const paymentService = {
     } catch (error) {
       return {
         success: false,
-        error: (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Ошибка генерации квитанции'
+        error: getErrorMessage(error) || 'Ошибка генерации квитанции'
       };
     }
   },
@@ -111,7 +112,7 @@ export const paymentService = {
     } catch (error) {
       return {
         success: false,
-        error: (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Ошибка скачивания квитанции'
+        error: getErrorMessage(error) || 'Ошибка скачивания квитанции'
       };
     }
   },

@@ -51,6 +51,7 @@ import {
   SPECIALTY_KEYS,
 } from '../utils/doctorPanelShared';
 import { useVisitLifecycle } from '../hooks/useVisitLifecycle';
+import { getErrorMessage } from '../utils/type-guards';
 
 const API_V1_BASE = getApiBaseUrl();
 const DERMATOLOGY_REQUEST_COOLDOWN_MS = 5000;
@@ -802,7 +803,7 @@ const DermatologistPanelUnified = () => {
           notify.success(printResult?.message || t('derma.derma_panel_ticket_printed', { name: row.patient_fio }));
         } catch (error: unknown) {
           logger.error('[Dermatology] Ошибка печати талона:', error);
-          notify.error((error as Error)?.message || t('derma.derma_panel_ticket_print_failed'));
+          notify.error(getErrorMessage(error) || t('derma.derma_panel_ticket_print_failed'));
         }
         break;
       case 'complete':
@@ -1285,7 +1286,7 @@ const DermatologistPanelUnified = () => {
       });
     } catch (error: unknown) {
       logger.error('[Dermatology] Prescription print error:', error);
-      notify.error((error as Error)?.message || t('derma.derma_panel_prescription_print_failed'));
+      notify.error(getErrorMessage(error) || t('derma.derma_panel_prescription_print_failed'));
       throw error;
     }
   };
@@ -1398,7 +1399,7 @@ const DermatologistPanelUnified = () => {
 
     } catch (error: unknown) {
       logger.error('[Dermatology] handleSaveVisit: error', error);
-      notify.error((error as Error)?.message || t('derma.derma_panel_complete_failed'));
+      notify.error(getErrorMessage(error) || t('derma.derma_panel_complete_failed'));
     } finally {
       logger.info('[Dermatology] handleSaveVisit: finish');
       setLoading(false);

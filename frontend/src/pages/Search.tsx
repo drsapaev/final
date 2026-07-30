@@ -11,6 +11,7 @@ import {
   Input } from '../components/ui/macos';
 import { getRoleHomeRoute } from '../routing/routeSelectors';
 import { useTranslation } from '../i18n/useTranslation';
+import { getErrorMessage } from '../utils/type-guards';
 
 const registrarHomeRoute = getRoleHomeRoute('registrar');
 
@@ -71,7 +72,7 @@ export default function Search() {
         } catch (err: unknown) {
           // PR-38 / Medium-23: log the error instead of silently swallowing.
           // Visit not found by ID — we'll try by patient_id next.
-          logger.warn('Search: getVisit failed, will try by patient_id', (err as Error)?.message);
+          logger.warn('Search: getVisit failed, will try by patient_id', getErrorMessage(err));
         }
 
         // Also get visits for patient with this ID
@@ -89,7 +90,7 @@ export default function Search() {
           }
         } catch (err: unknown) {
           // PR-38 / Medium-23: log instead of silent catch.
-          logger.warn('Search: patient visits fetch failed', (err as Error)?.message);
+          logger.warn('Search: patient visits fetch failed', getErrorMessage(err));
         }
       }
 
@@ -118,7 +119,7 @@ export default function Search() {
       setVisits(visitsData);
     } catch (err: unknown) {
       // PR-38 / Medium-23: log instead of silent catch.
-      logger.error('Search: query failed', (err as Error)?.message);
+      logger.error('Search: query failed', getErrorMessage(err));
       setError(t('misc.srch_error_search_failed'));
     } finally {
       setLoading(false);
@@ -172,7 +173,7 @@ export default function Search() {
       return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
     } catch (err: unknown) {
       // PR-38 / Medium-23: log instead of silent catch.
-      logger.warn('Search: formatDate failed', (err as Error)?.message);
+      logger.warn('Search: formatDate failed', getErrorMessage(err));
       return dateStr;
     }
   };

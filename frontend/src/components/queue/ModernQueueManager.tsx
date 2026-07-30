@@ -22,6 +22,7 @@ import { useQueueManager } from '../../hooks/useQueueManager';
 import { useQueueWebSocket } from '../../hooks/useQueueWebSocket';
 import QueueTable from './QueueTable';
 import logger from '../../utils/logger';
+import { getErrorMessage } from '../../utils/type-guards';
 import './ModernQueueManager.css';
 
 // === Domain types ===
@@ -209,7 +210,7 @@ const ModernQueueManager = ({
       setShowQrDialog(true);
       toast.success(t('misc.mqm_qr_generated'));
     } catch (error) {
-      toast.error((error as Error)?.message || t('misc.mqm_qr_gen_error'));
+      toast.error(getErrorMessage(error) || t('misc.mqm_qr_gen_error'));
     }
   };
 
@@ -225,7 +226,7 @@ const ModernQueueManager = ({
       setShowQrDialog(true);
       toast.success(t('misc.mqm_clinic_qr_generated'));
     } catch (error) {
-      toast.error((error as Error)?.message || t('misc.mqm_clinic_qr_gen_error'));
+      toast.error(getErrorMessage(error) || t('misc.mqm_clinic_qr_gen_error'));
     }
   };
 
@@ -272,7 +273,7 @@ const ModernQueueManager = ({
         onQueueUpdate();
       }
     } catch (error) {
-      toast.error((error as Error)?.message || t('misc.mqm_reception_open_error'));
+      toast.error(getErrorMessage(error) || t('misc.mqm_reception_open_error'));
     }
   };
 
@@ -314,7 +315,7 @@ const ModernQueueManager = ({
         onQueueUpdate();
       }
     } catch (error) {
-      toast.error((error as Error)?.message || t('misc.mqm_reception_close_error'));
+      toast.error(getErrorMessage(error) || t('misc.mqm_reception_close_error'));
     }
   };
 
@@ -341,7 +342,7 @@ const ModernQueueManager = ({
 
       await loadQueue();
     } catch (error) {
-      toast.error((error as Error)?.message || t('misc.mqm_call_patient_error'));
+      toast.error(getErrorMessage(error) || t('misc.mqm_call_patient_error'));
     }
   };
 

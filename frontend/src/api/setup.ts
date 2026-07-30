@@ -7,6 +7,7 @@ import logger from '../utils/logger';
 // потому что это pre-auth endpoint, но всё равно нужен unified error handling
 // (network errors, 500s, timeout).
 import { api } from './client';
+import { getErrorMessage } from '../utils/type-guards';
 
 const SETUP_STATUS_CACHE_MS = 30_000;
 
@@ -43,15 +44,14 @@ export async function fetchSetupStatus() {
       setupStatusCacheAt = Date.now();
       return payload;
     } catch (error) {
-      const axiosErr = error as { response?: { data?: { detail?: string } }; message?: string };
       if (setupStatusCache) {
         logger.warn('[FIX:SETUP] Setup status request failed, falling back to cached value', {
-          error: axiosErr?.message || 'unknown error',
+          error: getErrorMessage(error),
         });
         return setupStatusCache;
       }
       // Нормализуем error message из axios response.
-      const detail = axiosErr?.response?.data?.detail || axiosErr?.message || 'Setup status request failed';
+      const detail = getErrorMessage(error) || 'Setup status request failed';
       throw new Error(detail);
     } finally {
       setupStatusRequestPromise = null;
@@ -70,8 +70,7 @@ export async function initializeSetup(payload: Record<string, unknown>) {
     return response.data;
   } catch (error) {
     // Нормализуем error message из axios response.
-    const axiosErr = error as { response?: { data?: { detail?: string } }; message?: string };
-    const detail = axiosErr?.response?.data?.detail || axiosErr?.message || 'Setup request failed';
+    const detail = getErrorMessage(error) || 'Setup request failed';
     throw new Error(detail);
   }
 }

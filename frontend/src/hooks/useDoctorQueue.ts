@@ -65,7 +65,7 @@ const selectNextCallEntryId = (
     return backendEntryId;
   }
 
-  const entries = Array.isArray(queuePayload?.entries) ? queuePayload!.entries! : [];
+  const entries = Array.isArray(queuePayload?.entries) ? queuePayload?.entries ?? [] : [];
   const callableEntry = entries.find((entry) => hasBackendQueueAction(entry, 'call', 'can_call'));
   return callableEntry?.id ?? null;
 };

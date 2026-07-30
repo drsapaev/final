@@ -46,14 +46,14 @@ export default function GlobalNotificationCenter() {
   }, []);
 
   const runLoadNotifications = useCallback((source: string) => {
-    if (shouldSkipLoad(recipientScope, source)) {
+    if (!recipientScope || shouldSkipLoad(recipientScope, source)) {
       return Promise.resolve([]);
     }
 
     return loadNotifications({
-      role: recipientScope!.recipientType,
-      recipient_id: recipientScope!.recipientId,
-      recipient_type: recipientScope!.recipientType,
+      role: recipientScope.recipientType,
+      recipient_id: recipientScope.recipientId,
+      recipient_type: recipientScope.recipientType,
       status: 'all',
       limit: 50
     });

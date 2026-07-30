@@ -24,6 +24,7 @@
  * Включает русские и английские варианты
  */
 import logger from './logger';
+import { getErrorMessage } from './type-guards';
 
 export const SPECIALTY_TO_CODE = {
     // Cardiology
@@ -658,7 +659,7 @@ export async function loadMappingsFromBackend(): Promise<Record<string, unknown>
             return response as Record<string, unknown>;
         }
     } catch (error) {
-                logger.warn('[serviceCodeResolver] Failed to load mappings from backend:', (error as Error)?.message);
+                logger.warn('[serviceCodeResolver] Failed to load mappings from backend:', getErrorMessage(error));
     }
 
     // Fallback на статические маппинги

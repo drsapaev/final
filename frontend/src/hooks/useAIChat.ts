@@ -13,6 +13,7 @@ import { buildWsUrl } from '../api/runtime';
 import logger from '../utils/logger';
 import { tokenManager } from '../utils/tokenManager';
 import { detectPromptInjection } from '../utils/aiValidator';
+import { getErrorMessage } from '../utils/type-guards';
 import {
     MESSAGING_CONTRACT_VERSION,
     isSupportedMessagingContractVersion,
@@ -99,7 +100,7 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
             return response.data;
         } catch (err) {
             logger.error('Failed to load chat sessions:', err);
-            setError((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Failed to load sessions');
+            setError(getErrorMessage(err) || 'Failed to load sessions');
             return [];
         } finally {
             setLoading(false);
@@ -128,7 +129,7 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
             return session;
         } catch (err) {
             logger.error('Failed to create chat session:', err);
-            setError((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Failed to create session');
+            setError(getErrorMessage(err) || 'Failed to create session');
             return null;
         } finally {
             setLoading(false);
@@ -166,7 +167,7 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
             return sessionResponse.data;
         } catch (err) {
             logger.error('Failed to load chat session:', err);
-            setError((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Failed to load session');
+            setError(getErrorMessage(err) || 'Failed to load session');
             return null;
         } finally {
             setLoading(false);
@@ -230,7 +231,7 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
             return response.data;
         } catch (err) {
             logger.error('Failed to send message:', err);
-            setError((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Failed to send message');
+            setError(getErrorMessage(err) || 'Failed to send message');
 
             // Откатываем оптимистичное обновление
             setMessages(prev => prev.filter(m => !m._pending));
@@ -260,7 +261,7 @@ export const useAIChat = (options: Record<string, unknown> = {}) => {
             return true;
         } catch (err) {
             logger.error('Failed to delete session:', err);
-            setError((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Failed to delete session');
+            setError(getErrorMessage(err) || 'Failed to delete session');
             return false;
         }
     }, []);

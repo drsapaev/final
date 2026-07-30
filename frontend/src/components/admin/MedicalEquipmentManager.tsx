@@ -33,6 +33,7 @@ import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
+import { getErrorMessage } from '../../utils/type-guards';
 
 const MedicalEquipmentManager = () => {
   const { t: rawT } = useTranslation();
@@ -169,12 +170,7 @@ const MedicalEquipmentManager = () => {
       }
     } catch (error) {
       logger.error('Ошибка измерения:', error);
-      const err = error as { response?: { data?: { detail?: string } } };
-      if (err.response && err.response.data) {
-        toast.error(err.response.data.detail || t('admin2.equip_toast_measurement_failed'));
-      } else {
-        toast.error(t('admin2.equip_toast_measurement_failed'));
-      }
+      toast.error(getErrorMessage(error) || t('admin2.equip_toast_measurement_failed'));
     }
   };
 

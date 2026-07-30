@@ -37,6 +37,7 @@ import logger from '../../utils/logger';
 import { getReportEndpoint } from '../../utils/reportEndpoints';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
+import { getErrorMessage } from '../../utils/type-guards';
 
 interface AvailableReport {
   type?: string;
@@ -182,7 +183,7 @@ const ReportsManager = () => {
       }
     } catch (error) {
       logger.error('Ошибка генерации отчета:', error);
-      toast.error((error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('admin2.rm_report_generation_error'));
+      toast.error(getErrorMessage(error) || t('admin2.rm_report_generation_error'));
     } finally {
       setLoading(false);
     }

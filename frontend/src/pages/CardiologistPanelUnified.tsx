@@ -996,7 +996,7 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
       loadMacOSCardiologyAppointments(true);
     } catch (error: unknown) {
       logger.error('[Cardiology] Ошибка отмены записи:', error);
-      notify.error((error as Error)?.message || tI18n('cardio.cardio_panel_appointment_cancel_failed'));
+      notify.error(getErrorMessage(error) || tI18n('cardio.cardio_panel_appointment_cancel_failed'));
     } finally {
       setLoading(false);
     }
@@ -1404,7 +1404,7 @@ const MacOSCardiologistPanelUnified = (): React.JSX.Element | null => {
         logger.info('[Cardiology] loadEMR: aborted', { visitId });
         return null;
       }
-      logger.error('[Cardiology] loadEMR: network error', { visitId, error: (error as Error)?.message || error });
+      logger.error('[Cardiology] loadEMR: network error', { visitId, error: getErrorMessage(error) || error });
       notify.error(getErrorMessage(error, tI18n('cardio.cardio_panel_emr_load_failed')));
       return null;
     }

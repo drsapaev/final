@@ -26,6 +26,7 @@ import {
 } from '../../api/registrar';
 import logger from '../../utils/logger';
 import { useTranslation } from '../../i18n/useTranslation';
+import { getErrorMessage } from '../../utils/type-guards';
 
 const PRICE_OVERRIDE_ACTION_CAN_FIELD: Record<string, string> = {
   approve: 'can_approve',
@@ -107,8 +108,7 @@ const PriceOverrideApproval = () => {
     } catch (error) {
       logger.error('Error processing approval:', error);
       // Axios errors: detail лежит в error.response.data.detail.
-      const axiosErr = error as { response?: { data?: { detail?: string } }; message?: string };
-      const detail = axiosErr?.response?.data?.detail || axiosErr?.message || t('misc.poa_oshibka_obrabotki_zaprosa');
+      const detail = getErrorMessage(error) || t('misc.poa_oshibka_obrabotki_zaprosa');
       toast.error(detail);
     } finally {
       setIsProcessing(false);

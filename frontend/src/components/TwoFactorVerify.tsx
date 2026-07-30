@@ -5,6 +5,7 @@ import { Shield, Smartphone, Key, RefreshCw, CheckCircle, AlertCircle } from 'lu
 import { Input,
   Checkbox } from './ui/macos';
 import { useTranslation } from '../i18n/useTranslation';
+import { getErrorMessage } from '../utils/type-guards';
 
 interface TwoFactorVerifyProps {
   onSuccess?: (response: { data?: Record<string, unknown> }) => void;
@@ -62,8 +63,7 @@ const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken }:
         setError(response.data?.message || response.data?.message || t('misc.tfv_nevernyy_kod'));
       }
     } catch (err) {
-      const errObj = err as { response?: { data?: { detail?: string } } };
-      setError(errObj?.response?.data?.detail || t('misc.tfv_oshibka_verifikatsii'));
+      setError(getErrorMessage(err) || t('misc.tfv_oshibka_verifikatsii'));
     } finally {
       setLoading(false);
     }

@@ -61,6 +61,7 @@ import {
 
 'lucide-react';
 import { api } from '../api/client';
+import { getErrorMessage } from '../utils/type-guards';
 
 interface ErrorWithExtras extends Error {
   response?: { status?: number; data?: { detail?: string | { message?: string; error?: string } } };
@@ -357,7 +358,7 @@ const TelegramManager = () => {
     } catch (e: unknown) {
       const detail = (e as ErrorWithExtras)?.response?.data?.detail;
       const detailStr = typeof detail === 'string' ? detail : (detail?.message ?? '');
-      setError(detailStr || (e as Error)?.message || t('misc.tg_err_load'));
+      setError(detailStr || getErrorMessage(e) || t('misc.tg_err_load'));
     } finally {
       setLoading(false);
     }
@@ -569,7 +570,7 @@ const TelegramManager = () => {
     } catch (e: unknown) {
       const detail = (e as ErrorWithExtras)?.response?.data?.detail;
       const message = typeof detail === 'string' ? detail : (detail?.message ?? detail?.error);
-      setError(message || (e as Error)?.message || t('misc.tg_err_register_commands'));
+      setError(message || getErrorMessage(e) || t('misc.tg_err_register_commands'));
     } finally {
       setRegisteringCommands(false);
     }
@@ -589,7 +590,7 @@ const TelegramManager = () => {
     } catch (e: unknown) {
       const detail = (e as ErrorWithExtras)?.response?.data?.detail;
       const message = typeof detail === 'string' ? detail : detail?.message || detail?.error;
-      setError(message || (e as Error)?.message || t('misc.tg_err_register_staff_commands'));
+      setError(message || getErrorMessage(e) || t('misc.tg_err_register_staff_commands'));
     } finally {
       setRegisteringStaffCommands(false);
     }

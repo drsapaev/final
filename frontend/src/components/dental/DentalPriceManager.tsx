@@ -19,6 +19,7 @@ import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import { Input } from '../ui/macos';
 import { formatRegistrarDate } from '../../utils/dateUtils';
+import { getErrorMessage } from '../../utils/type-guards';
 
 /**
  * Компонент для указания цены стоматологом после лечения
@@ -134,7 +135,7 @@ const DentalPriceManager = ({
       }
     } catch (error) {
       logger.error('Error setting price:', error);
-      notify.error((error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('dental.dental_dpm_error_set_price'));
+      notify.error(getErrorMessage(error) || t('dental.dental_dpm_error_set_price'));
     } finally {
       setIsLoading(false);
     }

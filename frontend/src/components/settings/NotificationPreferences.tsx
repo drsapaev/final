@@ -27,6 +27,7 @@ import {
 import { getState as getAuthState } from '../../stores/auth';
 import { useTranslation } from '../../i18n/useTranslation';
 import logger from '../../utils/logger';
+import { getErrorMessage } from '../../utils/type-guards';
 
 interface PolicyControl {
   desktop: boolean;
@@ -664,8 +665,7 @@ export default function NotificationPreferences() {
       logger.info('[FIX:PROFILE] Loaded notification preferences', { userId: resolvedUserId });
     } catch (err: unknown) {
       logger.error('Failed to load notification settings:', err);
-      const e = err as { response?: { data?: { detail?: string } } };
-      setError(e?.response?.data?.detail || t('misc.np_load_error'));
+      setError(getErrorMessage(err) || t('misc.np_load_error'));
     } finally {
       setLoading(false);
     }
@@ -713,11 +713,7 @@ export default function NotificationPreferences() {
       logger.info('[FIX:PROFILE] Loaded notification runtime policy', { userId });
     } catch (err: unknown) {
       logger.warn('[FIX:PROFILE] Failed to load notification runtime policy', err);
-      const e = err as { response?: { data?: { detail?: string } } };
-      setPolicyError(
-        e?.response?.data?.detail ||
-          t('misc.np_load_policy_error')
-      );
+      setPolicyError(getErrorMessage(err) || t('misc.np_load_policy_error'));
     } finally {
       setPolicyLoading(false);
     }
@@ -784,8 +780,7 @@ export default function NotificationPreferences() {
           t('misc.np_partial_save_error', { parts: savedParts.join(' + ') })
         );
       } else {
-        const e = err as { response?: { data?: { detail?: string } } };
-        setError(e?.response?.data?.detail || t('misc.np_save_error'));
+        setError(getErrorMessage(err) || t('misc.np_save_error'));
       }
     } finally {
       setSaving(false);

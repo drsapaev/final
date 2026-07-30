@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { api } from '../api/client';
 import logger from '../utils/logger';
 import type { Doctor } from '../types/domain/clinic';
+import { getErrorMessage } from '../utils/type-guards';
 
 const normalizeDoctorPayload = (doctorData: Record<string, unknown>) => ({
   user_id: doctorData.userId ? Number(doctorData.userId) : null,
@@ -74,9 +75,8 @@ const useDoctors = () => {
         return response.data;
       } catch (err) {
         logger.error('Ошибка создания врача:', err);
-        const errObj = err as { response?: { data?: { detail?: string } }; message?: string };
         const errorMessage =
-          errObj?.response?.data?.detail || errObj?.message || 'Ошибка создания врача';
+          getErrorMessage(err) || 'Ошибка создания врача';
         setError(String(err));
         throw new Error(errorMessage);
       } finally {
@@ -97,9 +97,8 @@ const useDoctors = () => {
         return response.data;
       } catch (err) {
         logger.error('Ошибка обновления врача:', err);
-        const errObj = err as { response?: { data?: { detail?: string } }; message?: string };
         const errorMessage =
-          errObj?.response?.data?.detail || errObj?.message || 'Ошибка обновления врача';
+          getErrorMessage(err) || 'Ошибка обновления врача';
         setError(String(err));
         throw new Error(errorMessage);
       } finally {
@@ -119,9 +118,8 @@ const useDoctors = () => {
         await Promise.all([loadDoctors(), loadAvailableUsers()]);
       } catch (err) {
         logger.error('Ошибка удаления врача:', err);
-        const errObj = err as { response?: { data?: { detail?: string } }; message?: string };
         const errorMessage =
-          errObj?.response?.data?.detail || errObj?.message || 'Ошибка удаления врача';
+          getErrorMessage(err) || 'Ошибка удаления врача';
         setError(String(err));
         throw new Error(errorMessage);
       } finally {

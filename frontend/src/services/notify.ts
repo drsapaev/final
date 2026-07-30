@@ -1,4 +1,5 @@
 import { toast } from 'react-toastify';
+import { getErrorMessage } from '../utils/type-guards';
 
 type ToastOptions = Record<string, unknown>;
 
@@ -36,8 +37,7 @@ export const notify = {
     fallbackMessage: string = 'Произошла ошибка',
     options: ToastOptions = {}
   ): ReturnType<typeof toast.error> {
-    const err = error as { response?: { data?: { detail?: string } }; message?: string };
-    const message = err?.response?.data?.detail || err?.message || fallbackMessage;
+    const message = getErrorMessage(error) || fallbackMessage;
     return toast.error(message, buildOptions(options) as never);
   }
 };

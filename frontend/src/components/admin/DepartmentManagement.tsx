@@ -43,6 +43,7 @@ import logger from '../../utils/logger';
 import tokenManager from '../../utils/tokenManager';
 // P-013 fix: shared ConfirmDialog hook replacing window.confirm() calls.
 import { useConfirm } from '../common/ConfirmDialog';
+import { getErrorMessage } from '../../utils/type-guards';
 const API_BASE = getApiOrigin();
 
 const DEFAULT_STATS = {
@@ -293,7 +294,7 @@ const DepartmentManagement = () => {
       broadcastDepartmentsUpdate();
     } catch (err) {
       logger.error('Ошибка создания отделения:', err);
-      toast.error((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('admin2.dept_create_failed'));
+      toast.error(getErrorMessage(err) || t('admin2.dept_create_failed'));
     }
   };
 
@@ -337,7 +338,7 @@ const DepartmentManagement = () => {
       broadcastDepartmentsUpdate();
     } catch (err) {
       logger.error('Ошибка обновления отделения:', err);
-      toast.error((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('admin2.dept_update_failed'));
+      toast.error(getErrorMessage(err) || t('admin2.dept_update_failed'));
     }
   };
 
@@ -350,7 +351,7 @@ const DepartmentManagement = () => {
       broadcastDepartmentsUpdate();
     } catch (err) {
       logger.error('Ошибка обновления статуса:', err);
-      toast.error((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('admin2.dept_status_update_failed'));
+      toast.error(getErrorMessage(err) || t('admin2.dept_status_update_failed'));
     }
   };
 
@@ -362,7 +363,7 @@ const DepartmentManagement = () => {
       broadcastDepartmentsUpdate();
     } catch (err) {
       logger.error('Ошибка обновления порядка:', err);
-      toast.error((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('admin2.dept_order_update_failed'));
+      toast.error(getErrorMessage(err) || t('admin2.dept_order_update_failed'));
     }
   };
 
@@ -384,7 +385,7 @@ const DepartmentManagement = () => {
       broadcastDepartmentsUpdate();
     } catch (err) {
       logger.error('Ошибка удаления отделения:', err);
-      toast.error((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('admin2.dept_delete_failed'));
+      toast.error(getErrorMessage(err) || t('admin2.dept_delete_failed'));
     }
   };
 

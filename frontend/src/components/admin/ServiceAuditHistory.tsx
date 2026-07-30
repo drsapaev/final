@@ -4,6 +4,7 @@ import { useTranslation } from '../../i18n/useTranslation';
 import { useState, useEffect } from 'react';
 import { servicesService } from '../../api/services';
 import logger from '../../utils/logger';
+import { getErrorMessage } from '../../utils/type-guards';
 import {
   History,
   User,
@@ -77,13 +78,7 @@ const ServiceAuditHistory = ({ serviceId, serviceName }: ServiceAuditHistoryProp
         : (((response as { items?: ServiceAuditHistoryItem[] })?.items) || []);
       setHistory(nextHistory);
     } catch (error: unknown) {
-      const err = error as { response?: { data?: { detail?: string } }; data?: { detail?: string }; message?: string };
-      setErrorMessage(
-        err?.response?.data?.detail ||
-          err?.data?.detail ||
-          err?.message ||
-          t('admin2.sah_load_error')
-      );
+      setErrorMessage(getErrorMessage(error) || t('admin2.sah_load_error'));
       logger.error('Ошибка загрузки истории:', error);
     } finally {
       setLoading(false);

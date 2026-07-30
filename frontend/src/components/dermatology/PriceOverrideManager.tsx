@@ -17,6 +17,7 @@ import { api } from '../../api/client';
 import logger from '../../utils/logger';
 import { Input } from '../ui/macos';
 import { formatRegistrarDate } from '../../utils/dateUtils';
+import { getErrorMessage } from '../../utils/type-guards';
 
 /**
  * Компонент для управления изменениями цен дерматологом
@@ -127,7 +128,7 @@ const PriceOverrideManager = ({
       }
     } catch (error) {
       logger.error('Error creating price override:', error);
-      notify.error((error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('derma.derma_price_create_failed'));
+      notify.error(getErrorMessage(error) || t('derma.derma_price_create_failed'));
     } finally {
       setIsLoading(false);
     }

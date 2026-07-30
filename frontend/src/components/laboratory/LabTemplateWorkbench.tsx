@@ -27,6 +27,7 @@ import DesignTab from './templateEditor/DesignTab';
 import SignersTab from './templateEditor/SignersTab';
 import PreviewTab from './templateEditor/PreviewTab';
 import { useTranslation } from '../../i18n/useTranslation';
+import { getErrorMessage } from '../../utils/type-guards';
 
 export default function LabTemplateWorkbench({
   templates,
@@ -133,7 +134,7 @@ export default function LabTemplateWorkbench({
         setCatalogAnalytes(analytes);
       } catch (error) {
         if (!cancelled && notify) {
-          notify('error', (error as Error)?.message || t('errors.catalog_load_failed'));
+          notify('error', getErrorMessage(error) || t('errors.catalog_load_failed'));
         }
       }
     }
@@ -159,7 +160,7 @@ export default function LabTemplateWorkbench({
       setShowNewTemplateDialog(false);
       await onTemplatesChanged?.();
     } catch (error) {
-      notify?.('error', (error as Error)?.message);
+      notify?.('error', getErrorMessage(error));
     } finally {
       setSaving(false);
     }
@@ -244,7 +245,7 @@ export default function LabTemplateWorkbench({
       notify?.('success', t('success.template_draft_saved'));
       await onTemplatesChanged?.();
     } catch (error) {
-      notify?.('error', (error as Error)?.message);
+      notify?.('error', getErrorMessage(error));
     } finally {
       setSaving(false);
     }
@@ -270,7 +271,7 @@ export default function LabTemplateWorkbench({
       notify?.('success', t('success.template_published'));
       await onTemplatesChanged?.();
     } catch (error) {
-      notify?.('error', (error as Error)?.message);
+      notify?.('error', getErrorMessage(error));
     } finally {
       setSaving(false);
     }
@@ -299,7 +300,7 @@ export default function LabTemplateWorkbench({
       notify?.('success', t('success.template_archived'));
       await onTemplatesChanged?.();
     } catch (error) {
-      notify?.('error', (error as Error)?.message);
+      notify?.('error', getErrorMessage(error));
     } finally {
       setSaving(false);
     }

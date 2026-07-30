@@ -68,6 +68,7 @@ import CartStepV2 from './CartStepV2';
 // PR-45 / High-15: extracted sub-components to reduce god component size
 import EditModeBanner from './EditModeBanner';
 import StepProgressIndicator from './StepProgressIndicator';
+import { getErrorMessage } from '../../utils/type-guards';
 
 // ============================================================================
 // Type definitions (TypeScript strict-mode migration)
@@ -428,7 +429,7 @@ const AppointmentWizardV2 = ({
       } catch (error: unknown) {
         logger.warn('[AppointmentWizardV2] Failed to hydrate edit-mode patient gender', {
           patientId,
-          error: (error as Error)?.message || error
+          error: getErrorMessage(error) || error
         });
       }
     };
@@ -1907,8 +1908,7 @@ const AppointmentWizardV2 = ({
           } catch (updateError: unknown) {
             // ⭐ FIX: Не продолжаем с fallback - это создавало дубликаты!
             logger.error('❌ Ошибка обновления QR-записи:', updateError);
-            const updateErr = updateError as { response?: { data?: { detail?: string } }; message?: string };
-            const errorMessage = updateErr?.response?.data?.detail || updateErr?.message || t('misc.aw_unknown_error');
+            const errorMessage = getErrorMessage(updateError) || t('misc.aw_unknown_error');
             toast.error(t('misc.aw_record_update_error', { message: errorMessage }));
             setIsProcessing(false);
             return; // ⭐ CRITICAL: Не создаём дубликаты через cart endpoint
@@ -2254,9 +2254,8 @@ const AppointmentWizardV2 = ({
             onClose?.();
             return;
           } catch (editDeltaError: unknown) {
-            const editDeltaErr = editDeltaError as { response?: { data?: { detail?: string } }; message?: string };
             logger.error('[AppointmentWizardV2] edit delta failed', editDeltaError);
-            toast.error(editDeltaErr?.response?.data?.detail || editDeltaErr?.message || t('misc.aw_record_update_failed'));
+            toast.error(getErrorMessage(editDeltaError) || t('misc.aw_record_update_failed'));
             return;
           }
         }
@@ -2554,7 +2553,7 @@ const AppointmentWizardV2 = ({
       onClose?.();
     } catch (error: unknown) {
       logger.error('Ошибка завершения мастера:', error);
-      toast.error((error as Error)?.message || t('misc.aw_error_occurred'));
+      toast.error(getErrorMessage(error) || t('misc.aw_error_occurred'));
     } finally {
       setIsProcessing(false);
     }
