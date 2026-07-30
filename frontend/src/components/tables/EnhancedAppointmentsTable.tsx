@@ -116,6 +116,7 @@ export interface AppointmentRow {
   doctor_name?: string;
   department?: string;
   status?: string;
+  payment_status?: string;
   date?: string;
   appointment_date?: string;
   time?: string;
@@ -510,7 +511,6 @@ const EnhancedAppointmentsTable = ({
     };
 
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.scheduled;
-    config.icon;
 
     return (
       <div
@@ -1074,7 +1074,7 @@ const EnhancedAppointmentsTable = ({
             {firstQueue.number}
           </span>
 
-          {/* UX Audit Registrar #8: multi-badge в fallback тоже. */}
+          {/* UX Audit Registrar #8: multi-badge  fallback . */}
           {row.queue_numbers.length > 1 && (
             <span
               style={{
@@ -1156,10 +1156,10 @@ const EnhancedAppointmentsTable = ({
         border: outerBorder ? '1px solid var(--mac-border)' : 'none',
         borderRadius: outerBorder ? 'var(--mac-radius-lg)' : '0'
       }}>
-      {/* Панель инструментов */}
+      
       <div className="eat-toolbar">
         <div className="eat-toolbar-inner">
-          {/* Поиск */}
+          
           <div className="eat-search-input-wrap">
             <Input
               type="text"
@@ -1171,7 +1171,7 @@ const EnhancedAppointmentsTable = ({
 
           </div>
 
-          {/* Фильтр по статусу */}
+          
           <Select
             value={filterConfig.status}
             onChange={(e: SelectChangeEvent) => setFilterConfig((prev) => ({ ...prev, status: e.target.value }))}
@@ -1189,7 +1189,7 @@ const EnhancedAppointmentsTable = ({
             className="eat-filter-select" />
 
 
-          {/* Экспорт */}
+          
           <Button
             variant="outline"
             onClick={handleExport}
@@ -1199,7 +1199,7 @@ const EnhancedAppointmentsTable = ({
             {t('misc.eat_export')}
           </Button>
 
-          {/* Информация о выбранных */}
+          
           {showCheckboxes && selectedRows.size > 0 &&
           <Badge variant="info">
               {t('misc.eat_selected')}: {selectedRows.size}
@@ -1208,7 +1208,7 @@ const EnhancedAppointmentsTable = ({
         </div>
       </div>
 
-      {/* Таблица */}
+      
       {loading ? loaderNode : null}
       <div className="eat-table-scroll">
         <div className="admin-table-wrapper">
@@ -1224,7 +1224,7 @@ const EnhancedAppointmentsTable = ({
         }}>
           <thead>
             <tr>
-              {/* Чекбокс для выбора всех */}
+              
               {showCheckboxes &&
               <th className="eat-th" style={{
                 padding: '12px 8px',
@@ -1241,7 +1241,7 @@ const EnhancedAppointmentsTable = ({
                 </th>
               }
 
-              {/* Номер */}
+              
               <th
                 onClick={() => handleSort('queue_number')}
                 style={{
@@ -1264,7 +1264,7 @@ const EnhancedAppointmentsTable = ({
                 </div>
               </th>
 
-              {/* Пациент */}
+              
               <th
                 onClick={() => handleSort('patient_fio')}
                 style={{
@@ -1287,7 +1287,7 @@ const EnhancedAppointmentsTable = ({
                 </div>
               </th>
 
-              {/* Телефон - скрыт для doctor view */}
+              {/* -   doctor view */}
               {!isDoctorView &&
               <th className="eat-th" style={{
                 padding: '12px 8px',
@@ -1302,7 +1302,7 @@ const EnhancedAppointmentsTable = ({
                 </th>
               }
 
-              {/* Год рождения */}
+              
               <th
                 onClick={() => handleSort('patient_birth_year')}
                 style={{
@@ -1325,7 +1325,7 @@ const EnhancedAppointmentsTable = ({
                 </div>
               </th>
 
-              {/* Адрес - скрыт для doctor view */}
+              {/* -   doctor view */}
               {!isDoctorView &&
               <th className="eat-th hide-on-mobile" style={{
                 padding: '12px 8px',
@@ -1341,7 +1341,7 @@ const EnhancedAppointmentsTable = ({
                 </th>
               }
 
-              {/* Тип обращения */}
+              
               <th className="eat-th" style={{
                 padding: '12px 8px',
                 textAlign: 'center',
@@ -1355,7 +1355,7 @@ const EnhancedAppointmentsTable = ({
                 {t('misc.eat_visit_type')}
               </th>
 
-              {/* Услуги */}
+              
               <th className="eat-th" style={{
                 padding: '12px 8px',
                 textAlign: 'left',
@@ -1369,7 +1369,7 @@ const EnhancedAppointmentsTable = ({
                 {t('misc.eat_services')}
               </th>
 
-              {/* Вид оплаты */}
+              
               <th className="eat-th" style={{
                 padding: '12px 8px',
                 textAlign: 'center',
@@ -1383,7 +1383,7 @@ const EnhancedAppointmentsTable = ({
                 {t('misc.eat_payment_type')}
               </th>
 
-              {/* Дата и время */}
+              
               <th
                 onClick={() => handleSort('appointment_date')}
                 style={{
@@ -1406,7 +1406,7 @@ const EnhancedAppointmentsTable = ({
                 </div>
               </th>
 
-              {/* Статус */}
+              
               <th
                 onClick={() => handleSort('status')}
                 style={{
@@ -1430,7 +1430,7 @@ const EnhancedAppointmentsTable = ({
               </th>
 
 
-              {/* Стоимость */}
+              
               <th
                 onClick={() => handleSort('cost')}
                 style={{
@@ -1453,7 +1453,7 @@ const EnhancedAppointmentsTable = ({
                 </div>
               </th>
 
-              {/* Действия */}
+              
               <th className="eat-th" style={{
                 padding: '12px 8px',
                 textAlign: 'center',
@@ -1479,9 +1479,10 @@ const EnhancedAppointmentsTable = ({
                 </td>
               </tr> :
 
-            paginatedData.map((row: AppointmentRow, index: number) => {
+            paginatedData.map((row: AppointmentRow, index: number): React.ReactElement => {
               // ⭐ SSOT: Get session color for visual grouping (presentation only)
               const sessionColor = getSessionColor(row.session_id ?? '');
+              const statusBadge: React.ReactNode = renderStatus(String(row.status ?? ""));
               const rowRecord = row as unknown as Record<string, unknown>;
               const backendCanPay = getBackendActionAvailability(rowRecord, 'payment', 'can_mark_paid');
               const backendCanCall = getBackendActionAvailability(rowRecord, 'call', 'can_start_visit');
@@ -1544,7 +1545,7 @@ const EnhancedAppointmentsTable = ({
                   onClick={() => onRowClick?.(row as unknown as AppointmentRow)}
                   title={row.session_id ? t('misc.eat_session_label', { sessionId: row.session_id }) : undefined}>
 
-                    {/* Чекбокс */}
+                    
                     {showCheckboxes &&
                   <td
                     className="eat-td-base"
@@ -1557,7 +1558,7 @@ const EnhancedAppointmentsTable = ({
                       </td>
                   }
 
-                    {/* Номер */}
+                    
                     <td className="eat-td" style={{
                     padding: '12px 8px',
                     textAlign: 'center',
@@ -1567,7 +1568,7 @@ const EnhancedAppointmentsTable = ({
                       {renderQueueNumbers(row as unknown as Appointment)}
                     </td>
 
-                    {/* Пациент */}
+                    
                     <td className="eat-td" style={{
                     padding: '12px 8px',
                     color: 'var(--mac-text-primary)',
@@ -1584,8 +1585,8 @@ const EnhancedAppointmentsTable = ({
                       <div>
                         <div className="eat-td-flex">
                           <span>{row.patient_fio || '—'}</span>
-                          {/* Ярлыки источника/приоритета */}
-                          {/* ✅ SSOT: Только source='online' показывает QR badge */}
+                          {/* / */}
+                          {/* SSOT:  source='online'  QR badge */}
                           {row.source === 'online' &&
                         <span
                           style={{
@@ -1626,7 +1627,7 @@ const EnhancedAppointmentsTable = ({
                       </div>
                     </td>
 
-                    {/* Телефон - скрыт для doctor view */}
+                    {/* -   doctor view */}
                     {!isDoctorView &&
                   <td className="eat-td" style={{
                     padding: '12px 8px',
@@ -1656,7 +1657,7 @@ const EnhancedAppointmentsTable = ({
                       {String(row.patient_birth_year ?? '—')}
                     </td>
 
-                    {/* Адрес - скрыт для doctor view */}
+                    {/* -   doctor view */}
                     {!isDoctorView &&
                   <td className="eat-td hide-on-mobile" style={{
                     padding: '12px 8px',
@@ -1686,7 +1687,7 @@ const EnhancedAppointmentsTable = ({
                       </td>
                   }
 
-                    {/* Тип обращения */}
+                    
                     <td className="eat-td" style={{
                     padding: '12px 8px',
                     textAlign: 'center',
@@ -1706,12 +1707,12 @@ const EnhancedAppointmentsTable = ({
                     })())}
                     </td>
 
-                    {/* Услуги */}
+                    
                     <td className="eat-td" style={{
                     padding: '12px 8px',
                     minWidth: '180px'
                   }}>
-                      {/* ✅ ИСПРАВЛЕНО: Fallback для QR-записей (через service_name или queue_numbers) */}
+                      {/* : Fallback  QR- ( service_name  queue_numbers) */}
                       {renderServices(
                       (() => {
                         // Если есть services, используем их
@@ -1736,7 +1737,7 @@ const EnhancedAppointmentsTable = ({
                     )}
                     </td>
 
-                    {/* Вид оплаты */}
+                    
                     <td className="eat-td" style={{
                     padding: '12px 8px',
                     textAlign: 'center',
@@ -1772,7 +1773,7 @@ const EnhancedAppointmentsTable = ({
                     )}
                     </td>
 
-                    {/* P1 fix: Lab results badge — shows if lab results are ready */}
+                    {/* P1 fix: Lab results badge  shows if lab results are ready */}
                     {Boolean(row.latest_lab_report) && (
                       <td className="eat-td" style={{
                         padding: '12px 8px',
@@ -1806,7 +1807,7 @@ const EnhancedAppointmentsTable = ({
                       </td>
                     )}
 
-                    {/* Дата и время регистрации */}
+                    
                     <td className="eat-td" style={{
                     padding: '12px 8px',
                     textAlign: 'center',
@@ -1815,8 +1816,8 @@ const EnhancedAppointmentsTable = ({
                     minWidth: '100px'
                   }}>
                       <div>
-                        {/* Дата и время регистрации */}
-                        {/* ✅ SSOT FIX: ONLY use queue_time. Compute earliest from all patient entries if needed. */}
+                        
+                        {/* SSOT FIX: ONLY use queue_time. Compute earliest from all patient entries if needed. */}
                         {(() => {
                         // ⭐ SSOT: Use row.queue_time directly - no aggregation
                         const timeDisplay = getRegistrarTimestampDisplay(row as unknown as RegistrarTimestampRecord);
@@ -1867,7 +1868,7 @@ const EnhancedAppointmentsTable = ({
                       </div>
                     </td>
 
-                    {/* Статус */}
+                    
                     <td className="eat-td" style={{
                     padding: '12px 8px',
                     textAlign: 'center',
@@ -1879,7 +1880,7 @@ const EnhancedAppointmentsTable = ({
                       {/* UX Audit R-4.4: показываем visit status + payment status.
                           Раньше: 15 статусов в одной колонке, включая paid_pending/payment_paid.
                           Теперь: visit status (основной) + payment badge (если есть). */}
-                      {renderStatus(String(row.status ?? ""))}
+                      {statusBadge}
                       {row.payment_status && row.payment_status !== 'paid' && (
                         <div style={{
                           display: 'inline-flex',
@@ -1899,7 +1900,7 @@ const EnhancedAppointmentsTable = ({
                     </td>
 
 
-                    {/* Стоимость */}
+                    
                     <td className="eat-td" style={{
                     padding: '12px 8px',
                     textAlign: 'right',
@@ -1930,7 +1931,7 @@ const EnhancedAppointmentsTable = ({
                     })()}
                     </td>
 
-                    {/* Действия */}
+                    
                     <td
                     style={{
                       padding: '12px 8px',
@@ -1961,8 +1962,8 @@ const EnhancedAppointmentsTable = ({
                         zIndex: 100
                       }}>
 
-                        {/* В режиме панели врача кнопки оплаты не показываем */}
-                        {canPay &&
+                        
+                        {canPay ? (
                       <button
                         className="action-button action-button--success"
                         onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
@@ -1978,10 +1979,10 @@ const EnhancedAppointmentsTable = ({
 
                               {t('misc.eat_payment')}
                             </button>
-                      }
+                        ) : null}
 
-                        {/* Вызвать */}
-                        {canCall &&
+                        
+                        {canCall ? (
                       <button
                         className="action-button action-button--primary"
                         onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
@@ -1997,10 +1998,9 @@ const EnhancedAppointmentsTable = ({
 
                             {t('misc.eat_call_action')}
                           </button>
-                      }
+                        ) : null}
 
-                        {/* Печать */}
-                        {canPrint &&
+                        {canPrint ? (
                       <button
                         className="action-button"
                         onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
@@ -2017,10 +2017,10 @@ const EnhancedAppointmentsTable = ({
 
                             <FileText size={14} />
                           </button>
-                      }
+                      ) : null}
 
-                        {/* Завершить */}
-                        {canComplete &&
+                        
+                        {canComplete ? (
                       <button
                         className="action-button"
                         onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
@@ -2036,10 +2036,10 @@ const EnhancedAppointmentsTable = ({
 
                             {t('misc.eat_complete')}
                           </button>
-                      }
+                        ) : null}
 
-                        {/* ✅ НОВОЕ: Кнопки управления статусами очереди (для режима врача) */}
-                          {isDoctorView && row.queue_entry_id &&
+                        {/* :     (  ) */}
+                          {isDoctorView && row.queue_entry_id ? (
                         <QueueActionButtons
                           entry={{
                             queue_entry_id: row.queue_entry_id,
@@ -2060,9 +2060,9 @@ const EnhancedAppointmentsTable = ({
                           }}
                           compact={true} />
 
-                        }
+                        ) : null}
 
-                        {/* Просмотр */}
+                        
                         <button
                         className="action-button"
                         onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
@@ -2081,7 +2081,7 @@ const EnhancedAppointmentsTable = ({
                           <Eye size={14} />
                         </button>
 
-                        {/* Редактировать */}
+                        
                         <button
                         className="action-button"
                         onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
@@ -2100,8 +2100,8 @@ const EnhancedAppointmentsTable = ({
                           <Edit size={14} />
                         </button>
 
-                        {/* Просмотр EMR (только для завершённых записей) */}
-                        {canViewEmr &&
+                        {/* EMR (   ) */}
+                        {canViewEmr ? (
                         <button
                         className="action-button action-button--primary"
                         onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
@@ -2118,11 +2118,11 @@ const EnhancedAppointmentsTable = ({
 
                               <FileText size={14} />
                             </button>
-                      }
+                        ) : null}
 
                         {/* UX Audit Registrar #4: inline кнопки Cancel и Reschedule.
                             Раньше только через context menu — недоступно на touch-устройствах. */}
-                        {canReschedule &&
+                        {canReschedule ? (
                       <button
                         className="action-button"
                         onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
@@ -2138,9 +2138,9 @@ const EnhancedAppointmentsTable = ({
                         aria-label={t('misc.eat_reschedule_aria')}>
                           <CalendarClock size={14} />
                         </button>
-                      }
+                        ) : null}
 
-                        {canCancel &&
+                        {canCancel ? (
                       <button
                         className="action-button"
                         onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
@@ -2156,9 +2156,9 @@ const EnhancedAppointmentsTable = ({
                         aria-label={t('misc.eat_cancel_aria')}>
                           <X size={14} />
                         </button>
-                      }
+                        ) : null}
 
-                        {/* Еще */}
+                        
                       <button
                         className="action-button"
                         onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
@@ -2176,8 +2176,8 @@ const EnhancedAppointmentsTable = ({
                           <MoreHorizontal size={14} />
                         </button>
 
-                        {/* Назначить следующий визит */}
-                        {canScheduleNext &&
+                        
+                        {canScheduleNext ? (
                       <button
                         className="action-button action-button--primary"
                         onMouseDown={(e: React.MouseEvent<HTMLElement>) => {
@@ -2193,7 +2193,7 @@ const EnhancedAppointmentsTable = ({
 
                             {t('misc.eat_schedule_next')}
                           </button>
-                      }
+                        ) : null}
                       </div>
                     </td>
                   </tr>);
@@ -2205,7 +2205,7 @@ const EnhancedAppointmentsTable = ({
 </div>
       </div>
 
-      {/* Пагинация */}
+      
       {totalPages > 1 &&
       <div className="eat-pagination">
           <div className="eat-pagination-info">
