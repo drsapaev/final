@@ -2,8 +2,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.api.v1.endpoints import visit_payments
-from app.api.deps import get_db
-from app.core.security import get_current_user
+from app.api.deps import get_db, get_current_user
 
 
 def test_visit_payments_summary_route_dispatches_before_visit_id(monkeypatch):
